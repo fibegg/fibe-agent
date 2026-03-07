@@ -8,6 +8,7 @@ import { MessageStoreService } from './message-store/message-store.service';
 import { MessagesController } from './messages/messages.controller';
 import { ModelStoreService } from './model-store/model-store.service';
 import { ModelOptionsController } from './model-options/model-options.controller';
+import { StrategyRegistryService } from './strategies/strategy-registry.service';
 
 @Module({
   imports: [],
@@ -23,6 +24,7 @@ import { ModelOptionsController } from './model-options/model-options.controller
     AgentAuthGuard,
     MessageStoreService,
     ModelStoreService,
+    StrategyRegistryService,
   ],
 })
 export class AppModule {}
