@@ -1,14 +1,14 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
-import { MessagesService } from './messages.service';
+import { MessageStoreService } from '../message-store/message-store.service';
 
 @Controller()
 @UseGuards(AgentAuthGuard)
 export class MessagesController {
-  constructor(private readonly messages: MessagesService) {}
+  constructor(private readonly messageStore: MessageStoreService) {}
 
   @Get('messages')
-  getAll(): ReturnType<MessagesService['all']> {
-    return this.messages.all();
+  getAll() {
+    return this.messageStore.all();
   }
 }
