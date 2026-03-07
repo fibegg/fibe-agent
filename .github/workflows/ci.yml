@@ -28,7 +28,7 @@ jobs:
       - uses: oven-sh/setup-bun@v2
 
       - run: bun install
-      - run: bunx cypress install
+      - run: bunx playwright install --with-deps chromium
 
       # Prepend any command with "nx record --" to record its logs to Nx Cloud
       # - run: bunx nx record -- echo Hello World
