@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { existsSync, readFileSync } from 'node:fs';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
@@ -7,6 +7,12 @@ import { ModelStoreService } from '../model-store/model-store.service';
 import type { AgentStrategy } from '../strategies/strategy.types';
 import type { AuthConnection, LogoutConnection } from '../strategies/strategy.types';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
+import {
+  AUTH_STATUS as AUTH_STATUS_VAL,
+  ERROR_CODE,
+  WS_ACTION,
+  WS_EVENT,
+} from '../ws.constants';
 
 export interface OutboundEvent {
   type: string;
@@ -14,7 +20,7 @@ export interface OutboundEvent {
 }
 
 @Injectable()
-export class OrchestratorService {
+export class OrchestratorService implements OnModuleInit {
   private readonly logger = new Logger(OrchestratorService.name);
   private readonly strategy: AgentStrategy;
   isAuthenticated = false;
@@ -28,7 +34,10 @@ export class OrchestratorService {
     private readonly strategyRegistry: StrategyRegistryService
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
-    this.initAuthStatus();
+  }
+
+  async onModuleInit(): Promise<void> {
+    await this.initAuthStatus();
   }
 
   get outbound(): Subject<OutboundEvent> {
@@ -47,8 +56,8 @@ export class OrchestratorService {
     const previousState = this.isAuthenticated;
     this.isAuthenticated = await this.strategy.checkAuthStatus();
     if (this.isAuthenticated !== previousState) {
-      this._send('auth_status', {
-        status: this.isAuthenticated ? 'authenticated' : 'unauthenticated',
+      this._send(WS_EVENT.AUTH_STATUS, {
+        status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
         isProcessing: this.isProcessing,
       });
     }
@@ -58,31 +67,31 @@ export class OrchestratorService {
     const action = msg.action;
 
     switch (action) {
-      case 'check_auth_status':
+      case WS_ACTION.CHECK_AUTH_STATUS:
         await this.checkAndSendAuthStatus();
         break;
-      case 'initiate_auth':
+      case WS_ACTION.INITIATE_AUTH:
         await this.handleInitiateAuth();
         break;
-      case 'submit_auth_code':
+      case WS_ACTION.SUBMIT_AUTH_CODE:
         this.handleSubmitAuthCode(msg.code ?? '');
         break;
-      case 'cancel_auth':
+      case WS_ACTION.CANCEL_AUTH:
         this.handleCancelAuth();
         break;
-      case 'reauthenticate':
+      case WS_ACTION.REAUTHENTICATE:
         await this.handleReauthenticate();
         break;
-      case 'logout':
+      case WS_ACTION.LOGOUT:
         this.handleLogout();
         break;
-      case 'send_chat_message':
+      case WS_ACTION.SEND_CHAT_MESSAGE:
         await this.handleChatMessage(msg.text ?? '');
         break;
-      case 'get_model':
+      case WS_ACTION.GET_MODEL:
         this.handleGetModel();
         break;
-      case 'set_model':
+      case WS_ACTION.SET_MODEL:
         this.handleSetModel(msg.model ?? '');
         break;
       default:
@@ -91,26 +100,26 @@ export class OrchestratorService {
   }
 
   handleClientConnected(): void {
-    this._send('auth_status', {
-      status: this.isAuthenticated ? 'authenticated' : 'unauthenticated',
+    this._send(WS_EVENT.AUTH_STATUS, {
+      status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
       isProcessing: this.isProcessing,
     });
   }
 
   private async checkAndSendAuthStatus(): Promise<void> {
     this.isAuthenticated = await this.strategy.checkAuthStatus();
-    this._send('auth_status', {
-      status: this.isAuthenticated ? 'authenticated' : 'unauthenticated',
+    this._send(WS_EVENT.AUTH_STATUS, {
+      status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
       isProcessing: this.isProcessing,
     });
   }
 
   private async handleInitiateAuth(): Promise<void> {
-    this.logger.log('initiate_auth');
+    this.logger.log(WS_ACTION.INITIATE_AUTH);
     const currentlyAuthenticated = await this.strategy.checkAuthStatus();
     if (currentlyAuthenticated) {
       this.isAuthenticated = true;
-      this._send('auth_success');
+      this._send(WS_EVENT.AUTH_SUCCESS);
     } else {
       const connection = this.createAuthConnection();
       this.strategy.executeAuth(connection);
@@ -118,52 +127,61 @@ export class OrchestratorService {
   }
 
   private handleSubmitAuthCode(code: string): void {
-    this.logger.log('submit_auth_code');
+    this.logger.log(WS_ACTION.SUBMIT_AUTH_CODE);
     this.strategy.submitAuthCode(code);
   }
 
   private handleCancelAuth(): void {
-    this.logger.log('cancel_auth');
+    this.logger.log(WS_ACTION.CANCEL_AUTH);
     this.strategy.cancelAuth();
     this.isAuthenticated = false;
-    this._send('auth_status', { status: 'unauthenticated', isProcessing: this.isProcessing });
+    this._send(WS_EVENT.AUTH_STATUS, {
+      status: AUTH_STATUS_VAL.UNAUTHENTICATED,
+      isProcessing: this.isProcessing,
+    });
   }
 
   private async handleReauthenticate(): Promise<void> {
-    this.logger.log('reauthenticate');
+    this.logger.log(WS_ACTION.REAUTHENTICATE);
     this.strategy.cancelAuth();
     this.strategy.clearCredentials();
     this.isAuthenticated = false;
-    this._send('auth_status', { status: 'unauthenticated', isProcessing: this.isProcessing });
+    this._send(WS_EVENT.AUTH_STATUS, {
+      status: AUTH_STATUS_VAL.UNAUTHENTICATED,
+      isProcessing: this.isProcessing,
+    });
     const connection = this.createAuthConnection();
     this.strategy.executeAuth(connection);
   }
 
   private handleLogout(): void {
-    this.logger.log('logout');
+    this.logger.log(WS_ACTION.LOGOUT);
     this.strategy.cancelAuth();
     this.isAuthenticated = false;
     this.isProcessing = false;
-    this._send('auth_status', { status: 'unauthenticated', isProcessing: false });
+    this._send(WS_EVENT.AUTH_STATUS, {
+      status: AUTH_STATUS_VAL.UNAUTHENTICATED,
+      isProcessing: false,
+    });
     const connection = this.createLogoutConnection();
     this.strategy.executeLogout(connection);
   }
 
   private async handleChatMessage(text: string): Promise<void> {
     if (!this.isAuthenticated) {
-      this._send('error', { message: 'NEED_AUTH' });
+      this._send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
       return;
     }
     if (this.isProcessing) {
-      this._send('error', { message: 'BLOCKED' });
+      this._send(WS_EVENT.ERROR, { message: ERROR_CODE.BLOCKED });
       return;
     }
 
-    this.logger.log('send_chat_message');
+    this.logger.log(WS_ACTION.SEND_CHAT_MESSAGE);
     this.isProcessing = true;
 
     const userMessage = this.messageStore.add('user', text);
-    this._send('message', userMessage as unknown as Record<string, unknown>);
+    this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
 
     const systemPromptPath = this.config.getSystemPromptPath();
     let systemPrompt = '';
@@ -174,21 +192,21 @@ export class OrchestratorService {
     const model = this.modelStore.get();
 
     let accumulated = '';
-    this._send('stream_start', {});
+    this._send(WS_EVENT.STREAM_START, {});
 
     try {
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
-        this._send('stream_chunk', { text: chunk });
+        this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
       });
 
       const finalText =
         accumulated || 'Process completed successfully but returned no output.';
       this.messageStore.add('assistant', finalText);
-      this._send('stream_end', {});
+      this._send(WS_EVENT.STREAM_END, {});
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this._send('error', { message });
+      this._send(WS_EVENT.ERROR, { message });
     } finally {
       this.isProcessing = false;
     }
@@ -196,36 +214,36 @@ export class OrchestratorService {
 
   private createAuthConnection(): AuthConnection {
     return {
-      sendAuthUrlGenerated: (url) => this._send('auth_url_generated', { url }),
-      sendDeviceCode: (code) => this._send('auth_device_code', { code }),
-      sendAuthManualToken: () => this._send('auth_manual_token'),
+      sendAuthUrlGenerated: (url) => this._send(WS_EVENT.AUTH_URL_GENERATED, { url }),
+      sendDeviceCode: (code) => this._send(WS_EVENT.AUTH_DEVICE_CODE, { code }),
+      sendAuthManualToken: () => this._send(WS_EVENT.AUTH_MANUAL_TOKEN),
       sendAuthSuccess: () => {
         this.isAuthenticated = true;
-        this._send('auth_success');
+        this._send(WS_EVENT.AUTH_SUCCESS);
       },
       sendAuthStatus: (status) =>
-        this._send('auth_status', { status, isProcessing: this.isProcessing }),
-      sendError: (message) => this._send('error', { message }),
+        this._send(WS_EVENT.AUTH_STATUS, { status, isProcessing: this.isProcessing }),
+      sendError: (message) => this._send(WS_EVENT.ERROR, { message }),
     };
   }
 
   private createLogoutConnection(): LogoutConnection {
     return {
-      sendLogoutOutput: (text) => this._send('logout_output', { text }),
+      sendLogoutOutput: (text) => this._send(WS_EVENT.LOGOUT_OUTPUT, { text }),
       sendLogoutSuccess: () => {
         this.isAuthenticated = false;
-        this._send('logout_success');
+        this._send(WS_EVENT.LOGOUT_SUCCESS);
       },
-      sendError: (message) => this._send('error', { message }),
+      sendError: (message) => this._send(WS_EVENT.ERROR, { message }),
     };
   }
 
   private handleGetModel(): void {
-    this._send('model_updated', { model: this.modelStore.get() });
+    this._send(WS_EVENT.MODEL_UPDATED, { model: this.modelStore.get() });
   }
 
   private handleSetModel(model: string): void {
     const value = this.modelStore.set(model);
-    this._send('model_updated', { model: value });
+    this._send(WS_EVENT.MODEL_UPDATED, { model: value });
   }
 }

@@ -77,9 +77,12 @@
         }
       },
       "test": {
+        "executor": "nx:run-commands",
         "options": {
-          "passWithNoTests": true
-        }
+          "command": "bun test --preload ./test-setup.ts",
+          "cwd": "apps/api"
+        },
+        "dependsOn": []
       }
     }
   },

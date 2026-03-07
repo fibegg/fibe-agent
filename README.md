@@ -48,7 +48,6 @@ Copy `.env.example` to `.env` and adjust. Main variables:
 - `apps/api` – NestJS API, WebSocket at `/ws`, REST under `/api`
 - `apps/chat` – React chat UI (login, chat, auth modal, model selector)
 - `docs/API.md` – REST and WebSocket contract
-- `old-app/` – Original Express app (kept for reference until migration is verified)
 
 ## Scripts
 
