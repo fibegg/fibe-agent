@@ -22,7 +22,7 @@ export function ModelSelector({
         value={currentModel}
         onChange={(e) => onInputChange(e.target.value)}
         placeholder="Model (default)"
-        className="w-32 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-200 text-sm placeholder-slate-500"
+        className="w-32 px-2 py-1 rounded-md bg-card border border-border text-foreground text-sm placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
       />
       <div className="flex gap-1 flex-wrap">
         {options.map((opt) => (
@@ -30,10 +30,10 @@ export function ModelSelector({
             key={opt}
             type="button"
             onClick={() => onSelect(currentModel === opt ? '' : opt)}
-            className={`px-2 py-1 rounded text-sm ${
+            className={`px-2 py-1 rounded-md text-sm transition-colors ${
               currentModel === opt
-                ? 'bg-indigo-600 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-muted text-muted-foreground hover:bg-border'
             }`}
           >
             {opt}

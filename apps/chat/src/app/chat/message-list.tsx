@@ -50,29 +50,29 @@ export function MessageList({
         >
           <div
             className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-              msg.role === 'user' ? 'bg-indigo-600' : 'bg-slate-600'
+              msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
             }`}
           >
             {msg.role === 'user' ? 'U' : '◆'}
           </div>
           <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'text-right' : ''}`}>
             <div
-              className={`inline-block max-w-full px-3 py-2 rounded-lg ${
+              className={`inline-block max-w-full px-3 py-2 rounded-lg shadow-soft ${
                 msg.role === 'user'
-                  ? 'bg-indigo-600/80 text-white'
-                  : 'bg-slate-700 text-slate-200'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-card border border-border text-card-foreground'
               }`}
             >
               {msg.role === 'user' ? (
                 <span className="whitespace-pre-wrap">{msg.body}</span>
               ) : (
                 <div
-                  className="prose prose-invert prose-sm max-w-none"
+                  className="markdown-body prose prose-sm max-w-none dark:prose-invert"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
                 />
               )}
             </div>
-            <div className={`text-xs text-slate-500 mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
+            <div className={`text-xs text-muted-foreground mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
               {formatTime(msg.created_at)}
             </div>
           </div>
@@ -80,18 +80,18 @@ export function MessageList({
       ))}
       {isStreaming && (
         <div className="flex gap-3">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-slate-600 flex items-center justify-center text-sm">
+          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm">
             ◆
           </div>
           <div className="flex-1 min-w-0">
-            <div className="inline-block max-w-full px-3 py-2 rounded-lg bg-slate-700 text-slate-200">
+            <div className="inline-block max-w-full px-3 py-2 rounded-lg bg-card border border-border text-card-foreground shadow-soft">
               {streamingText ? (
                 <div
-                  className="prose prose-invert prose-sm max-w-none"
+                  className="markdown-body prose prose-sm max-w-none dark:prose-invert"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
                 />
               ) : (
-                <span className="text-slate-400">Thinking...</span>
+                <span className="text-muted-foreground">Thinking...</span>
               )}
             </div>
           </div>

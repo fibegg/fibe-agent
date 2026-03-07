@@ -37,18 +37,18 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
       <div
-        className="bg-slate-800 border border-slate-600 rounded-xl shadow-xl overflow-hidden w-full max-w-lg"
+        className="bg-card border border-border rounded-xl shadow-card overflow-hidden w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-slate-600">
-          <h3 className="text-lg font-semibold text-slate-200 flex items-center gap-2">
+        <div className="flex items-center justify-between p-4 border-b border-border">
+          <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
             <KeyIcon />
             Connect to Provider
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-slate-400 hover:text-white text-2xl leading-none"
+            className="text-muted-foreground hover:text-foreground text-2xl leading-none transition-colors"
             aria-label="Close"
           >
             &times;
@@ -57,14 +57,14 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
         <div className="p-4 space-y-4">
           {showUrl && (
             <div className="space-y-2">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground">
                 Please follow the link below to authorize the AI assistant.
               </p>
               <a
                 href={authModal.authUrl ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
               >
                 <ExternalIcon />
                 Open Authentication URL
@@ -72,10 +72,10 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
             </div>
           )}
           {showUrl && (authModal.deviceCode || authModal.isManualToken) && (
-            <div className="border-t border-slate-600 pt-4" />
+            <div className="border-t border-border pt-4" />
           )}
           <div className="space-y-2">
-            <label htmlFor="auth-code" className="block text-sm font-medium text-slate-300">
+            <label htmlFor="auth-code" className="block text-sm font-medium text-foreground">
               {codeLabel}
             </label>
             <input
@@ -85,14 +85,14 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
               readOnly={readOnly}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Paste code here..."
-              className="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
             />
             {showSubmit && (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium"
+                className="w-full py-2 rounded-lg bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground font-medium transition-opacity"
               >
                 {submitting ? 'Submitting...' : 'Submit'}
               </button>

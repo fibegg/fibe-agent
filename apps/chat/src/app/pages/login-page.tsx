@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ThemeToggle } from '../theme-toggle';
 import { getApiUrl, setToken } from '../api-url';
 
 export function LoginPage() {
@@ -35,24 +36,27 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-8 w-full max-w-md">
-        <div className="flex items-center gap-4 mb-6">
-          <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-violet-400">
-            <KeyIcon />
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      <div className="bg-card border border-border rounded-xl shadow-card p-8 w-full max-w-md">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+              <KeyIcon />
+            </div>
+            <h1 className="text-xl font-semibold text-foreground">
+              Agent Authentication
+            </h1>
           </div>
-          <h1 className="text-xl font-semibold text-slate-700 dark:text-slate-200">
-            Agent Authentication
-          </h1>
+          <ThemeToggle />
         </div>
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">
+          <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
             {error}
           </div>
         )}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">
+            <label htmlFor="password" className="block text-sm font-medium text-foreground mb-1">
               Playground Internal Password
             </label>
             <input
@@ -61,14 +65,14 @@ export function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Enter password to continue"
-              className="w-full px-4 py-2.5 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-800 dark:bg-slate-700 text-slate-200 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+              className="w-full px-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
               disabled={loading}
             />
           </div>
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 px-4 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white font-medium disabled:opacity-50"
+            className="w-full py-2.5 px-4 rounded-lg bg-primary hover:opacity-90 text-primary-foreground font-medium disabled:opacity-50 transition-opacity"
           >
             {loading ? 'Logging in...' : 'Login'}
           </button>

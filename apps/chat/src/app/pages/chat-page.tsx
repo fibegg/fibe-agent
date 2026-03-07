@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type ChatMessage } from '../chat/message-list';
 import { ModelSelector } from '../chat/model-selector';
+import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from '../chat/chat-state';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import type { ServerMessage } from '../chat/chat-state';
@@ -174,10 +175,10 @@ export function ChatPage() {
 
   const statusClass =
     state === CHAT_STATES.AUTHENTICATED
-      ? 'text-green-400'
+      ? 'text-success'
       : state === CHAT_STATES.ERROR
-        ? 'text-red-400'
-        : 'text-amber-400';
+        ? 'text-destructive'
+        : 'text-warning';
 
   const showModelSelector =
     state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE;
@@ -187,16 +188,16 @@ export function ChatPage() {
     (authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-800 text-slate-200">
+    <div className="min-h-screen flex flex-col bg-background text-foreground">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
         onClose={cancelAuth}
         onSubmitCode={submitAuthCode}
       />
-      <header className="flex items-center justify-between p-4 border-b border-slate-700 flex-wrap gap-2">
+      <header className="flex items-center justify-between p-4 border-b border-border flex-wrap gap-2 shadow-soft">
         <div>
-          <h1 className="text-lg font-semibold">AI Assistant</h1>
+          <h1 className="text-lg font-semibold text-foreground">AI Assistant</h1>
           <p className={`text-sm ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -211,7 +212,7 @@ export function ChatPage() {
             <button
               type="button"
               onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-              className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-sm"
+              className="px-3 py-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
             >
               {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
             </button>
@@ -220,21 +221,22 @@ export function ChatPage() {
             <button
               type="button"
               onClick={logout}
-              className="px-3 py-1.5 rounded-lg bg-red-600/80 hover:bg-red-500 text-sm"
+              className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-sm font-medium transition-colors"
             >
               Logout
             </button>
           )}
+          <ThemeToggle />
         </div>
       </header>
 
       {errorMessage && state === CHAT_STATES.ERROR && (
-        <div className="flex items-center justify-between px-4 py-2 bg-red-900/30 border-b border-red-800">
-          <span className="text-red-200 text-sm">{errorMessage}</span>
+        <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border">
+          <span className="text-destructive text-sm">{errorMessage}</span>
           <button
             type="button"
             onClick={dismissError}
-            className="text-slate-400 hover:text-white text-sm"
+            className="text-muted-foreground hover:text-foreground text-sm"
           >
             Dismiss
           </button>
@@ -252,11 +254,11 @@ export function ChatPage() {
         </div>
       </main>
 
-      <div className="p-4 border-t border-slate-700">
+      <div className="p-4 border-t border-border bg-card/50">
         <div className="max-w-3xl mx-auto flex gap-2">
           <textarea
             id="chat-input"
-            className="flex-1 min-h-[44px] max-h-32 px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-400 resize-y disabled:opacity-50"
+            className="flex-1 min-h-[44px] max-h-32 px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder-muted-foreground resize-y disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
             placeholder={
               state === CHAT_STATES.AUTHENTICATED
                 ? 'Ask me anything...'
@@ -270,7 +272,7 @@ export function ChatPage() {
             type="button"
             onClick={handleSend}
             disabled={state !== CHAT_STATES.AUTHENTICATED}
-            className="px-4 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 self-end"
+            className="px-4 rounded-lg bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-50 self-end font-medium transition-opacity"
           >
             Send
           </button>
