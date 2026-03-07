@@ -14,7 +14,7 @@ const PROVIDER_NAMES = [
   'opencodex',
 ] as const;
 
-const DEFAULT_PROVIDER = 'gemini';
+const DEFAULT_PROVIDER = 'mock';
 
 @Injectable()
 export class StrategyRegistryService {

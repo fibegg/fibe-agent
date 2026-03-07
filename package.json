@@ -1,8 +1,17 @@
 {
-  "name": "@playgrounds.dev/source",
+  "name": "@playgrounds.dev",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "packageManager": "bun@1.1.38",
+  "scripts": {
+    "dev": "nx run-many -t serve,dev --parallel=2",
+    "build": "nx run-many -t build --parallel=3",
+    "lint": "nx run-many -t lint",
+    "test": "nx run-many -t test",
+    "typecheck": "nx run-many -t typecheck",
+    "e2e": "nx run-many -t e2e",
+    "ci": "nx run-many -t lint,test,build,typecheck,e2e"
+  },
   "private": true,
   "dependencies": {
     "@nestjs/common": "^11.0.0",

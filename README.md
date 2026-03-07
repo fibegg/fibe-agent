@@ -4,22 +4,28 @@ Nx monorepo: **api** (NestJS + Fastify) and **chat** (React + Vite). The API run
 
 ## Run API + Chat
 
+Use **Bun** for fastest installs and script runs (`bun install`, `bun run dev`). npm works too.
+
+**Quick dev** (API + chat in parallel): `bun run dev`
+
+Or start separately:
+
 1. **Start the API** (port 3000):
 
    ```sh
-   npx nx serve api
+   bunx nx serve api
    ```
 
    Set `AGENT_PROVIDER=mock` if you don’t have a provider CLI installed:
 
    ```sh
-   AGENT_PROVIDER=mock npx nx serve api
+   AGENT_PROVIDER=mock bunx nx serve api
    ```
 
 2. **Start the chat app** (port 4200):
 
    ```sh
-   npx nx serve chat
+   bunx nx serve chat
    ```
 
    With the default Vite proxy, the chat app will use `http://localhost:3000` for `/api` and `/ws`. If the API runs on another host/port, set:
@@ -44,8 +50,16 @@ Copy `.env.example` to `.env` and adjust. Main variables:
 - `docs/API.md` – REST and WebSocket contract
 - `old-app/` – Original Express app (kept for reference until migration is verified)
 
-## Tasks
+## Scripts
 
-- `npx nx serve api` – run API
-- `npx nx serve chat` – run chat
-- `npx nx run-many -t lint test build typecheck e2e` – CI
+| Script       | Command        | Description                    |
+|-------------|----------------|--------------------------------|
+| **dev**     | `bun run dev`  | API + chat in parallel         |
+| **build**   | `bun run build`| Build all apps                 |
+| **lint**    | `bun run lint` | Lint all projects              |
+| **test**    | `bun run test` | Run unit tests                 |
+| **typecheck** | `bun run typecheck` | Type-check all projects |
+| **e2e**     | `bun run e2e`  | Run E2E tests                  |
+| **ci**      | `bun run ci`   | Lint, test, build, typecheck, e2e (CI pipeline) |
+
+GitHub Actions CI uses Bun and runs `bun run ci`. For reproducible CI, run `bun install` locally once and commit `bun.lockb`, then in `.github/workflows/ci.yml` you can use `bun install --frozen-lockfile`.
