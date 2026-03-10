@@ -14,7 +14,8 @@ const PROVIDER_NAMES = [
   'opencodex',
 ] as const;
 
-const DEFAULT_PROVIDER = 'mock';
+// const DEFAULT_PROVIDER = 'mock';
+const DEFAULT_PROVIDER = 'claude-code';
 
 @Injectable()
 export class StrategyRegistryService {
