@@ -13,15 +13,12 @@ describe('App', () => {
     expect(baseElement).toBeTruthy();
   });
 
-  it('should have a greeting as the title', () => {
-    const { getAllByText } = render(
+  it('should show login title when not authenticated', () => {
+    const { getByText } = render(
       <BrowserRouter>
         <App />
       </BrowserRouter>,
     );
-    expect(
-      getAllByText(new RegExp('Welcome @playgrounds.dev/chat', 'gi')).length >
-        0,
-    ).toBeTruthy();
+    expect(getByText('Agent Authentication')).toBeTruthy();
   });
 });

@@ -77,9 +77,12 @@
         }
       },
       "test": {
+        "executor": "nx:run-commands",
         "options": {
-          "passWithNoTests": true
-        }
+          "command": "bun test --preload ./test-setup.ts",
+          "cwd": "apps/api"
+        },
+        "dependsOn": []
       }
     }
   },
@@ -89,9 +92,11 @@
     "@nestjs/platform-fastify": "^11.0.0",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0",
-    "tslib": "^2.3.0"
+    "tslib": "^2.3.0",
+    "ws": "^8.19.0"
   },
   "devDependencies": {
-    "@nestjs/testing": "^11.0.0"
+    "@nestjs/testing": "^11.0.0",
+    "@types/ws": "^8.5.0"
   }
 }
