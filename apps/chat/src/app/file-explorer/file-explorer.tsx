@@ -351,8 +351,8 @@ export function FileExplorer() {
           <button
             type="button"
             onClick={expandAll}
-            className="h-6 sm:h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors"
-            title="Expand all"
+            className="h-7 min-w-7 flex items-center justify-center rounded px-2 text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors"
+            title="Expand All"
             aria-label="Expand all"
           >
             <ChevronDownIcon className="size-3" />
@@ -360,8 +360,8 @@ export function FileExplorer() {
           <button
             type="button"
             onClick={collapseAll}
-            className="h-6 sm:h-7 w-7 flex items-center justify-center rounded text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors"
-            title="Collapse all"
+            className="h-7 min-w-7 flex items-center justify-center rounded px-2 text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors"
+            title="Collapse All"
             aria-label="Collapse all"
           >
             <ChevronRightIcon className="size-3" />
