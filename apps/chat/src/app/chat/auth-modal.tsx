@@ -69,7 +69,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 href={authModal.authUrl ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/20 transition-opacity"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/30 transition-opacity"
               >
                 <ExternalIcon className="size-3.5" />
                 Open Authentication URL
