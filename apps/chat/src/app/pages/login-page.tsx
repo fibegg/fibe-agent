@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { getApiUrl, setToken } from '../api-url';
 
 export function LoginPage() {
@@ -35,7 +36,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900 relative overflow-hidden p-4">
+    <div className="min-h-screen h-full flex items-center justify-center bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
         {[0, 1, 2, 3, 4].map((i) => (
@@ -48,6 +49,7 @@ export function LoginPage() {
               top: `${15 + i * 18}%`,
               left: `${10 + (i % 3) * 35}%`,
               animationDelay: `${i * 0.7}s`,
+              animationDuration: `${8 + i * 2}s`,
             }}
           />
         ))}
@@ -65,13 +67,11 @@ export function LoginPage() {
         ))}
       </div>
 
-      <div className="relative z-10 w-full max-w-md flex flex-col items-center">
-        <h2 className="text-xl sm:text-2xl font-semibold text-white mb-6 tracking-tight">
+      <div className="relative z-10 w-full max-w-md px-4">
+        <h2 className="text-xl sm:text-2xl font-semibold text-white mb-6 tracking-tight text-center">
           Phoenix Chat
         </h2>
-        <div className="relative w-full px-4">
-          <div className="absolute inset-0 bg-gradient-to-t from-violet-500/20 to-transparent blur-3xl -z-10 scale-150 pointer-events-none" />
-          <div className="w-full bg-slate-800/40 backdrop-blur-2xl border border-violet-500/20 rounded-2xl shadow-[0_0_50px_rgba(139,92,246,0.3)] p-6 sm:p-8">
+        <div className="bg-slate-800/40 backdrop-blur-2xl border border-violet-500/20 rounded-2xl shadow-[0_0_50px_rgba(139,92,246,0.3)] p-6 sm:p-8">
             <div className="flex items-center justify-between mb-4 sm:mb-6">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
@@ -92,11 +92,7 @@ export function LoginPage() {
             </div>
 
             <div className="flex justify-center mb-4 sm:mb-6">
-              <img
-                src="https://spider-ardent-96875346.figma.site/_assets/v11/983ab7ca00b487dee5d894129bffdbec7233e5d0.png"
-                alt="Phoenix"
-                className="size-16 sm:size-20 object-contain drop-shadow-[0_0_15px_rgba(168,85,247,0.4)] animate-float"
-              />
+              <AnimatedPhoenixLogo className="size-16 sm:size-20" />
             </div>
 
           {error && (
@@ -136,11 +132,13 @@ export function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-4 sm:mt-6 text-center text-[10px] sm:text-xs text-violet-300/40">
-            Protected by Quantum Encryption • Phoenix v2.4.1
-          </p>
+          <div className="mt-4 sm:mt-6 text-center">
+            <p className="text-[10px] sm:text-xs text-violet-300/40">
+              Protected by Quantum Encryption • Phoenix v2.4.1
+            </p>
+          </div>
         </div>
-        </div>
+        <div className="absolute inset-0 bg-gradient-to-t from-violet-500/20 to-transparent blur-3xl -z-10 scale-150" />
       </div>
     </div>
   );
