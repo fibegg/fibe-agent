@@ -88,7 +88,7 @@ export function MessageList({
             <div
               className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
                 msg.role === 'user'
-                  ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/30'
+                  ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
                   : 'rounded-tl-sm bg-card/60 backdrop-blur-md border border-border/50 shadow-lg text-card-foreground'
               }`}
             >
@@ -134,12 +134,12 @@ export function MessageList({
         </div>
       ))}
       {isStreaming && (
-        <div className="flex gap-2 sm:gap-3 md:gap-4">
-          <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
-            <SparklesIcon className="size-3.5 sm:size-4" />
+        <div className="flex gap-4">
+          <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
+            <SparklesIcon className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl rounded-tl-sm bg-card/60 backdrop-blur-md border border-border/50 shadow-lg">
+            <div className="max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl rounded-tl-sm bg-card border border-border px-4 py-3">
               {streamingText ? (
                 <div
                   className="markdown-body prose prose-sm max-w-none dark:prose-invert"
