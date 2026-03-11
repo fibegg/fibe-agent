@@ -223,7 +223,7 @@ function SettingsIcon({ className }: { className?: string }) {
   );
 }
 
-export function FileExplorer() {
+export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
   const [tree, setTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -297,8 +297,8 @@ export function FileExplorer() {
 
   return (
     <div
-      className="min-h-0 flex flex-1 flex-col border-r border-border/50 bg-card/30 backdrop-blur-xl"
-      style={{ width: SIDEBAR_WIDTH_PX, minWidth: SIDEBAR_WIDTH_PX }}
+      className={`min-h-0 flex flex-1 flex-col border-r border-border/50 bg-card/30 backdrop-blur-xl ${fullWidth ? 'w-full' : ''}`}
+      style={fullWidth ? undefined : { width: SIDEBAR_WIDTH_PX, minWidth: SIDEBAR_WIDTH_PX }}
     >
       <div className="p-3 sm:p-4 border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
         <div className="flex items-center justify-between mb-3">

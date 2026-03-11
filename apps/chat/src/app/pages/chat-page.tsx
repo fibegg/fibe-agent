@@ -28,11 +28,16 @@ const STATE_LABELS: Record<string, string> = {
 
 const MODEL_DEBOUNCE_MS = 500;
 const MAX_PENDING_IMAGES = 5;
+const MOBILE_BREAKPOINT_PX = 1024;
 
 export function ChatPage() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
   const [modelOptions, setModelOptions] = useState<string[]>([]);
@@ -92,6 +97,17 @@ export function ChatPage() {
       loadModelOptions();
     }
   }, [authenticated, loadMessages, loadModelOptions]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT_PX);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(false);
+  }, [isMobile]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -300,6 +316,11 @@ export function ChatPage() {
     state === CHAT_STATES.AUTH_PENDING &&
     !!(authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
+  const filteredMessages =
+    searchQuery.trim() === ''
+      ? messages
+      : messages.filter((m) => m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase()));
+
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 text-foreground">
       <AuthModal
@@ -308,9 +329,45 @@ export function ChatPage() {
         onClose={cancelAuth}
         onSubmitCode={submitAuthCode}
       />
-      <aside className="flex min-h-0 flex-shrink-0 flex-col overflow-hidden" style={{ width: SIDEBAR_WIDTH_PX }}>
-        <FileExplorer />
-      </aside>
+      {isMobile && (
+        <>
+          <div className="fixed top-4 left-4 z-40 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="size-12 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/30 border border-violet-400/20 flex items-center justify-center text-white"
+              aria-label="Open file explorer"
+            >
+              <MenuIcon className="size-5" />
+            </button>
+          </div>
+          {sidebarOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-50 bg-black/50 lg:hidden"
+                aria-hidden
+                onClick={() => setSidebarOpen(false)}
+              />
+              <div className="fixed left-0 top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col bg-gradient-to-br from-background via-background to-violet-950/5 border-r border-violet-500/20 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="absolute top-3 right-3 z-10 size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
+                  aria-label="Close"
+                >
+                  <XIcon className="size-4" />
+                </button>
+                <FileExplorer fullWidth />
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {!isMobile && (
+        <aside className="flex min-h-0 flex-shrink-0 flex-col overflow-hidden" style={{ width: SIDEBAR_WIDTH_PX }}>
+          <FileExplorer />
+        </aside>
+      )}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="flex shrink-0 items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
           <div className="mb-2 sm:mb-3">
@@ -320,6 +377,7 @@ export function ChatPage() {
           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <button
               type="button"
+              onClick={() => setShowSearch((v) => !v)}
               className="size-7 sm:size-8 flex items-center justify-center rounded-lg text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
               title="Search in conversation"
               aria-label="Search in conversation"
@@ -353,6 +411,35 @@ export function ChatPage() {
             )}
           </div>
         </header>
+        {showSearch && (
+          <div className="shrink-0 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
+            <div className="relative">
+              <SearchIcon className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 size-3.5 sm:size-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search in conversation..."
+                className="w-full h-8 sm:h-9 pl-8 sm:pl-10 pr-8 sm:pr-10 text-xs sm:text-sm rounded-md bg-background/50 border border-violet-500/30 text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500/30"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <XIcon className="size-3.5 sm:size-4" />
+                </button>
+              )}
+            </div>
+            {searchQuery && (
+              <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+                Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
+              </p>
+            )}
+          </div>
+        )}
         {errorMessage && state === CHAT_STATES.ERROR && (
           <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border/50">
             <span className="text-destructive text-sm">{errorMessage}</span>
@@ -368,7 +455,7 @@ export function ChatPage() {
         <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
             <div className="max-w-4xl">
               <MessageList
-                messages={messages}
+                messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
               />
@@ -488,10 +575,26 @@ export function ChatPage() {
   );
 }
 
+function MenuIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+    </svg>
+  );
+}
+
 function SearchIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
     </svg>
   );
 }
