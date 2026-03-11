@@ -36,7 +36,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen h-full flex items-center justify-center bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900 relative overflow-hidden">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
         {[0, 1, 2, 3, 4].map((i) => (
