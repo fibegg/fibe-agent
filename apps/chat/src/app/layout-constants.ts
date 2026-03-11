@@ -1,1 +1,1 @@
-export const SIDEBAR_WIDTH_PX = 240;
+export const SIDEBAR_WIDTH_PX = 320;

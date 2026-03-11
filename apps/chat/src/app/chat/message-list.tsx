@@ -1,3 +1,4 @@
+import { Sparkles, User } from 'lucide-react';
 import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 
@@ -51,25 +52,29 @@ export function MessageList({
   isStreaming: boolean;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 sm:space-y-6">
       {messages.map((msg) => (
         <div
           key={msg.id ?? `${msg.created_at}-${msg.role}`}
-          className={`flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+          className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
         >
-          <div
-            className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-sm ${
-              msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
-            }`}
-          >
-            {msg.role === 'user' ? 'U' : '◆'}
+          <div className="flex-shrink-0">
+            {msg.role === 'user' ? (
+              <div className="size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white">
+                <User className="size-3.5 sm:size-4" />
+              </div>
+            ) : (
+              <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white">
+                <Sparkles className="size-3.5 sm:size-4" />
+              </div>
+            )}
           </div>
-          <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'text-right' : ''}`}>
+          <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
             <div
-              className={`inline-block max-w-full px-3 py-2 rounded-lg shadow-soft ${
+              className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
                 msg.role === 'user'
-                  ? 'bg-primary text-primary-foreground'
-                  : 'bg-card border border-border text-card-foreground'
+                  ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
+                  : 'rounded-tl-sm bg-card/60 backdrop-blur-md border border-border-subtle shadow-lg text-card-foreground'
               }`}
             >
               {msg.role === 'user' ? (
@@ -83,45 +88,54 @@ export function MessageList({
                             src={getUploadSrc(filename)}
                             alt=""
                             loading="lazy"
-                            className="max-w-full max-h-48 rounded object-contain bg-black/10"
+                            className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
                           />
                         ))}
                       </div>
                       {msg.body ? (
-                        <span className="whitespace-pre-wrap">{msg.body}</span>
+                        <span className="whitespace-pre-wrap text-sm leading-relaxed">{msg.body}</span>
                       ) : null}
                     </div>
                   ) : (
-                    <span className="whitespace-pre-wrap">{msg.body}</span>
+                    <span className="whitespace-pre-wrap text-sm leading-relaxed">{msg.body}</span>
                   )}
+                  <p className="text-xs mt-1.5 sm:mt-2 text-violet-200">
+                    {formatTime(msg.created_at)}
+                  </p>
                 </>
               ) : (
-                <div
-                  className="markdown-body prose prose-sm max-w-none dark:prose-invert"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
-                />
+                <>
+                  <div
+                    className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
+                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
+                  />
+                  <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
+                    {formatTime(msg.created_at)}
+                  </p>
+                </>
               )}
-            </div>
-            <div className={`text-xs text-muted-foreground mt-1 ${msg.role === 'user' ? 'text-right' : ''}`}>
-              {formatTime(msg.created_at)}
             </div>
           </div>
         </div>
       ))}
       {isStreaming && (
-        <div className="flex gap-3">
-          <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-sm">
-            ◆
+        <div className="flex gap-4">
+          <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white flex-shrink-0">
+            <Sparkles className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
-            <div className="inline-block max-w-full px-3 py-2 rounded-lg bg-card border border-border text-card-foreground shadow-soft">
+            <div className="max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl rounded-tl-sm bg-card border border-border px-4 py-3">
               {streamingText ? (
                 <div
-                  className="markdown-body prose prose-sm max-w-none dark:prose-invert"
+                  className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
                 />
               ) : (
-                <span className="text-muted-foreground">Thinking...</span>
+                <div className="flex gap-1.5">
+                  <span className="size-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="size-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="size-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
               )}
             </div>
           </div>

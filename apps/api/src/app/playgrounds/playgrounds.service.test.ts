@@ -67,4 +67,38 @@ describe('PlaygroundsService', () => {
     const service = new PlaygroundsService(config as never);
     expect(service.getTree()).toEqual([]);
   });
+
+  test('getFileContent returns file content for valid path', () => {
+    writeFileSync(join(playgroundDir, 'readme.md'), '# Hello\n');
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    expect(service.getFileContent('readme.md')).toBe('# Hello\n');
+  });
+
+  test('getFileContent returns content for file in subdirectory', () => {
+    mkdirSync(join(playgroundDir, 'src'));
+    writeFileSync(join(playgroundDir, 'src', 'index.ts'), 'export {};');
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    expect(service.getFileContent('src/index.ts')).toBe('export {};');
+  });
+
+  test('getFileContent throws NotFoundException for path traversal', () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    expect(() => service.getFileContent('../../etc/passwd')).toThrow('File not found');
+  });
+
+  test('getFileContent throws NotFoundException for directory', () => {
+    mkdirSync(join(playgroundDir, 'dir'));
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    expect(() => service.getFileContent('dir')).toThrow('File not found');
+  });
+
+  test('getFileContent throws NotFoundException for missing file', () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    expect(() => service.getFileContent('missing.txt')).toThrow('File not found');
+  });
 });

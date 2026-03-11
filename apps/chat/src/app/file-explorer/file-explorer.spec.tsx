@@ -16,7 +16,7 @@ describe('FileExplorer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows playground/ label in header', async () => {
+  it('shows playground/ label when tree is loaded', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -24,8 +24,9 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText('playground/')).toBeTruthy();
+      expect(screen.getByText(/No files in playground\//)).toBeTruthy();
     });
+    expect(screen.getByText(/playground\//)).toBeTruthy();
   });
 
   it('shows loading state initially', () => {
@@ -89,7 +90,7 @@ describe('FileExplorer', () => {
     expect(screen.getByText('src')).toBeTruthy();
   });
 
-  it('expands directory when folder is clicked', async () => {
+  it('expands and collapses directory when folder is clicked', async () => {
     const tree: PlaygroundEntry[] = [
       {
         name: 'lib',
@@ -107,10 +108,99 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.getByText('lib')).toBeTruthy();
     });
-    expect(screen.queryByText('util.ts')).toBeNull();
+    await waitFor(() => {
+      expect(screen.getByText('util.ts')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('lib'));
+    await waitFor(() => {
+      expect(screen.queryByText('util.ts')).toBeNull();
+    });
     fireEvent.click(screen.getByText('lib'));
     await waitFor(() => {
       expect(screen.getByText('util.ts')).toBeTruthy();
+    });
+  });
+
+  it('opens AI Code Review dialog when file is clicked', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'readme.md', path: 'readme.md', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: '# Hello' }),
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('readme.md')).toBeTruthy();
+    });
+    expect(screen.queryByRole('heading', { name: 'AI Code Review' })).toBeNull();
+    fireEvent.click(screen.getByText('readme.md'));
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'AI Code Review' })).toBeTruthy();
+    });
+    expect(screen.getAllByText('readme.md').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('calls onSettingsClick when Settings button is clicked', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    const onSettingsClick = vi.fn();
+    render(<FileExplorer onSettingsClick={onSettingsClick} />);
+    await waitFor(() => {
+      expect(screen.getByText(/playground\//)).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(onSettingsClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not throw when Settings is clicked without onSettingsClick', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText(/playground\//)).toBeTruthy();
+    });
+    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))).not.toThrow();
+  });
+
+  it('shows diff content in dialog after file content is loaded', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'app.js', path: 'app.js', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: 'const x = 1;' }),
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('app.js')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('app.js'));
+    await waitFor(() => {
+      expect(screen.getByText('Git Diff Changes')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/const x = 1;/)).toBeTruthy();
     });
   });
 });
