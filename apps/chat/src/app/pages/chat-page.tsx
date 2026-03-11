@@ -301,15 +301,18 @@ export function ChatPage() {
     !!(authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 text-foreground">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 text-foreground">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
         onClose={cancelAuth}
         onSubmitCode={submitAuthCode}
       />
-      <div className="min-h-0">
-        <header className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
+      <aside className="flex min-h-0 flex-shrink-0 flex-col overflow-hidden" style={{ width: SIDEBAR_WIDTH_PX }}>
+        <FileExplorer />
+      </aside>
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="flex shrink-0 items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
           <div className="mb-2 sm:mb-3">
             <h2 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h2>
             <p className={`text-[10px] sm:text-xs ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
@@ -334,7 +337,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-                className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+                className="px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
               >
                 {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
               </button>
@@ -343,7 +346,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={logout}
-                className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-sm font-medium transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
               >
                 Logout
               </button>
@@ -351,7 +354,7 @@ export function ChatPage() {
           </div>
         </header>
         {errorMessage && state === CHAT_STATES.ERROR && (
-          <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border/50">
+          <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border/50">
             <span className="text-destructive text-sm">{errorMessage}</span>
             <button
               type="button"
@@ -362,17 +365,7 @@ export function ChatPage() {
             </button>
           </div>
         )}
-      </div>
-
-      <div
-        className="grid min-h-0 overflow-hidden"
-        style={{ gridTemplateColumns: `${SIDEBAR_WIDTH_PX}px 1fr` }}
-      >
-        <aside className="flex min-h-0 flex-col overflow-hidden">
-          <FileExplorer />
-        </aside>
-        <main className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+        <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
             <div className="max-w-4xl mx-auto">
               <MessageList
                 messages={messages}
@@ -381,8 +374,8 @@ export function ChatPage() {
               />
               <div ref={messagesEndRef} />
             </div>
-          </div>
-          <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
+        </div>
+        <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
             <div className="max-w-4xl mx-auto flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
@@ -434,7 +427,7 @@ export function ChatPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-lg flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                  className="hidden sm:flex size-8 sm:size-9 rounded-lg items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
                   title="Attach image"
                   aria-label="Attach image"
                 >
@@ -445,7 +438,7 @@ export function ChatPage() {
                   className="flex-1 bg-transparent outline-none resize-none text-xs sm:text-sm py-2 min-h-[24px] max-h-32 text-foreground placeholder-muted-foreground disabled:opacity-50"
                   placeholder={
                     state === CHAT_STATES.AUTHENTICATED
-                      ? 'Ask me anything... (paste or attach images)'
+                      ? 'Ask me anything...'
                       : 'Complete authentication to start chatting...'
                   }
                   rows={1}
@@ -489,9 +482,8 @@ export function ChatPage() {
                 </button>
               </div>
             </div>
-          </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
