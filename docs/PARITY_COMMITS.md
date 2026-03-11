@@ -28,3 +28,8 @@ Each commit is one logical change. Applied in order.
 
 9. ✅ **style(file-explorer): expand/collapse all buttons**
    - h-7 px-2 text-[10px], title "Expand All" / "Collapse All".
+
+10. ✅ **feat(chat): responsive sidebar and expandable search**
+   - Viewport < 1024px: floating menu button opens drawer with FileExplorer (design ResponsiveFileExplorer).
+   - FileExplorer accepts optional fullWidth for drawer.
+   - Search icon toggles expandable search bar; filter messages; "Found N message(s)".
