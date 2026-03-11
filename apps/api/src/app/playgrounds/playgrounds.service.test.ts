@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { NotFoundException } from '@nestjs/common';
 import { PlaygroundsService } from './playgrounds.service';
 
 describe('PlaygroundsService', () => {
@@ -86,19 +87,19 @@ describe('PlaygroundsService', () => {
   test('getFileContent throws NotFoundException for path traversal', () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('../../etc/passwd')).toThrow('File not found');
+    expect(() => service.getFileContent('../../etc/passwd')).toThrow(NotFoundException);
   });
 
   test('getFileContent throws NotFoundException for directory', () => {
     mkdirSync(join(playgroundDir, 'dir'));
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('dir')).toThrow('File not found');
+    expect(() => service.getFileContent('dir')).toThrow(NotFoundException);
   });
 
   test('getFileContent throws NotFoundException for missing file', () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('missing.txt')).toThrow('File not found');
+    expect(() => service.getFileContent('missing.txt')).toThrow(NotFoundException);
   });
 });

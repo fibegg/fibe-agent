@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { BadRequestException } from '@nestjs/common';
 import { UploadsController } from './uploads.controller';
 
 describe('UploadsController', () => {
@@ -39,14 +40,14 @@ describe('UploadsController', () => {
     const uploads = {};
     const controller = new UploadsController(uploads as never);
     const req = { file: async () => undefined };
-    await expect(controller.uploadFile(req as never)).rejects.toThrow('No file uploaded');
+    await expect(controller.uploadFile(req as never)).rejects.toThrow(BadRequestException);
   });
 
   test('uploadFile throws when mimetype not audio', async () => {
     const uploads = {};
     const controller = new UploadsController(uploads as never);
     const req = { file: async () => ({ mimetype: 'image/png', toBuffer: async () => Buffer.from('') }) };
-    await expect(controller.uploadFile(req as never)).rejects.toThrow('Unsupported file type');
+    await expect(controller.uploadFile(req as never)).rejects.toThrow(BadRequestException);
   });
 
   test('uploadFile returns filename for valid audio', async () => {

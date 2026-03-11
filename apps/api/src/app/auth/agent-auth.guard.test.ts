@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { ExecutionContext } from '@nestjs/common';
+import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AgentAuthGuard } from './agent-auth.guard';
 
 function createMockContext(req: { headers?: Record<string, string>; query?: Record<string, string> }): ExecutionContext {
@@ -40,13 +40,13 @@ describe('AgentAuthGuard', () => {
     const config = { getAgentPassword: () => 'secret' };
     const guard = new AgentAuthGuard(config as never);
     const ctx = createMockContext({});
-    expect(() => guard.canActivate(ctx)).toThrow('Unauthorized');
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
   });
 
   test('throws when token does not match', () => {
     const config = { getAgentPassword: () => 'secret' };
     const guard = new AgentAuthGuard(config as never);
     const ctx = createMockContext({ headers: { authorization: 'Bearer wrong' } });
-    expect(() => guard.canActivate(ctx)).toThrow('Unauthorized');
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
   });
 });
