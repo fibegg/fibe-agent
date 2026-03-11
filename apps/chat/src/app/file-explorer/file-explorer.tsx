@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
+import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { ThemeToggle } from '../theme-toggle';
 import { SIDEBAR_WIDTH_PX } from '../layout-constants';
 
@@ -146,11 +147,11 @@ function TreeNode({
   }, [isDir, entry.path, onToggle]);
 
   return (
-    <div className="select-none">
+    <div className="select-none group">
       <button
         type="button"
         onClick={handleClick}
-        className="w-full flex items-center gap-1.5 py-1 px-2 text-left text-xs rounded-md transition-colors hover:bg-violet-500/5 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-violet-500/5"
+        className="w-full flex items-center gap-1.5 py-1 px-2 text-left text-xs rounded-md cursor-pointer transition-all hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-violet-500/5"
         style={{ paddingLeft: `${INDENT_BASE_PX + depth * INDENT_PER_LEVEL_PX}px` }}
       >
         <span className="w-3 flex items-center justify-center shrink-0 text-muted-foreground" aria-hidden>
@@ -209,6 +210,15 @@ function ChevronRightIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+function SettingsIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
     </svg>
   );
 }
@@ -293,15 +303,21 @@ export function FileExplorer() {
       <div className="p-3 sm:p-4 border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="size-6 rounded flex items-center justify-center text-violet-500">
-              <FolderIcon open />
-            </div>
+            <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
             <div>
               <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
               <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="size-7 sm:size-8 flex items-center justify-center rounded-lg text-violet-400 hover:bg-violet-500/10 transition-colors"
+              title="Settings"
+              aria-label="Settings"
+            >
+              <SettingsIcon className="size-3.5 sm:size-4" />
+            </button>
             <ThemeToggle />
           </div>
         </div>
@@ -321,16 +337,16 @@ export function FileExplorer() {
             onClick={expandOneLevel}
             className="flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 rounded text-[9px] sm:text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors px-2"
           >
-            <ChevronDownIcon className="size-2.5 sm:size-3 shrink-0" />
-            <span className="truncate hidden sm:inline">Expand</span>
+            <ChevronDownIcon className="size-2.5 sm:size-3 shrink-0 mr-1" />
+            <span className="truncate">Expand<span className="hidden sm:inline"> Level</span></span>
           </button>
           <button
             type="button"
             onClick={collapseOneLevel}
             className="flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 rounded text-[9px] sm:text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors px-2"
           >
-            <ChevronRightIcon className="size-2.5 sm:size-3 shrink-0" />
-            <span className="truncate hidden sm:inline">Collapse</span>
+            <ChevronRightIcon className="size-2.5 sm:size-3 shrink-0 mr-1" />
+            <span className="truncate">Collapse<span className="hidden sm:inline"> Level</span></span>
           </button>
           <button
             type="button"
