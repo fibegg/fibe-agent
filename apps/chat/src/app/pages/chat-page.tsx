@@ -8,6 +8,7 @@ import { FileExplorer } from '../file-explorer/file-explorer';
 import { SIDEBAR_WIDTH_PX } from '../layout-constants';
 import { CHAT_STATES } from '../chat/chat-state';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
+import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import type { ServerMessage } from '../chat/chat-state';
 import {
   getApiUrl,
@@ -38,6 +39,9 @@ export function ChatPage() {
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState('');
   const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [pendingVoice, setPendingVoice] = useState<string | null>(null);
+  const [pendingVoiceFilename, setPendingVoiceFilename] = useState<string | null>(null);
+  const [voiceUploadError, setVoiceUploadError] = useState<string | null>(null);
   const modelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -97,11 +101,12 @@ export function ChatPage() {
   const handleMessage = useCallback((data: ServerMessage) => {
     if (data.type === 'message' && data.role && data.body !== undefined) {
       const payload = data as { id?: string; imageUrls?: string[] };
+      const role = data.role as string;
       setMessages((prev) => [
         ...prev,
         {
           id: payload.id,
-          role: data.role,
+          role,
           body: data.body ?? '',
           created_at: (data.created_at as string) ?? new Date().toISOString(),
           ...(payload.imageUrls?.length ? { imageUrls: payload.imageUrls } : {}),
@@ -112,6 +117,8 @@ export function ChatPage() {
       setCurrentModel(data.model);
     }
   }, []);
+
+  const voiceRecorder = useVoiceRecorder();
 
   const {
     state,
@@ -141,15 +148,19 @@ export function ChatPage() {
   const handleSend = useCallback(() => {
     const input = document.getElementById('chat-input') as HTMLTextAreaElement | null;
     const text = input?.value?.trim();
-    if ((!text && !pendingImages.length) || state !== CHAT_STATES.AUTHENTICATED) return;
+    const hasVoice = !!pendingVoiceFilename || !!pendingVoice;
+    if ((!text && !pendingImages.length && !hasVoice) || state !== CHAT_STATES.AUTHENTICATED) return;
     send({
       action: 'send_chat_message',
       text: text ?? '',
       ...(pendingImages.length ? { images: pendingImages } : {}),
+      ...(pendingVoiceFilename ? { audioFilename: pendingVoiceFilename } : pendingVoice ? { audio: pendingVoice } : {}),
     });
     if (input) input.value = '';
     setPendingImages([]);
-  }, [send, state, pendingImages]);
+    setPendingVoice(null);
+    setPendingVoiceFilename(null);
+  }, [send, state, pendingImages, pendingVoice, pendingVoiceFilename]);
 
   const addImage = useCallback((dataUrl: string) => {
     setPendingImages((prev) => (prev.length < MAX_PENDING_IMAGES ? [...prev, dataUrl] : prev));
@@ -157,6 +168,12 @@ export function ChatPage() {
 
   const removePendingImage = useCallback((index: number) => {
     setPendingImages((prev) => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const removePendingVoice = useCallback(() => {
+    setPendingVoice(null);
+    setPendingVoiceFilename(null);
+    setVoiceUploadError(null);
   }, []);
 
   const handleFileChange = useCallback(
@@ -205,6 +222,47 @@ export function ChatPage() {
     [handleSend]
   );
 
+  const uploadVoiceFile = useCallback(async (blob: Blob): Promise<string | null> => {
+    const base = getApiUrl();
+    const url = base ? `${base}/api/uploads` : '/api/uploads';
+    const token = getAuthTokenForRequest();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const formData = new FormData();
+    formData.append('file', blob, 'recording.webm');
+    const res = await fetch(url, { method: 'POST', headers, body: formData });
+    if (!res.ok) return null;
+    const data = (await res.json()) as { filename: string };
+    return data.filename ?? null;
+  }, []);
+
+  const handleVoiceToggle = useCallback(async () => {
+    const input = document.getElementById('chat-input') as HTMLTextAreaElement | null;
+    if (voiceRecorder.isRecording) {
+      const result = await voiceRecorder.stopRecording();
+      if (result) {
+        if (result.transcript && input) {
+          const existing = input.value.trim();
+          input.value = existing ? `${existing} ${result.transcript}` : result.transcript;
+        }
+        if (result.blob.size > 0) {
+          const reader = new FileReader();
+          reader.onloadend = () => setPendingVoice(reader.result as string);
+          reader.readAsDataURL(result.blob);
+          setVoiceUploadError(null);
+          const filename = await uploadVoiceFile(result.blob);
+          if (filename) {
+            setPendingVoiceFilename(filename);
+          } else {
+            setVoiceUploadError('Upload failed; voice will be sent with message.');
+          }
+        }
+      }
+    } else {
+      await voiceRecorder.startRecording();
+    }
+  }, [voiceRecorder, uploadVoiceFile]);
+
   const handleModelSelect = useCallback(
     (model: string) => {
       setCurrentModel(model);
@@ -241,7 +299,7 @@ export function ChatPage() {
 
   const showAuthModal =
     state === CHAT_STATES.AUTH_PENDING &&
-    (authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
+    !!(authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
   return (
     <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-background text-foreground">
@@ -320,8 +378,21 @@ export function ChatPage() {
           </div>
           <div className="shrink-0 border-t border-border bg-card/50 p-4">
             <div className="max-w-3xl mx-auto flex flex-col gap-2">
-              {pendingImages.length > 0 && (
+              {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
+                  {pendingVoice && (
+                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card">
+                      <audio src={pendingVoice} controls className="max-h-10 min-w-[160px]" />
+                      <button
+                        type="button"
+                        onClick={removePendingVoice}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
+                        aria-label="Remove voice"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
                   {pendingImages.map((dataUrl, i) => (
                     <div key={i} className="relative inline-block">
                       <img
@@ -341,7 +412,10 @@ export function ChatPage() {
                   ))}
                 </div>
               )}
-              <div className="flex gap-2">
+              {(voiceRecorder.error || voiceUploadError) && (
+                <p className="text-destructive text-sm">{voiceRecorder.error ?? voiceUploadError}</p>
+              )}
+              <div className="flex gap-2 items-end">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -363,6 +437,31 @@ export function ChatPage() {
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
                 />
+                {voiceRecorder.isSupported && (
+                  <button
+                    type="button"
+                    onClick={handleVoiceToggle}
+                    disabled={state !== CHAT_STATES.AUTHENTICATED}
+                    className={`px-3 rounded-lg border self-end font-medium transition-colors flex items-center gap-1.5 min-w-[44px] justify-center ${
+                      voiceRecorder.isRecording
+                        ? 'bg-destructive/90 hover:bg-destructive text-white border-destructive'
+                        : 'border-border bg-card hover:bg-muted disabled:opacity-50'
+                    }`}
+                    title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
+                    aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
+                  >
+                    {voiceRecorder.isRecording ? (
+                      <>
+                        <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                        <span className="text-xs tabular-nums">
+                          {Math.floor(voiceRecorder.recordingTimeSec / 60)}:{(voiceRecorder.recordingTimeSec % 60).toString().padStart(2, '0')}
+                        </span>
+                      </>
+                    ) : (
+                      '🎤'
+                    )}
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
