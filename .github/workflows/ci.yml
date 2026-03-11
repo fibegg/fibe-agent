@@ -49,8 +49,8 @@ jobs:
             tag: claude-code
           - key: openai_codex
             tag: openai-codex
-          - key: opencode
-            tag: opencode
+          - key: opencodex
+            tag: opencodex
     steps:
       - uses: actions/checkout@v4
 
