@@ -363,7 +363,7 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
           </div>
         )}
         {!loading && !error && filteredTree.length > 0 && (
-          <div className="py-1 px-2">
+          <div className="p-2">
             <div className="px-2 py-1 text-[10px] text-muted-foreground font-medium">{PLAYGROUNDS_LABEL}</div>
             {filteredTree.map((entry) => (
               <TreeNode
