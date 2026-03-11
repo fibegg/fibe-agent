@@ -1,4 +1,4 @@
-FROM node:22-slim AS cli
+FROM node:24-slim AS cli
 
 ARG AGENT_PROVIDER=gemini
 
@@ -15,7 +15,9 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
-FROM oven/bun:1-slim AS builder
+FROM node:24-slim AS builder
+
+RUN npm install -g bun
 
 WORKDIR /app
 
@@ -30,7 +32,7 @@ COPY apps/api apps/api
 
 RUN bunx nx run api:build
 
-FROM node:22-slim
+FROM node:24-slim
 
 ARG AGENT_PROVIDER=gemini
 
