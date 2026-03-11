@@ -178,7 +178,8 @@ export function ChatPage() {
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      const item = e.clipboardData?.items?.find((it) => it.type.startsWith('image/'));
+      const items = e.clipboardData?.items;
+      const item = items ? Array.from(items).find((it) => it.type.startsWith('image/')) : undefined;
       if (!item || pendingImages.length >= MAX_PENDING_IMAGES) return;
       const file = item.getAsFile();
       if (!file) return;
