@@ -33,3 +33,9 @@ Each commit is one logical change. Applied in order.
    - Viewport < 1024px: floating menu button opens drawer with FileExplorer (design ResponsiveFileExplorer).
    - FileExplorer accepts optional fullWidth for drawer.
    - Search icon toggles expandable search bar; filter messages; "Found N message(s)".
+
+11. ✅ **style: icons, radii, backgrounds**
+   - Login: input, submit, error box rounded-md.
+   - Chat: all icon buttons and pills rounded-md; assistant avatar relative.
+   - File explorer: Folder/FolderOpen/File 24x24 lucide-style; Settings rounded-md.
+   - Theme toggle, auth modal close: rounded-md.
