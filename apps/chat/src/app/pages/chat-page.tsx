@@ -311,7 +311,7 @@ export function ChatPage() {
       />
       <div className="min-h-0">
         <header className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
-          <div>
+          <div className="mb-2 sm:mb-3">
             <h1 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h1>
             <p className={`text-[10px] sm:text-xs ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
           </div>
@@ -335,7 +335,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-                className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/20 hover:opacity-90 transition-opacity"
+                className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
               >
                 {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
               </button>
@@ -384,7 +384,7 @@ export function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
           </div>
-          <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border/50 bg-card/30 backdrop-blur-sm">
+          <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
             <div className="max-w-4xl mx-auto flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
