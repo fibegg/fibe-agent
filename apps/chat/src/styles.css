@@ -10,7 +10,7 @@
     --card-foreground: #1a1625;
     --muted: #f5f3ff;
     --muted-foreground: #6b7280;
-    --border: rgba(124, 58, 237, 0.12);
+    --border: rgba(124, 58, 237, 0.1);
     --primary: #7c3aed;
     --primary-foreground: #ffffff;
     --secondary: #f5f3ff;
@@ -18,6 +18,7 @@
     --destructive: #ef4444;
     --success: #22c55e;
     --warning: #f59e0b;
+    --radius: 0.75rem;
     --radius-xl: 1rem;
     --radius-lg: 0.75rem;
     --radius-md: 0.5rem;
@@ -75,6 +76,25 @@
     from { transform: rotate(360deg); }
     to { transform: rotate(0deg); }
   }
+  @keyframes explode {
+    0% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    100% { opacity: 0; transform: translate(-50%, -50%) scale(3); }
+  }
+  @keyframes energy-flow-1 {
+    0% { top: -50%; left: 20%; opacity: 0; }
+    50% { opacity: 1; }
+    100% { top: 150%; left: 80%; opacity: 0; }
+  }
+  @keyframes energy-flow-2 {
+    0% { top: -50%; left: 50%; opacity: 0; }
+    50% { opacity: 1; }
+    100% { top: 150%; left: 50%; opacity: 0; }
+  }
+  @keyframes energy-flow-3 {
+    0% { top: -50%; left: 80%; opacity: 0; }
+    50% { opacity: 1; }
+    100% { top: 150%; left: 20%; opacity: 0; }
+  }
   .animate-float { animation: float 3s ease-in-out infinite; }
   .animate-sparkle { animation: sparkle 2s ease-in-out infinite; }
   .animate-ping-slow { animation: ping-slow 3s cubic-bezier(0, 0, 0.2, 1) infinite; }
@@ -82,6 +102,10 @@
   .animate-pulse-glow { animation: pulse-glow 2s ease-in-out infinite; }
   .animate-spin-slow { animation: spin-slow 8s linear infinite; }
   .animate-spin-reverse { animation: spin-reverse 6s linear infinite; }
+  .animate-explode { animation: explode 0.8s ease-out forwards; }
+  .animate-energy-flow-1 { animation: energy-flow-1 3s linear infinite; }
+  .animate-energy-flow-2 { animation: energy-flow-2 2.5s linear infinite; }
+  .animate-energy-flow-3 { animation: energy-flow-3 3.5s linear infinite; }
 }
 
 body {
