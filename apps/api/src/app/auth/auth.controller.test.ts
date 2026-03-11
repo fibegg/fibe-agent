@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'bun:test';
+import { UnauthorizedException } from '@nestjs/common';
 import { AuthController } from './auth.controller';
 
 describe('AuthController', () => {
@@ -17,6 +18,6 @@ describe('AuthController', () => {
   test('login throws when password wrong', () => {
     const config = { getAgentPassword: () => 'secret' };
     const controller = new AuthController(config as never);
-    expect(() => controller.login({ password: 'wrong' })).toThrow('Invalid password');
+    expect(() => controller.login({ password: 'wrong' })).toThrow(UnauthorizedException);
   });
 });
