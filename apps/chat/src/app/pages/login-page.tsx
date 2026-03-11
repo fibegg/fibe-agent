@@ -52,37 +52,53 @@ export function LoginPage() {
             }}
           />
         ))}
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={`sparkle-${i}`}
+            className="absolute w-1 h-1 bg-violet-400 rounded-full animate-sparkle"
+            style={{
+              top: `${(i * 17) % 100}%`,
+              left: `${(i * 23) % 100}%`,
+              animationDelay: `${(i * 0.15) % 3}s`,
+              animationDuration: `${2 + (i % 3) * 0.5}s`,
+            }}
+          />
+        ))}
       </div>
 
       <div className="relative z-10 w-full max-w-md flex flex-col items-center">
         <h2 className="text-xl sm:text-2xl font-semibold text-white mb-6 tracking-tight">
           Phoenix Chat
         </h2>
-        <div className="w-full bg-slate-800/40 dark:bg-slate-900/50 backdrop-blur-2xl border border-violet-500/20 rounded-2xl shadow-[0_0_50px_rgba(139,92,246,0.2)] p-6 sm:p-8">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="p-1.5 sm:p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
-                <KeyIcon className="size-4 sm:size-5 text-violet-400" />
+        <div className="relative w-full px-4">
+          <div className="absolute inset-0 bg-gradient-to-t from-violet-500/20 to-transparent blur-3xl -z-10 scale-150 pointer-events-none" />
+          <div className="w-full bg-slate-800/40 backdrop-blur-2xl border border-violet-500/20 rounded-2xl shadow-[0_0_50px_rgba(139,92,246,0.3)] p-6 sm:p-8">
+            <div className="flex items-center justify-between mb-4 sm:mb-6">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
+                  <KeyIcon className="size-4 sm:size-5 text-violet-400" />
+                </div>
+                <div>
+                  <h1 className="text-base sm:text-lg font-semibold text-white">
+                    Agent Authentication
+                  </h1>
+                  <p className="text-[10px] sm:text-xs text-violet-300/60">
+                    Quantum Storage Access
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-base sm:text-lg font-semibold text-white">
-                  Agent Authentication
-                </h1>
-                <p className="text-[10px] sm:text-xs text-violet-300/60">
-                  Quantum Storage Access
-                </p>
+              <div className="p-1.5 sm:p-2 bg-violet-500/5 rounded-lg border border-violet-500/10">
+                <ThemeToggle />
               </div>
             </div>
-            <ThemeToggle />
-          </div>
 
-          <div className="flex justify-center mb-4 sm:mb-6">
-            <img
-              src="https://spider-ardent-96875346.figma.site/_assets/v11/983ab7ca00b487dee5d894129bffdbec7233e5d0.png"
-              alt="Phoenix"
-              className="size-16 sm:size-20 object-contain drop-shadow-[0_0_15px_rgba(168,85,247,0.4)]"
-            />
-          </div>
+            <div className="flex justify-center mb-4 sm:mb-6">
+              <img
+                src="https://spider-ardent-96875346.figma.site/_assets/v11/983ab7ca00b487dee5d894129bffdbec7233e5d0.png"
+                alt="Phoenix"
+                className="size-16 sm:size-20 object-contain drop-shadow-[0_0_15px_rgba(168,85,247,0.4)] animate-float"
+              />
+            </div>
 
           {error && (
             <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
@@ -124,6 +140,7 @@ export function LoginPage() {
           <p className="mt-4 sm:mt-6 text-center text-[10px] sm:text-xs text-violet-300/40">
             Protected by Quantum Encryption • Phoenix v2.4.1
           </p>
+        </div>
         </div>
       </div>
     </div>
