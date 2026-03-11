@@ -121,24 +121,58 @@ describe('FileExplorer', () => {
     });
   });
 
-  it('opens file details dialog when file is clicked', async () => {
+  it('opens AI Code Review dialog when file is clicked', async () => {
     const tree: PlaygroundEntry[] = [
       { name: 'readme.md', path: 'readme.md', type: 'file' },
     ];
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => tree,
-    });
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: '# Hello' }),
+      });
     render(<FileExplorer />);
     await waitFor(() => {
       expect(screen.getByText('readme.md')).toBeTruthy();
     });
-    expect(screen.queryByRole('heading', { name: 'File details' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'AI Code Review' })).toBeNull();
     fireEvent.click(screen.getByText('readme.md'));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'File details' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'AI Code Review' })).toBeTruthy();
     });
     expect(screen.getAllByText('readme.md').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows diff content in dialog after file content is loaded', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'app.js', path: 'app.js', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: 'const x = 1;' }),
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('app.js')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('app.js'));
+    await waitFor(() => {
+      expect(screen.getByText('Git Diff Changes')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/const x = 1;/)).toBeTruthy();
+    });
   });
 });

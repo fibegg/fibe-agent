@@ -15,8 +15,9 @@ Nest Fastify API (project `api`).
 | POST   | /api/uploads           | Bearer | Upload a voice file (multipart form field `file`). Returns `{ filename }`. Max 20MB. |
 | GET    | /api/model-options | Bearer | Returns string array of model names from `MODEL_OPTIONS` env                |
 | GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
+| GET    | /api/playgrounds/file | Bearer | Query `path` = relative path. Returns `{ content: string }`; 404 if not found or not a file. |
 
-When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/model-options`, and `GET /api/playgrounds` require `Authorization: Bearer <password>` or `?token=<password>`.
+When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/model-options`, `GET /api/playgrounds`, and `GET /api/playgrounds/file` require `Authorization: Bearer <password>` or `?token=<password>`.
 
 ## WebSocket
 

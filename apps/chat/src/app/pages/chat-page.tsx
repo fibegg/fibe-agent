@@ -412,36 +412,43 @@ export function ChatPage() {
             )}
             </div>
           </div>
-        </header>
-        {showSearch && (
-          <div className="shrink-0 px-3 sm:px-4 md:px-6 pb-2 sm:pb-3">
-            <div className="relative">
-              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 size-3.5 sm:size-4 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search in conversation..."
-                className="w-full h-8 sm:h-9 pl-8 sm:pl-10 pr-8 sm:pr-10 text-xs sm:text-sm rounded-md bg-background/50 border border-violet-500/30 dark:border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Clear search"
-                >
-                  <X className="size-3.5 sm:size-4" />
-                </button>
-              )}
+          <div
+            className="grid transition-[grid-template-rows] duration-200 ease-out"
+            style={{ gridTemplateRows: showSearch ? '1fr' : '0fr' }}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div
+                className={`pb-2 pt-0.5 transition-opacity duration-200 ${showSearch ? 'opacity-100' : 'opacity-0'}`}
+              >
+                <div className="relative">
+                  <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 size-3.5 sm:size-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search in conversation..."
+                    className="w-full h-8 sm:h-9 pl-8 sm:pl-10 pr-8 sm:pr-10 text-xs sm:text-sm rounded-md bg-input-bg border border-violet-500/30 dark:border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label="Clear search"
+                    >
+                      <X className="size-3.5 sm:size-4" />
+                    </button>
+                  )}
+                </div>
+                {searchQuery && (
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+                    Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
             </div>
-            {searchQuery && (
-              <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-                Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
-              </p>
-            )}
           </div>
-        )}
+        </header>
         {errorMessage && state === CHAT_STATES.ERROR && (
           <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border-subtle">
             <span className="text-destructive text-sm">{errorMessage}</span>
@@ -516,21 +523,11 @@ export function ChatPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500 transition-colors shrink-0"
                   title="Attach file"
                   aria-label="Attach file"
                 >
                   <Paperclip className="size-3.5 sm:size-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
-                  title="Upload photo"
-                  aria-label="Upload photo"
-                >
-                  <ImagePlus className="size-3.5 sm:size-4" />
                 </button>
                 <textarea
                   id="chat-input"
@@ -545,15 +542,25 @@ export function ChatPage() {
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500 transition-colors shrink-0"
+                  title="Upload photo"
+                  aria-label="Upload photo"
+                >
+                  <ImagePlus className="size-3.5 sm:size-4" />
+                </button>
                 {voiceRecorder.isSupported && (
                   <button
                     type="button"
                     onClick={handleVoiceToggle}
                     disabled={state !== CHAT_STATES.AUTHENTICATED}
-                    className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors ${
+                    className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
                       voiceRecorder.isRecording
                         ? 'bg-destructive/90 hover:bg-destructive text-white'
-                        : 'text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
+                        : 'text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500'
                     }`}
                     title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
                     aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}

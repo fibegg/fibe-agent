@@ -1,14 +1,19 @@
 import {
+  AlertTriangle,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
   ChevronsDown,
   ChevronsRight,
   Code,
+  Copy,
+  Download,
   File,
   FileText,
   Folder,
   FolderOpen,
   Image,
+  Info,
   Search,
   Settings,
   Sparkles,
@@ -107,22 +112,105 @@ function getFileIconAndColor(name: string): { Icon: typeof File; color: string }
   return { Icon: File, color: FILE_TYPE_COLOR.file };
 }
 
-function getFileKindLabel(name: string): string {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
-  if (IMAGE_EXT.has(ext)) return 'Image';
-  if (CODE_EXT.has(ext)) return 'Code';
-  if (DOC_EXT.has(ext)) return 'Document';
-  return 'File';
-}
-
-function getFileExtension(name: string): string {
-  if (!name.includes('.')) return '—';
-  return name.slice(name.lastIndexOf('.')).toLowerCase();
-}
-
 function FileTypeIcon({ name }: { name: string }) {
   const { Icon, color } = getFileIconAndColor(name);
   return <Icon className={`size-3.5 shrink-0 ${color}`} aria-hidden />;
+}
+
+interface CodeReviewIssue {
+  type: 'error' | 'warning' | 'info' | 'success';
+  line?: number;
+  message: string;
+  suggestion?: string;
+}
+
+function mockCodeReview(fileName: string): CodeReviewIssue[] {
+  if (fileName.endsWith('.md')) {
+    return [
+      { type: 'success', message: 'Markdown syntax is valid' },
+      { type: 'info', message: 'Consider adding more section headings for better structure' },
+      { type: 'info', line: 5, message: 'This section could benefit from code examples' },
+    ];
+  }
+  if (fileName.endsWith('.json')) {
+    return [
+      { type: 'success', message: 'JSON structure is valid' },
+      { type: 'warning', line: 12, message: 'Consider using semantic versioning for version field' },
+    ];
+  }
+  return [
+    { type: 'success', message: 'Code structure looks good' },
+    {
+      type: 'warning',
+      line: 45,
+      message: 'Consider extracting this logic into a separate function',
+      suggestion: 'function extractedLogic() { ... }',
+    },
+    { type: 'info', line: 78, message: 'This variable could be renamed for better clarity' },
+    {
+      type: 'error',
+      line: 120,
+      message: 'Potential null reference error',
+      suggestion: 'Add null check before accessing property',
+    },
+  ];
+}
+
+function getIssueIcon(type: string) {
+  switch (type) {
+    case 'error':
+      return <AlertTriangle className="size-4 text-red-500" />;
+    case 'warning':
+      return <AlertTriangle className="size-4 text-amber-500" />;
+    case 'success':
+      return <CheckCircle2 className="size-4 text-green-500" />;
+    default:
+      return <Info className="size-4 text-blue-500" />;
+  }
+}
+
+function getIssueColor(type: string): string {
+  switch (type) {
+    case 'error':
+      return 'border-red-500/30 bg-red-500/5';
+    case 'warning':
+      return 'border-amber-500/30 bg-amber-500/5';
+    case 'success':
+      return 'border-green-500/30 bg-green-500/5';
+    default:
+      return 'border-blue-500/30 bg-blue-500/5';
+  }
+}
+
+function contentToUnifiedDiff(content: string): string {
+  const lines = content.split(/\r?\n/);
+  const n = lines.length;
+  if (n === 0) return '@@ -0,0 +0,0 @@';
+  return `@@ -0,0 +1,${n} @@\n${lines.map((l) => `+ ${l}`).join('\n')}`;
+}
+
+function renderDiffLine(line: string, index: number) {
+  const isAddition = line.startsWith('+') && !line.startsWith('+++');
+  const isDeletion = line.startsWith('-') && !line.startsWith('---');
+  const isHeader = line.startsWith('@@');
+  let className = 'flex px-4 py-0.5 ';
+  if (isHeader) {
+    className += 'bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold';
+  } else if (isAddition) {
+    className += 'bg-green-500/10 text-green-700 dark:text-green-400';
+  } else if (isDeletion) {
+    className += 'bg-red-500/10 text-red-700 dark:text-red-400';
+  } else {
+    className += 'text-muted-foreground';
+  }
+  return (
+    <div key={index} className={className}>
+      <span className="select-none shrink-0 w-8 text-right pr-3 text-muted-foreground/70">
+        {index + 1}
+      </span>
+      <span className="min-w-0">{line}</span>
+    </div>
+  );
 }
 
 function FileDetailsDialog({
@@ -132,6 +220,10 @@ function FileDetailsDialog({
   entry: PlaygroundEntry;
   onClose: () => void;
 }) {
+  const [content, setContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -140,17 +232,74 @@ function FileDetailsDialog({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
 
-  const { Icon, color } = getFileIconAndColor(entry.name);
-  const kind = getFileKindLabel(entry.name);
-  const extension = getFileExtension(entry.name);
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setFetchError(null);
+    setContent(null);
+    const base = getApiUrl();
+    const url = base
+      ? `${base}/api/playgrounds/file?path=${encodeURIComponent(entry.path)}`
+      : `/api/playgrounds/file?path=${encodeURIComponent(entry.path)}`;
+    const token = getAuthTokenForRequest();
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    fetch(url, { headers })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (!res.ok) {
+          if (res.status === 404) {
+            setContent('');
+            return;
+          }
+          throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to load file');
+        }
+        const data = (await res.json()) as { content?: string };
+        setContent(typeof data.content === 'string' ? data.content : '');
+      })
+      .catch((e) => {
+        if (!cancelled) setFetchError(e instanceof Error ? e.message : 'Failed to load file');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [entry.path]);
+
+  const handleCopy = useCallback(() => {
+    if (content === null) return;
+    void navigator.clipboard.writeText(content);
+  }, [content]);
+
+  const handleDownload = useCallback(() => {
+    if (content === null) return;
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = entry.name;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }, [content, entry.name]);
+
+  const issues = mockCodeReview(entry.name);
+  const errorCount = issues.filter((i) => i.type === 'error').length;
+  const warningCount = issues.filter((i) => i.type === 'warning').length;
+  const infoCount = issues.filter((i) => i.type === 'info').length;
+  const successCount = issues.filter((i) => i.type === 'success').length;
+  const diffContent =
+    content !== null && !loading && !fetchError ? contentToUnifiedDiff(content) : '';
+  const diffLines = diffContent ? diffContent.split('\n') : [];
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="flex flex-col w-full max-w-[95vw] sm:max-w-[90vw] sm:w-[90vw] h-[85vh] sm:h-[90vh] max-h-[calc(100vh-2rem)] bg-background/95 dark:bg-[#0f0f14]/95 backdrop-blur-xl border border-violet-500/30 rounded-xl shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden"
+        className="flex flex-col w-full max-w-[95vw] sm:max-w-[90vw] sm:w-[90vw] h-[85vh] sm:h-[90vh] max-h-[calc(100vh-2rem)] bg-background/80 dark:bg-background/75 backdrop-blur-xl border border-border dark:border-violet-500/30 rounded-xl shadow-card dark:shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-4 sm:p-6 border-b border-border-subtle bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-violet-500/10 backdrop-blur-sm shrink-0">
@@ -161,7 +310,7 @@ function FileDetailsDialog({
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 sm:gap-3">
-                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">File details</h2>
+                  <h2 className="text-xl font-semibold text-foreground">AI Code Review</h2>
                   <button
                     type="button"
                     onClick={onClose}
@@ -174,60 +323,145 @@ function FileDetailsDialog({
                 <p className="text-sm text-muted-foreground mt-1 truncate" title={entry.name}>
                   {entry.name}
                 </p>
+                <div className="flex gap-3 mt-3 text-foreground">
+                  {errorCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className="size-2 rounded-full bg-red-500" />
+                      <span>{errorCount} Error{errorCount !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                  {warningCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className="size-2 rounded-full bg-amber-500" />
+                      <span>{warningCount} Warning{warningCount !== 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+                  {infoCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className="size-2 rounded-full bg-blue-500" />
+                      <span>{infoCount} Info</span>
+                    </div>
+                  )}
+                  {successCount > 0 && (
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className="size-2 rounded-full bg-green-500" />
+                      <span>{successCount} Success</span>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
-          <div className="flex-1 flex flex-col border-b sm:border-b-0 sm:border-r border-border-subtle min-h-0">
-            <div className="px-4 py-3 border-b border-border-subtle bg-muted/30 backdrop-blur-sm shrink-0">
-              <h3 className="text-sm font-medium text-foreground">File info</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">Metadata for selected file</p>
-            </div>
-            <div className="flex-1 overflow-auto min-h-0 p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-muted/50">
-                  <Icon className={`size-5 ${color}`} aria-hidden />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate" title={entry.name}>
-                    {entry.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate font-mono" title={entry.path}>
-                    {entry.path}
-                  </p>
-                </div>
+        <div className="flex-1 flex overflow-hidden min-h-0">
+          <div className="flex-1 flex flex-col border-r border-border-subtle min-h-0">
+            <div className="px-4 py-3 border-b border-border-subtle bg-muted/30 backdrop-blur-sm shrink-0 flex items-center justify-between">
+              <h3 className="text-sm font-medium text-foreground">Git Diff Changes</h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  disabled={content === null || loading}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50"
+                >
+                  <Copy className="size-3" />
+                  Copy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDownload}
+                  disabled={content === null || loading}
+                  className="flex items-center gap-1.5 rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50"
+                >
+                  <Download className="size-3" />
+                  Download
+                </button>
               </div>
-              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-xs">
-                <dt className="text-muted-foreground">Kind</dt>
-                <dd className="text-foreground">{kind}</dd>
-                <dt className="text-muted-foreground">Type</dt>
-                <dd className="text-foreground">File</dd>
-                <dt className="text-muted-foreground">Extension</dt>
-                <dd className="text-foreground font-mono">{extension}</dd>
-                <dt className="text-muted-foreground">Path</dt>
-                <dd className="text-foreground font-mono truncate" title={entry.path}>
-                  {entry.path}
-                </dd>
-              </dl>
+            </div>
+            <div className="flex-1 overflow-auto min-h-0">
+              {loading && (
+                <div className="p-4 flex items-center justify-center text-sm text-muted-foreground">
+                  Loading…
+                </div>
+              )}
+              {fetchError && (
+                <div className="p-4 rounded-xl border border-border-subtle bg-muted/20 m-4 text-center">
+                  <p className="text-sm text-muted-foreground">{fetchError}</p>
+                </div>
+              )}
+              {!loading && !fetchError && diffLines.length === 0 && content !== null && (
+                <div className="p-4 text-sm text-muted-foreground">Empty file</div>
+              )}
+              {!loading && !fetchError && diffLines.length > 0 && (
+                <pre className="text-xs font-mono bg-muted/30 dark:bg-card/40 backdrop-blur-sm border-b border-border-subtle p-0 m-0 min-h-full">
+                  <code className="block">
+                    {diffLines.map((line, index) => renderDiffLine(line, index))}
+                  </code>
+                </pre>
+              )}
             </div>
           </div>
 
-          <div className="w-full sm:w-96 flex flex-col min-h-0 min-w-0 bg-card/20 backdrop-blur-sm shrink-0 sm:shrink">
+          <div className="w-96 flex flex-col min-h-0 min-w-0 bg-muted/20 dark:bg-card/20 backdrop-blur-sm shrink-0">
             <div className="px-4 py-3 border-b border-border-subtle bg-gradient-to-r from-violet-500/10 to-purple-500/10 backdrop-blur-sm shrink-0">
-              <h3 className="text-sm font-medium text-foreground">Preview</h3>
-              <p className="text-xs text-muted-foreground mt-0.5">File content</p>
+              <h3 className="text-sm font-medium text-foreground">AI Analysis</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Powered by Phoenix AI</p>
             </div>
-            <div className="flex-1 overflow-auto min-h-0 p-4">
-              <div className="rounded-xl border border-border-subtle bg-muted/20 backdrop-blur-sm p-4 text-center">
-                <p className="text-sm text-muted-foreground">
-                  Content preview is not available for this file.
-                </p>
-                <p className="text-xs text-muted-foreground mt-1">
-                  File content can be loaded when an API is connected.
-                </p>
+            <div className="flex-1 overflow-auto min-h-0">
+              <div className="p-4 space-y-3">
+                {issues.map((issue, index) => (
+                  <div
+                    key={index}
+                    className={`p-4 rounded-xl border backdrop-blur-sm text-foreground ${getIssueColor(issue.type)}`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 mt-0.5">{getIssueIcon(issue.type)}</div>
+                      <div className="flex-1 min-w-0">
+                        {issue.line != null && (
+                          <div className="text-xs font-mono text-muted-foreground mb-1">
+                            Line {issue.line}
+                          </div>
+                        )}
+                        <p className="text-sm leading-relaxed text-foreground">{issue.message}</p>
+                        {issue.suggestion && (
+                          <div className="mt-2 p-2 bg-background/50 backdrop-blur-sm rounded-lg border border-border-subtle">
+                            <p className="text-xs text-muted-foreground mb-1">Suggestion:</p>
+                            <code className="text-xs font-mono text-foreground">{issue.suggestion}</code>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div className="mt-6 p-4 rounded-xl bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/20 backdrop-blur-sm text-foreground">
+                  <div className="flex items-start gap-3">
+                    <Sparkles className="size-5 text-violet-400 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <h4 className="font-medium mb-2 text-foreground">Overall Assessment</h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Your code quality is good with minor improvements needed. The structure is
+                        solid, but consider the suggestions above to enhance maintainability and
+                        prevent potential issues.
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
+            <div className="p-4 border-t border-border-subtle space-y-2 backdrop-blur-sm">
+              <button
+                type="button"
+                className="w-full h-9 rounded-md bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white text-sm font-medium shadow-lg shadow-violet-500/20"
+              >
+                Apply Suggestions
+              </button>
+              <button
+                type="button"
+                className="w-full h-9 rounded-md border border-border hover:bg-muted/50 dark:border-violet-500/30 dark:hover:bg-violet-500/10 text-foreground text-sm font-medium"
+              >
+                Export Report
+              </button>
             </div>
           </div>
         </div>
@@ -269,7 +503,7 @@ function TreeNode({
         className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs rounded-md cursor-pointer transition-all hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-violet-500/5"
         style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
       >
-        <span className="w-3 flex shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
+        <span className="w-3 flex shrink-0 items-center justify-center text-foreground/70 dark:text-muted-foreground" aria-hidden>
           {isDir && hasChildren ? (
             isOpen ? (
               <ChevronDown className="size-3" />
@@ -282,9 +516,9 @@ function TreeNode({
         </span>
         {isDir ? (
           isOpen ? (
-            <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+            <FolderOpen className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
           ) : (
-            <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+            <Folder className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
           )
         ) : (
           <FileTypeIcon name={entry.name} />
@@ -393,7 +627,7 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
   const filteredTree = filterTreeByQuery(tree, searchQuery);
 
   const toolbarBtnClass =
-    'rounded-md text-[9px] sm:text-[10px] font-medium text-white hover:bg-violet-500/10 hover:text-violet-400 transition-colors';
+    'rounded-md text-[9px] sm:text-[10px] font-medium text-foreground dark:text-white hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400 transition-colors';
 
   return (
     <>
@@ -412,7 +646,7 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors"
+              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
               title="Settings"
               aria-label="Settings"
             >

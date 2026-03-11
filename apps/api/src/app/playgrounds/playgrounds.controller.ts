@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { PlaygroundsService } from './playgrounds.service';
 
@@ -10,5 +10,13 @@ export class PlaygroundsController {
   @Get('playgrounds')
   getTree() {
     return this.playgrounds.getTree();
+  }
+
+  @Get('playgrounds/file')
+  getFileContent(@Query('path') path: string) {
+    if (!path || typeof path !== 'string') {
+      return { content: '' };
+    }
+    return { content: this.playgrounds.getFileContent(path) };
   }
 }
