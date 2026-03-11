@@ -123,8 +123,8 @@ export function LoginPage() {
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
-                  <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Authenticating...
+                  <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span className="text-xs sm:text-sm">Authenticating...</span>
                 </span>
               ) : (
                 'Login'
