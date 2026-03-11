@@ -71,6 +71,8 @@ export class OrchestratorService implements OnModuleInit {
     text?: string;
     model?: string;
     images?: string[];
+    audio?: string;
+    audioFilename?: string;
   }): Promise<void> {
     const action = msg.action;
 
@@ -94,7 +96,7 @@ export class OrchestratorService implements OnModuleInit {
         this.handleLogout();
         break;
       case WS_ACTION.SEND_CHAT_MESSAGE:
-        await this.handleChatMessage(msg.text ?? '', msg.images);
+        await this.handleChatMessage(msg.text ?? '', msg.images, msg.audio, msg.audioFilename);
         break;
       case WS_ACTION.GET_MODEL:
         this.handleGetModel();
@@ -175,7 +177,7 @@ export class OrchestratorService implements OnModuleInit {
     this.strategy.executeLogout(connection);
   }
 
-  private async handleChatMessage(text: string, images?: string[]): Promise<void> {
+  private async handleChatMessage(text: string, images?: string[], audio?: string, audioFilenameFromClient?: string): Promise<void> {
     if (!this.isAuthenticated) {
       this._send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
       return;
@@ -199,6 +201,15 @@ export class OrchestratorService implements OnModuleInit {
       }
     }
 
+    let audioFilename: string | null = audioFilenameFromClient ?? null;
+    if (!audioFilename && audio) {
+      try {
+        audioFilename = this.uploadsService.saveAudio(audio);
+      } catch {
+        this.logger.warn('Failed to save voice recording, skipping');
+      }
+    }
+
     const userMessage = this.messageStore.add('user', text, imageUrls.length ? imageUrls : undefined);
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
 
@@ -217,7 +228,14 @@ export class OrchestratorService implements OnModuleInit {
         ? `\n\nThe user attached ${paths.length} image(s). Full paths (for reference):\n${paths.map((p) => `- ${p}`).join('\n')}\n\n`
         : '';
     }
-    const fullPrompt = `${systemPrompt}${imageContext}\n${text}`.trim();
+
+    let voiceContext = '';
+    if (audioFilename) {
+      const path = this.uploadsService.getPath(audioFilename);
+      voiceContext = path ? `\n\nThe user attached a voice recording. File path: ${path}\n\n` : '';
+    }
+
+    const fullPrompt = `${systemPrompt}${imageContext}${voiceContext}\n${text}`.trim();
     const model = this.modelStore.get();
 
     let accumulated = '';

@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import multipart from '@fastify/multipart';
 import { WebSocketServer } from 'ws';
 import { AppModule } from './app/app.module';
 import { ConfigService } from './app/config/config.service';
@@ -20,6 +21,9 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter()
   );
+  const fastify = app.getHttpAdapter().getInstance();
+  await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
+
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
   const port = process.env.PORT ?? 3000;
@@ -30,7 +34,6 @@ async function bootstrap() {
 
   const config = app.get(ConfigService);
   const orchestrator = app.get(OrchestratorService);
-  const fastify = app.getHttpAdapter().getInstance();
   const server = (fastify as { server: import('http').Server }).server;
   const wss = new WebSocketServer({ server, path: '/ws' });
 
@@ -71,6 +74,8 @@ async function bootstrap() {
           text?: string;
           model?: string;
           images?: string[];
+          audio?: string;
+          audioFilename?: string;
         };
         void orchestrator.handleClientMessage(msg);
       } catch {

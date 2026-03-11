@@ -91,4 +91,35 @@ describe('OrchestratorService', () => {
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
   });
+
+  test('handleClientMessage send_chat_message with audioFilename streams response', async () => {
+    const orch = await createOrchestrator();
+    const uploads = new UploadsService({ getDataDir: () => dataDir } as never);
+    const filename = uploads.saveAudioFromBuffer(Buffer.from('audio'), 'audio/webm');
+    const events: Array<{ type: string }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'Hello',
+      audioFilename: filename,
+    });
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.ERROR)).toBe(false);
+  });
+
+  test('handleClientMessage send_chat_message with audio base64 saves and streams', async () => {
+    const orch = await createOrchestrator();
+    const dataUrl = 'data:audio/webm;base64,' + Buffer.from('voice').toString('base64');
+    const events: Array<{ type: string }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'Hi',
+      audio: dataUrl,
+    });
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.ERROR)).toBe(false);
+  });
 });

@@ -11,7 +11,8 @@ Nest Fastify API (project `api`).
 | GET    | /api            | No    | Returns `{ message: 'Hello API' }`                                          |
 | POST   | /api/login      | No    | Body `{ password? }`. Returns `{ success, message?, token? }` or 401       |
 | GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls? }[]`     |
-| GET    | /api/uploads/:filename | Bearer | Serves an uploaded image file (from chat attachments)        |
+| GET    | /api/uploads/:filename | Bearer | Serves an uploaded file (images or voice recordings from chat attachments)        |
+| POST   | /api/uploads           | Bearer | Upload a voice file (multipart form field `file`). Returns `{ filename }`. Max 20MB. |
 | GET    | /api/model-options | Bearer | Returns string array of model names from `MODEL_OPTIONS` env                |
 | GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
 
@@ -38,7 +39,7 @@ When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/model-options`, and
 | cancel_auth        | —           | Cancel ongoing auth           |
 | reauthenticate     | —           | Clear credentials and re-auth |
 | logout             | —           | Log out from provider         |
-| send_chat_message  | `{ text, images? }`  | Send user message (optional base64 data URL array `images`) and stream  |
+| send_chat_message  | `{ text, images?, audio?, audioFilename? }`  | Send user message; optional `images` (base64), optional `audio` (base64), or `audioFilename` (from POST /api/uploads); stream response  |
 | get_model          | —           | Request current model          |
 | set_model          | `{ model }` | Set model name                 |
 
