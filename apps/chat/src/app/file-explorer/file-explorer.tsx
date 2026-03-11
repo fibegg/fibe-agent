@@ -66,41 +66,19 @@ function filterTreeByQuery(entries: PlaygroundEntry[], query: string): Playgroun
 function FolderIcon({ open }: { open: boolean }) {
   return (
     <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
+      viewBox="0 0 24 24"
       fill="none"
-      className="shrink-0 text-violet-400"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5 shrink-0 text-violet-400"
       aria-hidden
     >
       {open ? (
-        <>
-          <path
-            d="M2 4h4l2 2h6v6H2V4z"
-            fill="currentColor"
-            opacity={0.4}
-          />
-          <path
-            d="M2 4v8h12V6H8L6 4H2z"
-            stroke="currentColor"
-            strokeWidth="1"
-            fill="none"
-          />
-        </>
+        <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.93 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.69.9L15 12" />
       ) : (
-        <>
-          <path
-            d="M2 5h4l2 2h6v5H2V5z"
-            fill="currentColor"
-            opacity={0.4}
-          />
-          <path
-            d="M2 5v6h12V7H8L6 5H2z"
-            stroke="currentColor"
-            strokeWidth="1"
-            fill="none"
-          />
-        </>
+        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
       )}
     </svg>
   );
@@ -109,20 +87,17 @@ function FolderIcon({ open }: { open: boolean }) {
 function FileIcon() {
   return (
     <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
+      viewBox="0 0 24 24"
       fill="none"
-      className="shrink-0 text-muted-foreground"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="size-3.5 shrink-0 text-muted-foreground"
       aria-hidden
     >
-      <path
-        d="M4 2h6l4 4v8H4V2z"
-        stroke="currentColor"
-        strokeWidth="1"
-        fill="none"
-      />
-      <path d="M10 2v4h4" stroke="currentColor" strokeWidth="1" fill="none" />
+      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
+      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
     </svg>
   );
 }
@@ -312,7 +287,7 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="size-7 sm:size-8 flex items-center justify-center rounded-lg text-violet-400 hover:bg-violet-500/10 transition-colors"
+              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors"
               title="Settings"
               aria-label="Settings"
             >

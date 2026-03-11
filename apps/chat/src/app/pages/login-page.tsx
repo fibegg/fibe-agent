@@ -96,7 +96,7 @@ export function LoginPage() {
             </div>
 
           {error && (
-            <div className="mb-4 p-3 rounded-lg bg-destructive/10 text-destructive text-sm border border-destructive/20">
+            <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm border border-destructive/20">
               {error}
             </div>
           )}
@@ -112,14 +112,14 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter password to continue"
-                className="w-full h-10 sm:h-11 px-4 rounded-lg text-sm bg-slate-900/50 border border-violet-500/20 text-white placeholder:text-violet-300/30 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20"
+                className="w-full h-10 sm:h-11 px-4 rounded-md text-sm bg-slate-900/50 border border-violet-500/20 text-white placeholder:text-violet-300/30 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20"
                 disabled={loading}
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-10 sm:h-11 text-sm font-medium rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-lg shadow-violet-500/30 transition-all duration-300 hover:shadow-violet-500/50 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              className="w-full h-10 sm:h-11 text-sm font-medium rounded-md bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white shadow-lg shadow-violet-500/30 transition-all duration-300 hover:shadow-violet-500/50 hover:scale-[1.02] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">

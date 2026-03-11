@@ -352,7 +352,7 @@ export function ChatPage() {
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(false)}
-                  className="absolute top-3 right-3 z-10 size-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
+                  className="absolute top-3 right-3 z-10 size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
                   aria-label="Close"
                 >
                   <XIcon className="size-4" />
@@ -378,7 +378,7 @@ export function ChatPage() {
             <button
               type="button"
               onClick={() => setShowSearch((v) => !v)}
-              className="size-7 sm:size-8 flex items-center justify-center rounded-lg text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
               title="Search in conversation"
               aria-label="Search in conversation"
             >
@@ -395,7 +395,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-                className="px-3 py-1.5 rounded-lg text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+                className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
               >
                 {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
               </button>
@@ -404,7 +404,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={logout}
-                className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
+                className="px-3 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
               >
                 Logout
               </button>
@@ -514,7 +514,7 @@ export function ChatPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="hidden sm:flex size-8 sm:size-9 rounded-lg items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                  className="hidden sm:flex size-8 sm:size-9 rounded-md items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
                   title="Attach image"
                   aria-label="Attach image"
                 >
@@ -538,7 +538,7 @@ export function ChatPage() {
                     type="button"
                     onClick={handleVoiceToggle}
                     disabled={state !== CHAT_STATES.AUTHENTICATED}
-                    className={`size-8 sm:size-9 rounded-lg flex items-center justify-center transition-colors ${
+                    className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors ${
                       voiceRecorder.isRecording
                         ? 'bg-destructive/90 hover:bg-destructive text-white'
                         : 'text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
@@ -562,7 +562,7 @@ export function ChatPage() {
                   type="button"
                   onClick={handleSend}
                   disabled={state !== CHAT_STATES.AUTHENTICATED}
-                  className="size-8 sm:size-9 rounded-lg flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
                   aria-label="Send"
                 >
                   <SendIcon className="size-3.5 sm:size-4" />

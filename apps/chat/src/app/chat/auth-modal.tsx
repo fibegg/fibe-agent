@@ -53,7 +53,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           <button
             type="button"
             onClick={onClose}
-            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
+            className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
             aria-label="Close"
           >
             &times;

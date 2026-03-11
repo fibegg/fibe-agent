@@ -79,7 +79,7 @@ export function MessageList({
                 <UserIcon className="size-3.5 sm:size-4" />
               </div>
             ) : (
-              <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white">
+              <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white">
                 <SparklesIcon className="size-3.5 sm:size-4" />
               </div>
             )}
@@ -135,7 +135,7 @@ export function MessageList({
       ))}
       {isStreaming && (
         <div className="flex gap-4">
-          <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white flex-shrink-0">
+          <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white flex-shrink-0">
             <SparklesIcon className="size-4" />
           </div>
           <div className="flex-1 min-w-0">
