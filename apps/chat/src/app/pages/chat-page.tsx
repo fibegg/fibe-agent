@@ -366,7 +366,7 @@ export function ChatPage() {
           </div>
         )}
         <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
-            <div className="max-w-4xl mx-auto">
+            <div className="max-w-4xl">
               <MessageList
                 messages={messages}
                 streamingText={streamingText}
@@ -376,7 +376,7 @@ export function ChatPage() {
             </div>
         </div>
         <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
-            <div className="max-w-4xl mx-auto flex flex-col gap-2">
+            <div className="max-w-4xl flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
                   {pendingVoice && (
