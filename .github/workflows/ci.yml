@@ -1,43 +1,92 @@
-name: CI
+name: CI/CD
 
 on:
   push:
-    branches:
-      - main
-      - dev
+    branches: [main, dev]
   pull_request:
-    branches:
-      - main
-      - dev
-
-permissions:
-  actions: read
-  contents: read
+    branches: [main]
 
 jobs:
-  main:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          filter: tree:0
-          fetch-depth: 0
+          bun-version: latest
 
-      # This enables task distribution via Nx Cloud
-      # Run this command as early as possible, before dependencies are installed
-      # Learn more at https://nx.dev/ci/reference/nx-cloud-cli#npx-nxcloud-startcirun
-      # Uncomment this line to enable task distribution
-      # - run: npx nx start-ci-run --distribute-on="3 linux-medium-js" --stop-agents-after="e2e-ci"
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
 
-      - uses: oven-sh/setup-bun@v2
+      - name: Run Lint
+        run: bun run lint
 
-      - run: bun install
-      - run: bunx playwright install --with-deps chromium
+      - name: Run Unit Tests
+        run: bun run test
 
-      # Prepend any command with "nx record --" to record its logs to Nx Cloud
-      # - run: bunx nx record -- echo Hello World
-      # When you enable task distribution, run the e2e-ci task instead of e2e
-      - run: bun run ci
-      # Nx Cloud recommends fixes for failures to help you get CI green faster. Learn more: https://nx.dev/ci/features/self-healing-ci
-      - run: npx nx fix-ci
-        if: always()
+      - name: Run Integration Tests
+        if: hashFiles('tests/bin/gemini') != ''
+        run: |
+          sed -i 's/\r$//' tests/bin/gemini
+          chmod +x tests/bin/gemini
+          bun run test:integration
+
+  build-and-push:
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        provider:
+          - key: gemini
+            tag: gemini
+          - key: claude_code
+            tag: claude-code
+          - key: openai_codex
+            tag: openai-codex
+          - key: opencode
+            tag: opencode
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Lowercase Repository Owner
+        id: repo_owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
+
+      - name: Determine image tag suffix
+        id: tag_suffix
+        run: |
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            echo "latest_tag=latest" >> $GITHUB_OUTPUT
+          else
+            echo "latest_tag=latest-${{ github.ref_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker Setup Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            AGENT_PROVIDER=${{ matrix.provider.key }}
+          tags: |
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/phoenix-agent-oauth:${{ matrix.provider.tag }}-${{ steps.tag_suffix.outputs.latest_tag }}
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/phoenix-agent-oauth:${{ matrix.provider.tag }}-${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.provider.key }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.provider.key }}
