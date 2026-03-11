@@ -1,11 +1,11 @@
+import { ImagePlus, Key, LogOut, Menu, Mic, Paperclip, Search, Send, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type ChatMessage } from '../chat/message-list';
 import { ModelSelector } from '../chat/model-selector';
-import { ThemeToggle } from '../theme-toggle';
 import { FileExplorer } from '../file-explorer/file-explorer';
-import { SIDEBAR_WIDTH_PX } from '../layout-constants';
+import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from '../chat/chat-state';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
@@ -29,11 +29,17 @@ const STATE_LABELS: Record<string, string> = {
 
 const MODEL_DEBOUNCE_MS = 500;
 const MAX_PENDING_IMAGES = 5;
+const MOBILE_BREAKPOINT_PX = 1024;
 
 export function ChatPage() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [isMobile, setIsMobile] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
   const [modelOptions, setModelOptions] = useState<string[]>([]);
@@ -93,6 +99,17 @@ export function ChatPage() {
       loadModelOptions();
     }
   }, [authenticated, loadMessages, loadModelOptions]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < MOBILE_BREAKPOINT_PX);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  useEffect(() => {
+    if (!isMobile) setSidebarOpen(false);
+  }, [isMobile]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -283,6 +300,8 @@ export function ChatPage() {
     [send]
   );
 
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
+
   if (!authenticated) {
     return null;
   }
@@ -301,21 +320,141 @@ export function ChatPage() {
     state === CHAT_STATES.AUTH_PENDING &&
     !!(authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
+  const filteredMessages =
+    searchQuery.trim() === ''
+      ? messages
+      : messages.filter((m) => m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase()));
+
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-background text-foreground">
+    <div className="size-full flex overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
         onClose={cancelAuth}
         onSubmitCode={submitAuthCode}
       />
-      <div className="min-h-0">
-        <header className="flex items-center justify-between p-4 border-b border-border flex-wrap gap-2 shadow-soft">
-          <div>
-            <h1 className="text-lg font-semibold text-foreground">AI Assistant</h1>
-            <p className={`text-sm ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
+      {settingsOpen && (
+        <>
+          <div
+            className="fixed inset-0 z-50 bg-black/50"
+            aria-hidden
+            onClick={closeSettings}
+          />
+          <div
+            className="fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border shadow-card overflow-hidden"
+            style={{ backgroundColor: 'var(--card)' }}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="settings-dialog-title"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+              <h2 id="settings-dialog-title" className="text-lg font-semibold text-foreground">
+                Settings
+              </h2>
+              <button
+                type="button"
+                onClick={closeSettings}
+                className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
+                aria-label="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center justify-between py-2">
+                <span className="text-sm font-medium text-foreground">Dark mode</span>
+                <ThemeToggle />
+              </div>
+              {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeSettings();
+                    state === CHAT_STATES.UNAUTHENTICATED ? startAuth() : reauthenticate();
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-violet-500/10 transition-colors"
+                >
+                  <Key className="size-4" />
+                  {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Re-authenticate'}
+                </button>
+              )}
+              {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeSettings();
+                    logout();
+                  }}
+                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 text-sm font-medium transition-colors"
+                >
+                  <LogOut className="size-4" />
+                  Logout
+                </button>
+              )}
+              <p className="text-xs text-muted-foreground pt-2">
+                Phoenix Quantum Storage · v2.4.1
+              </p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+        </>
+      )}
+      {isMobile && (
+        <>
+          <div className="fixed top-4 left-4 z-40 lg:hidden">
+            <button
+              type="button"
+              onClick={() => setSidebarOpen(true)}
+              className="size-12 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/30 border border-violet-400/20 flex items-center justify-center text-white"
+              aria-label="Open file explorer"
+            >
+              <Menu className="size-5" />
+            </button>
+          </div>
+          {sidebarOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-50 bg-black/50 lg:hidden"
+                aria-hidden
+                onClick={() => setSidebarOpen(false)}
+              />
+              <div className="fixed left-0 top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(false)}
+                  className="absolute top-3 right-3 z-10 size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
+                  aria-label="Close"
+                >
+                  <X className="size-4" />
+                </button>
+                <FileExplorer fullWidth onSettingsClick={() => setSettingsOpen(true)} />
+              </div>
+            </>
+          )}
+        </>
+      )}
+      {!isMobile && (
+        <aside className="flex min-h-0 w-full flex-shrink-0 flex-col overflow-hidden lg:w-80">
+          <FileExplorer onSettingsClick={() => setSettingsOpen(true)} />
+        </aside>
+      )}
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
+        <header className="flex shrink-0 flex-col px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border-subtle bg-card/40 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-2 sm:mb-3">
+            <div>
+              <h2 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h2>
+              <p className={`text-[10px] sm:text-xs ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
+            </div>
+            <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={() => setShowSearch((v) => !v)}
+              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+              title="Search in conversation"
+              aria-label="Search in conversation"
+            >
+              <Search className="size-3.5 sm:size-4" />
+            </button>
             <ModelSelector
               currentModel={currentModel}
               options={modelOptions}
@@ -327,7 +466,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-                className="px-3 py-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
+                className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
               >
                 {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
               </button>
@@ -336,16 +475,52 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={logout}
-                className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-sm font-medium transition-colors"
+                className="px-3 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
               >
                 Logout
               </button>
             )}
-            <ThemeToggle />
+            </div>
+          </div>
+          <div
+            className="grid transition-[grid-template-rows] duration-200 ease-out"
+            style={{ gridTemplateRows: showSearch ? '1fr' : '0fr' }}
+          >
+            <div className="min-h-0 overflow-hidden">
+              <div
+                className={`pb-2 pt-0.5 transition-opacity duration-200 ${showSearch ? 'opacity-100' : 'opacity-0'}`}
+              >
+                <div className="relative">
+                  <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 size-3.5 sm:size-4 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search in conversation..."
+                    className="w-full h-8 sm:h-9 pl-8 sm:pl-10 pr-8 sm:pr-10 text-xs sm:text-sm rounded-md bg-input-bg border border-violet-500/30 dark:border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label="Clear search"
+                    >
+                      <X className="size-3.5 sm:size-4" />
+                    </button>
+                  )}
+                </div>
+                {searchQuery && (
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+                    Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
         </header>
         {errorMessage && state === CHAT_STATES.ERROR && (
-          <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border">
+          <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border-subtle">
             <span className="text-destructive text-sm">{errorMessage}</span>
             <button
               type="button"
@@ -356,37 +531,27 @@ export function ChatPage() {
             </button>
           </div>
         )}
-      </div>
-
-      <div
-        className="grid min-h-0 overflow-hidden"
-        style={{ gridTemplateColumns: `${SIDEBAR_WIDTH_PX}px 1fr` }}
-      >
-        <aside className="flex min-h-0 flex-col overflow-hidden">
-          <FileExplorer />
-        </aside>
-        <main className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-auto p-4">
-            <div className="max-w-3xl mx-auto">
+        <div className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+            <div className="max-w-4xl">
               <MessageList
-                messages={messages}
+                messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
               />
               <div ref={messagesEndRef} />
             </div>
-          </div>
-          <div className="shrink-0 border-t border-border bg-card/50 p-4">
-            <div className="max-w-3xl mx-auto flex flex-col gap-2">
+        </div>
+        <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
+            <div className="max-w-4xl flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
                   {pendingVoice && (
-                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card">
+                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-border-subtle bg-card/60">
                       <audio src={pendingVoice} controls className="max-h-10 min-w-[160px]" />
                       <button
                         type="button"
                         onClick={removePendingVoice}
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center hover:opacity-90"
                         aria-label="Remove voice"
                       >
                         ×
@@ -398,12 +563,12 @@ export function ChatPage() {
                       <img
                         src={dataUrl}
                         alt=""
-                        className="w-16 h-16 object-cover rounded border border-border"
+                        className="w-16 h-16 object-cover rounded-xl border border-border-subtle"
                       />
                       <button
                         type="button"
                         onClick={() => removePendingImage(i)}
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center hover:opacity-90"
                         aria-label="Remove image"
                       >
                         ×
@@ -415,7 +580,7 @@ export function ChatPage() {
               {(voiceRecorder.error || voiceUploadError) && (
                 <p className="text-destructive text-sm">{voiceRecorder.error ?? voiceUploadError}</p>
               )}
-              <div className="flex gap-2 items-end">
+              <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border p-2 sm:p-3 shadow-xl shadow-violet-500/5">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -424,28 +589,48 @@ export function ChatPage() {
                   className="hidden"
                   onChange={handleFileChange}
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500 transition-colors shrink-0"
+                  title="Attach file"
+                  aria-label="Attach file"
+                >
+                  <Paperclip className="size-3.5 sm:size-4" />
+                </button>
                 <textarea
                   id="chat-input"
-                  className="flex-1 min-h-[44px] max-h-32 px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder-muted-foreground resize-y disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+                  className="flex-1 bg-transparent outline-none resize-none text-xs sm:text-sm py-2 min-h-[24px] max-h-32 text-foreground placeholder-muted-foreground disabled:opacity-50"
                   placeholder={
                     state === CHAT_STATES.AUTHENTICATED
-                      ? 'Ask me anything... (paste or attach images)'
+                      ? 'Ask me anything...'
                       : 'Complete authentication to start chatting...'
                   }
-                  rows={2}
+                  rows={1}
                   disabled={state !== CHAT_STATES.AUTHENTICATED}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500 transition-colors shrink-0"
+                  title="Upload photo"
+                  aria-label="Upload photo"
+                >
+                  <ImagePlus className="size-3.5 sm:size-4" />
+                </button>
                 {voiceRecorder.isSupported && (
                   <button
                     type="button"
                     onClick={handleVoiceToggle}
                     disabled={state !== CHAT_STATES.AUTHENTICATED}
-                    className={`px-3 rounded-lg border self-end font-medium transition-colors flex items-center gap-1.5 min-w-[44px] justify-center ${
+                    className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
                       voiceRecorder.isRecording
-                        ? 'bg-destructive/90 hover:bg-destructive text-white border-destructive'
-                        : 'border-border bg-card hover:bg-muted disabled:opacity-50'
+                        ? 'bg-destructive/90 hover:bg-destructive text-white'
+                        : 'text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500'
                     }`}
                     title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
                     aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
@@ -453,38 +638,29 @@ export function ChatPage() {
                     {voiceRecorder.isRecording ? (
                       <>
                         <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                        <span className="text-xs tabular-nums">
+                        <span className="text-xs tabular-nums ml-1">
                           {Math.floor(voiceRecorder.recordingTimeSec / 60)}:{(voiceRecorder.recordingTimeSec % 60).toString().padStart(2, '0')}
                         </span>
                       </>
                     ) : (
-                      '🎤'
+                      <Mic className="size-3.5 sm:size-4" />
                     )}
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="px-3 rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-50 self-end font-medium transition-colors"
-                  title="Attach image"
-                  aria-label="Attach image"
-                >
-                  📷
-                </button>
-                <button
-                  type="button"
                   onClick={handleSend}
                   disabled={state !== CHAT_STATES.AUTHENTICATED}
-                  className="px-4 rounded-lg bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-50 self-end font-medium transition-opacity"
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
+                  aria-label="Send"
                 >
-                  Send
+                  <Send className="size-3.5 sm:size-4" />
                 </button>
               </div>
             </div>
-          </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }
+

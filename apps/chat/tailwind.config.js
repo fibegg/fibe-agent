@@ -24,6 +24,8 @@ module.exports = {
         muted: 'var(--muted)',
         'muted-foreground': 'var(--muted-foreground)',
         border: 'var(--border)',
+        'border-subtle': 'var(--border-subtle)',
+        'input-bg': 'var(--input-bg)',
         primary: {
           DEFAULT: 'var(--primary)',
           foreground: 'var(--primary-foreground)',

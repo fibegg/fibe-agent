@@ -1,6 +1,6 @@
-import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { Injectable } from '@nestjs/common';
+import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { join, resolve, relative } from 'node:path';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 
 export interface PlaygroundEntry {
@@ -18,6 +18,19 @@ export class PlaygroundsService {
 
   getTree(): PlaygroundEntry[] {
     return this.readDir(this.config.getPlaygroundsDir(), '');
+  }
+
+  getFileContent(relativePath: string): string {
+    const base = resolve(this.config.getPlaygroundsDir());
+    const absPath = resolve(base, relativePath);
+    const rel = relative(base, absPath);
+    if (rel.startsWith('..') || absPath === base) {
+      throw new NotFoundException('File not found');
+    }
+    if (!existsSync(absPath) || !statSync(absPath).isFile()) {
+      throw new NotFoundException('File not found');
+    }
+    return readFileSync(absPath, 'utf-8');
   }
 
   private readDir(absPath: string, relativePath: string): PlaygroundEntry[] {
