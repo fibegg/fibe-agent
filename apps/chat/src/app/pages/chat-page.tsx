@@ -322,7 +322,7 @@ export function ChatPage() {
       : messages.filter((m) => m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase()));
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 text-foreground">
+    <div className="flex size-full min-h-screen overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 text-foreground">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
@@ -368,7 +368,7 @@ export function ChatPage() {
           <FileExplorer />
         </aside>
       )}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex shrink-0 items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
           <div className="mb-2 sm:mb-3">
             <h2 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h2>
