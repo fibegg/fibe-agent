@@ -35,47 +35,52 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
-        className="bg-card border border-border rounded-xl shadow-card overflow-hidden w-full max-w-lg"
+        className="bg-card/95 dark:bg-slate-900/95 backdrop-blur-xl border border-violet-500/20 rounded-2xl shadow-[0_0_40px_rgba(139,92,246,0.15)] overflow-hidden w-full max-w-lg"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <h3 className="text-lg font-semibold text-card-foreground flex items-center gap-2">
-            <KeyIcon />
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border/50 bg-gradient-to-br from-violet-500/5 to-transparent">
+          <h3 className="text-base sm:text-lg font-semibold text-card-foreground flex items-center gap-2">
+            <span className="p-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
+              <KeyIcon className="size-4 text-violet-400" />
+            </span>
             Connect to Provider
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="text-muted-foreground hover:text-foreground text-2xl leading-none transition-colors"
+            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
             aria-label="Close"
           >
             &times;
           </button>
         </div>
-        <div className="p-4 space-y-4">
+        <div className="p-4 sm:p-5 space-y-4">
           {showUrl && (
             <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 Please follow the link below to authorize the AI assistant.
               </p>
               <a
                 href={authModal.authUrl ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/20 transition-opacity"
               >
-                <ExternalIcon />
+                <ExternalIcon className="size-3.5" />
                 Open Authentication URL
               </a>
             </div>
           )}
           {showUrl && (authModal.deviceCode || authModal.isManualToken) && (
-            <div className="border-t border-border pt-4" />
+            <div className="border-t border-border/50 pt-4" />
           )}
           <div className="space-y-2">
-            <label htmlFor="auth-code" className="block text-sm font-medium text-foreground">
+            <label htmlFor="auth-code" className="block text-xs sm:text-sm font-medium text-foreground">
               {codeLabel}
             </label>
             <input
@@ -85,14 +90,14 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
               readOnly={readOnly}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Paste code here..."
-              className="w-full px-3 py-2 rounded-lg bg-background border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
+              className="w-full px-3 py-2.5 rounded-xl bg-background/50 border border-border focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 text-foreground placeholder-muted-foreground outline-none transition-shadow"
             />
             {showSubmit && (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full py-2 rounded-lg bg-primary hover:opacity-90 disabled:opacity-50 text-primary-foreground font-medium transition-opacity"
+                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/20 disabled:opacity-50 transition-opacity"
               >
                 {submitting ? 'Submitting...' : 'Submit'}
               </button>
@@ -104,17 +109,17 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   );
 }
 
-function KeyIcon() {
+function KeyIcon({ className }: { className?: string }) {
   return (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
     </svg>
   );
 }
 
-function ExternalIcon() {
+function ExternalIcon({ className }: { className?: string }) {
   return (
-    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
     </svg>
   );

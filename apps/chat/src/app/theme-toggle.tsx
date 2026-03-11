@@ -17,13 +17,13 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={handleClick}
-      className="p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted border border-border transition-colors"
+      className="size-7 sm:size-8 flex items-center justify-center rounded-lg text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors"
       aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {dark ? (
-        <SunIcon className="w-5 h-5" />
+        <SunIcon className="size-3.5 sm:size-4" />
       ) : (
-        <MoonIcon className="w-5 h-5" />
+        <MoonIcon className="size-3.5 sm:size-4" />
       )}
     </button>
   );

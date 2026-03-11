@@ -302,7 +302,7 @@ export function ChatPage() {
     !!(authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
   return (
-    <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-background text-foreground">
+    <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 text-foreground">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
@@ -310,12 +310,20 @@ export function ChatPage() {
         onSubmitCode={submitAuthCode}
       />
       <div className="min-h-0">
-        <header className="flex items-center justify-between p-4 border-b border-border flex-wrap gap-2 shadow-soft">
+        <header className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
           <div>
-            <h1 className="text-lg font-semibold text-foreground">AI Assistant</h1>
-            <p className={`text-sm ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
+            <h1 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h1>
+            <p className={`text-[10px] sm:text-xs ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+            <button
+              type="button"
+              className="size-7 sm:size-8 flex items-center justify-center rounded-lg text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+              title="Search in conversation"
+              aria-label="Search in conversation"
+            >
+              <SearchIcon className="size-3.5 sm:size-4" />
+            </button>
             <ModelSelector
               currentModel={currentModel}
               options={modelOptions}
@@ -327,7 +335,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-                className="px-3 py-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
+                className="px-3 py-1.5 rounded-lg text-xs sm:text-sm font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/20 hover:opacity-90 transition-opacity"
               >
                 {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
               </button>
@@ -345,7 +353,7 @@ export function ChatPage() {
           </div>
         </header>
         {errorMessage && state === CHAT_STATES.ERROR && (
-          <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border">
+          <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border/50">
             <span className="text-destructive text-sm">{errorMessage}</span>
             <button
               type="button"
@@ -366,8 +374,8 @@ export function ChatPage() {
           <FileExplorer />
         </aside>
         <main className="flex min-h-0 min-w-0 flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 overflow-auto p-4">
-            <div className="max-w-3xl mx-auto">
+          <div className="flex-1 min-h-0 overflow-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+            <div className="max-w-4xl mx-auto">
               <MessageList
                 messages={messages}
                 streamingText={streamingText}
@@ -376,17 +384,17 @@ export function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
           </div>
-          <div className="shrink-0 border-t border-border bg-card/50 p-4">
-            <div className="max-w-3xl mx-auto flex flex-col gap-2">
+          <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border/50 bg-card/30 backdrop-blur-sm">
+            <div className="max-w-4xl mx-auto flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
                   {pendingVoice && (
-                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-card">
+                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-card/60">
                       <audio src={pendingVoice} controls className="max-h-10 min-w-[160px]" />
                       <button
                         type="button"
                         onClick={removePendingVoice}
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center hover:opacity-90"
                         aria-label="Remove voice"
                       >
                         ×
@@ -398,12 +406,12 @@ export function ChatPage() {
                       <img
                         src={dataUrl}
                         alt=""
-                        className="w-16 h-16 object-cover rounded border border-border"
+                        className="w-16 h-16 object-cover rounded-xl border border-border/50"
                       />
                       <button
                         type="button"
                         onClick={() => removePendingImage(i)}
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white text-xs flex items-center justify-center hover:opacity-90"
                         aria-label="Remove image"
                       >
                         ×
@@ -415,7 +423,7 @@ export function ChatPage() {
               {(voiceRecorder.error || voiceUploadError) && (
                 <p className="text-destructive text-sm">{voiceRecorder.error ?? voiceUploadError}</p>
               )}
-              <div className="flex gap-2 items-end">
+              <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border p-2 sm:p-3 shadow-xl shadow-violet-500/5">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -424,15 +432,25 @@ export function ChatPage() {
                   className="hidden"
                   onChange={handleFileChange}
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
+                  className="size-8 sm:size-9 rounded-lg flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                  title="Attach image"
+                  aria-label="Attach image"
+                >
+                  <PaperclipIcon className="size-3.5 sm:size-4" />
+                </button>
                 <textarea
                   id="chat-input"
-                  className="flex-1 min-h-[44px] max-h-32 px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder-muted-foreground resize-y disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+                  className="flex-1 bg-transparent outline-none resize-none text-xs sm:text-sm py-2 min-h-[24px] max-h-32 text-foreground placeholder-muted-foreground disabled:opacity-50"
                   placeholder={
                     state === CHAT_STATES.AUTHENTICATED
                       ? 'Ask me anything... (paste or attach images)'
                       : 'Complete authentication to start chatting...'
                   }
-                  rows={2}
+                  rows={1}
                   disabled={state !== CHAT_STATES.AUTHENTICATED}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}
@@ -442,10 +460,10 @@ export function ChatPage() {
                     type="button"
                     onClick={handleVoiceToggle}
                     disabled={state !== CHAT_STATES.AUTHENTICATED}
-                    className={`px-3 rounded-lg border self-end font-medium transition-colors flex items-center gap-1.5 min-w-[44px] justify-center ${
+                    className={`size-8 sm:size-9 rounded-lg flex items-center justify-center transition-colors ${
                       voiceRecorder.isRecording
-                        ? 'bg-destructive/90 hover:bg-destructive text-white border-destructive'
-                        : 'border-border bg-card hover:bg-muted disabled:opacity-50'
+                        ? 'bg-destructive/90 hover:bg-destructive text-white'
+                        : 'text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
                     }`}
                     title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
                     aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
@@ -453,32 +471,23 @@ export function ChatPage() {
                     {voiceRecorder.isRecording ? (
                       <>
                         <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                        <span className="text-xs tabular-nums">
+                        <span className="text-xs tabular-nums ml-1">
                           {Math.floor(voiceRecorder.recordingTimeSec / 60)}:{(voiceRecorder.recordingTimeSec % 60).toString().padStart(2, '0')}
                         </span>
                       </>
                     ) : (
-                      '🎤'
+                      <MicIcon className="size-3.5 sm:size-4" />
                     )}
                   </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="px-3 rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-50 self-end font-medium transition-colors"
-                  title="Attach image"
-                  aria-label="Attach image"
-                >
-                  📷
-                </button>
-                <button
-                  type="button"
                   onClick={handleSend}
                   disabled={state !== CHAT_STATES.AUTHENTICATED}
-                  className="px-4 rounded-lg bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-50 self-end font-medium transition-opacity"
+                  className="size-8 sm:size-9 rounded-lg flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
+                  aria-label="Send"
                 >
-                  Send
+                  <SendIcon className="size-3.5 sm:size-4" />
                 </button>
               </div>
             </div>
@@ -486,5 +495,37 @@ export function ChatPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+function SearchIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+    </svg>
+  );
+}
+
+function PaperclipIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+    </svg>
+  );
+}
+
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v3m0 0v3m0-3h3m-3 0H9m3 0v-3m0 0V8a3 3 0 116 0v3z" />
+    </svg>
+  );
+}
+
+function SendIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+    </svg>
   );
 }

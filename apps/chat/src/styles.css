@@ -4,46 +4,57 @@
 
 @layer base {
   :root {
-    --background: #fafbfc;
-    --foreground: #0f172a;
+    --background: #fafaff;
+    --foreground: #1a1625;
     --card: #ffffff;
-    --card-foreground: #0f172a;
-    --muted: #f1f5f9;
-    --muted-foreground: #64748b;
-    --border: #e2e8f0;
-    --primary: #6366f1;
+    --card-foreground: #1a1625;
+    --muted: #f5f3ff;
+    --muted-foreground: #6b7280;
+    --border: rgba(124, 58, 237, 0.12);
+    --primary: #7c3aed;
     --primary-foreground: #ffffff;
-    --secondary: #f1f5f9;
-    --secondary-foreground: #334155;
+    --secondary: #f5f3ff;
+    --secondary-foreground: #5b21b6;
     --destructive: #ef4444;
     --success: #22c55e;
     --warning: #f59e0b;
     --radius-xl: 1rem;
     --radius-lg: 0.75rem;
     --radius-md: 0.5rem;
-    --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 1px 2px -1px rgb(0 0 0 / 0.04);
+    --shadow-soft: 0 1px 3px 0 rgb(124 58 237 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.04);
     --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
   }
 
   .dark {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --card: #1e293b;
-    --card-foreground: #f8fafc;
-    --muted: #1e293b;
-    --muted-foreground: #94a3b8;
-    --border: #334155;
-    --primary: #818cf8;
-    --primary-foreground: #0f172a;
-    --secondary: #334155;
-    --secondary-foreground: #e2e8f0;
+    --background: #0f0f14;
+    --foreground: #e5e7eb;
+    --card: #1a1a20;
+    --card-foreground: #e5e7eb;
+    --muted: #27272a;
+    --muted-foreground: #9ca3af;
+    --border: rgba(167, 139, 250, 0.15);
+    --primary: #a78bfa;
+    --primary-foreground: #1a1625;
+    --secondary: #2e1f47;
+    --secondary-foreground: #f5f3ff;
     --destructive: #f87171;
     --success: #4ade80;
     --warning: #fbbf24;
     --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.2);
     --shadow-card: 0 4px 6px -1px rgb(0 0 0 / 0.2), 0 2px 4px -2px rgb(0 0 0 / 0.15);
   }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  @keyframes sparkle {
+    0%, 100% { opacity: 0; transform: scale(0) rotate(0deg); }
+    50% { opacity: 1; transform: scale(1.5) rotate(180deg); }
+  }
+  .animate-float { animation: float 3s ease-in-out infinite; }
+  .animate-sparkle { animation: sparkle 2s ease-in-out infinite; }
 }
 
 body {
