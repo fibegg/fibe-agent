@@ -1,8 +1,23 @@
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronsDown,
+  ChevronsRight,
+  Code,
+  File,
+  FileText,
+  Folder,
+  FolderOpen,
+  Image,
+  Search,
+  Settings,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { ThemeToggle } from '../theme-toggle';
-import { SIDEBAR_WIDTH_PX } from '../layout-constants';
 
 export interface PlaygroundEntry {
   name: string;
@@ -14,8 +29,6 @@ export interface PlaygroundEntry {
 const PLAYGROUNDS_LABEL = 'playground/';
 const SIDEBAR_TITLE = 'Quantum Storage';
 const SIDEBAR_SUBTITLE = 'Phoenix v2.4.1';
-const INDENT_BASE_PX = 8;
-const INDENT_PER_LEVEL_PX = 12;
 
 function getAllDirPaths(entries: PlaygroundEntry[]): string[] {
   const out: string[] = [];
@@ -63,42 +76,151 @@ function filterTreeByQuery(entries: PlaygroundEntry[], query: string): Playgroun
   return entries.map(build).filter((e): e is PlaygroundEntry => e != null);
 }
 
-function FolderIcon({ open }: { open: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5 shrink-0 text-violet-400"
-      aria-hidden
-    >
-      {open ? (
-        <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.55 6a2 2 0 0 1-1.93 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.93a2 2 0 0 1 1.69.9L15 12" />
-      ) : (
-        <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" />
-      )}
-    </svg>
-  );
+const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
+const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.html']);
+const DOC_EXT = new Set(['.md', '.mdx', '.txt']);
+
+const FILE_TYPE_COLOR = {
+  image: 'text-pink-400',
+  code: 'text-green-400',
+  doc: 'text-blue-400',
+  file: 'text-muted-foreground',
+} as const;
+
+function getFileIconAndColor(name: string): { Icon: typeof File; color: string } {
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
+  if (IMAGE_EXT.has(ext)) return { Icon: Image, color: FILE_TYPE_COLOR.image };
+  if (CODE_EXT.has(ext)) return { Icon: Code, color: FILE_TYPE_COLOR.code };
+  if (DOC_EXT.has(ext)) return { Icon: FileText, color: FILE_TYPE_COLOR.doc };
+  return { Icon: File, color: FILE_TYPE_COLOR.file };
 }
 
-function FileIcon() {
+function getFileKindLabel(name: string): string {
+  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
+  if (IMAGE_EXT.has(ext)) return 'Image';
+  if (CODE_EXT.has(ext)) return 'Code';
+  if (DOC_EXT.has(ext)) return 'Document';
+  return 'File';
+}
+
+function getFileExtension(name: string): string {
+  if (!name.includes('.')) return '—';
+  return name.slice(name.lastIndexOf('.')).toLowerCase();
+}
+
+function FileTypeIcon({ name }: { name: string }) {
+  const { Icon, color } = getFileIconAndColor(name);
+  return <Icon className={`size-3.5 shrink-0 ${color}`} aria-hidden />;
+}
+
+function FileDetailsDialog({
+  entry,
+  onClose,
+}: {
+  entry: PlaygroundEntry;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onClose]);
+
+  const { Icon, color } = getFileIconAndColor(entry.name);
+  const kind = getFileKindLabel(entry.name);
+  const extension = getFileExtension(entry.name);
+
   return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className="size-3.5 shrink-0 text-muted-foreground"
-      aria-hidden
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
+      onClick={onClose}
     >
-      <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-      <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-    </svg>
+      <div
+        className="flex flex-col w-full max-w-[95vw] sm:max-w-[90vw] sm:w-[90vw] h-[85vh] sm:h-[90vh] max-h-[calc(100vh-2rem)] bg-background/95 dark:bg-[#0f0f14]/95 backdrop-blur-xl border border-violet-500/30 rounded-xl shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-4 sm:p-6 border-b border-border-subtle bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-violet-500/10 backdrop-blur-sm shrink-0">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-start gap-2 sm:gap-4 min-w-0">
+              <div className="size-10 sm:size-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
+                <Sparkles className="size-5 sm:size-6 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <h2 className="text-lg sm:text-xl font-semibold text-foreground">File details</h2>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="size-8 rounded-full hover:bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
+                    aria-label="Close"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1 truncate" title={entry.name}>
+                  {entry.name}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 flex flex-col sm:flex-row overflow-hidden min-h-0">
+          <div className="flex-1 flex flex-col border-b sm:border-b-0 sm:border-r border-border-subtle min-h-0">
+            <div className="px-4 py-3 border-b border-border-subtle bg-muted/30 backdrop-blur-sm shrink-0">
+              <h3 className="text-sm font-medium text-foreground">File info</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Metadata for selected file</p>
+            </div>
+            <div className="flex-1 overflow-auto min-h-0 p-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-muted/50">
+                  <Icon className={`size-5 ${color}`} aria-hidden />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium text-foreground truncate" title={entry.name}>
+                    {entry.name}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate font-mono" title={entry.path}>
+                    {entry.path}
+                  </p>
+                </div>
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2.5 text-xs">
+                <dt className="text-muted-foreground">Kind</dt>
+                <dd className="text-foreground">{kind}</dd>
+                <dt className="text-muted-foreground">Type</dt>
+                <dd className="text-foreground">File</dd>
+                <dt className="text-muted-foreground">Extension</dt>
+                <dd className="text-foreground font-mono">{extension}</dd>
+                <dt className="text-muted-foreground">Path</dt>
+                <dd className="text-foreground font-mono truncate" title={entry.path}>
+                  {entry.path}
+                </dd>
+              </dl>
+            </div>
+          </div>
+
+          <div className="w-full sm:w-96 flex flex-col min-h-0 min-w-0 bg-card/20 backdrop-blur-sm shrink-0 sm:shrink">
+            <div className="px-4 py-3 border-b border-border-subtle bg-gradient-to-r from-violet-500/10 to-purple-500/10 backdrop-blur-sm shrink-0">
+              <h3 className="text-sm font-medium text-foreground">Preview</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">File content</p>
+            </div>
+            <div className="flex-1 overflow-auto min-h-0 p-4">
+              <div className="rounded-xl border border-border-subtle bg-muted/20 backdrop-blur-sm p-4 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Content preview is not available for this file.
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  File content can be loaded when an API is connected.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -107,46 +229,55 @@ function TreeNode({
   depth,
   expanded,
   onToggle,
+  onFileClick,
 }: {
   entry: PlaygroundEntry;
   depth: number;
   expanded: Set<string>;
   onToggle: (path: string) => void;
+  onFileClick?: (entry: PlaygroundEntry) => void;
 }) {
   const isDir = entry.type === 'directory';
   const isOpen = expanded.has(entry.path);
   const hasChildren = isDir && (entry.children?.length ?? 0) > 0;
 
   const handleClick = useCallback(() => {
-    if (isDir) onToggle(entry.path);
-  }, [isDir, entry.path, onToggle]);
+    if (isDir) {
+      onToggle(entry.path);
+    } else if (onFileClick) {
+      onFileClick(entry);
+    }
+  }, [isDir, entry, onToggle, onFileClick]);
 
   return (
     <div className="select-none group">
       <button
         type="button"
         onClick={handleClick}
-        className="w-full flex items-center gap-1.5 py-1 px-2 text-left text-xs rounded-md cursor-pointer transition-all hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-violet-500/5"
-        style={{ paddingLeft: `${INDENT_BASE_PX + depth * INDENT_PER_LEVEL_PX}px` }}
+        className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs rounded-md cursor-pointer transition-all hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-violet-500/5"
+        style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
       >
-        <span className="w-3 flex items-center justify-center shrink-0 text-muted-foreground" aria-hidden>
-          {isDir && hasChildren && (
-            <span
-              style={{
-                transform: isOpen ? 'rotate(90deg)' : 'none',
-                display: 'inline-block',
-              }}
-            >
-              ▶
-            </span>
+        <span className="w-3 flex shrink-0 items-center justify-center text-muted-foreground" aria-hidden>
+          {isDir && hasChildren ? (
+            isOpen ? (
+              <ChevronDown className="size-3" />
+            ) : (
+              <ChevronRight className="size-3" />
+            )
+          ) : (
+            <span className="w-3" />
           )}
         </span>
         {isDir ? (
-          <FolderIcon open={isOpen} />
+          isOpen ? (
+            <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+          ) : (
+            <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+          )
         ) : (
-          <FileIcon />
+          <FileTypeIcon name={entry.name} />
         )}
-        <span className="truncate text-foreground">{entry.name}</span>
+        <span className="min-w-0 flex-1 truncate text-foreground">{entry.name}</span>
       </button>
       {isDir && hasChildren && isOpen && (
         <div>
@@ -157,44 +288,12 @@ function TreeNode({
               depth={depth + 1}
               expanded={expanded}
               onToggle={onToggle}
+              onFileClick={onFileClick}
             />
           ))}
         </div>
       )}
     </div>
-  );
-}
-
-function SearchIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
-}
-
-function ChevronRightIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-    </svg>
-  );
-}
-
-function SettingsIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-    </svg>
   );
 }
 
@@ -204,6 +303,7 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedFile, setSelectedFile] = useState<PlaygroundEntry | null>(null);
 
   useEffect(() => {
     const ac = new AbortController();
@@ -268,14 +368,21 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
     setExpanded(new Set());
   }, []);
 
+  const handleFileClick = useCallback((entry: PlaygroundEntry) => {
+    if (entry.type === 'file') setSelectedFile(entry);
+  }, []);
+
   const filteredTree = filterTreeByQuery(tree, searchQuery);
 
+  const toolbarBtnClass =
+    'rounded-md text-[9px] sm:text-[10px] font-medium text-white hover:bg-violet-500/10 hover:text-violet-400 transition-colors';
+
   return (
-    <div
-      className={`min-h-0 flex flex-1 flex-col border-r border-border/50 bg-card/30 backdrop-blur-xl ${fullWidth ? 'w-full' : ''}`}
-      style={fullWidth ? undefined : { width: SIDEBAR_WIDTH_PX, minWidth: SIDEBAR_WIDTH_PX }}
-    >
-      <div className="p-3 sm:p-4 border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
+    <>
+      <div
+        className="min-h-0 flex w-full flex-1 flex-col border-r border-border-subtle bg-card/30 backdrop-blur-xl"
+      >
+      <div className="p-3 sm:p-4 border-b border-border-subtle bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
@@ -291,55 +398,65 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
               title="Settings"
               aria-label="Settings"
             >
-              <SettingsIcon className="size-3.5 sm:size-4" />
+              <Settings className="size-3.5 sm:size-4" />
             </button>
             <ThemeToggle />
           </div>
         </div>
         <div className="relative mb-2">
-          <SearchIcon className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground pointer-events-none" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 sm:size-3.5 text-muted-foreground pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search files..."
-            className="w-full h-7 sm:h-8 pl-7 sm:pl-8 pr-2 text-[11px] sm:text-xs rounded-md bg-background/50 border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:border-violet-500/30"
+            className={`w-full h-7 sm:h-8 pl-7 sm:pl-8 text-[11px] sm:text-xs rounded-md bg-input-bg border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500/30 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 ${searchQuery ? 'pr-7 sm:pr-8' : 'pr-2'}`}
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rounded p-0.5"
+              aria-label="Clear search"
+            >
+              <X className="size-3 sm:size-3.5" />
+            </button>
+          )}
         </div>
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1.5">
           <button
             type="button"
             onClick={expandOneLevel}
-            className="flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 rounded text-[9px] sm:text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors px-2"
+            className={`flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 px-2 ${toolbarBtnClass}`}
           >
-            <ChevronDownIcon className="size-2.5 sm:size-3 shrink-0 mr-1" />
+            <ChevronsDown className="size-2.5 sm:size-3 shrink-0 mr-1" />
             <span className="truncate">Expand<span className="hidden sm:inline"> Level</span></span>
           </button>
           <button
             type="button"
             onClick={collapseOneLevel}
-            className="flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 rounded text-[9px] sm:text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors px-2"
+            className={`flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 px-2 ${toolbarBtnClass}`}
           >
-            <ChevronRightIcon className="size-2.5 sm:size-3 shrink-0 mr-1" />
+            <ChevronsRight className="size-2.5 sm:size-3 shrink-0 mr-1" />
             <span className="truncate">Collapse<span className="hidden sm:inline"> Level</span></span>
           </button>
           <button
             type="button"
             onClick={expandAll}
-            className="h-7 min-w-7 flex items-center justify-center rounded px-2 text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors"
+            className={`h-7 flex items-center justify-center px-2 text-[10px] ${toolbarBtnClass}`}
             title="Expand All"
             aria-label="Expand all"
           >
-            <ChevronDownIcon className="size-3" />
+            <ChevronsDown className="size-3" />
           </button>
           <button
             type="button"
             onClick={collapseAll}
-            className="h-7 min-w-7 flex items-center justify-center rounded px-2 text-[10px] text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 transition-colors"
+            className={`h-7 flex items-center justify-center px-2 text-[10px] ${toolbarBtnClass}`}
             title="Collapse All"
             aria-label="Collapse all"
           >
-            <ChevronRightIcon className="size-3" />
+            <ChevronsRight className="size-3" />
           </button>
         </div>
       </div>
@@ -372,11 +489,16 @@ export function FileExplorer({ fullWidth }: { fullWidth?: boolean } = {}) {
                 depth={0}
                 expanded={expanded}
                 onToggle={handleToggle}
+                onFileClick={handleFileClick}
               />
             ))}
           </div>
         )}
       </div>
-    </div>
+      </div>
+      {selectedFile?.type === 'file' && (
+        <FileDetailsDialog entry={selectedFile} onClose={() => setSelectedFile(null)} />
+      )}
+    </>
   );
 }

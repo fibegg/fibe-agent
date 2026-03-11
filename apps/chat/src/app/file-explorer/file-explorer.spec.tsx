@@ -16,7 +16,7 @@ describe('FileExplorer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows playground/ label in header', async () => {
+  it('shows playground/ label when tree is loaded', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -24,8 +24,9 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText('playground/')).toBeTruthy();
+      expect(screen.getByText(/No files in playground\//)).toBeTruthy();
     });
+    expect(screen.getByText(/playground\//)).toBeTruthy();
   });
 
   it('shows loading state initially', () => {
@@ -112,5 +113,26 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.getByText('util.ts')).toBeTruthy();
     });
+  });
+
+  it('opens file details dialog when file is clicked', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'readme.md', path: 'readme.md', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => tree,
+    });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('readme.md')).toBeTruthy();
+    });
+    expect(screen.queryByRole('heading', { name: 'File details' })).toBeNull();
+    fireEvent.click(screen.getByText('readme.md'));
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'File details' })).toBeTruthy();
+    });
+    expect(screen.getAllByText('readme.md').length).toBeGreaterThanOrEqual(1);
   });
 });
