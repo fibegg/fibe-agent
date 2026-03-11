@@ -54,6 +54,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.9"
+
+      - name: Regenerate lockfile for Linux (Docker build)
+        run: bun install
+
       - name: Lowercase Repository Owner
         id: repo_owner
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_OUTPUT
