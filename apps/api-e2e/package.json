@@ -8,14 +8,18 @@
       "api"
     ],
     "targets": {
-      "e2e": {
-        "executor": "@nx/jest:jest",
-        "outputs": [
-          "{projectRoot}/test-output/jest/coverage"
-        ],
+      "typecheck": {
+        "executor": "nx:run-commands",
         "options": {
-          "jestConfig": "apps/api-e2e/jest.config.cts",
-          "passWithNoTests": true
+          "command": "tsc -p tsconfig.typecheck.json --noEmit",
+          "cwd": "apps/api-e2e"
+        }
+      },
+      "e2e": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "bun test --preload ./src/support/test-setup.ts",
+          "cwd": "apps/api-e2e"
         },
         "dependsOn": [
           "api:build",

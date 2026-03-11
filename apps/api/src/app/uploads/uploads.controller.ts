@@ -6,9 +6,7 @@ import { UploadsService } from './uploads.service';
 
 const AUDIO_MIMES = new Set(['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus']);
 
-interface MultipartRequest extends FastifyRequest {
-  file: () => Promise<{ mimetype: string; toBuffer: () => Promise<Buffer> } | undefined>;
-}
+type MultipartFileResult = { mimetype: string; toBuffer: () => Promise<Buffer> } | undefined;
 
 @Controller('uploads')
 @UseGuards(AgentAuthGuard)
@@ -26,8 +24,8 @@ export class UploadsController {
   }
 
   @Post()
-  async uploadFile(@Req() req: MultipartRequest): Promise<{ filename: string }> {
-    const data = await req.file();
+  async uploadFile(@Req() req: FastifyRequest): Promise<{ filename: string }> {
+    const data = await (req as { file: () => Promise<MultipartFileResult> }).file();
     if (!data) throw new BadRequestException('No file uploaded');
     const mimetype = data.mimetype ?? 'audio/webm';
     if (!AUDIO_MIMES.has(mimetype) && !mimetype.startsWith('audio/')) {

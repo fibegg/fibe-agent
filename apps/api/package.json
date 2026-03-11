@@ -83,6 +83,13 @@
           "cwd": "apps/api"
         },
         "dependsOn": []
+      },
+      "typecheck": {
+        "executor": "nx:run-commands",
+        "options": {
+          "command": "tsc -p tsconfig.app.json --noEmit",
+          "cwd": "apps/api"
+        }
       }
     }
   },

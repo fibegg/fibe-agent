@@ -13,7 +13,6 @@
       "!{projectRoot}/**/*.spec.[jt]s",
       "!{projectRoot}/test-results/**/*",
       "!{projectRoot}/playwright-report/**/*",
-      "!{projectRoot}/jest.config.[jt]s",
       "!{projectRoot}/test-setup.[jt]s"
     ],
     "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
@@ -79,13 +78,6 @@
         "serveStaticTargetName": "serve-static"
       }
     },
-    {
-      "plugin": "@nx/jest/plugin",
-      "options": {
-        "targetName": "test"
-      },
-      "exclude": ["apps/api-e2e/**/*"]
-    }
   ],
   "targetDefaults": {
     "test": {
