@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type ChatMessage } from '../chat/message-list';
 import { ModelSelector } from '../chat/model-selector';
-import { ThemeToggle } from '../theme-toggle';
 import { FileExplorer } from '../file-explorer/file-explorer';
 import { SIDEBAR_WIDTH_PX } from '../layout-constants';
 import { CHAT_STATES } from '../chat/chat-state';
@@ -349,7 +348,6 @@ export function ChatPage() {
                 Logout
               </button>
             )}
-            <ThemeToggle />
           </div>
         </header>
         {errorMessage && state === CHAT_STATES.ERROR && (

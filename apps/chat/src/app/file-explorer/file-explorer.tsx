@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
+import { ThemeToggle } from '../theme-toggle';
 import { SIDEBAR_WIDTH_PX } from '../layout-constants';
 
 export interface PlaygroundEntry {
@@ -290,13 +291,18 @@ export function FileExplorer() {
       style={{ width: SIDEBAR_WIDTH_PX, minWidth: SIDEBAR_WIDTH_PX }}
     >
       <div className="p-3 sm:p-4 border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="size-6 rounded flex items-center justify-center text-violet-500">
-            <FolderIcon open />
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className="size-6 rounded flex items-center justify-center text-violet-500">
+              <FolderIcon open />
+            </div>
+            <div>
+              <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
+            </div>
           </div>
-          <div>
-            <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
-            <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
+          <div className="flex items-center gap-1">
+            <ThemeToggle />
           </div>
         </div>
         <div className="relative mb-2">
