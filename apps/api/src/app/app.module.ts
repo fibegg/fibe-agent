@@ -12,6 +12,8 @@ import { OrchestratorService } from './orchestrator/orchestrator.service';
 import { StrategyRegistryService } from './strategies/strategy-registry.service';
 import { UploadsController } from './uploads/uploads.controller';
 import { UploadsService } from './uploads/uploads.service';
+import { PlaygroundsController } from './playgrounds/playgrounds.controller';
+import { PlaygroundsService } from './playgrounds/playgrounds.service';
 
 @Module({
   imports: [],
@@ -21,6 +23,7 @@ import { UploadsService } from './uploads/uploads.service';
     MessagesController,
     ModelOptionsController,
     UploadsController,
+    PlaygroundsController,
   ],
   providers: [
     AppService,
@@ -31,6 +34,7 @@ import { UploadsService } from './uploads/uploads.service';
     StrategyRegistryService,
     OrchestratorService,
     UploadsService,
+    PlaygroundsService,
   ],
 })
 export class AppModule {}

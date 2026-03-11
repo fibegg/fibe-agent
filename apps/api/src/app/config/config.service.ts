@@ -22,4 +22,8 @@ export class ConfigService {
     }
     return join(process.cwd(), 'dist', 'assets', 'SYSTEM_PROMPT.md');
   }
+
+  getPlaygroundsDir(): string {
+    return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
+  }
 }

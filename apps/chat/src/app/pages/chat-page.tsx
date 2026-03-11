@@ -4,6 +4,8 @@ import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type ChatMessage } from '../chat/message-list';
 import { ModelSelector } from '../chat/model-selector';
 import { ThemeToggle } from '../theme-toggle';
+import { FileExplorer } from '../file-explorer/file-explorer';
+import { SIDEBAR_WIDTH_PX } from '../layout-constants';
 import { CHAT_STATES } from '../chat/chat-state';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import type { ServerMessage } from '../chat/chat-state';
@@ -242,137 +244,147 @@ export function ChatPage() {
     (authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground">
+    <div className="grid h-screen grid-rows-[auto_1fr] overflow-hidden bg-background text-foreground">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
         onClose={cancelAuth}
         onSubmitCode={submitAuthCode}
       />
-      <header className="flex items-center justify-between p-4 border-b border-border flex-wrap gap-2 shadow-soft">
-        <div>
-          <h1 className="text-lg font-semibold text-foreground">AI Assistant</h1>
-          <p className={`text-sm ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <ModelSelector
-            currentModel={currentModel}
-            options={modelOptions}
-            onSelect={handleModelSelect}
-            onInputChange={handleModelInputChange}
-            visible={showModelSelector}
-          />
-          {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
-            <button
-              type="button"
-              onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-              className="px-3 py-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
-            >
-              {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
-            </button>
-          )}
-          {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
-            <button
-              type="button"
-              onClick={logout}
-              className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-sm font-medium transition-colors"
-            >
-              Logout
-            </button>
-          )}
-          <ThemeToggle />
-        </div>
-      </header>
-
-      {errorMessage && state === CHAT_STATES.ERROR && (
-        <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border">
-          <span className="text-destructive text-sm">{errorMessage}</span>
-          <button
-            type="button"
-            onClick={dismissError}
-            className="text-muted-foreground hover:text-foreground text-sm"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      <main className="flex-1 overflow-auto p-4">
-        <div className="max-w-3xl mx-auto">
-          <MessageList
-            messages={messages}
-            streamingText={streamingText}
-            isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-          />
-          <div ref={messagesEndRef} />
-        </div>
-      </main>
-
-      <div className="p-4 border-t border-border bg-card/50">
-        <div className="max-w-3xl mx-auto flex flex-col gap-2">
-          {pendingImages.length > 0 && (
-            <div className="flex flex-wrap gap-2 items-center">
-              {pendingImages.map((dataUrl, i) => (
-                <div key={i} className="relative inline-block">
-                  <img
-                    src={dataUrl}
-                    alt=""
-                    className="w-16 h-16 object-cover rounded border border-border"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removePendingImage(i)}
-                    className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
-                    aria-label="Remove image"
-                  >
-                    ×
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex gap-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*"
-              multiple
-              className="hidden"
-              onChange={handleFileChange}
+      <div className="min-h-0">
+        <header className="flex items-center justify-between p-4 border-b border-border flex-wrap gap-2 shadow-soft">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">AI Assistant</h1>
+            <p className={`text-sm ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <ModelSelector
+              currentModel={currentModel}
+              options={modelOptions}
+              onSelect={handleModelSelect}
+              onInputChange={handleModelInputChange}
+              visible={showModelSelector}
             />
-            <textarea
-              id="chat-input"
-              className="flex-1 min-h-[44px] max-h-32 px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder-muted-foreground resize-y disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
-              placeholder={
-                state === CHAT_STATES.AUTHENTICATED
-                  ? 'Ask me anything... (paste or attach images)'
-                  : 'Complete authentication to start chatting...'
-              }
-              rows={2}
-              disabled={state !== CHAT_STATES.AUTHENTICATED}
-              onKeyDown={handleKeyDown}
-              onPaste={handlePaste}
-            />
+            {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
+              <button
+                type="button"
+                onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
+                className="px-3 py-1.5 rounded-lg bg-primary hover:opacity-90 text-primary-foreground text-sm font-medium transition-opacity"
+              >
+                {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
+              </button>
+            )}
+            {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
+              <button
+                type="button"
+                onClick={logout}
+                className="px-3 py-1.5 rounded-lg bg-destructive/90 hover:bg-destructive text-white text-sm font-medium transition-colors"
+              >
+                Logout
+              </button>
+            )}
+            <ThemeToggle />
+          </div>
+        </header>
+        {errorMessage && state === CHAT_STATES.ERROR && (
+          <div className="flex items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border">
+            <span className="text-destructive text-sm">{errorMessage}</span>
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-              className="px-3 rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-50 self-end font-medium transition-colors"
-              title="Attach image"
-              aria-label="Attach image"
+              onClick={dismissError}
+              className="text-muted-foreground hover:text-foreground text-sm"
             >
-              📷
-            </button>
-            <button
-              type="button"
-              onClick={handleSend}
-              disabled={state !== CHAT_STATES.AUTHENTICATED}
-              className="px-4 rounded-lg bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-50 self-end font-medium transition-opacity"
-            >
-              Send
+              Dismiss
             </button>
           </div>
-        </div>
+        )}
+      </div>
+
+      <div
+        className="grid min-h-0 overflow-hidden"
+        style={{ gridTemplateColumns: `${SIDEBAR_WIDTH_PX}px 1fr` }}
+      >
+        <aside className="flex min-h-0 flex-col overflow-hidden">
+          <FileExplorer />
+        </aside>
+        <main className="flex min-h-0 min-w-0 flex-col overflow-hidden">
+          <div className="flex-1 min-h-0 overflow-auto p-4">
+            <div className="max-w-3xl mx-auto">
+              <MessageList
+                messages={messages}
+                streamingText={streamingText}
+                isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+              />
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
+          <div className="shrink-0 border-t border-border bg-card/50 p-4">
+            <div className="max-w-3xl mx-auto flex flex-col gap-2">
+              {pendingImages.length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  {pendingImages.map((dataUrl, i) => (
+                    <div key={i} className="relative inline-block">
+                      <img
+                        src={dataUrl}
+                        alt=""
+                        className="w-16 h-16 object-cover rounded border border-border"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePendingImage(i)}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground text-xs flex items-center justify-center hover:opacity-90"
+                        aria-label="Remove image"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div className="flex gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                />
+                <textarea
+                  id="chat-input"
+                  className="flex-1 min-h-[44px] max-h-32 px-3 py-2 rounded-lg bg-card border border-border text-foreground placeholder-muted-foreground resize-y disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-primary/30 transition-shadow"
+                  placeholder={
+                    state === CHAT_STATES.AUTHENTICATED
+                      ? 'Ask me anything... (paste or attach images)'
+                      : 'Complete authentication to start chatting...'
+                  }
+                  rows={2}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
+                  className="px-3 rounded-lg border border-border bg-card hover:bg-muted disabled:opacity-50 self-end font-medium transition-colors"
+                  title="Attach image"
+                  aria-label="Attach image"
+                >
+                  📷
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSend}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED}
+                  className="px-4 rounded-lg bg-primary hover:opacity-90 text-primary-foreground disabled:opacity-50 self-end font-medium transition-opacity"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     </div>
   );

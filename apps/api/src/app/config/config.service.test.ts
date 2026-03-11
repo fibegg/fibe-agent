@@ -10,6 +10,7 @@ describe('ConfigService', () => {
     envBackup.MODEL_OPTIONS = process.env.MODEL_OPTIONS;
     envBackup.DATA_DIR = process.env.DATA_DIR;
     envBackup.SYSTEM_PROMPT_PATH = process.env.SYSTEM_PROMPT_PATH;
+    envBackup.PLAYGROUNDS_DIR = process.env.PLAYGROUNDS_DIR;
   });
 
   afterEach(() => {
@@ -17,6 +18,7 @@ describe('ConfigService', () => {
     process.env.MODEL_OPTIONS = envBackup.MODEL_OPTIONS;
     process.env.DATA_DIR = envBackup.DATA_DIR;
     process.env.SYSTEM_PROMPT_PATH = envBackup.SYSTEM_PROMPT_PATH;
+    process.env.PLAYGROUNDS_DIR = envBackup.PLAYGROUNDS_DIR;
   });
 
   test('getAgentPassword returns undefined when AGENT_PASSWORD not set', () => {
@@ -57,5 +59,15 @@ describe('ConfigService', () => {
   test('getSystemPromptPath returns default dist path when not set', () => {
     delete process.env.SYSTEM_PROMPT_PATH;
     expect(new ConfigService().getSystemPromptPath()).toBe(join(process.cwd(), 'dist', 'assets', 'SYSTEM_PROMPT.md'));
+  });
+
+  test('getPlaygroundsDir returns PLAYGROUNDS_DIR when set', () => {
+    process.env.PLAYGROUNDS_DIR = '/custom/playground';
+    expect(new ConfigService().getPlaygroundsDir()).toBe('/custom/playground');
+  });
+
+  test('getPlaygroundsDir returns default under cwd when not set', () => {
+    delete process.env.PLAYGROUNDS_DIR;
+    expect(new ConfigService().getPlaygroundsDir()).toBe(join(process.cwd(), 'playground'));
   });
 });

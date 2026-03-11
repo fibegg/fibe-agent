@@ -13,8 +13,9 @@ Nest Fastify API (project `api`).
 | GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls? }[]`     |
 | GET    | /api/uploads/:filename | Bearer | Serves an uploaded image file (from chat attachments)        |
 | GET    | /api/model-options | Bearer | Returns string array of model names from `MODEL_OPTIONS` env                |
+| GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
 
-When `AGENT_PASSWORD` is set, `GET /api/messages` and `GET /api/model-options` require `Authorization: Bearer <password>` or `?token=<password>`.
+When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/model-options`, and `GET /api/playgrounds` require `Authorization: Bearer <password>` or `?token=<password>`.
 
 ## WebSocket
 
