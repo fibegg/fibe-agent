@@ -18,12 +18,11 @@
       "e2e": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun test --preload ./src/support/test-setup.ts",
+          "command": "sh -c '(cd ../api && node dist/main.js) & sleep 3 && bun test --preload ./src/support/test-setup.ts'",
           "cwd": "apps/api-e2e"
         },
         "dependsOn": [
-          "api:build",
-          "api:serve"
+          "api:build:development"
         ]
       }
     }

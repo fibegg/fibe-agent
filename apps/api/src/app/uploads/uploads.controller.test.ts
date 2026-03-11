@@ -34,6 +34,14 @@ describe('UploadsController', () => {
     const res = { send: (payload: unknown) => { sent = payload; } };
     await controller.getFile('a.webm', res as never);
     expect(sent).toBeDefined();
+    if (sent && typeof (sent as { on?: (ev: string, fn: () => void) => void }).on === 'function') {
+      await new Promise<void>((resolve, reject) => {
+        const s = sent as NodeJS.ReadableStream;
+        s.on('end', () => resolve());
+        s.on('error', reject);
+        s.resume();
+      });
+    }
   });
 
   test('uploadFile throws when no file', async () => {
@@ -51,7 +59,7 @@ describe('UploadsController', () => {
   });
 
   test('uploadFile returns filename for valid audio', async () => {
-    const uploads = { saveAudioFromBuffer: (_: Buffer, __: string) => 'saved.webm' };
+    const uploads = { saveAudioFromBuffer: () => 'saved.webm' };
     const controller = new UploadsController(uploads as never);
     const req = { file: async () => ({ mimetype: 'audio/webm', toBuffer: async () => Buffer.from('') }) };
     const result = await controller.uploadFile(req as never);
