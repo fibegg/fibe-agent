@@ -19,3 +19,12 @@ Each commit is one logical change. Applied in order.
 
 6. ✅ **style(global): align theme tokens with design**
    - `--radius: 0.75rem`, border opacity `0.1` (light) to match design theme.css.
+
+7. ✅ **style(chat): match design layout and chat area**
+   - Flex layout (sidebar then main). Header inside main. Auth/Logout text-[10px] sm:text-xs. Paperclip hidden sm:flex. Placeholder "Ask me anything...".
+
+8. ✅ **style(chat): align content left (remove mx-auto)**
+   - Messages and input containers: max-w-4xl without mx-auto to match design.
+
+9. ✅ **style(file-explorer): expand/collapse all buttons**
+   - h-7 px-2 text-[10px], title "Expand All" / "Collapse All".
