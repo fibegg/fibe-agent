@@ -15,7 +15,7 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const url = base ? `${base}/api/login` : '/api/login';
+      const url = base ? `${base}/api/auth/login` : '/api/auth/login';
       const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -1,7 +1,7 @@
 import { Body, Controller, Post, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 
-@Controller()
+@Controller('auth')
 export class AuthController {
   constructor(private readonly config: ConfigService) {}
 

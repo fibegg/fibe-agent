@@ -9,7 +9,7 @@ Nest Fastify API (project `api`).
 | Method | Path            | Auth  | Description                                                                 |
 |--------|-----------------|-------|-----------------------------------------------------------------------------|
 | GET    | /api            | No    | Returns `{ message: 'Hello API' }`                                          |
-| POST   | /api/login      | No    | Body `{ password? }`. Returns `{ success, message?, token? }` or 401       |
+| POST   | /api/auth/login | No    | Body `{ password? }`. Returns `{ success, message?, token? }` or 401       |
 | GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls? }[]`     |
 | GET    | /api/uploads/:filename | Bearer | Serves an uploaded file (images or voice recordings from chat attachments)        |
 | POST   | /api/uploads           | Bearer | Upload a voice file (multipart form field `file`). Returns `{ filename }`. Max 20MB. |
