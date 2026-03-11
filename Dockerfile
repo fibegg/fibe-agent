@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
-FROM oven/bun:1-slim AS builder
+FROM oven/bun:1.3.9-slim AS builder
 
 WORKDIR /app
 
