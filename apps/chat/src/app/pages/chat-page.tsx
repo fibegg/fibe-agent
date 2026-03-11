@@ -311,7 +311,7 @@ export function ChatPage() {
       <div className="min-h-0">
         <header className="flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border/50 bg-card/40 backdrop-blur-xl flex-wrap gap-2">
           <div className="mb-2 sm:mb-3">
-            <h1 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h1>
+            <h2 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h2>
             <p className={`text-[10px] sm:text-xs ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
           </div>
           <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
