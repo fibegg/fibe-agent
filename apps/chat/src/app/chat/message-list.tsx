@@ -1,4 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { Sparkles, User } from 'lucide-react';
 import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
@@ -144,19 +145,23 @@ function MessageRow({ msg }: { msg: ChatMessage }) {
   );
 }
 
-export function MessageList({
-  messages,
-  streamingText,
-  isStreaming,
-  lastUserMessage,
-  scrollRef,
-}: {
-  messages: ChatMessage[];
-  streamingText: string;
-  isStreaming: boolean;
-  lastUserMessage?: string | null;
-  scrollRef?: React.RefObject<HTMLDivElement | null>;
-}) {
+export interface MessageListHandle {
+  scrollToBottom: (behavior?: ScrollBehavior) => void;
+}
+
+export const MessageList = forwardRef<
+  MessageListHandle | null,
+  {
+    messages: ChatMessage[];
+    streamingText: string;
+    isStreaming: boolean;
+    lastUserMessage?: string | null;
+    scrollRef?: React.RefObject<HTMLDivElement | null>;
+  }
+>(function MessageList(
+  { messages, streamingText, isStreaming, lastUserMessage, scrollRef },
+  ref
+) {
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef?.current ?? null,
@@ -167,6 +172,36 @@ export function MessageList({
 
   const virtualItems = scrollRef ? virtualizer.getVirtualItems() : null;
   const totalHeight = scrollRef ? virtualizer.getTotalSize() : 0;
+  const lastIndex = messages.length - 1;
+
+  const scrollToBottom = useCallback(
+    (behavior: ScrollBehavior = 'smooth') => {
+      if (lastIndex < 0) return;
+      virtualizer.scrollToIndex(lastIndex, {
+        align: 'end',
+        behavior: behavior === 'smooth' ? 'smooth' : 'auto',
+      });
+    },
+    [lastIndex, virtualizer]
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({ scrollToBottom }),
+    [scrollToBottom]
+  );
+
+  const hasScrolledToBottomOnMountRef = useRef(false);
+  useEffect(() => {
+    if (!scrollRef || messages.length === 0 || hasScrolledToBottomOnMountRef.current) return;
+    hasScrolledToBottomOnMountRef.current = true;
+    const id = requestAnimationFrame(() => {
+      if (scrollRef.current) {
+        virtualizer.scrollToIndex(messages.length - 1, { align: 'end', behavior: 'auto' });
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [scrollRef, messages.length, virtualizer]);
 
   const listContent = scrollRef && virtualItems ? (
     <div
@@ -221,4 +256,4 @@ export function MessageList({
       )}
     </>
   );
-}
+});

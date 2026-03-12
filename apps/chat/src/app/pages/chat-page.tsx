@@ -22,7 +22,7 @@ import {
   valueAfterAtMatchesEntry,
 } from '../chat/file-mention-dropdown';
 import { MentionInput } from '../chat/mention-input';
-import { MessageList, type ChatMessage } from '../chat/message-list';
+import { MessageList, type ChatMessage, type MessageListHandle } from '../chat/message-list';
 import { ModelSelector } from '../chat/model-selector';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
@@ -87,6 +87,7 @@ export function ChatPage() {
   const modelDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLDivElement>(null);
+  const messageListRef = useRef<MessageListHandle | null>(null);
   const { entries: playgroundEntries } = usePlaygroundFiles();
   const atMention = getAtMentionState(inputValue, cursorOffset);
   const [mentionDropdownClosedAfterSelect, setMentionDropdownClosedAfterSelect] = useState(false);
@@ -669,6 +670,7 @@ export function ChatPage() {
           >
             <div className="max-w-4xl">
               <MessageList
+                ref={messageListRef}
                 messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
@@ -681,7 +683,10 @@ export function ChatPage() {
           {!scroll.isAtBottom && (
             <button
               type="button"
-              onClick={() => scroll.scrollToBottom('smooth')}
+              onClick={() => {
+                messageListRef.current?.scrollToBottom('smooth');
+                scroll.scrollToBottom('smooth');
+              }}
               className="absolute bottom-4 right-4 sm:right-6 md:right-8 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-card/95 border border-border shadow-lg text-sm font-medium text-foreground hover:bg-violet-500/10 hover:border-violet-500/30 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2 focus:ring-offset-background transition-colors"
               aria-label="Jump to latest messages"
             >

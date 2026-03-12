@@ -1,6 +1,7 @@
+import { createRef } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
-import { MessageList, type ChatMessage } from './message-list';
+import { render, screen, act } from '@testing-library/react';
+import { MessageList, type ChatMessage, type MessageListHandle } from './message-list';
 
 vi.mock('../api-url', () => ({
   getApiUrl: () => '',
@@ -107,5 +108,43 @@ describe('MessageList', () => {
     expect(screen.getByTitle('test-100kb.scss')).toBeTruthy();
     expect(screen.getByText('examples')).toBeTruthy();
     expect(screen.getByText('test-100kb.scss')).toBeTruthy();
+  });
+
+  it('exposes scrollToBottom via ref', () => {
+    const ref = createRef<MessageListHandle | null>();
+    const messages: ChatMessage[] = [
+      { role: 'user', body: 'Hi', created_at: '2025-03-11T12:00:00.000Z' },
+    ];
+    render(
+      <MessageList ref={ref} messages={messages} streamingText="" isStreaming={false} />
+    );
+    expect(ref.current).not.toBeNull();
+    expect(typeof ref.current!.scrollToBottom).toBe('function');
+  });
+
+  it('scrollToBottom can be called with no args without throwing', () => {
+    const ref = createRef<MessageListHandle | null>();
+    const messages: ChatMessage[] = [
+      { role: 'user', body: 'Hi', created_at: '2025-03-11T12:00:00.000Z' },
+    ];
+    render(
+      <MessageList ref={ref} messages={messages} streamingText="" isStreaming={false} />
+    );
+    act(() => {
+      ref.current!.scrollToBottom();
+    });
+  });
+
+  it('scrollToBottom can be called with behavior without throwing', () => {
+    const ref = createRef<MessageListHandle | null>();
+    const messages: ChatMessage[] = [
+      { role: 'user', body: 'Hi', created_at: '2025-03-11T12:00:00.000Z' },
+    ];
+    render(
+      <MessageList ref={ref} messages={messages} streamingText="" isStreaming={false} />
+    );
+    act(() => {
+      ref.current!.scrollToBottom('smooth');
+    });
   });
 });
