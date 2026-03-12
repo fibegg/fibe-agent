@@ -46,6 +46,22 @@ describe('MessageList', () => {
     expect(screen.getByText(/\d{1,2}:\d{2} (AM|PM)/)).toBeTruthy();
   });
 
+  it('renders assistant message bubble with card styling', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: 'Reply',
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const bubble = container.querySelector('.bg-card');
+    expect(bubble).toBeTruthy();
+    expect(bubble?.textContent).toContain('Reply');
+  });
+
   it('renders multiple messages in order', () => {
     const messages: ChatMessage[] = [
       { role: 'user', body: 'First', created_at: '2025-03-11T12:00:00.000Z' },

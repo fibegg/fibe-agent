@@ -80,6 +80,9 @@ function getUploadSrc(filename: string): string {
 const ESTIMATED_ROW_HEIGHT = 120;
 const ROW_GAP = 24;
 
+const ASSISTANT_BUBBLE_CLASSES =
+  'rounded-tl-sm bg-card border border-border shadow-xl shadow-violet-500/5 text-card-foreground';
+
 function MessageRow({ msg }: { msg: ChatMessage }) {
   return (
     <div
@@ -101,7 +104,7 @@ function MessageRow({ msg }: { msg: ChatMessage }) {
           className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
             msg.role === 'user'
               ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
-              : 'rounded-tl-sm bg-card/60 backdrop-blur-md border border-border-subtle shadow-lg text-card-foreground'
+              : ASSISTANT_BUBBLE_CLASSES
           }`}
         >
           {msg.role === 'user' ? (
@@ -241,7 +244,7 @@ export const MessageList = forwardRef<
         <div className="flex gap-2 sm:gap-3 md:gap-4">
           <ThinkingAvatar />
           <div className="flex-1 min-w-0">
-            <div className="max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl rounded-tl-sm bg-card border border-border px-4 py-3">
+            <div className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl px-4 py-3 ${ASSISTANT_BUBBLE_CLASSES}`}>
               {streamingText ? (
                 <div
                   className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
