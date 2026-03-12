@@ -29,6 +29,10 @@ async function bootstrap() {
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
+  const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
+    : ['http://localhost:4200', 'http://localhost:4300'];
+  app.enableCors({ origin: corsOrigins });
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
   const port = process.env.PORT ?? 3000;
   await app.listen(port, '0.0.0.0');
