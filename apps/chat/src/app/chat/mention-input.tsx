@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { AT_MENTION_REGEX, isLikelyFile, pathDisplayName } from './mention-utils';
+import {
+  AT_MENTION_REGEX,
+  type FileIconType,
+  getFileIconType,
+  pathDisplayName,
+} from './mention-utils';
 
 type Segment = { type: 'text'; value: string } | { type: 'mention'; path: string };
 
@@ -94,7 +99,17 @@ function setCaretOffset(root: HTMLElement, targetOffset: number): void {
 }
 
 const CHIP_CLASS =
-  'group relative inline-flex items-center gap-1 rounded-full pl-1.5 pr-2 py-0.5 text-xs font-medium bg-violet-500/90 border border-violet-400/50 text-white shrink-0';
+  'group relative inline-flex items-center gap-1.5 rounded-md pl-1.5 pr-2 py-0.5 text-xs font-medium bg-muted/80 border border-border-subtle text-foreground shrink-0';
+
+const CHIP_ICON_SVG: Record<FileIconType, string> = {
+  folder:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>',
+  file: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>',
+  doc: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/></svg>',
+  code: '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>',
+  image:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>',
+};
 
 function buildChipSpan(path: string, onRemove: () => void): HTMLSpanElement {
   const span = document.createElement('span');
@@ -102,19 +117,18 @@ function buildChipSpan(path: string, onRemove: () => void): HTMLSpanElement {
   span.setAttribute('data-path', path);
   span.className = CHIP_CLASS;
   span.title = path;
+  const { type, colorClass } = getFileIconType(path);
   const icon = document.createElement('span');
   icon.setAttribute('aria-hidden', 'true');
-  icon.className = 'chip-icon shrink-0 flex items-center';
-  icon.innerHTML = isLikelyFile(path)
-    ? '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>'
-    : '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>';
+  icon.className = `chip-icon shrink-0 flex items-center [&_svg]:shrink-0 ${colorClass}`;
+  icon.innerHTML = CHIP_ICON_SVG[type];
   const label = document.createElement('span');
   label.className = 'truncate max-w-[100px] sm:max-w-[120px]';
   label.textContent = pathDisplayName(path);
   const removeBtn = document.createElement('button');
   removeBtn.type = 'button';
   removeBtn.className =
-    'absolute top-1/2 -translate-y-1/2 right-[5px] opacity-0 group-hover:opacity-100 size-4 rounded-full flex items-center justify-center hover:bg-white/20 transition-opacity bg-violet-500/90 border border-violet-400/50';
+    'absolute top-1/2 -translate-y-1/2 right-[5px] opacity-0 group-hover:opacity-100 size-4 rounded-full flex items-center justify-center hover:bg-muted transition-opacity';
   removeBtn.setAttribute('aria-label', 'Remove');
   removeBtn.innerHTML =
     '<svg xmlns="http://www.w3.org/2000/svg" width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';

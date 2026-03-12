@@ -94,7 +94,7 @@ function filterTreeByQuery(entries: PlaygroundEntry[], query: string): Playgroun
 }
 
 const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
-const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.html']);
+const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.sass', '.html']);
 const DOC_EXT = new Set(['.md', '.mdx', '.txt']);
 
 const FILE_TYPE_COLOR = {

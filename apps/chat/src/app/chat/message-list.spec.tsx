@@ -91,4 +91,21 @@ describe('MessageList', () => {
     expect(screen.getByText('readme.md')).toBeTruthy();
     expect(screen.getByTitle('apps/chat/readme.md')).toBeTruthy();
   });
+
+  it('renders multiple @mentions as separate badges', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: 'Compare @examples and @test-100kb.scss',
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    expect(screen.getByTitle('examples')).toBeTruthy();
+    expect(screen.getByTitle('test-100kb.scss')).toBeTruthy();
+    expect(screen.getByText('examples')).toBeTruthy();
+    expect(screen.getByText('test-100kb.scss')).toBeTruthy();
+  });
 });

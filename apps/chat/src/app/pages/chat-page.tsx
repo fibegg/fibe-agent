@@ -297,9 +297,10 @@ export function ChatPage() {
   const handleMentionSelect = useCallback(
     (path: string) => {
       flushSync(() => setMentionDropdownClosedAfterSelect(true));
+      const inserted = `@${path} `;
       const newVal =
         inputValue.slice(0, atMention.replaceStart) +
-        `@${path}` +
+        inserted +
         inputValue.slice(cursorOffset);
       setInputState({ value: newVal, cursor: newVal.length });
       chatInputRef.current?.focus();
