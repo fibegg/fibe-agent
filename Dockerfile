@@ -54,6 +54,7 @@ COPY --from=builder /app/apps/api/dist ./dist/
 COPY --from=builder /app/apps/chat/dist ./chat/
 COPY apps/api/package.json ./package.json
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
+RUN npm install -g mcp-remote && npm cache clean --force
 
 EXPOSE 3000
 
