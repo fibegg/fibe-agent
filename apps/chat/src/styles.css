@@ -145,6 +145,21 @@ body {
   display: none;
 }
 
+.sidebar-toggle {
+  box-shadow:
+    0 -1px 0 0 var(--border-subtle),
+    1px 0 0 0 var(--border-subtle),
+    0 1px 0 0 var(--border-subtle);
+}
+
+.sidebar-toggle:hover {
+  box-shadow:
+    0 -1px 0 0 var(--border-subtle),
+    1px 0 0 0 var(--border-subtle),
+    0 1px 0 0 var(--border-subtle),
+    0 2px 8px -2px rgb(124 58 237 / 0.25);
+}
+
 .markdown-body h1,
 .markdown-body h2,
 .markdown-body h3 {

@@ -546,8 +546,13 @@ function TreeNode({
 
 export function FileExplorer({
   fullWidth,
+  collapsed,
   onSettingsClick,
-}: { fullWidth?: boolean; onSettingsClick?: () => void } = {}) {
+}: {
+  fullWidth?: boolean;
+  collapsed?: boolean;
+  onSettingsClick?: () => void;
+} = {}) {
   const [tree, setTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -633,10 +638,37 @@ export function FileExplorer({
   const toolbarBtnClass =
     'rounded-md text-[9px] sm:text-[10px] font-medium text-foreground dark:text-white hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400 transition-colors';
 
+  if (collapsed) {
+    return (
+      <>
+        <div className="flex min-h-0 w-full flex-1 flex-col items-center bg-card/30 py-4 backdrop-blur-xl">
+          <div className="flex flex-col items-center gap-3">
+            <AnimatedPhoenixLogo className="size-8 text-violet-500" />
+            <div className="flex flex-col gap-1">
+              <button
+                type="button"
+                className="flex size-8 items-center justify-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
+                title="Settings"
+                aria-label="Settings"
+                onClick={onSettingsClick}
+              >
+                <Settings className="size-4" />
+              </button>
+              <ThemeToggle />
+            </div>
+          </div>
+        </div>
+        {selectedFile?.type === 'file' && (
+          <FileDetailsDialog entry={selectedFile} onClose={() => setSelectedFile(null)} />
+        )}
+      </>
+    );
+  }
+
   return (
     <>
       <div
-        className="min-h-0 flex w-full flex-1 flex-col border-r border-border-subtle bg-card/30 backdrop-blur-xl"
+        className="min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl"
       >
       <div className="p-3 sm:p-4 border-b border-border-subtle bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
         <div className="flex items-center justify-between mb-3">

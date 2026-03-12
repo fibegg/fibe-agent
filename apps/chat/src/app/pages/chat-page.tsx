@@ -1,4 +1,16 @@
-import { ImagePlus, Key, LogOut, Menu, Mic, Paperclip, Search, Send, X } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ImagePlus,
+  Key,
+  LogOut,
+  Menu,
+  Mic,
+  Paperclip,
+  Search,
+  Send,
+  X,
+} from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
@@ -23,6 +35,12 @@ import {
   getAuthTokenForRequest,
   isAuthenticated,
 } from '../api-url';
+import {
+  getInitialSidebarCollapsed,
+  persistSidebarCollapsed,
+  SIDEBAR_COLLAPSED_WIDTH_PX,
+  SIDEBAR_WIDTH_PX,
+} from '../layout-constants';
 
 const STATE_LABELS: Record<string, string> = {
   [CHAT_STATES.INITIALIZING]: 'Connecting...',
@@ -45,6 +63,7 @@ export function ChatPage() {
 
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -72,6 +91,20 @@ export function ChatPage() {
   useEffect(() => {
     if (!atMention.show) setMentionDropdownClosedAfterSelect(false);
   }, [atMention.show]);
+
+  useEffect(() => persistSidebarCollapsed(sidebarCollapsed), [sidebarCollapsed]);
+
+  useEffect(() => {
+    if (isMobile) return;
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
+        e.preventDefault();
+        setSidebarCollapsed((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isMobile]);
 
   const authenticated = isAuthenticated();
   useEffect(() => {
@@ -369,7 +402,7 @@ export function ChatPage() {
       : messages.filter((m) => m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase()));
 
   return (
-    <div className="size-full flex overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10">
+    <div className="flex h-screen w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10">
       <AuthModal
         open={showAuthModal}
         authModal={authModal}
@@ -477,9 +510,38 @@ export function ChatPage() {
         </>
       )}
       {!isMobile && (
-        <aside className="flex min-h-0 w-full flex-shrink-0 flex-col overflow-hidden lg:w-80">
-          <FileExplorer onSettingsClick={() => setSettingsOpen(true)} />
-        </aside>
+        <div
+          className="relative flex min-h-0 flex-shrink-0 flex-col overflow-visible transition-[width] duration-300 ease-out"
+          style={{ width: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : SIDEBAR_WIDTH_PX }}
+        >
+          <aside className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <FileExplorer
+              collapsed={sidebarCollapsed}
+              onSettingsClick={() => setSettingsOpen(true)}
+            />
+          </aside>
+          <div
+            className="absolute top-0 right-0 bottom-0 w-px pointer-events-none z-0 bg-[var(--border-subtle)]"
+            aria-hidden
+          />
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((v) => !v)}
+            title={
+              sidebarCollapsed
+                ? 'Expand sidebar (⌘B)'
+                : 'Collapse sidebar (⌘B)'
+            }
+            className="sidebar-toggle absolute top-1/2 right-0 z-10 flex h-14 w-7 -translate-y-1/2 translate-x-full items-center justify-center rounded-r-lg border-0 bg-card/80 backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:bg-violet-500/10 focus:outline-none focus:ring-2 focus:ring-violet-500/30 active:scale-95"
+            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="size-4 text-violet-500 transition-transform" />
+            ) : (
+              <ChevronLeft className="size-4 text-violet-500 transition-transform" />
+            )}
+          </button>
+        </div>
       )}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex shrink-0 flex-col px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border-subtle bg-card/40 backdrop-blur-xl">

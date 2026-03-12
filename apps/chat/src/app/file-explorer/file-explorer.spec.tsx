@@ -176,6 +176,44 @@ describe('FileExplorer', () => {
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))).not.toThrow();
   });
 
+  it('renders collapsed rail when collapsed is true', () => {
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation(
+      () => new Promise<Response>(() => undefined)
+    );
+    render(<FileExplorer collapsed />);
+    expect(screen.queryByPlaceholderText('Search files...')).toBeNull();
+    expect(screen.queryByText(/Expand Level/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
+  });
+
+  it('renders full explorer when collapsed is false', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    render(<FileExplorer collapsed={false} />);
+    await waitFor(() => {
+      expect(screen.getByPlaceholderText('Search files...')).toBeTruthy();
+    });
+    expect(screen.getByText(/playground\//)).toBeTruthy();
+  });
+
+  it('shows Settings in collapsed rail and calls onSettingsClick when clicked', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    const onSettingsClick = vi.fn();
+    render(<FileExplorer collapsed onSettingsClick={onSettingsClick} />);
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(onSettingsClick).toHaveBeenCalledTimes(1);
+  });
+
   it('shows diff content in dialog after file content is loaded', async () => {
     const tree: PlaygroundEntry[] = [
       { name: 'app.js', path: 'app.js', type: 'file' },
