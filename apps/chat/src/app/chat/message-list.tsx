@@ -160,7 +160,8 @@ export function MessageList({
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef?.current ?? null,
-    estimateSize: () => ESTIMATED_ROW_HEIGHT + ROW_GAP,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    gap: ROW_GAP,
     overscan: 5,
   });
 
@@ -177,10 +178,12 @@ export function MessageList({
         return (
           <div
             key={msg.id ?? `${msg.created_at}-${msg.role}`}
+            data-index={virtualRow.index}
+            ref={virtualizer.measureElement}
             className="absolute left-0 w-full"
             style={{
               top: virtualRow.start,
-              height: virtualRow.size - ROW_GAP,
+              minHeight: virtualRow.size,
             }}
           >
             <MessageRow msg={msg} />
