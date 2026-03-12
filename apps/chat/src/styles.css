@@ -180,6 +180,8 @@ body {
 .chat-messages-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
+  contain: paint;
+  transform: translateZ(0);
 }
 
 .chat-messages-scroll::-webkit-scrollbar {

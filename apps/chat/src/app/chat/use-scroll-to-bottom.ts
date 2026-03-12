@@ -18,6 +18,7 @@ export function useScrollToBottom(scrollDeps: unknown[]) {
   const userJustSentRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
 
+  const prevAtBottomRef = useRef(true);
   const checkAtBottom = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return true;
@@ -27,7 +28,9 @@ export function useScrollToBottom(scrollDeps: unknown[]) {
       el.clientHeight
     );
     userWasAtBottomRef.current = atBottom;
-    setIsAtBottom(atBottom);
+    const changed = prevAtBottomRef.current !== atBottom;
+    prevAtBottomRef.current = atBottom;
+    if (changed) setIsAtBottom(atBottom);
     return atBottom;
   }, []);
 

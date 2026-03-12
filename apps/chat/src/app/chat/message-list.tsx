@@ -206,7 +206,7 @@ export const MessageList = forwardRef<
   const listContent = scrollRef && virtualItems ? (
     <div
       className="w-full relative"
-      style={{ height: totalHeight }}
+      style={{ height: totalHeight, contain: 'layout paint' } as React.CSSProperties}
     >
       {virtualItems.map((virtualRow) => {
         const msg = messages[virtualRow.index];

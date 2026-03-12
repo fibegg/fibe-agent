@@ -76,4 +76,48 @@ describe('useScrollToBottom', () => {
       result.current.onScroll();
     });
   });
+
+  it('onScroll sets isAtBottom to true when scroll is at bottom', () => {
+    const { result } = renderHook(() => useScrollToBottom([]));
+    const el = document.createElement('div');
+    Object.defineProperty(el, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(el, 'clientHeight', { value: 600, configurable: true });
+    Object.defineProperty(el, 'scrollTop', { value: 400, writable: true, configurable: true });
+    (result.current.scrollRef as { current: HTMLDivElement | null }).current = el as HTMLDivElement;
+    act(() => {
+      result.current.onScroll();
+    });
+    expect(result.current.isAtBottom).toBe(true);
+  });
+
+  it('onScroll sets isAtBottom to false when scroll is not at bottom', () => {
+    const { result } = renderHook(() => useScrollToBottom([]));
+    const el = document.createElement('div');
+    Object.defineProperty(el, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(el, 'clientHeight', { value: 600, configurable: true });
+    Object.defineProperty(el, 'scrollTop', { value: 300, writable: true, configurable: true });
+    (result.current.scrollRef as { current: HTMLDivElement | null }).current = el as HTMLDivElement;
+    act(() => {
+      result.current.onScroll();
+    });
+    expect(result.current.isAtBottom).toBe(false);
+  });
+
+  it('onScroll updates isAtBottom when crossing threshold', () => {
+    const { result } = renderHook(() => useScrollToBottom([]));
+    const el = document.createElement('div');
+    Object.defineProperty(el, 'scrollHeight', { value: 1000, configurable: true });
+    Object.defineProperty(el, 'clientHeight', { value: 600, configurable: true });
+    Object.defineProperty(el, 'scrollTop', { value: 300, writable: true, configurable: true });
+    (result.current.scrollRef as { current: HTMLDivElement | null }).current = el as HTMLDivElement;
+    act(() => {
+      result.current.onScroll();
+    });
+    expect(result.current.isAtBottom).toBe(false);
+    Object.defineProperty(el, 'scrollTop', { value: 400, writable: true, configurable: true });
+    act(() => {
+      result.current.onScroll();
+    });
+    expect(result.current.isAtBottom).toBe(true);
+  });
 });
