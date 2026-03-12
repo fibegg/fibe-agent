@@ -1,6 +1,8 @@
 import { join } from 'path';
+import { APP_GUARD } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
+import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigService } from './config/config.service';
@@ -19,6 +21,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
 
 @Module({
   imports: [
+    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 100 }]),
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'chat'),
       exclude: ['/api/(.*)', '/ws'],
@@ -34,6 +37,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
     PlaygroundsController,
   ],
   providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
     AppService,
     ConfigService,
     AgentAuthGuard,
