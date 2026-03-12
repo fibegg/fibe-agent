@@ -57,11 +57,11 @@ describe('MessageList', () => {
     expect(screen.getByText('Second')).toBeTruthy();
   });
 
-  it('shows streaming placeholder when streaming with empty text', () => {
-    const { container } = render(
+  it('shows thinking state when streaming with empty text', () => {
+    render(
       <MessageList messages={[]} streamingText="" isStreaming={true} />
     );
-    const dots = container.querySelectorAll('.animate-bounce');
+    const dots = document.querySelectorAll('.animate-thinking-bounce');
     expect(dots.length).toBeGreaterThanOrEqual(1);
   });
 

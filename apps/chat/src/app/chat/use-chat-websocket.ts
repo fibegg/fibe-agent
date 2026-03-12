@@ -186,6 +186,7 @@ export function useChatWebSocket(
       }
 
       if (data.type === 'stream_start') {
+        transition(setState, CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
         streamingAccumulatorRef.current = '';
         onStreamStartRef.current?.();
