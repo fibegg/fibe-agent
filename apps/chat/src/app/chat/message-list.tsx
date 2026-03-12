@@ -1,3 +1,4 @@
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Sparkles, User } from 'lucide-react';
 import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
@@ -75,82 +76,129 @@ function getUploadSrc(filename: string): string {
   return token ? `${path}?token=${encodeURIComponent(token)}` : path;
 }
 
+const ESTIMATED_ROW_HEIGHT = 120;
+const ROW_GAP = 24;
+
+function MessageRow({ msg }: { msg: ChatMessage }) {
+  return (
+    <div
+      className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+    >
+      <div className="flex-shrink-0">
+        {msg.role === 'user' ? (
+          <div className="size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white">
+            <User className="size-3.5 sm:size-4" />
+          </div>
+        ) : (
+          <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white">
+            <Sparkles className="size-3.5 sm:size-4" />
+          </div>
+        )}
+      </div>
+      <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
+        <div
+          className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
+            msg.role === 'user'
+              ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
+              : 'rounded-tl-sm bg-card/60 backdrop-blur-md border border-border-subtle shadow-lg text-card-foreground'
+          }`}
+        >
+          {msg.role === 'user' ? (
+            <>
+              {msg.imageUrls?.length ? (
+                <div className="flex flex-col gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    {msg.imageUrls.map((filename) => (
+                      <img
+                        key={filename}
+                        src={getUploadSrc(filename)}
+                        alt=""
+                        loading="lazy"
+                        className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
+                      />
+                    ))}
+                  </div>
+                  {msg.body ? <MessageBodyWithMentions body={msg.body} /> : null}
+                </div>
+              ) : (
+                <MessageBodyWithMentions body={msg.body} />
+              )}
+              <p className="text-xs mt-1.5 sm:mt-2 text-violet-200">
+                {formatTime(msg.created_at)}
+              </p>
+            </>
+          ) : (
+            <>
+              <div
+                className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
+                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
+              />
+              <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
+                {formatTime(msg.created_at)}
+              </p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function MessageList({
   messages,
   streamingText,
   isStreaming,
   lastUserMessage,
+  scrollRef,
 }: {
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
   lastUserMessage?: string | null;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
 }) {
-  return (
+  const virtualizer = useVirtualizer({
+    count: messages.length,
+    getScrollElement: () => scrollRef?.current ?? null,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT + ROW_GAP,
+    overscan: 5,
+  });
+
+  const virtualItems = scrollRef ? virtualizer.getVirtualItems() : null;
+  const totalHeight = scrollRef ? virtualizer.getTotalSize() : 0;
+
+  const listContent = scrollRef && virtualItems ? (
+    <div
+      className="w-full relative"
+      style={{ height: totalHeight }}
+    >
+      {virtualItems.map((virtualRow) => {
+        const msg = messages[virtualRow.index];
+        return (
+          <div
+            key={msg.id ?? `${msg.created_at}-${msg.role}`}
+            className="absolute left-0 w-full"
+            style={{
+              top: virtualRow.start,
+              height: virtualRow.size - ROW_GAP,
+            }}
+          >
+            <MessageRow msg={msg} />
+          </div>
+        );
+      })}
+    </div>
+  ) : (
     <div className="space-y-4 sm:space-y-6">
       {messages.map((msg) => (
-        <div
-          key={msg.id ?? `${msg.created_at}-${msg.role}`}
-          className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
-        >
-          <div className="flex-shrink-0">
-            {msg.role === 'user' ? (
-              <div className="size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white">
-                <User className="size-3.5 sm:size-4" />
-              </div>
-            ) : (
-              <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white">
-                <Sparkles className="size-3.5 sm:size-4" />
-              </div>
-            )}
-          </div>
-          <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
-            <div
-              className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
-                msg.role === 'user'
-                  ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
-                  : 'rounded-tl-sm bg-card/60 backdrop-blur-md border border-border-subtle shadow-lg text-card-foreground'
-              }`}
-            >
-                  {msg.role === 'user' ? (
-                <>
-                  {msg.imageUrls?.length ? (
-                    <div className="flex flex-col gap-2">
-                      <div className="flex flex-wrap gap-2">
-                        {msg.imageUrls.map((filename) => (
-                          <img
-                            key={filename}
-                            src={getUploadSrc(filename)}
-                            alt=""
-                            loading="lazy"
-                            className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
-                          />
-                        ))}
-                      </div>
-                      {msg.body ? <MessageBodyWithMentions body={msg.body} /> : null}
-                    </div>
-                  ) : (
-                    <MessageBodyWithMentions body={msg.body} />
-                  )}
-                  <p className="text-xs mt-1.5 sm:mt-2 text-violet-200">
-                    {formatTime(msg.created_at)}
-                  </p>
-                </>
-              ) : (
-                <>
-                  <div
-                    className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
-                    dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
-                  />
-                  <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
-                    {formatTime(msg.created_at)}
-                  </p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <MessageRow key={msg.id ?? `${msg.created_at}-${msg.role}`} msg={msg} />
       ))}
+    </div>
+  );
+
+  return (
+    <>
+      {listContent}
       {isStreaming && (
         <div className="flex gap-2 sm:gap-3 md:gap-4">
           <ThinkingAvatar />
@@ -168,6 +216,6 @@ export function MessageList({
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }

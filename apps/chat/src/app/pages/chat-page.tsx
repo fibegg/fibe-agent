@@ -63,6 +63,7 @@ const MOBILE_BREAKPOINT_PX = 1024;
 export function ChatPage() {
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
 
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -665,13 +666,17 @@ export function ChatPage() {
             </button>
           </div>
         )}
-        <div className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
+        <div
+          ref={messagesScrollRef}
+          className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8"
+        >
             <div className="max-w-4xl">
               <MessageList
                 messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
                 lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastSentMessage : null}
+                scrollRef={messagesScrollRef}
               />
               <div ref={messagesEndRef} />
             </div>
