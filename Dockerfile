@@ -1,5 +1,6 @@
 FROM node:24-slim AS cli
 
+ARG BUILDKIT_INLINE_CACHE=1
 ARG AGENT_PROVIDER=gemini
 
 RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
@@ -17,6 +18,8 @@ RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null |
 
 FROM oven/bun:1.3.9-slim AS builder
 
+ARG BUILDKIT_INLINE_CACHE=1
+
 WORKDIR /app
 
 COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json ./
@@ -30,20 +33,25 @@ COPY apps/api apps/api
 COPY apps/chat apps/chat
 
 ENV NX_DAEMON=false
-RUN bunx nx run api:build
-RUN bunx nx run chat:build
+RUN bunx nx run-many --targets=build --projects=api,chat
 
 FROM node:24-slim
 
-ARG AGENT_PROVIDER=gemini
+ARG BUILDKIT_INLINE_CACHE=1
 
+# Unconditional packages — cached across all provider variants
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
     jq less tree wget zip unzip openssh-client \
-    && if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    apt-get install -y --no-install-recommends dbus gnome-keyring libsecret-1-0; \
-    fi \
     && rm -rf /var/lib/apt/lists/*
+
+# Conditional packages — only busts cache for claude_code builds
+ARG AGENT_PROVIDER=gemini
+RUN if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
+    apt-get update && apt-get install -y --no-install-recommends \
+    dbus gnome-keyring libsecret-1-0 \
+    && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=cli /usr/local/bin /usr/local/bin
@@ -53,8 +61,9 @@ WORKDIR /app
 COPY --from=builder /app/apps/api/dist ./dist/
 COPY --from=builder /app/apps/chat/dist ./chat/
 COPY apps/api/package.json ./package.json
-RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
-RUN npm install -g mcp-remote && npm cache clean --force
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --omit=dev --ignore-scripts && \
+    npm install -g mcp-remote
 
 EXPOSE 3000
 
