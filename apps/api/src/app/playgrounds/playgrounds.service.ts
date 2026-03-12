@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
-import { join, resolve, relative } from 'node:path';
+import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 
@@ -11,6 +11,13 @@ export interface PlaygroundEntry {
 }
 
 const HIDDEN_PREFIX = '.';
+
+const IGNORED_NAMES = new Set<string>(['node_modules', '.git']);
+
+function pathInIgnoredDir(relPath: string): boolean {
+  const segments = relPath.replace(/\\/g, '/').split('/');
+  return segments.some((seg) => IGNORED_NAMES.has(seg));
+}
 
 @Injectable()
 export class PlaygroundsService {
@@ -24,7 +31,7 @@ export class PlaygroundsService {
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    if (rel.startsWith('..') || absPath === base) {
+    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
       throw new NotFoundException('File not found');
     }
     if (!existsSync(absPath) || !statSync(absPath).isFile()) {
@@ -37,7 +44,7 @@ export class PlaygroundsService {
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    if (rel.startsWith('..') || absPath === base) {
+    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
       throw new NotFoundException('Folder not found');
     }
     if (!existsSync(absPath) || !statSync(absPath).isDirectory()) {
@@ -47,10 +54,11 @@ export class PlaygroundsService {
   }
 
   private collectFileContents(absPath: string, relPath: string): { path: string; content: string }[] {
+    if (IGNORED_NAMES.has(basename(absPath))) return [];
     const result: { path: string; content: string }[] = [];
     const entries = readdirSync(absPath, { withFileTypes: true });
     for (const e of entries) {
-      if (e.name.startsWith(HIDDEN_PREFIX)) continue;
+      if (e.name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(e.name)) continue;
       const childRel = relPath ? `${relPath}/${e.name}` : e.name;
       const childAbs = join(absPath, e.name);
       if (e.isFile()) {
@@ -67,13 +75,14 @@ export class PlaygroundsService {
   }
 
   private readDir(absPath: string, relativePath: string): PlaygroundEntry[] {
+    if (IGNORED_NAMES.has(basename(absPath))) return [];
     try {
       const entries = readdirSync(absPath, { withFileTypes: true });
       const result: PlaygroundEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
       const files: { name: string; rel: string }[] = [];
       for (const e of entries) {
-        if (e.name.startsWith(HIDDEN_PREFIX)) continue;
+        if (e.name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(e.name)) continue;
         const rel = relativePath ? `${relativePath}/${e.name}` : e.name;
         if (e.isDirectory()) {
           dirs.push({ name: e.name, abs: join(absPath, e.name), rel });

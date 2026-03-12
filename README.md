@@ -22,7 +22,7 @@ Or start separately:
    AGENT_PROVIDER=mock bunx nx serve api
    ```
 
-2. **Start the chat app** (port 4200):
+2. **Start the chat app** (port 3100):
 
    ```sh
    bunx nx serve chat
@@ -34,7 +34,7 @@ Or start separately:
    VITE_API_URL=http://localhost:3000
    ```
 
-3. Open **http://localhost:4200**. If `AGENT_PASSWORD` is set, log in with that password first, then use the chat.
+3. Open **http://localhost:3100**. If `AGENT_PASSWORD` is set, log in with that password first, then use the chat.
 
 ## Environment
 

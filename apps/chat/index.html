@@ -30,7 +30,8 @@
     <script>
       (function () {
         var s = localStorage.getItem('chat-theme');
-        document.documentElement.classList.toggle('dark', s === 'dark');
+        var dark = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.classList.toggle('dark', dark);
       })();
     </script>
     <div id="root"></div>

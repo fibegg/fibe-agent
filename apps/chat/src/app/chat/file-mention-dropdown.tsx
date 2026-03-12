@@ -22,12 +22,26 @@ export function FileMentionDropdown({
   const [highlightIndex, setHighlightIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  const filtered = query.trim()
-    ? entries.filter(
-        (e) =>
-          e.path.toLowerCase().includes(query.trim().toLowerCase()) ||
-          e.name.toLowerCase().includes(query.trim().toLowerCase())
-      )
+  const q = query.trim();
+  const qLower = q.toLowerCase();
+  const filtered = q
+    ? entries
+        .filter(
+          (e) =>
+            e.path.toLowerCase().includes(qLower) ||
+            e.name.toLowerCase().includes(qLower)
+        )
+        .sort((a, b) => {
+          const aName = a.name.toLowerCase();
+          const bName = b.name.toLowerCase();
+          const aNameStarts = aName.startsWith(qLower) ? 0 : 1;
+          const bNameStarts = bName.startsWith(qLower) ? 0 : 1;
+          if (aNameStarts !== bNameStarts) return aNameStarts - bNameStarts;
+          const aNameHas = aName.includes(qLower) ? 0 : 1;
+          const bNameHas = bName.includes(qLower) ? 0 : 1;
+          if (aNameHas !== bNameHas) return aNameHas - bNameHas;
+          return a.path.localeCompare(b.path);
+        })
     : entries;
   const slice = filtered.slice(0, MAX_VISIBLE);
   const hasMore = filtered.length > MAX_VISIBLE;

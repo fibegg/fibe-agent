@@ -1,11 +1,20 @@
 import { useState, useEffect } from 'react';
-import { isDark, toggleTheme as doToggle } from './theme';
+import { getStoredTheme, isDark, toggleTheme as doToggle } from './theme';
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(false);
+  const [dark, setDark] = useState(
+    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+  );
 
   useEffect(() => {
     setDark(isDark());
+    const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)');
+    if (!m) return;
+    const handler = () => {
+      if (getStoredTheme() === null) setDark(isDark());
+    };
+    m.addEventListener('change', handler);
+    return () => m.removeEventListener('change', handler);
   }, []);
 
   const handleClick = () => {

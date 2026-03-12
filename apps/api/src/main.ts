@@ -31,7 +31,7 @@ async function bootstrap() {
   app.setGlobalPrefix(globalPrefix);
   const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
-    : ['http://localhost:4200', 'http://localhost:4300'];
+    : ['http://localhost:3100', 'http://localhost:4300'];
   app.enableCors({ origin: corsOrigins });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true })
