@@ -22,6 +22,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '..', 'chat'),
       exclude: ['/api/(.*)', '/ws'],
+      serveStaticOptions: { fallthrough: true },
     }),
   ],
   controllers: [
