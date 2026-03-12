@@ -24,7 +24,7 @@ function segmentsToStr(segments: Segment[]): string {
 
 function readDomFromEl(el: HTMLElement): Segment[] {
   const out: Segment[] = [];
-  for (const node of el.childNodes) {
+  for (const node of Array.from(el.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) {
       const v = node.textContent ?? '';
       if (v) out.push({ type: 'text', value: v });
@@ -216,7 +216,7 @@ export function MentionInput({
     const el = ref.current;
     if (!el) return [];
     const out: Segment[] = [];
-    for (const node of el.childNodes) {
+    for (const node of Array.from(el.childNodes)) {
       if (node.nodeType === Node.TEXT_NODE) {
         const v = node.textContent ?? '';
         if (v) out.push({ type: 'text', value: v });
