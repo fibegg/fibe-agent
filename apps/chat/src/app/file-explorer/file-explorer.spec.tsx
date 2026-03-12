@@ -255,10 +255,10 @@ describe('FileExplorer', () => {
       json: async () => [] as PlaygroundEntry[],
     });
     render(<FileExplorer collapsed={false} />);
+    expect(screen.getByPlaceholderText('Search files...')).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByPlaceholderText('Search files...')).toBeTruthy();
+      expect(screen.getByText(/playground\//)).toBeTruthy();
     });
-    expect(screen.getByText(/playground\//)).toBeTruthy();
   });
 
   it('shows Settings in collapsed rail and calls onSettingsClick when clicked', async () => {
