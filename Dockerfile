@@ -27,8 +27,10 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install
 
 COPY apps/api apps/api
+COPY apps/chat apps/chat
 
 RUN bunx nx run api:build
+RUN bunx nx run chat:build
 
 FROM node:24-slim
 
@@ -48,6 +50,7 @@ COPY --from=cli /usr/local/bin /usr/local/bin
 WORKDIR /app
 
 COPY --from=builder /app/apps/api/dist ./dist/
+COPY --from=builder /app/apps/chat/dist ./chat/
 COPY apps/api/package.json ./package.json
 RUN npm install --omit=dev --ignore-scripts && npm cache clean --force
 

@@ -1,4 +1,6 @@
+import { join } from 'path';
 import { Module } from '@nestjs/common';
+import { ServeStaticModule } from '@nestjs/serve-static';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigService } from './config/config.service';
@@ -16,7 +18,12 @@ import { PlaygroundsController } from './playgrounds/playgrounds.controller';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
 
 @Module({
-  imports: [],
+  imports: [
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'chat'),
+      exclude: ['/api/(.*)', '/ws'],
+    }),
+  ],
   controllers: [
     AppController,
     AuthController,
