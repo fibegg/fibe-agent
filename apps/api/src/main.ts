@@ -9,9 +9,13 @@ import multipart from '@fastify/multipart';
 import { WebSocketServer } from 'ws';
 import { AppModule } from './app/app.module';
 import { ConfigService } from './app/config/config.service';
+import { getCorsOrigin, getFrameAncestors } from './cors-frame.config';
 import { GlobalHttpExceptionFilter } from './app/http-exception.filter';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
 import { loadInjectedCredentials } from './credential-injector';
+
+const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
+const DEFAULT_PORT = 3000;
 
 async function bootstrap() {
   const injected = loadInjectedCredentials();
@@ -24,24 +28,28 @@ async function bootstrap() {
     new FastifyAdapter()
   );
   const fastify = app.getHttpAdapter().getInstance();
-  await fastify.register(helmet);
-  await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
 
-  const globalPrefix = 'api';
-  app.setGlobalPrefix(globalPrefix);
-  const corsOrigins = process.env.CORS_ORIGINS
-    ? process.env.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean)
-    : ['http://localhost:3100', 'http://localhost:4300'];
-  app.enableCors({ origin: corsOrigins });
+  await fastify.register(helmet, {
+    frameguard: false,
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: { frameAncestors: getFrameAncestors(process.env) },
+    },
+  });
+  await fastify.register(multipart, { limits: { fileSize: MULTIPART_LIMIT_BYTES } });
+
+  app.setGlobalPrefix('api');
+  app.enableCors({
+    origin: getCorsOrigin(process.env),
+    credentials: true,
+  });
   app.useGlobalPipes(
     new ValidationPipe({ whitelist: true, transform: true })
   );
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
-  const port = process.env.PORT ?? 3000;
+  const port = Number(process.env.PORT) || DEFAULT_PORT;
   await app.listen(port, '0.0.0.0');
-  Logger.log(
-    `Application is running on: http://localhost:${port}/${globalPrefix}`
-  );
+  Logger.log(`Application is running on: http://localhost:${port}/api`);
 
   const config = app.get(ConfigService);
   const orchestrator = app.get(OrchestratorService);
