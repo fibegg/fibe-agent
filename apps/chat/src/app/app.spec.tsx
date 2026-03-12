@@ -13,12 +13,12 @@ describe('App', () => {
     expect(baseElement).toBeTruthy();
   });
 
-  it('should show login title when not authenticated', () => {
-    const { getByText } = render(
-      <BrowserRouter>
+  it('should show login title when not authenticated', async () => {
+    const { findByText } = render(
+      <BrowserRouter initialEntries={['/login']}>
         <App />
       </BrowserRouter>,
     );
-    expect(getByText('Agent Authentication')).toBeTruthy();
+    expect(await findByText('Agent Authentication')).toBeTruthy();
   });
 });
