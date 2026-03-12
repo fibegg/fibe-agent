@@ -1,5 +1,5 @@
 import { render } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 
 import App from './app';
 
@@ -15,9 +15,9 @@ describe('App', () => {
 
   it('should show login title when not authenticated', async () => {
     const { findByText } = render(
-      <BrowserRouter initialEntries={['/login']}>
+      <MemoryRouter initialEntries={['/login']}>
         <App />
-      </BrowserRouter>,
+      </MemoryRouter>,
     );
     expect(await findByText('Agent Authentication')).toBeTruthy();
   });
