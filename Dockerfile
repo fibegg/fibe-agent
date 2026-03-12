@@ -29,6 +29,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 COPY apps/api apps/api
 COPY apps/chat apps/chat
 
+ENV NX_DAEMON=false
 RUN bunx nx run api:build
 RUN bunx nx run chat:build
 
