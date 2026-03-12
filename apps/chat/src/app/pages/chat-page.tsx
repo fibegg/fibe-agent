@@ -30,6 +30,7 @@ import { FileExplorer } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
+import { HeaderThinkingIcons } from '../chat/header-thinking-icons';
 import {
   getApiUrl,
   getAuthTokenForRequest,
@@ -69,6 +70,7 @@ export function ChatPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
+  const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState('');
   const [pendingImages, setPendingImages] = useState<string[]>([]);
@@ -167,23 +169,32 @@ export function ChatPage() {
   }, [isMobile]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    const id = requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    });
+    return () => cancelAnimationFrame(id);
   }, [messages, streamingText]);
 
   const handleMessage = useCallback((data: ServerMessage) => {
     if (data.type === 'message' && data.role && data.body !== undefined) {
       const payload = data as { id?: string; imageUrls?: string[] };
       const role = data.role as string;
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: payload.id,
-          role,
-          body: data.body ?? '',
-          created_at: (data.created_at as string) ?? new Date().toISOString(),
-          ...(payload.imageUrls?.length ? { imageUrls: payload.imageUrls } : {}),
-        },
-      ]);
+      const body = data.body ?? '';
+      const created_at = (data.created_at as string) ?? new Date().toISOString();
+      const serverMsg = {
+        id: payload.id,
+        role,
+        body,
+        created_at,
+        ...(payload.imageUrls?.length ? { imageUrls: payload.imageUrls } : {}),
+      };
+      setMessages((prev) => {
+        const last = prev[prev.length - 1];
+        if (last?.role === 'user' && last?.optimistic && last.body === body) {
+          return [...prev.slice(0, -1), { ...serverMsg }];
+        }
+        return [...prev, serverMsg];
+      });
     }
     if (data.type === 'model_updated' && data.model !== undefined) {
       setCurrentModel(data.model);
@@ -214,6 +225,7 @@ export function ChatPage() {
         { role: 'assistant', body: text, created_at: new Date().toISOString() },
       ]);
       setStreamingText('');
+      setLastSentMessage(null);
     }
   );
 
@@ -227,6 +239,13 @@ export function ChatPage() {
       ...(pendingImages.length ? { images: pendingImages } : {}),
       ...(pendingVoiceFilename ? { audioFilename: pendingVoiceFilename } : pendingVoice ? { audio: pendingVoice } : {}),
     });
+    if (text) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'user', body: text, created_at: new Date().toISOString(), optimistic: true },
+      ]);
+    }
+    setLastSentMessage(text || null);
     setInputState({ value: '', cursor: 0 });
     setPendingImages([]);
     setPendingVoice(null);
@@ -549,7 +568,16 @@ export function ChatPage() {
           <div className="flex items-center justify-between mb-2 sm:mb-3">
             <div>
               <h2 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h2>
-              <p className={`text-[10px] sm:text-xs ${statusClass}`}>{STATE_LABELS[state] ?? state}</p>
+              {state === CHAT_STATES.AWAITING_RESPONSE ? (
+                <div className="flex items-center justify-start gap-1.5 mt-0.5">
+                  <span className="text-[10px] sm:text-xs text-warning">Thinking...</span>
+                  <HeaderThinkingIcons />
+                </div>
+              ) : (
+                <p className={`text-[10px] sm:text-xs ${statusClass}`}>
+                  {STATE_LABELS[state] ?? state}
+                </p>
+              )}
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
             <button
@@ -643,6 +671,7 @@ export function ChatPage() {
                 messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+                lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastSentMessage : null}
               />
               <div ref={messagesEndRef} />
             </div>

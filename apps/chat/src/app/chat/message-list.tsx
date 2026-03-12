@@ -2,6 +2,7 @@ import { Code, File, FileText, Folder, Image, Sparkles, User } from 'lucide-reac
 import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { AT_MENTION_REGEX, getFileIconType, pathDisplayName } from './mention-utils';
+import { ThinkingAvatar, ThinkingState } from './thinking-state';
 
 function MentionChipIcon({ path }: { path: string }) {
   const { type, colorClass } = getFileIconType(path);
@@ -51,6 +52,7 @@ export interface ChatMessage {
   body: string;
   created_at: string;
   imageUrls?: string[];
+  optimistic?: boolean;
 }
 
 function formatTime(iso: string): string {
@@ -89,10 +91,12 @@ export function MessageList({
   messages,
   streamingText,
   isStreaming,
+  lastUserMessage,
 }: {
   messages: ChatMessage[];
   streamingText: string;
   isStreaming: boolean;
+  lastUserMessage?: string | null;
 }) {
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -160,10 +164,8 @@ export function MessageList({
         </div>
       ))}
       {isStreaming && (
-        <div className="flex gap-4">
-          <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white flex-shrink-0">
-            <Sparkles className="size-4" />
-          </div>
+        <div className="flex gap-2 sm:gap-3 md:gap-4">
+          <ThinkingAvatar />
           <div className="flex-1 min-w-0">
             <div className="max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl rounded-tl-sm bg-card border border-border px-4 py-3">
               {streamingText ? (
@@ -172,11 +174,7 @@ export function MessageList({
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
                 />
               ) : (
-                <div className="flex gap-1.5">
-                  <span className="size-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <span className="size-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <span className="size-2 bg-violet-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
+                <ThinkingState lastUserMessage={lastUserMessage} />
               )}
             </div>
           </div>
