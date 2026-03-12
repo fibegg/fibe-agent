@@ -19,8 +19,6 @@ describe('layout-constants', () => {
 });
 
 describe('getInitialSidebarCollapsed', () => {
-  const key = SIDEBAR_COLLAPSE_STORAGE_KEY;
-
   beforeEach(() => {
     vi.stubGlobal('localStorage', {
       getItem: vi.fn(),

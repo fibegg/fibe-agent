@@ -47,6 +47,7 @@ export default defineConfig(() => ({
           if (id.includes('node_modules/marked') || id.includes('node_modules/prismjs')) {
             return 'vendor-markdown';
           }
+          return undefined;
         },
       },
     },
