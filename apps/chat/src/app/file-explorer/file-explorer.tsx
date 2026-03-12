@@ -560,10 +560,12 @@ export function FileExplorer({
   fullWidth: _fullWidth,
   collapsed,
   onSettingsClick,
+  onClose,
 }: {
   fullWidth?: boolean;
   collapsed?: boolean;
   onSettingsClick?: () => void;
+  onClose?: () => void;
 } = {}) {
   const [tree, setTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -708,6 +710,16 @@ export function FileExplorer({
               <Settings className="size-3.5 sm:size-4" />
             </button>
             <ThemeToggle />
+            {onClose && (
+              <button
+                type="button"
+                onClick={onClose}
+                className="size-7 sm:size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
+                aria-label="Close"
+              >
+                <X className="size-3.5 sm:size-4" />
+              </button>
+            )}
           </div>
         </div>
         <div className="relative mb-2">

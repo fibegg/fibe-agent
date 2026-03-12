@@ -26,6 +26,7 @@ import { ModelSelector } from '../chat/model-selector';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
+import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { FileExplorer } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from '../chat/chat-state';
@@ -167,6 +168,8 @@ export function ChatPage() {
   useEffect(() => {
     if (!isMobile) setSidebarOpen(false);
   }, [isMobile]);
+
+  const closeMobileSidebar = useCallback(() => setSidebarOpen(false), []);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => {
@@ -495,38 +498,20 @@ export function ChatPage() {
           </div>
         </>
       )}
-      {isMobile && (
+      {isMobile && sidebarOpen && (
         <>
-          <div className="fixed top-4 left-4 z-40 lg:hidden">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="size-12 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 shadow-lg shadow-violet-500/30 border border-violet-400/20 flex items-center justify-center text-white"
-              aria-label="Open file explorer"
-            >
-              <Menu className="size-5" />
-            </button>
+          <div
+            className="fixed inset-0 z-50 bg-black/50 lg:hidden"
+            aria-hidden
+            onClick={closeMobileSidebar}
+          />
+          <div className="fixed left-0 top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 lg:hidden">
+            <FileExplorer
+              fullWidth
+              onSettingsClick={() => setSettingsOpen(true)}
+              onClose={closeMobileSidebar}
+            />
           </div>
-          {sidebarOpen && (
-            <>
-              <div
-                className="fixed inset-0 z-50 bg-black/50 lg:hidden"
-                aria-hidden
-                onClick={() => setSidebarOpen(false)}
-              />
-              <div className="fixed left-0 top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 lg:hidden">
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(false)}
-                  className="absolute top-3 right-3 z-10 size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
-                  aria-label="Close"
-                >
-                  <X className="size-4" />
-                </button>
-                <FileExplorer fullWidth onSettingsClick={() => setSettingsOpen(true)} />
-              </div>
-            </>
-          )}
         </>
       )}
       {!isMobile && (
@@ -566,54 +551,67 @@ export function ChatPage() {
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
         <header className="flex shrink-0 flex-col px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border-subtle bg-card/40 backdrop-blur-xl">
           <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <div>
-              <h2 className="font-semibold text-sm sm:text-base text-foreground">AI Assistant</h2>
-              {state === CHAT_STATES.AWAITING_RESPONSE ? (
-                <div className="flex items-center justify-start gap-1.5 mt-0.5">
-                  <span className="text-[10px] sm:text-xs text-warning">Thinking...</span>
-                  <HeaderThinkingIcons />
-                </div>
-              ) : (
-                <p className={`text-[10px] sm:text-xs ${statusClass}`}>
-                  {STATE_LABELS[state] ?? state}
-                </p>
-              )}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 shrink-0 lg:hidden">
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-violet-600/90 to-purple-600/90 hover:from-violet-500 hover:to-purple-500 shadow-md shadow-violet-500/20 border border-violet-400/20 pl-1.5 pr-2.5 py-1.5 text-white transition-all active:scale-[0.98]"
+                  aria-label="Open menu"
+                >
+                  <AnimatedPhoenixLogo className="size-7 sm:size-8 pointer-events-none" />
+                  <Menu className="size-4 sm:size-5 shrink-0" />
+                </button>
+              </div>
+              <div className="min-w-0">
+                <h2 className="font-semibold text-sm sm:text-base text-foreground truncate">AI Assistant</h2>
+                {state === CHAT_STATES.AWAITING_RESPONSE ? (
+                  <div className="flex items-center justify-start gap-1.5 mt-0.5">
+                    <span className="text-[10px] sm:text-xs text-warning">Thinking...</span>
+                    <HeaderThinkingIcons />
+                  </div>
+                ) : (
+                  <p className={`text-[10px] sm:text-xs ${statusClass}`}>
+                    {STATE_LABELS[state] ?? state}
+                  </p>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={() => setShowSearch((v) => !v)}
-              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
-              title="Search in conversation"
-              aria-label="Search in conversation"
-            >
-              <Search className="size-3.5 sm:size-4" />
-            </button>
-            <ModelSelector
-              currentModel={currentModel}
-              options={modelOptions}
-              onSelect={handleModelSelect}
-              onInputChange={handleModelInputChange}
-              visible={showModelSelector}
-            />
-            {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
               <button
                 type="button"
-                onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
-                className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+                onClick={() => setShowSearch((v) => !v)}
+                className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                title="Search in conversation"
+                aria-label="Search in conversation"
               >
-                {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
+                <Search className="size-3.5 sm:size-4" />
               </button>
-            )}
-            {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
-              <button
-                type="button"
-                onClick={logout}
-                className="px-3 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
-              >
-                Logout
-              </button>
-            )}
+              <ModelSelector
+                currentModel={currentModel}
+                options={modelOptions}
+                onSelect={handleModelSelect}
+                onInputChange={handleModelInputChange}
+                visible={showModelSelector}
+              />
+              {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
+                <button
+                  type="button"
+                  onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
+                  className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+                >
+                  {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
+                </button>
+              )}
+              {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
+                <button
+                  type="button"
+                  onClick={logout}
+                  className="px-3 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
+                >
+                  Logout
+                </button>
+              )}
             </div>
           </div>
           <div

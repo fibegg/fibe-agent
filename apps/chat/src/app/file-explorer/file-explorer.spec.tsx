@@ -209,6 +209,35 @@ describe('FileExplorer', () => {
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))).not.toThrow();
   });
 
+  it('renders Close button when onClose is provided and calls it when clicked', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    const onClose = vi.fn();
+    render(<FileExplorer onClose={onClose} />);
+    await waitFor(() => {
+      expect(screen.getByText(/playground\//)).toBeTruthy();
+    });
+    expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render Close button when onClose is not provided', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText(/playground\//)).toBeTruthy();
+    });
+    expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
+  });
+
   it('renders collapsed rail when collapsed is true', () => {
     (fetch as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise<Response>(() => undefined)
