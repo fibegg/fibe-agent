@@ -29,6 +29,9 @@ jobs:
       - name: Run Typecheck
         run: bun run typecheck
 
+      - name: Build
+        run: bun run build
+
       - name: Run Integration Tests
         if: hashFiles('tests/bin/gemini') != ''
         run: |
