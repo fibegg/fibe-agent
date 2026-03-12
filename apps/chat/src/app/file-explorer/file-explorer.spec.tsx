@@ -300,6 +300,62 @@ describe('FileExplorer', () => {
     });
   });
 
+  it('shows zig language label for .zig file in file viewer', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'build.zig', path: 'build.zig', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: 'const std = @import("std");' }),
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('build.zig')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('build.zig'));
+    await waitFor(() => {
+      expect(screen.getByText('zig')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/@import/)).toBeTruthy();
+    });
+  });
+
+  it('shows Plain text for unknown file extension in file viewer', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'file.xyz', path: 'file.xyz', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: 'unknown format content' }),
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('file.xyz')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('file.xyz'));
+    await waitFor(() => {
+      expect(screen.getByText('Plain text')).toBeTruthy();
+    });
+    await waitFor(() => {
+      expect(screen.getByText(/unknown format content/)).toBeTruthy();
+    });
+  });
+
   it('shows Empty file when file content is empty', async () => {
     const tree: PlaygroundEntry[] = [
       { name: 'empty.txt', path: 'empty.txt', type: 'file' },
@@ -343,6 +399,59 @@ describe('FileExplorer', () => {
     fireEvent.click(screen.getByText('bad.txt'));
     await waitFor(() => {
       expect(screen.getByText('Failed to load file')).toBeTruthy();
+    });
+  });
+
+  it('shows File not found when file content returns 404', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'missing.md', path: 'missing.md', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('missing.md')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('missing.md'));
+    await waitFor(() => {
+      expect(screen.getByText('File not found')).toBeTruthy();
+    });
+  });
+
+  it('closes file viewer when Close button is clicked', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'f.js', path: 'f.js', type: 'file' },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({ content: 'x' }),
+      });
+    render(<FileExplorer />);
+    await waitFor(() => {
+      expect(screen.getByText('f.js')).toBeTruthy();
+    });
+    fireEvent.click(screen.getByText('f.js'));
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'File viewer' })).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() => {
+      expect(screen.queryByRole('heading', { name: 'File viewer' })).toBeNull();
     });
   });
 

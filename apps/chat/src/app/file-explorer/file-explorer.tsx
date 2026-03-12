@@ -29,6 +29,7 @@ import 'prismjs/components/prism-typescript';
 import 'prismjs/components/prism-jsx';
 import 'prismjs/components/prism-tsx';
 import 'prismjs/components/prism-json';
+import 'prismjs/components/prism-json5';
 import 'prismjs/components/prism-bash';
 import 'prismjs/components/prism-python';
 import 'prismjs/components/prism-yaml';
@@ -36,6 +37,7 @@ import 'prismjs/components/prism-sql';
 import 'prismjs/components/prism-scss';
 import 'prismjs/components/prism-ruby';
 import 'prismjs/components/prism-go';
+import 'prismjs/components/prism-go-module';
 import 'prismjs/components/prism-rust';
 import 'prismjs/components/prism-java';
 import 'prismjs/components/prism-kotlin';
@@ -45,6 +47,57 @@ import 'prismjs/components/prism-csharp';
 import 'prismjs/components/prism-c';
 import 'prismjs/components/prism-cpp';
 import 'prismjs/components/prism-markdown';
+import 'prismjs/components/prism-zig';
+import 'prismjs/components/prism-lua';
+import 'prismjs/components/prism-dart';
+import 'prismjs/components/prism-haskell';
+import 'prismjs/components/prism-scala';
+import 'prismjs/components/prism-nim';
+import 'prismjs/components/prism-elixir';
+import 'prismjs/components/prism-erlang';
+import 'prismjs/components/prism-clojure';
+import 'prismjs/components/prism-groovy';
+import 'prismjs/components/prism-perl';
+import 'prismjs/components/prism-powershell';
+import 'prismjs/components/prism-fsharp';
+import 'prismjs/components/prism-ocaml';
+import 'prismjs/components/prism-solidity';
+import 'prismjs/components/prism-toml';
+import 'prismjs/components/prism-docker';
+import 'prismjs/components/prism-makefile';
+import 'prismjs/components/prism-cmake';
+import 'prismjs/components/prism-gradle';
+import 'prismjs/components/prism-ini';
+import 'prismjs/components/prism-graphql';
+import 'prismjs/components/prism-pug';
+import 'prismjs/components/prism-less';
+import 'prismjs/components/prism-stylus';
+import 'prismjs/components/prism-coffeescript';
+import 'prismjs/components/prism-julia';
+import 'prismjs/components/prism-r';
+import 'prismjs/components/prism-basic';
+import 'prismjs/components/prism-vbnet';
+import 'prismjs/components/prism-protobuf';
+import 'prismjs/components/prism-nginx';
+import 'prismjs/components/prism-diff';
+import 'prismjs/components/prism-csv';
+import 'prismjs/components/prism-rest';
+import 'prismjs/components/prism-latex';
+import 'prismjs/components/prism-objectivec';
+import 'prismjs/components/prism-gdscript';
+import 'prismjs/components/prism-glsl';
+import 'prismjs/components/prism-verilog';
+import 'prismjs/components/prism-vhdl';
+import 'prismjs/components/prism-wasm';
+import 'prismjs/components/prism-d';
+import 'prismjs/components/prism-crystal';
+import 'prismjs/components/prism-fortran';
+import 'prismjs/components/prism-nix';
+import 'prismjs/components/prism-hcl';
+import 'prismjs/components/prism-properties';
+import 'prismjs/components/prism-editorconfig';
+import 'prismjs/components/prism-dot';
+import 'prismjs/components/prism-mermaid';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { ThemeToggle } from '../theme-toggle';
@@ -58,15 +111,20 @@ const PRISM_LANGUAGES: Record<string, string> = {
   scss: 'scss',
   sass: 'sass',
   html: 'markup',
+  htm: 'markup',
   json: 'json',
+  json5: 'json5',
   md: 'markdown',
   mdx: 'markdown',
   py: 'python',
+  pyw: 'python',
   rb: 'ruby',
   go: 'go',
+  mod: 'go-module',
   rs: 'rust',
   java: 'java',
   kt: 'kotlin',
+  kts: 'kotlin',
   swift: 'swift',
   php: 'php',
   sql: 'sql',
@@ -74,17 +132,112 @@ const PRISM_LANGUAGES: Record<string, string> = {
   yml: 'yaml',
   sh: 'bash',
   bash: 'bash',
+  zsh: 'bash',
   xml: 'markup',
   vue: 'markup',
+  svg: 'markup',
   c: 'c',
   cpp: 'cpp',
+  cc: 'cpp',
+  cxx: 'cpp',
   cs: 'csharp',
   h: 'c',
   hpp: 'cpp',
+  zig: 'zig',
+  lua: 'lua',
+  dart: 'dart',
+  hs: 'haskell',
+  lhs: 'haskell',
+  scala: 'scala',
+  sc: 'scala',
+  nim: 'nim',
+  nimble: 'nim',
+  ex: 'elixir',
+  exs: 'elixir',
+  erl: 'erlang',
+  hrl: 'erlang',
+  clj: 'clojure',
+  cljs: 'clojure',
+  cljc: 'clojure',
+  edn: 'clojure',
+  groovy: 'groovy',
+  gy: 'groovy',
+  gvy: 'groovy',
+  pl: 'perl',
+  pm: 'perl',
+  ps1: 'powershell',
+  psm1: 'powershell',
+  pssc: 'powershell',
+  fs: 'fsharp',
+  fsi: 'fsharp',
+  fsx: 'fsharp',
+  ml: 'ocaml',
+  mli: 'ocaml',
+  sol: 'solidity',
+  toml: 'toml',
+  makefile: 'makefile',
+  mk: 'makefile',
+  cmake: 'cmake',
+  gradle: 'gradle',
+  ini: 'ini',
+  cfg: 'ini',
+  graphql: 'graphql',
+  gql: 'graphql',
+  pug: 'pug',
+  jade: 'pug',
+  less: 'less',
+  styl: 'stylus',
+  coffee: 'coffeescript',
+  jl: 'julia',
+  r: 'r',
+  R: 'r',
+  vb: 'vbnet',
+  proto: 'protobuf',
+  nginx: 'nginx',
+  diff: 'diff',
+  patch: 'diff',
+  csv: 'csv',
+  rst: 'rest',
+  tex: 'latex',
+  latex: 'latex',
+  m: 'objectivec',
+  mm: 'objectivec',
+  gd: 'gdscript',
+  glsl: 'glsl',
+  vert: 'glsl',
+  frag: 'glsl',
+  v: 'verilog',
+  sv: 'verilog',
+  vhd: 'vhdl',
+  vhdl: 'vhdl',
+  wat: 'wasm',
+  ll: 'llvm',
+  d: 'd',
+  cr: 'crystal',
+  f: 'fortran',
+  f90: 'fortran',
+  f95: 'fortran',
+  nix: 'nix',
+  hcl: 'hcl',
+  tf: 'hcl',
+  tfvars: 'hcl',
+  properties: 'properties',
+  props: 'properties',
+  editorconfig: 'editorconfig',
+  dot: 'dot',
+  mermaid: 'mermaid',
+  mmd: 'mermaid',
 };
 
 function getPrismLanguage(filename: string): string {
-  const ext = filename.includes('.') ? filename.slice(filename.lastIndexOf('.') + 1).toLowerCase() : '';
+  const baseName = filename.includes('/') ? filename.slice(filename.lastIndexOf('/') + 1) : filename;
+  if (baseName === 'Dockerfile' || baseName.startsWith('Dockerfile.')) {
+    return 'docker';
+  }
+  if (baseName === 'Makefile' || baseName === 'makefile') {
+    return 'makefile';
+  }
+  const ext = baseName.includes('.') ? baseName.slice(baseName.lastIndexOf('.') + 1).toLowerCase() : '';
   return PRISM_LANGUAGES[ext] ?? 'plain';
 }
 
@@ -207,8 +360,7 @@ function FileDetailsDialog({
     setFetchError(null);
     setContent(null);
     const base = getApiUrl();
-    const path = encodeURIComponent(entry.path);
-    const url = base ? `${base}/api/playgrounds/file?path=${path}` : `/api/playgrounds/file?path=${path}`;
+    const url = `${base || ''}/api/playgrounds/file?path=${encodeURIComponent(entry.path)}`;
     const token = getAuthTokenForRequest();
     const headers: Record<string, string> = {};
     if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -218,13 +370,16 @@ function FileDetailsDialog({
         if (cancelled) return;
         if (!res.ok) {
           if (res.status === 404) {
-            setContent('');
+            setFetchError('File not found');
+            setContent(null);
             return;
           }
           throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to load file');
         }
         const data = (await res.json()) as { content?: string };
-        setContent(typeof data.content === 'string' ? data.content : '');
+        const text = typeof data.content === 'string' ? data.content : '';
+        setContent(text);
+        setFetchError(null);
       })
       .catch((e) => {
         if (!cancelled) setFetchError(e instanceof Error ? e.message : 'Failed to load file');
@@ -237,10 +392,17 @@ function FileDetailsDialog({
     };
   }, [entry.path]);
 
+  const language = getPrismLanguage(entry.name);
+  const languageClass = language === 'plain' ? '' : `language-${language}`;
+
   useEffect(() => {
-    if (!content || loading || fetchError || !codeRef.current) return;
-    Prism.highlightElement(codeRef.current);
-  }, [content, loading, fetchError]);
+    if (!content || loading || fetchError || !codeRef.current || language === 'plain') return;
+    try {
+      Prism.highlightElement(codeRef.current);
+    } catch {
+      // Leave existing text content if highlighting fails
+    }
+  }, [content, loading, fetchError, language]);
 
   const handleCopy = useCallback(() => {
     if (content === null) return;
@@ -256,9 +418,6 @@ function FileDetailsDialog({
     a.click();
     URL.revokeObjectURL(a.href);
   }, [content, entry.name]);
-
-  const language = getPrismLanguage(entry.name);
-  const languageClass = language === 'plain' ? '' : `language-${language}`;
 
   return (
     <div
@@ -334,7 +493,7 @@ function FileDetailsDialog({
               </div>
             )}
             {!loading && !fetchError && content !== null && content.length > 0 && (
-              <pre className="line-numbers !m-0 !rounded-none !bg-transparent p-4 text-sm font-mono min-h-full">
+              <pre className="line-numbers !m-0 !rounded-none !bg-transparent p-4 text-sm font-mono min-h-full" key={entry.path}>
                 <code ref={codeRef} className={languageClass}>
                   {content}
                 </code>
