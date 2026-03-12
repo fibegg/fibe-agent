@@ -1,5 +1,5 @@
-import { FileText, Folder } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { FileIcon } from '../file-icon';
 import type { PlaygroundEntryItem } from './use-playground-files';
 
 const MAX_VISIBLE = 8;
@@ -109,11 +109,12 @@ export function FileMentionDropdown({
             onMouseEnter={() => setHighlightIndex(i)}
             onClick={() => handleSelect(entry.path)}
           >
-            {entry.type === 'directory' ? (
-              <Folder className="size-3 shrink-0 text-violet-500/80" aria-hidden />
-            ) : (
-              <FileText className="size-3 shrink-0 text-violet-500/80" aria-hidden />
-            )}
+            <FileIcon
+              pathOrName={entry.path}
+              isDirectory={entry.type === 'directory'}
+              size={12}
+              className="shrink-0"
+            />
             <span className="min-w-0 truncate font-medium">{entry.name}</span>
           </button>
         ))

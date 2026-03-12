@@ -3,18 +3,16 @@ import {
   ChevronRight,
   ChevronsDown,
   ChevronsRight,
-  Code,
   Copy,
   Download,
-  File,
   FileText,
   Folder,
   FolderOpen,
-  Image,
   Search,
   Settings,
   X,
 } from 'lucide-react';
+import { FileIcon } from '../file-icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Prism from 'prismjs';
 import 'prismjs/themes/prism-tomorrow.css';
@@ -310,30 +308,6 @@ function filterTreeByQuery(entries: PlaygroundEntry[], query: string): Playgroun
   return entries.map(build).filter((e): e is PlaygroundEntry => e != null);
 }
 
-const IMAGE_EXT = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.ico']);
-const CODE_EXT = new Set(['.ts', '.tsx', '.js', '.jsx', '.json', '.css', '.scss', '.sass', '.html']);
-const DOC_EXT = new Set(['.md', '.mdx', '.txt']);
-
-const FILE_TYPE_COLOR = {
-  image: 'text-pink-400',
-  code: 'text-green-400',
-  doc: 'text-blue-400',
-  file: 'text-muted-foreground',
-} as const;
-
-function getFileIconAndColor(name: string): { Icon: typeof File; color: string } {
-  const ext = name.includes('.') ? name.slice(name.lastIndexOf('.')).toLowerCase() : '';
-  if (IMAGE_EXT.has(ext)) return { Icon: Image, color: FILE_TYPE_COLOR.image };
-  if (CODE_EXT.has(ext)) return { Icon: Code, color: FILE_TYPE_COLOR.code };
-  if (DOC_EXT.has(ext)) return { Icon: FileText, color: FILE_TYPE_COLOR.doc };
-  return { Icon: File, color: FILE_TYPE_COLOR.file };
-}
-
-function FileTypeIcon({ name }: { name: string }) {
-  const { Icon, color } = getFileIconAndColor(name);
-  return <Icon className={`size-3.5 shrink-0 ${color}`} aria-hidden />;
-}
-
 function FileDetailsDialog({
   entry,
   onClose,
@@ -560,7 +534,7 @@ function TreeNode({
             <Folder className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
           )
         ) : (
-          <FileTypeIcon name={entry.name} />
+          <FileIcon pathOrName={entry.name} />
         )}
         <span className="min-w-0 flex-1 truncate text-foreground">{entry.name}</span>
       </button>

@@ -1,24 +1,12 @@
-import { Code, File, FileText, Folder, Image, Sparkles, User } from 'lucide-react';
+import { Sparkles, User } from 'lucide-react';
 import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
-import { AT_MENTION_REGEX, getFileIconType, pathDisplayName } from './mention-utils';
+import { FileIcon } from '../file-icon';
+import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
 import { ThinkingAvatar, ThinkingState } from './thinking-state';
 
 function MentionChipIcon({ path }: { path: string }) {
-  const { type, colorClass } = getFileIconType(path);
-  const iconClass = `size-3 shrink-0 opacity-90 ${colorClass}`;
-  switch (type) {
-    case 'folder':
-      return <Folder className={iconClass} aria-hidden />;
-    case 'image':
-      return <Image className={iconClass} aria-hidden />;
-    case 'code':
-      return <Code className={iconClass} aria-hidden />;
-    case 'doc':
-      return <FileText className={iconClass} aria-hidden />;
-    default:
-      return <File className={iconClass} aria-hidden />;
-  }
+  return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
 }
 
 function MessageBodyWithMentions({ body }: { body: string }) {
