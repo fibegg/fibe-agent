@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Logger } from '@nestjs/common';
 
-const HOME = process.env.HOME ?? '/home/node';
+const getHome = () => process.env.HOME ?? '/home/node';
 const logger = new Logger('McpConfigWriter');
 
 interface McpEnvelope {
@@ -20,7 +20,7 @@ const PROVIDER_WRITERS: Record<string, (envelope: McpEnvelope) => void> = {
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
   gemini: (env) => {
-    const dir = join(HOME, '.gemini');
+    const dir = join(getHome(), '.gemini');
     const configPath = join(dir, 'settings.json');
     let existing: Record<string, unknown> = {};
 
@@ -54,7 +54,7 @@ const PROVIDER_WRITERS: Record<string, (envelope: McpEnvelope) => void> = {
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
   'claude-code': (env) => {
-    const dir = join(HOME, '.claude');
+    const dir = join(getHome(), '.claude');
     const configPath = join(dir, 'settings.json');
     let existing: Record<string, unknown> = {};
 
@@ -88,7 +88,7 @@ const PROVIDER_WRITERS: Record<string, (envelope: McpEnvelope) => void> = {
    * Format: [mcp_servers."<name>"] with url and env keys (TOML)
    */
   'openai-codex': (env) => {
-    const dir = join(HOME, '.codex');
+    const dir = join(getHome(), '.codex');
     const configPath = join(dir, 'config.toml');
     let existingContent = '';
 
@@ -104,7 +104,7 @@ const PROVIDER_WRITERS: Record<string, (envelope: McpEnvelope) => void> = {
 
     // Remove any existing [mcp_servers."playgrounds"] block
     const cleaned = existingContent
-      .replace(/\[mcp_servers\."playgrounds"\][^\[]*/gs, '')
+      .replace(/\[mcp_servers\."playgrounds"\][^[]*/gs, '')
       .trim();
 
     const tomlBlock = [
