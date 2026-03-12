@@ -4,6 +4,16 @@ export function getApiUrl(): string {
   return '';
 }
 
+export function isChatModelLocked(): boolean {
+  const v = import.meta.env.VITE_LOCK_CHAT_MODEL as string | undefined;
+  return (
+    typeof v === 'string' &&
+    v.length > 0 &&
+    v !== 'false' &&
+    v !== '0'
+  );
+}
+
 export function getWsUrl(): string {
   const base = getApiUrl();
   if (base) {

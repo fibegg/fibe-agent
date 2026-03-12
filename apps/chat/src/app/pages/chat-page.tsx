@@ -36,6 +36,7 @@ import {
   getApiUrl,
   getAuthTokenForRequest,
   isAuthenticated,
+  isChatModelLocked,
 } from '../api-url';
 import {
   getInitialSidebarCollapsed,
@@ -593,6 +594,7 @@ export function ChatPage() {
                 onSelect={handleModelSelect}
                 onInputChange={handleModelInputChange}
                 visible={showModelSelector}
+                modelLocked={isChatModelLocked()}
               />
               {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
                 <button
