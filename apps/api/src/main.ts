@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { WebSocketServer } from 'ws';
 import { AppModule } from './app/app.module';
@@ -23,6 +24,7 @@ async function bootstrap() {
     new FastifyAdapter()
   );
   const fastify = app.getHttpAdapter().getInstance();
+  await fastify.register(helmet);
   await fastify.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
 
   const globalPrefix = 'api';
