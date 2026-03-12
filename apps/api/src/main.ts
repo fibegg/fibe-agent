@@ -29,11 +29,18 @@ async function bootstrap() {
   );
   const fastify = app.getHttpAdapter().getInstance();
 
+  const ancestors = getFrameAncestors(process.env);
+  const isHttp = ancestors.some((a) => a.startsWith('http://'));
+
   await fastify.register(helmet, {
     frameguard: false,
     contentSecurityPolicy: {
       useDefaults: true,
-      directives: { frameAncestors: getFrameAncestors(process.env) },
+      directives: {
+        frameAncestors: ancestors,
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        ...(isHttp ? { upgradeInsecureRequests: null } : {}),
+      },
     },
   });
   await fastify.register(multipart, { limits: { fileSize: MULTIPART_LIMIT_BYTES } });
