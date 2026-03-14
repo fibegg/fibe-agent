@@ -605,6 +605,7 @@ export function FileExplorer({
   onToggleCollapse,
   onFileSelect,
   selectedPath: selectedPathProp,
+  refreshTrigger,
 }: {
   fullWidth?: boolean;
   collapsed?: boolean;
@@ -613,6 +614,7 @@ export function FileExplorer({
   onToggleCollapse?: () => void;
   onFileSelect?: (entry: PlaygroundEntry) => void;
   selectedPath?: string | null;
+  refreshTrigger?: number;
 } = {}) {
   const [tree, setTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -659,6 +661,11 @@ export function FileExplorer({
     void refetch(ac.signal);
     return () => ac.abort();
   }, [refetch]);
+
+  useEffect(() => {
+    if (refreshTrigger === undefined) return;
+    void refetch();
+  }, [refreshTrigger, refetch]);
 
   useEffect(() => {
     if (tree.length > 0 || loading) return;

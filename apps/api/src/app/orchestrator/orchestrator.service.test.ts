@@ -132,4 +132,19 @@ describe('OrchestratorService', () => {
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.ERROR)).toBe(false);
   });
+
+  test('send_chat_message sends stream_start with model and synthetic thinking_step', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    const streamStart = events.find((e) => e.type === WS_EVENT.STREAM_START);
+    expect(streamStart).toBeDefined();
+    expect(streamStart?.data.model).toBeDefined();
+    const thinkingStep = events.find((e) => e.type === WS_EVENT.THINKING_STEP);
+    expect(thinkingStep).toBeDefined();
+    expect(thinkingStep?.data.title).toBe('Generating response');
+    expect(thinkingStep?.data.status).toBe('processing');
+  });
 });

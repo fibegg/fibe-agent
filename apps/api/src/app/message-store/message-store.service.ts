@@ -4,12 +4,21 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 
+export interface StoredStoryEntry {
+  id: string;
+  type: string;
+  message: string;
+  timestamp: string;
+  details?: string;
+}
+
 export interface StoredMessage {
   id: string;
   role: string;
   body: string;
   created_at: string;
   imageUrls?: string[];
+  story?: StoredStoryEntry[];
 }
 
 @Injectable()
@@ -39,6 +48,14 @@ export class MessageStoreService {
     this.messages.push(message);
     this.save();
     return message;
+  }
+
+  setStoryForLastAssistant(story: StoredStoryEntry[]): void {
+    const last = this.messages[this.messages.length - 1];
+    if (last?.role === 'assistant' && Array.isArray(story)) {
+      last.story = story;
+      this.save();
+    }
   }
 
   clear(): void {

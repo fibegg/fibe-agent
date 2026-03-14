@@ -42,6 +42,7 @@ export interface ChatMessage {
   body: string;
   created_at: string;
   imageUrls?: string[];
+  story?: Array<{ id: string; type: string; message: string; timestamp: string; details?: string }>;
   optimistic?: boolean;
 }
 

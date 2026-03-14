@@ -13,6 +13,31 @@ export interface LogoutConnection {
   sendError(message: string): void;
 }
 
+export type ThinkingStepStatus = 'pending' | 'processing' | 'complete';
+
+export interface ThinkingStep {
+  id: string;
+  title: string;
+  status: ThinkingStepStatus;
+  details?: string;
+  timestamp: Date;
+}
+
+export interface ToolEvent {
+  kind: 'file_created' | 'tool_call';
+  name: string;
+  path?: string;
+  summary?: string;
+}
+
+export interface StreamingCallbacks {
+  onReasoningStart?: () => void;
+  onReasoningChunk?: (text: string) => void;
+  onReasoningEnd?: () => void;
+  onStep?: (step: ThinkingStep) => void;
+  onTool?: (event: ToolEvent) => void;
+}
+
 export interface AgentStrategy {
   ensureSettings?(): void;
   executeAuth(connection: AuthConnection): void;
@@ -25,6 +50,7 @@ export interface AgentStrategy {
   executePromptStreaming(
     prompt: string,
     model: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks
   ): Promise<void>;
 }

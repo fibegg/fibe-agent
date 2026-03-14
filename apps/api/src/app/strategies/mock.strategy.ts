@@ -40,9 +40,19 @@ export class MockStrategy implements AgentStrategy {
   executePromptStreaming(
     _prompt: string,
     _model: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    callbacks?: import('./strategy.types').StreamingCallbacks
   ): Promise<void> {
     return new Promise((resolve) => {
+      callbacks?.onReasoningChunk?.('Considering the request...\n');
+      callbacks?.onReasoningChunk?.('Preparing a helpful response.\n');
+      callbacks?.onReasoningEnd?.();
+      callbacks?.onTool?.({
+        kind: 'file_created',
+        name: 'example-output.ts',
+        path: 'example-output.ts',
+        summary: 'Sample file created by mock agent',
+      });
       setTimeout(() => {
         const timestamp = new Date().toISOString();
         onChunk('[MOCKED RESPONSE] Hello! ');

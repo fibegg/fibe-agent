@@ -1,0 +1,43 @@
+export type ThinkingStepStatus = 'pending' | 'processing' | 'complete';
+
+export interface ThinkingStep {
+  id: string;
+  title: string;
+  status: ThinkingStepStatus;
+  details?: string;
+  timestamp: Date;
+}
+
+export type ToolOrFileEventKind = 'file_created' | 'tool_call';
+
+export interface ToolOrFileEvent {
+  kind: ToolOrFileEventKind;
+  name: string;
+  path?: string;
+  summary?: string;
+}
+
+export type ThinkingActivityType =
+  | 'reasoning_start'
+  | 'reasoning_end'
+  | 'step'
+  | 'file_created'
+  | 'tool_call'
+  | 'stream_start';
+
+export interface ThinkingActivity {
+  id: string;
+  type: ThinkingActivityType;
+  message: string;
+  timestamp: Date;
+  details?: string;
+  debug?: Record<string, unknown>;
+}
+
+export type StoryJson = Array<{
+  id: string;
+  type: string;
+  message: string;
+  timestamp: string;
+  details?: string;
+}>;

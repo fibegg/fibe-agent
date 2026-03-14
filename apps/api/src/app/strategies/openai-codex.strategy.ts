@@ -124,7 +124,8 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   executePromptStreaming(
     prompt: string,
     _model: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    callbacks?: import('./strategy.types').StreamingCallbacks
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const playgroundDir = join(process.cwd(), 'playground');
@@ -149,11 +150,15 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       codexProcess.stderr?.on('data', (data: Buffer | string) => {
         const text = data.toString();
         errorResult += text;
-        // Codex outputs progress/thinking to stderr — forward it as chunks
-        onChunk(text);
+        if (callbacks?.onReasoningChunk) {
+          callbacks.onReasoningChunk(text);
+        } else {
+          onChunk(text);
+        }
       });
 
       codexProcess.on('close', (code) => {
+        callbacks?.onReasoningEnd?.();
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {

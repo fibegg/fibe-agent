@@ -47,6 +47,15 @@ import {
   SIDEBAR_WIDTH_PX,
 } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
+import type {
+  ThinkingStep,
+  ThinkingActivity,
+  ToolOrFileEvent,
+} from '../chat/thinking-types';
+
+function nextActivityId(): string {
+  return `act-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+}
 
 const MODEL_DEBOUNCE_MS = 500;
 const MAX_PENDING_IMAGES = 5;
@@ -69,6 +78,17 @@ export function ChatPage() {
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [currentModel, setCurrentModel] = useState('');
+  const [streamingModel, setStreamingModel] = useState<string | null>(null);
+  const [reasoningText, setReasoningText] = useState('');
+  const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
+  const [toolEvents, setToolEvents] = useState<ToolOrFileEvent[]>([]);
+  const [activityLog, setActivityLog] = useState<ThinkingActivity[]>([]);
+  const activityLogRef = useRef<ThinkingActivity[]>([]);
+  const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => {});
+  useEffect(() => {
+    activityLogRef.current = activityLog;
+  }, [activityLog]);
+  const reasoningStartedLoggedRef = useRef(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
   const [pendingVoiceFilename, setPendingVoiceFilename] = useState<string | null>(null);
@@ -81,7 +101,9 @@ export function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<MessageListHandle | null>(null);
-  const { entries: playgroundEntries, loading: playgroundLoading } = usePlaygroundFiles();
+  const { entries: playgroundEntries, loading: playgroundLoading, refetch: refetchPlaygrounds } =
+    usePlaygroundFiles();
+  const [playgroundRefreshTrigger, setPlaygroundRefreshTrigger] = useState(0);
   const hasPlaygroundFiles = playgroundLoading || playgroundEntries.length > 0;
   const atMention = getAtMentionState(inputValue, cursorOffset);
   const [mentionDropdownClosedAfterSelect, setMentionDropdownClosedAfterSelect] = useState(false);
@@ -219,17 +241,152 @@ export function ChatPage() {
     dismissError,
   } = useChatWebSocket(
     handleMessage,
-    (chunk) => setStreamingText((prev) => prev + chunk),
-    () => setStreamingText(''),
+    (chunk) => flushSync(() => setStreamingText((prev) => prev + chunk)),
+    (data) => {
+      setStreamingText('');
+      setReasoningText('');
+      setThinkingSteps([]);
+      setToolEvents([]);
+      reasoningStartedLoggedRef.current = false;
+      setStreamingModel(data?.model ?? null);
+      setActivityLog([
+        {
+          id: nextActivityId(),
+          type: 'stream_start',
+          message: 'Response started',
+          timestamp: new Date(),
+          details: data?.model ? `Model: ${data.model}` : undefined,
+        },
+      ]);
+    },
     (finalText) => {
       const text = finalText?.trim() || 'Process completed successfully but returned no output.';
+      const log = activityLogRef.current;
+      const storyForApi = log.map(({ id, type, message, timestamp, details }) => ({
+        id,
+        type,
+        message,
+        timestamp: timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
+        ...(details !== undefined ? { details } : {}),
+      }));
       setMessages((m) => [
         ...m,
-        { role: 'assistant', body: text, created_at: new Date().toISOString() },
+        {
+          role: 'assistant',
+          body: text,
+          created_at: new Date().toISOString(),
+          story: storyForApi,
+        },
       ]);
+      sendRef.current({ action: 'submit_story', story: storyForApi });
       setStreamingText('');
       setLastSentMessage(null);
+      setStreamingModel(null);
+      refetchPlaygrounds();
+      setPlaygroundRefreshTrigger((t) => t + 1);
+    },
+    {
+      onStreamStartData: (data) => setStreamingModel(data.model ?? null),
+      onReasoningStart: () => {
+        setActivityLog((prev) => [
+          ...prev,
+          {
+            id: nextActivityId(),
+            type: 'reasoning_start',
+            message: 'Started reasoning',
+            timestamp: new Date(),
+          },
+        ]);
+      },
+      onReasoningChunk: (text) => {
+        if (!reasoningStartedLoggedRef.current && text) {
+          reasoningStartedLoggedRef.current = true;
+          setActivityLog((prev) => [
+            ...prev,
+            {
+              id: nextActivityId(),
+              type: 'reasoning_start',
+              message: 'Streaming reasoning',
+              timestamp: new Date(),
+            },
+          ]);
+        }
+        flushSync(() => setReasoningText((prev) => prev + text));
+      },
+      onReasoningEnd: () => {
+        setActivityLog((prev) => [
+          ...prev,
+          {
+            id: nextActivityId(),
+            type: 'reasoning_end',
+            message: 'Reasoning completed',
+            timestamp: new Date(),
+          },
+        ]);
+      },
+      onThinkingStep: (step) => {
+        flushSync(() =>
+          setThinkingSteps((prev) => {
+            const idx = prev.findIndex((s) => s.id === step.id);
+            if (idx >= 0) {
+              const next = [...prev];
+              next[idx] = step;
+              return next;
+            }
+            return [...prev, step];
+          })
+        );
+        setActivityLog((prev) => [
+          ...prev,
+          {
+            id: nextActivityId(),
+            type: 'step',
+            message: `${step.title} – ${step.status}`,
+            timestamp: step.timestamp instanceof Date ? step.timestamp : new Date(step.timestamp),
+            details: step.details,
+            debug: { id: step.id, title: step.title, status: step.status, details: step.details },
+          },
+        ]);
+      },
+      onToolOrFile: (event) => {
+        flushSync(() => setToolEvents((prev) => [...prev, event]));
+        if (event.kind === 'file_created') {
+          refetchPlaygrounds();
+          setPlaygroundRefreshTrigger((t) => t + 1);
+        }
+        const msg =
+          event.kind === 'file_created'
+            ? `Created ${event.path ?? event.name}`
+            : `Ran ${event.name}`;
+        setActivityLog((prev) => [
+          ...prev,
+          {
+            id: nextActivityId(),
+            type: event.kind,
+            message: msg,
+            timestamp: new Date(),
+            details: event.summary ?? event.path,
+            debug: { kind: event.kind, name: event.name, path: event.path, summary: event.summary },
+          },
+        ]);
+      },
     }
+  );
+
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
+
+  const lastAssistantMessage = useMemo(
+    () => [...messages].reverse().find((m) => m.role === 'assistant'),
+    [messages]
+  );
+  const displayStory = useMemo(
+    () =>
+      state === CHAT_STATES.AWAITING_RESPONSE
+        ? activityLog
+        : (lastAssistantMessage?.story ?? []),
+    [state, activityLog, lastAssistantMessage]
   );
 
   const handleSend = useCallback(() => {
@@ -520,6 +677,7 @@ export function ChatPage() {
                 closeMobileSidebar();
               }}
               selectedPath={viewingFile?.path ?? null}
+              refreshTrigger={playgroundRefreshTrigger}
             />
           </div>
         </>
@@ -536,6 +694,7 @@ export function ChatPage() {
               onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
               onFileSelect={(entry) => setViewingFile(entry)}
               selectedPath={viewingFile?.path ?? null}
+              refreshTrigger={playgroundRefreshTrigger}
             />
           </aside>
         </div>
@@ -834,6 +993,12 @@ export function ChatPage() {
           isCollapsed={rightSidebarCollapsed}
           onToggle={() => setRightSidebarCollapsed((v) => !v)}
           isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+          currentModel={streamingModel ?? currentModel}
+          reasoningText={reasoningText}
+          streamingResponseText={streamingText}
+          thinkingSteps={thinkingSteps}
+          toolEvents={toolEvents}
+          storyItems={displayStory}
         />
       )}
     </div>

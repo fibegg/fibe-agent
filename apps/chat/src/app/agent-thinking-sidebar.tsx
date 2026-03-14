@@ -1,100 +1,100 @@
 import {
   Brain,
-  CheckCircle2,
-  Clock,
+  FileCode,
   Loader2,
-  Search,
+  MessageSquare,
   Sparkles,
-  X,
+  Terminal,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useEffect } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
   RIGHT_SIDEBAR_WIDTH_PX,
 } from './layout-constants';
+import { formatRelativeTime } from './format-relative-time';
+import type { ThinkingStep, ToolOrFileEvent } from './chat/thinking-types';
 
-interface ThinkingStep {
+const DEFAULT_MODEL_LABEL = 'Model (default)';
+
+export type StoryEntry = {
   id: string;
-  title: string;
-  status: 'pending' | 'processing' | 'complete';
+  type: string;
+  message: string;
+  timestamp: string | Date;
   details?: string;
-  timestamp: Date;
+};
+
+function getActivityIcon(type: string) {
+  switch (type) {
+    case 'stream_start':
+      return Sparkles;
+    case 'reasoning_start':
+    case 'reasoning_end':
+      return Brain;
+    case 'step':
+      return Loader2;
+    case 'file_created':
+      return FileCode;
+    case 'tool_call':
+      return Terminal;
+    default:
+      return MessageSquare;
+  }
+}
+
+function getActivityLabel(type: string): string {
+  switch (type) {
+    case 'stream_start':
+      return 'Started';
+    case 'reasoning_start':
+    case 'reasoning_end':
+      return 'Thinking';
+    case 'step':
+      return 'Step';
+    case 'file_created':
+      return 'File';
+    case 'tool_call':
+      return 'Command';
+    default:
+      return 'Activity';
+  }
 }
 
 interface AgentThinkingSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   isStreaming?: boolean;
-}
-
-const MOCK_STEPS: ThinkingStep[] = [
-  {
-    id: '1',
-    title: 'Analyzing user query',
-    status: 'complete',
-    details: 'Parsed intent and extracted key requirements',
-    timestamp: new Date(Date.now() - 5000),
-  },
-  {
-    id: '2',
-    title: 'Searching knowledge base',
-    status: 'complete',
-    details: 'Found 15 relevant code patterns',
-    timestamp: new Date(Date.now() - 3000),
-  },
-  {
-    id: '3',
-    title: 'Generating response',
-    status: 'processing',
-    details: 'Synthesizing optimal solution...',
-    timestamp: new Date(),
-  },
-  {
-    id: '4',
-    title: 'Validating output',
-    status: 'pending',
-    timestamp: new Date(),
-  },
-];
-
-function getStatusIcon(status: ThinkingStep['status']) {
-  switch (status) {
-    case 'complete':
-      return <CheckCircle2 className="size-4 text-green-400" />;
-    case 'processing':
-      return <Loader2 className="size-4 text-violet-400 animate-spin" />;
-    case 'pending':
-      return <Clock className="size-4 text-muted-foreground" />;
-  }
-}
-
-function getStatusColor(status: ThinkingStep['status']) {
-  switch (status) {
-    case 'complete':
-      return 'border-green-500/30 bg-green-500/5';
-    case 'processing':
-      return 'border-violet-500/50 bg-violet-500/10 shadow-lg shadow-violet-500/20';
-    case 'pending':
-      return 'border-border/50 bg-muted/30';
-  }
-}
-
-function formatRelativeTime(date: Date): string {
-  const sec = Math.floor((Date.now() - date.getTime()) / 1000);
-  if (sec < 60) return 'now';
-  if (sec < 120) return '1s ago';
-  if (sec < 300) return `${Math.floor(sec / 60)}s ago`;
-  return 'now';
+  currentModel?: string;
+  reasoningText?: string;
+  streamingResponseText?: string;
+  thinkingSteps?: ThinkingStep[];
+  toolEvents?: ToolOrFileEvent[];
+  storyItems?: StoryEntry[];
 }
 
 export function AgentThinkingSidebar({
   isCollapsed,
   onToggle,
   isStreaming = false,
+  currentModel = '',
+  reasoningText = '',
+  streamingResponseText = '',
+  thinkingSteps = [],
+  toolEvents = [],
+  storyItems = [],
 }: AgentThinkingSidebarProps) {
-  const [thinkingSteps] = useState<ThinkingStep[]>(MOCK_STEPS);
-  const [searchQuery, setSearchQuery] = useState('');
+  const thinkingScrollRef = useRef<HTMLDivElement>(null);
+
+  const displayThinkingText = reasoningText || streamingResponseText;
+
+  useEffect(() => {
+    if (isStreaming && displayThinkingText) {
+      thinkingScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [isStreaming, displayThinkingText]);
+
+  const modelLabel = currentModel.trim() || DEFAULT_MODEL_LABEL;
 
   return (
     <div
@@ -128,32 +128,12 @@ export function AgentThinkingSidebar({
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                className="shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md"
+              <span
+                className="shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]"
+                title={modelLabel}
               >
-                Model (default)
-              </button>
-            </div>
-            <div className="relative h-8">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search thinking steps..."
-                className="h-8 w-full pl-8 pr-8 text-xs rounded-md bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  aria-label="Clear search"
-                >
-                  <X className="size-3.5" />
-                </button>
-              )}
+                {modelLabel}
+              </span>
             </div>
           </>
         ) : (
@@ -169,58 +149,118 @@ export function AgentThinkingSidebar({
       </div>
 
       {!isCollapsed && (
-        <div className="flex-1 min-h-0 overflow-auto p-4">
-          <div className="space-y-3">
-            {thinkingSteps.map((step, index) => (
-              <div
-                key={step.id}
-                className={`p-3 rounded-lg border transition-all duration-300 ${getStatusColor(
-                  step.status
-                )}`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="mt-0.5">{getStatusIcon(step.status)}</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="text-sm font-medium">{step.title}</h3>
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {formatRelativeTime(step.timestamp)}
+        <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-3">
+          <div className="flex-1 min-h-0 max-h-[360px] overflow-y-auto rounded-lg border border-violet-500/20 bg-violet-500/5 flex flex-col">
+            <div className="flex items-center gap-2 px-3 py-2 border-b border-violet-500/20 shrink-0">
+              <h3 className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+                Online activity
+              </h3>
+              {isStreaming && (
+                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/20 text-[9px] font-medium text-violet-400">
+                  <span className="size-1.5 rounded-full bg-violet-400 animate-pulse" aria-hidden />
+                  Live
+                </span>
+              )}
+            </div>
+            <ul className="list-none p-0 m-0 flex-1 min-h-0 overflow-y-auto border-l-2 border-violet-500/20 ml-3 pl-3">
+              {storyItems.length === 0 && !displayThinkingText && !isStreaming && (
+                <li className="py-3 text-xs text-muted-foreground">
+                  Activity will appear here when the agent responds.
+                </li>
+              )}
+              {storyItems.map((entry) => {
+                const Icon = getActivityIcon(entry.type);
+                const label = getActivityLabel(entry.type);
+                return (
+                  <li
+                    key={entry.id}
+                    className="relative pl-5 pr-2 py-2.5 flex items-start gap-2 before:content-[''] before:absolute before:left-[-11px] before:top-3.5 before:size-2 before:rounded-full before:bg-violet-400 before:border-2 before:border-background before:z-[1]"
+                  >
+                    <Icon
+                      className={`size-4 shrink-0 mt-0.5 -ml-4 ${
+                        entry.type === 'file_created'
+                          ? 'text-green-400'
+                          : entry.type === 'tool_call'
+                            ? 'text-violet-400'
+                            : 'text-violet-300'
+                      }`}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="text-[10px] font-medium text-violet-300 uppercase tracking-wide">
+                          {label}
+                        </p>
+                        <span className="text-[9px] text-muted-foreground shrink-0">
+                          {formatRelativeTime(entry.timestamp)}
+                        </span>
+                      </div>
+                      <p className="text-xs text-foreground/90 mt-0.5 break-words">{entry.message}</p>
+                      {entry.details && (
+                        <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
+                          {entry.details}
+                        </p>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+              {(displayThinkingText || isStreaming) && (
+                <li className="relative pl-5 pr-2 py-2.5 flex flex-col gap-1.5 before:content-[''] before:absolute before:left-[-11px] before:top-3.5 before:size-2 before:rounded-full before:bg-violet-400 before:border-2 before:border-background before:z-[1] before:animate-pulse">
+                  <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+                    {reasoningText ? 'Reasoning' : 'Response'}
+                  </p>
+                  <div className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                    {displayThinkingText || (isStreaming ? '…' : '')}
+                    <span ref={thinkingScrollRef} className="inline-block min-h-0" aria-hidden />
+                  </div>
+                </li>
+              )}
+            </ul>
+          </div>
+
+          {toolEvents.length > 0 && (
+            <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 overflow-hidden shrink-0">
+              <h3 className="text-xs font-semibold px-3 py-2 text-violet-300 border-b border-violet-500/20">
+                Created files & tools
+              </h3>
+              <div className="divide-y divide-violet-500/10 max-h-40 overflow-y-auto">
+                {toolEvents.map((event, i) => (
+                  <div
+                    key={i}
+                    className="p-3 flex items-start gap-3 rounded-none border-0 border-b border-violet-500/10 last:border-b-0"
+                  >
+                    {event.kind === 'file_created' ? (
+                      <FileCode className="size-4 text-green-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <Terminal className="size-4 text-violet-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground truncate">{event.name}</p>
+                      {event.path && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5" title={event.path}>
+                          {event.path}
+                        </p>
+                      )}
+                      {event.summary && !event.path && (
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">
+                          {event.summary}
+                        </p>
+                      )}
+                      <span
+                        className={`inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-medium ${
+                          event.kind === 'file_created'
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-violet-500/20 text-violet-400'
+                        }`}
+                      >
+                        {event.kind === 'file_created' ? 'Created' : 'Ran'}
                       </span>
                     </div>
-                    {step.details && (
-                      <p className="text-xs text-muted-foreground">
-                        {step.details}
-                      </p>
-                    )}
                   </div>
-                </div>
-                {step.status === 'processing' && (
-                  <div className="mt-2 h-1 bg-violet-500/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-violet-500 rounded-full animate-pulse w-3/4" />
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-          <div className="mt-6 p-3 rounded-lg bg-gradient-to-br from-violet-500/10 to-purple-500/10 border border-violet-500/20">
-            <h3 className="text-xs font-semibold mb-2 text-violet-300">
-              Processing Stats
-            </h3>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <div className="flex justify-between">
-                <span>Tokens analyzed:</span>
-                <span className="text-foreground font-medium">1,247</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Response time:</span>
-                <span className="text-foreground font-medium">2.3s</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Confidence:</span>
-                <span className="text-green-400 font-medium">94%</span>
+                ))}
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 

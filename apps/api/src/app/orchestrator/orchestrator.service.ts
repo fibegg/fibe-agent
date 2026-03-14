@@ -2,12 +2,21 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { existsSync, readFileSync } from 'node:fs';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
-import { MessageStoreService } from '../message-store/message-store.service';
+import {
+  MessageStoreService,
+  type StoredStoryEntry,
+} from '../message-store/message-store.service';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { UploadsService } from '../uploads/uploads.service';
-import type { AgentStrategy } from '../strategies/strategy.types';
-import type { AuthConnection, LogoutConnection } from '../strategies/strategy.types';
+import type {
+  AgentStrategy,
+  AuthConnection,
+  LogoutConnection,
+  StreamingCallbacks,
+  ThinkingStep,
+  ToolEvent,
+} from '../strategies/strategy.types';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
   AUTH_STATUS as AUTH_STATUS_VAL,
@@ -71,6 +80,7 @@ export class OrchestratorService implements OnModuleInit {
     images?: string[];
     audio?: string;
     audioFilename?: string;
+    story?: Array<{ id: string; type: string; message: string; timestamp: string; details?: string }>;
   }): Promise<void> {
     const action = msg.action;
 
@@ -95,6 +105,9 @@ export class OrchestratorService implements OnModuleInit {
         break;
       case WS_ACTION.SEND_CHAT_MESSAGE:
         await this.handleChatMessage(msg.text ?? '', msg.images, msg.audio, msg.audioFilename);
+        break;
+      case WS_ACTION.SUBMIT_STORY:
+        this.handleSubmitStory(msg.story ?? []);
         break;
       case WS_ACTION.GET_MODEL:
         this.handleGetModel();
@@ -261,18 +274,76 @@ export class OrchestratorService implements OnModuleInit {
     const fullPrompt = `${systemPrompt}${fileContext}${imageContext}${voiceContext}\n${text}`.trim();
     const model = this.modelStore.get();
 
+    const syntheticStepId = 'generating-response';
+    const syntheticStep: ThinkingStep = {
+      id: syntheticStepId,
+      title: 'Generating response',
+      status: 'processing',
+      timestamp: new Date(),
+    };
+    this._send(WS_EVENT.STREAM_START, { model });
+    this._send(WS_EVENT.THINKING_STEP, {
+      id: syntheticStep.id,
+      title: syntheticStep.title,
+      status: syntheticStep.status,
+      details: syntheticStep.details,
+      timestamp: syntheticStep.timestamp.toISOString(),
+    });
+
+    const callbacks: StreamingCallbacks = {
+      onReasoningStart: () => {
+        this._send(WS_EVENT.REASONING_START, {});
+      },
+      onReasoningChunk: (reasoningText) => {
+        this._send(WS_EVENT.REASONING_CHUNK, { text: reasoningText });
+      },
+      onReasoningEnd: () => {
+        this._send(WS_EVENT.REASONING_END, {});
+      },
+      onStep: (step) => {
+        this._send(WS_EVENT.THINKING_STEP, {
+          id: step.id,
+          title: step.title,
+          status: step.status,
+          details: step.details,
+          timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : step.timestamp,
+        });
+      },
+      onTool: (event: ToolEvent) => {
+        if (event.kind === 'file_created') {
+          this._send(WS_EVENT.FILE_CREATED, {
+            name: event.name,
+            path: event.path,
+            summary: event.summary,
+          });
+        } else {
+          this._send(WS_EVENT.TOOL_CALL, {
+            name: event.name,
+            path: event.path,
+            summary: event.summary,
+          });
+        }
+      },
+    };
+
     let accumulated = '';
-    this._send(WS_EVENT.STREAM_START, {});
 
     try {
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
-      });
+      }, callbacks);
 
       const finalText =
         accumulated || 'The agent produced no visible output.';
       this.messageStore.add('assistant', finalText);
+      this._send(WS_EVENT.THINKING_STEP, {
+        id: syntheticStepId,
+        title: syntheticStep.title,
+        status: 'complete',
+        details: syntheticStep.details,
+        timestamp: new Date().toISOString(),
+      });
       this._send(WS_EVENT.STREAM_END, {});
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -306,6 +377,10 @@ export class OrchestratorService implements OnModuleInit {
       },
       sendError: (message) => this._send(WS_EVENT.ERROR, { message }),
     };
+  }
+
+  private handleSubmitStory(story: StoredStoryEntry[]): void {
+    this.messageStore.setStoryForLastAssistant(story);
   }
 
   private handleGetModel(): void {

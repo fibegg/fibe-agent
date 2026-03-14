@@ -198,7 +198,8 @@ export class GeminiStrategy implements AgentStrategy {
   executePromptStreaming(
     prompt: string,
     model: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    _callbacks?: import('./strategy.types').StreamingCallbacks
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ensureSettings();

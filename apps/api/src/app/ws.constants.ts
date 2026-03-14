@@ -6,6 +6,7 @@ export const WS_ACTION = {
   REAUTHENTICATE: 'reauthenticate',
   LOGOUT: 'logout',
   SEND_CHAT_MESSAGE: 'send_chat_message',
+  SUBMIT_STORY: 'submit_story',
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
 } as const;
@@ -24,6 +25,12 @@ export const WS_EVENT = {
   STREAM_CHUNK: 'stream_chunk',
   STREAM_END: 'stream_end',
   MODEL_UPDATED: 'model_updated',
+  REASONING_START: 'reasoning_start',
+  REASONING_CHUNK: 'reasoning_chunk',
+  REASONING_END: 'reasoning_end',
+  THINKING_STEP: 'thinking_step',
+  TOOL_CALL: 'tool_call',
+  FILE_CREATED: 'file_created',
 } as const;
 
 export const AUTH_STATUS = {

@@ -13,6 +13,8 @@ import {
   type ChatState,
   type ServerMessage,
 } from './chat-state';
+import type { ThinkingStep } from './thinking-types';
+import type { ToolOrFileEvent } from './thinking-types';
 
 export interface AuthModalState {
   authUrl: string | null;
@@ -44,11 +46,21 @@ function transition(
   setState(newState);
 }
 
+export interface ThinkingCallbacks {
+  onStreamStartData?: (data: { model?: string }) => void;
+  onReasoningStart?: () => void;
+  onReasoningChunk?: (text: string) => void;
+  onReasoningEnd?: () => void;
+  onThinkingStep?: (step: ThinkingStep) => void;
+  onToolOrFile?: (event: ToolOrFileEvent) => void;
+}
+
 export function useChatWebSocket(
   onMessage?: (data: ServerMessage) => void,
   onStreamChunk?: (text: string) => void,
-  onStreamStart?: () => void,
-  onStreamEnd?: (finalText: string) => void
+  onStreamStart?: (data?: { model?: string }) => void,
+  onStreamEnd?: (finalText: string) => void,
+  thinkingCallbacks?: ThinkingCallbacks
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -66,6 +78,8 @@ export function useChatWebSocket(
   const onStreamChunkRef = useRef(onStreamChunk);
   const onStreamStartRef = useRef(onStreamStart);
   const onStreamEndRef = useRef(onStreamEnd);
+  const thinkingRef = useRef(thinkingCallbacks);
+  thinkingRef.current = thinkingCallbacks;
   onMessageRef.current = onMessage;
   onStreamChunkRef.current = onStreamChunk;
   onStreamStartRef.current = onStreamStart;
@@ -190,7 +204,8 @@ export function useChatWebSocket(
         transition(setState, CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
         streamingAccumulatorRef.current = '';
-        onStreamStartRef.current?.();
+        onStreamStartRef.current?.({ model: data.model });
+        thinkingRef.current?.onStreamStartData?.({ model: data.model });
         return;
       }
 
@@ -207,6 +222,56 @@ export function useChatWebSocket(
         onStreamEndRef.current?.(finalText);
         streamingAccumulatorRef.current = '';
         transition(setState, CHAT_STATES.AUTHENTICATED);
+        return;
+      }
+
+      if (data.type === 'reasoning_start') {
+        thinkingRef.current?.onReasoningStart?.();
+        return;
+      }
+
+      if (data.type === 'reasoning_chunk') {
+        const text = data.text ?? '';
+        thinkingRef.current?.onReasoningChunk?.(text);
+        return;
+      }
+
+      if (data.type === 'reasoning_end') {
+        thinkingRef.current?.onReasoningEnd?.();
+        return;
+      }
+
+      if (data.type === 'thinking_step') {
+        const step: ThinkingStep = {
+          id: data.id ?? '',
+          title: data.title ?? '',
+          status: (data.status as ThinkingStep['status']) ?? 'pending',
+          details: data.details,
+          timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
+        };
+        thinkingRef.current?.onThinkingStep?.(step);
+        return;
+      }
+
+      if (data.type === 'tool_call') {
+        const event: ToolOrFileEvent = {
+          kind: 'tool_call',
+          name: data.name ?? '',
+          path: data.path,
+          summary: data.summary,
+        };
+        thinkingRef.current?.onToolOrFile?.(event);
+        return;
+      }
+
+      if (data.type === 'file_created') {
+        const event: ToolOrFileEvent = {
+          kind: 'file_created',
+          name: data.name ?? '',
+          path: data.path,
+          summary: data.summary,
+        };
+        thinkingRef.current?.onToolOrFile?.(event);
         return;
       }
 

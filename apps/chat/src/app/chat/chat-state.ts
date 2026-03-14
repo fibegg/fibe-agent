@@ -38,4 +38,12 @@ export interface ServerMessage {
   text?: string;
   model?: string;
   imageUrls?: string[];
+  id?: string;
+  title?: string;
+  details?: string;
+  timestamp?: string;
+  name?: string;
+  path?: string;
+  summary?: string;
+  kind?: 'file_created' | 'tool_call';
 }
