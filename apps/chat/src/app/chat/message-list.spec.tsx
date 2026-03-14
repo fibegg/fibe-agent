@@ -57,7 +57,7 @@ describe('MessageList', () => {
     const { container } = render(
       <MessageList messages={messages} streamingText="" isStreaming={false} />
     );
-    const bubble = container.querySelector('.bg-card');
+    const bubble = container.querySelector('[class*="bg-card"]');
     expect(bubble).toBeTruthy();
     expect(bubble?.textContent).toContain('Reply');
   });

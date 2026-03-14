@@ -81,9 +81,21 @@ const ESTIMATED_ROW_HEIGHT = 120;
 const ROW_GAP = 24;
 
 const ASSISTANT_BUBBLE_CLASSES =
-  'rounded-tl-sm bg-card border border-border shadow-xl shadow-violet-500/5 text-card-foreground';
+  'rounded-2xl rounded-tl-sm bg-card/60 backdrop-blur-md border border-border/50 shadow-lg text-card-foreground';
 
-function MessageRow({ msg }: { msg: ChatMessage }) {
+const TYPING_BUBBLE_CLASSES =
+  'rounded-2xl rounded-tl-sm bg-card border border-border text-card-foreground';
+
+const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
+const FULL_WIDTH = 'max-w-full';
+
+function MessageRow({
+  msg,
+  maxWidthClass = DEFAULT_MAX_WIDTH,
+}: {
+  msg: ChatMessage;
+  maxWidthClass?: string;
+}) {
   return (
     <div
       className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
@@ -101,7 +113,7 @@ function MessageRow({ msg }: { msg: ChatMessage }) {
       </div>
       <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
         <div
-          className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
+          className={`${maxWidthClass} px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
             msg.role === 'user'
               ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
               : ASSISTANT_BUBBLE_CLASSES
@@ -160,11 +172,13 @@ export const MessageList = forwardRef<
     isStreaming: boolean;
     lastUserMessage?: string | null;
     scrollRef?: React.RefObject<HTMLDivElement | null>;
+    bothSidebarsCollapsed?: boolean;
   }
 >(function MessageList(
-  { messages, streamingText, isStreaming, lastUserMessage, scrollRef },
+  { messages, streamingText, isStreaming, lastUserMessage, scrollRef, bothSidebarsCollapsed },
   ref
 ) {
+  const maxWidthClass = bothSidebarsCollapsed ? FULL_WIDTH : DEFAULT_MAX_WIDTH;
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef?.current ?? null,
@@ -224,7 +238,7 @@ export const MessageList = forwardRef<
               minHeight: virtualRow.size,
             }}
           >
-            <MessageRow msg={msg} />
+            <MessageRow msg={msg} maxWidthClass={maxWidthClass} />
           </div>
         );
       })}
@@ -232,7 +246,11 @@ export const MessageList = forwardRef<
   ) : (
     <div className="space-y-4 sm:space-y-6">
       {messages.map((msg) => (
-        <MessageRow key={msg.id ?? `${msg.created_at}-${msg.role}`} msg={msg} />
+        <MessageRow
+          key={msg.id ?? `${msg.created_at}-${msg.role}`}
+          msg={msg}
+          maxWidthClass={maxWidthClass}
+        />
       ))}
     </div>
   );
@@ -244,7 +262,11 @@ export const MessageList = forwardRef<
         <div className="flex gap-2 sm:gap-3 md:gap-4">
           <ThinkingAvatar />
           <div className="flex-1 min-w-0">
-            <div className={`max-w-[90%] sm:max-w-[85%] md:max-w-[80%] rounded-2xl px-4 py-3 ${ASSISTANT_BUBBLE_CLASSES}`}>
+            <div
+              className={`${maxWidthClass} px-4 py-3 ${
+                streamingText ? ASSISTANT_BUBBLE_CLASSES : TYPING_BUBBLE_CLASSES
+              }`}
+            >
               {streamingText ? (
                 <div
                   className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"

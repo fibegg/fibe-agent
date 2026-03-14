@@ -7,7 +7,7 @@ const ChatPage = lazy(() => import('./pages/chat-page').then((m) => ({ default: 
 
 function PageFallback() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-violet-950/10">
       <span className="text-muted-foreground">Loading…</span>
     </div>
   );

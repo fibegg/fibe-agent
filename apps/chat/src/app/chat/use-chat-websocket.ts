@@ -25,6 +25,7 @@ export interface UseChatWebSocketResult {
   errorMessage: string | null;
   authModal: AuthModalState;
   send: (msg: Record<string, unknown>) => void;
+  reconnect: () => void;
   startAuth: () => void;
   reauthenticate: () => void;
   logout: () => void;
@@ -287,11 +288,25 @@ export function useChatWebSocket(
     setState(CHAT_STATES.AUTHENTICATED);
   }, []);
 
+  const reconnect = useCallback(() => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    clearResponseTimer();
+    wsRef.current?.close();
+    wsRef.current = null;
+    setErrorMessage(null);
+    setState(CHAT_STATES.INITIALIZING);
+    connect();
+  }, [connect, clearResponseTimer]);
+
   return {
     state,
     errorMessage,
     authModal,
     send,
+    reconnect,
     startAuth,
     reauthenticate,
     logout,

@@ -91,7 +91,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
               readOnly={readOnly}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Paste code here..."
-              className="w-full px-3 py-2.5 rounded-xl bg-background/50 border border-border text-foreground placeholder-muted-foreground focus:border-violet-500/50 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 outline-none transition-shadow"
+              className="w-full px-3 py-2.5 rounded-xl bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 outline-none transition-shadow"
             />
             {showSubmit && (
               <button

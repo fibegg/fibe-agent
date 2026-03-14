@@ -1,7 +1,5 @@
 import {
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ImagePlus,
   Key,
   LogOut,
@@ -12,7 +10,7 @@ import {
   Send,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
@@ -29,9 +27,9 @@ import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
-import { FileExplorer } from '../file-explorer/file-explorer';
+import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
-import { CHAT_STATES } from '../chat/chat-state';
+import { CHAT_STATES, STATE_LABELS } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { HeaderThinkingIcons } from '../chat/header-thinking-icons';
 import {
@@ -42,21 +40,13 @@ import {
 } from '../api-url';
 import {
   getInitialSidebarCollapsed,
+  getInitialRightSidebarCollapsed,
   persistSidebarCollapsed,
+  persistRightSidebarCollapsed,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
 } from '../layout-constants';
-
-const STATE_LABELS: Record<string, string> = {
-  [CHAT_STATES.INITIALIZING]: 'Connecting...',
-  [CHAT_STATES.AGENT_OFFLINE]: 'Agent offline',
-  [CHAT_STATES.UNAUTHENTICATED]: 'Authentication required',
-  [CHAT_STATES.AUTH_PENDING]: 'Authentication in progress...',
-  [CHAT_STATES.AUTHENTICATED]: 'Ready to help',
-  [CHAT_STATES.AWAITING_RESPONSE]: 'Working...',
-  [CHAT_STATES.LOGGING_OUT]: 'Logging out...',
-  [CHAT_STATES.ERROR]: 'Error occurred',
-};
+import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 
 const MODEL_DEBOUNCE_MS = 500;
 const MAX_PENDING_IMAGES = 5;
@@ -71,8 +61,10 @@ export function ChatPage() {
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(
+    getInitialRightSidebarCollapsed
+  );
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
@@ -81,6 +73,7 @@ export function ChatPage() {
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
   const [pendingVoiceFilename, setPendingVoiceFilename] = useState<string | null>(null);
   const [voiceUploadError, setVoiceUploadError] = useState<string | null>(null);
+  const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [inputState, setInputState] = useState({ value: '', cursor: 0 });
   const inputValue = inputState.value;
   const cursorOffset = inputState.cursor;
@@ -101,13 +94,21 @@ export function ChatPage() {
   }, [atMention.show]);
 
   useEffect(() => persistSidebarCollapsed(sidebarCollapsed), [sidebarCollapsed]);
+  useEffect(
+    () => persistRightSidebarCollapsed(rightSidebarCollapsed),
+    [rightSidebarCollapsed]
+  );
 
   useEffect(() => {
     if (isMobile) return;
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'b') {
         e.preventDefault();
-        setSidebarCollapsed((v) => !v);
+        if (e.shiftKey) {
+          setRightSidebarCollapsed((v) => !v);
+        } else {
+          setSidebarCollapsed((v) => !v);
+        }
       }
     };
     window.addEventListener('keydown', handler);
@@ -209,6 +210,7 @@ export function ChatPage() {
     errorMessage,
     authModal,
     send,
+    reconnect,
     startAuth,
     cancelAuth,
     submitAuthCode,
@@ -406,7 +408,7 @@ export function ChatPage() {
 
   const statusClass =
     state === CHAT_STATES.AUTHENTICATED
-      ? 'text-success'
+      ? 'text-muted-foreground'
       : state === CHAT_STATES.ERROR
         ? 'text-destructive'
         : 'text-warning';
@@ -418,10 +420,15 @@ export function ChatPage() {
     state === CHAT_STATES.AUTH_PENDING &&
     !!(authModal.authUrl || authModal.deviceCode || authModal.isManualToken);
 
-  const filteredMessages =
-    searchQuery.trim() === ''
-      ? messages
-      : messages.filter((m) => m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase()));
+  const filteredMessages = useMemo(
+    () =>
+      searchQuery.trim() === ''
+        ? messages
+        : messages.filter((m) =>
+            m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase())
+          ),
+    [messages, searchQuery]
+  );
 
   return (
     <div className="flex h-screen w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10">
@@ -439,21 +446,20 @@ export function ChatPage() {
             onClick={closeSettings}
           />
           <div
-            className="fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border shadow-card overflow-hidden"
-            style={{ backgroundColor: 'var(--card)' }}
+            className="fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-gradient-to-br from-card via-card to-violet-950/5 border border-violet-500/20 shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
             aria-labelledby="settings-dialog-title"
           >
-            <div className="flex items-center justify-between p-4 border-b border-border-subtle">
+            <div className="flex items-center justify-between p-4 border-b border-border/50">
               <h2 id="settings-dialog-title" className="text-lg font-semibold text-foreground">
                 Settings
               </h2>
               <button
                 type="button"
                 onClick={closeSettings}
-                className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-violet-500/10"
+                className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10"
                 aria-label="Close"
               >
                 <X className="size-4" />
@@ -471,7 +477,7 @@ export function ChatPage() {
                     closeSettings();
                     state === CHAT_STATES.UNAUTHENTICATED ? startAuth() : reauthenticate();
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-violet-500/10 transition-colors"
+                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-500/20 text-sm font-medium text-foreground hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30 transition-colors"
                 >
                   <Key className="size-4" />
                   {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Re-authenticate'}
@@ -509,47 +515,42 @@ export function ChatPage() {
               fullWidth
               onSettingsClick={() => setSettingsOpen(true)}
               onClose={closeMobileSidebar}
+              onFileSelect={(entry) => {
+                setViewingFile(entry);
+                closeMobileSidebar();
+              }}
+              selectedPath={viewingFile?.path ?? null}
             />
           </div>
         </>
       )}
       {hasPlaygroundFiles && !isMobile && (
         <div
-          className="relative flex min-h-0 flex-shrink-0 flex-col overflow-visible transition-[width] duration-300 ease-out"
+          className="flex min-h-0 flex-shrink-0 flex-col overflow-visible transition-[width] duration-300 ease-out"
           style={{ width: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : SIDEBAR_WIDTH_PX }}
         >
-          <aside className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
             <FileExplorer
               collapsed={sidebarCollapsed}
               onSettingsClick={() => setSettingsOpen(true)}
+              onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+              onFileSelect={(entry) => setViewingFile(entry)}
+              selectedPath={viewingFile?.path ?? null}
             />
           </aside>
-          <div
-            className="absolute top-0 right-0 bottom-0 w-px pointer-events-none z-0 bg-[var(--border-subtle)]"
-            aria-hidden
-          />
-          <button
-            type="button"
-            onClick={() => setSidebarCollapsed((v) => !v)}
-            title={
-              sidebarCollapsed
-                ? 'Expand sidebar (⌘B)'
-                : 'Collapse sidebar (⌘B)'
-            }
-            className="sidebar-toggle absolute top-1/2 right-0 z-10 flex h-14 w-7 -translate-y-1/2 translate-x-full items-center justify-center rounded-r-lg border-0 bg-card/80 backdrop-blur-sm transition-all duration-200 hover:scale-105 hover:bg-violet-500/10 focus:outline-none focus:ring-2 focus:ring-violet-500/30 active:scale-95"
-            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          >
-            {sidebarCollapsed ? (
-              <ChevronRight className="size-4 text-violet-500 transition-transform" />
-            ) : (
-              <ChevronLeft className="size-4 text-violet-500 transition-transform" />
-            )}
-          </button>
         </div>
       )}
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-        <header className="flex shrink-0 flex-col px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-border-subtle bg-card/40 backdrop-blur-xl">
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
+        {viewingFile ? (
+          <FileViewerPanel
+            entry={viewingFile}
+            onClose={() => setViewingFile(null)}
+            inline
+          />
+        ) : (
+          <>
+        <header className="flex shrink-0 flex-col px-4 pt-4 pb-[15px] border-b border-border/50 bg-card/40 backdrop-blur-xl">
+          <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="flex items-center gap-1.5 shrink-0 lg:hidden">
                 <button
@@ -563,10 +564,14 @@ export function ChatPage() {
                 </button>
               </div>
               <div className="min-w-0">
-                <h2 className="font-semibold text-sm sm:text-base text-foreground truncate">AI Assistant</h2>
+                <h2 className="font-semibold text-sm text-foreground truncate">
+                  AI Assistant
+                </h2>
                 {state === CHAT_STATES.AWAITING_RESPONSE ? (
                   <div className="flex items-center justify-start gap-1.5 mt-0.5">
-                    <span className="text-[10px] sm:text-xs text-warning">Thinking...</span>
+                    <span className="text-[10px] sm:text-xs text-warning">
+                      Thinking...
+                    </span>
                     <HeaderThinkingIcons />
                   </div>
                 ) : (
@@ -579,13 +584,19 @@ export function ChatPage() {
             <div className="flex items-center gap-1 sm:gap-2">
               <button
                 type="button"
-                onClick={() => setShowSearch((v) => !v)}
-                className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
-                title="Search in conversation"
-                aria-label="Search in conversation"
+                className="hidden sm:flex px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
               >
-                <Search className="size-3.5 sm:size-4" />
+                New chat
               </button>
+              {(state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR) && (
+                <button
+                  type="button"
+                  onClick={reconnect}
+                  className="px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+                >
+                  Reconnect
+                </button>
+              )}
               <ModelSelector
                 currentModel={currentModel}
                 options={modelOptions}
@@ -594,65 +605,46 @@ export function ChatPage() {
                 visible={showModelSelector}
                 modelLocked={isChatModelLocked()}
               />
-              {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
+              {state === CHAT_STATES.UNAUTHENTICATED && (
                 <button
                   type="button"
-                  onClick={state === CHAT_STATES.UNAUTHENTICATED ? startAuth : reauthenticate}
+                  onClick={startAuth}
                   className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
                 >
-                  {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Reauthenticate'}
-                </button>
-              )}
-              {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
-                <button
-                  type="button"
-                  onClick={logout}
-                  className="px-3 py-1.5 rounded-md bg-destructive/90 hover:bg-destructive text-white text-[10px] sm:text-xs font-medium transition-colors"
-                >
-                  Logout
+                  Start Auth
                 </button>
               )}
             </div>
           </div>
-          <div
-            className="grid transition-[grid-template-rows] duration-200 ease-out"
-            style={{ gridTemplateRows: showSearch ? '1fr' : '0fr' }}
-          >
-            <div className="min-h-0 overflow-hidden">
-              <div
-                className={`pb-2 pt-0.5 transition-opacity duration-200 ${showSearch ? 'opacity-100' : 'opacity-0'}`}
+          <div className="relative h-8">
+            <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 size-3.5 sm:size-4 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search in conversation..."
+              className="w-full h-8 pl-8 sm:pl-10 pr-8 sm:pr-10 text-xs sm:text-sm rounded-md bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
               >
-                <div className="relative">
-                  <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 size-3.5 sm:size-4 text-muted-foreground pointer-events-none" />
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search in conversation..."
-                    className="w-full h-8 sm:h-9 pl-8 sm:pl-10 pr-8 sm:pr-10 text-xs sm:text-sm rounded-md bg-input-bg border border-violet-500/30 dark:border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
-                  />
-                  {searchQuery && (
-                    <button
-                      type="button"
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-2.5 sm:right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                      aria-label="Clear search"
-                    >
-                      <X className="size-3.5 sm:size-4" />
-                    </button>
-                  )}
-                </div>
-                {searchQuery && (
-                  <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-                    Found {filteredMessages.length} message{filteredMessages.length !== 1 ? 's' : ''}
-                  </p>
-                )}
-              </div>
-            </div>
+                <X className="size-3.5 sm:size-4" />
+              </button>
+            )}
           </div>
+          {searchQuery && (
+            <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
+              Found {filteredMessages.length} message
+              {filteredMessages.length !== 1 ? 's' : ''}
+            </p>
+          )}
         </header>
         {errorMessage && state === CHAT_STATES.ERROR && (
-          <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border-subtle">
+          <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border/50">
             <span className="text-destructive text-sm">{errorMessage}</span>
             <button
               type="button"
@@ -677,6 +669,11 @@ export function ChatPage() {
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
                 lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastSentMessage : null}
                 scrollRef={scroll.scrollRef}
+                bothSidebarsCollapsed={
+                  !isMobile &&
+                  (hasPlaygroundFiles ? sidebarCollapsed : true) &&
+                  rightSidebarCollapsed
+                }
               />
               <div ref={scroll.endRef} />
             </div>
@@ -701,7 +698,7 @@ export function ChatPage() {
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
                   {pendingVoice && (
-                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-border-subtle bg-card/60">
+                    <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-card/60">
                       <audio src={pendingVoice} controls className="max-h-10 min-w-[160px]" />
                       <button
                         type="button"
@@ -718,7 +715,7 @@ export function ChatPage() {
                       <img
                         src={dataUrl}
                         alt=""
-                        className="w-16 h-16 object-cover rounded-xl border border-border-subtle"
+                        className="w-16 h-16 object-cover rounded-xl border border-border/50"
                       />
                       <button
                         type="button"
@@ -748,13 +745,16 @@ export function ChatPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500 transition-colors shrink-0"
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
                   title="Attach file"
                   aria-label="Attach file"
                 >
                   <Paperclip className="size-3.5 sm:size-4" />
                 </button>
-                <div className="relative flex-1 min-w-0">
+                <div
+                  className="relative flex-1 min-w-0"
+                  title={state === CHAT_STATES.AUTHENTICATED ? 'Type @ to link a file' : undefined}
+                >
                   <MentionInput
                     inputRef={chatInputRef}
                     id="chat-input"
@@ -764,7 +764,7 @@ export function ChatPage() {
                     onCursorChange={(c) => setInputState((prev) => ({ ...prev, cursor: c }))}
                     placeholder={
                       state === CHAT_STATES.AUTHENTICATED
-                        ? 'Ask me anything... (type @ to link a file)'
+                        ? 'Ask me anything...'
                         : 'Complete authentication to start chatting...'
                     }
                     disabled={state !== CHAT_STATES.AUTHENTICATED}
@@ -785,7 +785,7 @@ export function ChatPage() {
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500 transition-colors shrink-0"
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
                   title="Upload photo"
                   aria-label="Upload photo"
                 >
@@ -799,7 +799,7 @@ export function ChatPage() {
                     className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
                       voiceRecorder.isRecording
                         ? 'bg-destructive/90 hover:bg-destructive text-white'
-                        : 'text-foreground dark:text-violet-400 hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-500'
+                        : 'text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
                     }`}
                     title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
                     aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
@@ -828,7 +828,16 @@ export function ChatPage() {
               </div>
             </div>
         </div>
+          </>
+        )}
       </main>
+      {!isMobile && (
+        <AgentThinkingSidebar
+          isCollapsed={rightSidebarCollapsed}
+          onToggle={() => setRightSidebarCollapsed((v) => !v)}
+          isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+        />
+      )}
     </div>
   );
 }

@@ -17,17 +17,17 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
 
   return (
     <div className="flex items-center gap-3 py-0.5">
-      <div className="flex gap-1 shrink-0">
+      <div className="flex gap-1.5 shrink-0">
         <span
           className="size-2 rounded-full bg-violet-400 animate-thinking-bounce"
           style={{ animationDelay: '0ms' }}
         />
         <span
-          className="size-2 rounded-full bg-purple-400 animate-thinking-bounce"
+          className="size-2 rounded-full bg-violet-400 animate-thinking-bounce"
           style={{ animationDelay: '150ms' }}
         />
         <span
-          className="size-2 rounded-full bg-fuchsia-400 animate-thinking-bounce"
+          className="size-2 rounded-full bg-violet-400 animate-thinking-bounce"
           style={{ animationDelay: '300ms' }}
         />
       </div>
