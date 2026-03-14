@@ -42,7 +42,7 @@ ARG BUILDKIT_INLINE_CACHE=1
 # Unconditional packages — cached across all provider variants
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
-    jq less tree wget zip unzip openssh-client \
+    jq less tree wget zip unzip openssh-client docker.io \
     && rm -rf /var/lib/apt/lists/*
 
 # Conditional packages — only busts cache for claude_code builds
