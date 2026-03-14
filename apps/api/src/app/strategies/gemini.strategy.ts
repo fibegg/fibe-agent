@@ -12,9 +12,19 @@ export class GeminiStrategy implements AgentStrategy {
   private activeAuthProcess: ReturnType<typeof spawn> | null = null;
   private currentConnection: AuthConnection | null = null;
   private _hasSession = false;
+  private ensureSettings(): void {
+    if (!existsSync(GEMINI_CONFIG_DIR)) {
+      mkdirSync(GEMINI_CONFIG_DIR, { recursive: true });
+    }
+    const settingsPath = join(GEMINI_CONFIG_DIR, 'settings.json');
+    require('node:fs').writeFileSync(settingsPath, JSON.stringify({
+      security: { auth: { selectedType: "oauth-personal" } }
+    }));
+  }
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
+    this.ensureSettings();
     this.activeAuthProcess = spawn('gemini', ['-p', ''], {
       env: { ...process.env, NO_BROWSER: 'true' },
       shell: false,
@@ -122,6 +132,7 @@ export class GeminiStrategy implements AgentStrategy {
 
   checkAuthStatus(): Promise<boolean> {
     return new Promise((resolve) => {
+      this.ensureSettings();
       const geminiProcess = spawn('gemini', ['-p', ''], {
         env: { ...process.env, NO_BROWSER: 'true' },
         shell: false,
