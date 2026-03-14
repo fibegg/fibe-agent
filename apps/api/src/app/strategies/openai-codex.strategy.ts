@@ -12,7 +12,6 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   private readonly logger = new Logger(OpenaiCodexStrategy.name);
   private activeAuthProcess: ReturnType<typeof spawn> | null = null;
   private currentConnection: AuthConnection | null = null;
-  private _hasSession = false;
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
@@ -97,13 +96,11 @@ export class OpenaiCodexStrategy implements AgentStrategy {
 
     logoutProcess.on('close', () => {
       this.clearCredentials();
-      this._hasSession = false;
       connection.sendLogoutSuccess();
     });
 
     logoutProcess.on('error', () => {
       this.clearCredentials();
-      this._hasSession = false;
       connection.sendLogoutSuccess();
     });
   }
@@ -160,7 +157,6 @@ export class OpenaiCodexStrategy implements AgentStrategy {
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
-          this._hasSession = true;
           resolve();
         }
       });
