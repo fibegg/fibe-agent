@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 import type { AgentStrategy } from './strategy.types';
@@ -17,9 +17,18 @@ export class GeminiStrategy implements AgentStrategy {
       mkdirSync(GEMINI_CONFIG_DIR, { recursive: true });
     }
     const settingsPath = join(GEMINI_CONFIG_DIR, 'settings.json');
-    require('node:fs').writeFileSync(settingsPath, JSON.stringify({
-      security: { auth: { selectedType: "oauth-personal" } }
-    }));
+    let existing: Record<string, unknown> = {};
+    try {
+      if (existsSync(settingsPath)) {
+        existing = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      }
+    } catch { /* start fresh */ }
+
+    const config = {
+      ...existing,
+      security: { auth: { selectedType: "oauth-personal" } },
+    };
+    writeFileSync(settingsPath, JSON.stringify(config, null, 2));
   }
 
   executeAuth(connection: AuthConnection): void {
