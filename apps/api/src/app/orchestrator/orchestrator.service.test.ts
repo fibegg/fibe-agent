@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { OrchestratorService } from './orchestrator.service';
+import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { MessageStoreService } from '../message-store/message-store.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
@@ -31,6 +32,7 @@ describe('OrchestratorService', () => {
       getModelOptions: () => [],
       getDefaultModel: () => '',
     };
+    const activityStore = new ActivityStoreService(config as never);
     const messageStore = new MessageStoreService(config as never);
     const modelStore = new ModelStoreService(config as never);
     const strategyRegistry = new StrategyRegistryService();
@@ -41,6 +43,7 @@ describe('OrchestratorService', () => {
       },
     } as unknown as PlaygroundsService;
     const orch = new OrchestratorService(
+      activityStore,
       messageStore,
       modelStore,
       config as never,

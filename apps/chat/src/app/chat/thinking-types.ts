@@ -15,6 +15,7 @@ export interface ToolOrFileEvent {
   name: string;
   path?: string;
   summary?: string;
+  command?: string;
 }
 
 export type ThinkingActivityType =
@@ -23,7 +24,8 @@ export type ThinkingActivityType =
   | 'step'
   | 'file_created'
   | 'tool_call'
-  | 'stream_start';
+  | 'stream_start'
+  | 'info';
 
 export interface ThinkingActivity {
   id: string;
@@ -31,6 +33,8 @@ export interface ThinkingActivity {
   message: string;
   timestamp: Date;
   details?: string;
+  command?: string;
+  path?: string;
   debug?: Record<string, unknown>;
 }
 
@@ -40,4 +44,6 @@ export type StoryJson = Array<{
   message: string;
   timestamp: string;
   details?: string;
+  command?: string;
+  path?: string;
 }>;

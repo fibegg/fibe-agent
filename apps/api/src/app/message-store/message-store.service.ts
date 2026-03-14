@@ -10,6 +10,8 @@ export interface StoredStoryEntry {
   message: string;
   timestamp: string;
   details?: string;
+  command?: string;
+  path?: string;
 }
 
 export interface StoredMessage {

@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { Sparkles, User } from 'lucide-react';
+import { FileCode, Sparkles, User } from 'lucide-react';
 import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { FileIcon } from '../file-icon';
@@ -42,7 +42,15 @@ export interface ChatMessage {
   body: string;
   created_at: string;
   imageUrls?: string[];
-  story?: Array<{ id: string; type: string; message: string; timestamp: string; details?: string }>;
+  story?: Array<{
+    id: string;
+    type: string;
+    message: string;
+    timestamp: string;
+    details?: string;
+    command?: string;
+    path?: string;
+  }>;
   optimistic?: boolean;
 }
 
@@ -150,6 +158,76 @@ function MessageRow({
                 className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
               />
+              {msg.story && msg.story.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border/50 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+                    Activity
+                  </p>
+                  <div className="space-y-2">
+                    {msg.story
+                      .filter((e) => e.type !== 'stream_start')
+                      .map((entry) => {
+                        const isCommand = entry.type === 'tool_call' && entry.command;
+                        const isFile = entry.type === 'file_created' && (entry.path || entry.details);
+                        const isThinking =
+                          entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
+                        if (isThinking) {
+                          return (
+                            <div
+                              key={entry.id}
+                              className="rounded-lg bg-violet-950/30 border border-violet-500/20 px-3 py-2 max-h-40 overflow-y-auto"
+                            >
+                              <p className="text-[10px] font-semibold text-violet-300/90 uppercase tracking-wide mb-1">
+                                Thinking
+                              </p>
+                              <p className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                                {entry.details ?? ''}
+                              </p>
+                            </div>
+                          );
+                        }
+                        if (isCommand) {
+                          return (
+                            <div
+                              key={entry.id}
+                              className="rounded-lg bg-zinc-900/80 border border-violet-500/20 px-3 py-2 font-mono text-xs text-green-300/95 overflow-x-auto"
+                            >
+                              <span className="text-violet-400/80 select-none">$ </span>
+                              {entry.command}
+                            </div>
+                          );
+                        }
+                        if (isFile) {
+                          return (
+                            <div
+                              key={entry.id}
+                              className="rounded-lg bg-green-950/20 border border-green-500/20 px-3 py-2 flex items-center gap-2"
+                            >
+                              <FileCode className="size-3.5 text-green-400 shrink-0" />
+                              <span className="text-xs text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
+                                {entry.path ?? entry.details}
+                              </span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <div key={entry.id} className="flex items-start gap-2 text-xs text-muted-foreground">
+                            {entry.type === 'step' ? (
+                              <span className="font-medium text-violet-400/90">{entry.message}</span>
+                            ) : (
+                              <span>{entry.message}</span>
+                            )}
+                            {entry.details && (
+                              <span className="truncate" title={entry.details}>
+                                {entry.details}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
+                  </div>
+                </div>
+              )}
               <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
                 {formatTime(msg.created_at)}
               </p>

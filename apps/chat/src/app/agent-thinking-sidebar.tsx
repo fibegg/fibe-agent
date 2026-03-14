@@ -3,10 +3,12 @@ import {
   FileCode,
   Loader2,
   MessageSquare,
+  Search,
   Sparkles,
   Terminal,
+  X,
 } from 'lucide-react';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
@@ -14,6 +16,7 @@ import {
 } from './layout-constants';
 import { formatRelativeTime } from './format-relative-time';
 import type { ThinkingStep, ToolOrFileEvent } from './chat/thinking-types';
+import { TypingText } from './chat/typing-text';
 
 const DEFAULT_MODEL_LABEL = 'Model (default)';
 
@@ -23,6 +26,8 @@ export type StoryEntry = {
   message: string;
   timestamp: string | Date;
   details?: string;
+  command?: string;
+  path?: string;
 };
 
 function getActivityIcon(type: string) {
@@ -38,6 +43,8 @@ function getActivityIcon(type: string) {
       return FileCode;
     case 'tool_call':
       return Terminal;
+    case 'info':
+      return MessageSquare;
     default:
       return MessageSquare;
   }
@@ -56,6 +63,8 @@ function getActivityLabel(type: string): string {
       return 'File';
     case 'tool_call':
       return 'Command';
+    case 'info':
+      return 'Info';
     default:
       return 'Activity';
   }
@@ -85,8 +94,27 @@ export function AgentThinkingSidebar({
   storyItems = [],
 }: AgentThinkingSidebarProps) {
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
+  const [activitySearchQuery, setActivitySearchQuery] = useState('');
 
   const displayThinkingText = reasoningText || streamingResponseText;
+
+  const filteredStoryItems = activitySearchQuery.trim()
+    ? storyItems.filter((entry) => {
+        const q = activitySearchQuery.trim().toLowerCase();
+        const message = (entry.message ?? '').toLowerCase();
+        const details = (entry.details ?? '').toLowerCase();
+        const command = (entry.command ?? '').toLowerCase();
+        const path = (entry.path ?? '').toLowerCase();
+        const label = getActivityLabel(entry.type).toLowerCase();
+        return (
+          message.includes(q) ||
+          details.includes(q) ||
+          command.includes(q) ||
+          path.includes(q) ||
+          label.includes(q)
+        );
+      })
+    : storyItems;
 
   useEffect(() => {
     if (isStreaming && displayThinkingText) {
@@ -135,6 +163,27 @@ export function AgentThinkingSidebar({
                 {modelLabel}
               </span>
             </div>
+            <div className="relative h-8 mt-2">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                value={activitySearchQuery}
+                onChange={(e) => setActivitySearchQuery(e.target.value)}
+                placeholder="Search activity..."
+                className="w-full h-8 pl-8 pr-8 text-xs bg-background/50 border border-violet-500/30 rounded-md focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-foreground placeholder:text-muted-foreground"
+                aria-label="Search activity"
+              />
+              {activitySearchQuery ? (
+                <button
+                  type="button"
+                  onClick={() => setActivitySearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label="Clear search"
+                >
+                  <X className="size-3.5" />
+                </button>
+              ) : null}
+            </div>
           </>
         ) : (
           <div className="relative mx-auto">
@@ -163,14 +212,23 @@ export function AgentThinkingSidebar({
               )}
             </div>
             <ul className="list-none p-0 m-0 flex-1 min-h-0 overflow-y-auto border-l-2 border-violet-500/20 ml-3 pl-3">
-              {storyItems.length === 0 && !displayThinkingText && !isStreaming && (
+              {filteredStoryItems.length === 0 && storyItems.length === 0 && !displayThinkingText && !isStreaming && (
                 <li className="py-3 text-xs text-muted-foreground">
                   Activity will appear here when the agent responds.
                 </li>
               )}
-              {storyItems.map((entry) => {
+              {filteredStoryItems.length === 0 && storyItems.length > 0 && activitySearchQuery.trim() && (
+                <li className="py-3 text-xs text-muted-foreground">
+                  No activity matches &quot;{activitySearchQuery.trim()}&quot;.
+                </li>
+              )}
+              {filteredStoryItems.map((entry) => {
                 const Icon = getActivityIcon(entry.type);
                 const label = getActivityLabel(entry.type);
+                const isCommandBlock = entry.type === 'tool_call' && entry.command;
+                const isFileBlock = entry.type === 'file_created' && (entry.path || entry.details);
+                const isThinkingBlock =
+                  entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
                 return (
                   <li
                     key={entry.id}
@@ -194,11 +252,38 @@ export function AgentThinkingSidebar({
                           {formatRelativeTime(entry.timestamp)}
                         </span>
                       </div>
-                      <p className="text-xs text-foreground/90 mt-0.5 break-words">{entry.message}</p>
-                      {entry.details && (
-                        <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
-                          {entry.details}
-                        </p>
+                      {isThinkingBlock ? (
+                        <div className="mt-1.5 rounded-md bg-violet-950/40 border border-violet-500/20 px-2.5 py-2 max-h-32 overflow-y-auto">
+                          <p className="text-[11px] text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                            {entry.details}
+                          </p>
+                        </div>
+                      ) : isCommandBlock ? (
+                        <div className="mt-1.5 rounded-md bg-zinc-900/90 border border-violet-500/20 px-2.5 py-2 font-mono text-[11px] text-green-300/95 overflow-x-auto">
+                          <span className="text-violet-400/80 select-none">$ </span>
+                          <TypingText
+                            text={entry.command ?? ''}
+                            charMs={20}
+                            showCursor={isStreaming}
+                            skipAnimation={!isStreaming}
+                          />
+                        </div>
+                      ) : isFileBlock ? (
+                        <div className="mt-1.5 rounded-md bg-green-950/30 border border-green-500/20 px-2.5 py-1.5 flex items-center gap-2">
+                          <FileCode className="size-3.5 text-green-400 shrink-0" />
+                          <span className="text-[11px] text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
+                            {entry.path ?? entry.details}
+                          </span>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="text-xs text-foreground/90 mt-0.5 break-words">{entry.message}</p>
+                          {entry.details && entry.type !== 'reasoning_start' && (
+                            <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
+                              {entry.details}
+                            </p>
+                          )}
+                        </>
                       )}
                     </div>
                   </li>

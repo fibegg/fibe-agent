@@ -181,7 +181,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
             event?: {
               type?: string;
               index?: number;
-              delta?: { type?: string; text?: string };
+              delta?: { type?: string; text?: string; thinking?: string };
               content_block?: { type?: string; name?: string; input?: unknown };
             };
           };
@@ -195,12 +195,15 @@ export class ClaudeCodeStrategy implements AgentStrategy {
               }
               onChunk(ev.delta.text);
             }
-            if (ev.delta.type === 'thinking_delta' && ev.delta.text) {
-              if (!inThinking) {
-                inThinking = true;
-                callbacks?.onReasoningStart?.();
+            if (ev.delta.type === 'thinking_delta') {
+              const thinkingChunk = ev.delta.thinking ?? ev.delta.text ?? '';
+              if (thinkingChunk) {
+                if (!inThinking) {
+                  inThinking = true;
+                  callbacks?.onReasoningStart?.();
+                }
+                callbacks?.onReasoningChunk?.(thinkingChunk);
               }
-              callbacks?.onReasoningChunk?.(ev.delta.text);
             }
           }
           if (ev.type === 'content_block_stop' && inThinking) {
@@ -209,13 +212,22 @@ export class ClaudeCodeStrategy implements AgentStrategy {
           }
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
             const cb = ev.content_block;
+            const input = cb.input && typeof cb.input === 'object' ? cb.input as Record<string, unknown> : undefined;
+            const command =
+              typeof input?.command === 'string'
+                ? input.command
+                : typeof (input?.arguments as Record<string, unknown>)?.command === 'string'
+                  ? (input.arguments as Record<string, unknown>).command as string
+                  : undefined;
+            const summary =
+              input && !command
+                ? JSON.stringify(input).slice(0, 200)
+                : undefined;
             callbacks?.onTool?.({
               kind: 'tool_call',
               name: cb.name ?? 'tool',
-              summary:
-                cb.input && typeof cb.input === 'object'
-                  ? JSON.stringify(cb.input).slice(0, 200)
-                  : undefined,
+              summary,
+              command,
             });
           }
         } catch {

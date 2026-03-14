@@ -85,10 +85,11 @@ export function ChatPage() {
   const [activityLog, setActivityLog] = useState<ThinkingActivity[]>([]);
   const activityLogRef = useRef<ThinkingActivity[]>([]);
   const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => {});
+  const reasoningTextRef = useRef('');
+  const thinkingEntryIdRef = useRef<string | null>(null);
   useEffect(() => {
     activityLogRef.current = activityLog;
   }, [activityLog]);
-  const reasoningStartedLoggedRef = useRef(false);
   const [pendingImages, setPendingImages] = useState<string[]>([]);
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
   const [pendingVoiceFilename, setPendingVoiceFilename] = useState<string | null>(null);
@@ -247,7 +248,8 @@ export function ChatPage() {
       setReasoningText('');
       setThinkingSteps([]);
       setToolEvents([]);
-      reasoningStartedLoggedRef.current = false;
+      reasoningTextRef.current = '';
+      thinkingEntryIdRef.current = null;
       setStreamingModel(data?.model ?? null);
       setActivityLog([
         {
@@ -262,12 +264,14 @@ export function ChatPage() {
     (finalText) => {
       const text = finalText?.trim() || 'Process completed successfully but returned no output.';
       const log = activityLogRef.current;
-      const storyForApi = log.map(({ id, type, message, timestamp, details }) => ({
+      const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
         id,
         type,
         message,
         timestamp: timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
         ...(details !== undefined ? { details } : {}),
+        ...(command !== undefined ? { command } : {}),
+        ...(path !== undefined ? { path } : {}),
       }));
       setMessages((m) => [
         ...m,
@@ -288,41 +292,42 @@ export function ChatPage() {
     {
       onStreamStartData: (data) => setStreamingModel(data.model ?? null),
       onReasoningStart: () => {
+        const id = nextActivityId();
+        thinkingEntryIdRef.current = id;
         setActivityLog((prev) => [
           ...prev,
           {
-            id: nextActivityId(),
+            id,
             type: 'reasoning_start',
-            message: 'Started reasoning',
+            message: 'Thinking',
             timestamp: new Date(),
+            details: '',
           },
         ]);
       },
       onReasoningChunk: (text) => {
-        if (!reasoningStartedLoggedRef.current && text) {
-          reasoningStartedLoggedRef.current = true;
-          setActivityLog((prev) => [
-            ...prev,
-            {
-              id: nextActivityId(),
-              type: 'reasoning_start',
-              message: 'Streaming reasoning',
-              timestamp: new Date(),
-            },
-          ]);
-        }
-        flushSync(() => setReasoningText((prev) => prev + text));
+        reasoningTextRef.current += text;
+        flushSync(() => setReasoningText(reasoningTextRef.current));
+        const entryId = thinkingEntryIdRef.current;
+        if (!entryId) return;
+        setActivityLog((prev) => {
+          const idx = prev.findIndex((e) => e.id === entryId);
+          if (idx < 0) return prev;
+          const next = [...prev];
+          next[idx] = { ...next[idx], details: reasoningTextRef.current };
+          return next;
+        });
       },
       onReasoningEnd: () => {
-        setActivityLog((prev) => [
-          ...prev,
-          {
-            id: nextActivityId(),
-            type: 'reasoning_end',
-            message: 'Reasoning completed',
-            timestamp: new Date(),
-          },
-        ]);
+        setActivityLog((prev) => {
+          const entryId = thinkingEntryIdRef.current;
+          if (!entryId) return prev;
+          const idx = prev.findIndex((e) => e.id === entryId);
+          if (idx < 0) return prev;
+          const next = [...prev];
+          next[idx] = { ...next[idx], message: 'Thinking completed' };
+          return next;
+        });
       },
       onThinkingStep: (step) => {
         flushSync(() =>
@@ -357,7 +362,7 @@ export function ChatPage() {
         const msg =
           event.kind === 'file_created'
             ? `Created ${event.path ?? event.name}`
-            : `Ran ${event.name}`;
+            : event.command ? event.command : `Ran ${event.name}`;
         setActivityLog((prev) => [
           ...prev,
           {
@@ -365,7 +370,9 @@ export function ChatPage() {
             type: event.kind,
             message: msg,
             timestamp: new Date(),
-            details: event.summary ?? event.path,
+            details: event.summary ?? (event.kind === 'file_created' ? event.path : undefined),
+            command: event.kind === 'tool_call' ? event.command : undefined,
+            path: event.path,
             debug: { kind: event.kind, name: event.name, path: event.path, summary: event.summary },
           },
         ]);

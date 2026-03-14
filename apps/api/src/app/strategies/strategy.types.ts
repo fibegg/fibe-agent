@@ -28,6 +28,7 @@ export interface ToolEvent {
   name: string;
   path?: string;
   summary?: string;
+  command?: string;
 }
 
 export interface StreamingCallbacks {

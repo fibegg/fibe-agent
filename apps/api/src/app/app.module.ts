@@ -8,6 +8,8 @@ import { AppService } from './app.service';
 import { ConfigService } from './config/config.service';
 import { AgentAuthGuard } from './auth/agent-auth.guard';
 import { AuthController } from './auth/auth.controller';
+import { ActivityController } from './activity/activity.controller';
+import { ActivityStoreService } from './activity-store/activity-store.service';
 import { MessageStoreService } from './message-store/message-store.service';
 import { MessagesController } from './messages/messages.controller';
 import { ModelStoreService } from './model-store/model-store.service';
@@ -30,6 +32,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
   ],
   controllers: [
     AppController,
+    ActivityController,
     AuthController,
     MessagesController,
     ModelOptionsController,
@@ -41,6 +44,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
     AppService,
     ConfigService,
     AgentAuthGuard,
+    ActivityStoreService,
     MessageStoreService,
     ModelStoreService,
     StrategyRegistryService,

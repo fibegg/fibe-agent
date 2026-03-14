@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { existsSync, readFileSync } from 'node:fs';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
+import { ActivityStoreService } from '../activity-store/activity-store.service';
 import {
   MessageStoreService,
   type StoredStoryEntry,
@@ -41,6 +42,7 @@ export class OrchestratorService implements OnModuleInit {
   private readonly outbound$ = new Subject<OutboundEvent>();
 
   constructor(
+    private readonly activityStore: ActivityStoreService,
     private readonly messageStore: MessageStoreService,
     private readonly modelStore: ModelStoreService,
     private readonly config: ConfigService,
@@ -321,6 +323,7 @@ export class OrchestratorService implements OnModuleInit {
             name: event.name,
             path: event.path,
             summary: event.summary,
+            command: event.command,
           });
         }
       },
@@ -381,6 +384,7 @@ export class OrchestratorService implements OnModuleInit {
 
   private handleSubmitStory(story: StoredStoryEntry[]): void {
     this.messageStore.setStoryForLastAssistant(story);
+    this.activityStore.append(story);
   }
 
   private handleGetModel(): void {
