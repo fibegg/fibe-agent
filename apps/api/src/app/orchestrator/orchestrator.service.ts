@@ -58,16 +58,6 @@ export class OrchestratorService implements OnModuleInit {
     this.outbound$.next({ type, data });
   }
 
-  private async initAuthStatus(): Promise<void> {
-    const previousState = this.isAuthenticated;
-    this.isAuthenticated = await this.strategy.checkAuthStatus();
-    if (this.isAuthenticated !== previousState) {
-      this._send(WS_EVENT.AUTH_STATUS, {
-        status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
-        isProcessing: this.isProcessing,
-      });
-    }
-  }
 
   async handleClientMessage(msg: {
     action: string;

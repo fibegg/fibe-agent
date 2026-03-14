@@ -66,6 +66,9 @@ async function bootstrap() {
 
   const config = app.get(ConfigService);
   const orchestrator = app.get(OrchestratorService);
+  if (injected) {
+    orchestrator.isAuthenticated = true;
+  }
   const server = (fastify as { server: import('http').Server }).server;
   const wss = new WebSocketServer({ server, path: '/ws' });
 
