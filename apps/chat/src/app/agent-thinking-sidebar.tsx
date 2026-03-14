@@ -170,7 +170,7 @@ export function AgentThinkingSidebar({
                 value={activitySearchQuery}
                 onChange={(e) => setActivitySearchQuery(e.target.value)}
                 placeholder="Search activity..."
-                className="w-full h-8 pl-8 pr-8 text-xs bg-background/50 border border-violet-500/30 rounded-md focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-foreground placeholder:text-muted-foreground"
+                className="w-full h-8 pl-8 pr-8 text-xs bg-input-background border border-violet-500/30 rounded-md focus:border-violet-500 focus:outline-none focus:ring-1 focus:ring-violet-500/50 text-foreground placeholder:text-muted-foreground"
                 aria-label="Search activity"
               />
               {activitySearchQuery ? (

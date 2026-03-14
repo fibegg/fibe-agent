@@ -1,12 +1,54 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AuthConnection, LogoutConnection } from './strategy.types';
+import type { AuthConnection, LogoutConnection, ToolEvent } from './strategy.types';
 import type { AgentStrategy } from './strategy.types';
 
 const CLAUDE_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.claude');
 const TOKEN_FILE_PATH = join(CLAUDE_CONFIG_DIR, 'agent_token.txt');
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
+
+const FILE_WRITING_TOOL_NAMES = ['write_file', 'edit_file', 'search_replace'];
+
+export function toolUseToEvent(
+  cb: { name?: string; input?: unknown },
+  input: Record<string, unknown> | undefined
+): ToolEvent {
+  const args = input && typeof input.arguments === 'object' ? (input.arguments as Record<string, unknown>) : undefined;
+  const command =
+    typeof input?.command === 'string'
+      ? input.command
+      : typeof args?.command === 'string'
+        ? args.command
+        : undefined;
+  const summary =
+    input && !command ? JSON.stringify(input).slice(0, 200) : undefined;
+  const isFileTool = FILE_WRITING_TOOL_NAMES.includes((cb.name ?? '').toLowerCase());
+  const pathFromInput =
+    typeof input?.path === 'string'
+      ? input.path
+      : typeof input?.file_path === 'string'
+        ? input.file_path
+        : typeof input?.path_input === 'string'
+          ? input.path_input
+          : typeof input?.name === 'string' && isFileTool
+            ? input.name
+            : undefined;
+  if (isFileTool && (pathFromInput ?? cb.name)) {
+    return {
+      kind: 'file_created',
+      name: (pathFromInput ? pathFromInput.split(/[/\\]/).pop() : undefined) ?? cb.name ?? 'file',
+      path: pathFromInput ?? cb.name,
+      summary,
+    };
+  }
+  return {
+    kind: 'tool_call',
+    name: cb.name ?? 'tool',
+    summary,
+    command,
+  };
+}
 
 export class ClaudeCodeStrategy implements AgentStrategy {
   private currentConnection: AuthConnection | null = null;
@@ -212,23 +254,8 @@ export class ClaudeCodeStrategy implements AgentStrategy {
           }
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
             const cb = ev.content_block;
-            const input = cb.input && typeof cb.input === 'object' ? cb.input as Record<string, unknown> : undefined;
-            const command =
-              typeof input?.command === 'string'
-                ? input.command
-                : typeof (input?.arguments as Record<string, unknown>)?.command === 'string'
-                  ? (input.arguments as Record<string, unknown>).command as string
-                  : undefined;
-            const summary =
-              input && !command
-                ? JSON.stringify(input).slice(0, 200)
-                : undefined;
-            callbacks?.onTool?.({
-              kind: 'tool_call',
-              name: cb.name ?? 'tool',
-              summary,
-              command,
-            });
+            const input = cb.input && typeof cb.input === 'object' ? (cb.input as Record<string, unknown>) : undefined;
+            callbacks?.onTool?.(toolUseToEvent(cb, input));
           }
         } catch {
           /* ignore malformed lines */
