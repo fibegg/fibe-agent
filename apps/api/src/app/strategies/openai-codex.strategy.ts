@@ -135,9 +135,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
         mkdirSync(playgroundDir, { recursive: true });
       }
 
-      const codexArgs = this._hasSession
-        ? ['exec', 'resume', '--last', '--yolo', prompt]
-        : ['exec', '--yolo', prompt];
+      const codexArgs = ['exec', '--yolo', prompt];
 
       const codexProcess = spawn('codex', codexArgs, {
         env: { ...process.env },
@@ -152,12 +150,15 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       });
 
       codexProcess.stderr?.on('data', (data: Buffer | string) => {
-        errorResult += data.toString();
+        const text = data.toString();
+        errorResult += text;
+        // Codex outputs progress/thinking to stderr — forward it as chunks
+        onChunk(text);
       });
 
       codexProcess.on('close', (code) => {
-        if (code !== 0 && errorResult.trim()) {
-          reject(new Error(errorResult || `Process exited with code ${code}`));
+        if (code !== 0 && code !== null) {
+          reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
           this._hasSession = true;
           resolve();
