@@ -55,14 +55,16 @@ describe('OrchestratorService', () => {
     return orch;
   }
 
-  test('handleClientConnected sends auth_status', async () => {
+  test('handleClientConnected sends auth_status and activity_snapshot', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
     orch.handleClientConnected();
-    expect(events.length).toBe(1);
+    expect(events.length).toBe(2);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
+    expect(events[1].type).toBe(WS_EVENT.ACTIVITY_SNAPSHOT);
+    expect(events[1].data.activity).toBeDefined();
   });
 
   test('handleClientMessage get_model sends model_updated', async () => {

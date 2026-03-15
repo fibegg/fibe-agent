@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  MAIN_CONTENT_MIN_WIDTH_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_COLLAPSE_STORAGE_KEY,
   SIDEBAR_WIDTH_PX,
@@ -16,6 +17,10 @@ describe('layout-constants', () => {
   it('exports expected sidebar width values', () => {
     expect(SIDEBAR_WIDTH_PX).toBe(280);
     expect(SIDEBAR_COLLAPSED_WIDTH_PX).toBe(56);
+  });
+
+  it('exports main content min width', () => {
+    expect(MAIN_CONTENT_MIN_WIDTH_PX).toBe(260);
   });
 
   it('exports storage key for sidebar collapse', () => {

@@ -83,8 +83,8 @@ describe('useChatWebSocket thinking callbacks', () => {
         set onmessage(handler: (e: MessageEvent) => void) {
           messageHandler = handler;
         }
-        get onmessage() {
-          return messageHandler;
+        get onmessage(): (e: MessageEvent) => void {
+          return messageHandler ?? (() => {});
         }
       }
     );

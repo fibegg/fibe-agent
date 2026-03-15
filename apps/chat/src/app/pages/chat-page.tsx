@@ -43,6 +43,7 @@ import {
   getInitialRightSidebarCollapsed,
   persistSidebarCollapsed,
   persistRightSidebarCollapsed,
+  MAIN_CONTENT_MIN_WIDTH_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
 } from '../layout-constants';
@@ -714,15 +715,12 @@ export function ChatPage() {
           </aside>
         </div>
       )}
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent">
-        {viewingFile ? (
-          <FileViewerPanel
-            entry={viewingFile}
-            onClose={() => setViewingFile(null)}
-            inline
-          />
-        ) : (
-          <>
+      <main
+        className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
+        style={{ minWidth: MAIN_CONTENT_MIN_WIDTH_PX }}
+      >
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden w-full">
+        <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
         <header className="flex shrink-0 flex-col px-4 pt-4 pb-[15px] border-b border-border/50 bg-card/40 backdrop-blur-xl">
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -865,8 +863,21 @@ export function ChatPage() {
             </button>
           )}
         </div>
-          </>
+        {viewingFile && (
+          <div
+            className="absolute inset-0 z-10 flex flex-col min-h-0 bg-background"
+            role="dialog"
+            aria-modal="true"
+            aria-label="File viewer"
+          >
+            <FileViewerPanel
+              entry={viewingFile}
+              onClose={() => setViewingFile(null)}
+              inline
+            />
+          </div>
         )}
+        </div>
         <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
             <div className="max-w-4xl flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
@@ -1001,6 +1012,7 @@ export function ChatPage() {
                 </button>
               </div>
             </div>
+        </div>
         </div>
       </main>
       {!isMobile && (

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileExplorer, type PlaygroundEntry } from './file-explorer';
+import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from './file-explorer';
 
 vi.mock('../api-url', () => ({
   getApiUrl: () => '',
@@ -561,5 +561,37 @@ describe('FileExplorer', () => {
         json: async () => ({ content: 'done' }),
       });
     });
+  });
+});
+
+describe('FileViewerPanel', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders inline with file content and calls onClose when Close is clicked', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: 'body { color: red; }' }),
+    });
+    const onClose = vi.fn();
+    render(
+      <FileViewerPanel
+        entry={{ name: 'style.css', path: 'style.css', type: 'file' }}
+        onClose={onClose}
+        inline
+      />
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/color: red/)).toBeTruthy();
+    });
+    expect(screen.getByRole('heading', { name: 'style.css' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
