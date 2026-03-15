@@ -63,8 +63,11 @@ export default defineConfig(() => ({
           if (id.includes('node_modules/lucide-react')) {
             return 'vendor-lucide';
           }
-          if (id.includes('node_modules/marked') || id.includes('node_modules/prismjs')) {
+          if (id.includes('node_modules/marked')) {
             return 'vendor-markdown';
+          }
+          if (id.includes('node_modules/prismjs')) {
+            return 'vendor-prism';
           }
           return undefined;
         },

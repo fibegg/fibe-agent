@@ -12,88 +12,6 @@ import {
 } from 'lucide-react';
 import { FileIcon } from '../file-icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Prism from 'prismjs';
-import 'prismjs/themes/prism-tomorrow.css';
-import 'prismjs/plugins/line-numbers/prism-line-numbers';
-import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
-import 'prismjs/components/prism-markup';
-import 'prismjs/components/prism-markup-templating';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-clike';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-jsx';
-import 'prismjs/components/prism-tsx';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-json5';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-yaml';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-scss';
-import 'prismjs/components/prism-ruby';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-go-module';
-import 'prismjs/components/prism-rust';
-import 'prismjs/components/prism-java';
-import 'prismjs/components/prism-kotlin';
-import 'prismjs/components/prism-swift';
-import 'prismjs/components/prism-php';
-import 'prismjs/components/prism-csharp';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-cpp';
-import 'prismjs/components/prism-markdown';
-import 'prismjs/components/prism-zig';
-import 'prismjs/components/prism-lua';
-import 'prismjs/components/prism-dart';
-import 'prismjs/components/prism-haskell';
-import 'prismjs/components/prism-scala';
-import 'prismjs/components/prism-nim';
-import 'prismjs/components/prism-elixir';
-import 'prismjs/components/prism-erlang';
-import 'prismjs/components/prism-clojure';
-import 'prismjs/components/prism-groovy';
-import 'prismjs/components/prism-perl';
-import 'prismjs/components/prism-powershell';
-import 'prismjs/components/prism-fsharp';
-import 'prismjs/components/prism-ocaml';
-import 'prismjs/components/prism-solidity';
-import 'prismjs/components/prism-toml';
-import 'prismjs/components/prism-docker';
-import 'prismjs/components/prism-makefile';
-import 'prismjs/components/prism-cmake';
-import 'prismjs/components/prism-gradle';
-import 'prismjs/components/prism-ini';
-import 'prismjs/components/prism-graphql';
-import 'prismjs/components/prism-pug';
-import 'prismjs/components/prism-less';
-import 'prismjs/components/prism-stylus';
-import 'prismjs/components/prism-coffeescript';
-import 'prismjs/components/prism-julia';
-import 'prismjs/components/prism-r';
-import 'prismjs/components/prism-basic';
-import 'prismjs/components/prism-vbnet';
-import 'prismjs/components/prism-protobuf';
-import 'prismjs/components/prism-nginx';
-import 'prismjs/components/prism-diff';
-import 'prismjs/components/prism-csv';
-import 'prismjs/components/prism-rest';
-import 'prismjs/components/prism-latex';
-import 'prismjs/components/prism-objectivec';
-import 'prismjs/components/prism-gdscript';
-import 'prismjs/components/prism-glsl';
-import 'prismjs/components/prism-verilog';
-import 'prismjs/components/prism-vhdl';
-import 'prismjs/components/prism-wasm';
-import 'prismjs/components/prism-d';
-import 'prismjs/components/prism-crystal';
-import 'prismjs/components/prism-fortran';
-import 'prismjs/components/prism-nix';
-import 'prismjs/components/prism-hcl';
-import 'prismjs/components/prism-properties';
-import 'prismjs/components/prism-editorconfig';
-import 'prismjs/components/prism-dot';
-import 'prismjs/components/prism-mermaid';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { SidebarToggle } from '../sidebar-toggle';
@@ -321,6 +239,8 @@ const LANGUAGE_LABEL: Record<string, string> = {
   bash: 'Bash',
 };
 
+type PrismLoader = { highlightCodeElement: (el: HTMLElement) => void };
+
 export function FileViewerPanel({
   entry,
   onClose,
@@ -334,6 +254,7 @@ export function FileViewerPanel({
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [searchInFile, setSearchInFile] = useState('');
+  const [prismLoader, setPrismLoader] = useState<PrismLoader | null>(null);
   const codeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -388,13 +309,18 @@ export function FileViewerPanel({
   const lineCount = content !== null ? content.split('\n').length : null;
 
   useEffect(() => {
-    if (!content || loading || fetchError || !codeRef.current || language === 'plain') return;
+    if (!content || loading || language === 'plain') return;
+    import('./prism-loader').then((m) => setPrismLoader(m));
+  }, [content, loading, language]);
+
+  useEffect(() => {
+    if (!content || loading || fetchError || !codeRef.current || language === 'plain' || !prismLoader) return;
     try {
-      Prism.highlightElement(codeRef.current);
+      prismLoader.highlightCodeElement(codeRef.current);
     } catch {
       // Leave existing text content if highlighting fails
     }
-  }, [content, loading, fetchError, language]);
+  }, [content, loading, fetchError, language, prismLoader]);
 
   const handleCopy = useCallback(() => {
     if (content === null) return;
