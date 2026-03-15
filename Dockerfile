@@ -57,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # uv – ultrafast Python package/project manager (single static binary)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+RUN ln -sf /usr/local/bin/uv /usr/local/bin/uvx
 
 # Deno – secure JS/TS runtime for quick scripting
 ENV DENO_INSTALL=/usr/local

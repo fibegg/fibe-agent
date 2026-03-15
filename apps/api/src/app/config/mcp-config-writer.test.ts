@@ -148,6 +148,34 @@ describe('writeMcpConfig', () => {
         args: ['mcp-server-docker'],
       });
     });
+
+    it('includes --allow-http flag for non-HTTPS server URLs', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          'local-dev': {
+            serverUrl: 'http://rails.test:3000/mcp',
+            authHeader: 'Bearer dev_key',
+          },
+        },
+      });
+      writeMcpConfig();
+      const config = JSON.parse(
+        readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
+      );
+      expect(config.mcpServers['local-dev']).toEqual({
+        command: 'npx',
+        args: ['-y', 'mcp-remote', 'http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer dev_key'],
+      });
+    });
+
+    it('does NOT include --allow-http for HTTPS server URLs', () => {
+      writeMcpConfig();
+      const config = JSON.parse(
+        readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
+      );
+      // Default setup uses https://my.playgrounds.dev
+      expect(config.mcpServers['playgrounds-dev'].args).not.toContain('--allow-http');
+    });
   });
 
   describe('claude-code provider', () => {
