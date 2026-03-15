@@ -29,6 +29,7 @@ describe('OrchestratorService', () => {
     const config = {
       getDataDir: () => dataDir,
       getSystemPromptPath: () => join(dataDir, 'nonexistent.md'),
+      getSystemPrompt: () => undefined,
       getModelOptions: () => [],
       getDefaultModel: () => '',
     };
