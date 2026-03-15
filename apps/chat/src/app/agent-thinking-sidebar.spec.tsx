@@ -216,4 +216,21 @@ describe('AgentThinkingSidebar', () => {
     const block = screen.getByText(/Thinking\.\.\./).closest('div')?.parentElement;
     expect(block?.classList.contains('animate-pulse')).toBe(true);
   });
+
+  it('applies full width and solid background when mobileOverlay is true', () => {
+    const { container } = render(
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} mobileOverlay />
+    );
+    const panel = container.firstChild as HTMLElement;
+    expect(panel.style.width).toBe('100%');
+    expect(panel.classList.contains('bg-background')).toBe(true);
+  });
+
+  it('uses fixed width when mobileOverlay is false', () => {
+    const { container } = render(
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
+    );
+    const panel = container.firstChild as HTMLElement;
+    expect(panel.style.width).not.toBe('100%');
+  });
 });
