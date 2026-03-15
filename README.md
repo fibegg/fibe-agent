@@ -31,7 +31,7 @@ Or start separately:
    With the default Vite proxy, the chat app will use `http://localhost:3000` for `/api` and `/ws`. If the API runs on another host/port, set:
 
    ```sh
-   VITE_API_URL=http://localhost:3000
+   API_URL=http://localhost:3000
    ```
 
 3. Open **http://localhost:3100**. If `AGENT_PASSWORD` is set, log in with that password first, then use the chat.
@@ -41,7 +41,7 @@ Or start separately:
 Copy `.env.example` to `.env` and adjust. Main variables:
 
 - **API:** `PORT`, `AGENT_PASSWORD`, `AGENT_PROVIDER` (mock, gemini, claude-code, openai-codex, opencodex), `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`
-- **Chat:** `VITE_API_URL` (only if the API is not on the same origin or not proxied), `VITE_LOCK_CHAT_MODEL` (optional; when set, the model selector is disabled and only shows the model in use)
+- **Chat:** `API_URL` (only if the API is not on the same origin or not proxied), `LOCK_CHAT_MODEL` (optional; when set, the model selector is disabled and only shows the model in use), `ASSISTANT_AVATAR_URL` (optional; URL for the assistant’s avatar), `USER_AVATAR_URL` (optional; URL for the user’s avatar)
 
 ## Project layout
 

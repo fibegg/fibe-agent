@@ -37,13 +37,3 @@ export interface ThinkingActivity {
   path?: string;
   debug?: Record<string, unknown>;
 }
-
-export type StoryJson = Array<{
-  id: string;
-  type: string;
-  message: string;
-  timestamp: string;
-  details?: string;
-  command?: string;
-  path?: string;
-}>;

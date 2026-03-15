@@ -98,6 +98,20 @@ import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { SidebarToggle } from '../sidebar-toggle';
 import { ThemeToggle } from '../theme-toggle';
+import {
+  BUTTON_GHOST_ACCENT,
+  BUTTON_ICON_ACCENT,
+  BUTTON_ICON_ACCENT_SM,
+  BUTTON_ICON_MUTED,
+  CARD_HEADER,
+  CLEAR_BUTTON_POSITION,
+  INPUT_SEARCH,
+  LOGO_ICON_BOX,
+  MODAL_OVERLAY,
+  SEARCH_ICON_POSITION,
+  TREE_NODE_BASE,
+  TREE_NODE_SELECTED,
+} from '../ui-classes';
 
 const PRISM_LANGUAGES: Record<string, string> = {
   js: 'javascript',
@@ -404,10 +418,10 @@ export function FileViewerPanel({
       style={inline ? undefined : { backgroundColor: 'var(--card)' }}
       onClick={inline ? undefined : (e) => e.stopPropagation()}
     >
-      <div className="px-4 pt-4 pb-[11px] border-b border-border/50 bg-card/40 backdrop-blur-xl shrink-0">
+      <div className={CARD_HEADER}>
         <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className="size-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
+            <div className={LOGO_ICON_BOX}>
               <FileText className="size-5 text-white" />
             </div>
             <div className="min-w-0 flex-1">
@@ -425,7 +439,7 @@ export function FileViewerPanel({
               type="button"
               onClick={handleCopy}
               disabled={content === null || loading}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50"
+              className={BUTTON_GHOST_ACCENT}
             >
               <Copy className="size-3" />
               Copy
@@ -434,7 +448,7 @@ export function FileViewerPanel({
               type="button"
               onClick={handleDownload}
               disabled={content === null || loading}
-              className="flex items-center gap-1.5 rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50"
+              className={BUTTON_GHOST_ACCENT}
             >
               <Download className="size-3" />
               Download
@@ -442,7 +456,7 @@ export function FileViewerPanel({
             <button
               type="button"
               onClick={onClose}
-              className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              className={`${BUTTON_ICON_MUTED} size-8`}
               aria-label="Close"
             >
               <X className="size-4" />
@@ -450,19 +464,19 @@ export function FileViewerPanel({
           </div>
         </div>
         <div className="relative h-8">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          <Search className={SEARCH_ICON_POSITION} />
           <input
             type="text"
             value={searchInFile}
             onChange={(e) => setSearchInFile(e.target.value)}
             placeholder="Search in file..."
-            className="h-8 w-full pl-8 pr-8 text-xs rounded-md bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+            className={INPUT_SEARCH}
           />
           {searchInFile && (
             <button
               type="button"
               onClick={() => setSearchInFile('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className={CLEAR_BUTTON_POSITION}
               aria-label="Clear search"
             >
               <X className="size-3.5" />
@@ -507,10 +521,7 @@ function FileDetailsDialog({
   onClose: () => void;
 }) {
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <div className={MODAL_OVERLAY} onClick={onClose}>
       <div onClick={(e) => e.stopPropagation()}>
         <FileViewerPanel entry={entry} onClose={onClose} />
       </div>
@@ -551,9 +562,7 @@ function TreeNode({
       <button
         type="button"
         onClick={handleClick}
-        className={`w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs rounded-md cursor-pointer transition-all focus:outline-none focus:ring-1 focus:ring-violet-500/30 ${
-          isSelected ? 'bg-violet-500/10 text-violet-400' : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'
-        }`}
+        className={`${TREE_NODE_BASE} ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'}`}
         style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
       >
         <span className="w-3 flex shrink-0 items-center justify-center text-foreground/70 dark:text-muted-foreground" aria-hidden>
@@ -598,7 +607,6 @@ function TreeNode({
 }
 
 export function FileExplorer({
-  fullWidth: _fullWidth,
   collapsed,
   onSettingsClick,
   onClose,
@@ -607,7 +615,6 @@ export function FileExplorer({
   selectedPath: selectedPathProp,
   refreshTrigger,
 }: {
-  fullWidth?: boolean;
   collapsed?: boolean;
   onSettingsClick?: () => void;
   onClose?: () => void;
@@ -719,7 +726,7 @@ export function FileExplorer({
         <div className="flex flex-col items-center gap-3">
           <button
             type="button"
-            className="flex size-9 items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors"
+            className={`${BUTTON_ICON_ACCENT} size-9`}
             title="Settings"
             aria-label="Settings"
             onClick={onSettingsClick}
@@ -746,7 +753,7 @@ export function FileExplorer({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors"
+              className={BUTTON_ICON_ACCENT_SM}
               title="Settings"
               aria-label="Settings"
               onClick={onSettingsClick}
@@ -758,7 +765,7 @@ export function FileExplorer({
               <button
                 type="button"
                 onClick={onClose}
-                className="size-7 sm:size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
+                className={`${BUTTON_ICON_MUTED} size-7 sm:size-8`}
                 aria-label="Close"
               >
                 <X className="size-3.5 sm:size-4" />
@@ -767,19 +774,19 @@ export function FileExplorer({
           </div>
         </div>
         <div className="relative h-8 mt-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" aria-hidden />
+          <Search className={SEARCH_ICON_POSITION} aria-hidden />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search files..."
-            className="w-full h-8 pl-8 pr-8 text-xs rounded-md bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+            className={INPUT_SEARCH}
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              className={CLEAR_BUTTON_POSITION}
               aria-label="Clear search"
             >
               <X className="size-3.5" />

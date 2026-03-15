@@ -8,9 +8,25 @@ const rootPkg = JSON.parse(
   readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')
 ) as { version: string };
 
+const CHAT_ENV_KEYS = [
+  'API_URL',
+  'LOCK_CHAT_MODEL',
+  'USER_AVATAR_URL',
+  'ASSISTANT_AVATAR_URL',
+] as const;
+
+function chatEnvDefine() {
+  const entries = CHAT_ENV_KEYS.map((key) => [
+    `__${key}__`,
+    JSON.stringify(process.env[key] ?? ''),
+  ]);
+  return Object.fromEntries(entries);
+}
+
 export default defineConfig(() => ({
   define: {
     __APP_VERSION__: JSON.stringify(rootPkg.version),
+    ...chatEnvDefine(),
   },
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/chat',

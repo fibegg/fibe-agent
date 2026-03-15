@@ -25,7 +25,7 @@ describe('layout-constants', () => {
   });
 
   it('exports chat header padding bottom', () => {
-    expect(CHAT_HEADER_PADDING_BOTTOM_PX).toBe(11);
+    expect(CHAT_HEADER_PADDING_BOTTOM_PX).toBe(16);
   });
 
   it('exports storage key for sidebar collapse', () => {

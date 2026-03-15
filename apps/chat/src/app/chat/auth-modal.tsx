@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import type { AuthModalState } from './use-chat-websocket';
+import {
+  BUTTON_ICON_MUTED,
+  BUTTON_PRIMARY_ROUNDED,
+  INPUT_ROUNDED,
+  MODAL_OVERLAY_CENTER,
+} from '../ui-classes';
 
 interface AuthModalProps {
   open: boolean;
@@ -35,10 +41,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <div className={MODAL_OVERLAY_CENTER} onClick={onClose}>
       <div
         className="border border-border rounded-2xl shadow-card overflow-hidden w-full max-w-lg"
         style={{ backgroundColor: 'var(--card)' }}
@@ -54,7 +57,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           <button
             type="button"
             onClick={onClose}
-            className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
+            className={`${BUTTON_ICON_MUTED} size-8`}
             aria-label="Close"
           >
             &times;
@@ -70,7 +73,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 href={authModal.authUrl ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/30 transition-opacity"
+                className={`${BUTTON_PRIMARY_ROUNDED} inline-flex`}
               >
                 <ExternalIcon className="size-3.5" />
                 Open Authentication URL
@@ -91,14 +94,14 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
               readOnly={readOnly}
               onChange={(e) => setCode(e.target.value)}
               placeholder="Paste code here..."
-              className="w-full px-3 py-2.5 rounded-xl bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 outline-none transition-shadow"
+              className={INPUT_ROUNDED}
             />
             {showSubmit && (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/20 disabled:opacity-50 transition-opacity"
+                className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-violet-500/20 disabled:opacity-50`}
               >
                 {submitting ? 'Submitting...' : 'Submit'}
               </button>

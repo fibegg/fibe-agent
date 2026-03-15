@@ -97,15 +97,3 @@ export function getThinkingLines(lastUserMessage: string | null | undefined): st
   return DEFAULT_LINES;
 }
 
-const STATUS_LABELS = [
-  'Thinking...',
-  'Consulting the phoenix...',
-  'Brewing ideas...',
-  'One moment...',
-  'Working on it...',
-];
-
-export function getThinkingStatusLabels(lastUserMessage: string | null | undefined): string[] {
-  const lines = getThinkingLines(lastUserMessage);
-  return lines.length > 0 ? lines : STATUS_LABELS;
-}

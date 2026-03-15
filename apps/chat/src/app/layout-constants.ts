@@ -1,7 +1,7 @@
 export const SIDEBAR_WIDTH_PX = 280;
 export const SIDEBAR_COLLAPSED_WIDTH_PX = 56;
 export const MAIN_CONTENT_MIN_WIDTH_PX = 260;
-export const CHAT_HEADER_PADDING_BOTTOM_PX = 15;
+export const CHAT_HEADER_PADDING_BOTTOM_PX = 16;
 export const SIDEBAR_COLLAPSE_STORAGE_KEY = 'phoenix-sidebar-collapsed';
 
 export const RIGHT_SIDEBAR_WIDTH_PX = 280;

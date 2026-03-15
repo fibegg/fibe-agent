@@ -6,6 +6,15 @@ import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { FileIcon } from '../file-icon';
 import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
 import { ThinkingAvatar, ThinkingState } from './thinking-state';
+import {
+  AVATAR_ASSISTANT,
+  AVATAR_USER,
+  BUBBLE_ASSISTANT,
+  BUBBLE_TYPING,
+  BUBBLE_USER,
+  PROSE_MESSAGE,
+} from '../ui-classes';
+import { ASSISTANT_AVATAR_URL, USER_AVATAR_URL } from './chat-avatar';
 
 function MentionChipIcon({ path }: { path: string }) {
   return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
@@ -88,13 +97,6 @@ function getUploadSrc(filename: string): string {
 
 const ESTIMATED_ROW_HEIGHT = 120;
 const ROW_GAP = 24;
-
-const ASSISTANT_BUBBLE_CLASSES =
-  'rounded-2xl rounded-tl-sm bg-card/60 backdrop-blur-md border border-border/50 shadow-lg text-card-foreground';
-
-const TYPING_BUBBLE_CLASSES =
-  'rounded-2xl rounded-tl-sm bg-card border border-border text-card-foreground';
-
 const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
 const FULL_WIDTH = 'max-w-full';
 
@@ -111,11 +113,21 @@ function MessageRow({
     >
       <div className="flex-shrink-0">
         {msg.role === 'user' ? (
-          <div className="size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white">
-            <User className="size-3.5 sm:size-4" />
+          USER_AVATAR_URL ? (
+            <div className={`${AVATAR_USER} overflow-hidden`}>
+              <img src={USER_AVATAR_URL} alt="" className="size-full object-cover" />
+            </div>
+          ) : (
+            <div className={AVATAR_USER}>
+              <User className="size-3.5 sm:size-4" />
+            </div>
+          )
+        ) : ASSISTANT_AVATAR_URL ? (
+          <div className={`${AVATAR_ASSISTANT} overflow-hidden`}>
+            <img src={ASSISTANT_AVATAR_URL} alt="" className="size-full object-cover" />
           </div>
         ) : (
-          <div className="size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white">
+          <div className={AVATAR_ASSISTANT}>
             <Sparkles className="size-3.5 sm:size-4" />
           </div>
         )}
@@ -123,9 +135,7 @@ function MessageRow({
       <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
         <div
           className={`${maxWidthClass} px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
-            msg.role === 'user'
-              ? 'rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20'
-              : ASSISTANT_BUBBLE_CLASSES
+            msg.role === 'user' ? `rounded-tr-sm ${BUBBLE_USER}` : BUBBLE_ASSISTANT
           }`}
         >
           {msg.role === 'user' ? (
@@ -155,7 +165,7 @@ function MessageRow({
           ) : (
             <>
               <div
-                className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
+                className={PROSE_MESSAGE}
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
               />
               <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
@@ -273,12 +283,12 @@ export const MessageList = forwardRef<
           <div className="flex-1 min-w-0">
             <div
               className={`${maxWidthClass} px-4 py-3 ${
-                streamingText ? ASSISTANT_BUBBLE_CLASSES : TYPING_BUBBLE_CLASSES
+                streamingText ? BUBBLE_ASSISTANT : BUBBLE_TYPING
               }`}
             >
               {streamingText ? (
                 <div
-                  className="markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px]"
+                  className={PROSE_MESSAGE}
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
                 />
               ) : (

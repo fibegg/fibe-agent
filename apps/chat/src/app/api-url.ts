@@ -1,11 +1,11 @@
 export function getApiUrl(): string {
-  const env = import.meta.env.VITE_API_URL as string | undefined;
+  const env = typeof __API_URL__ !== 'undefined' ? __API_URL__ : '';
   if (env) return env.replace(/\/$/, '');
   return '';
 }
 
 export function isChatModelLocked(): boolean {
-  const v = import.meta.env.VITE_LOCK_CHAT_MODEL as string | undefined;
+  const v = typeof __LOCK_CHAT_MODEL__ !== 'undefined' ? __LOCK_CHAT_MODEL__ : '';
   return (
     typeof v === 'string' &&
     v.length > 0 &&

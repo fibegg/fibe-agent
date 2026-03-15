@@ -49,6 +49,16 @@ import {
 } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 import type { ThinkingStep, ThinkingActivity } from '../chat/thinking-types';
+import {
+  BUTTON_DESTRUCTIVE_GHOST,
+  BUTTON_OUTLINE_ACCENT,
+  CLEAR_BUTTON_POSITION,
+  INPUT_SEARCH,
+  MODAL_CARD,
+  MODAL_OVERLAY_DARK,
+  SEARCH_ICON_POSITION,
+  SETTINGS_CLOSE_BUTTON,
+} from '../ui-classes';
 
 function nextActivityId(): string {
   return `act-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -609,12 +619,12 @@ export function ChatPage() {
       {settingsOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/50"
+            className={MODAL_OVERLAY_DARK}
             aria-hidden
             onClick={closeSettings}
           />
           <div
-            className="fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-xl bg-gradient-to-br from-card via-card to-violet-950/5 border border-violet-500/20 shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden"
+            className={`fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 ${MODAL_CARD}`}
             onClick={(e) => e.stopPropagation()}
             role="dialog"
             aria-modal="true"
@@ -627,7 +637,7 @@ export function ChatPage() {
               <button
                 type="button"
                 onClick={closeSettings}
-                className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10"
+                className={SETTINGS_CLOSE_BUTTON}
                 aria-label="Close"
               >
                 <X className="size-4" />
@@ -645,7 +655,7 @@ export function ChatPage() {
                     closeSettings();
                     state === CHAT_STATES.UNAUTHENTICATED ? startAuth() : reauthenticate();
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg border border-violet-500/20 text-sm font-medium text-foreground hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30 transition-colors"
+                  className={BUTTON_OUTLINE_ACCENT}
                 >
                   <Key className="size-4" />
                   {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Re-authenticate'}
@@ -658,7 +668,7 @@ export function ChatPage() {
                     closeSettings();
                     logout();
                   }}
-                  className="w-full flex items-center gap-2 px-4 py-2.5 rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 text-sm font-medium transition-colors"
+                  className={BUTTON_DESTRUCTIVE_GHOST}
                 >
                   <LogOut className="size-4" />
                   Logout
@@ -674,13 +684,12 @@ export function ChatPage() {
       {hasPlaygroundFiles && isMobile && sidebarOpen && (
         <>
           <div
-            className="fixed inset-0 z-50 bg-black/50 lg:hidden"
+            className={`${MODAL_OVERLAY_DARK} lg:hidden`}
             aria-hidden
             onClick={closeMobileSidebar}
           />
           <div className="fixed left-0 top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 lg:hidden">
             <FileExplorer
-              fullWidth
               onSettingsClick={() => setSettingsOpen(true)}
               onClose={closeMobileSidebar}
               onFileSelect={(entry) => {
@@ -756,12 +765,6 @@ export function ChatPage() {
               </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
-              <button
-                type="button"
-                className="hidden sm:flex px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
-              >
-                New chat
-              </button>
               {(state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR) && (
                 <button
                   type="button"
@@ -790,20 +793,20 @@ export function ChatPage() {
               )}
             </div>
           </div>
-          <div className="relative h-8 mt-[5px]">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" aria-hidden />
+          <div className="relative h-8 mt-1">
+            <Search className={SEARCH_ICON_POSITION} aria-hidden />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search in conversation..."
-              className="w-full h-8 pl-8 pr-8 text-xs rounded-md bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+              className={INPUT_SEARCH}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                className={CLEAR_BUTTON_POSITION}
                 aria-label="Clear search"
               >
                 <X className="size-3.5" />
@@ -881,7 +884,7 @@ export function ChatPage() {
         )}
         </div>
         <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
-            <div className="max-w-4xl flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               {(pendingImages.length > 0 || pendingVoice) && (
                 <div className="flex flex-wrap gap-2 items-center">
                   {pendingVoice && (

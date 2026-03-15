@@ -19,6 +19,25 @@ import {
 import { formatRelativeTime } from './format-relative-time';
 import type { ThinkingStep } from './chat/thinking-types';
 import { TypingText } from './chat/typing-text';
+import {
+  ACTIVITY_BLOCK_BASE,
+  ACTIVITY_BLOCK_VARIANTS,
+  ACTIVITY_BODY,
+  ACTIVITY_ICON_COLOR,
+  ACTIVITY_LABEL,
+  ACTIVITY_MONO,
+  ACTIVITY_TIMESTAMP,
+  BADGE_CARD,
+  CLEAR_BUTTON_POSITION,
+  FLEX_ROW_CENTER,
+  FLEX_ROW_CENTER_WRAP,
+  INPUT_SEARCH,
+  SEARCH_ICON_POSITION,
+  SESSION_STATS_HEADING,
+  SESSION_STATS_PANEL,
+  SIDEBAR_HEADER,
+  SIDEBAR_PANEL,
+} from './ui-classes';
 
 const DEFAULT_MODEL_LABEL = 'Model (default)';
 
@@ -78,17 +97,7 @@ function getActivityLabel(type: string): string {
   }
 }
 
-const BLOCK_VARIANTS = {
-  stream_start: 'rounded-lg border border-blue-500/30 bg-blue-500/10',
-  reasoning: 'rounded-lg border border-violet-500/30 bg-violet-500/10',
-  step: 'rounded-lg border border-zinc-500/20 bg-zinc-500/10',
-  tool_call: 'rounded-lg border border-amber-500/30 bg-amber-500/10',
-  file_created: 'rounded-lg border border-green-500/30 bg-green-500/10',
-  task_complete: 'rounded-lg border border-green-500/30 bg-green-500/10',
-  default: 'rounded-lg border border-violet-500/20 bg-violet-500/5',
-} as const;
-
-function getBlockVariant(entry: StoryEntry): keyof typeof BLOCK_VARIANTS {
+function getBlockVariant(entry: StoryEntry): keyof typeof ACTIVITY_BLOCK_VARIANTS {
   if (entry.type === 'stream_start') return 'stream_start';
   if (entry.type === 'reasoning_start' || entry.type === 'reasoning_end') return 'reasoning';
   if (entry.type === 'step') return 'step';
@@ -220,7 +229,7 @@ export function AgentThinkingSidebar({
 
   return (
     <div
-      className="relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-purple-950/5 border-l border-violet-500/20 transition-all duration-300"
+      className={SIDEBAR_PANEL}
       style={{
         width: isCollapsed ? RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX : RIGHT_SIDEBAR_WIDTH_PX,
       }}
@@ -234,11 +243,11 @@ export function AgentThinkingSidebar({
         }
       />
 
-      <div className="p-4 border-b border-violet-500/20 shrink-0">
+      <div className={SIDEBAR_HEADER}>
         {!isCollapsed ? (
           <>
-            <div className="flex items-center justify-between gap-2 mb-2 min-h-[3.25rem] min-w-0">
-              <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+            <div className={`${FLEX_ROW_CENTER_WRAP} mb-2 min-h-[3.25rem]`}>
+              <div className={`${FLEX_ROW_CENTER} flex-1 overflow-hidden`}>
                 <div className="relative shrink-0">
                   <Brain className="size-5 text-violet-400" />
                   <Sparkles className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse" />
@@ -250,28 +259,25 @@ export function AgentThinkingSidebar({
                   </p>
                 </div>
               </div>
-              <span
-                className="shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]"
-                title={modelLabel}
-              >
+              <span className={BADGE_CARD} title={modelLabel}>
                 {modelLabel}
               </span>
             </div>
             <div className="relative h-8 mt-2">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" aria-hidden />
+              <Search className={SEARCH_ICON_POSITION} aria-hidden />
               <input
                 type="text"
                 value={activitySearchQuery}
                 onChange={(e) => setActivitySearchQuery(e.target.value)}
                 placeholder="Search activity..."
-                className="w-full h-8 pl-8 pr-8 text-xs rounded-md bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30"
+                className={INPUT_SEARCH}
                 aria-label="Search activity"
               />
               {activitySearchQuery ? (
                 <button
                   type="button"
                   onClick={() => setActivitySearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  className={CLEAR_BUTTON_POSITION}
                   aria-label="Clear search"
                 >
                   <X className="size-3.5" />
@@ -312,33 +318,26 @@ export function AgentThinkingSidebar({
                 const isFileBlock = entry.type === 'file_created' && (entry.path || entry.details);
                 const isThinkingBlock =
                   entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
-                const iconColor =
-                  entry.type === 'file_created'
-                    ? 'text-green-500'
-                    : entry.type === 'tool_call'
-                      ? 'text-amber-500'
-                      : entry.type === 'stream_start'
-                        ? 'text-blue-400'
-                        : 'text-violet-400';
+                const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
                 return (
                   <div
                     key={entry.id}
-                    className={`${BLOCK_VARIANTS[variant]} px-3 py-2.5 flex flex-col gap-1.5`}
+                    className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}
                   >
-                    <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
-                      <div className="flex items-center gap-2 min-w-0">
+                    <div className={FLEX_ROW_CENTER_WRAP}>
+                      <div className={FLEX_ROW_CENTER}>
                         <Icon className={`size-4 shrink-0 ${iconColor}`} />
-                        <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/90 truncate">
+                        <p className={ACTIVITY_LABEL}>
                           {label}
                         </p>
                       </div>
-                      <span className="text-[9px] text-muted-foreground shrink-0">
+                      <span className={ACTIVITY_TIMESTAMP}>
                         {formatRelativeTime(entry.timestamp)}
                       </span>
                     </div>
                     {isThinkingBlock ? (
                       <div className="mt-0.5 rounded-md bg-background/40 px-2.5 py-2 max-h-32 overflow-y-auto">
-                        <p className="text-[11px] text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                        <p className={`text-[11px] ${ACTIVITY_MONO}`}>
                           {entry.details}
                         </p>
                       </div>
@@ -361,7 +360,7 @@ export function AgentThinkingSidebar({
                       </div>
                     ) : (
                       <div className="mt-0.5">
-                        <p className="text-xs text-foreground/90 break-words">{entry.message}</p>
+                        <p className={ACTIVITY_BODY}>{entry.message}</p>
                         {entry.details && entry.type !== 'reasoning_start' && String(entry.details).trim() !== '{}' && (
                           <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
                             {entry.details}
@@ -374,29 +373,29 @@ export function AgentThinkingSidebar({
             })}
             {(displayThinkingText || isStreaming) && (
               <div
-                className={`${BLOCK_VARIANTS.reasoning} px-3 py-2.5 flex flex-col gap-1.5 ${isStreaming ? 'animate-pulse' : ''}`}
+                className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''}`}
               >
                 <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
                   {reasoningText ? 'Reasoning' : 'Response'}
                 </p>
-                <div className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                <div className={ACTIVITY_MONO}>
                   {displayThinkingText || (isStreaming ? '…' : '')}
                   <span ref={thinkingScrollRef} className="inline-block min-h-0" aria-hidden />
                 </div>
               </div>
             )}
             {!isStreaming && filteredStoryItems.length > 0 && (
-              <div className={`${BLOCK_VARIANTS.task_complete} px-3 py-2.5 flex flex-col gap-1.5`}>
-                <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
-                  <div className="flex items-center gap-2 min-w-0">
+              <div className={`${ACTIVITY_BLOCK_VARIANTS.task_complete} ${ACTIVITY_BLOCK_BASE}`}>
+                <div className={FLEX_ROW_CENTER_WRAP}>
+                  <div className={FLEX_ROW_CENTER}>
                     <CheckCircle2 className="size-4 shrink-0 text-green-500" />
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/90 truncate">
+                    <p className={ACTIVITY_LABEL}>
                       Task complete
                     </p>
                   </div>
-                  <span className="text-[9px] text-muted-foreground shrink-0">just now</span>
+                  <span className={ACTIVITY_TIMESTAMP}>just now</span>
                 </div>
-                <p className="text-xs text-foreground/90 mt-0.5 break-words">
+                <p className={`${ACTIVITY_BODY} mt-0.5`}>
                   Response completed.
                 </p>
               </div>
@@ -404,8 +403,8 @@ export function AgentThinkingSidebar({
             <div ref={activityEndRef} className="h-0 shrink-0" aria-hidden />
           </div>
 
-          <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 overflow-hidden shrink-0">
-            <h3 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 text-violet-300 border-b border-violet-500/20">
+          <div className={SESSION_STATS_PANEL}>
+            <h3 className={SESSION_STATS_HEADING}>
               <Zap className="size-3.5 shrink-0" aria-hidden />
               Session Stats
             </h3>
