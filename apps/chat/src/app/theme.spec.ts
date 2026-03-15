@@ -5,6 +5,7 @@ import {
   isDark,
   toggleTheme,
   initTheme,
+  isSetThemeMessage,
 } from './theme';
 
 const STORAGE_KEY = 'chat-theme';
@@ -87,6 +88,32 @@ describe('toggleTheme', () => {
     expect(toggleTheme()).toBe('light');
     expect(isDark()).toBe(false);
     expect(getStoredTheme()).toBe('light');
+  });
+});
+
+describe('isSetThemeMessage', () => {
+  it('returns true for valid light message', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'light' })).toBe(true);
+  });
+
+  it('returns true for valid dark message', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dark' })).toBe(true);
+  });
+
+  it('returns false for null', () => {
+    expect(isSetThemeMessage(null)).toBe(false);
+  });
+
+  it('returns false for wrong action', () => {
+    expect(isSetThemeMessage({ action: 'other', theme: 'dark' })).toBe(false);
+  });
+
+  it('returns false for invalid theme', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'system' })).toBe(false);
+  });
+
+  it('returns false for non-object', () => {
+    expect(isSetThemeMessage('set_theme')).toBe(false);
   });
 });
 

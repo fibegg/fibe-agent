@@ -14,6 +14,7 @@ import { FileIcon } from '../file-icon';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
+import { shouldHideHeaderLogo, shouldHideThemeSwitch } from '../embed-config';
 import { SidebarToggle } from '../sidebar-toggle';
 import { ThemeToggle } from '../theme-toggle';
 import {
@@ -643,7 +644,9 @@ export function FileExplorer({
   const collapsedContent = (
     <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 py-4 backdrop-blur-xl">
       <div className="flex flex-1 flex-col items-center pt-4 gap-3">
-        <AnimatedPhoenixLogo className="size-8 text-violet-500" />
+        {!shouldHideHeaderLogo() && (
+          <AnimatedPhoenixLogo className="size-8 text-violet-500" />
+        )}
         <div className="flex flex-col items-center gap-3">
           <button
             type="button"
@@ -654,7 +657,7 @@ export function FileExplorer({
           >
             <Settings className="size-4" />
           </button>
-          <ThemeToggle />
+          {!shouldHideThemeSwitch() && <ThemeToggle />}
         </div>
       </div>
     </div>
@@ -665,7 +668,9 @@ export function FileExplorer({
       <div className="p-4 border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
         <div className="flex items-center justify-between mb-2 min-h-[3.25rem]">
           <div className="flex items-center gap-2">
-            <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
+            {!shouldHideHeaderLogo() && (
+              <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
+            )}
             <div>
               <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
               <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
@@ -681,7 +686,7 @@ export function FileExplorer({
             >
               <Settings className="size-3.5 sm:size-4" />
             </button>
-            <ThemeToggle />
+            {!shouldHideThemeSwitch() && <ThemeToggle />}
             {onClose && (
               <button
                 type="button"

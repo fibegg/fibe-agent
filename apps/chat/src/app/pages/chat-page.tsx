@@ -27,6 +27,7 @@ import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
+import { shouldHideHeaderLogo, shouldHideThemeSwitch } from '../embed-config';
 import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES, STATE_LABELS } from '../chat/chat-state';
@@ -644,10 +645,12 @@ export function ChatPage() {
               </button>
             </div>
             <div className="p-4 space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-sm font-medium text-foreground">Dark mode</span>
-                <ThemeToggle />
-              </div>
+              {!shouldHideThemeSwitch() && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-medium text-foreground">Dark mode</span>
+                  <ThemeToggle />
+                </div>
+              )}
               {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
                 <button
                   type="button"
@@ -743,7 +746,9 @@ export function ChatPage() {
                   className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-violet-600/90 to-purple-600/90 hover:from-violet-500 hover:to-purple-500 shadow-md shadow-violet-500/20 border border-violet-400/20 pl-1.5 pr-2.5 py-1.5 text-white transition-all active:scale-[0.98]"
                   aria-label="Open menu"
                 >
-                  <AnimatedPhoenixLogo className="size-7 sm:size-8 pointer-events-none" />
+                  {!shouldHideHeaderLogo() && (
+                    <AnimatedPhoenixLogo className="size-7 sm:size-8 pointer-events-none" />
+                  )}
                   <Menu className="size-4 sm:size-5 shrink-0" />
                 </button>
               </div>

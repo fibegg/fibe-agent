@@ -74,3 +74,20 @@ Each message is an object with a `type` and optional extra fields.
 | file_created        | name, path?, summary? | File created by agent                |
 
 The client can build a chronological **story** (activity timeline) from `stream_start`, `reasoning_start` / `reasoning_chunk` / `reasoning_end`, `thinking_step`, `tool_call`, and `file_created` events, which arrive in order during a response.
+
+## Embedding the chat app (iframe)
+
+When the chat app is loaded inside an iframe (e.g. Phoenix frame), the following apply.
+
+### Environment variables (chat app, `VITE_*`)
+
+| Variable | Values | Description |
+|----------|--------|-------------|
+| `VITE_HIDE_HEADER_LOGO` | `1`, `true`, `yes` | Hide the Phoenix logo in header, sidebar, and login. |
+| `VITE_THEME_SOURCE` | `localStorage` (default), `frame` | `localStorage`: theme from local storage + in-app toggle. `frame`: theme is driven by parent via postMessage (see below). |
+| `VITE_HIDE_THEME_SWITCH` | `1`, `true`, `yes` | Hide the theme toggle in the UI so the parent/iframe can control theme via postMessage. |
+
+### postMessage: parent → chat iframe
+
+- **Auto-auth:** `{ action: 'auto_auth', password: '<internal_password>' }` — chat calls `POST /api/auth/login` and stores the token.
+- **Set theme:** `{ action: 'set_theme', theme: 'light' | 'dark' }` — applied when `VITE_THEME_SOURCE=frame`. Theme is also persisted to `localStorage` so it survives refresh.

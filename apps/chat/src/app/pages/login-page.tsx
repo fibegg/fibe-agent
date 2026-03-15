@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { getApiUrl, setToken, isAuthenticated } from '../api-url';
+import { shouldHideHeaderLogo } from '../embed-config';
 import { waitForAutoAuth } from '../postmessage-auth';
 
 export function LoginPage() {
@@ -60,7 +61,9 @@ export function LoginPage() {
     return (
       <div className="w-full h-full min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900">
         <div className="text-center space-y-4">
-          <AnimatedPhoenixLogo className="size-16 mx-auto" />
+          {!shouldHideHeaderLogo() && (
+            <AnimatedPhoenixLogo className="size-16 mx-auto" />
+          )}
           <div className="flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             <span className="text-sm text-violet-300/60">Connecting...</span>
@@ -123,9 +126,11 @@ export function LoginPage() {
               </div>
             </div>
 
-            <div className="flex justify-center mb-4 sm:mb-6">
-              <AnimatedPhoenixLogo className="size-16 sm:size-20" />
-            </div>
+            {!shouldHideHeaderLogo() && (
+              <div className="flex justify-center mb-4 sm:mb-6">
+                <AnimatedPhoenixLogo className="size-16 sm:size-20" />
+              </div>
+            )}
 
           {error && (
             <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm border border-destructive/20">

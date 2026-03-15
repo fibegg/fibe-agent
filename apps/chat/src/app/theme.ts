@@ -1,6 +1,27 @@
+import { getThemeSource } from './embed-config';
+
 const STORAGE_KEY = 'chat-theme';
 
 export type Theme = 'light' | 'dark';
+
+export function isSetThemeMessage(data: unknown): data is { action: 'set_theme'; theme: Theme } {
+  const o = data as Record<string, unknown> | null;
+  return (
+    o !== null &&
+    typeof o === 'object' &&
+    o.action === 'set_theme' &&
+    (o.theme === 'light' || o.theme === 'dark')
+  );
+}
+
+function initFrameThemeListener(): void {
+  if (typeof window === 'undefined' || window === window.parent) return;
+  if (getThemeSource() !== 'frame') return;
+  window.addEventListener('message', (event: MessageEvent) => {
+    if (!isSetThemeMessage(event.data)) return;
+    setStoredTheme(event.data.theme);
+  });
+}
 
 export function getStoredTheme(): Theme | null {
   if (typeof window === 'undefined') return null;
@@ -45,6 +66,7 @@ export function toggleTheme(): Theme {
 export function initTheme(): void {
   if (typeof window === 'undefined') return;
   applyTheme();
+  initFrameThemeListener();
   const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)');
   if (m) m.addEventListener('change', () => {
     if (getStoredTheme() === null) applyTheme();
