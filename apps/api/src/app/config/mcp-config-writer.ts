@@ -36,11 +36,11 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   }
 
   // Streamable-HTTP server — use mcp-remote proxy
-  return {
-    command: 'npx',
-    args: ['-y', 'mcp-remote', entry.serverUrl!],
-    env: { AUTHORIZATION: entry.authHeader ?? '' },
-  };
+  const args = ['-y', 'mcp-remote', entry.serverUrl!];
+  if (entry.authHeader) {
+    args.push('--header', `Authorization:${entry.authHeader}`);
+  }
+  return { command: 'npx', args };
 }
 
 /**

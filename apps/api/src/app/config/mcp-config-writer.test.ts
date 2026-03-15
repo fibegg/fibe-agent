@@ -68,8 +68,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev'],
-        env: { AUTHORIZATION: 'Bearer plgr_test_key123' },
+        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer plgr_test_key123'],
       });
     });
 
@@ -104,7 +103,6 @@ describe('writeMcpConfig', () => {
       expect(config.mcpServers['Sentry']).toEqual({
         command: 'npx',
         args: ['-y', 'mcp-remote', 'https://mcp.sentry.dev/mcp'],
-        env: { AUTHORIZATION: '' },
       });
     });
 
@@ -173,8 +171,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev'],
-        env: { AUTHORIZATION: 'Bearer plgr_test_key456' },
+        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer plgr_test_key456'],
       });
     });
 
@@ -267,8 +264,7 @@ describe('writeMcpConfig', () => {
       );
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev'],
-        env: { AUTHORIZATION: 'Bearer legacy_key' },
+        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer legacy_key'],
       });
     });
   });
