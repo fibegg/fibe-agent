@@ -46,4 +46,23 @@ export interface ServerMessage {
   path?: string;
   summary?: string;
   kind?: 'file_created' | 'tool_call';
+  command?: string;
+  activity?: StoredActivityEntry[];
+  entry?: StoredActivityEntry;
+}
+
+export interface StoredStoryEntry {
+  id: string;
+  type: string;
+  message: string;
+  timestamp: string;
+  details?: string;
+  command?: string;
+  path?: string;
+}
+
+export interface StoredActivityEntry {
+  id: string;
+  created_at: string;
+  story: StoredStoryEntry[];
 }

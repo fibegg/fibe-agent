@@ -1,5 +1,6 @@
 import {
   Brain,
+  CheckCircle2,
   FileCode,
   Loader2,
   MessageSquare,
@@ -8,14 +9,14 @@ import {
   Terminal,
   X,
 } from 'lucide-react';
-import { useRef, useEffect, useState } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
   RIGHT_SIDEBAR_WIDTH_PX,
 } from './layout-constants';
 import { formatRelativeTime } from './format-relative-time';
-import type { ThinkingStep, ToolOrFileEvent } from './chat/thinking-types';
+import type { ThinkingStep } from './chat/thinking-types';
 import { TypingText } from './chat/typing-text';
 
 const DEFAULT_MODEL_LABEL = 'Model (default)';
@@ -28,6 +29,12 @@ export type StoryEntry = {
   details?: string;
   command?: string;
   path?: string;
+};
+
+export type SessionActivityEntry = {
+  id: string;
+  created_at: string;
+  story: StoryEntry[];
 };
 
 function getActivityIcon(type: string) {
@@ -56,7 +63,7 @@ function getActivityLabel(type: string): string {
       return 'Started';
     case 'reasoning_start':
     case 'reasoning_end':
-      return 'Thinking';
+      return 'Reasoning';
     case 'step':
       return 'Step';
     case 'file_created':
@@ -70,6 +77,42 @@ function getActivityLabel(type: string): string {
   }
 }
 
+const BLOCK_VARIANTS = {
+  stream_start: 'rounded-lg border border-blue-500/30 bg-blue-500/10',
+  reasoning: 'rounded-lg border border-violet-500/30 bg-violet-500/10',
+  step: 'rounded-lg border border-zinc-500/20 bg-zinc-500/10',
+  tool_call: 'rounded-lg border border-amber-500/30 bg-amber-500/10',
+  file_created: 'rounded-lg border border-green-500/30 bg-green-500/10',
+  task_complete: 'rounded-lg border border-green-500/30 bg-green-500/10',
+  default: 'rounded-lg border border-violet-500/20 bg-violet-500/5',
+} as const;
+
+function getBlockVariant(entry: StoryEntry): keyof typeof BLOCK_VARIANTS {
+  if (entry.type === 'stream_start') return 'stream_start';
+  if (entry.type === 'reasoning_start' || entry.type === 'reasoning_end') return 'reasoning';
+  if (entry.type === 'step') return 'step';
+  if (entry.type === 'tool_call') return 'tool_call';
+  if (entry.type === 'file_created') return 'file_created';
+  return 'default';
+}
+
+function formatSessionDurationMs(ms: number): string {
+  if (ms < 1000) return '0s';
+  const sec = Math.floor(ms / 1000) % 60;
+  const min = Math.floor(ms / 60_000) % 60;
+  const h = Math.floor(ms / 3_600_000);
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (min > 0) parts.push(`${min}m`);
+  parts.push(`${sec}s`);
+  return parts.join(' ');
+}
+
+function toTimestampMs(ts: string | Date | undefined, fallback: string): number {
+  if (!ts) return new Date(fallback).getTime();
+  return typeof ts === 'string' ? new Date(ts).getTime() : (ts as Date).getTime();
+}
+
 interface AgentThinkingSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
@@ -78,8 +121,8 @@ interface AgentThinkingSidebarProps {
   reasoningText?: string;
   streamingResponseText?: string;
   thinkingSteps?: ThinkingStep[];
-  toolEvents?: ToolOrFileEvent[];
   storyItems?: StoryEntry[];
+  sessionActivity?: SessionActivityEntry[];
 }
 
 export function AgentThinkingSidebar({
@@ -90,13 +133,35 @@ export function AgentThinkingSidebar({
   reasoningText = '',
   streamingResponseText = '',
   thinkingSteps = [],
-  toolEvents = [],
   storyItems = [],
+  sessionActivity = [],
 }: AgentThinkingSidebarProps) {
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
+  const activityEndRef = useRef<HTMLDivElement>(null);
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
 
   const displayThinkingText = reasoningText || streamingResponseText;
+
+  const sessionStats = useMemo(() => {
+    const fromSession = sessionActivity.reduce((acc, t) => acc + (t.story?.length ?? 0), 0);
+    const totalActions = fromSession + (isStreaming ? storyItems.length : 0);
+    const completed = isStreaming ? Math.max(0, totalActions - 1) : totalActions;
+    const processing = isStreaming ? 1 : 0;
+    const allEntries = [
+      ...sessionActivity.flatMap((t) =>
+        (t.story ?? []).map((s) => ({ created_at: t.created_at, ts: s.timestamp }))
+      ),
+      ...storyItems.map((s) => ({
+        created_at: typeof s.timestamp === 'string' ? s.timestamp : (s.timestamp as Date)?.toISOString?.() ?? '',
+        ts: s.timestamp,
+      })),
+    ].filter((e) => e.created_at || e.ts);
+    const times = allEntries.map((e) => toTimestampMs(e.ts, e.created_at));
+    const firstTs = times.length ? Math.min(...times) : 0;
+    const lastTs = times.length ? Math.max(...times) : 0;
+    const sessionTimeMs = lastTs && firstTs ? (isStreaming ? Date.now() - firstTs : lastTs - firstTs) : 0;
+    return { totalActions, completed, processing, sessionTimeMs };
+  }, [sessionActivity, storyItems, isStreaming]);
 
   const filteredStoryItems = activitySearchQuery.trim()
     ? storyItems.filter((entry) => {
@@ -117,10 +182,16 @@ export function AgentThinkingSidebar({
     : storyItems;
 
   useEffect(() => {
-    if (isStreaming && displayThinkingText) {
-      thinkingScrollRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isStreaming && displayThinkingText && typeof thinkingScrollRef.current?.scrollIntoView === 'function') {
+      thinkingScrollRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [isStreaming, displayThinkingText]);
+
+  useEffect(() => {
+    if (typeof activityEndRef.current?.scrollIntoView === 'function') {
+      activityEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [storyItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
 
   const modelLabel = currentModel.trim() || DEFAULT_MODEL_LABEL;
 
@@ -150,7 +221,7 @@ export function AgentThinkingSidebar({
                   <Sparkles className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse" />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="font-semibold text-sm truncate">Agent Thinking</h2>
+                  <h2 className="font-semibold text-sm truncate">Agent Activity</h2>
                   <p className="text-[10px] text-muted-foreground truncate">
                     {isStreaming ? 'Processing' : 'Idle'}
                   </p>
@@ -198,154 +269,135 @@ export function AgentThinkingSidebar({
       </div>
 
       {!isCollapsed && (
-        <div className="flex-1 min-h-0 overflow-auto p-4 flex flex-col gap-3">
-          <div className="flex-1 min-h-0 max-h-[360px] overflow-y-auto rounded-lg border border-violet-500/20 bg-violet-500/5 flex flex-col">
-            <div className="flex items-center gap-2 px-3 py-2 border-b border-violet-500/20 shrink-0">
-              <h3 className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
-                Online activity
-              </h3>
-              {isStreaming && (
-                <span className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-violet-500/20 text-[9px] font-medium text-violet-400">
-                  <span className="size-1.5 rounded-full bg-violet-400 animate-pulse" aria-hidden />
-                  Live
-                </span>
-              )}
-            </div>
-            <ul className="list-none p-0 m-0 flex-1 min-h-0 overflow-y-auto border-l-2 border-violet-500/20 ml-3 pl-3">
-              {filteredStoryItems.length === 0 && storyItems.length === 0 && !displayThinkingText && !isStreaming && (
-                <li className="py-3 text-xs text-muted-foreground">
-                  Activity will appear here when the agent responds.
-                </li>
-              )}
-              {filteredStoryItems.length === 0 && storyItems.length > 0 && activitySearchQuery.trim() && (
-                <li className="py-3 text-xs text-muted-foreground">
-                  No activity matches &quot;{activitySearchQuery.trim()}&quot;.
-                </li>
-              )}
-              {filteredStoryItems.map((entry) => {
+        <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-3">
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
+            {filteredStoryItems.length === 0 && storyItems.length === 0 && !displayThinkingText && !isStreaming && (
+              <p className="py-3 text-xs text-muted-foreground">
+                Activity will appear here when the agent responds.
+              </p>
+            )}
+            {filteredStoryItems.length === 0 && storyItems.length > 0 && activitySearchQuery.trim() && (
+              <p className="py-3 text-xs text-muted-foreground">
+                No activity matches &quot;{activitySearchQuery.trim()}&quot;.
+              </p>
+            )}
+            {filteredStoryItems.map((entry) => {
                 const Icon = getActivityIcon(entry.type);
                 const label = getActivityLabel(entry.type);
+                const variant = getBlockVariant(entry);
                 const isCommandBlock = entry.type === 'tool_call' && entry.command;
                 const isFileBlock = entry.type === 'file_created' && (entry.path || entry.details);
                 const isThinkingBlock =
                   entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
+                const iconColor =
+                  entry.type === 'file_created'
+                    ? 'text-green-500'
+                    : entry.type === 'tool_call'
+                      ? 'text-amber-500'
+                      : entry.type === 'stream_start'
+                        ? 'text-blue-400'
+                        : 'text-violet-400';
                 return (
-                  <li
+                  <div
                     key={entry.id}
-                    className="relative pl-5 pr-2 py-2.5 flex items-start gap-2 before:content-[''] before:absolute before:left-[-11px] before:top-3.5 before:size-2 before:rounded-full before:bg-violet-400 before:border-2 before:border-background before:z-[1]"
+                    className={`${BLOCK_VARIANTS[variant]} px-3 py-2.5 flex flex-col gap-1.5`}
                   >
-                    <Icon
-                      className={`size-4 shrink-0 mt-0.5 -ml-4 ${
-                        entry.type === 'file_created'
-                          ? 'text-green-400'
-                          : entry.type === 'tool_call'
-                            ? 'text-violet-400'
-                            : 'text-violet-300'
-                      }`}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <p className="text-[10px] font-medium text-violet-300 uppercase tracking-wide">
+                    <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Icon className={`size-4 shrink-0 ${iconColor}`} />
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/90 truncate">
                           {label}
                         </p>
-                        <span className="text-[9px] text-muted-foreground shrink-0">
-                          {formatRelativeTime(entry.timestamp)}
-                        </span>
                       </div>
-                      {isThinkingBlock ? (
-                        <div className="mt-1.5 rounded-md bg-violet-950/40 border border-violet-500/20 px-2.5 py-2 max-h-32 overflow-y-auto">
-                          <p className="text-[11px] text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
-                            {entry.details}
-                          </p>
-                        </div>
-                      ) : isCommandBlock ? (
-                        <div className="mt-1.5 rounded-md bg-zinc-900/90 border border-violet-500/20 px-2.5 py-2 font-mono text-[11px] text-green-300/95 overflow-x-auto">
-                          <span className="text-violet-400/80 select-none">$ </span>
-                          <TypingText
-                            text={entry.command ?? ''}
-                            charMs={20}
-                            showCursor={isStreaming}
-                            skipAnimation={!isStreaming}
-                          />
-                        </div>
-                      ) : isFileBlock ? (
-                        <div className="mt-1.5 rounded-md bg-green-950/30 border border-green-500/20 px-2.5 py-1.5 flex items-center gap-2">
-                          <FileCode className="size-3.5 text-green-400 shrink-0" />
-                          <span className="text-[11px] text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
-                            {entry.path ?? entry.details}
-                          </span>
-                        </div>
-                      ) : (
-                        <>
-                          <p className="text-xs text-foreground/90 mt-0.5 break-words">{entry.message}</p>
-                          {entry.details && entry.type !== 'reasoning_start' && (
-                            <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
-                              {entry.details}
-                            </p>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-              {(displayThinkingText || isStreaming) && (
-                <li className="relative pl-5 pr-2 py-2.5 flex flex-col gap-1.5 before:content-[''] before:absolute before:left-[-11px] before:top-3.5 before:size-2 before:rounded-full before:bg-violet-400 before:border-2 before:border-background before:z-[1] before:animate-pulse">
-                  <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
-                    {reasoningText ? 'Reasoning' : 'Response'}
-                  </p>
-                  <div className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
-                    {displayThinkingText || (isStreaming ? '…' : '')}
-                    <span ref={thinkingScrollRef} className="inline-block min-h-0" aria-hidden />
-                  </div>
-                </li>
-              )}
-            </ul>
-          </div>
-
-          {toolEvents.length > 0 && (
-            <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 overflow-hidden shrink-0">
-              <h3 className="text-xs font-semibold px-3 py-2 text-violet-300 border-b border-violet-500/20">
-                Created files & tools
-              </h3>
-              <div className="divide-y divide-violet-500/10 max-h-40 overflow-y-auto">
-                {toolEvents.map((event, i) => (
-                  <div
-                    key={i}
-                    className="p-3 flex items-start gap-3 rounded-none border-0 border-b border-violet-500/10 last:border-b-0"
-                  >
-                    {event.kind === 'file_created' ? (
-                      <FileCode className="size-4 text-green-400 shrink-0 mt-0.5" />
-                    ) : (
-                      <Terminal className="size-4 text-violet-400 shrink-0 mt-0.5" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-foreground truncate">{event.name}</p>
-                      {event.path && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5" title={event.path}>
-                          {event.path}
-                        </p>
-                      )}
-                      {event.summary && !event.path && (
-                        <p className="text-xs text-muted-foreground truncate mt-0.5">
-                          {event.summary}
-                        </p>
-                      )}
-                      <span
-                        className={`inline-block mt-1.5 px-2 py-0.5 rounded text-[10px] font-medium ${
-                          event.kind === 'file_created'
-                            ? 'bg-green-500/20 text-green-400'
-                            : 'bg-violet-500/20 text-violet-400'
-                        }`}
-                      >
-                        {event.kind === 'file_created' ? 'Created' : 'Ran'}
+                      <span className="text-[9px] text-muted-foreground shrink-0">
+                        {formatRelativeTime(entry.timestamp)}
                       </span>
                     </div>
+                    {isThinkingBlock ? (
+                      <div className="mt-0.5 rounded-md bg-background/40 px-2.5 py-2 max-h-32 overflow-y-auto">
+                        <p className="text-[11px] text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                          {entry.details}
+                        </p>
+                      </div>
+                    ) : isCommandBlock ? (
+                      <div className="mt-0.5 rounded-md bg-zinc-900/90 px-2.5 py-2 font-mono text-[11px] text-green-300/95 overflow-x-auto">
+                        <span className="text-amber-400/80 select-none">$ </span>
+                        <TypingText
+                          text={entry.command ?? ''}
+                          charMs={20}
+                          showCursor={isStreaming}
+                          skipAnimation={!isStreaming}
+                        />
+                      </div>
+                    ) : isFileBlock ? (
+                      <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                        <FileCode className="size-3.5 text-green-500 shrink-0" />
+                        <span className="text-[11px] text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
+                          {entry.path ?? entry.details}
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="mt-0.5">
+                        <p className="text-xs text-foreground/90 break-words">{entry.message}</p>
+                        {entry.details && entry.type !== 'reasoning_start' && String(entry.details).trim() !== '{}' && (
+                          <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
+                            {entry.details}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
+                );
+            })}
+            {(displayThinkingText || isStreaming) && (
+              <div
+                className={`${BLOCK_VARIANTS.reasoning} px-3 py-2.5 flex flex-col gap-1.5 ${isStreaming ? 'animate-pulse' : ''}`}
+              >
+                <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+                  {reasoningText ? 'Reasoning' : 'Response'}
+                </p>
+                <div className="text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words">
+                  {displayThinkingText || (isStreaming ? '…' : '')}
+                  <span ref={thinkingScrollRef} className="inline-block min-h-0" aria-hidden />
+                </div>
               </div>
-            </div>
-          )}
+            )}
+            {!isStreaming && filteredStoryItems.length > 0 && (
+              <div className={`${BLOCK_VARIANTS.task_complete} px-3 py-2.5 flex flex-col gap-1.5`}>
+                <div className="flex items-center justify-between gap-2 flex-wrap min-w-0">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CheckCircle2 className="size-4 shrink-0 text-green-500" />
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-foreground/90 truncate">
+                      Task complete
+                    </p>
+                  </div>
+                  <span className="text-[9px] text-muted-foreground shrink-0">just now</span>
+                </div>
+                <p className="text-xs text-foreground/90 mt-0.5 break-words">
+                  Response completed.
+                </p>
+              </div>
+            )}
+            <div ref={activityEndRef} className="h-0 shrink-0" aria-hidden />
+          </div>
+
+          <div className="rounded-lg border border-violet-500/20 bg-violet-500/5 overflow-hidden shrink-0">
+            <h3 className="text-xs font-semibold px-3 py-2 text-violet-300 border-b border-violet-500/20">
+              Session stats
+            </h3>
+            <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-3 py-2 text-[11px]">
+              <dt className="text-muted-foreground">Total actions</dt>
+              <dd className="font-medium text-foreground text-right">{sessionStats.totalActions}</dd>
+              <dt className="text-muted-foreground">Completed</dt>
+              <dd className="font-medium text-foreground text-right">{sessionStats.completed}</dd>
+              <dt className="text-muted-foreground">Processing</dt>
+              <dd className="font-medium text-foreground text-right">{sessionStats.processing}</dd>
+              <dt className="text-muted-foreground">Session time</dt>
+              <dd className="font-medium text-foreground text-right">
+                {formatSessionDurationMs(sessionStats.sessionTimeMs)}
+              </dd>
+            </dl>
+          </div>
         </div>
       )}
 

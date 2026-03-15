@@ -12,6 +12,7 @@ import {
   RECONNECT_INTERVAL_MS,
   type ChatState,
   type ServerMessage,
+  type StoredActivityEntry,
 } from './chat-state';
 import type { ThinkingStep } from './thinking-types';
 import type { ToolOrFileEvent } from './thinking-types';
@@ -26,6 +27,7 @@ export interface UseChatWebSocketResult {
   state: ChatState;
   errorMessage: string | null;
   authModal: AuthModalState;
+  sessionActivity: StoredActivityEntry[];
   send: (msg: Record<string, unknown>) => void;
   reconnect: () => void;
   startAuth: () => void;
@@ -70,6 +72,7 @@ export function useChatWebSocket(
     deviceCode: null,
     isManualToken: false,
   });
+  const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -276,6 +279,16 @@ export function useChatWebSocket(
         return;
       }
 
+      if (data.type === 'activity_snapshot') {
+        setSessionActivity(Array.isArray(data.activity) ? data.activity : []);
+        return;
+      }
+
+      if (data.type === 'activity_appended' && data.entry) {
+        setSessionActivity((prev) => [...prev, data.entry as StoredActivityEntry]);
+        return;
+      }
+
       if (data.type === 'model_updated') {
         onMessageRef.current?.(data);
         return;
@@ -371,6 +384,7 @@ export function useChatWebSocket(
     state,
     errorMessage,
     authModal,
+    sessionActivity,
     send,
     reconnect,
     startAuth,

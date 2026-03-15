@@ -47,11 +47,7 @@ import {
   SIDEBAR_WIDTH_PX,
 } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
-import type {
-  ThinkingStep,
-  ThinkingActivity,
-  ToolOrFileEvent,
-} from '../chat/thinking-types';
+import type { ThinkingStep, ThinkingActivity } from '../chat/thinking-types';
 
 function nextActivityId(): string {
   return `act-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -81,7 +77,6 @@ export function ChatPage() {
   const [streamingModel, setStreamingModel] = useState<string | null>(null);
   const [reasoningText, setReasoningText] = useState('');
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
-  const [toolEvents, setToolEvents] = useState<ToolOrFileEvent[]>([]);
   const [activityLog, setActivityLog] = useState<ThinkingActivity[]>([]);
   const activityLogRef = useRef<ThinkingActivity[]>([]);
   const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => {});
@@ -106,6 +101,7 @@ export function ChatPage() {
     usePlaygroundFiles();
   const [playgroundRefreshTrigger, setPlaygroundRefreshTrigger] = useState(0);
   const hasPlaygroundFiles = playgroundLoading || playgroundEntries.length > 0;
+  const prevHasPlaygroundFilesRef = useRef(hasPlaygroundFiles);
   const atMention = getAtMentionState(inputValue, cursorOffset);
   const [mentionDropdownClosedAfterSelect, setMentionDropdownClosedAfterSelect] = useState(false);
   const mentionOpen =
@@ -121,6 +117,14 @@ export function ChatPage() {
     () => persistRightSidebarCollapsed(rightSidebarCollapsed),
     [rightSidebarCollapsed]
   );
+
+  useEffect(() => {
+    const hadFiles = prevHasPlaygroundFilesRef.current;
+    prevHasPlaygroundFilesRef.current = hasPlaygroundFiles;
+    if (!hadFiles && hasPlaygroundFiles && !playgroundLoading) {
+      setSidebarCollapsed(false);
+    }
+  }, [hasPlaygroundFiles, playgroundLoading]);
 
   useEffect(() => {
     if (isMobile) return;
@@ -232,6 +236,7 @@ export function ChatPage() {
     state,
     errorMessage,
     authModal,
+    sessionActivity,
     send,
     reconnect,
     startAuth,
@@ -247,7 +252,6 @@ export function ChatPage() {
       setStreamingText('');
       setReasoningText('');
       setThinkingSteps([]);
-      setToolEvents([]);
       reasoningTextRef.current = '';
       thinkingEntryIdRef.current = null;
       setStreamingModel(data?.model ?? null);
@@ -354,7 +358,6 @@ export function ChatPage() {
         ]);
       },
       onToolOrFile: (event) => {
-        flushSync(() => setToolEvents((prev) => [...prev, event]));
         if (event.kind === 'file_created') {
           refetchPlaygrounds();
           setPlaygroundRefreshTrigger((t) => t + 1);
@@ -692,11 +695,16 @@ export function ChatPage() {
       {!isMobile && (
         <div
           className="flex min-h-0 flex-shrink-0 flex-col overflow-visible transition-[width] duration-300 ease-out"
-          style={{ width: sidebarCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : SIDEBAR_WIDTH_PX }}
+          style={{
+            width:
+              !hasPlaygroundFiles || sidebarCollapsed
+                ? SIDEBAR_COLLAPSED_WIDTH_PX
+                : SIDEBAR_WIDTH_PX,
+          }}
         >
           <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
             <FileExplorer
-              collapsed={sidebarCollapsed}
+              collapsed={!hasPlaygroundFiles || sidebarCollapsed}
               onSettingsClick={() => setSettingsOpen(true)}
               onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
               onFileSelect={(entry) => setViewingFile(entry)}
@@ -1004,8 +1012,8 @@ export function ChatPage() {
           reasoningText={reasoningText}
           streamingResponseText={streamingText}
           thinkingSteps={thinkingSteps}
-          toolEvents={toolEvents}
           storyItems={displayStory}
+          sessionActivity={sessionActivity}
         />
       )}
     </div>

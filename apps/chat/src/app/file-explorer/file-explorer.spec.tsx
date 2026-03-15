@@ -16,7 +16,7 @@ describe('FileExplorer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows playground/ label when tree is loaded', async () => {
+  it('hides file explorer block when tree is loaded with no files', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -24,9 +24,10 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/No files in playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.getByText(/playground\//)).toBeTruthy();
+    expect(screen.queryByText(/No files in playground\//)).toBeNull();
+    expect(screen.queryByText(/playground\//)).toBeNull();
   });
 
   it('shows loading state initially', () => {
@@ -37,7 +38,7 @@ describe('FileExplorer', () => {
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
-  it('shows empty message when API returns empty array', async () => {
+  it('hides file explorer block when API returns empty array', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -45,8 +46,22 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/No files in playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
+    expect(screen.queryByText(/No files in playground\//)).toBeNull();
+  });
+
+  it('does not render expand/collapse button when tree is empty', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    render(<FileExplorer collapsed onToggleCollapse={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).toBeNull();
+    });
+    expect(screen.queryByRole('button', { name: 'Expand file explorer' })).toBeNull();
   });
 
   it('shows error when fetch fails', async () => {
@@ -190,7 +205,7 @@ describe('FileExplorer', () => {
     const onSettingsClick = vi.fn();
     render(<FileExplorer onSettingsClick={onSettingsClick} />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(onSettingsClick).toHaveBeenCalledTimes(1);
@@ -204,7 +219,7 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))).not.toThrow();
   });
@@ -218,7 +233,7 @@ describe('FileExplorer', () => {
     const onClose = vi.fn();
     render(<FileExplorer onClose={onClose} />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -233,7 +248,7 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
   });
@@ -257,7 +272,7 @@ describe('FileExplorer', () => {
     render(<FileExplorer collapsed={false} />);
     expect(screen.getByPlaceholderText('Search files...')).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
   });
 

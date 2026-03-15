@@ -3,11 +3,11 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { AgentThinkingSidebar } from './agent-thinking-sidebar';
 
 describe('AgentThinkingSidebar', () => {
-  it('renders Agent Thinking heading when expanded', () => {
+  it('renders Agent Activity heading when expanded', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
     );
-    expect(screen.getByRole('heading', { name: 'Agent Thinking' })).toBeTruthy();
+    expect(screen.getByRole('heading', { name: 'Agent Activity' })).toBeTruthy();
   });
 
   it('renders Model (default) label when expanded and no model set', () => {
@@ -21,7 +21,7 @@ describe('AgentThinkingSidebar', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} isStreaming />
     );
-    expect(screen.getByText('Processing')).toBeTruthy();
+    expect(screen.getAllByText('Processing').length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows Idle when isStreaming is false', () => {
@@ -35,7 +35,7 @@ describe('AgentThinkingSidebar', () => {
     render(
       <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />
     );
-    expect(screen.queryByRole('heading', { name: 'Agent Thinking' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Agent Activity' })).toBeNull();
     expect(screen.queryByText('Model (default)')).toBeNull();
   });
 
@@ -102,13 +102,6 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.queryByText(/Streaming output/)).toBeNull();
   });
 
-  it('shows Online activity heading when expanded', () => {
-    render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
-    );
-    expect(screen.getByText('Online activity')).toBeTruthy();
-  });
-
   it('renders story items when storyItems provided', () => {
     const storyItems = [
       {
@@ -135,20 +128,90 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText(/Generating response/)).toBeTruthy();
   });
 
-  it('shows Created files & tools blocks when toolEvents provided', () => {
-    const toolEvents = [
-      { kind: 'file_created' as const, name: 'src/foo.ts', path: 'src/foo.ts' },
-      { kind: 'tool_call' as const, name: 'npm run build', summary: 'Build completed' },
+  it('shows Session stats section when expanded', () => {
+    render(
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
+    );
+    expect(screen.getByText('Session stats')).toBeTruthy();
+  });
+
+  it('shows Task complete block when not streaming and story items exist', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
     ];
     render(
       <AgentThinkingSidebar
         isCollapsed={false}
         onToggle={vi.fn()}
-        toolEvents={toolEvents}
+        storyItems={storyItems}
+        isStreaming={false}
       />
     );
-    expect(screen.getByText('Created files & tools')).toBeTruthy();
-    expect(screen.getAllByText('src/foo.ts').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('npm run build')).toBeTruthy();
+    expect(screen.getByText('Task complete')).toBeTruthy();
+    expect(screen.getByText('Response completed.')).toBeTruthy();
+  });
+
+  it('does not show Task complete block when streaming', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+        isStreaming
+      />
+    );
+    expect(screen.queryByText('Task complete')).toBeNull();
+  });
+
+  it('shows total actions and session time from sessionActivity', () => {
+    const sessionActivity = [
+      {
+        id: 'e1',
+        created_at: '2026-03-14T23:32:47.170Z',
+        story: [
+          { id: 's1', type: 'stream_start', message: 'Started', timestamp: '2026-03-14T23:32:43.237Z' },
+          { id: 's2', type: 'tool_call', message: 'Ran Bash', timestamp: '2026-03-14T23:32:45.000Z' },
+        ],
+      },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+      />
+    );
+    expect(screen.getByText('Total actions')).toBeTruthy();
+    expect(screen.getByText('Session time')).toBeTruthy();
+    expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('does not apply animate-pulse to reasoning block when task is complete', () => {
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        reasoningText="Final reasoning content"
+        isStreaming={false}
+      />
+    );
+    const block = screen.getByText(/Final reasoning content/).closest('div')?.parentElement;
+    expect(block?.classList.contains('animate-pulse')).toBe(false);
+  });
+
+  it('applies animate-pulse to reasoning block when streaming', () => {
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        reasoningText="Thinking..."
+        isStreaming
+      />
+    );
+    const block = screen.getByText(/Thinking\.\.\./).closest('div')?.parentElement;
+    expect(block?.classList.contains('animate-pulse')).toBe(true);
   });
 });

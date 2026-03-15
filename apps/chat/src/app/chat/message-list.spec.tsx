@@ -46,6 +46,24 @@ describe('MessageList', () => {
     expect(screen.getByText(/\d{1,2}:\d{2} (AM|PM)/)).toBeTruthy();
   });
 
+  it('does not render Activity section in assistant message when story is present', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: 'Done.',
+        created_at: '2025-03-11T17:01:00.000Z',
+        story: [
+          { id: '1', type: 'tool_call', message: 'Ran Bash', timestamp: '2025-03-11T17:00:59.000Z', command: 'ls' },
+        ],
+      },
+    ];
+    render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    expect(screen.getByText('Done.')).toBeTruthy();
+    expect(screen.queryByText('Activity')).toBeNull();
+  });
+
   it('renders assistant message bubble with card styling', () => {
     const messages: ChatMessage[] = [
       {
