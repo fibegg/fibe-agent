@@ -52,6 +52,7 @@ export interface AgentStrategy {
     prompt: string,
     model: string,
     onChunk: (chunk: string) => void,
-    callbacks?: StreamingCallbacks
+    callbacks?: StreamingCallbacks,
+    systemPrompt?: string
   ): Promise<void>;
 }
