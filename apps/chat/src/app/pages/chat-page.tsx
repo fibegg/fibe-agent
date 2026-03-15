@@ -1,12 +1,10 @@
 import {
   Brain,
   ChevronDown,
-  ImagePlus,
   Key,
   LogOut,
   Menu,
   Mic,
-  Paperclip,
   Search,
   Send,
   X,
@@ -399,6 +397,14 @@ export function ChatPage() {
     [state, activityLog, lastAssistantMessage]
   );
 
+  const pastActivityFromMessages = useMemo(
+    () =>
+      messages
+        .filter((m) => m.role === 'assistant' && Array.isArray(m.story))
+        .map((m) => ({ id: m.created_at, created_at: m.created_at, story: m.story! })),
+    [messages]
+  );
+
   const handleSend = useCallback(() => {
     const text = inputValue.trim();
     const hasVoice = !!pendingVoiceFilename || !!pendingVoice;
@@ -708,6 +714,7 @@ export function ChatPage() {
               thinkingSteps={thinkingSteps}
               storyItems={displayStory}
               sessionActivity={sessionActivity}
+              pastActivityFromMessages={pastActivityFromMessages}
               mobileOverlay
             />
           </div>
@@ -955,16 +962,6 @@ export function ChatPage() {
                   className="hidden"
                   onChange={handleFileChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
-                  title="Attach file"
-                  aria-label="Attach file"
-                >
-                  <Paperclip className="size-3.5 sm:size-4" />
-                </button>
                 <div
                   className="relative flex-1 min-w-0"
                   title={state === CHAT_STATES.AUTHENTICATED ? 'Type @ to link a file' : undefined}
@@ -995,16 +992,6 @@ export function ChatPage() {
                     onClose={handleMentionClose}
                   />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
-                  title="Upload photo"
-                  aria-label="Upload photo"
-                >
-                  <ImagePlus className="size-3.5 sm:size-4" />
-                </button>
                 {voiceRecorder.isSupported && (
                   <button
                     type="button"
@@ -1054,6 +1041,7 @@ export function ChatPage() {
           thinkingSteps={thinkingSteps}
           storyItems={displayStory}
           sessionActivity={sessionActivity}
+          pastActivityFromMessages={pastActivityFromMessages}
         />
       )}
     </div>

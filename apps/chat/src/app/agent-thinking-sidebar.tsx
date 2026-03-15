@@ -1,5 +1,6 @@
-import { Brain, CheckCircle2, FileCode, Loader2, Search, Sparkles, X, Zap } from 'lucide-react';
-import { memo, useRef, useEffect, useMemo, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { Brain, CheckCircle2, Download, Loader2, Search, Sparkles, X } from 'lucide-react';
+import { memo, useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
@@ -29,8 +30,6 @@ import {
   FLEX_ROW_CENTER_WRAP,
   INPUT_SEARCH,
   SEARCH_ICON_POSITION,
-  SESSION_STATS_HEADING,
-  SESSION_STATS_PANEL,
   SIDEBAR_HEADER,
   SIDEBAR_PANEL,
 } from './ui-classes';
@@ -43,6 +42,19 @@ export type SessionActivityEntry = {
   story: StoryEntry[];
 };
 
+const ACTIVITY_ESTIMATE_HEIGHT = 72;
+const ACTIVITY_GAP = 8;
+const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
+
+const STAT_TOOLTIPS = {
+  total: 'Total actions',
+  completed: 'Completed',
+  processing: 'Processing',
+  sessionTime: 'Session time',
+} as const;
+
+const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
+
 const ActivityBlock = memo(function ActivityBlock({
   entry,
   isStreaming,
@@ -54,10 +66,48 @@ const ActivityBlock = memo(function ActivityBlock({
   const label = getActivityLabel(entry.type);
   const variant = getBlockVariant(entry);
   const isCommandBlock = entry.type === 'tool_call' && entry.command;
-  const isFileBlock = entry.type === 'file_created' && (entry.path || entry.details);
   const isThinkingBlock =
     entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
+  const isSingleRow = SINGLE_ROW_TYPES.has(entry.type);
   const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
+
+  const singleRowText =
+    entry.type === 'file_created'
+      ? (entry.path ?? entry.details ?? entry.message)
+      : entry.type === 'tool_call' && entry.command
+        ? entry.command
+        : entry.type === 'step'
+          ? entry.message
+          : label;
+
+  if (isSingleRow) {
+    return (
+      <div
+        className={`${ACTIVITY_BLOCK_VARIANTS[variant]} px-3 py-1.5 flex items-center justify-between gap-2 min-w-0`}
+      >
+        <div className={`${FLEX_ROW_CENTER} min-w-0 flex-1 truncate`}>
+          <Icon className={`size-4 shrink-0 ${iconColor}`} />
+          {isCommandBlock ? (
+            <span className="text-[11px] font-mono text-green-300/95 truncate" title={entry.command}>
+              <span className="text-amber-400/80 select-none">$ </span>
+              <TypingText
+                text={entry.command ?? ''}
+                charMs={20}
+                showCursor={isStreaming}
+                skipAnimation={!isStreaming}
+              />
+            </span>
+          ) : (
+            <p className={`${ACTIVITY_LABEL} truncate`} title={singleRowText}>
+              {singleRowText}
+            </p>
+          )}
+        </div>
+        <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>{formatRelativeTime(entry.timestamp)}</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}
@@ -74,23 +124,6 @@ const ActivityBlock = memo(function ActivityBlock({
       {isThinkingBlock ? (
         <div className="mt-0.5 rounded-md bg-background/40 px-2.5 py-2 max-h-32 overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO}`}>{entry.details}</p>
-        </div>
-      ) : isCommandBlock ? (
-        <div className="mt-0.5 rounded-md bg-zinc-900/90 px-2.5 py-2 font-mono text-[11px] text-green-300/95 overflow-x-auto">
-          <span className="text-amber-400/80 select-none">$ </span>
-          <TypingText
-            text={entry.command ?? ''}
-            charMs={20}
-            showCursor={isStreaming}
-            skipAnimation={!isStreaming}
-          />
-        </div>
-      ) : isFileBlock ? (
-        <div className="mt-0.5 flex items-center gap-2 min-w-0">
-          <FileCode className="size-3.5 text-green-500 shrink-0" />
-          <span className="text-[11px] text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
-            {entry.path ?? entry.details}
-          </span>
         </div>
       ) : (
         <div className="mt-0.5">
@@ -115,6 +148,7 @@ interface AgentThinkingSidebarProps {
   thinkingSteps?: ThinkingStep[];
   storyItems?: StoryEntry[];
   sessionActivity?: SessionActivityEntry[];
+  pastActivityFromMessages?: SessionActivityEntry[];
   mobileOverlay?: boolean;
 }
 
@@ -127,9 +161,11 @@ export function AgentThinkingSidebar({
   thinkingSteps = [],
   storyItems = [],
   sessionActivity = [],
+  pastActivityFromMessages = [],
   mobileOverlay = false,
 }: AgentThinkingSidebarProps) {
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
+  const activityScrollRef = useRef<HTMLDivElement>(null);
   const activityEndRef = useRef<HTMLDivElement>(null);
   const prevActivityDepsRef = useRef({
     storyLength: 0,
@@ -138,8 +174,22 @@ export function AgentThinkingSidebar({
     streaming: false,
   });
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
+  const [scrollContainerReady, setScrollContainerReady] = useState(false);
+  const setActivityScrollRef = useCallback((el: HTMLDivElement | null) => {
+    (activityScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
+    setScrollContainerReady((prev) => (el ? true : prev));
+  }, []);
+  useEffect(() => {
+    if (isCollapsed) setScrollContainerReady(false);
+  }, [isCollapsed]);
 
   const displayThinkingText = reasoningText || streamingResponseText;
+
+  const fullStoryItems = useMemo(() => {
+    const past = sessionActivity.length > 0 ? sessionActivity : pastActivityFromMessages;
+    const fromPast = past.flatMap((a) => (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp })));
+    return [...fromPast, ...storyItems];
+  }, [sessionActivity, pastActivityFromMessages, storyItems]);
 
   const sessionStats = useMemo(() => {
     const fromSession = sessionActivity.reduce((acc, t) => acc + (t.story?.length ?? 0), 0);
@@ -163,9 +213,9 @@ export function AgentThinkingSidebar({
   }, [sessionActivity, storyItems, isStreaming]);
 
   const filteredStoryItems = useMemo(() => {
-    if (!activitySearchQuery.trim()) return storyItems;
+    if (!activitySearchQuery.trim()) return fullStoryItems;
     const q = activitySearchQuery.trim().toLowerCase();
-    return storyItems.filter((entry) => {
+    return fullStoryItems.filter((entry) => {
       const message = (entry.message ?? '').toLowerCase();
       const details = (entry.details ?? '').toLowerCase();
       const command = (entry.command ?? '').toLowerCase();
@@ -179,7 +229,20 @@ export function AgentThinkingSidebar({
         label.includes(q)
       );
     });
-  }, [storyItems, activitySearchQuery]);
+  }, [fullStoryItems, activitySearchQuery]);
+
+  const virtualizer = useVirtualizer({
+    count: filteredStoryItems.length,
+    getScrollElement: () => activityScrollRef.current,
+    estimateSize: () => ACTIVITY_ESTIMATE_HEIGHT,
+    gap: ACTIVITY_GAP,
+    overscan: 5,
+  });
+  const useVirtual = filteredStoryItems.length >= ACTIVITY_VIRTUALIZE_THRESHOLD;
+  const virtualItems = useVirtual && (scrollContainerReady || activityScrollRef.current)
+    ? virtualizer.getVirtualItems()
+    : null;
+  const virtualTotalHeight = virtualItems ? virtualizer.getTotalSize() : 0;
 
   useEffect(() => {
     if (isStreaming && displayThinkingText && typeof thinkingScrollRef.current?.scrollIntoView === 'function') {
@@ -189,33 +252,69 @@ export function AgentThinkingSidebar({
 
   useEffect(() => {
     const prev = prevActivityDepsRef.current;
-    const storyLength = storyItems.length;
-    const sessionLength = sessionActivity.length;
+    const fullLength = fullStoryItems.length;
     const hasThinking = !!displayThinkingText;
     const streaming = isStreaming;
     const activityGrew =
-      storyLength > prev.storyLength ||
-      sessionLength > prev.sessionLength ||
+      fullLength > prev.storyLength ||
       (hasThinking && !prev.hasThinking) ||
       (streaming && !prev.streaming);
     prevActivityDepsRef.current = {
-      storyLength,
-      sessionLength,
+      storyLength: fullLength,
+      sessionLength: sessionActivity.length,
       hasThinking,
       streaming,
     };
     if (activityGrew && typeof activityEndRef.current?.scrollIntoView === 'function') {
       activityEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [storyItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
+  }, [fullStoryItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
+
+  const handleDownloadActivity = useCallback(() => {
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      sessionStats: {
+        totalActions: sessionStats.totalActions,
+        completed: sessionStats.completed,
+        sessionTimeMs: sessionStats.sessionTimeMs,
+      },
+      activity: fullStoryItems.map((e) => ({
+        id: e.id,
+        type: e.type,
+        message: e.message,
+        timestamp: typeof e.timestamp === 'string' ? e.timestamp : (e.timestamp as Date)?.toISOString?.() ?? '',
+        ...(e.details !== undefined ? { details: e.details } : {}),
+        ...(e.command !== undefined ? { command: e.command } : {}),
+        ...(e.path !== undefined ? { path: e.path } : {}),
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `agent-activity-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }, [sessionStats.totalActions, sessionStats.completed, sessionStats.sessionTimeMs, fullStoryItems]);
 
   return (
     <div
-      className={mobileOverlay ? `${SIDEBAR_PANEL} bg-background` : SIDEBAR_PANEL}
+      className={`min-h-0 overflow-hidden ${mobileOverlay ? `${SIDEBAR_PANEL} bg-background` : SIDEBAR_PANEL}`}
       style={{
-        width: mobileOverlay ? '100%' : (isCollapsed ? RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX : RIGHT_SIDEBAR_WIDTH_PX),
+        width: mobileOverlay
+          ? '100%'
+          : isCollapsed
+            ? RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX
+            : RIGHT_SIDEBAR_WIDTH_PX,
       }}
     >
+      <style>{`
+        @keyframes statTick {
+          from { opacity: 0.6; transform: scale(1.06); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .stat-tick { animation: statTick 0.22s ease-out 1; }
+      `}</style>
       <SidebarToggle
         isCollapsed={isCollapsed}
         onClick={onToggle}
@@ -225,21 +324,63 @@ export function AgentThinkingSidebar({
         }
       />
 
+      {!isCollapsed && (
+        <div className="shrink-0 px-4 pt-4 flex items-start gap-2">
+          <div className="relative shrink-0 pt-1">
+            <Brain className="size-5 text-violet-400" />
+            <Sparkles
+              className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse"
+              aria-hidden
+            />
+          </div>
+          <p className="px-2 py-1.5 text-[10px] font-medium tabular-nums flex items-center gap-0.5 flex-wrap">
+            <span
+              key={`total-${sessionStats.totalActions}`}
+              className="text-foreground stat-tick inline-block"
+              title={STAT_TOOLTIPS.total}
+            >
+              {sessionStats.totalActions}
+            </span>
+            <span className="text-muted-foreground/70">/</span>
+            <span
+              key={`completed-${sessionStats.completed}`}
+              className="text-emerald-400 stat-tick inline-block"
+              title={STAT_TOOLTIPS.completed}
+            >
+              {sessionStats.completed}
+            </span>
+            <span className="text-muted-foreground/70">/</span>
+            <span
+              key={`processing-${sessionStats.processing}`}
+              className="text-cyan-400 stat-tick inline-block"
+              title={STAT_TOOLTIPS.processing}
+            >
+              {sessionStats.processing}
+            </span>
+            <span className="text-muted-foreground/70">/</span>
+            <span
+              key={`time-${sessionStats.sessionTimeMs}`}
+              className="text-foreground stat-tick inline-block"
+              title={STAT_TOOLTIPS.sessionTime}
+            >
+              {formatSessionDurationMs(sessionStats.sessionTimeMs)}
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={handleDownloadActivity}
+            className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors shrink-0"
+            title="Download activity"
+            aria-label="Download activity"
+          >
+            <Download className="size-4" />
+          </button>
+        </div>
+      )}
+
       <div className={SIDEBAR_HEADER}>
         {!isCollapsed ? (
           <>
-            <div className={`${FLEX_ROW_CENTER} mb-2 min-h-[3.25rem]`}>
-              <div className="relative shrink-0">
-                <Brain className="size-5 text-violet-400" />
-                <Sparkles className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse" />
-              </div>
-              <div className="min-w-0">
-                <h2 className="font-semibold text-sm truncate">Agent Activity</h2>
-                <p className="text-[10px] text-muted-foreground truncate">
-                  {isStreaming ? 'Processing' : 'Idle'}
-                </p>
-              </div>
-            </div>
             <div className="relative h-8 mt-2">
               <Search className={SEARCH_ICON_POSITION} aria-hidden />
               <input
@@ -275,21 +416,63 @@ export function AgentThinkingSidebar({
       </div>
 
       {!isCollapsed && (
-        <div className="flex-1 min-h-0 overflow-hidden p-4 flex flex-col gap-3">
-          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
-            {filteredStoryItems.length === 0 && storyItems.length === 0 && !displayThinkingText && !isStreaming && (
-              <p className="py-3 text-xs text-muted-foreground">
-                Activity will appear here when the agent responds.
-              </p>
-            )}
-            {filteredStoryItems.length === 0 && storyItems.length > 0 && activitySearchQuery.trim() && (
-              <p className="py-3 text-xs text-muted-foreground">
-                No activity matches &quot;{activitySearchQuery.trim()}&quot;.
-              </p>
-            )}
-            {filteredStoryItems.map((entry) => (
-              <ActivityBlock key={entry.id} entry={entry} isStreaming={isStreaming} />
-            ))}
+        <div
+          ref={setActivityScrollRef}
+          className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3"
+        >
+          <div className="flex flex-col gap-2">
+            {filteredStoryItems.length === 0 &&
+              fullStoryItems.length === 0 &&
+              !displayThinkingText &&
+              !isStreaming && (
+                <p className="py-3 text-xs text-muted-foreground">
+                  Activity will appear here when the agent responds.
+                </p>
+              )}
+            {filteredStoryItems.length === 0 &&
+              fullStoryItems.length > 0 &&
+              activitySearchQuery.trim() && (
+                <p className="py-3 text-xs text-muted-foreground">
+                  No activity matches &quot;{activitySearchQuery.trim()}&quot;.
+                </p>
+              )}
+            {filteredStoryItems.length > 0 && virtualItems ? (
+              <div
+                className="w-full relative"
+                style={
+                  {
+                    height: virtualTotalHeight,
+                    contain: 'layout paint',
+                  } as React.CSSProperties
+                }
+              >
+                {virtualItems.map((virtualRow) => {
+                  const entry = filteredStoryItems[virtualRow.index];
+                  return (
+                    <div
+                      key={`activity-${virtualRow.index}-${entry.id}`}
+                      data-index={virtualRow.index}
+                      ref={virtualizer.measureElement}
+                      className="absolute left-0 w-full"
+                      style={{
+                        top: virtualRow.start,
+                        minHeight: virtualRow.size,
+                      }}
+                    >
+                      <ActivityBlock entry={entry} isStreaming={isStreaming} />
+                    </div>
+                  );
+                })}
+              </div>
+            ) : filteredStoryItems.length > 0 ? (
+              filteredStoryItems.map((entry, index) => (
+                <ActivityBlock
+                  key={`activity-${index}-${entry.id}`}
+                  entry={entry}
+                  isStreaming={isStreaming}
+                />
+              ))
+            ) : null}
             {(displayThinkingText || isStreaming) && (
               <div
                 className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''}`}
@@ -299,46 +482,26 @@ export function AgentThinkingSidebar({
                 </p>
                 <div className={ACTIVITY_MONO}>
                   {displayThinkingText || (isStreaming ? '…' : '')}
-                  <span ref={thinkingScrollRef} className="inline-block min-h-0" aria-hidden />
+                  <span
+                    ref={thinkingScrollRef}
+                    className="inline-block min-h-0"
+                    aria-hidden
+                  />
                 </div>
               </div>
             )}
             {!isStreaming && filteredStoryItems.length > 0 && (
-              <div className={`${ACTIVITY_BLOCK_VARIANTS.task_complete} ${ACTIVITY_BLOCK_BASE}`}>
-                <div className={FLEX_ROW_CENTER_WRAP}>
-                  <div className={FLEX_ROW_CENTER}>
-                    <CheckCircle2 className="size-4 shrink-0 text-green-500" />
-                    <p className={ACTIVITY_LABEL}>
-                      Task complete
-                    </p>
-                  </div>
-                  <span className={ACTIVITY_TIMESTAMP}>just now</span>
+              <div
+                className={`${ACTIVITY_BLOCK_VARIANTS.task_complete} ${ACTIVITY_BLOCK_BASE} ${FLEX_ROW_CENTER_WRAP}`}
+              >
+                <div className={FLEX_ROW_CENTER}>
+                  <CheckCircle2 className="size-4 shrink-0 text-green-500" />
+                  <p className={ACTIVITY_LABEL}>Task complete</p>
                 </div>
-                <p className={`${ACTIVITY_BODY} mt-0.5`}>
-                  Response completed.
-                </p>
+                <span className={ACTIVITY_TIMESTAMP}>just now</span>
               </div>
             )}
             <div ref={activityEndRef} className="h-0 shrink-0" aria-hidden />
-          </div>
-
-          <div className={SESSION_STATS_PANEL}>
-            <h3 className={SESSION_STATS_HEADING}>
-              <Zap className="size-3.5 shrink-0" aria-hidden />
-              Session Stats
-            </h3>
-            <dl className="grid grid-cols-2 gap-x-3 gap-y-1.5 px-3 py-2 text-[11px]">
-              <dt className="text-muted-foreground">Total actions:</dt>
-              <dd className="font-medium text-foreground text-right">{sessionStats.totalActions}</dd>
-              <dt className="text-muted-foreground">Completed:</dt>
-              <dd className="font-medium text-emerald-400 text-right">{sessionStats.completed}</dd>
-              <dt className="text-muted-foreground">Processing:</dt>
-              <dd className="font-medium text-cyan-400 text-right">{sessionStats.processing}</dd>
-              <dt className="text-muted-foreground">Session time:</dt>
-              <dd className="font-medium text-foreground text-right">
-                {formatSessionDurationMs(sessionStats.sessionTimeMs)}
-              </dd>
-            </dl>
           </div>
         </div>
       )}

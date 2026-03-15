@@ -3,32 +3,19 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { AgentThinkingSidebar } from './agent-thinking-sidebar';
 
 describe('AgentThinkingSidebar', () => {
-  it('renders Agent Activity heading when expanded', () => {
+  it('renders stats line and download button when expanded', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
     );
-    expect(screen.getByRole('heading', { name: 'Agent Activity' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Download activity' })).toBeTruthy();
+    expect(screen.getByTitle('Total actions')).toBeTruthy();
   });
 
-  it('shows Processing when isStreaming is true', () => {
-    render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} isStreaming />
-    );
-    expect(screen.getAllByText('Processing').length).toBeGreaterThanOrEqual(1);
-  });
-
-  it('shows Idle when isStreaming is false', () => {
-    render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
-    );
-    expect(screen.getByText('Idle')).toBeTruthy();
-  });
-
-  it('does not show heading when collapsed', () => {
+  it('does not show download button when collapsed', () => {
     render(
       <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />
     );
-    expect(screen.queryByRole('heading', { name: 'Agent Activity' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Download activity' })).toBeNull();
   });
 
   it('calls onToggle when sidebar toggle is clicked', () => {
@@ -105,11 +92,11 @@ describe('AgentThinkingSidebar', () => {
         storyItems={storyItems}
       />
     );
-    expect(screen.getByText('Response started')).toBeTruthy();
+    expect(screen.getByText('Started')).toBeTruthy();
     expect(screen.getByText(/Generating response/)).toBeTruthy();
   });
 
-  it('renders tool_call activity block with Command label and command text', () => {
+  it('renders tool_call activity block with command text in one row', () => {
     const storyItems = [
       {
         id: 'tc1',
@@ -126,15 +113,17 @@ describe('AgentThinkingSidebar', () => {
         storyItems={storyItems}
       />
     );
-    expect(screen.getByText('Command')).toBeTruthy();
     expect(screen.getByText('npm install')).toBeTruthy();
   });
 
-  it('shows Session stats section when expanded', () => {
+  it('shows stat tooltips when expanded', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
     );
-    expect(screen.getByText('Session Stats')).toBeTruthy();
+    expect(screen.getByTitle('Total actions')).toBeTruthy();
+    expect(screen.getByTitle('Completed')).toBeTruthy();
+    expect(screen.getByTitle('Processing')).toBeTruthy();
+    expect(screen.getByTitle('Session time')).toBeTruthy();
   });
 
   it('shows Task complete block when not streaming and story items exist', () => {
@@ -150,7 +139,6 @@ describe('AgentThinkingSidebar', () => {
       />
     );
     expect(screen.getByText('Task complete')).toBeTruthy();
-    expect(screen.getByText('Response completed.')).toBeTruthy();
   });
 
   it('does not show Task complete block when streaming', () => {
@@ -168,7 +156,7 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.queryByText('Task complete')).toBeNull();
   });
 
-  it('shows total actions and session time from sessionActivity', () => {
+  it('shows totals from sessionActivity in stats line when expanded', () => {
     const sessionActivity = [
       {
         id: 'e1',
@@ -186,8 +174,6 @@ describe('AgentThinkingSidebar', () => {
         sessionActivity={sessionActivity}
       />
     );
-    expect(screen.getByText('Total actions:')).toBeTruthy();
-    expect(screen.getByText('Session time:')).toBeTruthy();
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
   });
 
