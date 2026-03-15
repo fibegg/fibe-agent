@@ -1,7 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
+import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { Sparkles, User } from 'lucide-react';
-import { marked } from 'marked';
 import { getApiUrl, getAuthTokenForRequest } from '../api-url';
 import { FileIcon } from '../file-icon';
 import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
@@ -15,6 +14,7 @@ import {
   PROSE_MESSAGE,
 } from '../ui-classes';
 import { ASSISTANT_AVATAR_URL, USER_AVATAR_URL } from './chat-avatar';
+import { renderMarkdown } from './markdown-cache';
 
 function MentionChipIcon({ path }: { path: string }) {
   return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
@@ -73,21 +73,6 @@ function formatTime(iso: string): string {
   return `${h}:${mins} ${ampm}`;
 }
 
-function renderMarkdown(text: string): string {
-  try {
-    const out = marked.parse(text);
-    return typeof out === 'string' ? out : escapeHtml(text);
-  } catch {
-    return escapeHtml(text);
-  }
-}
-
-function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
 function getUploadSrc(filename: string): string {
   const base = getApiUrl();
   const path = base ? `${base}/api/uploads/${encodeURIComponent(filename)}` : `/api/uploads/${encodeURIComponent(filename)}`;
@@ -100,7 +85,7 @@ const ROW_GAP = 24;
 const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
 const FULL_WIDTH = 'max-w-full';
 
-function MessageRow({
+const MessageRow = memo(function MessageRow({
   msg,
   maxWidthClass = DEFAULT_MAX_WIDTH,
 }: {
@@ -177,7 +162,7 @@ function MessageRow({
       </div>
     </div>
   );
-}
+});
 
 export interface MessageListHandle {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
