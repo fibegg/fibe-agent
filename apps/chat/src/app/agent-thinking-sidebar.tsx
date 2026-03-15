@@ -10,7 +10,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useRef, useEffect, useMemo, useState } from 'react';
+import { memo, useRef, useEffect, useMemo, useState } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
@@ -119,6 +119,69 @@ function toTimestampMs(ts: string | Date | undefined, fallback: string): number 
   if (!ts) return new Date(fallback).getTime();
   return typeof ts === 'string' ? new Date(ts).getTime() : (ts as Date).getTime();
 }
+
+const ActivityBlock = memo(function ActivityBlock({
+  entry,
+  isStreaming,
+}: {
+  entry: StoryEntry;
+  isStreaming: boolean;
+}) {
+  const Icon = getActivityIcon(entry.type);
+  const label = getActivityLabel(entry.type);
+  const variant = getBlockVariant(entry);
+  const isCommandBlock = entry.type === 'tool_call' && entry.command;
+  const isFileBlock = entry.type === 'file_created' && (entry.path || entry.details);
+  const isThinkingBlock =
+    entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
+  const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
+  return (
+    <div
+      className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}
+    >
+      <div className={FLEX_ROW_CENTER_WRAP}>
+        <div className={FLEX_ROW_CENTER}>
+          <Icon className={`size-4 shrink-0 ${iconColor}`} />
+          <p className={ACTIVITY_LABEL}>{label}</p>
+        </div>
+        <span className={ACTIVITY_TIMESTAMP}>
+          {formatRelativeTime(entry.timestamp)}
+        </span>
+      </div>
+      {isThinkingBlock ? (
+        <div className="mt-0.5 rounded-md bg-background/40 px-2.5 py-2 max-h-32 overflow-y-auto">
+          <p className={`text-[11px] ${ACTIVITY_MONO}`}>{entry.details}</p>
+        </div>
+      ) : isCommandBlock ? (
+        <div className="mt-0.5 rounded-md bg-zinc-900/90 px-2.5 py-2 font-mono text-[11px] text-green-300/95 overflow-x-auto">
+          <span className="text-amber-400/80 select-none">$ </span>
+          <TypingText
+            text={entry.command ?? ''}
+            charMs={20}
+            showCursor={isStreaming}
+            skipAnimation={!isStreaming}
+          />
+        </div>
+      ) : isFileBlock ? (
+        <div className="mt-0.5 flex items-center gap-2 min-w-0">
+          <FileCode className="size-3.5 text-green-500 shrink-0" />
+          <span className="text-[11px] text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
+            {entry.path ?? entry.details}
+          </span>
+        </div>
+      ) : (
+        <div className="mt-0.5">
+          <p className={ACTIVITY_BODY}>{entry.message}</p>
+          {entry.details && entry.type !== 'reasoning_start' && String(entry.details).trim() !== '{}' && (
+            <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
+              {entry.details}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
 
 interface AgentThinkingSidebarProps {
   isCollapsed: boolean;
@@ -298,67 +361,9 @@ export function AgentThinkingSidebar({
                 No activity matches &quot;{activitySearchQuery.trim()}&quot;.
               </p>
             )}
-            {filteredStoryItems.map((entry) => {
-                const Icon = getActivityIcon(entry.type);
-                const label = getActivityLabel(entry.type);
-                const variant = getBlockVariant(entry);
-                const isCommandBlock = entry.type === 'tool_call' && entry.command;
-                const isFileBlock = entry.type === 'file_created' && (entry.path || entry.details);
-                const isThinkingBlock =
-                  entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
-                const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
-                return (
-                  <div
-                    key={entry.id}
-                    className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}
-                  >
-                    <div className={FLEX_ROW_CENTER_WRAP}>
-                      <div className={FLEX_ROW_CENTER}>
-                        <Icon className={`size-4 shrink-0 ${iconColor}`} />
-                        <p className={ACTIVITY_LABEL}>
-                          {label}
-                        </p>
-                      </div>
-                      <span className={ACTIVITY_TIMESTAMP}>
-                        {formatRelativeTime(entry.timestamp)}
-                      </span>
-                    </div>
-                    {isThinkingBlock ? (
-                      <div className="mt-0.5 rounded-md bg-background/40 px-2.5 py-2 max-h-32 overflow-y-auto">
-                        <p className={`text-[11px] ${ACTIVITY_MONO}`}>
-                          {entry.details}
-                        </p>
-                      </div>
-                    ) : isCommandBlock ? (
-                      <div className="mt-0.5 rounded-md bg-zinc-900/90 px-2.5 py-2 font-mono text-[11px] text-green-300/95 overflow-x-auto">
-                        <span className="text-amber-400/80 select-none">$ </span>
-                        <TypingText
-                          text={entry.command ?? ''}
-                          charMs={20}
-                          showCursor={isStreaming}
-                          skipAnimation={!isStreaming}
-                        />
-                      </div>
-                    ) : isFileBlock ? (
-                      <div className="mt-0.5 flex items-center gap-2 min-w-0">
-                        <FileCode className="size-3.5 text-green-500 shrink-0" />
-                        <span className="text-[11px] text-foreground/90 font-mono truncate" title={entry.path ?? entry.details}>
-                          {entry.path ?? entry.details}
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="mt-0.5">
-                        <p className={ACTIVITY_BODY}>{entry.message}</p>
-                        {entry.details && entry.type !== 'reasoning_start' && String(entry.details).trim() !== '{}' && (
-                          <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
-                            {entry.details}
-                          </p>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-            })}
+            {filteredStoryItems.map((entry) => (
+              <ActivityBlock key={entry.id} entry={entry} isStreaming={isStreaming} />
+            ))}
             {(displayThinkingText || isStreaming) && (
               <div
                 className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''}`}

@@ -109,6 +109,27 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText(/Generating response/)).toBeTruthy();
   });
 
+  it('renders tool_call activity block with Command label and command text', () => {
+    const storyItems = [
+      {
+        id: 'tc1',
+        type: 'tool_call',
+        message: 'Ran command',
+        timestamp: new Date().toISOString(),
+        command: 'npm install',
+      },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />
+    );
+    expect(screen.getByText('Command')).toBeTruthy();
+    expect(screen.getByText('npm install')).toBeTruthy();
+  });
+
   it('shows Session stats section when expanded', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
