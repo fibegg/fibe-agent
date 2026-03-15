@@ -229,10 +229,14 @@ export class OrchestratorService implements OnModuleInit {
     const userMessage = this.messageStore.add('user', text, imageUrls.length ? imageUrls : undefined);
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
 
-    const systemPromptPath = this.config.getSystemPromptPath();
     let systemPrompt = '';
-    if (existsSync(systemPromptPath)) {
-      systemPrompt = readFileSync(systemPromptPath, 'utf8');
+    if (this.config.getSystemPrompt()) {
+      systemPrompt = this.config.getSystemPrompt()!;
+    } else {
+      const systemPromptPath = this.config.getSystemPromptPath();
+      if (existsSync(systemPromptPath)) {
+        systemPrompt = readFileSync(systemPromptPath, 'utf8');
+      }
     }
 
     let imageContext = '';
