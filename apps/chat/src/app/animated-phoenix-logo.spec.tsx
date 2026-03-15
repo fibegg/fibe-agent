@@ -32,7 +32,9 @@ describe('AnimatedPhoenixLogo', () => {
 
   it('applies hover scale and rotate when hovered', () => {
     render(<AnimatedPhoenixLogo />);
-    fireEvent.mouseEnter(screen.getByRole('img').parentElement!.parentElement!);
+    const wrapper = screen.getByRole('img').parentElement?.parentElement;
+    expect(wrapper).toBeTruthy();
+    fireEvent.mouseEnter(wrapper as HTMLElement);
     const img = screen.getByRole('img');
     expect(img.className).toContain('scale-125');
     expect(img.className).toContain('rotate-12');
@@ -48,9 +50,10 @@ describe('AnimatedPhoenixLogo', () => {
 
   it('removes hover state on mouse leave', () => {
     render(<AnimatedPhoenixLogo />);
-    const wrapper = screen.getByRole('img').parentElement!.parentElement!;
-    fireEvent.mouseEnter(wrapper);
-    fireEvent.mouseLeave(wrapper);
+    const wrapper = screen.getByRole('img').parentElement?.parentElement;
+    expect(wrapper).toBeTruthy();
+    fireEvent.mouseEnter(wrapper as HTMLElement);
+    fireEvent.mouseLeave(wrapper as HTMLElement);
     const img = screen.getByRole('img');
     expect(img.className).toContain('scale-100');
   });
