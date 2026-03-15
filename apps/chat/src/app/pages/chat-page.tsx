@@ -31,7 +31,6 @@ import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-exp
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES, STATE_LABELS } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
-import { HeaderThinkingIcons } from '../chat/header-thinking-icons';
 import {
   getApiUrl,
   getAuthTokenForRequest,
@@ -46,6 +45,7 @@ import {
   MAIN_CONTENT_MIN_WIDTH_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
+  CHAT_HEADER_PADDING_BOTTOM_PX,
 } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 import type { ThinkingStep, ThinkingActivity } from '../chat/thinking-types';
@@ -80,7 +80,7 @@ export function ChatPage() {
   const [thinkingSteps, setThinkingSteps] = useState<ThinkingStep[]>([]);
   const [activityLog, setActivityLog] = useState<ThinkingActivity[]>([]);
   const activityLogRef = useRef<ThinkingActivity[]>([]);
-  const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => {});
+  const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => undefined);
   const reasoningTextRef = useRef('');
   const thinkingEntryIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -101,7 +101,7 @@ export function ChatPage() {
   const { entries: playgroundEntries, loading: playgroundLoading, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
   const [playgroundRefreshTrigger, setPlaygroundRefreshTrigger] = useState(0);
-  const hasPlaygroundFiles = playgroundLoading || playgroundEntries.length > 0;
+  const hasPlaygroundFiles = playgroundEntries.length > 0;
   const prevHasPlaygroundFilesRef = useRef(hasPlaygroundFiles);
   const atMention = getAtMentionState(inputValue, cursorOffset);
   const [mentionDropdownClosedAfterSelect, setMentionDropdownClosedAfterSelect] = useState(false);
@@ -422,7 +422,7 @@ export function ChatPage() {
     setPendingVoice(null);
     setPendingVoiceFilename(null);
     scroll.markJustSent();
-  }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, scroll.markJustSent]);
+  }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, scroll]);
 
   const addImage = useCallback((dataUrl: string) => {
     setPendingImages((prev) => (prev.length < MAX_PENDING_IMAGES ? [...prev, dataUrl] : prev));
@@ -721,7 +721,10 @@ export function ChatPage() {
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden w-full">
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
-        <header className="flex shrink-0 flex-col px-4 pt-4 pb-[15px] border-b border-border/50 bg-card/40 backdrop-blur-xl">
+        <header
+          className="flex shrink-0 flex-col border-b border-border/50 bg-card/40 backdrop-blur-xl px-4 pt-4"
+          style={{ paddingBottom: CHAT_HEADER_PADDING_BOTTOM_PX }}
+        >
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="flex items-center gap-1.5 shrink-0 lg:hidden">
@@ -739,18 +742,17 @@ export function ChatPage() {
                 <h2 className="font-semibold text-sm text-foreground truncate">
                   AI Assistant
                 </h2>
-                {state === CHAT_STATES.AWAITING_RESPONSE ? (
-                  <div className="flex items-center justify-start gap-1.5 mt-0.5">
+                <div className="min-h-[14px] mt-0.5 flex items-center">
+                  {state === CHAT_STATES.AWAITING_RESPONSE ? (
                     <span className="text-[10px] sm:text-xs text-warning">
                       Thinking...
                     </span>
-                    <HeaderThinkingIcons />
-                  </div>
-                ) : (
-                  <p className={`text-[10px] sm:text-xs ${statusClass}`}>
-                    {STATE_LABELS[state] ?? state}
-                  </p>
-                )}
+                  ) : (
+                    <p className={`text-[10px] sm:text-xs ${statusClass}`}>
+                      {STATE_LABELS[state] ?? state}
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">

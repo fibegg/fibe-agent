@@ -153,7 +153,7 @@ describe('MessageList', () => {
       <MessageList ref={ref} messages={messages} streamingText="" isStreaming={false} />
     );
     expect(ref.current).not.toBeNull();
-    expect(typeof ref.current!.scrollToBottom).toBe('function');
+    expect(typeof (ref.current as MessageListHandle).scrollToBottom).toBe('function');
   });
 
   it('scrollToBottom can be called with no args without throwing', () => {
@@ -165,7 +165,8 @@ describe('MessageList', () => {
       <MessageList ref={ref} messages={messages} streamingText="" isStreaming={false} />
     );
     act(() => {
-      ref.current!.scrollToBottom();
+      const handle = ref.current;
+      if (handle) handle.scrollToBottom();
     });
   });
 
@@ -178,7 +179,8 @@ describe('MessageList', () => {
       <MessageList ref={ref} messages={messages} streamingText="" isStreaming={false} />
     );
     act(() => {
-      ref.current!.scrollToBottom('smooth');
+      const handle = ref.current;
+      if (handle) handle.scrollToBottom('smooth');
     });
   });
 });

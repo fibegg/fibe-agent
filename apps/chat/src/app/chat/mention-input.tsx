@@ -336,7 +336,7 @@ export function MentionInput({
       }
       onKeyDown?.(e);
     },
-    [onChange, onCursorChange, onValueAndCursor, onKeyDown, ref, removeChipAtPath]
+    [onKeyDown, ref, removeChipAtPath]
   );
 
   return (

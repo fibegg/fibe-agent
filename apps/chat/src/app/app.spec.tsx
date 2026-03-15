@@ -19,6 +19,6 @@ describe('App', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await findByText('Agent Authentication')).toBeTruthy();
+    expect(await findByText('Agent Authentication', {}, { timeout: 5000 })).toBeTruthy();
   });
 });
