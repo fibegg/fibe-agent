@@ -43,7 +43,24 @@ ARG BUILDKIT_INLINE_CACHE=1
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
     jq less tree wget zip unzip openssh-client docker.io \
-    && rm -rf /var/lib/apt/lists/*
+    # Tier 1 – essential agent tooling
+    python3 python3-venv \
+    ripgrep fd-find \
+    make file patch \
+    ca-certificates \
+    # Tier 2 – extended agent tooling
+    sqlite3 pandoc htop strace \
+    # Tier 3 – native compilation support
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/fdfind /usr/local/bin/fd
+
+# uv – ultrafast Python package/project manager (single static binary)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Deno – secure JS/TS runtime for quick scripting
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Conditional packages — only busts cache for claude_code builds
 ARG AGENT_PROVIDER=gemini

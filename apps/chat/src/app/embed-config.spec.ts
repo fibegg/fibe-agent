@@ -5,9 +5,8 @@ import {
   shouldHideThemeSwitch,
 } from './embed-config';
 
-const env = (overrides: Record<string, string | undefined> = {}): ImportMetaEnv => ({
-  ...overrides,
-});
+const env = (overrides: Record<string, string | undefined> = {}): ImportMetaEnv =>
+  ({ ...overrides }) as unknown as ImportMetaEnv;
 
 describe('shouldHideHeaderLogo', () => {
   it('returns false when env is empty', () => {
