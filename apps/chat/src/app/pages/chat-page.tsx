@@ -838,7 +838,7 @@ export function ChatPage() {
             onScroll={scroll.onScroll}
             className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8"
           >
-            <div className="max-w-4xl">
+            <div>
               <MessageList
                 ref={messageListRef}
                 messages={filteredMessages}
