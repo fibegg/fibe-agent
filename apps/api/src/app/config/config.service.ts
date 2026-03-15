@@ -30,6 +30,10 @@ export class ConfigService {
     return join(process.cwd(), 'dist', 'assets', 'SYSTEM_PROMPT.md');
   }
 
+  getSystemPrompt(): string | undefined {
+    return process.env.SYSTEM_PROMPT;
+  }
+
   getPlaygroundsDir(): string {
     return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
   }
