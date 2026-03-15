@@ -3,8 +3,7 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from './file-explorer';
 
 vi.mock('../api-url', () => ({
-  getApiUrl: () => '',
-  getAuthTokenForRequest: () => '',
+  apiRequest: (path: string, options?: RequestInit) => fetch(path, options),
 }));
 
 describe('FileExplorer', () => {

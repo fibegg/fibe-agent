@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
@@ -40,6 +41,7 @@ export class OrchestratorService implements OnModuleInit {
   isAuthenticated = false;
   isProcessing = false;
   private readonly outbound$ = new Subject<OutboundEvent>();
+  private cachedSystemPromptFromFile: string | null = null;
 
   constructor(
     private readonly activityStore: ActivityStoreService,
@@ -55,6 +57,16 @@ export class OrchestratorService implements OnModuleInit {
 
   async onModuleInit(): Promise<void> {
     writeMcpConfig();
+    if (!this.config.getSystemPrompt()) {
+      const path = this.config.getSystemPromptPath();
+      if (existsSync(path)) {
+        try {
+          this.cachedSystemPromptFromFile = await readFile(path, 'utf8');
+        } catch {
+          this.logger.warn('Failed to read system prompt file');
+        }
+      }
+    }
   }
 
   get outbound(): Subject<OutboundEvent> {
@@ -210,7 +222,7 @@ export class OrchestratorService implements OnModuleInit {
     if (images?.length) {
       for (const dataUrl of images) {
         try {
-          imageUrls.push(this.uploadsService.saveImage(dataUrl));
+          imageUrls.push(await this.uploadsService.saveImage(dataUrl));
         } catch {
           this.logger.warn('Failed to save one image, skipping');
         }
@@ -220,7 +232,7 @@ export class OrchestratorService implements OnModuleInit {
     let audioFilename: string | null = audioFilenameFromClient ?? null;
     if (!audioFilename && audio) {
       try {
-        audioFilename = this.uploadsService.saveAudio(audio);
+        audioFilename = await this.uploadsService.saveAudio(audio);
       } catch {
         this.logger.warn('Failed to save voice recording, skipping');
       }
@@ -232,11 +244,8 @@ export class OrchestratorService implements OnModuleInit {
     let systemPrompt = '';
     if (this.config.getSystemPrompt()) {
       systemPrompt = this.config.getSystemPrompt()!;
-    } else {
-      const systemPromptPath = this.config.getSystemPromptPath();
-      if (existsSync(systemPromptPath)) {
-        systemPrompt = readFileSync(systemPromptPath, 'utf8');
-      }
+    } else if (this.cachedSystemPromptFromFile !== null) {
+      systemPrompt = this.cachedSystemPromptFromFile;
     }
 
     let imageContext = '';
@@ -262,11 +271,11 @@ export class OrchestratorService implements OnModuleInit {
       const blocks: string[] = [];
       for (const relPath of atPaths) {
         try {
-          const content = this.playgroundsService.getFileContent(relPath);
+          const content = await this.playgroundsService.getFileContent(relPath);
           blocks.push(`--- ${relPath} ---\n${content}\n---`);
         } catch {
           try {
-            const files = this.playgroundsService.getFolderFileContents(relPath);
+            const files = await this.playgroundsService.getFolderFileContents(relPath);
             for (const { path: p, content } of files) {
               blocks.push(`--- ${p} ---\n${content}\n---`);
             }

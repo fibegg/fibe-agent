@@ -8,15 +8,16 @@ export class PlaygroundsController {
   constructor(private readonly playgrounds: PlaygroundsService) {}
 
   @Get('playgrounds')
-  getTree() {
+  async getTree() {
     return this.playgrounds.getTree();
   }
 
   @Get('playgrounds/file')
-  getFileContent(@Query('path') path: string) {
+  async getFileContent(@Query('path') path: string) {
     if (!path || typeof path !== 'string') {
       return { content: '' };
     }
-    return { content: this.playgrounds.getFileContent(path) };
+    const content = await this.playgrounds.getFileContent(path);
+    return { content };
   }
 }

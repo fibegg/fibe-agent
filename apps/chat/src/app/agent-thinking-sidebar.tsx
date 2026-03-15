@@ -1,15 +1,4 @@
-import {
-  Brain,
-  CheckCircle2,
-  FileCode,
-  Loader2,
-  MessageSquare,
-  Search,
-  Sparkles,
-  Terminal,
-  X,
-  Zap,
-} from 'lucide-react';
+import { Brain, CheckCircle2, FileCode, Loader2, Search, Sparkles, X, Zap } from 'lucide-react';
 import { memo, useRef, useEffect, useMemo, useState } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
@@ -19,6 +8,14 @@ import {
 import { formatRelativeTime } from './format-relative-time';
 import type { ThinkingStep } from './chat/thinking-types';
 import { TypingText } from './chat/typing-text';
+import {
+  getActivityIcon,
+  getActivityLabel,
+  getBlockVariant,
+  formatSessionDurationMs,
+  toTimestampMs,
+  type StoryEntry,
+} from './agent-thinking-utils';
 import {
   ACTIVITY_BLOCK_BASE,
   ACTIVITY_BLOCK_VARIANTS,
@@ -38,87 +35,13 @@ import {
   SIDEBAR_PANEL,
 } from './ui-classes';
 
-export type StoryEntry = {
-  id: string;
-  type: string;
-  message: string;
-  timestamp: string | Date;
-  details?: string;
-  command?: string;
-  path?: string;
-};
+export type { StoryEntry } from './agent-thinking-utils';
 
 export type SessionActivityEntry = {
   id: string;
   created_at: string;
   story: StoryEntry[];
 };
-
-function getActivityIcon(type: string) {
-  switch (type) {
-    case 'stream_start':
-      return Sparkles;
-    case 'reasoning_start':
-    case 'reasoning_end':
-      return Brain;
-    case 'step':
-      return Loader2;
-    case 'file_created':
-      return FileCode;
-    case 'tool_call':
-      return Terminal;
-    case 'info':
-      return MessageSquare;
-    default:
-      return MessageSquare;
-  }
-}
-
-function getActivityLabel(type: string): string {
-  switch (type) {
-    case 'stream_start':
-      return 'Started';
-    case 'reasoning_start':
-    case 'reasoning_end':
-      return 'Reasoning';
-    case 'step':
-      return 'Step';
-    case 'file_created':
-      return 'File';
-    case 'tool_call':
-      return 'Command';
-    case 'info':
-      return 'Info';
-    default:
-      return 'Activity';
-  }
-}
-
-function getBlockVariant(entry: StoryEntry): keyof typeof ACTIVITY_BLOCK_VARIANTS {
-  if (entry.type === 'stream_start') return 'stream_start';
-  if (entry.type === 'reasoning_start' || entry.type === 'reasoning_end') return 'reasoning';
-  if (entry.type === 'step') return 'step';
-  if (entry.type === 'tool_call') return 'tool_call';
-  if (entry.type === 'file_created') return 'file_created';
-  return 'default';
-}
-
-function formatSessionDurationMs(ms: number): string {
-  if (ms < 1000) return '0s';
-  const sec = Math.floor(ms / 1000) % 60;
-  const min = Math.floor(ms / 60_000) % 60;
-  const h = Math.floor(ms / 3_600_000);
-  const parts: string[] = [];
-  if (h > 0) parts.push(`${h}h`);
-  if (min > 0) parts.push(`${min}m`);
-  parts.push(`${sec}s`);
-  return parts.join(' ');
-}
-
-function toTimestampMs(ts: string | Date | undefined, fallback: string): number {
-  if (!ts) return new Date(fallback).getTime();
-  return typeof ts === 'string' ? new Date(ts).getTime() : (ts as Date).getTime();
-}
 
 const ActivityBlock = memo(function ActivityBlock({
   entry,
@@ -239,23 +162,24 @@ export function AgentThinkingSidebar({
     return { totalActions, completed, processing, sessionTimeMs };
   }, [sessionActivity, storyItems, isStreaming]);
 
-  const filteredStoryItems = activitySearchQuery.trim()
-    ? storyItems.filter((entry) => {
-        const q = activitySearchQuery.trim().toLowerCase();
-        const message = (entry.message ?? '').toLowerCase();
-        const details = (entry.details ?? '').toLowerCase();
-        const command = (entry.command ?? '').toLowerCase();
-        const path = (entry.path ?? '').toLowerCase();
-        const label = getActivityLabel(entry.type).toLowerCase();
-        return (
-          message.includes(q) ||
-          details.includes(q) ||
-          command.includes(q) ||
-          path.includes(q) ||
-          label.includes(q)
-        );
-      })
-    : storyItems;
+  const filteredStoryItems = useMemo(() => {
+    if (!activitySearchQuery.trim()) return storyItems;
+    const q = activitySearchQuery.trim().toLowerCase();
+    return storyItems.filter((entry) => {
+      const message = (entry.message ?? '').toLowerCase();
+      const details = (entry.details ?? '').toLowerCase();
+      const command = (entry.command ?? '').toLowerCase();
+      const path = (entry.path ?? '').toLowerCase();
+      const label = getActivityLabel(entry.type).toLowerCase();
+      return (
+        message.includes(q) ||
+        details.includes(q) ||
+        command.includes(q) ||
+        path.includes(q) ||
+        label.includes(q)
+      );
+    });
+  }, [storyItems, activitySearchQuery]);
 
   useEffect(() => {
     if (isStreaming && displayThinkingText && typeof thinkingScrollRef.current?.scrollIntoView === 'function') {

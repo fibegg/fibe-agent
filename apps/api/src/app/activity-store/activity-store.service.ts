@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import type { StoredStoryEntry } from '../message-store/message-store.service';
@@ -34,13 +35,13 @@ export class ActivityStoreService {
       story: Array.isArray(story) ? story : [],
     };
     this.activities.push(entry);
-    this.save();
+    void this.save();
     return entry;
   }
 
   clear(): void {
     this.activities = [];
-    this.save();
+    void this.save();
   }
 
   private ensureDataDir(): void {
@@ -60,8 +61,8 @@ export class ActivityStoreService {
     }
   }
 
-  private save(): void {
-    writeFileSync(
+  private async save(): Promise<void> {
+    await writeFile(
       this.activityPath,
       JSON.stringify(this.activities, null, 2)
     );

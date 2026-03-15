@@ -8,6 +8,8 @@ interface SidebarToggleProps {
   ariaLabel: string;
 }
 
+const PULSE_HIDE_DELAY_MS = 5000;
+
 export function SidebarToggle({
   isCollapsed,
   onClick,
@@ -17,7 +19,7 @@ export function SidebarToggle({
   const [showPulse, setShowPulse] = useState(true);
 
   useEffect(() => {
-    const timer = setTimeout(() => setShowPulse(false), 5000);
+    const timer = setTimeout(() => setShowPulse(false), PULSE_HIDE_DELAY_MS);
     return () => clearTimeout(timer);
   }, []);
 

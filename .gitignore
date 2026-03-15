@@ -50,3 +50,5 @@ test-output
 **/test-results/
 
 designs/
+
+.env

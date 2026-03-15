@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { getApiUrl, getAuthTokenForRequest } from '../api-url';
-
-const REFETCH_WHEN_EMPTY_MS = 8000;
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiRequest } from '../api-url';
+import { API_PATHS } from '../api-paths';
+import { REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
 
 export interface PlaygroundEntryItem {
   path: string;
@@ -9,14 +9,14 @@ export interface PlaygroundEntryItem {
   type: 'file' | 'directory';
 }
 
-interface PlaygroundEntry {
+export interface PlaygroundTreeEntry {
   name: string;
   path: string;
   type: 'file' | 'directory';
-  children?: PlaygroundEntry[];
+  children?: PlaygroundTreeEntry[];
 }
 
-function flattenEntries(entries: PlaygroundEntry[]): PlaygroundEntryItem[] {
+function flattenEntries(entries: PlaygroundTreeEntry[]): PlaygroundEntryItem[] {
   const out: PlaygroundEntryItem[] = [];
   for (const e of entries) {
     out.push({ path: e.path, name: e.name, type: e.type });
@@ -36,34 +36,34 @@ function sortEntries(items: PlaygroundEntryItem[]): PlaygroundEntryItem[] {
 
 export function usePlaygroundFiles(): {
   entries: PlaygroundEntryItem[];
+  tree: PlaygroundTreeEntry[];
   loading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
 } {
-  const [entries, setEntries] = useState<PlaygroundEntryItem[]>([]);
+  const [tree, setTree] = useState<PlaygroundTreeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const entries = useMemo(
+    () => sortEntries(flattenEntries(tree)),
+    [tree]
+  );
 
   const refetch = useCallback(async () => {
     setLoading(true);
     setError(null);
-    const base = getApiUrl();
-    const url = base ? `${base}/api/playgrounds` : '/api/playgrounds';
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
-      const res = await fetch(url, { headers });
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS);
       if (res.status === 401) {
-        setEntries([]);
+        setTree([]);
         return;
       }
       if (!res.ok) throw new Error('Failed to load playgrounds');
-      const data = (await res.json()) as PlaygroundEntry[];
-      const list = Array.isArray(data) ? data : [];
-      setEntries(sortEntries(flattenEntries(list)));
+      const data = (await res.json()) as PlaygroundTreeEntry[];
+      setTree(Array.isArray(data) ? data : []);
     } catch (e) {
-      setEntries([]);
+      setTree([]);
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
       setLoading(false);
@@ -75,10 +75,10 @@ export function usePlaygroundFiles(): {
   }, [refetch]);
 
   useEffect(() => {
-    if (entries.length > 0 || loading) return;
+    if (tree.length > 0 || loading) return;
     const id = setInterval(() => void refetch(), REFETCH_WHEN_EMPTY_MS);
     return () => clearInterval(id);
-  }, [entries.length, loading, refetch]);
+  }, [tree.length, loading, refetch]);
 
   const refetchRef = useRef(refetch);
   refetchRef.current = refetch;
@@ -90,5 +90,5 @@ export function usePlaygroundFiles(): {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  return { entries, loading, error, refetch };
+  return { entries, tree, loading, error, refetch };
 }

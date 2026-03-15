@@ -20,8 +20,9 @@ describe('OrchestratorService', () => {
     process.env.AGENT_PROVIDER = 'mock';
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     process.env.AGENT_PROVIDER = envBackup;
+    await new Promise((r) => setTimeout(r, 50));
     rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -39,7 +40,10 @@ describe('OrchestratorService', () => {
     const strategyRegistry = new StrategyRegistryService();
     const uploadsService = new UploadsService(config as never);
     const playgroundsService = {
-      getFileContent: () => {
+      getFileContent: async () => {
+        throw new Error('not found');
+      },
+      getFolderFileContents: async () => {
         throw new Error('not found');
       },
     } as unknown as PlaygroundsService;

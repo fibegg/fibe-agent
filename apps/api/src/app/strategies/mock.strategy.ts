@@ -2,6 +2,9 @@ import { Logger } from '@nestjs/common';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 import type { AgentStrategy } from './strategy.types';
 
+const MOCK_AUTH_DELAY_MS = 1000;
+const MOCK_LOGOUT_DELAY_MS = 500;
+
 export class MockStrategy implements AgentStrategy {
   private readonly logger = new Logger(MockStrategy.name);
 
@@ -9,7 +12,7 @@ export class MockStrategy implements AgentStrategy {
     this.logger.log('executeAuth: Mocking auth success in 1s');
     setTimeout(() => {
       connection.sendAuthSuccess();
-    }, 1000);
+    }, MOCK_AUTH_DELAY_MS);
   }
 
   submitAuthCode(code: string): void {
@@ -29,7 +32,7 @@ export class MockStrategy implements AgentStrategy {
     connection.sendLogoutOutput('Logging out (mock)...\n');
     setTimeout(() => {
       connection.sendLogoutSuccess();
-    }, 500);
+    }, MOCK_LOGOUT_DELAY_MS);
   }
 
   checkAuthStatus(): Promise<boolean> {
@@ -59,7 +62,7 @@ export class MockStrategy implements AgentStrategy {
         onChunk('[MOCKED RESPONSE] Hello! ');
         onChunk(`The current timestamp is ${timestamp}`);
         resolve();
-      }, 1000);
+      }, MOCK_AUTH_DELAY_MS);
     });
   }
 }

@@ -1,3 +1,5 @@
+export const REFETCH_WHEN_EMPTY_MS = 8000;
+
 export const SIDEBAR_WIDTH_PX = 280;
 export const SIDEBAR_COLLAPSED_WIDTH_PX = 56;
 export const MAIN_CONTENT_MIN_WIDTH_PX = 260;

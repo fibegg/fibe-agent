@@ -118,9 +118,10 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         recognitionRef.current = recognition;
       }
 
+      const RECORDING_TICK_MS = 1000;
       timerRef.current = setInterval(() => {
         setRecordingTimeSec((s) => s + 1);
-      }, 1000);
+      }, RECORDING_TICK_MS);
 
       setIsRecording(true);
     } catch (err) {

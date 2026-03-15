@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 import type { AgentStrategy } from './strategy.types';
+import { runAuthProcess } from './auth-process-helper';
 
 const CODEX_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.codex');
 const CODEX_AUTH_FILE = join(CODEX_CONFIG_DIR, 'auth.json');
@@ -12,61 +13,54 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   private readonly logger = new Logger(OpenaiCodexStrategy.name);
   private activeAuthProcess: ReturnType<typeof spawn> | null = null;
   private currentConnection: AuthConnection | null = null;
+  private authCancel: (() => void) | null = null;
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
-    this.activeAuthProcess = spawn('codex', ['login', '--device-auth'], {
-      env: { ...process.env },
-      shell: false,
-    });
-
     let authUrlExtracted = false;
     let deviceCodeExtracted = false;
 
-    const handleCliOutput = (data: Buffer | string) => {
-      const output = data.toString();
-      // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
-      const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
-
-      const urlMatch = clean.match(/https:\/\/[^\s"'>]+/);
-      if (urlMatch && !authUrlExtracted) {
-        authUrlExtracted = true;
-        this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
-      }
-
-      const codeMatch = clean.match(/\b([A-Z0-9]{3,5}-[A-Z0-9]{3,5})\b/);
-      if (codeMatch && !deviceCodeExtracted) {
-        deviceCodeExtracted = true;
-        this.currentConnection?.sendDeviceCode(codeMatch[1]);
-      }
-    };
-
-    this.activeAuthProcess.stdout?.on('data', handleCliOutput);
-    this.activeAuthProcess.stderr?.on('data', handleCliOutput);
-
-    this.activeAuthProcess.on('close', (code) => {
-      if (this.currentConnection) {
-        if (code === 0) {
-          this.currentConnection.sendAuthSuccess();
-        } else {
-          this.currentConnection.sendAuthStatus('unauthenticated');
+    const { process: proc, cancel } = runAuthProcess('codex', ['login', '--device-auth'], {
+      env: process.env,
+      onData: (output) => {
+        // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
+        const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
+        const urlMatch = clean.match(/https:\/\/[^\s"'>]+/);
+        if (urlMatch && !authUrlExtracted) {
+          authUrlExtracted = true;
+          this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
         }
-      }
-      this.activeAuthProcess = null;
-      this.currentConnection = null;
+        const codeMatch = clean.match(/\b([A-Z0-9]{3,5}-[A-Z0-9]{3,5})\b/);
+        if (codeMatch && !deviceCodeExtracted) {
+          deviceCodeExtracted = true;
+          this.currentConnection?.sendDeviceCode(codeMatch[1]);
+        }
+      },
+      onClose: (code) => {
+        if (this.currentConnection) {
+          if (code === 0) {
+            this.currentConnection.sendAuthSuccess();
+          } else {
+            this.currentConnection.sendAuthStatus('unauthenticated');
+          }
+        }
+        this.activeAuthProcess = null;
+        this.currentConnection = null;
+      },
+      onError: (err) => {
+        this.logger.error('Codex Auth Process error', err);
+      },
     });
 
-    this.activeAuthProcess.on('error', (err) => {
-      this.logger.error('Codex Auth Process error', err);
-    });
+    this.activeAuthProcess = proc;
+    this.authCancel = cancel;
   }
 
   cancelAuth(): void {
-    if (this.activeAuthProcess) {
-      this.activeAuthProcess.kill();
-      this.activeAuthProcess = null;
-      this.currentConnection = null;
-    }
+    this.authCancel?.();
+    this.authCancel = null;
+    this.activeAuthProcess = null;
+    this.currentConnection = null;
   }
 
   submitAuthCode(code: string): void {

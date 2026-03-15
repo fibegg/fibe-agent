@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync 
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 import type { AgentStrategy } from './strategy.types';
+import { runAuthProcess } from './auth-process-helper';
 
 const GEMINI_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.gemini');
 
@@ -11,7 +12,9 @@ export class GeminiStrategy implements AgentStrategy {
   private readonly logger = new Logger(GeminiStrategy.name);
   private activeAuthProcess: ReturnType<typeof spawn> | null = null;
   private currentConnection: AuthConnection | null = null;
+  private authCancel: (() => void) | null = null;
   private _hasSession = false;
+
   ensureSettings(): void {
     if (!existsSync(GEMINI_CONFIG_DIR)) {
       mkdirSync(GEMINI_CONFIG_DIR, { recursive: true });
@@ -34,59 +37,54 @@ export class GeminiStrategy implements AgentStrategy {
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
     this.ensureSettings();
-    this.activeAuthProcess = spawn('gemini', ['-p', ''], {
-      env: { ...process.env, NO_BROWSER: 'true' },
-      shell: false,
-    });
-
     let authUrlExtracted = false;
     let isCode42Expected = false;
 
-    const handleCliOutput = (data: Buffer | string) => {
-      const output = data.toString();
-      if (
-        output.includes('No input provided via stdin') ||
-        output.includes('Loaded cached credentials')
-      ) {
-        isCode42Expected = true;
-      }
-      if (!output.includes('Waiting for authentication')) {
-        this.logger.log(`RAW OUTPUT: ${output.trim()}`);
-      }
-      const urlMatch = output.match(/https:\/\/accounts\.google\.com[^\s"'>]+/);
-      if (urlMatch && !authUrlExtracted) {
-        authUrlExtracted = true;
-        this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
-      }
-    };
-
-    this.activeAuthProcess.stdout?.on('data', handleCliOutput);
-    this.activeAuthProcess.stderr?.on('data', handleCliOutput);
-
-    this.activeAuthProcess.on('close', (code) => {
-      this.logger.log(`Gemini Auth Process exited with code ${code}`);
-      if (this.currentConnection) {
-        if (code === 0 || (code === 42 && isCode42Expected)) {
-          this.currentConnection.sendAuthSuccess();
-        } else {
-          this.currentConnection.sendAuthStatus('unauthenticated');
+    const { process: proc, cancel } = runAuthProcess('gemini', ['-p', ''], {
+      env: { ...process.env, NO_BROWSER: 'true' },
+      onData: (output) => {
+        if (
+          output.includes('No input provided via stdin') ||
+          output.includes('Loaded cached credentials')
+        ) {
+          isCode42Expected = true;
         }
-      }
-      this.activeAuthProcess = null;
-      this.currentConnection = null;
+        if (!output.includes('Waiting for authentication')) {
+          this.logger.log(`RAW OUTPUT: ${output.trim()}`);
+        }
+        const urlMatch = output.match(/https:\/\/accounts\.google\.com[^\s"'>]+/);
+        if (urlMatch && !authUrlExtracted) {
+          authUrlExtracted = true;
+          this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
+        }
+      },
+      onClose: (code) => {
+        this.logger.log(`Gemini Auth Process exited with code ${code}`);
+        if (this.currentConnection) {
+          if (code === 0 || (code === 42 && isCode42Expected)) {
+            this.currentConnection.sendAuthSuccess();
+          } else {
+            this.currentConnection.sendAuthStatus('unauthenticated');
+          }
+        }
+        this.activeAuthProcess = null;
+        this.authCancel = null;
+        this.currentConnection = null;
+      },
+      onError: (err) => {
+        this.logger.error('Gemini Auth Process error', err);
+      },
     });
 
-    this.activeAuthProcess.on('error', (err) => {
-      this.logger.error('Gemini Auth Process error', err);
-    });
+    this.activeAuthProcess = proc;
+    this.authCancel = cancel;
   }
 
   cancelAuth(): void {
-    if (this.activeAuthProcess) {
-      this.activeAuthProcess.kill();
-      this.activeAuthProcess = null;
-      this.currentConnection = null;
-    }
+    this.authCancel?.();
+    this.authCancel = null;
+    this.activeAuthProcess = null;
+    this.currentConnection = null;
   }
 
   submitAuthCode(code: string): void {

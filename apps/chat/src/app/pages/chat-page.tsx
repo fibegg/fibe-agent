@@ -33,12 +33,8 @@ import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-exp
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES, STATE_LABELS } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
-import {
-  getApiUrl,
-  getAuthTokenForRequest,
-  isAuthenticated,
-  isChatModelLocked,
-} from '../api-url';
+import { apiRequest, isAuthenticated, isChatModelLocked } from '../api-url';
+import { API_PATHS } from '../api-paths';
 import {
   getInitialSidebarCollapsed,
   getInitialRightSidebarCollapsed,
@@ -112,9 +108,8 @@ export function ChatPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLDivElement>(null);
   const messageListRef = useRef<MessageListHandle | null>(null);
-  const { entries: playgroundEntries, loading: playgroundLoading, refetch: refetchPlaygrounds } =
+  const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
-  const [playgroundRefreshTrigger, setPlaygroundRefreshTrigger] = useState(0);
   const hasPlaygroundFiles = playgroundEntries.length > 0;
   const prevHasPlaygroundFilesRef = useRef(hasPlaygroundFiles);
   const atMention = getAtMentionState(inputValue, cursorOffset);
@@ -165,13 +160,8 @@ export function ChatPage() {
   }, [authenticated, navigate]);
 
   const loadMessages = useCallback(async () => {
-    const base = getApiUrl();
-    const url = base ? `${base}/api/messages` : '/api/messages';
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
-      const res = await fetch(url, { headers });
+      const res = await apiRequest(API_PATHS.MESSAGES);
       if (res.status === 401) {
         navigate('/login', { replace: true });
         return;
@@ -184,13 +174,8 @@ export function ChatPage() {
   }, [navigate]);
 
   const loadModelOptions = useCallback(async () => {
-    const base = getApiUrl();
-    const url = base ? `${base}/api/model-options` : '/api/model-options';
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
-      const res = await fetch(url, { headers });
+      const res = await apiRequest(API_PATHS.MODEL_OPTIONS);
       if (res.status === 401) return;
       const data = (await res.json()) as string[];
       setModelOptions(Array.isArray(data) ? data : []);
@@ -309,7 +294,6 @@ export function ChatPage() {
       setLastSentMessage(null);
       setStreamingModel(null);
       refetchPlaygrounds();
-      setPlaygroundRefreshTrigger((t) => t + 1);
     },
     {
       onStreamStartData: (data) => setStreamingModel(data.model ?? null),
@@ -376,10 +360,7 @@ export function ChatPage() {
         ]);
       },
       onToolOrFile: (event) => {
-        if (event.kind === 'file_created') {
-          refetchPlaygrounds();
-          setPlaygroundRefreshTrigger((t) => t + 1);
-        }
+        if (event.kind === 'file_created') refetchPlaygrounds();
         const msg =
           event.kind === 'file_created'
             ? `Created ${event.path ?? event.name}`
@@ -398,7 +379,8 @@ export function ChatPage() {
           },
         ]);
       },
-    }
+    },
+    refetchPlaygrounds
   );
 
   useEffect(() => {
@@ -524,14 +506,12 @@ export function ChatPage() {
   }, [inputValue, cursorOffset, atMention.replaceStart]);
 
   const uploadVoiceFile = useCallback(async (blob: Blob): Promise<string | null> => {
-    const base = getApiUrl();
-    const url = base ? `${base}/api/uploads` : '/api/uploads';
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     const formData = new FormData();
     formData.append('file', blob, 'recording.webm');
-    const res = await fetch(url, { method: 'POST', headers, body: formData });
+    const res = await apiRequest(API_PATHS.UPLOADS, {
+      method: 'POST',
+      body: formData,
+    });
     if (!res.ok) return null;
     const data = (await res.json()) as { filename: string };
     return data.filename ?? null;
@@ -699,6 +679,7 @@ export function ChatPage() {
           />
           <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20`}>
             <FileExplorer
+              tree={playgroundTree}
               onSettingsClick={() => setSettingsOpen(true)}
               onClose={closeMobileSidebar}
               onFileSelect={(entry) => {
@@ -706,7 +687,6 @@ export function ChatPage() {
                 closeMobileSidebar();
               }}
               selectedPath={viewingFile?.path ?? null}
-              refreshTrigger={playgroundRefreshTrigger}
             />
           </div>
         </>
@@ -745,12 +725,12 @@ export function ChatPage() {
         >
           <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
             <FileExplorer
+              tree={playgroundTree}
               collapsed={!hasPlaygroundFiles || sidebarCollapsed}
               onSettingsClick={() => setSettingsOpen(true)}
               onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
               onFileSelect={(entry) => setViewingFile(entry)}
               selectedPath={viewingFile?.path ?? null}
-              refreshTrigger={playgroundRefreshTrigger}
             />
           </aside>
         </div>
