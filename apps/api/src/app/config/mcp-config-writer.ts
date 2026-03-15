@@ -116,12 +116,12 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   },
 
   /**
-   * Claude Code: ~/.claude/settings.json
-   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
+   * Claude Code: ~/.claude.json
+   * User-scoped MCP servers live in ~/.claude.json (not ~/.claude/settings.json).
+   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } }, ...otherKeys }
    */
   'claude-code': (servers) => {
-    const dir = join(getHome(), '.claude');
-    const configPath = join(dir, 'settings.json');
+    const configPath = join(getHome(), '.claude.json');
     let existing: Record<string, unknown> = {};
 
     try {
@@ -131,8 +131,6 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     } catch {
       /* start fresh */
     }
-
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
     const nativeServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
