@@ -181,6 +181,7 @@ export interface PlaygroundEntry {
 const SIDEBAR_TITLE = 'Standalone';
 const REFETCH_WHEN_EMPTY_MS = 8000;
 const SIDEBAR_SUBTITLE = `Phoenix v${__APP_VERSION__}`;
+const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
 
 function getDirPathsAtDepth(entries: PlaygroundEntry[], depth: number): string[] {
   if (depth === 0) {
@@ -728,6 +729,11 @@ export function FileExplorer({
         )}
         {error && (
           <div className="px-3 py-2 text-xs text-destructive">{error}</div>
+        )}
+        {!loading && !error && tree.length === 0 && (
+          <div className="px-3 py-4 text-sm text-muted-foreground">
+            {EMPTY_PLAYGROUND_MESSAGE}
+          </div>
         )}
         {!error && tree.length > 0 && filteredTree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">

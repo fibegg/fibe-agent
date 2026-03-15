@@ -690,7 +690,7 @@ export function ChatPage() {
           </div>
         </>
       )}
-      {hasPlaygroundFiles && isMobile && sidebarOpen && (
+      {isMobile && sidebarOpen && (
         <>
           <div
             className={`${MODAL_OVERLAY_DARK} lg:hidden`}

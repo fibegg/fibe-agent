@@ -16,7 +16,7 @@ describe('FileExplorer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('hides file explorer block when tree is loaded with no files', async () => {
+  it('shows empty playground message when tree is loaded with no files', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -26,8 +26,7 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.queryByText(/No files in playground\//)).toBeNull();
-    expect(screen.queryByText(/playground\//)).toBeNull();
+    expect(screen.getByText("You don't have any files in the playground.")).toBeTruthy();
   });
 
   it('shows loading state initially', () => {
@@ -38,7 +37,7 @@ describe('FileExplorer', () => {
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
-  it('hides file explorer block when API returns empty array', async () => {
+  it('shows empty playground message when API returns empty array', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -48,7 +47,7 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.queryByText(/No files in playground\//)).toBeNull();
+    expect(screen.getByText("You don't have any files in the playground.")).toBeTruthy();
   });
 
   it('does not render expand/collapse button when tree is empty', async () => {
