@@ -138,6 +138,12 @@ export function AgentThinkingSidebar({
 }: AgentThinkingSidebarProps) {
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
   const activityEndRef = useRef<HTMLDivElement>(null);
+  const prevActivityDepsRef = useRef({
+    storyLength: 0,
+    sessionLength: 0,
+    hasThinking: false,
+    streaming: false,
+  });
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
 
   const displayThinkingText = reasoningText || streamingResponseText;
@@ -188,7 +194,23 @@ export function AgentThinkingSidebar({
   }, [isStreaming, displayThinkingText]);
 
   useEffect(() => {
-    if (typeof activityEndRef.current?.scrollIntoView === 'function') {
+    const prev = prevActivityDepsRef.current;
+    const storyLength = storyItems.length;
+    const sessionLength = sessionActivity.length;
+    const hasThinking = !!displayThinkingText;
+    const streaming = isStreaming;
+    const activityGrew =
+      storyLength > prev.storyLength ||
+      sessionLength > prev.sessionLength ||
+      (hasThinking && !prev.hasThinking) ||
+      (streaming && !prev.streaming);
+    prevActivityDepsRef.current = {
+      storyLength,
+      sessionLength,
+      hasThinking,
+      streaming,
+    };
+    if (activityGrew && typeof activityEndRef.current?.scrollIntoView === 'function') {
       activityEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [storyItems.length, sessionActivity.length, displayThinkingText, isStreaming]);

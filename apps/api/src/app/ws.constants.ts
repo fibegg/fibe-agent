@@ -31,6 +31,8 @@ export const WS_EVENT = {
   THINKING_STEP: 'thinking_step',
   TOOL_CALL: 'tool_call',
   FILE_CREATED: 'file_created',
+  ACTIVITY_SNAPSHOT: 'activity_snapshot',
+  ACTIVITY_APPENDED: 'activity_appended',
 } as const;
 
 export const AUTH_STATUS = {

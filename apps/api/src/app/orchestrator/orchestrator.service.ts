@@ -127,6 +127,9 @@ export class OrchestratorService implements OnModuleInit {
       status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
       isProcessing: this.isProcessing,
     });
+    this._send(WS_EVENT.ACTIVITY_SNAPSHOT, {
+      activity: this.activityStore.all(),
+    });
   }
 
   private async checkAndSendAuthStatus(): Promise<void> {
@@ -384,7 +387,8 @@ export class OrchestratorService implements OnModuleInit {
 
   private handleSubmitStory(story: StoredStoryEntry[]): void {
     this.messageStore.setStoryForLastAssistant(story);
-    this.activityStore.append(story);
+    const entry = this.activityStore.append(story);
+    this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
   }
 
   private handleGetModel(): void {
