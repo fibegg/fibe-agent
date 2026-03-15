@@ -166,9 +166,9 @@ describe('writeMcpConfig', () => {
       delete process.env.DOCKER_MCP_CONFIG_JSON;
     });
 
-    it('writes settings.json with mcpServers block', () => {
+    it('writes .claude.json with mcpServers block', () => {
       writeMcpConfig();
-      const configPath = join(testHome, '.claude', 'settings.json');
+      const configPath = join(testHome, '.claude.json');
       expect(existsSync(configPath)).toBe(true);
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
@@ -186,10 +186,20 @@ describe('writeMcpConfig', () => {
       });
       writeMcpConfig();
       const config = JSON.parse(
-        readFileSync(join(testHome, '.claude', 'settings.json'), 'utf8'),
+        readFileSync(join(testHome, '.claude.json'), 'utf8'),
       );
       expect(Object.keys(config.mcpServers)).toContain('playgrounds-dev');
       expect(Object.keys(config.mcpServers)).toContain('docker');
+    });
+
+    it('preserves existing .claude.json content', () => {
+      writeFileSync(join(testHome, '.claude.json'), JSON.stringify({ userID: 'abc123', firstStartTime: '2026-01-01' }));
+
+      writeMcpConfig();
+      const config = JSON.parse(readFileSync(join(testHome, '.claude.json'), 'utf8'));
+      expect(config.userID).toBe('abc123');
+      expect(config.firstStartTime).toBe('2026-01-01');
+      expect(config.mcpServers['playgrounds-dev']).toBeDefined();
     });
   });
 
