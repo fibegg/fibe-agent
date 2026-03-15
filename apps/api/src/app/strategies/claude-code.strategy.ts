@@ -176,7 +176,8 @@ export class ClaudeCodeStrategy implements AgentStrategy {
     prompt: string,
     _model: string,
     onChunk: (chunk: string) => void,
-    callbacks?: import('./strategy.types').StreamingCallbacks
+    callbacks?: import('./strategy.types').StreamingCallbacks,
+    systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       if (!existsSync(PLAYGROUND_DIR)) {
@@ -189,6 +190,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
         '-p',
         prompt,
         '--dangerously-skip-permissions',
+        ...(systemPrompt ? ['--system-prompt', systemPrompt] : []),
         ...(useStreamJson
           ? ['--output-format', 'stream-json', '--include-partial-messages', '--verbose']
           : []),

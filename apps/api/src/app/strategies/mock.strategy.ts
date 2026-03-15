@@ -41,7 +41,8 @@ export class MockStrategy implements AgentStrategy {
     _prompt: string,
     _model: string,
     onChunk: (chunk: string) => void,
-    callbacks?: import('./strategy.types').StreamingCallbacks
+    callbacks?: import('./strategy.types').StreamingCallbacks,
+    _systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve) => {
       callbacks?.onReasoningChunk?.('Considering the request...\n');

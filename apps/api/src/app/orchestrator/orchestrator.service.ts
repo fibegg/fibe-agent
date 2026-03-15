@@ -276,7 +276,7 @@ export class OrchestratorService implements OnModuleInit {
       }
     }
 
-    const fullPrompt = `${systemPrompt}${fileContext}${imageContext}${voiceContext}\n${text}`.trim();
+    const fullPrompt = `${fileContext}${imageContext}${voiceContext}\n${text}`.trim();
     const model = this.modelStore.get();
 
     const syntheticStepId = 'generating-response';
@@ -338,7 +338,7 @@ export class OrchestratorService implements OnModuleInit {
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
-      }, callbacks);
+      }, callbacks, systemPrompt || undefined);
 
       const finalText =
         accumulated || 'The agent produced no visible output.';

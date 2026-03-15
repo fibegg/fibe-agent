@@ -125,7 +125,8 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     prompt: string,
     _model: string,
     onChunk: (chunk: string) => void,
-    callbacks?: import('./strategy.types').StreamingCallbacks
+    callbacks?: import('./strategy.types').StreamingCallbacks,
+    systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const playgroundDir = join(process.cwd(), 'playground');
@@ -133,7 +134,8 @@ export class OpenaiCodexStrategy implements AgentStrategy {
         mkdirSync(playgroundDir, { recursive: true });
       }
 
-      const codexArgs = ['exec', '--yolo', prompt];
+      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
+      const codexArgs = ['exec', '--yolo', effectivePrompt];
 
       const codexProcess = spawn('codex', codexArgs, {
         env: { ...process.env },

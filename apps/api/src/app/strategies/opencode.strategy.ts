@@ -30,7 +30,8 @@ export class OpencodeStrategy implements AgentStrategy {
     _prompt: string,
     _model: string,
     _onChunk: (chunk: string) => void,
-    _callbacks?: import('./strategy.types').StreamingCallbacks
+    _callbacks?: import('./strategy.types').StreamingCallbacks,
+    _systemPrompt?: string
   ): Promise<void> {
     return Promise.reject(new Error('Opencode strategy is not implemented'));
   }

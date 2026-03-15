@@ -199,7 +199,8 @@ export class GeminiStrategy implements AgentStrategy {
     prompt: string,
     model: string,
     onChunk: (chunk: string) => void,
-    _callbacks?: import('./strategy.types').StreamingCallbacks
+    _callbacks?: import('./strategy.types').StreamingCallbacks,
+    systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.ensureSettings();
@@ -208,12 +209,13 @@ export class GeminiStrategy implements AgentStrategy {
         mkdirSync(playgroundDir, { recursive: true });
       }
 
+      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
       const geminiArgs = [
         ...this.getModelArgs(model),
         ...(this._hasSession ? ['--resume'] : []),
         '--yolo',
         '-p',
-        prompt,
+        effectivePrompt,
       ];
 
       const geminiProcess = spawn('gemini', geminiArgs, {
