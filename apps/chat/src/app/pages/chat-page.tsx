@@ -1,4 +1,5 @@
 import {
+  Brain,
   ChevronDown,
   ImagePlus,
   Key,
@@ -57,6 +58,7 @@ import {
   INPUT_SEARCH,
   MODAL_CARD,
   MODAL_OVERLAY_DARK,
+  MOBILE_SHEET_PANEL,
   SEARCH_ICON_POSITION,
   SETTINGS_CLOSE_BUTTON,
 } from '../ui-classes';
@@ -77,6 +79,7 @@ export function ChatPage() {
 
   const [isMobile, setIsMobile] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(
     getInitialRightSidebarCollapsed
@@ -211,7 +214,10 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => {
-    if (!isMobile) setSidebarOpen(false);
+    if (!isMobile) {
+      setSidebarOpen(false);
+      setRightSidebarOpen(false);
+    }
   }, [isMobile]);
 
   const closeMobileSidebar = useCallback(() => setSidebarOpen(false), []);
@@ -691,7 +697,7 @@ export function ChatPage() {
             aria-hidden
             onClick={closeMobileSidebar}
           />
-          <div className="fixed left-0 top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 lg:hidden">
+          <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20`}>
             <FileExplorer
               onSettingsClick={() => setSettingsOpen(true)}
               onClose={closeMobileSidebar}
@@ -701,6 +707,28 @@ export function ChatPage() {
               }}
               selectedPath={viewingFile?.path ?? null}
               refreshTrigger={playgroundRefreshTrigger}
+            />
+          </div>
+        </>
+      )}
+      {isMobile && rightSidebarOpen && (
+        <>
+          <div
+            className={`${MODAL_OVERLAY_DARK} lg:hidden`}
+            aria-hidden
+            onClick={() => setRightSidebarOpen(false)}
+          />
+          <div className={`${MOBILE_SHEET_PANEL} right-0 bg-background border-l border-violet-500/20`}>
+            <AgentThinkingSidebar
+              isCollapsed={false}
+              onToggle={() => setRightSidebarOpen(false)}
+              isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+              reasoningText={reasoningText}
+              streamingResponseText={streamingText}
+              thinkingSteps={thinkingSteps}
+              storyItems={displayStory}
+              sessionActivity={sessionActivity}
+              mobileOverlay
             />
           </div>
         </>
@@ -770,6 +798,17 @@ export function ChatPage() {
               </div>
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
+              {isMobile && (
+                <button
+                  type="button"
+                  onClick={() => setRightSidebarOpen(true)}
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                  title="Agent activity"
+                  aria-label="Open agent activity"
+                >
+                  <Brain className="size-4 sm:size-5" />
+                </button>
+              )}
               {(state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR) && (
                 <button
                   type="button"

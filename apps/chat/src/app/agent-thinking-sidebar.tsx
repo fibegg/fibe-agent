@@ -192,6 +192,7 @@ interface AgentThinkingSidebarProps {
   thinkingSteps?: ThinkingStep[];
   storyItems?: StoryEntry[];
   sessionActivity?: SessionActivityEntry[];
+  mobileOverlay?: boolean;
 }
 
 export function AgentThinkingSidebar({
@@ -203,6 +204,7 @@ export function AgentThinkingSidebar({
   thinkingSteps = [],
   storyItems = [],
   sessionActivity = [],
+  mobileOverlay = false,
 }: AgentThinkingSidebarProps) {
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
   const activityEndRef = useRef<HTMLDivElement>(null);
@@ -285,9 +287,9 @@ export function AgentThinkingSidebar({
 
   return (
     <div
-      className={SIDEBAR_PANEL}
+      className={mobileOverlay ? `${SIDEBAR_PANEL} bg-background` : SIDEBAR_PANEL}
       style={{
-        width: isCollapsed ? RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX : RIGHT_SIDEBAR_WIDTH_PX,
+        width: mobileOverlay ? '100%' : (isCollapsed ? RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX : RIGHT_SIDEBAR_WIDTH_PX),
       }}
     >
       <SidebarToggle

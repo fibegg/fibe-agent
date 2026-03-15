@@ -79,6 +79,8 @@ export const CARD_HEADER = 'px-4 pt-4 pb-[11px] border-b border-border/50 bg-car
 
 export const MODAL_OVERLAY = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm';
 export const MODAL_OVERLAY_DARK = 'fixed inset-0 z-50 bg-black/50';
+export const MOBILE_SHEET_PANEL =
+  'fixed top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col lg:hidden';
 export const MODAL_OVERLAY_CENTER =
   'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm';
 
