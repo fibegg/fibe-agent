@@ -10,13 +10,6 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByRole('heading', { name: 'Agent Activity' })).toBeTruthy();
   });
 
-  it('renders Model (default) label when expanded and no model set', () => {
-    render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
-    );
-    expect(screen.getByText('Model (default)')).toBeTruthy();
-  });
-
   it('shows Processing when isStreaming is true', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} isStreaming />
@@ -31,12 +24,11 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText('Idle')).toBeTruthy();
   });
 
-  it('does not show heading or model label when collapsed', () => {
+  it('does not show heading when collapsed', () => {
     render(
       <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />
     );
     expect(screen.queryByRole('heading', { name: 'Agent Activity' })).toBeNull();
-    expect(screen.queryByText('Model (default)')).toBeNull();
   });
 
   it('calls onToggle when sidebar toggle is clicked', () => {
@@ -54,17 +46,6 @@ describe('AgentThinkingSidebar', () => {
       <AgentThinkingSidebar isCollapsed onToggle={onToggle} />
     );
     expect(screen.getByRole('button', { name: 'Expand thinking panel' })).toBeTruthy();
-  });
-
-  it('shows currentModel when provided', () => {
-    render(
-      <AgentThinkingSidebar
-        isCollapsed={false}
-        onToggle={vi.fn()}
-        currentModel="claude-3-opus"
-      />
-    );
-    expect(screen.getByText('claude-3-opus')).toBeTruthy();
   });
 
   it('shows reasoning text in scrollable area', () => {

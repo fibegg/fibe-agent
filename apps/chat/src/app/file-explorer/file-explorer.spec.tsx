@@ -83,7 +83,7 @@ describe('FileExplorer', () => {
     });
   });
 
-  it('shows single top-level directory name as label when tree has one dir', async () => {
+  it('shows tree with single top-level directory when tree has one dir', async () => {
     const tree: PlaygroundEntry[] = [
       {
         name: 'zcss',
@@ -99,9 +99,32 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText('zcss/')).toBeTruthy();
+      expect(screen.getByText('zcss')).toBeTruthy();
     });
-    expect(screen.getByText('zcss')).toBeTruthy();
+    expect(screen.getByText('build.zig')).toBeTruthy();
+  });
+
+  it('shows file tree when refetching and tree already has files', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'src', path: 'src', type: 'directory', children: [] },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockImplementation(
+        () => new Promise(() => undefined)
+      );
+    const { rerender } = render(<FileExplorer refreshTrigger={0} />);
+    await waitFor(() => {
+      expect(screen.getByText('src')).toBeTruthy();
+    });
+    rerender(<FileExplorer refreshTrigger={1} />);
+    await act(() => Promise.resolve());
+    expect(screen.getByText('src')).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
   });
 
   it('shows Phoenix version in sidebar', async () => {

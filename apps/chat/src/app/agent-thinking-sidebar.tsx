@@ -27,7 +27,6 @@ import {
   ACTIVITY_LABEL,
   ACTIVITY_MONO,
   ACTIVITY_TIMESTAMP,
-  BADGE_CARD,
   CLEAR_BUTTON_POSITION,
   FLEX_ROW_CENTER,
   FLEX_ROW_CENTER_WRAP,
@@ -38,8 +37,6 @@ import {
   SIDEBAR_HEADER,
   SIDEBAR_PANEL,
 } from './ui-classes';
-
-const DEFAULT_MODEL_LABEL = 'Model (default)';
 
 export type StoryEntry = {
   id: string;
@@ -127,7 +124,6 @@ interface AgentThinkingSidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
   isStreaming?: boolean;
-  currentModel?: string;
   reasoningText?: string;
   streamingResponseText?: string;
   thinkingSteps?: ThinkingStep[];
@@ -139,7 +135,6 @@ export function AgentThinkingSidebar({
   isCollapsed,
   onToggle,
   isStreaming = false,
-  currentModel = '',
   reasoningText = '',
   streamingResponseText = '',
   thinkingSteps = [],
@@ -225,8 +220,6 @@ export function AgentThinkingSidebar({
     }
   }, [storyItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
 
-  const modelLabel = currentModel.trim() || DEFAULT_MODEL_LABEL;
-
   return (
     <div
       className={SIDEBAR_PANEL}
@@ -246,22 +239,17 @@ export function AgentThinkingSidebar({
       <div className={SIDEBAR_HEADER}>
         {!isCollapsed ? (
           <>
-            <div className={`${FLEX_ROW_CENTER_WRAP} mb-2 min-h-[3.25rem]`}>
-              <div className={`${FLEX_ROW_CENTER} flex-1 overflow-hidden`}>
-                <div className="relative shrink-0">
-                  <Brain className="size-5 text-violet-400" />
-                  <Sparkles className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="font-semibold text-sm truncate">Agent Activity</h2>
-                  <p className="text-[10px] text-muted-foreground truncate">
-                    {isStreaming ? 'Processing' : 'Idle'}
-                  </p>
-                </div>
+            <div className={`${FLEX_ROW_CENTER} mb-2 min-h-[3.25rem]`}>
+              <div className="relative shrink-0">
+                <Brain className="size-5 text-violet-400" />
+                <Sparkles className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse" />
               </div>
-              <span className={BADGE_CARD} title={modelLabel}>
-                {modelLabel}
-              </span>
+              <div className="min-w-0">
+                <h2 className="font-semibold text-sm truncate">Agent Activity</h2>
+                <p className="text-[10px] text-muted-foreground truncate">
+                  {isStreaming ? 'Processing' : 'Idle'}
+                </p>
+              </div>
             </div>
             <div className="relative h-8 mt-2">
               <Search className={SEARCH_ICON_POSITION} aria-hidden />

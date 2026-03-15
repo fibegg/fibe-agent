@@ -259,7 +259,6 @@ export interface PlaygroundEntry {
   children?: PlaygroundEntry[];
 }
 
-const PLAYGROUNDS_LABEL = 'playground/';
 const SIDEBAR_TITLE = 'Standalone';
 const REFETCH_WHEN_EMPTY_MS = 8000;
 const SIDEBAR_SUBTITLE = `Phoenix v${__APP_VERSION__}`;
@@ -712,10 +711,6 @@ export function FileExplorer({
   );
 
   const filteredTree = useMemo(() => filterTreeByQuery(tree, searchQuery), [tree, searchQuery]);
-  const playgroundLabel = useMemo(
-    () => (tree.length === 1 && tree[0].type === 'directory' ? `${tree[0].name}/` : PLAYGROUNDS_LABEL),
-    [tree]
-  );
   const openFileEntry =
     !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
 
@@ -795,7 +790,7 @@ export function FileExplorer({
         </div>
       </div>
       <div className="flex-1 overflow-auto py-2">
-        {loading && (
+        {loading && tree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             Loading…
           </div>
@@ -803,14 +798,13 @@ export function FileExplorer({
         {error && (
           <div className="px-3 py-2 text-xs text-destructive">{error}</div>
         )}
-        {!loading && !error && tree.length > 0 && filteredTree.length === 0 && (
+        {!error && tree.length > 0 && filteredTree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             No matches for &quot;{searchQuery}&quot;
           </div>
         )}
-        {!loading && !error && filteredTree.length > 0 && (
+        {!error && filteredTree.length > 0 && (
           <div className="p-2 animate-file-explorer-in">
-            <div className="px-2 py-1 text-[10px] text-muted-foreground font-medium">{playgroundLabel}</div>
             {filteredTree.map((entry) => (
               <TreeNode
                 key={entry.path}

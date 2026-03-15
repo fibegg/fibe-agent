@@ -16,7 +16,7 @@ describe('ModelSelector', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders only disabled input when visible and modelLocked', () => {
+  it('renders read-only trigger when visible and modelLocked', () => {
     render(
       <ModelSelector
         currentModel="flash"
@@ -27,13 +27,12 @@ describe('ModelSelector', () => {
         modelLocked
       />
     );
-    const input = screen.getByRole('textbox', { name: 'Model in use' });
-    expect((input as HTMLInputElement).value).toBe('flash');
-    expect((input as HTMLInputElement).disabled).toBe(true);
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByLabelText('Model in use')).toBeTruthy();
+    expect(screen.getByText('flash')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /select model/i })).toBeNull();
   });
 
-  it('renders input and option buttons when visible and not locked', () => {
+  it('renders trigger with Model (default) when currentModel is empty', () => {
     render(
       <ModelSelector
         currentModel=""
@@ -43,10 +42,25 @@ describe('ModelSelector', () => {
         visible
       />
     );
-    const input = screen.getByPlaceholderText('Model (default)');
-    expect((input as HTMLInputElement).disabled).toBe(false);
-    expect(screen.getByRole('button', { name: 'flash' })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'pro' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Select model' })).toBeTruthy();
+    expect(screen.getByText('Model (default)')).toBeTruthy();
+  });
+
+  it('opens dropdown with options when trigger is clicked', () => {
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['flash', 'pro']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    expect(screen.getByRole('listbox', { name: 'Model options' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'Model (default)' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'flash' })).toBeTruthy();
+    expect(screen.getByRole('option', { name: 'pro' })).toBeTruthy();
   });
 
   it('calls onSelect with option when clicking unselected option', () => {
@@ -60,11 +74,12 @@ describe('ModelSelector', () => {
         visible
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'pro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    fireEvent.click(screen.getByRole('option', { name: 'pro' }));
     expect(onSelect).toHaveBeenCalledWith('pro');
   });
 
-  it('calls onSelect with empty string when clicking selected option', () => {
+  it('calls onSelect with empty string when clicking Model (default)', () => {
     const onSelect = vi.fn();
     render(
       <ModelSelector
@@ -75,24 +90,30 @@ describe('ModelSelector', () => {
         visible
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'pro' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Model (default)' }));
     expect(onSelect).toHaveBeenCalledWith('');
   });
 
-  it('calls onInputChange when typing in input', () => {
+  it('shows Custom model option and calls onInputChange when entering custom value', () => {
     const onInputChange = vi.fn();
+    const onSelect = vi.fn();
     render(
       <ModelSelector
         currentModel=""
         options={[]}
-        onSelect={vi.fn()}
+        onSelect={onSelect}
         onInputChange={onInputChange}
         visible
       />
     );
-    fireEvent.change(screen.getByPlaceholderText('Model (default)'), {
-      target: { value: 'custom' },
-    });
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Custom model...' }));
+    const input = screen.getByLabelText('Custom model name');
+    expect(input).toBeTruthy();
+    fireEvent.change(input, { target: { value: 'custom' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
     expect(onInputChange).toHaveBeenCalledWith('custom');
+    expect(onSelect).toHaveBeenCalledWith('custom');
   });
 });

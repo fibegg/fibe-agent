@@ -1025,7 +1025,6 @@ export function ChatPage() {
           isCollapsed={rightSidebarCollapsed}
           onToggle={() => setRightSidebarCollapsed((v) => !v)}
           isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-          currentModel={streamingModel ?? currentModel}
           reasoningText={reasoningText}
           streamingResponseText={streamingText}
           thinkingSteps={thinkingSteps}
