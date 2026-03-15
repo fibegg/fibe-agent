@@ -62,7 +62,8 @@ export function useChatWebSocket(
   onStreamChunk?: (text: string) => void,
   onStreamStart?: (data?: { model?: string }) => void,
   onStreamEnd?: (finalText: string) => void,
-  thinkingCallbacks?: ThinkingCallbacks
+  thinkingCallbacks?: ThinkingCallbacks,
+  onPlaygroundChanged?: () => void
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -82,11 +83,13 @@ export function useChatWebSocket(
   const onStreamStartRef = useRef(onStreamStart);
   const onStreamEndRef = useRef(onStreamEnd);
   const thinkingRef = useRef(thinkingCallbacks);
+  const onPlaygroundChangedRef = useRef(onPlaygroundChanged);
   thinkingRef.current = thinkingCallbacks;
   onMessageRef.current = onMessage;
   onStreamChunkRef.current = onStreamChunk;
   onStreamStartRef.current = onStreamStart;
   onStreamEndRef.current = onStreamEnd;
+  onPlaygroundChangedRef.current = onPlaygroundChanged;
   const streamingAccumulatorRef = useRef('');
 
   const clearResponseTimer = useCallback(() => {
@@ -291,6 +294,11 @@ export function useChatWebSocket(
 
       if (data.type === 'model_updated') {
         onMessageRef.current?.(data);
+        return;
+      }
+
+      if (data.type === 'playground_changed') {
+        onPlaygroundChangedRef.current?.();
         return;
       }
     };

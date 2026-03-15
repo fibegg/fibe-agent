@@ -33,6 +33,7 @@ export const WS_EVENT = {
   FILE_CREATED: 'file_created',
   ACTIVITY_SNAPSHOT: 'activity_snapshot',
   ACTIVITY_APPENDED: 'activity_appended',
+  PLAYGROUND_CHANGED: 'playground_changed',
 } as const;
 
 export const AUTH_STATUS = {

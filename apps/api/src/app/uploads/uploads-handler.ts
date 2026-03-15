@@ -18,12 +18,12 @@ export function validateUploadMimetype(mimetype: string): void {
 
 export async function processUploadFile(
   fileResult: MultipartFileResult,
-  saveAudioFromBuffer: (buffer: Buffer, mimetype: string) => string
+  saveAudioFromBuffer: (buffer: Buffer, mimetype: string) => string | Promise<string>
 ): Promise<{ filename: string }> {
   if (!fileResult) throw new BadRequestException('No file uploaded');
   const mimetype = fileResult.mimetype ?? 'audio/webm';
   validateUploadMimetype(mimetype);
   const buffer = await fileResult.toBuffer();
-  const filename = saveAudioFromBuffer(buffer, mimetype);
+  const filename = await saveAudioFromBuffer(buffer, mimetype);
   return { filename };
 }

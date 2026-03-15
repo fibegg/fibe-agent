@@ -11,7 +11,8 @@ describe('MessageStoreService', () => {
     dataDir = mkdtempSync(join(tmpdir(), 'msg-store-'));
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await new Promise((r) => setTimeout(r, 30));
     rmSync(dataDir, { recursive: true, force: true });
   });
 

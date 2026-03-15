@@ -3,8 +3,7 @@ import { renderHook, act, waitFor } from '@testing-library/react';
 import { usePlaygroundFiles } from './use-playground-files';
 
 vi.mock('../api-url', () => ({
-  getApiUrl: vi.fn(() => ''),
-  getAuthTokenForRequest: vi.fn(() => ''),
+  apiRequest: vi.fn((path: string, options?: RequestInit) => fetch(path, options)),
 }));
 
 describe('usePlaygroundFiles', () => {
@@ -16,12 +15,13 @@ describe('usePlaygroundFiles', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns entries, loading, error, and refetch', () => {
+  it('returns entries, tree, loading, error, and refetch', () => {
     (fetch as ReturnType<typeof vi.fn>).mockImplementation(
       () => new Promise<Response>(() => undefined)
     );
     const { result } = renderHook(() => usePlaygroundFiles());
     expect(Array.isArray(result.current.entries)).toBe(true);
+    expect(Array.isArray(result.current.tree)).toBe(true);
     expect(typeof result.current.loading).toBe('boolean');
     expect(result.current.error).toBeNull();
     expect(typeof result.current.refetch).toBe('function');

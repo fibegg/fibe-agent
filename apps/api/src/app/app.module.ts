@@ -20,6 +20,7 @@ import { UploadsController } from './uploads/uploads.controller';
 import { UploadsService } from './uploads/uploads.service';
 import { PlaygroundsController } from './playgrounds/playgrounds.controller';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
+import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
     OrchestratorService,
     UploadsService,
     PlaygroundsService,
+    PlaygroundWatcherService,
   ],
 })
 export class AppModule {}

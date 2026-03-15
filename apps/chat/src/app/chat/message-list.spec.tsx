@@ -4,7 +4,7 @@ import { render, screen, act } from '@testing-library/react';
 import { MessageList, type ChatMessage, type MessageListHandle } from './message-list';
 
 vi.mock('../api-url', () => ({
-  getApiUrl: () => '',
+  buildApiUrl: (path: string) => path,
   getAuthTokenForRequest: () => '',
 }));
 

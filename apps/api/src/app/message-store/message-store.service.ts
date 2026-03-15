@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 
@@ -48,7 +49,7 @@ export class MessageStoreService {
       ...(imageUrls?.length ? { imageUrls } : {}),
     };
     this.messages.push(message);
-    this.save();
+    void this.save();
     return message;
   }
 
@@ -56,13 +57,13 @@ export class MessageStoreService {
     const last = this.messages[this.messages.length - 1];
     if (last?.role === 'assistant' && Array.isArray(story)) {
       last.story = story;
-      this.save();
+      void this.save();
     }
   }
 
   clear(): void {
     this.messages = [];
-    this.save();
+    void this.save();
   }
 
   private ensureDataDir(): void {
@@ -81,8 +82,8 @@ export class MessageStoreService {
     }
   }
 
-  private save(): void {
-    writeFileSync(
+  private async save(): Promise<void> {
+    await writeFile(
       this.messagesPath,
       JSON.stringify(this.messages, null, 2)
     );

@@ -11,8 +11,10 @@ import {
   X,
 } from 'lucide-react';
 import { FileIcon } from '../file-icon';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getApiUrl, getAuthTokenForRequest } from '../api-url';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiRequest } from '../api-url';
+import { API_PATHS } from '../api-paths';
+import { REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { shouldHideHeaderLogo, shouldHideThemeSwitch } from '../embed-config';
 import { SidebarToggle } from '../sidebar-toggle';
@@ -179,7 +181,6 @@ export interface PlaygroundEntry {
 }
 
 const SIDEBAR_TITLE = 'Standalone';
-const REFETCH_WHEN_EMPTY_MS = 8000;
 const SIDEBAR_SUBTITLE = `Phoenix v${__APP_VERSION__}`;
 const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
 
@@ -272,14 +273,10 @@ export function FileViewerPanel({
     setLoading(true);
     setFetchError(null);
     setContent(null);
-    const base = getApiUrl();
-    const url = `${base || ''}/api/playgrounds/file?path=${encodeURIComponent(entry.path)}`;
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    fetch(url, { headers })
-      .then(async (res) => {
+    const path = `${API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
+    void (async () => {
+      try {
+        const res = await apiRequest(path);
         if (cancelled) return;
         if (!res.ok) {
           if (res.status === 404) {
@@ -291,15 +288,16 @@ export function FileViewerPanel({
         }
         const data = (await res.json()) as { content?: string };
         const text = typeof data.content === 'string' ? data.content : '';
-        setContent(text);
-        setFetchError(null);
-      })
-      .catch((e) => {
+        if (!cancelled) {
+          setContent(text);
+          setFetchError(null);
+        }
+      } catch (e) {
         if (!cancelled) setFetchError(e instanceof Error ? e.message : 'Failed to load file');
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -456,7 +454,7 @@ function FileDetailsDialog({
   );
 }
 
-function TreeNode({
+const TreeNode = memo(function TreeNode({
   entry,
   depth,
   expanded,
@@ -531,7 +529,10 @@ function TreeNode({
       )}
     </div>
   );
-}
+});
+
+const isControlledTree = (t: PlaygroundEntry[] | null | undefined): t is PlaygroundEntry[] =>
+  Array.isArray(t);
 
 export function FileExplorer({
   collapsed,
@@ -541,6 +542,7 @@ export function FileExplorer({
   onFileSelect,
   selectedPath: selectedPathProp,
   refreshTrigger,
+  tree: treeProp,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -549,41 +551,42 @@ export function FileExplorer({
   onFileSelect?: (entry: PlaygroundEntry) => void;
   selectedPath?: string | null;
   refreshTrigger?: number;
+  tree?: PlaygroundEntry[] | null;
 } = {}) {
-  const [tree, setTree] = useState<PlaygroundEntry[]>([]);
+  const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
+
+  const controlled = isControlledTree(treeProp);
+  const tree = controlled ? treeProp : internalTree;
+  const loadingState = controlled ? false : loading;
+
   const selectedFile = selectedPathProp !== undefined
     ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
     : selectedFileLocal;
 
   const refetch = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
-    const base = getApiUrl();
-    const url = base ? `${base}/api/playgrounds` : '/api/playgrounds';
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
-      const res = await fetch(url, { headers, signal });
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS, { signal });
       if (res.status === 401) {
-        setTree([]);
+        setInternalTree([]);
         return;
       }
       if (!res.ok) throw new Error('Failed to load playgrounds');
       const data = (await res.json()) as PlaygroundEntry[];
       const list = Array.isArray(data) ? data : [];
-      setTree(list);
+      setInternalTree(list);
       setError(null);
       if (list.length > 0) {
         setExpanded((prev) => new Set(getDirPathsAtDepth(list, 0)));
       }
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
-      setTree([]);
+      setInternalTree([]);
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
       setLoading(false);
@@ -591,31 +594,40 @@ export function FileExplorer({
   }, []);
 
   useEffect(() => {
+    if (controlled) return;
     const ac = new AbortController();
     void refetch(ac.signal);
     return () => ac.abort();
-  }, [refetch]);
+  }, [controlled, refetch]);
 
   useEffect(() => {
-    if (refreshTrigger === undefined) return;
+    if (controlled || refreshTrigger === undefined) return;
     void refetch();
-  }, [refreshTrigger, refetch]);
+  }, [controlled, refreshTrigger, refetch]);
 
   useEffect(() => {
-    if (tree.length > 0 || loading) return;
+    if (controlled || internalTree.length > 0 || loading) return;
     const id = setInterval(() => void refetch(), REFETCH_WHEN_EMPTY_MS);
     return () => clearInterval(id);
-  }, [tree.length, loading, refetch]);
+  }, [controlled, internalTree.length, loading, refetch]);
 
   const refetchRef = useRef(refetch);
   refetchRef.current = refetch;
   useEffect(() => {
+    if (controlled) return;
     const onVisibility = () => {
       if (document.visibilityState === 'visible') refetchRef.current();
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
-  }, []);
+  }, [controlled]);
+
+  const hasSetInitialExpand = useRef(false);
+  useEffect(() => {
+    if (!controlled || !treeProp?.length || hasSetInitialExpand.current) return;
+    hasSetInitialExpand.current = true;
+    setExpanded(new Set(getDirPathsAtDepth(treeProp, 0)));
+  }, [controlled, treeProp]);
 
   const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -722,7 +734,7 @@ export function FileExplorer({
         </div>
       </div>
       <div className="flex-1 overflow-auto py-2">
-        {loading && tree.length === 0 && (
+        {loadingState && tree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             Loading…
           </div>
@@ -730,7 +742,7 @@ export function FileExplorer({
         {error && (
           <div className="px-3 py-2 text-xs text-destructive">{error}</div>
         )}
-        {!loading && !error && tree.length === 0 && (
+        {!loadingState && !error && tree.length === 0 && (
           <div className="px-3 py-4 text-sm text-muted-foreground">
             {EMPTY_PLAYGROUND_MESSAGE}
           </div>

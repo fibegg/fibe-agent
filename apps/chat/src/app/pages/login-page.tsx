@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
-import { getApiUrl, setToken, isAuthenticated } from '../api-url';
+import { loginWithPassword, isAuthenticated } from '../api-url';
 import { shouldHideHeaderLogo } from '../embed-config';
 import { waitForAutoAuth } from '../postmessage-auth';
 
@@ -11,9 +11,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [autoAuthPending, setAutoAuthPending] = useState(window !== window.parent);
   const navigate = useNavigate();
-  const base = getApiUrl();
 
-  // Try postMessage auto-auth when embedded in an iframe
   useEffect(() => {
     if (window === window.parent) return;
     if (isAuthenticated()) {
@@ -21,14 +19,15 @@ export function LoginPage() {
       return;
     }
     let cancelled = false;
-    waitForAutoAuth().then((success) => {
+    void (async () => {
+      const success = await waitForAutoAuth();
       if (cancelled) return;
       setAutoAuthPending(false);
-      if (success) {
-        navigate('/', { replace: true });
-      }
-    });
-    return () => { cancelled = true; };
+      if (success) navigate('/', { replace: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -36,21 +35,12 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const url = base ? `${base}/api/auth/login` : '/api/auth/login';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const data = (await res.json()) as { success?: boolean; token?: string; error?: string };
-      if (res.ok && data.success) {
-        setToken(data.token ?? '');
+      const result = await loginWithPassword(password);
+      if (result.success) {
         navigate('/', { replace: true });
       } else {
-        setError(data.error ?? 'Authentication failed');
+        setError(result.error ?? 'Authentication failed');
       }
-    } catch {
-      setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }

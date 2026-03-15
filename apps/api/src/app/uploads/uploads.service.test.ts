@@ -22,44 +22,44 @@ describe('UploadsService', () => {
     expect(service.getUploadsDir()).toBe(join(dataDir, 'uploads'));
   });
 
-  test('saveImage creates file and returns filename', () => {
+  test('saveImage creates file and returns filename', async () => {
     const service = new UploadsService(config as never);
     const dataUrl = 'data:image/png;base64,' + Buffer.from('x').toString('base64');
-    const filename = service.saveImage(dataUrl);
+    const filename = await service.saveImage(dataUrl);
     expect(filename).toMatch(/^[0-9a-f-]+\.png$/);
     const path = service.getPath(filename);
     expect(path).toBeDefined();
     if (path) expect(readFileSync(path).length).toBeGreaterThan(0);
   });
 
-  test('saveImage uses jpg for jpeg mime', () => {
+  test('saveImage uses jpg for jpeg mime', async () => {
     const service = new UploadsService(config as never);
     const dataUrl = 'data:image/jpeg;base64,' + Buffer.from('x').toString('base64');
-    const filename = service.saveImage(dataUrl);
+    const filename = await service.saveImage(dataUrl);
     expect(filename).toMatch(/\.jpg$/);
   });
 
-  test('saveAudio creates file from data URL', () => {
+  test('saveAudio creates file from data URL', async () => {
     const service = new UploadsService(config as never);
     const dataUrl = 'data:audio/webm;base64,' + Buffer.from('audio').toString('base64');
-    const filename = service.saveAudio(dataUrl);
+    const filename = await service.saveAudio(dataUrl);
     expect(filename).toMatch(/^[0-9a-f-]+\.webm$/);
     expect(service.getPath(filename)).toBeTruthy();
   });
 
-  test('saveAudioFromBuffer creates file with correct extension', () => {
+  test('saveAudioFromBuffer creates file with correct extension', async () => {
     const service = new UploadsService(config as never);
     const buf = Buffer.from('audio');
-    const filename = service.saveAudioFromBuffer(buf, 'audio/ogg;codecs=opus');
+    const filename = await service.saveAudioFromBuffer(buf, 'audio/ogg;codecs=opus');
     expect(filename).toMatch(/\.ogg$/);
     const path = service.getPath(filename);
     expect(path).toBeDefined();
     if (path) expect(readFileSync(path)).toEqual(buf);
   });
 
-  test('saveAudioFromBuffer uses m4a for mp4 mime', () => {
+  test('saveAudioFromBuffer uses m4a for mp4 mime', async () => {
     const service = new UploadsService(config as never);
-    const filename = service.saveAudioFromBuffer(Buffer.from('x'), 'audio/mp4');
+    const filename = await service.saveAudioFromBuffer(Buffer.from('x'), 'audio/mp4');
     expect(filename).toMatch(/\.m4a$/);
   });
 
@@ -74,18 +74,18 @@ describe('UploadsService', () => {
     expect(service.getPath('nonexistent.uuid')).toBeNull();
   });
 
-  test('getPath returns path for existing file', () => {
+  test('getPath returns path for existing file', async () => {
     const service = new UploadsService(config as never);
-    const filename = service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
+    const filename = await service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
     const path = service.getPath(filename);
     expect(path).toBe(join(dataDir, 'uploads', filename));
   });
 
-  test('saveAudioFromBuffer creates uploads dir when missing', () => {
+  test('saveAudioFromBuffer creates uploads dir when missing', async () => {
     const subDir = join(dataDir, 'nested');
     (config as { getDataDir: () => string }).getDataDir = () => subDir;
     const service = new UploadsService(config as never);
-    const filename = service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
+    const filename = await service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
     expect(service.getPath(filename)).toBe(join(subDir, 'uploads', filename));
   });
 });

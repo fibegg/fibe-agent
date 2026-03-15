@@ -14,6 +14,8 @@ import { ConfigService } from './app/config/config.service';
 import { getCorsOrigin, getFrameAncestors } from './cors-frame.config';
 import { GlobalHttpExceptionFilter } from './app/http-exception.filter';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
+import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
+import { WS_EVENT } from './app/ws.constants';
 import { loadInjectedCredentials } from './credential-injector';
 
 const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
@@ -83,6 +85,11 @@ async function bootstrap() {
 
   orchestrator.outbound.subscribe((ev) => {
     sendToClient(ev.type, ev.data as Record<string, unknown>);
+  });
+
+  const playgroundWatcher = app.get(PlaygroundWatcherService);
+  playgroundWatcher.playgroundChanged$.subscribe(() => {
+    sendToClient(WS_EVENT.PLAYGROUND_CHANGED, {});
   });
 
   wss.on('connection', (ws, req) => {
