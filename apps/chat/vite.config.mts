@@ -33,6 +33,7 @@ export default defineConfig(() => ({
   server: {
     port: 3100,
     host: 'localhost',
+    allowedHosts: ['.ngrok-free.dev'],
     proxy: {
       '/api': 'http://localhost:3000',
       '/ws': { target: 'http://localhost:3000', ws: true },
