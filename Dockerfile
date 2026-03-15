@@ -82,6 +82,9 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
+# Playwright browser + system deps for @playwright/mcp
+RUN npx playwright install --with-deps chromium
+
 EXPOSE 3000
 
 RUN mkdir -p /app/data /app/playground \
