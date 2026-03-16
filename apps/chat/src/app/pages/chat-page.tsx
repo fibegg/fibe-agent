@@ -42,7 +42,7 @@ import {
   MAIN_CONTENT_MIN_WIDTH_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_WIDTH_PX,
-  CHAT_HEADER_PADDING_BOTTOM_PX,
+  PANEL_HEADER_MIN_HEIGHT_PX,
 } from '../layout-constants';
 import { FileIcon } from '../file-icon';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
@@ -52,11 +52,14 @@ import {
   BUTTON_DESTRUCTIVE_GHOST,
   BUTTON_OUTLINE_ACCENT,
   CLEAR_BUTTON_POSITION,
+  HEADER_FIRST_ROW,
+  HEADER_PADDING,
   INPUT_SEARCH,
   MODAL_CARD,
   MODAL_OVERLAY_DARK,
   MOBILE_SHEET_PANEL,
   SEARCH_ICON_POSITION,
+  SEARCH_ROW_WRAPPER,
   SETTINGS_CLOSE_BUTTON,
 } from '../ui-classes';
 
@@ -883,10 +886,10 @@ export function ChatPage() {
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden w-full">
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
         <header
-          className="flex shrink-0 flex-col border-b border-border/50 bg-card/40 backdrop-blur-xl px-4 pt-4"
-          style={{ paddingBottom: CHAT_HEADER_PADDING_BOTTOM_PX }}
+          className={`border-b border-border/50 bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
+          style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
         >
-          <div className="flex items-center justify-between mb-1 min-h-[3.25rem]">
+          <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="flex items-center gap-1.5 shrink-0 lg:hidden">
                 <button
@@ -970,7 +973,7 @@ export function ChatPage() {
               )}
             </div>
           </div>
-          <div className="relative h-8 mt-1">
+          <div className={SEARCH_ROW_WRAPPER}>
             <Search className={SEARCH_ICON_POSITION} aria-hidden />
             <input
               type="text"

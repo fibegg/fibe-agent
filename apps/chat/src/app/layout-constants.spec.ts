@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   MAIN_CONTENT_MIN_WIDTH_PX,
-  CHAT_HEADER_PADDING_BOTTOM_PX,
+  PANEL_HEADER_MIN_HEIGHT_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_COLLAPSE_STORAGE_KEY,
   SIDEBAR_WIDTH_PX,
@@ -24,8 +24,8 @@ describe('layout-constants', () => {
     expect(MAIN_CONTENT_MIN_WIDTH_PX).toBe(260);
   });
 
-  it('exports chat header padding bottom', () => {
-    expect(CHAT_HEADER_PADDING_BOTTOM_PX).toBe(16);
+  it('exports panel header min height', () => {
+    expect(PANEL_HEADER_MIN_HEIGHT_PX).toBe(128);
   });
 
   it('exports storage key for sidebar collapse', () => {

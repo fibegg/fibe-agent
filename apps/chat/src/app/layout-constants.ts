@@ -3,7 +3,7 @@ export const REFETCH_WHEN_EMPTY_MS = 8000;
 export const SIDEBAR_WIDTH_PX = 280;
 export const SIDEBAR_COLLAPSED_WIDTH_PX = 56;
 export const MAIN_CONTENT_MIN_WIDTH_PX = 260;
-export const CHAT_HEADER_PADDING_BOTTOM_PX = 16;
+export const PANEL_HEADER_MIN_HEIGHT_PX = 128;
 export const SIDEBAR_COLLAPSE_STORAGE_KEY = 'phoenix-sidebar-collapsed';
 
 export const RIGHT_SIDEBAR_WIDTH_PX = 280;

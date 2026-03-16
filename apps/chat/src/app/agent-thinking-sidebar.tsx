@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { memo, useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
+  PANEL_HEADER_MIN_HEIGHT_PX,
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
   RIGHT_SIDEBAR_WIDTH_PX,
 } from './layout-constants';
@@ -30,7 +31,9 @@ import {
   FLEX_ROW_CENTER,
   FLEX_ROW_CENTER_WRAP,
   INPUT_SEARCH,
+  HEADER_FIRST_ROW,
   SEARCH_ICON_POSITION,
+  SEARCH_ROW_WRAPPER,
   SIDEBAR_HEADER,
   SIDEBAR_PANEL,
 } from './ui-classes';
@@ -92,6 +95,52 @@ const STAT_TOOLTIPS = {
 
 const STAT_TOOLTIP_POPOVER_CLASS =
   'pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100';
+
+const ACTIVITY_DOT_COLOR: Record<string, string> = {
+  stream_start: 'bg-blue-500',
+  reasoning: 'bg-violet-500',
+  step: 'bg-zinc-500',
+  tool_call: 'bg-amber-500',
+  file_created: 'bg-green-500',
+  task_complete: 'bg-green-500',
+  default: 'bg-violet-500',
+};
+
+const ACTIVITY_CIRCLE_LETTER: Record<string, string> = {
+  stream_start: 'S',
+  reasoning: 'R',
+  step: 'P',
+  tool_call: 'C',
+  file_created: 'F',
+  task_complete: '✓',
+  default: 'A',
+};
+
+const ACTIVITY_COLOR_HEX: Record<string, string> = {
+  stream_start: '#3b82f6',
+  reasoning: '#8b5cf6',
+  step: '#71717a',
+  tool_call: '#f59e0b',
+  file_created: '#22c55e',
+  task_complete: '#22c55e',
+  default: '#8b5cf6',
+};
+
+function activityHoverContent(item: DisplayItem): string {
+  if (item.kind === 'command_group') {
+    const labels = item.entries.map((e) => commandLabel(e)).filter(Boolean);
+    if (labels.length === 0) return 'Commands';
+    return labels.map((l) => `$ ${l}`).join('\n');
+  }
+  const e = item.entry;
+  if (e.type === 'tool_call') return `$ ${commandLabel(e) || 'Command'}`;
+  if (e.type === 'file_created') return e.path ?? e.message ?? 'File';
+  if (e.type === 'reasoning_start' || e.type === 'reasoning_end') return (e.details ?? '').trim() || 'Reasoning';
+  if (e.type === 'stream_start') return 'Started';
+  if (e.type === 'step') return e.message || e.details || 'Step';
+  if (e.type === 'task_complete') return 'Task complete';
+  return e.message || e.details || getActivityLabel(e.type);
+}
 
 const BRAIN_IDLE = 'text-violet-400';
 const BRAIN_IDLE_ACCENT = 'text-violet-300';
@@ -289,6 +338,11 @@ export function AgentThinkingSidebar({
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
   const [reasoningMaxHeightPx, setReasoningMaxHeightPx] = useState<number | null>(null);
+  const [activityTooltip, setActivityTooltip] = useState<{
+    rect: { left: number; top: number; height: number };
+    content: string;
+    variant: string;
+  } | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
   const setActivityScrollRef = useCallback((el: HTMLDivElement | null) => {
     (activityScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -513,104 +567,101 @@ export function AgentThinkingSidebar({
         }
         .brain-download-anim { animation: brainDownloadPulse 2.2s ease-in-out forwards; }
       `}</style>
-      {!isCollapsed && (
-        <div className="shrink-0 px-4 pt-4 min-h-[54px] flex items-center gap-2">
-          <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
-            <button
-              type="button"
-              onClick={runCopyWithAnimation}
-              className="relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
-              aria-label="Activity"
-              disabled={downloadAnimating}
-            >
-              {downloadAnimating ? (
-              <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
-                <Brain className="size-8 brain-download-anim" />
-              </span>
-            ) : (
-              <>
-                <Brain className={`size-8 ${brainClasses.brain} transition-colors`} />
-                {isStreaming ? (
-                  <Loader2
-                    className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
-                    aria-hidden
-                  />
-                ) : (
-                  <Sparkles
-                    className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
-                    aria-hidden
-                  />
-                )}
-              </>
-            )}
-            </button>
-          </div>
-          {copiedToClipboard &&
-            copyTooltipAnchor &&
-            typeof document !== 'undefined' &&
-            createPortal(
-              <span
-                className="pointer-events-none fixed z-[9999] rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-lg whitespace-nowrap"
-                role="status"
-                style={{
-                  left: copyTooltipAnchor.centerX,
-                  top: copyTooltipAnchor.bottom + 8,
-                  transform: 'translate(-50%, 0)',
-                }}
-              >
-                Copied to clipboard
-              </span>,
-              document.body
-            )}
-          {sessionStats.totalActions === 0 &&
-          sessionStats.completed === 0 &&
-          sessionStats.processing === 0 ? (
-            <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground italic max-w-[200px] leading-none flex items-center">
-              These are not the droids you deepseek.
-            </p>
-          ) : (
-            <p className="px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
-              <span
-                key={`total-${sessionStats.totalActions}`}
-                className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
-                title={STAT_TOOLTIPS.total}
-              >
-                <span className="text-foreground stat-tick">{sessionStats.totalActions}</span>
-                <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
-                  {STAT_TOOLTIPS.total}
-                </span>
-              </span>
-              <span className="text-muted-foreground/70">/</span>
-              <span
-                key={`completed-${sessionStats.completed}`}
-                className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
-                title={STAT_TOOLTIPS.completed}
-              >
-                <span className="text-emerald-400 stat-tick">{sessionStats.completed}</span>
-                <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
-                  {STAT_TOOLTIPS.completed}
-                </span>
-              </span>
-              <span className="text-muted-foreground/70">/</span>
-              <span
-                key={`processing-${sessionStats.processing}`}
-                className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
-                title={STAT_TOOLTIPS.processing}
-              >
-                <span className="text-cyan-400 stat-tick">{sessionStats.processing}</span>
-                <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
-                  {STAT_TOOLTIPS.processing}
-                </span>
-              </span>
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className={SIDEBAR_HEADER}>
+      <div className={SIDEBAR_HEADER} style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}>
         {!isCollapsed ? (
           <>
-            <div className="relative h-8 mt-2">
+            <div className={`flex items-center gap-2 ${HEADER_FIRST_ROW}`}>
+              <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={runCopyWithAnimation}
+                  className="relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
+                  aria-label="Activity"
+                  disabled={downloadAnimating}
+                >
+                  {downloadAnimating ? (
+                    <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
+                      <Brain className="size-8 brain-download-anim" />
+                    </span>
+                  ) : (
+                    <>
+                      <Brain className={`size-8 ${brainClasses.brain} transition-colors`} />
+                      {isStreaming ? (
+                        <Loader2
+                          className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
+                          aria-hidden
+                        />
+                      ) : (
+                        <Sparkles
+                          className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
+                          aria-hidden
+                        />
+                      )}
+                    </>
+                  )}
+                </button>
+              </div>
+              {copiedToClipboard &&
+                copyTooltipAnchor &&
+                typeof document !== 'undefined' &&
+                createPortal(
+                  <span
+                    className="pointer-events-none fixed z-[9999] rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-lg whitespace-nowrap"
+                    role="status"
+                    style={{
+                      left: copyTooltipAnchor.centerX,
+                      top: copyTooltipAnchor.bottom + 8,
+                      transform: 'translate(-50%, 0)',
+                    }}
+                  >
+                    Copied to clipboard
+                  </span>,
+                  document.body
+                )}
+              {sessionStats.totalActions === 0 &&
+              sessionStats.completed === 0 &&
+              sessionStats.processing === 0 ? (
+                <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground italic max-w-[200px] leading-none flex items-center">
+                  These are not the droids you deepseek.
+                </p>
+              ) : (
+                <p className="px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
+                  <span
+                    key={`total-${sessionStats.totalActions}`}
+                    className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
+                    title={STAT_TOOLTIPS.total}
+                  >
+                    <span className="text-foreground stat-tick">{sessionStats.totalActions}</span>
+                    <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
+                      {STAT_TOOLTIPS.total}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground/70">/</span>
+                  <span
+                    key={`completed-${sessionStats.completed}`}
+                    className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
+                    title={STAT_TOOLTIPS.completed}
+                  >
+                    <span className="text-emerald-400 stat-tick">{sessionStats.completed}</span>
+                    <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
+                      {STAT_TOOLTIPS.completed}
+                    </span>
+                  </span>
+                  <span className="text-muted-foreground/70">/</span>
+                  <span
+                    key={`processing-${sessionStats.processing}`}
+                    className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
+                    title={STAT_TOOLTIPS.processing}
+                  >
+                    <span className="text-cyan-400 stat-tick">{sessionStats.processing}</span>
+                    <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
+                      {STAT_TOOLTIPS.processing}
+                    </span>
+                  </span>
+                </p>
+              )}
+            </div>
+            <div className={SEARCH_ROW_WRAPPER}>
               <Search className={SEARCH_ICON_POSITION} aria-hidden />
               <input
                 type="text"
@@ -633,20 +684,85 @@ export function AgentThinkingSidebar({
             </div>
           </>
         ) : (
-          <div className="relative mx-auto">
-            <Brain className={`size-5 ${brainClasses.brain} transition-colors`} />
-            {isStreaming ? (
-              <Loader2
-                className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-spin transition-colors`}
-              />
-            ) : (
-              <Sparkles
-                className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-pulse transition-colors`}
-              />
-            )}
+          <div className="flex flex-col items-center gap-1.5 w-full">
+            <div className="relative shrink-0">
+              <Brain className={`size-5 ${brainClasses.brain} transition-colors`} />
+              {isStreaming ? (
+                <Loader2
+                  className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-spin transition-colors`}
+                />
+              ) : (
+                <Sparkles
+                  className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-pulse transition-colors`}
+                />
+              )}
+            </div>
+            <div
+              className="grid grid-cols-1 gap-px text-[10px] font-medium tabular-nums text-center text-muted-foreground [&>*]:bg-muted/30 [&>*]:rounded [&>*]:py-0.5 [&>*]:min-w-0"
+              aria-label="Total / Completed / Processing"
+            >
+              <span className="text-foreground stat-tick" title={STAT_TOOLTIPS.total}>
+                {sessionStats.totalActions}
+              </span>
+              <span className="text-emerald-400 stat-tick" title={STAT_TOOLTIPS.completed}>
+                {sessionStats.completed}
+              </span>
+              <span className="text-cyan-400 stat-tick" title={STAT_TOOLTIPS.processing}>
+                {sessionStats.processing}
+              </span>
+            </div>
           </div>
         )}
       </div>
+
+      {isCollapsed && displayList.length > 0 && (() => {
+        const taskCompleteEntry: DisplayItem = {
+          kind: 'entry',
+          entry: { id: 'task-complete', type: 'task_complete', message: 'Task complete', timestamp: '' },
+        };
+        const collapsedChainList =
+          !isStreaming && displayList.length > 0 ? [...displayList, taskCompleteEntry] : displayList;
+        return (
+        <div className="p-3 flex flex-col items-center gap-0 min-h-0 shrink-0">
+          {collapsedChainList.map((item, i) => {
+            const variant = item.kind === 'entry' ? getBlockVariant(item.entry) : 'tool_call';
+            const bgColor = ACTIVITY_DOT_COLOR[variant] ?? ACTIVITY_DOT_COLOR.default;
+            const hexColor = ACTIVITY_COLOR_HEX[variant] ?? ACTIVITY_COLOR_HEX.default;
+            const prevItem = i > 0 ? collapsedChainList[i - 1] : null;
+            const prevVariant = prevItem?.kind === 'entry' ? getBlockVariant(prevItem.entry) : prevItem ? 'tool_call' : null;
+            const prevHex = prevVariant !== null ? (ACTIVITY_COLOR_HEX[prevVariant] ?? ACTIVITY_COLOR_HEX.default) : null;
+            const letter = ACTIVITY_CIRCLE_LETTER[variant] ?? ACTIVITY_CIRCLE_LETTER.default;
+            const isLast = i === collapsedChainList.length - 1;
+            const hoverText = activityHoverContent(item);
+            return (
+              <span key={item.kind === 'entry' ? item.entry.id : item.id} className="flex flex-col items-center gap-0">
+                {i > 0 && prevHex !== null && (
+                  <div
+                    className="w-0.5 h-2 shrink-0 rounded-full"
+                    style={{ background: `linear-gradient(to bottom, ${prevHex}, ${hexColor})` }}
+                    aria-hidden
+                  />
+                )}
+                <span
+                  className={`relative inline-flex items-center justify-center size-5 rounded-full shrink-0 text-[10px] font-semibold text-white ${bgColor} ${isLast && isStreaming ? 'animate-pulse' : ''} cursor-default`}
+                  title={hoverText}
+                  onMouseEnter={(e) =>
+                    setActivityTooltip({
+                      rect: e.currentTarget.getBoundingClientRect(),
+                      content: hoverText,
+                      variant,
+                    })
+                  }
+                  onMouseLeave={() => setActivityTooltip(null)}
+                >
+                  {letter}
+                </span>
+              </span>
+            );
+          })}
+        </div>
+        );
+      })()}
 
       {!isCollapsed && (
         <div
@@ -749,22 +865,22 @@ export function AgentThinkingSidebar({
         </div>
       )}
 
-      {isCollapsed && (
-        <div className="flex-1 flex flex-col items-center justify-start pt-8 gap-4">
-          <div className="relative">
-            <Brain className={`size-6 ${brainClasses.brain}`} />
-            {isStreaming ? (
-              <Loader2
-                className={`size-3 ${brainClasses.accent} absolute -bottom-1 -right-1 animate-spin`}
-              />
-            ) : (
-              <Sparkles
-                className={`size-3 ${brainClasses.accent} absolute -bottom-1 -right-1 animate-pulse`}
-              />
-            )}
-          </div>
-        </div>
-      )}
+      {activityTooltip &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            className={`fixed z-[9999] rounded-lg px-4 py-3 text-sm font-medium bg-popover text-popover-foreground border border-border shadow-lg text-left leading-relaxed ${activityTooltip.variant === 'reasoning' ? 'min-w-[360px] max-w-[720px] whitespace-normal' : 'min-w-[320px] max-w-[560px] whitespace-pre-line'}`}
+            role="tooltip"
+            style={{
+              left: activityTooltip.rect.left - 8,
+              top: activityTooltip.rect.top + activityTooltip.rect.height / 2,
+              transform: 'translate(-100%, -50%)',
+            }}
+          >
+            {activityTooltip.content}
+          </div>,
+          document.body
+        )}
       </div>
     </div>
   );

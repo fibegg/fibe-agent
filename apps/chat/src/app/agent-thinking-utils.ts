@@ -71,6 +71,7 @@ export function getBlockVariant(entry: StoryEntry): keyof typeof ACTIVITY_BLOCK_
   if (entry.type === 'step') return 'step';
   if (entry.type === 'tool_call') return 'tool_call';
   if (entry.type === 'file_created') return 'file_created';
+  if (entry.type === 'task_complete') return 'task_complete';
   return 'default';
 }
 

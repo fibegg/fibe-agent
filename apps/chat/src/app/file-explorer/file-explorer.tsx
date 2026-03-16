@@ -14,7 +14,7 @@ import { FileIcon } from '../file-icon';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '../api-paths';
-import { REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
+import { PANEL_HEADER_MIN_HEIGHT_PX, REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
 import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
 import { shouldHideHeaderLogo, shouldHideThemeSwitch } from '../embed-config';
 import { SidebarToggle } from '../sidebar-toggle';
@@ -26,10 +26,13 @@ import {
   BUTTON_ICON_MUTED,
   CARD_HEADER,
   CLEAR_BUTTON_POSITION,
+  HEADER_FIRST_ROW,
+  HEADER_PADDING,
   INPUT_SEARCH,
   LOGO_ICON_BOX,
   MODAL_OVERLAY,
   SEARCH_ICON_POSITION,
+  SEARCH_ROW_WRAPPER,
   TREE_NODE_BASE,
   TREE_NODE_SELECTED,
 } from '../ui-classes';
@@ -343,8 +346,8 @@ export function FileViewerPanel({
       style={inline ? undefined : { backgroundColor: 'var(--card)' }}
       onClick={inline ? undefined : (e) => e.stopPropagation()}
     >
-      <div className={CARD_HEADER}>
-        <div className="flex items-center justify-between gap-2 mb-2 min-w-0">
+      <div className={CARD_HEADER} style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}>
+        <div className={`flex items-center justify-between gap-2 min-w-0 ${HEADER_FIRST_ROW}`}>
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className={LOGO_ICON_BOX}>
               <FileText className="size-5 text-white" />
@@ -388,7 +391,7 @@ export function FileViewerPanel({
             </button>
           </div>
         </div>
-        <div className="relative h-8">
+        <div className={SEARCH_ROW_WRAPPER}>
           <Search className={SEARCH_ICON_POSITION} />
           <input
             type="text"
@@ -678,8 +681,11 @@ export function FileExplorer({
 
   const expandedContent = (
     <div className="min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl border-r border-border/50">
-      <div className="p-4 border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
-        <div className="flex items-center justify-between mb-2 min-h-[3.25rem]">
+      <div
+        className={`border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0 ${HEADER_PADDING}`}
+        style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
+      >
+        <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
           <div className="flex items-center gap-2">
             {!shouldHideHeaderLogo() && (
               <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
@@ -712,7 +718,7 @@ export function FileExplorer({
             )}
           </div>
         </div>
-        <div className="relative h-8 mt-2">
+        <div className={SEARCH_ROW_WRAPPER}>
           <Search className={SEARCH_ICON_POSITION} aria-hidden />
           <input
             type="text"

@@ -58,6 +58,10 @@ describe('getBlockVariant', () => {
     expect(getBlockVariant({ id: '1', type: 'file_created', message: '', timestamp: '' })).toBe('file_created');
   });
 
+  it('returns task_complete for task_complete entry', () => {
+    expect(getBlockVariant({ id: '1', type: 'task_complete', message: '', timestamp: '' })).toBe('task_complete');
+  });
+
   it('returns default for unknown type', () => {
     expect(getBlockVariant({ id: '1', type: 'other', message: '', timestamp: '' })).toBe('default');
   });

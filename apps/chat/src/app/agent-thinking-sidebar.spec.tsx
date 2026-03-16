@@ -175,6 +175,22 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText('Task complete')).toBeTruthy();
   });
 
+  it('shows task complete indicator in collapsed chain when not streaming and story items exist', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo ok' },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+        isStreaming={false}
+      />
+    );
+    expect(screen.getByTitle('Task complete')).toBeTruthy();
+  });
+
   it('does not show Task complete block when streaming', () => {
     const storyItems = [
       { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },

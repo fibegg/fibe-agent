@@ -30,6 +30,10 @@ export const BUTTON_GHOST_ACCENT =
 
 export const SEARCH_ICON_POSITION = 'absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none';
 export const CLEAR_BUTTON_POSITION = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground';
+export const SEARCH_ROW_WRAPPER = 'relative h-8 mt-2';
+export const HEADER_FIRST_ROW = 'h-[3.25rem] mb-2 overflow-hidden flex-shrink-0';
+export const HEADER_BORDER = 'border-border/50';
+export const HEADER_PADDING = 'px-4 py-3';
 
 export const FLEX_ROW_CENTER = 'flex items-center gap-2 min-w-0';
 export const FLEX_ROW_CENTER_WRAP = 'flex items-center justify-between gap-2 flex-wrap min-w-0';
@@ -74,8 +78,8 @@ export const PROSE_MESSAGE = 'markdown-body prose prose-sm max-w-none dark:prose
 
 export const SIDEBAR_PANEL =
   'relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-purple-950/5 border-l border-violet-500/20 transition-all duration-300';
-export const SIDEBAR_HEADER = 'p-4 border-b border-violet-500/20 shrink-0';
-export const CARD_HEADER = 'px-4 pt-4 pb-[11px] border-b border-border/50 bg-card/40 backdrop-blur-xl shrink-0';
+export const SIDEBAR_HEADER = `border-b ${HEADER_BORDER} shrink-0 ${HEADER_PADDING}`;
+export const CARD_HEADER = `border-b ${HEADER_BORDER} bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`;
 
 export const MODAL_OVERLAY = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm';
 export const MODAL_OVERLAY_DARK = 'fixed inset-0 z-50 bg-black/50';
