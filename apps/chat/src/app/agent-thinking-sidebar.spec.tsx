@@ -123,7 +123,7 @@ describe('AgentThinkingSidebar', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
     );
-    expect(screen.getByText(/aren't the droids you're looking for/)).toBeTruthy();
+    expect(screen.getByText(/are not the droids you deepseek/)).toBeTruthy();
   });
 
   it('shows stat tooltips when expanded', () => {
