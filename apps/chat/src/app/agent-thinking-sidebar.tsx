@@ -11,6 +11,7 @@ import { formatRelativeTime } from './format-relative-time';
 import type { ThinkingStep } from './chat/thinking-types';
 import { TypingText } from './chat/typing-text';
 import {
+  filterVisibleStoryItems,
   getActivityIcon,
   getActivityLabel,
   getBlockVariant,
@@ -42,9 +43,10 @@ export type SessionActivityEntry = {
   story: StoryEntry[];
 };
 
-const ACTIVITY_ESTIMATE_HEIGHT = 72;
+const ACTIVITY_ESTIMATE_HEIGHT = 32;
 const ACTIVITY_GAP = 8;
 const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
+const REASONING_MAX_HEIGHT_RATIO = 0.75;
 
 const STAT_TOOLTIPS = {
   total: 'Total actions',
@@ -84,8 +86,8 @@ const ActivityBlock = memo(function ActivityBlock({
   const singleRowText =
     entry.type === 'file_created'
       ? (entry.path ?? entry.details ?? entry.message)
-      : entry.type === 'tool_call' && entry.command
-        ? entry.command
+      : entry.type === 'tool_call'
+        ? (entry.command ?? entry.message ?? entry.details ?? label)
         : entry.type === 'step'
           ? entry.message
           : label;
@@ -95,7 +97,7 @@ const ActivityBlock = memo(function ActivityBlock({
   if (isSingleRow) {
     return (
       <div
-        className={`${ACTIVITY_BLOCK_VARIANTS[variant]} px-3 py-1.5 flex items-center justify-between gap-2 min-w-0`}
+        className={`${ACTIVITY_BLOCK_VARIANTS[variant]} px-3 py-1 flex items-center justify-between gap-2 min-w-0`}
       >
         <div className={`${FLEX_ROW_CENTER} min-w-0 flex-1 truncate`}>
           {isStreamStartThinking ? (
@@ -142,14 +144,14 @@ const ActivityBlock = memo(function ActivityBlock({
         </span>
       </div>
       {isThinkingBlock ? (
-        <div className="mt-0.5 rounded-md bg-background/40 px-2.5 py-2 max-h-32 overflow-y-auto">
+        <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-32 overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO}`}>{entry.details}</p>
         </div>
       ) : (
         <div className="mt-0.5">
           <p className={ACTIVITY_BODY}>{entry.message}</p>
           {entry.details && entry.type !== 'reasoning_start' && String(entry.details).trim() !== '{}' && (
-            <p className="text-[10px] text-muted-foreground mt-1 truncate" title={entry.details}>
+            <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={entry.details}>
               {entry.details}
             </p>
           )}
@@ -200,6 +202,7 @@ export function AgentThinkingSidebar({
   const [downloadAnimating, setDownloadAnimating] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
+  const [reasoningMaxHeightPx, setReasoningMaxHeightPx] = useState<number | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
   const setActivityScrollRef = useCallback((el: HTMLDivElement | null) => {
     (activityScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
@@ -209,34 +212,39 @@ export function AgentThinkingSidebar({
     if (isCollapsed) setScrollContainerReady(false);
   }, [isCollapsed]);
 
+  useEffect(() => {
+    const el = activityScrollRef.current;
+    const hasReasoning = !!(reasoningText || streamingResponseText || isStreaming);
+    if (!el || !hasReasoning || typeof ResizeObserver === 'undefined') return;
+    const setMax = () => setReasoningMaxHeightPx(Math.floor(el.clientHeight * REASONING_MAX_HEIGHT_RATIO));
+    setMax();
+    const ro = new ResizeObserver(setMax);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [reasoningText, streamingResponseText, isStreaming, scrollContainerReady]);
+
   const displayThinkingText = reasoningText || streamingResponseText;
 
   const fullStoryItems = useMemo(() => {
     const past = sessionActivity.length > 0 ? sessionActivity : pastActivityFromMessages;
     const fromPast = past.flatMap((a) => (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp })));
-    return [...fromPast, ...storyItems];
+    return filterVisibleStoryItems([...fromPast, ...storyItems]);
   }, [sessionActivity, pastActivityFromMessages, storyItems]);
 
   const sessionStats = useMemo(() => {
-    const fromSession = sessionActivity.reduce((acc, t) => acc + (t.story?.length ?? 0), 0);
-    const totalActions = fromSession + (isStreaming ? storyItems.length : 0);
+    const totalActions = fullStoryItems.length;
     const completed = isStreaming ? Math.max(0, totalActions - 1) : totalActions;
     const processing = isStreaming ? 1 : 0;
-    const allEntries = [
-      ...sessionActivity.flatMap((t) =>
-        (t.story ?? []).map((s) => ({ created_at: t.created_at, ts: s.timestamp }))
-      ),
-      ...storyItems.map((s) => ({
-        created_at: typeof s.timestamp === 'string' ? s.timestamp : (s.timestamp as Date)?.toISOString?.() ?? '',
-        ts: s.timestamp,
-      })),
-    ].filter((e) => e.created_at || e.ts);
+    const allEntries = fullStoryItems.map((s) => ({
+      created_at: typeof s.timestamp === 'string' ? s.timestamp : (s.timestamp as Date)?.toISOString?.() ?? '',
+      ts: s.timestamp,
+    })).filter((e) => e.created_at || e.ts);
     const times = allEntries.map((e) => toTimestampMs(e.ts, e.created_at));
     const firstTs = times.length ? Math.min(...times) : 0;
     const lastTs = times.length ? Math.max(...times) : 0;
     const sessionTimeMs = lastTs && firstTs ? (isStreaming ? Date.now() - firstTs : lastTs - firstTs) : 0;
     return { totalActions, completed, processing, sessionTimeMs };
-  }, [sessionActivity, storyItems, isStreaming]);
+  }, [fullStoryItems, isStreaming]);
 
   const lastStoryTimestampMs = useMemo(() => {
     if (fullStoryItems.length === 0) return 0;
@@ -551,21 +559,21 @@ export function AgentThinkingSidebar({
       {!isCollapsed && (
         <div
           ref={setActivityScrollRef}
-          className="flex-1 min-h-0 overflow-y-auto p-4 flex flex-col gap-3"
+          className="flex-1 min-h-0 overflow-y-auto p-3 flex flex-col gap-2"
         >
           <div className="flex flex-col gap-2">
             {filteredStoryItems.length === 0 &&
               fullStoryItems.length === 0 &&
               !displayThinkingText &&
               !isStreaming && (
-                <p className="py-3 text-xs text-muted-foreground">
+                <p className="py-2 text-xs text-muted-foreground">
                   Activity will appear here when the agent responds.
                 </p>
               )}
             {filteredStoryItems.length === 0 &&
               fullStoryItems.length > 0 &&
               activitySearchQuery.trim() && (
-                <p className="py-3 text-xs text-muted-foreground">
+                <p className="py-2 text-xs text-muted-foreground">
                   No activity matches &quot;{activitySearchQuery.trim()}&quot;.
                 </p>
               )}
@@ -587,10 +595,7 @@ export function AgentThinkingSidebar({
                       data-index={virtualRow.index}
                       ref={virtualizer.measureElement}
                       className="absolute left-0 w-full"
-                      style={{
-                        top: virtualRow.start,
-                        minHeight: virtualRow.size,
-                      }}
+                      style={{ top: virtualRow.start }}
                     >
                       <ActivityBlock entry={entry} isStreaming={isStreaming} />
                     </div>
@@ -608,12 +613,13 @@ export function AgentThinkingSidebar({
             ) : null}
             {(displayThinkingText || isStreaming) && (
               <div
-                className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''}`}
+                className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''} min-h-0 flex flex-col shrink-0`}
+                style={reasoningMaxHeightPx != null ? { maxHeight: reasoningMaxHeightPx } : undefined}
               >
-                <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+                <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide shrink-0">
                   {reasoningText ? 'Reasoning' : 'Response'}
                 </p>
-                <div className={ACTIVITY_MONO}>
+                <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>
                   {displayThinkingText || (isStreaming ? '…' : '')}
                   <span
                     ref={thinkingScrollRef}
@@ -625,11 +631,11 @@ export function AgentThinkingSidebar({
             )}
             {!isStreaming && filteredStoryItems.length > 0 && (
               <div
-                className={`${ACTIVITY_BLOCK_VARIANTS.task_complete} ${ACTIVITY_BLOCK_BASE} ${FLEX_ROW_CENTER_WRAP}`}
+                className={`${ACTIVITY_BLOCK_VARIANTS.task_complete} px-3 py-1 flex items-center justify-between gap-2 min-w-0`}
               >
-                <div className={FLEX_ROW_CENTER}>
+                <div className={`${FLEX_ROW_CENTER} min-w-0 flex-1 truncate`}>
                   <CheckCircle2 className="size-4 shrink-0 text-green-500" />
-                  <p className={ACTIVITY_LABEL}>Task complete</p>
+                  <p className={`${ACTIVITY_LABEL} truncate`}>Task complete</p>
                 </div>
                 <span className={ACTIVITY_TIMESTAMP}>just now</span>
               </div>

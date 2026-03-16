@@ -231,4 +231,22 @@ describe('AgentThinkingSidebar', () => {
     const panel = container.firstChild as HTMLElement;
     expect(panel.style.width).not.toBe('100%');
   });
+
+  it('does not show AskUserQuestion entries in activity list', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      { id: '2', type: 'AskUserQuestion', message: 'Ask user', timestamp: new Date().toISOString() },
+      { id: '3', type: 'step', message: 'Step done', timestamp: new Date().toISOString() },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />
+    );
+    expect(screen.getByText('Started')).toBeTruthy();
+    expect(screen.getByText(/Step done/)).toBeTruthy();
+    expect(screen.queryByText(/Ask user/)).toBeNull();
+  });
 });

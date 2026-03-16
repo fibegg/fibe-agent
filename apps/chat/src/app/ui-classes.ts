@@ -34,12 +34,12 @@ export const CLEAR_BUTTON_POSITION = 'absolute right-2.5 top-1/2 -translate-y-1/
 export const FLEX_ROW_CENTER = 'flex items-center gap-2 min-w-0';
 export const FLEX_ROW_CENTER_WRAP = 'flex items-center justify-between gap-2 flex-wrap min-w-0';
 
-export const ACTIVITY_BLOCK_BASE = 'px-3 py-2.5 flex flex-col gap-1.5';
+export const ACTIVITY_BLOCK_BASE = 'px-3 py-1.5 flex flex-col gap-0.5';
 export const ACTIVITY_BLOCK_VARIANTS = {
   stream_start: 'rounded-lg border border-blue-500/30 bg-blue-500/10',
   reasoning: 'rounded-lg border border-violet-500/30 bg-violet-500/10',
   step: 'rounded-lg border border-zinc-500/20 bg-zinc-500/10',
-  tool_call: 'rounded-lg border border-amber-500/30 bg-amber-500/10',
+  tool_call: '',
   file_created: 'rounded-lg border border-green-500/30 bg-green-500/10',
   task_complete: 'rounded-lg border border-green-500/30 bg-green-500/10',
   default: 'rounded-lg border border-violet-500/20 bg-violet-500/5',
