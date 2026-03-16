@@ -57,7 +57,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # uv – ultrafast Python package/project manager (single static binary)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-RUN ln -sf /usr/local/bin/uv /usr/local/bin/uvx
+# uvx wrapper – some uv versions don't handle argv[0]=="uvx" correctly,
+# so we use a shell script that delegates to `uv tool run` instead of a symlink.
+RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
+    && chmod +x /usr/local/bin/uvx
 
 # Deno – secure JS/TS runtime for quick scripting
 ENV DENO_INSTALL=/usr/local
@@ -83,8 +86,12 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
-# Playwright browser + system deps for @playwright/mcp
-RUN npx playwright install --with-deps chromium
+# @playwright/mcp – globally install so the agent can use it without npx download,
+# then install Chromium using the SAME Playwright version bundled by @playwright/mcp
+# to avoid browser↔library version mismatches.
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g @playwright/mcp && \
+    npx playwright install --with-deps chromium
 
 EXPOSE 3000
 
