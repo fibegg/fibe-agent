@@ -52,6 +52,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     # Tier 2 – extended agent tooling
     sqlite3 pandoc htop strace \
+    imagemagick ffmpeg ghostscript \
     # Tier 3 – native compilation support
     build-essential \
     && rm -rf /var/lib/apt/lists/* \
