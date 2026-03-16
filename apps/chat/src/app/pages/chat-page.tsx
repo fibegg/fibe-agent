@@ -400,6 +400,11 @@ export function ChatPage() {
     () => [...messages].reverse().find((m) => m.role === 'assistant'),
     [messages]
   );
+  const lastUserMessageFromHistory = useMemo(
+    () => [...messages].reverse().find((m) => m.role === 'user')?.body ?? null,
+    [messages]
+  );
+  const lastUserMessage = lastSentMessage ?? lastUserMessageFromHistory;
   const displayStory = useMemo(
     () =>
       state === CHAT_STATES.AWAITING_RESPONSE
@@ -851,6 +856,7 @@ export function ChatPage() {
               storyItems={displayStory}
               sessionActivity={sessionActivity}
               pastActivityFromMessages={pastActivityFromMessages}
+              lastUserMessage={lastUserMessage}
               mobileOverlay
             />
           </div>
@@ -1221,6 +1227,7 @@ export function ChatPage() {
           storyItems={displayStory}
           sessionActivity={sessionActivity}
           pastActivityFromMessages={pastActivityFromMessages}
+          lastUserMessage={lastUserMessage}
         />
       )}
     </div>
