@@ -38,6 +38,8 @@ RUN bunx nx run-many --targets=build --projects=api,chat
 FROM node:24-slim
 
 ARG BUILDKIT_INLINE_CACHE=1
+ARG GIT_SHA
+ENV GIT_SHA=$GIT_SHA
 
 # Unconditional packages — cached across all provider variants
 RUN apt-get update && apt-get install -y --no-install-recommends \

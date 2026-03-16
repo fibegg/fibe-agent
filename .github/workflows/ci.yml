@@ -91,6 +91,7 @@ jobs:
           platforms: linux/amd64,linux/arm64
           build-args: |
             AGENT_PROVIDER=${{ matrix.provider.key }}
+            GIT_SHA=${{ github.sha }}
           tags: |
             ghcr.io/${{ steps.repo_owner.outputs.owner }}/phoenix-agent-oauth:${{ matrix.provider.tag }}-${{ steps.tag_suffix.outputs.latest_tag }}
             ghcr.io/${{ steps.repo_owner.outputs.owner }}/phoenix-agent-oauth:${{ matrix.provider.tag }}-${{ github.sha }}
