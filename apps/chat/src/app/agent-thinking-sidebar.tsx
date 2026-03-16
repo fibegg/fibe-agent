@@ -377,7 +377,7 @@ export function AgentThinkingSidebar({
 
   return (
     <div
-      className={`min-h-0 overflow-hidden ${mobileOverlay ? `${SIDEBAR_PANEL} bg-background` : SIDEBAR_PANEL}`}
+      className={`relative min-h-0 flex flex-col ${mobileOverlay ? `${SIDEBAR_PANEL} bg-background` : SIDEBAR_PANEL}`}
       style={{
         width: mobileOverlay
           ? '100%'
@@ -386,6 +386,15 @@ export function AgentThinkingSidebar({
             : RIGHT_SIDEBAR_WIDTH_PX,
       }}
     >
+      <SidebarToggle
+        isCollapsed={isCollapsed}
+        onClick={onToggle}
+        side="right"
+        ariaLabel={
+          isCollapsed ? 'Expand thinking panel' : 'Collapse thinking panel'
+        }
+      />
+      <div className="min-h-0 overflow-hidden flex-1 flex flex-col min-w-0">
       <style>{`
         @keyframes statTick {
           from { opacity: 0.6; transform: scale(1.06); }
@@ -404,15 +413,6 @@ export function AgentThinkingSidebar({
         }
         .brain-download-anim { animation: brainDownloadPulse 2.2s ease-in-out forwards; }
       `}</style>
-      <SidebarToggle
-        isCollapsed={isCollapsed}
-        onClick={onToggle}
-        side="right"
-        ariaLabel={
-          isCollapsed ? 'Expand thinking panel' : 'Collapse thinking panel'
-        }
-      />
-
       {!isCollapsed && (
         <div className="shrink-0 px-4 pt-4 min-h-[54px] flex items-center gap-2">
           <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
@@ -466,7 +466,7 @@ export function AgentThinkingSidebar({
           sessionStats.completed === 0 &&
           sessionStats.processing === 0 ? (
             <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground italic max-w-[200px] leading-none flex items-center">
-              These aren't the droids you're looking for.
+              These are not the droids you deepseek.
             </p>
           ) : (
             <p className="px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
@@ -655,6 +655,7 @@ export function AgentThinkingSidebar({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 }
