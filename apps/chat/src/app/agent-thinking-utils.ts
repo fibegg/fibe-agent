@@ -9,6 +9,12 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { ACTIVITY_BLOCK_VARIANTS } from './ui-classes';
 
+export const HIDDEN_ACTIVITY_TYPES = new Set<string>(['AskUserQuestion']);
+
+export function filterVisibleStoryItems(entries: StoryEntry[]): StoryEntry[] {
+  return entries.filter((e) => !HIDDEN_ACTIVITY_TYPES.has(e.type));
+}
+
 export type StoryEntry = {
   id: string;
   type: string;
