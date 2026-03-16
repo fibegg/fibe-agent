@@ -15,7 +15,7 @@ import { getCorsOrigin, getFrameAncestors } from './cors-frame.config';
 import { GlobalHttpExceptionFilter } from './app/http-exception.filter';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
-import { WS_EVENT } from './app/ws.constants';
+import { WS_CLOSE, WS_EVENT } from './app/ws.constants';
 import { loadInjectedCredentials } from './credential-injector';
 
 const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
@@ -98,13 +98,13 @@ async function bootstrap() {
       const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
       const token = url.searchParams.get('token');
       if (token !== requiredPassword) {
-        ws.close(4001, 'Unauthorized');
+        ws.close(WS_CLOSE.UNAUTHORIZED, 'Unauthorized');
         return;
       }
     }
     if (activeClient && activeClient.readyState === 1) {
-      ws.close(4000, 'Another session is already active');
-      return;
+      activeClient.close(WS_CLOSE.SESSION_TAKEN_OVER, 'Session taken over by another client');
+      activeClient = null;
     }
     activeClient = ws;
     orchestrator.handleClientConnected();

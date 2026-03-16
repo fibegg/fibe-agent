@@ -25,6 +25,12 @@ export const STATE_LABELS: Record<ChatState, string> = {
 export const RESPONSE_TIMEOUT_MS = 600_000;
 export const RECONNECT_INTERVAL_MS = 500;
 
+export const WS_CLOSE = {
+  ANOTHER_SESSION_ACTIVE: 4000,
+  UNAUTHORIZED: 4001,
+  SESSION_TAKEN_OVER: 4002,
+} as const;
+
 export interface ServerMessage {
   type: string;
   status?: string;

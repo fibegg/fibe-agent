@@ -29,8 +29,10 @@ When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activity`, `GET /ap
 
 **Behaviour:**
 
-- Only one client can be connected at a time. A second connection is closed with code `4000` and reason "Another session is already active".
+- Only one client can be the active session at a time. When a second client connects, the **first** client is closed with code `4002` and reason "Session taken over by another client"; the second client becomes active. The displaced client can show "Your session was taken over by another client" and offer Reconnect (user clicks when they want to try again).
 - Unauthorized connections (wrong or missing token when password is required) are closed with code `4001`.
+
+**Close codes:** `4001` = Unauthorized; `4002` = Session taken over by another client (displaced client only).
 
 ### Client → Server (JSON)
 
