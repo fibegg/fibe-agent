@@ -16,6 +16,7 @@ export interface ToolOrFileEvent {
   path?: string;
   summary?: string;
   command?: string;
+  details?: string;
 }
 
 export type ThinkingActivityType =

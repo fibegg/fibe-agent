@@ -51,7 +51,7 @@ export function getActivityLabel(type: string): string {
       return 'Started';
     case 'reasoning_start':
     case 'reasoning_end':
-      return 'Reasoning';
+      return '';
     case 'step':
       return 'Step';
     case 'file_created':

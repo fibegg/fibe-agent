@@ -73,7 +73,7 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.queryByText(/Streaming output/)).toBeNull();
   });
 
-  it('renders story items when storyItems provided', () => {
+  it('renders story items when storyItems provided and streaming', () => {
     const storyItems = [
       {
         id: '1',
@@ -93,9 +93,10 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
+        isStreaming
       />
     );
-    expect(screen.getByText('Started')).toBeTruthy();
+    expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.getByText(/Generating response/)).toBeTruthy();
   });
 
@@ -117,6 +118,26 @@ describe('AgentThinkingSidebar', () => {
       />
     );
     expect(screen.getByText('npm install')).toBeTruthy();
+  });
+
+  it('strips leading "Ran " from tool_call when only message is set', () => {
+    const storyItems = [
+      {
+        id: 'tc1',
+        type: 'tool_call',
+        message: 'Ran Bash',
+        timestamp: new Date().toISOString(),
+      },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />
+    );
+    expect(screen.getByText('Bash')).toBeTruthy();
+    expect(screen.queryByText(/Ran Bash/)).toBeNull();
   });
 
   it('shows empty state message when no activity', () => {
@@ -141,6 +162,7 @@ describe('AgentThinkingSidebar', () => {
   it('shows Task complete block when not streaming and story items exist', () => {
     const storyItems = [
       { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      { id: '2', type: 'tool_call', message: 'Ran command', timestamp: new Date().toISOString(), command: 'echo ok' },
     ];
     render(
       <AgentThinkingSidebar
@@ -243,10 +265,47 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
+        isStreaming
       />
     );
-    expect(screen.getByText('Started')).toBeTruthy();
+    expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.getByText(/Step done/)).toBeTruthy();
     expect(screen.queryByText(/Ask user/)).toBeNull();
+  });
+
+  it('hides Started and step (GENERATING RESPONSE) when not streaming', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      { id: '2', type: 'step', message: 'GENERATING RESPONSE – PROCESSING', timestamp: new Date().toISOString() },
+      { id: '3', type: 'tool_call', message: 'Ran command', timestamp: new Date().toISOString(), command: 'npm run build' },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+        isStreaming={false}
+      />
+    );
+    expect(screen.queryByText('Started')).toBeNull();
+    expect(screen.queryByText(/GENERATING RESPONSE/)).toBeNull();
+    expect(screen.getByText('npm run build')).toBeTruthy();
+  });
+
+  it('shows stream_start and step when streaming', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      { id: '2', type: 'step', message: 'GENERATING RESPONSE – PROCESSING', timestamp: new Date().toISOString() },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+        isStreaming
+      />
+    );
+    expect(screen.getByText('Thinking...')).toBeTruthy();
+    expect(screen.getByText(/GENERATING RESPONSE/)).toBeTruthy();
   });
 });
