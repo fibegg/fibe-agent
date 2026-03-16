@@ -20,6 +20,10 @@ import {
   type StoryEntry,
 } from './agent-thinking-utils';
 import {
+  parseThinkingSegments,
+  SUSPICIOUS_TOOLTIP,
+} from './thinking-failure-patterns';
+import {
   ACTIVITY_BLOCK_BASE,
   ACTIVITY_BLOCK_VARIANTS,
   ACTIVITY_BODY,
@@ -152,6 +156,37 @@ const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
 
 const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
 
+const SUSPICIOUS_SEGMENT_CLASS =
+  'bg-amber-500/25 text-amber-200 border-b border-amber-500/50 rounded-sm px-0.5';
+
+const ThinkingTextWithHighlights = memo(function ThinkingTextWithHighlights({
+  text,
+  className,
+}: {
+  text: string;
+  className?: string;
+}) {
+  const segments = useMemo(() => parseThinkingSegments(text), [text]);
+  if (segments.length === 0) return null;
+  return (
+    <span className={className}>
+      {segments.map((seg, i) =>
+        seg.suspicious ? (
+          <mark
+            key={i}
+            className={SUSPICIOUS_SEGMENT_CLASS}
+            title={SUSPICIOUS_TOOLTIP}
+          >
+            {seg.text}
+          </mark>
+        ) : (
+          <span key={i}>{seg.text}</span>
+        )
+      )}
+    </span>
+  );
+});
+
 const ActivityBlock = memo(function ActivityBlock({
   entry,
   isStreaming,
@@ -230,7 +265,9 @@ const ActivityBlock = memo(function ActivityBlock({
       </div>
       {isThinkingBlock ? (
         <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-32 overflow-y-auto">
-          <p className={`text-[11px] ${ACTIVITY_MONO}`}>{entry.details}</p>
+          <p className={`text-[11px] ${ACTIVITY_MONO}`}>
+            <ThinkingTextWithHighlights text={entry.details ?? ''} />
+          </p>
         </div>
       ) : (
         <div className="mt-0.5">
@@ -840,7 +877,9 @@ export function AgentThinkingSidebar({
                   Response
                 </p>
                 <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>
-                  {displayThinkingText || (isStreaming ? '…' : '')}
+                  <ThinkingTextWithHighlights
+                    text={displayThinkingText || (isStreaming ? '…' : '')}
+                  />
                   <span
                     ref={thinkingScrollRef}
                     className="inline-block min-h-0"

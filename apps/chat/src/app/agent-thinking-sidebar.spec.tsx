@@ -120,6 +120,25 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText('npm install')).toBeTruthy();
   });
 
+  it('highlights suspicious failure phrases in reasoning activity block', () => {
+    const storyItems = [
+      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      {
+        id: '2',
+        type: 'reasoning_start',
+        message: '',
+        timestamp: new Date().toISOString(),
+        details: 'But authentication fails. Trying fallback.',
+      },
+    ];
+    render(
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />
+    );
+    const mark = document.querySelector('mark[title="Possible failure — check token or access"]');
+    expect(mark).toBeTruthy();
+    expect(mark?.textContent).toContain('authentication fails');
+  });
+
   it('strips leading "Ran " from tool_call when only message is set', () => {
     const storyItems = [
       {
