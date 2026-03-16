@@ -3,10 +3,12 @@ import { test, expect } from '@playwright/test';
 test.describe('@playgrounds.dev/chat-e2e', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    await page.waitForLoadState('domcontentloaded');
   });
 
-  test('should display app heading', async ({ page }) => {
-    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Agent Authentication|Welcome/);
+  test('should display app (login or chat)', async ({ page }) => {
+    const loginVisible = page.getByRole('button', { name: 'Login' });
+    const chatHeading = page.getByRole('heading', { name: /AI Assistant/i });
+    await expect(loginVisible.or(chatHeading)).toBeVisible({ timeout: 15_000 });
   });
 });

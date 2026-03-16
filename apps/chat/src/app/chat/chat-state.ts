@@ -22,6 +22,18 @@ export const STATE_LABELS: Record<ChatState, string> = {
   [CHAT_STATES.ERROR]: 'Error occurred',
 };
 
+export const CHAT_INPUT_PLACEHOLDER = {
+  AUTH_REQUIRED: 'Complete authentication to start chatting...',
+  READY: 'Ask me anything...',
+  WORKING: 'Working...',
+} as const;
+
+export function getChatInputPlaceholder(state: ChatState): string {
+  if (state === CHAT_STATES.AWAITING_RESPONSE) return CHAT_INPUT_PLACEHOLDER.WORKING;
+  if (state === CHAT_STATES.AUTHENTICATED) return CHAT_INPUT_PLACEHOLDER.READY;
+  return CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED;
+}
+
 export const RESPONSE_TIMEOUT_MS = 600_000;
 export const RECONNECT_INTERVAL_MS = 500;
 

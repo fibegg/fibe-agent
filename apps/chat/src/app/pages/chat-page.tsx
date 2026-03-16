@@ -29,7 +29,7 @@ import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { shouldHideThemeSwitch } from '../embed-config';
 import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
-import { CHAT_STATES, STATE_LABELS } from '../chat/chat-state';
+import { CHAT_STATES, getChatInputPlaceholder, STATE_LABELS } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { apiRequest, isAuthenticated, isChatModelLocked } from '../api-url';
 import { API_PATHS } from '../api-paths';
@@ -856,7 +856,6 @@ export function ChatPage() {
               storyItems={displayStory}
               sessionActivity={sessionActivity}
               pastActivityFromMessages={pastActivityFromMessages}
-              lastUserMessage={lastUserMessage}
               mobileOverlay
             />
           </div>
@@ -921,17 +920,11 @@ export function ChatPage() {
                   )}
                 </div>
                 <div className="min-h-[14px] mt-0.5 flex items-center">
-                  {state === CHAT_STATES.AWAITING_RESPONSE ? (
-                    <span className="text-[10px] sm:text-xs text-warning">
-                      Thinking...
-                    </span>
-                  ) : (
-                    <p className={`text-[10px] sm:text-xs ${statusClass}`}>
-                      {state === CHAT_STATES.AGENT_OFFLINE && errorMessage
-                        ? errorMessage
-                        : STATE_LABELS[state] ?? state}
-                    </p>
-                  )}
+                  <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
+                    {state === CHAT_STATES.AGENT_OFFLINE && errorMessage
+                      ? errorMessage
+                      : STATE_LABELS[state] ?? state}
+                  </p>
                 </div>
               </div>
             </div>
@@ -1026,7 +1019,7 @@ export function ChatPage() {
                 messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-                lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastSentMessage : null}
+                lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastUserMessage : null}
                 scrollRef={scroll.scrollRef}
                 bothSidebarsCollapsed={
                   !isMobile && sidebarCollapsed && rightSidebarCollapsed
@@ -1158,11 +1151,7 @@ export function ChatPage() {
                     onChange={(v) => setInputState((prev) => ({ ...prev, value: v, cursor: v.length }))}
                     onValueAndCursor={(v, c) => setInputState({ value: v, cursor: c })}
                     onCursorChange={(c) => setInputState((prev) => ({ ...prev, cursor: c }))}
-                    placeholder={
-                      state === CHAT_STATES.AUTHENTICATED
-                        ? 'Ask me anything...'
-                        : 'Complete authentication to start chatting...'
-                    }
+                    placeholder={getChatInputPlaceholder(state)}
                     disabled={state !== CHAT_STATES.AUTHENTICATED}
                     onKeyDown={handleKeyDown}
                     onPaste={handlePaste}
@@ -1227,7 +1216,6 @@ export function ChatPage() {
           storyItems={displayStory}
           sessionActivity={sessionActivity}
           pastActivityFromMessages={pastActivityFromMessages}
-          lastUserMessage={lastUserMessage}
         />
       )}
     </div>

@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   CHAT_STATES,
+  CHAT_INPUT_PLACEHOLDER,
+  getChatInputPlaceholder,
   STATE_LABELS,
   RESPONSE_TIMEOUT_MS,
   RECONNECT_INTERVAL_MS,
@@ -38,5 +40,20 @@ describe('chat-state', () => {
     expect(WS_CLOSE.ANOTHER_SESSION_ACTIVE).toBe(4000);
     expect(WS_CLOSE.UNAUTHORIZED).toBe(4001);
     expect(WS_CLOSE.SESSION_TAKEN_OVER).toBe(4002);
+  });
+
+  it('getChatInputPlaceholder returns WORKING for AWAITING_RESPONSE', () => {
+    expect(getChatInputPlaceholder(CHAT_STATES.AWAITING_RESPONSE)).toBe(CHAT_INPUT_PLACEHOLDER.WORKING);
+  });
+
+  it('getChatInputPlaceholder returns READY for AUTHENTICATED', () => {
+    expect(getChatInputPlaceholder(CHAT_STATES.AUTHENTICATED)).toBe(CHAT_INPUT_PLACEHOLDER.READY);
+  });
+
+  it('getChatInputPlaceholder returns AUTH_REQUIRED for unauthenticated states', () => {
+    expect(getChatInputPlaceholder(CHAT_STATES.INITIALIZING)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
+    expect(getChatInputPlaceholder(CHAT_STATES.UNAUTHENTICATED)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
+    expect(getChatInputPlaceholder(CHAT_STATES.AGENT_OFFLINE)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
+    expect(getChatInputPlaceholder(CHAT_STATES.ERROR)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
   });
 });
