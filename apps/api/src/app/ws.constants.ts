@@ -45,3 +45,9 @@ export const ERROR_CODE = {
   NEED_AUTH: 'NEED_AUTH',
   BLOCKED: 'BLOCKED',
 } as const;
+
+export const WS_CLOSE = {
+  ANOTHER_SESSION_ACTIVE: 4000,
+  UNAUTHORIZED: 4001,
+  SESSION_TAKEN_OVER: 4002,
+} as const;

@@ -4,6 +4,7 @@ import {
   STATE_LABELS,
   RESPONSE_TIMEOUT_MS,
   RECONNECT_INTERVAL_MS,
+  WS_CLOSE,
   type ChatState,
 } from './chat-state';
 
@@ -31,5 +32,11 @@ describe('chat-state', () => {
   it('exports positive timeout and reconnect interval', () => {
     expect(RESPONSE_TIMEOUT_MS).toBeGreaterThan(0);
     expect(RECONNECT_INTERVAL_MS).toBeGreaterThan(0);
+  });
+
+  it('WS_CLOSE has expected close codes', () => {
+    expect(WS_CLOSE.ANOTHER_SESSION_ACTIVE).toBe(4000);
+    expect(WS_CLOSE.UNAUTHORIZED).toBe(4001);
+    expect(WS_CLOSE.SESSION_TAKEN_OVER).toBe(4002);
   });
 });

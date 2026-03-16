@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useChatWebSocket } from './use-chat-websocket';
-import { CHAT_STATES } from './chat-state';
+import { CHAT_STATES, WS_CLOSE } from './chat-state';
 
 vi.mock('../api-url', () => ({
   isAuthenticated: vi.fn(() => true),
@@ -149,5 +149,90 @@ describe('useChatWebSocket thinking callbacks', () => {
     expect(onThinkingStep.mock.calls[0][0].id).toBe('1');
     expect(onThinkingStep.mock.calls[0][0].title).toBe('Generating');
     expect(onThinkingStep.mock.calls[0][0].status).toBe('processing');
+  });
+});
+
+describe('useChatWebSocket close codes', () => {
+  let lastWs: { onclose?: (e: CloseEvent) => void; onopen?: () => void } | null = null;
+
+  beforeEach(() => {
+    lastWs = null;
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWebSocket {
+        readyState = 0;
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+        send = vi.fn();
+        set onclose(handler: (e: CloseEvent) => void) {
+          (this as unknown as { _onclose: (e: CloseEvent) => void })._onclose = handler;
+        }
+        get onclose() {
+          return (this as unknown as { _onclose: (e: CloseEvent) => void })._onclose;
+        }
+        set onopen(handler: () => void) {
+          (this as unknown as { _onopen: () => void })._onopen = handler;
+        }
+        get onopen() {
+          return (this as unknown as { _onopen: () => void })._onopen;
+        }
+        constructor() {
+          lastWs = this as unknown as typeof lastWs;
+        }
+      }
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('sets ERROR and message when closed with 4000', async () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MemoryRouter>{children}</MemoryRouter>
+    );
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const ws = lastWs as unknown as { _onclose: (e: CloseEvent) => void };
+    act(() => {
+      ws._onclose({ code: WS_CLOSE.ANOTHER_SESSION_ACTIVE } as CloseEvent);
+    });
+    expect(result.current.state).toBe(CHAT_STATES.ERROR);
+    expect(result.current.errorMessage).toBe('Another session is already active');
+  });
+
+  it('sets ERROR and message when closed with 4002', async () => {
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MemoryRouter>{children}</MemoryRouter>
+    );
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const ws = lastWs as unknown as { _onclose: (e: CloseEvent) => void };
+    act(() => {
+      ws._onclose({ code: WS_CLOSE.SESSION_TAKEN_OVER } as CloseEvent);
+    });
+    expect(result.current.state).toBe(CHAT_STATES.ERROR);
+    expect(result.current.errorMessage).toBe('Your session was taken over by another client');
+  });
+
+  it('clears token when closed with 4001', async () => {
+    const { clearToken } = await import('../api-url');
+    const wrapper = ({ children }: { children: React.ReactNode }) => (
+      <MemoryRouter>{children}</MemoryRouter>
+    );
+    renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const ws = lastWs as unknown as { _onclose: (e: CloseEvent) => void };
+    act(() => {
+      ws._onclose({ code: WS_CLOSE.UNAUTHORIZED } as CloseEvent);
+    });
+    expect(clearToken).toHaveBeenCalled();
   });
 });

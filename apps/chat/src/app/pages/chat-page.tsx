@@ -922,7 +922,9 @@ export function ChatPage() {
                     </span>
                   ) : (
                     <p className={`text-[10px] sm:text-xs ${statusClass}`}>
-                      {STATE_LABELS[state] ?? state}
+                      {state === CHAT_STATES.AGENT_OFFLINE && errorMessage
+                        ? errorMessage
+                        : STATE_LABELS[state] ?? state}
                     </p>
                   )}
                 </div>

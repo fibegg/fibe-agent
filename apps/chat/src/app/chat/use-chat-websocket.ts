@@ -10,6 +10,7 @@ import {
   CHAT_STATES,
   RESPONSE_TIMEOUT_MS,
   RECONNECT_INTERVAL_MS,
+  WS_CLOSE,
   type ChatState,
   type ServerMessage,
   type StoredActivityEntry,
@@ -136,6 +137,7 @@ export function useChatWebSocket(
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      setErrorMessage(null);
       send({ action: 'get_model' });
     };
 
@@ -305,13 +307,18 @@ export function useChatWebSocket(
     };
 
     ws.onclose = (event: CloseEvent) => {
-      if (event.code === 4001) {
+      if (event.code === WS_CLOSE.UNAUTHORIZED) {
         clearToken();
         navigate('/login', { replace: true });
         return;
       }
-      if (event.code === 4000) {
+      if (event.code === WS_CLOSE.ANOTHER_SESSION_ACTIVE) {
         setErrorMessage('Another session is already active');
+        transition(setState, CHAT_STATES.ERROR);
+        return;
+      }
+      if (event.code === WS_CLOSE.SESSION_TAKEN_OVER) {
+        setErrorMessage('Your session was taken over by another client');
         transition(setState, CHAT_STATES.ERROR);
         return;
       }
