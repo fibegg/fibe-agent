@@ -125,7 +125,7 @@ describe('FileExplorer', () => {
     expect(screen.queryByText('Loading…')).toBeNull();
   });
 
-  it('shows Phoenix version in sidebar', async () => {
+  it('shows version in sidebar', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -133,7 +133,7 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/Phoenix v/)).toBeTruthy();
+      expect(screen.getByText(/v[\d.]/)).toBeTruthy();
     });
   });
 

@@ -26,8 +26,7 @@ import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
-import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
-import { shouldHideHeaderLogo, shouldHideThemeSwitch } from '../embed-config';
+import { shouldHideThemeSwitch } from '../embed-config';
 import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES, STATE_LABELS } from '../chat/chat-state';
@@ -807,7 +806,7 @@ export function ChatPage() {
                 </button>
               )}
               <p className="text-xs text-muted-foreground pt-2">
-                Phoenix Quantum Storage · v{__APP_VERSION__}
+                v{__APP_VERSION__}
               </p>
             </div>
           </div>
@@ -895,12 +894,9 @@ export function ChatPage() {
                 <button
                   type="button"
                   onClick={() => setSidebarOpen(true)}
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-br from-violet-600/90 to-purple-600/90 hover:from-violet-500 hover:to-purple-500 shadow-md shadow-violet-500/20 border border-violet-400/20 pl-1.5 pr-2.5 py-1.5 text-white transition-all active:scale-[0.98]"
+                  className="flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"
                   aria-label="Open menu"
                 >
-                  {!shouldHideHeaderLogo() && (
-                    <AnimatedPhoenixLogo className="size-7 sm:size-8 pointer-events-none" />
-                  )}
                   <Menu className="size-4 sm:size-5 shrink-0" />
                 </button>
               </div>

@@ -13,12 +13,12 @@ describe('App', () => {
     expect(baseElement).toBeTruthy();
   });
 
-  it('should show login title when not authenticated', async () => {
-    const { findByText } = render(
+  it('should show login form when not authenticated', async () => {
+    const { findByRole } = render(
       <MemoryRouter initialEntries={['/login']}>
         <App />
       </MemoryRouter>,
     );
-    expect(await findByText('Agent Authentication', {}, { timeout: 5000 })).toBeTruthy();
+    expect(await findByRole('button', { name: 'Login' }, { timeout: 5000 })).toBeTruthy();
   });
 });

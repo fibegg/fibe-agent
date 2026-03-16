@@ -21,8 +21,8 @@ describe('ThinkingState', () => {
   });
 
   it('uses easter egg lines when lastUserMessage matches', () => {
-    render(<ThinkingState lastUserMessage="phoenix" />);
-    const text = screen.getByText(/phoenix|ashes|renewal|flame/i);
+    render(<ThinkingState lastUserMessage="42" />);
+    const text = screen.getByText(/ultimate answer|Don't panic/i);
     expect(text).toBeTruthy();
   });
 });
