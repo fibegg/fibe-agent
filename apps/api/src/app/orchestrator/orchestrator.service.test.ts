@@ -48,8 +48,12 @@ describe('OrchestratorService', () => {
       },
     } as unknown as PlaygroundsService;
     const phoenixSync = {
-      syncMessages: async () => {},
-      syncActivity: async () => {},
+      syncMessages: async (payload: string) => {
+        void payload;
+      },
+      syncActivity: async (payload: string) => {
+        void payload;
+      },
     } as unknown as import('../phoenix-sync/phoenix-sync.service').PhoenixSyncService;
     const orch = new OrchestratorService(
       activityStore,
