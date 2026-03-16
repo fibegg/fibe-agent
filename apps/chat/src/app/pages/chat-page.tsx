@@ -5,6 +5,7 @@ import {
   LogOut,
   Menu,
   Mic,
+  Paperclip,
   Search,
   Send,
   X,
@@ -44,6 +45,7 @@ import {
   CHAT_HEADER_PADDING_BOTTOM_PX,
 } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
+import { formatSessionDurationMs, toTimestampMs } from '../agent-thinking-utils';
 import type { ThinkingStep, ThinkingActivity } from '../chat/thinking-types';
 import {
   BUTTON_DESTRUCTIVE_GHOST,
@@ -404,6 +406,23 @@ export function ChatPage() {
         .map((m) => ({ id: m.created_at, created_at: m.created_at, story: m.story! })),
     [messages]
   );
+
+  const sessionTimeMs = useMemo(() => {
+    const allEntries = [
+      ...sessionActivity.flatMap((t) =>
+        (t.story ?? []).map((s) => ({ created_at: t.created_at, ts: s.timestamp }))
+      ),
+      ...displayStory.map((s) => ({
+        created_at: typeof s.timestamp === 'string' ? s.timestamp : (s.timestamp as Date)?.toISOString?.() ?? '',
+        ts: s.timestamp,
+      })),
+    ].filter((e) => e.created_at || e.ts);
+    const times = allEntries.map((e) => toTimestampMs(e.ts, e.created_at));
+    const firstTs = times.length ? Math.min(...times) : 0;
+    const lastTs = times.length ? Math.max(...times) : 0;
+    const isStreaming = state === CHAT_STATES.AWAITING_RESPONSE;
+    return lastTs && firstTs ? (isStreaming ? Date.now() - firstTs : lastTs - firstTs) : 0;
+  }, [sessionActivity, displayStory, state]);
 
   const handleSend = useCallback(() => {
     const text = inputValue.trim();
@@ -768,9 +787,19 @@ export function ChatPage() {
                 </button>
               </div>
               <div className="min-w-0">
-                <h2 className="font-semibold text-sm text-foreground truncate">
-                  AI Assistant
-                </h2>
+                <div className="flex items-center gap-2">
+                  <h2 className="font-semibold text-sm text-foreground truncate">
+                    AI Assistant
+                  </h2>
+                  {sessionTimeMs > 0 && (
+                    <span
+                      className="text-[10px] sm:text-xs font-medium tabular-nums text-foreground"
+                      title="Session time"
+                    >
+                      {formatSessionDurationMs(sessionTimeMs)}
+                    </span>
+                  )}
+                </div>
                 <div className="min-h-[14px] mt-0.5 flex items-center">
                   {state === CHAT_STATES.AWAITING_RESPONSE ? (
                     <span className="text-[10px] sm:text-xs text-warning">
@@ -962,6 +991,16 @@ export function ChatPage() {
                   className="hidden"
                   onChange={handleFileChange}
                 />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={state !== CHAT_STATES.AUTHENTICATED || pendingImages.length >= MAX_PENDING_IMAGES}
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0 disabled:opacity-50"
+                  title="Attach image"
+                  aria-label="Attach image"
+                >
+                  <Paperclip className="size-3.5 sm:size-4" />
+                </button>
                 <div
                   className="relative flex-1 min-w-0"
                   title={state === CHAT_STATES.AUTHENTICATED ? 'Type @ to link a file' : undefined}

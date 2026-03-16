@@ -3,19 +3,22 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { AgentThinkingSidebar } from './agent-thinking-sidebar';
 
 describe('AgentThinkingSidebar', () => {
-  it('renders stats line and download button when expanded', () => {
+  it('renders stats line and activity (brain) button when expanded', () => {
+    const sessionActivity = [
+      { id: 'e1', created_at: new Date().toISOString(), story: [{ id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() }] },
+    ];
     render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} sessionActivity={sessionActivity} />
     );
-    expect(screen.getByRole('button', { name: 'Download activity' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Activity' })).toBeTruthy();
     expect(screen.getByTitle('Total actions')).toBeTruthy();
   });
 
-  it('does not show download button when collapsed', () => {
+  it('does not show stats row when collapsed', () => {
     render(
       <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />
     );
-    expect(screen.queryByRole('button', { name: 'Download activity' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Activity' })).toBeNull();
   });
 
   it('calls onToggle when sidebar toggle is clicked', () => {
@@ -116,14 +119,23 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText('npm install')).toBeTruthy();
   });
 
-  it('shows stat tooltips when expanded', () => {
+  it('shows empty state message when no activity', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
+    );
+    expect(screen.getByText(/aren't the droids you're looking for/)).toBeTruthy();
+  });
+
+  it('shows stat tooltips when expanded', () => {
+    const sessionActivity = [
+      { id: 'e1', created_at: new Date().toISOString(), story: [{ id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() }] },
+    ];
+    render(
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} sessionActivity={sessionActivity} />
     );
     expect(screen.getByTitle('Total actions')).toBeTruthy();
     expect(screen.getByTitle('Completed')).toBeTruthy();
     expect(screen.getByTitle('Processing')).toBeTruthy();
-    expect(screen.getByTitle('Session time')).toBeTruthy();
   });
 
   it('shows Task complete block when not streaming and story items exist', () => {

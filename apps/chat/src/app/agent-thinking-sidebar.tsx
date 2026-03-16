@@ -1,5 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Brain, CheckCircle2, Download, Loader2, Search, Sparkles, X } from 'lucide-react';
+import { Brain, CheckCircle2, Loader2, Search, Sparkles, X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { memo, useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
@@ -13,7 +14,6 @@ import {
   getActivityIcon,
   getActivityLabel,
   getBlockVariant,
-  formatSessionDurationMs,
   toTimestampMs,
   type StoryEntry,
 } from './agent-thinking-utils';
@@ -50,8 +50,18 @@ const STAT_TOOLTIPS = {
   total: 'Total actions',
   completed: 'Completed',
   processing: 'Processing',
-  sessionTime: 'Session time',
 } as const;
+
+const STAT_TOOLTIP_POPOVER_CLASS =
+  'pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100';
+
+const BRAIN_IDLE = 'text-violet-400';
+const BRAIN_IDLE_ACCENT = 'text-violet-300';
+const BRAIN_WORKING = 'text-blue-400';
+const BRAIN_WORKING_ACCENT = 'text-blue-300';
+const BRAIN_COMPLETE = 'text-emerald-400';
+const BRAIN_COMPLETE_ACCENT = 'text-emerald-300';
+const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
 
 const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
 
@@ -80,13 +90,19 @@ const ActivityBlock = memo(function ActivityBlock({
           ? entry.message
           : label;
 
+  const isStreamStartThinking = entry.type === 'stream_start' && isStreaming;
+
   if (isSingleRow) {
     return (
       <div
         className={`${ACTIVITY_BLOCK_VARIANTS[variant]} px-3 py-1.5 flex items-center justify-between gap-2 min-w-0`}
       >
         <div className={`${FLEX_ROW_CENTER} min-w-0 flex-1 truncate`}>
-          <Icon className={`size-4 shrink-0 ${iconColor}`} />
+          {isStreamStartThinking ? (
+            <Loader2 className={`size-4 shrink-0 animate-spin ${iconColor}`} />
+          ) : (
+            <Icon className={`size-4 shrink-0 ${iconColor}`} />
+          )}
           {isCommandBlock ? (
             <span className="text-[11px] font-mono text-green-300/95 truncate" title={entry.command}>
               <span className="text-amber-400/80 select-none">$ </span>
@@ -97,6 +113,10 @@ const ActivityBlock = memo(function ActivityBlock({
                 skipAnimation={!isStreaming}
               />
             </span>
+          ) : isStreamStartThinking ? (
+            <p className={`${ACTIVITY_LABEL} truncate`} title="Thinking...">
+              Thinking...
+            </p>
           ) : (
             <p className={`${ACTIVITY_LABEL} truncate`} title={singleRowText}>
               {singleRowText}
@@ -173,8 +193,14 @@ export function AgentThinkingSidebar({
     hasThinking: false,
     streaming: false,
   });
+  const prevStreamingRef = useRef(isStreaming);
+  const completeSinceRef = useRef<number>(0);
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   const [scrollContainerReady, setScrollContainerReady] = useState(false);
+  const [downloadAnimating, setDownloadAnimating] = useState(false);
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
+  const brainButtonRef = useRef<HTMLDivElement>(null);
   const setActivityScrollRef = useCallback((el: HTMLDivElement | null) => {
     (activityScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     setScrollContainerReady((prev) => (el ? true : prev));
@@ -211,6 +237,48 @@ export function AgentThinkingSidebar({
     const sessionTimeMs = lastTs && firstTs ? (isStreaming ? Date.now() - firstTs : lastTs - firstTs) : 0;
     return { totalActions, completed, processing, sessionTimeMs };
   }, [sessionActivity, storyItems, isStreaming]);
+
+  const lastStoryTimestampMs = useMemo(() => {
+    if (fullStoryItems.length === 0) return 0;
+    const times = fullStoryItems.map((e) =>
+      toTimestampMs(e.timestamp, typeof e.timestamp === 'string' ? e.timestamp : '')
+    );
+    return Math.max(...times);
+  }, [fullStoryItems]);
+
+  useEffect(() => {
+    if (prevStreamingRef.current && !isStreaming) {
+      completeSinceRef.current = Date.now();
+    }
+    prevStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
+  const [transitionToIdleTrigger, setTransitionToIdleTrigger] = useState(0);
+  useEffect(() => {
+    if (isStreaming) return;
+    const fromStory = fullStoryItems.length > 0 && lastStoryTimestampMs > 0 ? lastStoryTimestampMs : 0;
+    const fromStreamEnd = completeSinceRef.current || 0;
+    const completeAt = Math.max(fromStory, fromStreamEnd);
+    if (completeAt === 0) return;
+    const elapsed = Date.now() - completeAt;
+    if (elapsed >= BRAIN_COMPLETE_TO_IDLE_MS) return;
+    const remaining = BRAIN_COMPLETE_TO_IDLE_MS - elapsed;
+    const t = setTimeout(() => setTransitionToIdleTrigger((n) => n + 1), remaining);
+    return () => clearTimeout(t);
+  }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs, transitionToIdleTrigger]);
+
+  const brainClasses = useMemo(() => {
+    if (isStreaming) return { brain: BRAIN_WORKING, accent: BRAIN_WORKING_ACCENT };
+    const fromStreamEnd = completeSinceRef.current;
+    const fromStory =
+      fullStoryItems.length > 0 && lastStoryTimestampMs > 0
+        ? Date.now() - lastStoryTimestampMs < BRAIN_COMPLETE_TO_IDLE_MS
+        : false;
+    const fromStreamEndRecent =
+      fromStreamEnd > 0 && Date.now() - fromStreamEnd < BRAIN_COMPLETE_TO_IDLE_MS;
+    if (fromStory || fromStreamEndRecent) return { brain: BRAIN_COMPLETE, accent: BRAIN_COMPLETE_ACCENT };
+    return { brain: BRAIN_IDLE, accent: BRAIN_IDLE_ACCENT };
+  }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs, transitionToIdleTrigger]);
 
   const filteredStoryItems = useMemo(() => {
     if (!activitySearchQuery.trim()) return fullStoryItems;
@@ -270,7 +338,9 @@ export function AgentThinkingSidebar({
     }
   }, [fullStoryItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
 
-  const handleDownloadActivity = useCallback(() => {
+  const runCopyWithAnimation = useCallback(async () => {
+    if (downloadAnimating) return;
+    setDownloadAnimating(true);
     const payload = {
       exportedAt: new Date().toISOString(),
       sessionStats: {
@@ -288,14 +358,22 @@ export function AgentThinkingSidebar({
         ...(e.path !== undefined ? { path: e.path } : {}),
       })),
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `agent-activity-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-  }, [sessionStats.totalActions, sessionStats.completed, sessionStats.sessionTimeMs, fullStoryItems]);
+    const text = JSON.stringify(payload, null, 2);
+    try {
+      await navigator.clipboard.writeText(text);
+      const rect = brainButtonRef.current?.getBoundingClientRect();
+      if (rect) {
+        setCopyTooltipAnchor({ centerX: rect.left + rect.width / 2, bottom: rect.bottom });
+      }
+      setCopiedToClipboard(true);
+      setTimeout(() => {
+        setCopiedToClipboard(false);
+        setCopyTooltipAnchor(null);
+      }, 2500);
+    } finally {
+      setTimeout(() => setDownloadAnimating(false), 2200);
+    }
+  }, [sessionStats.totalActions, sessionStats.completed, sessionStats.sessionTimeMs, fullStoryItems, downloadAnimating]);
 
   return (
     <div
@@ -314,6 +392,17 @@ export function AgentThinkingSidebar({
           to { opacity: 1; transform: scale(1); }
         }
         .stat-tick { animation: statTick 0.22s ease-out 1; }
+        @keyframes brainDownloadPulse {
+          0% { transform: scale(1); opacity: 1; color: inherit; }
+          12% { transform: scale(1.25); opacity: 1; color: inherit; }
+          25% { transform: scale(1); opacity: 1; color: inherit; }
+          37% { transform: scale(1.2); opacity: 1; color: inherit; }
+          50% { transform: scale(1); opacity: 1; color: inherit; }
+          62% { transform: scale(1); opacity: 1; color: rgb(239 68 68); }
+          75% { transform: scale(1); opacity: 1; color: rgb(239 68 68); }
+          100% { transform: scale(6); opacity: 0; color: rgb(239 68 68); }
+        }
+        .brain-download-anim { animation: brainDownloadPulse 2.2s ease-in-out forwards; }
       `}</style>
       <SidebarToggle
         isCollapsed={isCollapsed}
@@ -325,56 +414,96 @@ export function AgentThinkingSidebar({
       />
 
       {!isCollapsed && (
-        <div className="shrink-0 px-4 pt-4 flex items-start gap-2">
-          <div className="relative shrink-0 pt-1">
-            <Brain className="size-5 text-violet-400" />
-            <Sparkles
-              className="size-3 text-violet-300 absolute -top-1 -right-1 animate-pulse"
-              aria-hidden
-            />
+        <div className="shrink-0 px-4 pt-4 min-h-[54px] flex items-center gap-2">
+          <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
+            <button
+              type="button"
+              onClick={runCopyWithAnimation}
+              className="relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
+              aria-label="Activity"
+              disabled={downloadAnimating}
+            >
+              {downloadAnimating ? (
+              <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
+                <Brain className="size-8 brain-download-anim" />
+              </span>
+            ) : (
+              <>
+                <Brain className={`size-8 ${brainClasses.brain} transition-colors`} />
+                {isStreaming ? (
+                  <Loader2
+                    className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
+                    aria-hidden
+                  />
+                ) : (
+                  <Sparkles
+                    className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
+                    aria-hidden
+                  />
+                )}
+              </>
+            )}
+            </button>
           </div>
-          <p className="px-2 py-1.5 text-[10px] font-medium tabular-nums flex items-center gap-0.5 flex-wrap">
-            <span
-              key={`total-${sessionStats.totalActions}`}
-              className="text-foreground stat-tick inline-block"
-              title={STAT_TOOLTIPS.total}
-            >
-              {sessionStats.totalActions}
-            </span>
-            <span className="text-muted-foreground/70">/</span>
-            <span
-              key={`completed-${sessionStats.completed}`}
-              className="text-emerald-400 stat-tick inline-block"
-              title={STAT_TOOLTIPS.completed}
-            >
-              {sessionStats.completed}
-            </span>
-            <span className="text-muted-foreground/70">/</span>
-            <span
-              key={`processing-${sessionStats.processing}`}
-              className="text-cyan-400 stat-tick inline-block"
-              title={STAT_TOOLTIPS.processing}
-            >
-              {sessionStats.processing}
-            </span>
-            <span className="text-muted-foreground/70">/</span>
-            <span
-              key={`time-${sessionStats.sessionTimeMs}`}
-              className="text-foreground stat-tick inline-block"
-              title={STAT_TOOLTIPS.sessionTime}
-            >
-              {formatSessionDurationMs(sessionStats.sessionTimeMs)}
-            </span>
-          </p>
-          <button
-            type="button"
-            onClick={handleDownloadActivity}
-            className="size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors shrink-0"
-            title="Download activity"
-            aria-label="Download activity"
-          >
-            <Download className="size-4" />
-          </button>
+          {copiedToClipboard &&
+            copyTooltipAnchor &&
+            typeof document !== 'undefined' &&
+            createPortal(
+              <span
+                className="pointer-events-none fixed z-[9999] rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-lg whitespace-nowrap"
+                role="status"
+                style={{
+                  left: copyTooltipAnchor.centerX,
+                  top: copyTooltipAnchor.bottom + 8,
+                  transform: 'translate(-50%, 0)',
+                }}
+              >
+                Copied to clipboard
+              </span>,
+              document.body
+            )}
+          {sessionStats.totalActions === 0 &&
+          sessionStats.completed === 0 &&
+          sessionStats.processing === 0 ? (
+            <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground italic max-w-[200px] leading-none flex items-center">
+              These aren't the droids you're looking for.
+            </p>
+          ) : (
+            <p className="px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
+              <span
+                key={`total-${sessionStats.totalActions}`}
+                className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
+                title={STAT_TOOLTIPS.total}
+              >
+                <span className="text-foreground stat-tick">{sessionStats.totalActions}</span>
+                <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
+                  {STAT_TOOLTIPS.total}
+                </span>
+              </span>
+              <span className="text-muted-foreground/70">/</span>
+              <span
+                key={`completed-${sessionStats.completed}`}
+                className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
+                title={STAT_TOOLTIPS.completed}
+              >
+                <span className="text-emerald-400 stat-tick">{sessionStats.completed}</span>
+                <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
+                  {STAT_TOOLTIPS.completed}
+                </span>
+              </span>
+              <span className="text-muted-foreground/70">/</span>
+              <span
+                key={`processing-${sessionStats.processing}`}
+                className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
+                title={STAT_TOOLTIPS.processing}
+              >
+                <span className="text-cyan-400 stat-tick">{sessionStats.processing}</span>
+                <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
+                  {STAT_TOOLTIPS.processing}
+                </span>
+              </span>
+            </p>
+          )}
         </div>
       )}
 
@@ -405,12 +534,16 @@ export function AgentThinkingSidebar({
           </>
         ) : (
           <div className="relative mx-auto">
-            <Brain className="size-5 text-violet-400" />
-            <Loader2
-              className={`size-3 text-violet-300 absolute -top-1 -right-1 ${
-                isStreaming ? 'animate-spin' : ''
-              }`}
-            />
+            <Brain className={`size-5 ${brainClasses.brain} transition-colors`} />
+            {isStreaming ? (
+              <Loader2
+                className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-spin transition-colors`}
+              />
+            ) : (
+              <Sparkles
+                className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-pulse transition-colors`}
+              />
+            )}
           </div>
         )}
       </div>
@@ -509,12 +642,16 @@ export function AgentThinkingSidebar({
       {isCollapsed && (
         <div className="flex-1 flex flex-col items-center justify-start pt-8 gap-4">
           <div className="relative">
-            <Brain className="size-6 text-violet-400" />
-            <Loader2
-              className={`size-3 text-violet-300 absolute -bottom-1 -right-1 ${
-                isStreaming ? 'animate-spin' : ''
-              }`}
-            />
+            <Brain className={`size-6 ${brainClasses.brain}`} />
+            {isStreaming ? (
+              <Loader2
+                className={`size-3 ${brainClasses.accent} absolute -bottom-1 -right-1 animate-spin`}
+              />
+            ) : (
+              <Sparkles
+                className={`size-3 ${brainClasses.accent} absolute -bottom-1 -right-1 animate-pulse`}
+              />
+            )}
           </div>
         </div>
       )}
