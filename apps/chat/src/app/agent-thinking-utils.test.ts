@@ -14,9 +14,9 @@ describe('getActivityLabel', () => {
     expect(getActivityLabel('stream_start')).toBe('Started');
   });
 
-  it('returns Reasoning for reasoning_start and reasoning_end', () => {
-    expect(getActivityLabel('reasoning_start')).toBe('Reasoning');
-    expect(getActivityLabel('reasoning_end')).toBe('Reasoning');
+  it('returns empty string for reasoning_start and reasoning_end', () => {
+    expect(getActivityLabel('reasoning_start')).toBe('');
+    expect(getActivityLabel('reasoning_end')).toBe('');
   });
 
   it('returns Step for step', () => {

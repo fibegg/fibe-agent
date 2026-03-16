@@ -372,7 +372,7 @@ export function ChatPage() {
             type: event.kind,
             message: msg,
             timestamp: new Date(),
-            details: event.summary ?? (event.kind === 'file_created' ? event.path : undefined),
+            details: event.kind === 'tool_call' ? (event.details ?? event.summary) : (event.summary ?? (event.kind === 'file_created' ? event.path : undefined)),
             command: event.kind === 'tool_call' ? event.command : undefined,
             path: event.path,
             debug: { kind: event.kind, name: event.name, path: event.path, summary: event.summary },

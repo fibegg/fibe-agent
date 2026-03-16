@@ -340,6 +340,7 @@ export class OrchestratorService implements OnModuleInit {
             path: event.path,
             summary: event.summary,
             command: event.command,
+            details: event.details,
           });
         }
       },

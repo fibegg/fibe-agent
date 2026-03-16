@@ -266,6 +266,7 @@ export function useChatWebSocket(
           path: data.path,
           summary: data.summary,
           command: data.command,
+          details: data.details,
         };
         thinkingRef.current?.onToolOrFile?.(event);
         return;

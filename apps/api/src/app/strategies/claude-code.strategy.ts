@@ -10,19 +10,41 @@ const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 
 const FILE_WRITING_TOOL_NAMES = ['write_file', 'edit_file', 'search_replace'];
 
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((x) => typeof x === 'string');
+}
+
+function buildCommandFromInput(input: Record<string, unknown> | undefined): string | undefined {
+  if (!input) return undefined;
+  const argsObj = input.arguments && typeof input.arguments === 'object' ? (input.arguments as Record<string, unknown>) : undefined;
+  const base =
+    typeof input.command === 'string'
+      ? input.command
+      : typeof argsObj?.command === 'string'
+        ? argsObj.command
+        : undefined;
+  const extraArgs = isStringArray(input.args)
+    ? input.args
+    : isStringArray(argsObj?.args)
+      ? argsObj.args
+      : isStringArray(input.arguments)
+        ? input.arguments
+        : undefined;
+  if (base && extraArgs?.length) return `${base.trim()} ${extraArgs.join(' ')}`.trim();
+  if (base) return base;
+  if (extraArgs?.length) return extraArgs.join(' ');
+  return undefined;
+}
+
 export function toolUseToEvent(
   cb: { name?: string; input?: unknown },
   input: Record<string, unknown> | undefined
 ): ToolEvent {
-  const args = input && typeof input.arguments === 'object' ? (input.arguments as Record<string, unknown>) : undefined;
-  const command =
-    typeof input?.command === 'string'
-      ? input.command
-      : typeof args?.command === 'string'
-        ? args.command
-        : undefined;
+  const command = buildCommandFromInput(input);
   const summary =
     input && !command ? JSON.stringify(input).slice(0, 200) : undefined;
+  const details =
+    input && typeof input === 'object' ? JSON.stringify(input).slice(0, 500) : undefined;
   const isFileTool = FILE_WRITING_TOOL_NAMES.includes((cb.name ?? '').toLowerCase());
   const pathFromInput =
     typeof input?.path === 'string'
@@ -47,6 +69,7 @@ export function toolUseToEvent(
     name: cb.name ?? 'tool',
     summary,
     command,
+    details,
   };
 }
 

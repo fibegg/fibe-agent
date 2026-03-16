@@ -48,6 +48,8 @@ const ACTIVITY_GAP = 8;
 const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
 const REASONING_MAX_HEIGHT_RATIO = 0.75;
 
+const HIDDEN_WHEN_IDLE_TYPES = new Set(['stream_start', 'step']);
+
 const STAT_TOOLTIPS = {
   total: 'Total actions',
   completed: 'Completed',
@@ -87,7 +89,7 @@ const ActivityBlock = memo(function ActivityBlock({
     entry.type === 'file_created'
       ? (entry.path ?? entry.details ?? entry.message)
       : entry.type === 'tool_call'
-        ? (entry.command ?? entry.message ?? entry.details ?? label)
+        ? (entry.command ?? (entry.message ?? entry.details ?? label).replace(/^Ran\s+/i, ''))
         : entry.type === 'step'
           ? entry.message
           : label;
@@ -106,7 +108,7 @@ const ActivityBlock = memo(function ActivityBlock({
             <Icon className={`size-4 shrink-0 ${iconColor}`} />
           )}
           {isCommandBlock ? (
-            <span className="text-[11px] font-mono text-green-300/95 truncate" title={entry.command}>
+            <span className="text-[11px] font-mono text-green-300/95 truncate" title={entry.details ?? entry.command}>
               <span className="text-amber-400/80 select-none">$ </span>
               <TypingText
                 text={entry.command ?? ''}
@@ -289,9 +291,13 @@ export function AgentThinkingSidebar({
   }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs, transitionToIdleTrigger]);
 
   const filteredStoryItems = useMemo(() => {
-    if (!activitySearchQuery.trim()) return fullStoryItems;
+    const forDisplay =
+      isStreaming
+        ? fullStoryItems
+        : fullStoryItems.filter((e) => !HIDDEN_WHEN_IDLE_TYPES.has(e.type));
+    if (!activitySearchQuery.trim()) return forDisplay;
     const q = activitySearchQuery.trim().toLowerCase();
-    return fullStoryItems.filter((entry) => {
+    return forDisplay.filter((entry) => {
       const message = (entry.message ?? '').toLowerCase();
       const details = (entry.details ?? '').toLowerCase();
       const command = (entry.command ?? '').toLowerCase();
@@ -305,7 +311,7 @@ export function AgentThinkingSidebar({
         label.includes(q)
       );
     });
-  }, [fullStoryItems, activitySearchQuery]);
+  }, [fullStoryItems, isStreaming, activitySearchQuery]);
 
   const virtualizer = useVirtualizer({
     count: filteredStoryItems.length,
@@ -617,7 +623,7 @@ export function AgentThinkingSidebar({
                 style={reasoningMaxHeightPx != null ? { maxHeight: reasoningMaxHeightPx } : undefined}
               >
                 <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide shrink-0">
-                  {reasoningText ? 'Reasoning' : 'Response'}
+                  Response
                 </p>
                 <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>
                   {displayThinkingText || (isStreaming ? '…' : '')}

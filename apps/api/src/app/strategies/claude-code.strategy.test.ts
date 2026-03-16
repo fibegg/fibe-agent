@@ -63,4 +63,31 @@ describe('toolUseToEvent', () => {
     expect(event.kind).toBe('tool_call');
     expect(event.command).toBe('ls -la');
   });
+
+  test('builds full command from command plus args array', () => {
+    const event = toolUseToEvent(
+      { name: 'run_terminal_cmd' },
+      { command: 'npm', args: ['run', 'build', '--prod'] }
+    );
+    expect(event.kind).toBe('tool_call');
+    expect(event.command).toBe('npm run build --prod');
+  });
+
+  test('builds command from arguments array only', () => {
+    const event = toolUseToEvent(
+      { name: 'run_terminal_cmd' },
+      { arguments: ['bun', 'install', '--frozen-lockfile'] }
+    );
+    expect(event.kind).toBe('tool_call');
+    expect(event.command).toBe('bun install --frozen-lockfile');
+  });
+
+  test('includes details for tool_call', () => {
+    const event = toolUseToEvent(
+      { name: 'run_terminal_cmd' },
+      { command: 'echo', args: ['hello'] }
+    );
+    expect(event.details).toBeDefined();
+    expect(JSON.parse(event.details!)).toEqual({ command: 'echo', args: ['hello'] });
+  });
 });
