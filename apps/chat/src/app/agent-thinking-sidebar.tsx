@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Brain, CheckCircle2, Loader2, Search, Sparkles, X } from 'lucide-react';
+import { Brain, CheckCircle2, ChevronDown, ChevronRight, Loader2, Search, Sparkles, Terminal, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { memo, useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
@@ -47,8 +47,42 @@ const ACTIVITY_ESTIMATE_HEIGHT = 32;
 const ACTIVITY_GAP = 8;
 const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
 const REASONING_MAX_HEIGHT_RATIO = 0.75;
+const COMMAND_GROUP_MIN = 3;
 
 const HIDDEN_WHEN_IDLE_TYPES = new Set(['stream_start', 'step']);
+
+export type DisplayItem =
+  | { kind: 'entry'; entry: StoryEntry }
+  | { kind: 'command_group'; id: string; entries: StoryEntry[] };
+
+function buildDisplayList(entries: StoryEntry[]): DisplayItem[] {
+  const result: DisplayItem[] = [];
+  let i = 0;
+  while (i < entries.length) {
+    if (entries[i].type !== 'tool_call') {
+      result.push({ kind: 'entry', entry: entries[i] });
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < entries.length && entries[j].type === 'tool_call') j++;
+    const runLength = j - i;
+    if (runLength >= COMMAND_GROUP_MIN) {
+      result.push({ kind: 'command_group', id: `cg-${entries[i].id}`, entries: entries.slice(i, j) });
+      i = j;
+    } else {
+      for (let k = i; k < j; k++) result.push({ kind: 'entry', entry: entries[k] });
+      i = j;
+    }
+  }
+  return result;
+}
+
+function commandLabel(entry: StoryEntry): string {
+  if (entry.command) return entry.command;
+  const raw = entry.message ?? entry.details ?? getActivityLabel(entry.type);
+  return String(raw).replace(/^Ran\s+/i, '');
+}
 
 const STAT_TOOLTIPS = {
   total: 'Total actions',
@@ -157,6 +191,56 @@ const ActivityBlock = memo(function ActivityBlock({
               {entry.details}
             </p>
           )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+const COMMANDS_GROUP_STYLE = 'rounded-lg border border-amber-500/30 bg-amber-500/10';
+
+const CommandGroupBlock = memo(function CommandGroupBlock({
+  entries,
+  defaultExpanded = false,
+}: {
+  entries: StoryEntry[];
+  defaultExpanded?: boolean;
+}) {
+  const [expanded, setExpanded] = useState(defaultExpanded);
+  const n = entries.length;
+  return (
+    <div className={`${COMMANDS_GROUP_STYLE} ${ACTIVITY_BLOCK_BASE} min-h-0 flex flex-col`}>
+      <button
+        type="button"
+        onClick={() => setExpanded((e) => !e)}
+        className={`${FLEX_ROW_CENTER_WRAP} w-full text-left gap-2 min-w-0 -m-1 p-1 rounded-md hover:bg-amber-500/10`}
+        aria-expanded={expanded}
+      >
+        <div className={FLEX_ROW_CENTER}>
+          {expanded ? (
+            <ChevronDown className="size-4 shrink-0 text-amber-500" />
+          ) : (
+            <ChevronRight className="size-4 shrink-0 text-amber-500" />
+          )}
+          <Terminal className="size-4 shrink-0 text-amber-500" />
+          <p className={ACTIVITY_LABEL}>
+            {n} command{n !== 1 ? 's' : ''}
+          </p>
+        </div>
+        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(entries[0].timestamp)}</span>
+      </button>
+      {expanded && (
+        <div className="mt-0.5 flex flex-col gap-0.5 max-h-40 overflow-y-auto">
+          {entries.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-center gap-2 min-w-0 py-0.5 px-2 rounded bg-background/40 text-[11px] font-mono text-green-300/95 truncate"
+              title={entry.details ?? entry.command}
+            >
+              <span className="text-amber-400/80 shrink-0 select-none">$</span>
+              <span className="truncate">{commandLabel(entry)}</span>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -313,14 +397,16 @@ export function AgentThinkingSidebar({
     });
   }, [fullStoryItems, isStreaming, activitySearchQuery]);
 
+  const displayList = useMemo(() => buildDisplayList(filteredStoryItems), [filteredStoryItems]);
+
   const virtualizer = useVirtualizer({
-    count: filteredStoryItems.length,
+    count: displayList.length,
     getScrollElement: () => activityScrollRef.current,
     estimateSize: () => ACTIVITY_ESTIMATE_HEIGHT,
     gap: ACTIVITY_GAP,
     overscan: 5,
   });
-  const useVirtual = filteredStoryItems.length >= ACTIVITY_VIRTUALIZE_THRESHOLD;
+  const useVirtual = displayList.length >= ACTIVITY_VIRTUALIZE_THRESHOLD;
   const virtualItems = useVirtual && (scrollContainerReady || activityScrollRef.current)
     ? virtualizer.getVirtualItems()
     : null;
@@ -583,7 +669,7 @@ export function AgentThinkingSidebar({
                   No activity matches &quot;{activitySearchQuery.trim()}&quot;.
                 </p>
               )}
-            {filteredStoryItems.length > 0 && virtualItems ? (
+            {displayList.length > 0 && virtualItems ? (
               <div
                 className="w-full relative"
                 style={
@@ -594,28 +680,40 @@ export function AgentThinkingSidebar({
                 }
               >
                 {virtualItems.map((virtualRow) => {
-                  const entry = filteredStoryItems[virtualRow.index];
+                  const item = displayList[virtualRow.index];
+                  const key =
+                    item.kind === 'entry'
+                      ? `activity-${virtualRow.index}-${item.entry.id}`
+                      : `group-${virtualRow.index}-${item.id}`;
                   return (
                     <div
-                      key={`activity-${virtualRow.index}-${entry.id}`}
+                      key={key}
                       data-index={virtualRow.index}
                       ref={virtualizer.measureElement}
                       className="absolute left-0 w-full"
                       style={{ top: virtualRow.start }}
                     >
-                      <ActivityBlock entry={entry} isStreaming={isStreaming} />
+                      {item.kind === 'entry' ? (
+                        <ActivityBlock entry={item.entry} isStreaming={isStreaming} />
+                      ) : (
+                        <CommandGroupBlock entries={item.entries} />
+                      )}
                     </div>
                   );
                 })}
               </div>
-            ) : filteredStoryItems.length > 0 ? (
-              filteredStoryItems.map((entry, index) => (
-                <ActivityBlock
-                  key={`activity-${index}-${entry.id}`}
-                  entry={entry}
-                  isStreaming={isStreaming}
-                />
-              ))
+            ) : displayList.length > 0 ? (
+              displayList.map((item, index) =>
+                item.kind === 'entry' ? (
+                  <ActivityBlock
+                    key={`activity-${index}-${item.entry.id}`}
+                    entry={item.entry}
+                    isStreaming={isStreaming}
+                  />
+                ) : (
+                  <CommandGroupBlock key={`group-${index}-${item.id}`} entries={item.entries} />
+                )
+              )
             ) : null}
             {(displayThinkingText || isStreaming) && (
               <div

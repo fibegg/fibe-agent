@@ -308,4 +308,59 @@ describe('AgentThinkingSidebar', () => {
     expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.getByText(/GENERATING RESPONSE/)).toBeTruthy();
   });
+
+  it('groups 3+ consecutive tool_calls into one collapsible commands block', () => {
+    const storyItems = [
+      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
+      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
+      { id: '3', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo c' },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />
+    );
+    expect(screen.getByText(/3 commands/)).toBeTruthy();
+    expect(screen.queryByText('echo a')).toBeNull();
+    expect(screen.queryByText('echo b')).toBeNull();
+    expect(screen.queryByText('echo c')).toBeNull();
+  });
+
+  it('shows 2 tool_calls as separate blocks (no group)', () => {
+    const storyItems = [
+      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
+      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />
+    );
+    expect(screen.getByText('echo a')).toBeTruthy();
+    expect(screen.getByText('echo b')).toBeTruthy();
+    expect(screen.queryByText(/2 commands/)).toBeNull();
+  });
+
+  it('expanded commands group shows list of commands', () => {
+    const storyItems = [
+      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
+      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
+      { id: '3', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo c' },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /3 commands/ }));
+    expect(screen.getByText('echo a')).toBeTruthy();
+    expect(screen.getByText('echo b')).toBeTruthy();
+    expect(screen.getByText('echo c')).toBeTruthy();
+  });
 });
