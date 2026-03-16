@@ -8,10 +8,6 @@ function env(): ImportMetaEnv {
   return import.meta.env;
 }
 
-export function shouldHideHeaderLogo(e?: ImportMetaEnv): boolean {
-  return truthy(e?.VITE_HIDE_HEADER_LOGO ?? env().VITE_HIDE_HEADER_LOGO);
-}
-
 export type ThemeSource = 'localStorage' | 'frame';
 
 export function getThemeSource(e?: ImportMetaEnv): ThemeSource {

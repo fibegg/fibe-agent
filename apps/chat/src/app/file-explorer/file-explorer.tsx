@@ -15,8 +15,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '../api-paths';
 import { PANEL_HEADER_MIN_HEIGHT_PX, REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
-import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
-import { shouldHideHeaderLogo, shouldHideThemeSwitch } from '../embed-config';
+import { shouldHideThemeSwitch } from '../embed-config';
 import { SidebarToggle } from '../sidebar-toggle';
 import { ThemeToggle } from '../theme-toggle';
 import {
@@ -184,7 +183,7 @@ export interface PlaygroundEntry {
 }
 
 const SIDEBAR_TITLE = 'Standalone';
-const SIDEBAR_SUBTITLE = `Phoenix v${__APP_VERSION__}`;
+const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
 const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
 
 function getDirPathsAtDepth(entries: PlaygroundEntry[], depth: number): string[] {
@@ -658,12 +657,8 @@ export function FileExplorer({
     !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
 
   const collapsedContent = (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 py-4 backdrop-blur-xl">
-      <div className="flex flex-1 flex-col items-center pt-4 gap-3">
-        {!shouldHideHeaderLogo() && (
-          <AnimatedPhoenixLogo className="size-8 text-violet-500" />
-        )}
-        <div className="flex flex-col items-center gap-3">
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 pt-3 pb-4 backdrop-blur-xl">
+      <div className="flex flex-col items-center gap-3">
           <button
             type="button"
             className={`${BUTTON_ICON_ACCENT} size-9`}
@@ -675,7 +670,6 @@ export function FileExplorer({
           </button>
           {!shouldHideThemeSwitch() && <ThemeToggle />}
         </div>
-      </div>
     </div>
   );
 
@@ -686,11 +680,8 @@ export function FileExplorer({
         style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
       >
         <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
-          <div className="flex items-center gap-2">
-            {!shouldHideHeaderLogo() && (
-              <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
-            )}
-            <div>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="min-w-0">
               <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
               <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
             </div>

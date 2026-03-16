@@ -85,7 +85,6 @@ When the chat app is loaded inside an iframe (e.g. Phoenix frame), the following
 
 | Variable | Values | Description |
 |----------|--------|-------------|
-| `VITE_HIDE_HEADER_LOGO` | `1`, `true`, `yes` | Hide the Phoenix logo in header, sidebar, and login. |
 | `VITE_THEME_SOURCE` | `localStorage` (default), `frame` | `localStorage`: theme from local storage + in-app toggle. `frame`: theme is driven by parent via postMessage (see below). |
 | `VITE_HIDE_THEME_SWITCH` | `1`, `true`, `yes` | Hide the theme toggle in the UI so the parent/iframe can control theme via postMessage. |
 

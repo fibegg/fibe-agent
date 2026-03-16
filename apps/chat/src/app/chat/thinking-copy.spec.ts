@@ -13,11 +13,6 @@ describe('getThinkingLines', () => {
     expect(lines.length).toBeGreaterThan(0);
   });
 
-  it('returns phoenix easter egg lines when message contains phoenix', () => {
-    const lines = getThinkingLines('Tell me about the phoenix');
-    expect(lines).toContain('The phoenix is rising from the ashes...');
-  });
-
   it('returns 42 easter egg lines when message contains 42', () => {
     const lines = getThinkingLines('What is 42?');
     expect(lines).toContain('Computing the ultimate answer...');

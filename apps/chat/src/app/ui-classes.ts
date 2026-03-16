@@ -23,7 +23,7 @@ export const BUTTON_ICON_MUTED =
 export const BUTTON_ICON_ACCENT =
   'rounded-md flex items-center justify-center text-violet-400 hover:bg-violet-500/10 transition-colors';
 export const BUTTON_ICON_ACCENT_SM =
-  'size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors';
+  'size-8 sm:size-9 flex items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors';
 
 export const BUTTON_GHOST_ACCENT =
   'rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50 flex items-center gap-1.5';
