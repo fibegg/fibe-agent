@@ -548,7 +548,7 @@ export function AgentThinkingSidebar({
           isCollapsed ? 'Expand thinking panel' : 'Collapse thinking panel'
         }
       />
-      <div className="min-h-0 overflow-hidden flex-1 flex flex-col min-w-0">
+      <div className="min-h-0 overflow-visible flex-1 flex flex-col min-w-0">
       <style>{`
         @keyframes statTick {
           from { opacity: 0.6; transform: scale(1.06); }
@@ -570,7 +570,7 @@ export function AgentThinkingSidebar({
       <div className={SIDEBAR_HEADER} style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}>
         {!isCollapsed ? (
           <>
-            <div className={`flex items-center gap-2 ${HEADER_FIRST_ROW}`}>
+            <div className={`flex items-center gap-2 ${HEADER_FIRST_ROW} overflow-visible`}>
               <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
                 <button
                   type="button"
