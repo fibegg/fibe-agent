@@ -22,6 +22,7 @@ import { PlaygroundsController } from './playgrounds/playgrounds.controller';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
 import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
+import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
     PlaygroundsService,
     PlaygroundWatcherService,
     PhoenixSyncService,
+    GithubTokenRefreshService,
   ],
 })
 export class AppModule {}
