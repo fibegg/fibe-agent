@@ -21,6 +21,7 @@ import { UploadsService } from './uploads/uploads.service';
 import { PlaygroundsController } from './playgrounds/playgrounds.controller';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
+import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { PlaygroundWatcherService } from './playgrounds/playground-watcher.servi
     UploadsService,
     PlaygroundsService,
     PlaygroundWatcherService,
+    PhoenixSyncService,
   ],
 })
 export class AppModule {}

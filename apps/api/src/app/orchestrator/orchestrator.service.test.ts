@@ -47,6 +47,10 @@ describe('OrchestratorService', () => {
         throw new Error('not found');
       },
     } as unknown as PlaygroundsService;
+    const phoenixSync = {
+      syncMessages: async () => {},
+      syncActivity: async () => {},
+    } as unknown as import('../phoenix-sync/phoenix-sync.service').PhoenixSyncService;
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -54,7 +58,8 @@ describe('OrchestratorService', () => {
       config as never,
       strategyRegistry,
       uploadsService,
-      playgroundsService
+      playgroundsService,
+      phoenixSync
     );
     await orch.onModuleInit();
     return orch;
@@ -114,7 +119,7 @@ describe('OrchestratorService', () => {
     const orch = await createOrchestrator();
     orch.isAuthenticated = true;
     const uploads = new UploadsService({ getDataDir: () => dataDir } as never);
-    const filename = uploads.saveAudioFromBuffer(Buffer.from('audio'), 'audio/webm');
+    const filename = await uploads.saveAudioFromBuffer(Buffer.from('audio'), 'audio/webm');
     const events: Array<{ type: string }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage({

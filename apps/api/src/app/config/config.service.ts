@@ -37,4 +37,20 @@ export class ConfigService {
   getPlaygroundsDir(): string {
     return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
   }
+
+  getPhoenixApiKey(): string | undefined {
+    return process.env.PHOENIX_API_KEY;
+  }
+
+  getPhoenixApiUrl(): string | undefined {
+    return process.env.PHOENIX_API_URL;
+  }
+
+  getPhoenixAgentId(): string | undefined {
+    return process.env.PHOENIX_AGENT_ID;
+  }
+
+  isPhoenixSyncEnabled(): boolean {
+    return process.env.PHOENIX_SYNC_ENABLED === 'true';
+  }
 }

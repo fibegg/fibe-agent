@@ -8,6 +8,7 @@ import {
   MessageStoreService,
   type StoredStoryEntry,
 } from '../message-store/message-store.service';
+import { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -50,7 +51,8 @@ export class OrchestratorService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly strategyRegistry: StrategyRegistryService,
     private readonly uploadsService: UploadsService,
-    private readonly playgroundsService: PlaygroundsService
+    private readonly playgroundsService: PlaygroundsService,
+    private readonly phoenixSync: PhoenixSyncService
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
   }
@@ -357,6 +359,9 @@ export class OrchestratorService implements OnModuleInit {
       const finalText =
         accumulated || 'The agent produced no visible output.';
       this.messageStore.add('assistant', finalText);
+      void this.phoenixSync.syncMessages(
+        JSON.stringify(this.messageStore.all())
+      );
       this._send(WS_EVENT.THINKING_STEP, {
         id: syntheticStepId,
         title: syntheticStep.title,
@@ -403,6 +408,12 @@ export class OrchestratorService implements OnModuleInit {
     this.messageStore.setStoryForLastAssistant(story);
     const entry = this.activityStore.append(story);
     this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
+    void this.phoenixSync.syncMessages(
+      JSON.stringify(this.messageStore.all())
+    );
+    void this.phoenixSync.syncActivity(
+      JSON.stringify(this.activityStore.all())
+    );
   }
 
   private handleGetModel(): void {
