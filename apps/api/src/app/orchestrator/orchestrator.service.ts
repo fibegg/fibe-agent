@@ -162,7 +162,6 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private async handleInitiateAuth(): Promise<void> {
-    this.logger.log(WS_ACTION.INITIATE_AUTH);
     const currentlyAuthenticated = await this.strategy.checkAuthStatus();
     if (currentlyAuthenticated) {
       this.isAuthenticated = true;
@@ -174,12 +173,10 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private handleSubmitAuthCode(code: string): void {
-    this.logger.log(WS_ACTION.SUBMIT_AUTH_CODE);
     this.strategy.submitAuthCode(code);
   }
 
   private handleCancelAuth(): void {
-    this.logger.log(WS_ACTION.CANCEL_AUTH);
     this.strategy.cancelAuth();
     this.isAuthenticated = false;
     this._send(WS_EVENT.AUTH_STATUS, {
@@ -189,7 +186,6 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private async handleReauthenticate(): Promise<void> {
-    this.logger.log(WS_ACTION.REAUTHENTICATE);
     this.strategy.cancelAuth();
     this.strategy.clearCredentials();
     this.isAuthenticated = false;
@@ -202,7 +198,6 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private handleLogout(): void {
-    this.logger.log(WS_ACTION.LOGOUT);
     this.strategy.cancelAuth();
     this.isAuthenticated = false;
     this.isProcessing = false;
@@ -230,7 +225,6 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
 
-    this.logger.log(WS_ACTION.SEND_CHAT_MESSAGE);
     this.isProcessing = true;
 
     const imageUrls: string[] = [];

@@ -1,5 +1,8 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { containerLog } from './container-logger';
+
+const CREDENTIALS_CONTEXT = 'Credentials';
 
 /**
  * Loads pre-authenticated credentials from AGENT_CREDENTIALS_JSON.
@@ -15,8 +18,9 @@ export function loadInjectedCredentials(): boolean {
 
   const sessionDir = process.env.SESSION_DIR;
   if (!sessionDir) {
-    console.warn(
-      '[CREDENTIALS] AGENT_CREDENTIALS_JSON is set but SESSION_DIR is not. Skipping injection.'
+    containerLog.warn(
+      'AGENT_CREDENTIALS_JSON is set but SESSION_DIR is not. Skipping injection.',
+      CREDENTIALS_CONTEXT
     );
     return false;
   }
@@ -26,7 +30,7 @@ export function loadInjectedCredentials(): boolean {
     credentialFiles = JSON.parse(raw) as Record<string, string>;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error('[CREDENTIALS] Failed to parse AGENT_CREDENTIALS_JSON:', message);
+    containerLog.error(`Failed to parse AGENT_CREDENTIALS_JSON: ${message}`, CREDENTIALS_CONTEXT);
     return false;
   }
 
@@ -35,28 +39,29 @@ export function loadInjectedCredentials(): boolean {
     typeof credentialFiles !== 'object' ||
     Array.isArray(credentialFiles)
   ) {
-    console.error(
-      '[CREDENTIALS] AGENT_CREDENTIALS_JSON must be a JSON object { filename: content }'
+    containerLog.error(
+      'AGENT_CREDENTIALS_JSON must be a JSON object { filename: content }',
+      CREDENTIALS_CONTEXT
     );
     return false;
   }
 
   const entries = Object.entries(credentialFiles);
   if (entries.length === 0) {
-    console.warn('[CREDENTIALS] AGENT_CREDENTIALS_JSON is empty object. Skipping.');
+    containerLog.warn('AGENT_CREDENTIALS_JSON is empty object. Skipping.', CREDENTIALS_CONTEXT);
     return false;
   }
 
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
-    console.log(`[CREDENTIALS] Created session directory: ${sessionDir}`);
+    containerLog.log(`Created session directory: ${sessionDir}`, CREDENTIALS_CONTEXT);
   }
 
   let injectedCount = 0;
   for (const [filename, content] of entries) {
     const safeName = path.basename(filename);
     if (safeName !== filename) {
-      console.warn(`[CREDENTIALS] Skipping suspicious filename: ${filename}`);
+      containerLog.warn(`Skipping suspicious filename: ${filename}`, CREDENTIALS_CONTEXT);
       continue;
     }
     try {
@@ -64,12 +69,18 @@ export function loadInjectedCredentials(): boolean {
       injectedCount++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(`[CREDENTIALS] Failed to write ${path.join(sessionDir, safeName)}:`, message);
+      containerLog.error(
+        `Failed to write ${path.join(sessionDir, safeName)}: ${message}`,
+        CREDENTIALS_CONTEXT
+      );
     }
   }
 
   if (injectedCount > 0) {
-    console.log(`[CREDENTIALS] Injected ${injectedCount} credential file(s) from stored Agent.`);
+    containerLog.log(
+      `Injected ${injectedCount} credential file(s) from stored Agent.`,
+      CREDENTIALS_CONTEXT
+    );
   }
   return injectedCount > 0;
 }

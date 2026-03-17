@@ -1,4 +1,4 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import {
   FastifyAdapter,
@@ -6,6 +6,7 @@ import {
 } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
+import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { WebSocketServer } from 'ws';
@@ -16,6 +17,7 @@ import { GlobalHttpExceptionFilter } from './app/http-exception.filter';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
 import { WS_CLOSE, WS_EVENT } from './app/ws.constants';
+import { ContainerLoggerService, logRequest, logWs } from './container-logger';
 import { loadInjectedCredentials } from './credential-injector';
 
 const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
@@ -26,16 +28,37 @@ const playgroundsDir = process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playg
 try { mkdirSync(playgroundsDir, { recursive: true }); } catch { /* ignore if it fails */ }
 
 async function bootstrap() {
+  const logger = new ContainerLoggerService('Bootstrap');
   const injected = loadInjectedCredentials();
   if (injected) {
-    Logger.log('Stored agent credentials loaded — skipping manual auth.');
+    logger.log('Stored agent credentials loaded — skipping manual auth.');
   }
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter()
+    new FastifyAdapter(),
+    { logger }
   );
   const fastify = app.getHttpAdapter().getInstance();
+
+  fastify.addHook('onRequest', (request, _reply, done) => {
+    (request as { _startTime?: number })._startTime = Date.now();
+    (request as { _requestId?: string })._requestId =
+      (request.headers['x-request-id'] as string) ?? randomUUID();
+    done();
+  });
+  fastify.addHook('onResponse', (request, reply, done) => {
+    const start = (request as { _startTime?: number })._startTime;
+    const requestId = (request as { _requestId?: string })._requestId ?? '';
+    logRequest({
+      requestId,
+      method: request.method,
+      url: request.url,
+      statusCode: reply.statusCode,
+      durationMs: start != null ? Date.now() - start : 0,
+    });
+    done();
+  });
 
   const ancestors = getFrameAncestors(process.env);
   const isHttp = ancestors.some((a) => a.startsWith('http://'));
@@ -64,7 +87,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
   const port = Number(process.env.PORT) || DEFAULT_PORT;
   await app.listen(port, '0.0.0.0');
-  Logger.log(`Application is running on: http://localhost:${port}/api`);
+  logger.log(`Application is running on: http://localhost:${port}/api`);
 
   const config = app.get(ConfigService);
   const orchestrator = app.get(OrchestratorService);
@@ -98,6 +121,7 @@ async function bootstrap() {
       const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
       const token = url.searchParams.get('token');
       if (token !== requiredPassword) {
+        logWs({ event: 'disconnect', closeCode: WS_CLOSE.UNAUTHORIZED, error: 'Unauthorized' });
         ws.close(WS_CLOSE.UNAUTHORIZED, 'Unauthorized');
         return;
       }
@@ -108,6 +132,7 @@ async function bootstrap() {
     }
     activeClient = ws;
     orchestrator.handleClientConnected();
+    logWs({ event: 'connect' });
 
     ws.on('message', (raw: Buffer) => {
       try {
@@ -121,24 +146,26 @@ async function bootstrap() {
           audioFilename?: string;
           attachmentFilenames?: string[];
         };
+        logWs({ event: 'action', action: msg.action });
         void orchestrator.handleClientMessage(msg);
       } catch {
         // ignore invalid JSON
       }
     });
 
-    ws.on('close', () => {
+    ws.on('close', (code?: number) => {
+      logWs({ event: 'disconnect', closeCode: code });
       if (activeClient === ws) {
         activeClient = null;
       }
     });
 
-    ws.on('error', () => {
-      /* ignore */
+    ws.on('error', (err) => {
+      logWs({ event: 'disconnect', error: err instanceof Error ? err.message : String(err) });
     });
   });
 
-  Logger.log(`WebSocket server listening on path /ws`);
+  logger.log('WebSocket server listening on path /ws');
 }
 
 bootstrap();
