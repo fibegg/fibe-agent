@@ -1,5 +1,6 @@
 {
   "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "parallel": 8,
   "namedInputs": {
     "default": ["{projectRoot}/**/*", "sharedGlobals"],
     "production": [
@@ -15,7 +16,7 @@
       "!{projectRoot}/playwright-report/**/*",
       "!{projectRoot}/test-setup.[jt]s"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
+    "sharedGlobals": []
   },
   "plugins": [
     {
@@ -80,7 +81,21 @@
     },
   ],
   "targetDefaults": {
+    "build": {
+      "cache": true
+    },
+    "lint": {
+      "cache": true
+    },
+    "typecheck": {
+      "cache": true
+    },
     "test": {
+      "cache": true,
+      "dependsOn": ["^build"]
+    },
+    "e2e": {
+      "cache": true,
       "dependsOn": ["^build"]
     }
   },
