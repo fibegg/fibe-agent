@@ -89,16 +89,17 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
-# @playwright/mcp – globally install so the agent can use it without npx download,
-# then install Chromium using the SAME Playwright version bundled by @playwright/mcp
-# to avoid browser↔library version mismatches.
+# @playwright/mcp – globally install so the agent can use it without npx download.
+# Pin version to keep browser↔library alignment deterministic.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g @playwright/mcp && \
-    npx playwright install --with-deps chromium
+    npm install -g @playwright/mcp@0.0.68
+
+# System libraries required by Chromium (must run as root).
+RUN npx -y playwright install-deps chromium
 
 EXPOSE 3000
 
-RUN mkdir -p /app/data /app/playground \
+RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
@@ -106,9 +107,13 @@ RUN mkdir -p /app/data /app/playground \
     elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
     mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
     fi \
-    && chown -R node:node /app/data /app/playground
+    && chown -R node:node /app/data /app/playground /home/node/.cache
 
 USER node
+
+# Download Chromium browser binary as node so it lands in /home/node/.cache
+# and is accessible at runtime (container runs as USER node).
+RUN npx -y playwright install chromium
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 
