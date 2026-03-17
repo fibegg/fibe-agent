@@ -3,6 +3,11 @@ const { join } = require('path');
 
 module.exports = {
   node: { __dirname: false },
+  resolve: {
+    alias: {
+      '@shared': join(__dirname, '../../shared'),
+    },
+  },
   output: {
     path: join(__dirname, 'dist'),
     clean: true,

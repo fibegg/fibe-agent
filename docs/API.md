@@ -4,6 +4,8 @@ Nest Fastify API (project `api`).
 
 **Base URL:** `http://localhost:3000/api` when served with `nx serve api`.
 
+Path constants are defined in `shared/api-paths.ts` (`API_PATHS.*`, `API_PATH_UPLOADS_BY_FILENAME`) and used by the chat app and tests so routes stay in sync.
+
 ## REST Endpoints
 
 | Method | Path            | Auth  | Description                                                                 |

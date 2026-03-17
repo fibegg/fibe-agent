@@ -43,6 +43,9 @@ export default defineConfig(() => ({
     port: 4300,
     host: 'localhost',
   },
+  resolve: {
+    alias: { '@shared': join(import.meta.dirname, '../../shared') },
+  },
   plugins: [react()],
   // Uncomment this if you are using workers.
   // worker: {
