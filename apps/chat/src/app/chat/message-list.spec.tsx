@@ -129,6 +129,24 @@ describe('MessageList', () => {
     expect(code?.textContent).toBe('code');
   });
 
+  it('renders user message fenced code block as pre with language-ts code element', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: '```ts\nfunction test() {}\n```',
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const pre = container.querySelector('pre');
+    expect(pre).toBeTruthy();
+    const code = container.querySelector('code.language-ts');
+    expect(code).toBeTruthy();
+    expect(code?.textContent?.trim()).toBe('function test() {}');
+  });
+
   it('renders user message with @path as badge showing path display name', () => {
     const messages: ChatMessage[] = [
       {

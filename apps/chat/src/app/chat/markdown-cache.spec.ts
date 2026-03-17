@@ -28,6 +28,13 @@ describe('markdown-cache', () => {
     expect(html).toContain('line2');
   });
 
+  it('renders fenced code block with language as pre and code with language class', () => {
+    const html = renderMarkdown('```ts\nfunction test() {}\n```');
+    expect(html).toContain('<pre>');
+    expect(html).toContain('language-ts');
+    expect(html).toContain('function test() {}');
+  });
+
   it('evicts oldest entries when over max size', () => {
     for (let i = 0; i < 250; i++) renderMarkdown(`text-${i}`);
     expect(getMarkdownCacheSize()).toBeLessThanOrEqual(200);

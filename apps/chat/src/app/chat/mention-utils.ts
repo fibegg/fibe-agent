@@ -13,7 +13,7 @@ export function parseMessageBodyParts(body: string): MessageBodyPart[] {
   MENTION_AFTER_START_OR_WHITESPACE.lastIndex = 0;
   while ((match = MENTION_AFTER_START_OR_WHITESPACE.exec(body)) !== null) {
     const fullMatch = match[0];
-    const path = match[1].startsWith('@') ? match[1].slice(1) : match[1];
+    const path = match[1].slice(1);
     if (match.index > lastEnd) {
       const textEnd = /^\s/.test(fullMatch) ? match.index + 1 : match.index;
       parts.push({ type: 'text', content: body.slice(lastEnd, textEnd) });
