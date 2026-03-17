@@ -21,6 +21,20 @@ Nest Fastify API (project `api`).
 
 When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activity`, `GET /api/model-options`, `GET /api/playgrounds`, and `GET /api/playgrounds/file` require `Authorization: Bearer <password>` or `?token=<password>`.
 
+## Container logging
+
+All API logs are written as **one JSON object per line** to stdout/stderr so container and log aggregators can parse and filter by level, context, or request ID.
+
+| Env var     | Values (case-insensitive) | Description |
+|-------------|----------------------------|-------------|
+| `LOG_LEVEL` | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` | Minimum level emitted. `info` and `log` are equivalent. |
+
+**Log shape:** `{ "timestamp": "<ISO8601>", "level": "log", "context": "<optional>", "message": "<string>", ... }`
+
+- **Application logs:** `context` is the class or module name (e.g. `OrchestratorService`, `Credentials`, `Bootstrap`).
+- **HTTP requests:** Each request is logged once on response with `context: "http"`, `message: "request"`, plus `requestId`, `method`, `url`, `statusCode`, `durationMs`. Request ID is taken from `x-request-id` or generated.
+- **WebSocket:** Connection and disconnect with `context: "ws"`, `message: "connect"` or `"disconnect"`; each client action is logged with `message: "action"` and `action: "<action name>"` (e.g. `send_chat_message`).
+
 ## WebSocket
 
 **Path:** `/ws` (same host/port as the API, no `/api` prefix).
