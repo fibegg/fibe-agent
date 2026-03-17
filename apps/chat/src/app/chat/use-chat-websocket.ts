@@ -300,6 +300,16 @@ export function useChatWebSocket(
         return;
       }
 
+      if (data.type === 'activity_updated' && data.entry) {
+        const updated = data.entry as StoredActivityEntry;
+        setSessionActivity((prev) =>
+          prev.some((a) => a.id === updated.id)
+            ? prev.map((a) => (a.id === updated.id ? updated : a))
+            : [...prev, updated]
+        );
+        return;
+      }
+
       if (data.type === 'model_updated') {
         onMessageRef.current?.(data);
         return;

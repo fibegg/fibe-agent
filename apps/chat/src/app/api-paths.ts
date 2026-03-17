@@ -5,4 +5,5 @@ export const API_PATHS = {
   UPLOADS: '/api/uploads',
   PLAYGROUNDS: '/api/playgrounds',
   PLAYGROUNDS_FILE: '/api/playgrounds/file',
+  ACTIVITY: '/api/activity',
 } as const;

@@ -34,6 +34,7 @@ export const WS_EVENT = {
   FILE_CREATED: 'file_created',
   ACTIVITY_SNAPSHOT: 'activity_snapshot',
   ACTIVITY_APPENDED: 'activity_appended',
+  ACTIVITY_UPDATED: 'activity_updated',
   PLAYGROUND_CHANGED: 'playground_changed',
 } as const;
 

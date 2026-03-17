@@ -4,6 +4,9 @@ import { AppErrorBoundary } from './error-boundary';
 
 const LoginPage = lazy(() => import('./pages/login-page').then((m) => ({ default: m.LoginPage })));
 const ChatPage = lazy(() => import('./pages/chat-page').then((m) => ({ default: m.ChatPage })));
+const ActivityReviewPage = lazy(() =>
+  import('./pages/activity-review-page').then((m) => ({ default: m.ActivityReviewPage }))
+);
 
 function PageFallback() {
   return (
@@ -20,6 +23,7 @@ export function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<ChatPage />} />
+          <Route path="/activity/:id" element={<ActivityReviewPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

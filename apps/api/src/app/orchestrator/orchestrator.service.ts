@@ -1,4 +1,5 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Subject } from 'rxjs';
@@ -44,6 +45,8 @@ export class OrchestratorService implements OnModuleInit {
   isProcessing = false;
   private readonly outbound$ = new Subject<OutboundEvent>();
   private cachedSystemPromptFromFile: string | null = null;
+  private currentActivityId: string | null = null;
+  private reasoningTextAccumulated = '';
 
   constructor(
     private readonly activityStore: ActivityStoreService,
@@ -345,6 +348,18 @@ export class OrchestratorService implements OnModuleInit {
       timestamp: new Date(),
     };
     this._send(WS_EVENT.STREAM_START, { model });
+    const streamStartEntry: StoredStoryEntry = {
+      id: randomUUID(),
+      type: 'stream_start',
+      message: 'Response started',
+      timestamp: new Date().toISOString(),
+      details: model ? `Model: ${model}` : undefined,
+    };
+    const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
+    this.currentActivityId = currentActivity.id;
+    this.reasoningTextAccumulated = '';
+    this._send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
+
     this._send(WS_EVENT.THINKING_STEP, {
       id: syntheticStep.id,
       title: syntheticStep.title,
@@ -358,10 +373,22 @@ export class OrchestratorService implements OnModuleInit {
         this._send(WS_EVENT.REASONING_START, {});
       },
       onReasoningChunk: (reasoningText) => {
+        this.reasoningTextAccumulated += reasoningText;
         this._send(WS_EVENT.REASONING_CHUNK, { text: reasoningText });
       },
       onReasoningEnd: () => {
         this._send(WS_EVENT.REASONING_END, {});
+        if (this.currentActivityId && this.reasoningTextAccumulated.trim()) {
+          const entry: StoredStoryEntry = {
+            id: randomUUID(),
+            type: 'reasoning_start',
+            message: 'Reasoning',
+            timestamp: new Date().toISOString(),
+            details: this.reasoningTextAccumulated.trim(),
+          };
+          this.activityStore.appendEntry(this.currentActivityId, entry);
+        }
+        this.reasoningTextAccumulated = '';
       },
       onStep: (step) => {
         this._send(WS_EVENT.THINKING_STEP, {
@@ -371,6 +398,16 @@ export class OrchestratorService implements OnModuleInit {
           details: step.details,
           timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : step.timestamp,
         });
+        if (this.currentActivityId) {
+          const entry: StoredStoryEntry = {
+            id: step.id,
+            type: 'step',
+            message: step.title,
+            timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : String(step.timestamp),
+            details: step.details,
+          };
+          this.activityStore.appendEntry(this.currentActivityId, entry);
+        }
       },
       onTool: (event: ToolEvent) => {
         if (event.kind === 'file_created') {
@@ -379,6 +416,16 @@ export class OrchestratorService implements OnModuleInit {
             path: event.path,
             summary: event.summary,
           });
+          if (this.currentActivityId) {
+            const entry: StoredStoryEntry = {
+              id: randomUUID(),
+              type: 'file_created',
+              message: event.summary ?? event.name,
+              timestamp: new Date().toISOString(),
+              path: event.path,
+            };
+            this.activityStore.appendEntry(this.currentActivityId, entry);
+          }
         } else {
           this._send(WS_EVENT.TOOL_CALL, {
             name: event.name,
@@ -387,6 +434,17 @@ export class OrchestratorService implements OnModuleInit {
             command: event.command,
             details: event.details,
           });
+          if (this.currentActivityId) {
+            const entry: StoredStoryEntry = {
+              id: randomUUID(),
+              type: 'tool_call',
+              message: event.summary ?? event.name,
+              timestamp: new Date().toISOString(),
+              command: event.command,
+              details: event.details,
+            };
+            this.activityStore.appendEntry(this.currentActivityId, entry);
+          }
         }
       },
     };
@@ -440,8 +498,17 @@ export class OrchestratorService implements OnModuleInit {
 
   private handleSubmitStory(story: StoredStoryEntry[]): void {
     this.messageStore.setStoryForLastAssistant(story);
-    const entry = this.activityStore.append(story);
-    this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
+    if (this.currentActivityId) {
+      this.activityStore.replaceStory(this.currentActivityId, story);
+      const entry = this.activityStore.getById(this.currentActivityId);
+      if (entry) {
+        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry });
+      }
+      this.currentActivityId = null;
+    } else {
+      const entry = this.activityStore.append(story);
+      this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
+    }
     void this.phoenixSync.syncMessages(
       JSON.stringify(this.messageStore.all())
     );

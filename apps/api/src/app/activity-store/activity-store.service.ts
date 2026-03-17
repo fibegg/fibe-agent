@@ -28,6 +28,10 @@ export class ActivityStoreService {
     return this.activities;
   }
 
+  getById(id: string): StoredActivityEntry | undefined {
+    return this.activities.find((a) => a.id === id);
+  }
+
   append(story: StoredStoryEntry[]): StoredActivityEntry {
     const entry: StoredActivityEntry = {
       id: randomUUID(),
@@ -37,6 +41,33 @@ export class ActivityStoreService {
     this.activities.push(entry);
     void this.save();
     return entry;
+  }
+
+  createWithEntry(firstEntry: StoredStoryEntry): StoredActivityEntry {
+    const entry: StoredActivityEntry = {
+      id: randomUUID(),
+      created_at: new Date().toISOString(),
+      story: [firstEntry],
+    };
+    this.activities.push(entry);
+    void this.save();
+    return entry;
+  }
+
+  appendEntry(activityId: string, storyEntry: StoredStoryEntry): void {
+    const activity = this.activities.find((a) => a.id === activityId);
+    if (activity) {
+      activity.story.push(storyEntry);
+      void this.save();
+    }
+  }
+
+  replaceStory(activityId: string, story: StoredStoryEntry[]): void {
+    const activity = this.activities.find((a) => a.id === activityId);
+    if (activity) {
+      activity.story = Array.isArray(story) ? story : [];
+      void this.save();
+    }
   }
 
   clear(): void {

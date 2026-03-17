@@ -885,6 +885,7 @@ export function ChatPage() {
               sessionActivity={sessionActivity}
               pastActivityFromMessages={pastActivityFromMessages}
               mobileOverlay
+              onActivityClick={(id) => navigate(`/activity/${id}`)}
             />
           </div>
         </>
@@ -1269,6 +1270,7 @@ export function ChatPage() {
           storyItems={displayStory}
           sessionActivity={sessionActivity}
           pastActivityFromMessages={pastActivityFromMessages}
+          onActivityClick={(id) => navigate(`/activity/${id}`)}
         />
       )}
     </div>

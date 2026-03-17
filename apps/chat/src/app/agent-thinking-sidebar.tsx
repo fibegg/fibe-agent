@@ -59,27 +59,31 @@ const COMMAND_GROUP_MIN = 3;
 
 const HIDDEN_WHEN_IDLE_TYPES = new Set(['stream_start', 'step']);
 
-export type DisplayItem =
-  | { kind: 'entry'; entry: StoryEntry }
-  | { kind: 'command_group'; id: string; entries: StoryEntry[] };
+type StoryEntryWithActivityId = StoryEntry & { _activityId?: string };
 
-function buildDisplayList(entries: StoryEntry[]): DisplayItem[] {
+export type DisplayItem =
+  | { kind: 'entry'; entry: StoryEntry; activityId?: string }
+  | { kind: 'command_group'; id: string; entries: StoryEntry[]; activityId?: string };
+
+function buildDisplayList(entries: StoryEntryWithActivityId[]): DisplayItem[] {
   const result: DisplayItem[] = [];
   let i = 0;
   while (i < entries.length) {
     if (entries[i].type !== 'tool_call') {
-      result.push({ kind: 'entry', entry: entries[i] });
+      result.push({ kind: 'entry', entry: entries[i], activityId: entries[i]._activityId });
       i++;
       continue;
     }
     let j = i;
     while (j < entries.length && entries[j].type === 'tool_call') j++;
     const runLength = j - i;
+    const slice = entries.slice(i, j);
+    const activityId = slice[0]?._activityId;
     if (runLength >= COMMAND_GROUP_MIN) {
-      result.push({ kind: 'command_group', id: `cg-${entries[i].id}`, entries: entries.slice(i, j) });
+      result.push({ kind: 'command_group', id: `cg-${entries[i].id}`, entries: slice, activityId });
       i = j;
     } else {
-      for (let k = i; k < j; k++) result.push({ kind: 'entry', entry: entries[k] });
+      for (let k = i; k < j; k++) result.push({ kind: 'entry', entry: entries[k], activityId: entries[k]._activityId });
       i = j;
     }
   }
@@ -191,9 +195,17 @@ const ThinkingTextWithHighlights = memo(function ThinkingTextWithHighlights({
 const ActivityBlock = memo(function ActivityBlock({
   entry,
   isStreaming,
+  activityId,
+  onActivityClick,
+  lastStreamStartId,
+  isInCurrentRun,
 }: {
   entry: StoryEntry;
   isStreaming: boolean;
+  activityId?: string;
+  onActivityClick?: (activityId: string) => void;
+  lastStreamStartId?: string | null;
+  isInCurrentRun?: boolean;
 }) {
   const Icon = getActivityIcon(entry.type);
   const label = getActivityLabel(entry.type);
@@ -203,6 +215,10 @@ const ActivityBlock = memo(function ActivityBlock({
     entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
   const isSingleRow = SINGLE_ROW_TYPES.has(entry.type);
   const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
+  const isClickable = !!(activityId && onActivityClick);
+  const isStreamStartThinking =
+    entry.type === 'stream_start' && isStreaming && entry.id === lastStreamStartId;
+  const showTypingCursor = isStreaming && isInCurrentRun;
 
   const singleRowText =
     entry.type === 'file_created'
@@ -213,10 +229,21 @@ const ActivityBlock = memo(function ActivityBlock({
           ? entry.message
           : label;
 
-  const isStreamStartThinking = entry.type === 'stream_start' && isStreaming;
+  const wrap = (node: React.ReactNode) =>
+    isClickable && activityId && onActivityClick ? (
+      <button
+        type="button"
+        onClick={() => onActivityClick(activityId)}
+        className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+      >
+        {node}
+      </button>
+    ) : (
+      node
+    );
 
   if (isSingleRow) {
-    return (
+    return wrap(
       <div
         className={`${ACTIVITY_BLOCK_VARIANTS[variant]} px-3 py-1 flex items-center justify-between gap-2 min-w-0`}
       >
@@ -232,8 +259,8 @@ const ActivityBlock = memo(function ActivityBlock({
               <TypingText
                 text={entry.command ?? ''}
                 charMs={20}
-                showCursor={isStreaming}
-                skipAnimation={!isStreaming}
+                showCursor={showTypingCursor}
+                skipAnimation={!showTypingCursor}
               />
             </span>
           ) : isStreamStartThinking ? (
@@ -251,7 +278,7 @@ const ActivityBlock = memo(function ActivityBlock({
     );
   }
 
-  return (
+  return wrap(
     <div
       className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}
     >
@@ -289,17 +316,25 @@ const COMMANDS_GROUP_STYLE = 'rounded-lg border border-amber-500/30 bg-amber-500
 const CommandGroupBlock = memo(function CommandGroupBlock({
   entries,
   defaultExpanded = false,
+  activityId,
+  onActivityClick,
 }: {
   entries: StoryEntry[];
   defaultExpanded?: boolean;
+  activityId?: string;
+  onActivityClick?: (activityId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const n = entries.length;
-  return (
+  const isClickable = !!(activityId && onActivityClick);
+  const content = (
     <div className={`${COMMANDS_GROUP_STYLE} ${ACTIVITY_BLOCK_BASE} min-h-0 flex flex-col`}>
       <button
         type="button"
-        onClick={() => setExpanded((e) => !e)}
+        onClick={(e) => {
+          if (isClickable) e.stopPropagation();
+          setExpanded((prev) => !prev);
+        }}
         className={`${FLEX_ROW_CENTER_WRAP} w-full text-left gap-2 min-w-0 -m-1 p-1 rounded-md hover:bg-amber-500/10`}
         aria-expanded={expanded}
       >
@@ -332,6 +367,17 @@ const CommandGroupBlock = memo(function CommandGroupBlock({
       )}
     </div>
   );
+  return isClickable && activityId && onActivityClick ? (
+    <button
+      type="button"
+      onClick={() => onActivityClick(activityId)}
+      className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+    >
+      {content}
+    </button>
+  ) : (
+    content
+  );
 });
 
 interface AgentThinkingSidebarProps {
@@ -345,6 +391,7 @@ interface AgentThinkingSidebarProps {
   sessionActivity?: SessionActivityEntry[];
   pastActivityFromMessages?: SessionActivityEntry[];
   mobileOverlay?: boolean;
+  onActivityClick?: (activityId: string) => void;
 }
 
 export function AgentThinkingSidebar({
@@ -358,7 +405,10 @@ export function AgentThinkingSidebar({
   sessionActivity = [],
   pastActivityFromMessages = [],
   mobileOverlay = false,
+  onActivityClick,
 }: AgentThinkingSidebarProps) {
+  const latestActivityId =
+    sessionActivity.length > 0 ? sessionActivity[sessionActivity.length - 1].id : undefined;
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
   const activityScrollRef = useRef<HTMLDivElement>(null);
   const activityEndRef = useRef<HTMLDivElement>(null);
@@ -407,10 +457,14 @@ export function AgentThinkingSidebar({
 
   const displayThinkingText = reasoningText || streamingResponseText;
 
-  const fullStoryItems = useMemo(() => {
-    const past = sessionActivity.length > 0 ? sessionActivity : pastActivityFromMessages;
-    const fromPast = past.flatMap((a) => (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp })));
-    return filterVisibleStoryItems([...fromPast, ...storyItems]);
+  const fullStoryItems = useMemo((): StoryEntryWithActivityId[] => {
+    const fromSession = sessionActivity.flatMap((a) =>
+      (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp, _activityId: a.id }))
+    );
+    const fromPast = pastActivityFromMessages.flatMap((a) =>
+      (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp }))
+    );
+    return filterVisibleStoryItems([...fromPast, ...fromSession, ...storyItems]) as StoryEntryWithActivityId[];
   }, [sessionActivity, pastActivityFromMessages, storyItems]);
 
   const sessionStats = useMemo(() => {
@@ -492,6 +546,24 @@ export function AgentThinkingSidebar({
       );
     });
   }, [fullStoryItems, isStreaming, activitySearchQuery]);
+
+  const { lastStreamStartId, currentRunIds } = useMemo(() => {
+    let lastStreamStartIndex = -1;
+    for (let i = filteredStoryItems.length - 1; i >= 0; i--) {
+      if (filteredStoryItems[i].type === 'stream_start') {
+        lastStreamStartIndex = i;
+        break;
+      }
+    }
+    const lastStreamStartId =
+      lastStreamStartIndex >= 0 ? filteredStoryItems[lastStreamStartIndex].id : null;
+    const currentRunIds = new Set(
+      lastStreamStartIndex >= 0
+        ? filteredStoryItems.slice(lastStreamStartIndex).map((e) => e.id)
+        : []
+    );
+    return { lastStreamStartId, currentRunIds };
+  }, [filteredStoryItems]);
 
   const displayList = useMemo(() => buildDisplayList(filteredStoryItems), [filteredStoryItems]);
 
@@ -640,7 +712,7 @@ export function AgentThinkingSidebar({
               <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
                 <button
                   type="button"
-                  onClick={runCopyWithAnimation}
+                  onClick={() => void runCopyWithAnimation()}
                   className="relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
                   aria-label="Activity"
                   disabled={downloadAnimating}
@@ -750,7 +822,13 @@ export function AgentThinkingSidebar({
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center gap-1.5 w-full">
+          <button
+            type="button"
+            onClick={() => void runCopyWithAnimation()}
+            disabled={downloadAnimating}
+            className="flex flex-col items-center gap-1.5 w-full rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
+            aria-label="Copy activity to clipboard"
+          >
             <div className="relative shrink-0">
               <Brain className={`size-5 ${brainClasses.brain} transition-colors`} />
               {isStreaming ? (
@@ -777,7 +855,7 @@ export function AgentThinkingSidebar({
                 {sessionStats.processing}
               </span>
             </div>
-          </div>
+          </button>
         )}
       </div>
 
@@ -878,9 +956,20 @@ export function AgentThinkingSidebar({
                       style={{ top: virtualRow.start }}
                     >
                       {item.kind === 'entry' ? (
-                        <ActivityBlock entry={item.entry} isStreaming={isStreaming} />
+                        <ActivityBlock
+                          entry={item.entry}
+                          isStreaming={isStreaming}
+                          activityId={item.activityId}
+                          onActivityClick={onActivityClick}
+                          lastStreamStartId={lastStreamStartId}
+                          isInCurrentRun={currentRunIds.has(item.entry.id)}
+                        />
                       ) : (
-                        <CommandGroupBlock entries={item.entries} />
+                        <CommandGroupBlock
+                          entries={item.entries}
+                          activityId={item.activityId}
+                          onActivityClick={onActivityClick}
+                        />
                       )}
                     </div>
                   );
@@ -893,31 +982,67 @@ export function AgentThinkingSidebar({
                     key={`activity-${index}-${item.entry.id}`}
                     entry={item.entry}
                     isStreaming={isStreaming}
+                    activityId={item.activityId}
+                    onActivityClick={onActivityClick}
+                    lastStreamStartId={lastStreamStartId}
+                    isInCurrentRun={currentRunIds.has(item.entry.id)}
                   />
                 ) : (
-                  <CommandGroupBlock key={`group-${index}-${item.id}`} entries={item.entries} />
+                  <CommandGroupBlock
+                    key={`group-${index}-${item.id}`}
+                    entries={item.entries}
+                    activityId={item.activityId}
+                    onActivityClick={onActivityClick}
+                  />
                 )
               )
             ) : null}
             {(displayThinkingText || isStreaming) && (
-              <div
-                className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''} min-h-0 flex flex-col shrink-0`}
-                style={reasoningMaxHeightPx != null ? { maxHeight: reasoningMaxHeightPx } : undefined}
-              >
-                <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide shrink-0">
-                  Response
-                </p>
-                <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>
-                  <ThinkingTextWithHighlights
-                    text={displayThinkingText || (isStreaming ? '…' : '')}
-                  />
-                  <span
-                    ref={thinkingScrollRef}
-                    className="inline-block min-h-0"
-                    aria-hidden
-                  />
+              latestActivityId && onActivityClick ? (
+                <button
+                  type="button"
+                  onClick={() => onActivityClick(latestActivityId)}
+                  className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                >
+                  <div
+                    className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''} min-h-0 flex flex-col shrink-0`}
+                    style={reasoningMaxHeightPx != null ? { maxHeight: reasoningMaxHeightPx } : undefined}
+                  >
+                    <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide shrink-0">
+                      Response
+                    </p>
+                    <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>
+                      <ThinkingTextWithHighlights
+                        text={displayThinkingText || (isStreaming ? '…' : '')}
+                      />
+                      <span
+                        ref={thinkingScrollRef}
+                        className="inline-block min-h-0"
+                        aria-hidden
+                      />
+                    </div>
+                  </div>
+                </button>
+              ) : (
+                <div
+                  className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''} min-h-0 flex flex-col shrink-0`}
+                  style={reasoningMaxHeightPx != null ? { maxHeight: reasoningMaxHeightPx } : undefined}
+                >
+                  <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide shrink-0">
+                    Response
+                  </p>
+                  <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>
+                    <ThinkingTextWithHighlights
+                      text={displayThinkingText || (isStreaming ? '…' : '')}
+                    />
+                    <span
+                      ref={thinkingScrollRef}
+                      className="inline-block min-h-0"
+                      aria-hidden
+                    />
+                  </div>
                 </div>
-              </div>
+              )
             )}
             {!isStreaming && filteredStoryItems.length > 0 && (
               <div
