@@ -11,6 +11,7 @@ const PROVIDER_NAMES = [
   'gemini',
   'claude-code',
   'openai-codex',
+  'opencode',
   'opencodex',
 ] as const;
 
@@ -32,6 +33,7 @@ export class StrategyRegistryService {
         return new ClaudeCodeStrategy();
       case 'openai-codex':
         return new OpenaiCodexStrategy();
+      case 'opencode':
       case 'opencodex':
         return new OpencodeStrategy();
       default:

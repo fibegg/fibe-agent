@@ -12,6 +12,8 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g @anthropic-ai/claude-code@2.1.50; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
     npm install -g @openai/codex@0.104.0; \
+    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
+    npm install -g opencode-ai; \
     fi
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
@@ -106,6 +108,8 @@ RUN mkdir -p /app/data /app/playground /home/node/.cache \
     mkdir -p /home/node/.codex && chown -R node:node /home/node/.codex; \
     elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
     mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
+    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
+    mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
     fi \
     && chown -R node:node /app/data /app/playground /home/node/.cache
 
