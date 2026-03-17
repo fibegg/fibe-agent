@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
-import type { AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 
@@ -36,7 +36,8 @@ function hasEnvApiKey(): boolean {
 export class OpencodeStrategy implements AgentStrategy {
   private readonly logger = new Logger(OpencodeStrategy.name);
   private currentConnection: AuthConnection | null = null;
-  private _hasSession = false;
+  private currentStreamProcess: ChildProcess | null = null;
+  private streamInterrupted = false;
 
   /**
    * Reads a manually stored API key from the auth file (set via auth modal).
@@ -69,7 +70,6 @@ export class OpencodeStrategy implements AgentStrategy {
 
     if (hasEnvApiKey()) {
       this.logger.log('API key found in environment — skipping auth modal');
-      this._hasSession = true;
       connection.sendAuthSuccess();
       return;
     }
@@ -92,7 +92,6 @@ export class OpencodeStrategy implements AgentStrategy {
       if (this.currentConnection) {
         this.currentConnection.sendAuthSuccess();
       }
-      this._hasSession = true;
     } else {
       this.currentConnection?.sendAuthStatus('unauthenticated');
     }
@@ -111,7 +110,6 @@ export class OpencodeStrategy implements AgentStrategy {
 
   executeLogout(connection: LogoutConnection): void {
     this.clearCredentials();
-    this._hasSession = false;
     connection.sendLogoutSuccess();
   }
 
@@ -141,6 +139,11 @@ export class OpencodeStrategy implements AgentStrategy {
     return !hasEnvApiKey() && this.getStoredApiKey() !== null;
   }
 
+  interruptAgent(): void {
+    this.streamInterrupted = true;
+    this.currentStreamProcess?.kill();
+  }
+
   executePromptStreaming(
     prompt: string,
     model: string,
@@ -149,6 +152,7 @@ export class OpencodeStrategy implements AgentStrategy {
     systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.streamInterrupted = false;
       if (!existsSync(PLAYGROUND_DIR)) {
         mkdirSync(PLAYGROUND_DIR, { recursive: true });
       }
@@ -193,9 +197,9 @@ export class OpencodeStrategy implements AgentStrategy {
       const opencodeProcess = spawn('opencode', opencodeArgs, {
         env,
         cwd: PLAYGROUND_DIR,
-        // Redirect stdin from /dev/null so opencode doesn't wait for TTY
         stdio: ['ignore', 'pipe', 'pipe'],
       });
+      this.currentStreamProcess = opencodeProcess;
 
       let errorResult = '';
       let lineBuffer = '';
@@ -236,7 +240,7 @@ export class OpencodeStrategy implements AgentStrategy {
               case 'tool_call':
                 if (callbacks?.onTool && event.part) {
                   callbacks.onTool({
-                    kind: 'tool_use',
+                    kind: 'tool_call',
                     name: event.part.name ?? 'tool',
                     path: event.part.path,
                     summary: event.part.summary,
@@ -282,7 +286,7 @@ export class OpencodeStrategy implements AgentStrategy {
       });
 
       opencodeProcess.on('close', (code) => {
-        // Flush any remaining buffer content
+        this.currentStreamProcess = null;
         if (lineBuffer.trim()) {
           try {
             const event = JSON.parse(lineBuffer.trim()) as {
@@ -298,15 +302,19 @@ export class OpencodeStrategy implements AgentStrategy {
         }
 
         callbacks?.onReasoningEnd?.();
+        if (this.streamInterrupted) {
+          reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
-          this._hasSession = true;
           resolve();
         }
       });
 
       opencodeProcess.on('error', (err) => {
+        this.currentStreamProcess = null;
         this.logger.error('OpenCode process error', err);
         reject(err);
       });

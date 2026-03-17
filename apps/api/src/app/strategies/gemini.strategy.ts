@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
-import type { AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 import { runAuthProcess } from './auth-process-helper';
 
 const GEMINI_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.gemini');
@@ -14,6 +14,8 @@ export class GeminiStrategy implements AgentStrategy {
   private currentConnection: AuthConnection | null = null;
   private authCancel: (() => void) | null = null;
   private _hasSession = false;
+  private currentStreamProcess: ChildProcess | null = null;
+  private streamInterrupted = false;
 
   ensureSettings(): void {
     if (!existsSync(GEMINI_CONFIG_DIR)) {
@@ -193,6 +195,11 @@ export class GeminiStrategy implements AgentStrategy {
     return ['-m', model];
   }
 
+  interruptAgent(): void {
+    this.streamInterrupted = true;
+    this.currentStreamProcess?.kill();
+  }
+
   executePromptStreaming(
     prompt: string,
     model: string,
@@ -201,6 +208,7 @@ export class GeminiStrategy implements AgentStrategy {
     systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.streamInterrupted = false;
       this.ensureSettings();
       const playgroundDir = join(process.cwd(), 'playground');
       if (!existsSync(playgroundDir)) {
@@ -221,6 +229,7 @@ export class GeminiStrategy implements AgentStrategy {
         cwd: playgroundDir,
         shell: false,
       });
+      this.currentStreamProcess = geminiProcess;
 
       let errorResult = '';
 
@@ -234,6 +243,11 @@ export class GeminiStrategy implements AgentStrategy {
       });
 
       geminiProcess.on('close', (code) => {
+        this.currentStreamProcess = null;
+        if (this.streamInterrupted) {
+          reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
         const modelNotFound =
           errorResult.includes('ModelNotFoundError') ||
           errorResult.includes('Requested entity was not found');
@@ -267,7 +281,10 @@ export class GeminiStrategy implements AgentStrategy {
         }
       });
 
-      geminiProcess.on('error', reject);
+      geminiProcess.on('error', (err) => {
+        this.currentStreamProcess = null;
+        reject(err);
+      });
     });
   }
 }

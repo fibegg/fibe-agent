@@ -166,4 +166,25 @@ describe('OrchestratorService', () => {
     expect(thinkingStep?.data.title).toBe('Generating response');
     expect(thinkingStep?.data.status).toBe('processing');
   });
+
+  test('handleClientMessage interrupt_agent when not processing does nothing', async () => {
+    const orch = await createOrchestrator();
+    const events: Array<{ type: string }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    orch.handleClientMessage({ action: WS_ACTION.INTERRUPT_AGENT });
+    expect(events.length).toBe(0);
+  });
+
+  test('handleClientMessage interrupt_agent when processing sends stream_end with accumulated', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    const promise = orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    orch.handleClientMessage({ action: WS_ACTION.INTERRUPT_AGENT });
+    await promise;
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
+    expect(orch.isProcessing).toBe(false);
+  });
 });

@@ -28,7 +28,7 @@ describe('useChatWebSocket', () => {
     vi.unstubAllGlobals();
   });
 
-  it('returns state, send, reconnect, and other expected fields', () => {
+  it('returns state, send, reconnect, interruptAgent, and other expected fields', () => {
     const wrapper = ({ children }: { children: React.ReactNode }) => (
       <MemoryRouter>{children}</MemoryRouter>
     );
@@ -36,6 +36,7 @@ describe('useChatWebSocket', () => {
     expect(result.current.state).toBeDefined();
     expect(typeof result.current.send).toBe('function');
     expect(typeof result.current.reconnect).toBe('function');
+    expect(typeof result.current.interruptAgent).toBe('function');
     expect(typeof result.current.startAuth).toBe('function');
     expect(typeof result.current.dismissError).toBe('function');
     expect(result.current.errorMessage).toBeNull();

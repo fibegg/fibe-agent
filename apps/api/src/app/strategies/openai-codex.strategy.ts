@@ -1,9 +1,9 @@
 import { Logger } from '@nestjs/common';
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
-import type { AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 import { runAuthProcess } from './auth-process-helper';
 
 const CODEX_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.codex');
@@ -14,6 +14,8 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   private activeAuthProcess: ReturnType<typeof spawn> | null = null;
   private currentConnection: AuthConnection | null = null;
   private authCancel: (() => void) | null = null;
+  private currentStreamProcess: ChildProcess | null = null;
+  private streamInterrupted = false;
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
@@ -115,6 +117,11 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     });
   }
 
+  interruptAgent(): void {
+    this.streamInterrupted = true;
+    this.currentStreamProcess?.kill();
+  }
+
   executePromptStreaming(
     prompt: string,
     _model: string,
@@ -123,6 +130,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.streamInterrupted = false;
       const playgroundDir = join(process.cwd(), 'playground');
       if (!existsSync(playgroundDir)) {
         mkdirSync(playgroundDir, { recursive: true });
@@ -136,6 +144,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
         cwd: playgroundDir,
         shell: false,
       });
+      this.currentStreamProcess = codexProcess;
 
       let errorResult = '';
 
@@ -154,7 +163,12 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       });
 
       codexProcess.on('close', (code) => {
+        this.currentStreamProcess = null;
         callbacks?.onReasoningEnd?.();
+        if (this.streamInterrupted) {
+          reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
@@ -162,7 +176,10 @@ export class OpenaiCodexStrategy implements AgentStrategy {
         }
       });
 
-      codexProcess.on('error', reject);
+      codexProcess.on('error', (err) => {
+        this.currentStreamProcess = null;
+        reject(err);
+      });
     });
   }
 }

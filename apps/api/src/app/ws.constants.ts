@@ -9,6 +9,7 @@ export const WS_ACTION = {
   SUBMIT_STORY: 'submit_story',
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
+  INTERRUPT_AGENT: 'interrupt_agent',
 } as const;
 
 export const WS_EVENT = {

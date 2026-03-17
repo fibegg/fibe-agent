@@ -9,6 +9,7 @@ import {
   RotateCw,
   Search,
   Send,
+  Square,
   X,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -259,6 +260,7 @@ export function ChatPage() {
     reauthenticate,
     logout,
     dismissError,
+    interruptAgent,
   } = useChatWebSocket(
     handleMessage,
     (chunk) => flushSync(() => setStreamingText((prev) => prev + chunk)),
@@ -1225,15 +1227,26 @@ export function ChatPage() {
                     )}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={handleSend}
-                  disabled={state !== CHAT_STATES.AUTHENTICATED}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
-                  aria-label="Send"
-                >
-                  <Send className="size-3.5 sm:size-4" />
-                </button>
+                {state === CHAT_STATES.AWAITING_RESPONSE ? (
+                  <button
+                    type="button"
+                    onClick={interruptAgent}
+                    className="size-8 sm:size-9 rounded-md flex items-center justify-center border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Stop"
+                  >
+                    <Square className="size-3.5 sm:size-4 fill-current" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleSend}
+                    disabled={state !== CHAT_STATES.AUTHENTICATED}
+                    className="size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
+                    aria-label="Send"
+                  >
+                    <Send className="size-3.5 sm:size-4" />
+                  </button>
+                )}
               </div>
             </div>
         </div>

@@ -37,6 +37,7 @@ export interface UseChatWebSocketResult {
   cancelAuth: () => void;
   submitAuthCode: (code: string) => void;
   dismissError: () => void;
+  interruptAgent: () => void;
   setState: React.Dispatch<React.SetStateAction<ChatState>>;
   setErrorMessage: React.Dispatch<React.SetStateAction<string | null>>;
   setAuthModal: React.Dispatch<React.SetStateAction<AuthModalState>>;
@@ -383,6 +384,10 @@ export function useChatWebSocket(
     setState(CHAT_STATES.AUTHENTICATED);
   }, []);
 
+  const interruptAgent = useCallback(() => {
+    send({ action: 'interrupt_agent' });
+  }, [send]);
+
   const reconnect = useCallback(() => {
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
@@ -409,6 +414,7 @@ export function useChatWebSocket(
     cancelAuth,
     submitAuthCode,
     dismissError,
+    interruptAgent,
     setState,
     setErrorMessage,
     setAuthModal,

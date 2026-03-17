@@ -40,6 +40,8 @@ export interface StreamingCallbacks {
   onTool?: (event: ToolEvent) => void;
 }
 
+export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
+
 export interface AgentStrategy {
   ensureSettings?(): void;
   executeAuth(connection: AuthConnection): void;
@@ -49,6 +51,7 @@ export interface AgentStrategy {
   executeLogout(connection: LogoutConnection): void;
   checkAuthStatus(): Promise<boolean>;
   getModelArgs?(model: string): string[];
+  interruptAgent?(): void;
   executePromptStreaming(
     prompt: string,
     model: string,

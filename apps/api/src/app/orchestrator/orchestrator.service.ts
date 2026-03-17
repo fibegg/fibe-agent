@@ -20,6 +20,7 @@ import type {
   ThinkingStep,
   ToolEvent,
 } from '../strategies/strategy.types';
+import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
   AUTH_STATUS as AUTH_STATUS_VAL,
@@ -83,6 +84,24 @@ export class OrchestratorService implements OnModuleInit {
     this.outbound$.next({ type, data });
   }
 
+  private finishStream(
+    accumulated: string,
+    stepId: string,
+    step: ThinkingStep
+  ): void {
+    const finalText = accumulated || 'The agent produced no visible output.';
+    this.messageStore.add('assistant', finalText);
+    void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
+    this._send(WS_EVENT.THINKING_STEP, {
+      id: stepId,
+      title: step.title,
+      status: 'complete',
+      details: step.details,
+      timestamp: new Date().toISOString(),
+    });
+    this._send(WS_EVENT.STREAM_END, {});
+  }
+
   ensureStrategySettings(): void {
     this.strategy.ensureSettings?.();
   }
@@ -137,6 +156,11 @@ export class OrchestratorService implements OnModuleInit {
         break;
       case WS_ACTION.SET_MODEL:
         this.handleSetModel(msg.model ?? '');
+        break;
+      case WS_ACTION.INTERRUPT_AGENT:
+        if (this.isProcessing) {
+          this.strategy.interruptAgent?.();
+        }
         break;
       default:
         this.logger.warn(`Unknown action: ${action}`);
@@ -374,24 +398,14 @@ export class OrchestratorService implements OnModuleInit {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
       }, callbacks, systemPrompt || undefined);
-
-      const finalText =
-        accumulated || 'The agent produced no visible output.';
-      this.messageStore.add('assistant', finalText);
-      void this.phoenixSync.syncMessages(
-        JSON.stringify(this.messageStore.all())
-      );
-      this._send(WS_EVENT.THINKING_STEP, {
-        id: syntheticStepId,
-        title: syntheticStep.title,
-        status: 'complete',
-        details: syntheticStep.details,
-        timestamp: new Date().toISOString(),
-      });
-      this._send(WS_EVENT.STREAM_END, {});
+      this.finishStream(accumulated, syntheticStepId, syntheticStep);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      this._send(WS_EVENT.ERROR, { message });
+      if (message === INTERRUPTED_MESSAGE) {
+        this.finishStream(accumulated, syntheticStepId, syntheticStep);
+      } else {
+        this._send(WS_EVENT.ERROR, { message });
+      }
     } finally {
       this.isProcessing = false;
     }

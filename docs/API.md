@@ -62,6 +62,7 @@ All API logs are written as **one JSON object per line** to stdout/stderr so con
 | submit_story       | `{ story }` | Submit activity story (array of `{ id, type, message, timestamp, details?, command?, path? }`) for the last assistant message; call after stream ends. Entries with `command` (e.g. tool_call) or `path` (e.g. file_created) are shown as terminal/file blocks in the UI. |
 | get_model          | —           | Request current model          |
 | set_model          | `{ model }` | Set model name                 |
+| interrupt_agent    | —           | Stop the current agent run; server sends `stream_end` with accumulated text so far. |
 
 ### Server → Client (JSON)
 

@@ -1,8 +1,8 @@
-import { spawn } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection, ToolEvent } from './strategy.types';
-import type { AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
 const CLAUDE_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.claude');
 const TOKEN_FILE_PATH = join(CLAUDE_CONFIG_DIR, 'agent_token.txt');
@@ -76,6 +76,8 @@ export function toolUseToEvent(
 export class ClaudeCodeStrategy implements AgentStrategy {
   private currentConnection: AuthConnection | null = null;
   private _hasSession = false;
+  private currentStreamProcess: ChildProcess | null = null;
+  private streamInterrupted = false;
 
   private getToken(): string | null {
     if (existsSync(TOKEN_FILE_PATH)) {
@@ -195,6 +197,11 @@ export class ClaudeCodeStrategy implements AgentStrategy {
     });
   }
 
+  interruptAgent(): void {
+    this.streamInterrupted = true;
+    this.currentStreamProcess?.kill();
+  }
+
   executePromptStreaming(
     prompt: string,
     _model: string,
@@ -203,6 +210,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
     systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
+      this.streamInterrupted = false;
       if (!existsSync(PLAYGROUND_DIR)) {
         mkdirSync(PLAYGROUND_DIR, { recursive: true });
       }
@@ -233,6 +241,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
         cwd: PLAYGROUND_DIR,
         shell: false,
       });
+      this.currentStreamProcess = claudeProcess;
       claudeProcess.stdin?.end();
 
       let errorResult = '';
@@ -304,7 +313,12 @@ export class ClaudeCodeStrategy implements AgentStrategy {
       });
 
       claudeProcess.on('close', (code) => {
+        this.currentStreamProcess = null;
         if (useStreamJson && stdoutBuffer.trim()) handleStreamJsonLine(stdoutBuffer);
+        if (this.streamInterrupted) {
+          reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
         if (code !== 0 && errorResult.trim()) {
           reject(new Error(errorResult || `Process exited with code ${code}`));
         } else {
@@ -313,7 +327,10 @@ export class ClaudeCodeStrategy implements AgentStrategy {
         }
       });
 
-      claudeProcess.on('error', reject);
+      claudeProcess.on('error', (err) => {
+        this.currentStreamProcess = null;
+        reject(err);
+      });
     });
   }
 

@@ -1,12 +1,13 @@
 import { Logger } from '@nestjs/common';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
-import type { AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
 const MOCK_AUTH_DELAY_MS = 1000;
 const MOCK_LOGOUT_DELAY_MS = 500;
 
 export class MockStrategy implements AgentStrategy {
   private readonly logger = new Logger(MockStrategy.name);
+  private streamCancel: (() => void) | null = null;
 
   executeAuth(connection: AuthConnection): void {
     this.logger.log('executeAuth: Mocking auth success in 1s');
@@ -40,6 +41,10 @@ export class MockStrategy implements AgentStrategy {
     return Promise.resolve(true);
   }
 
+  interruptAgent(): void {
+    this.streamCancel?.();
+  }
+
   executePromptStreaming(
     _prompt: string,
     _model: string,
@@ -47,7 +52,13 @@ export class MockStrategy implements AgentStrategy {
     callbacks?: import('./strategy.types').StreamingCallbacks,
     _systemPrompt?: string
   ): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
+      const timeoutRef: { id: ReturnType<typeof setTimeout> | null } = { id: null };
+      this.streamCancel = () => {
+        this.streamCancel = null;
+        if (timeoutRef.id !== null) clearTimeout(timeoutRef.id);
+        reject(new Error(INTERRUPTED_MESSAGE));
+      };
       callbacks?.onReasoningChunk?.('Considering the request...\n');
       callbacks?.onReasoningChunk?.('Preparing a helpful response.\n');
       callbacks?.onReasoningEnd?.();
@@ -57,7 +68,9 @@ export class MockStrategy implements AgentStrategy {
         path: 'example-output.ts',
         summary: 'Sample file created by mock agent',
       });
-      setTimeout(() => {
+      timeoutRef.id = setTimeout(() => {
+        this.streamCancel = null;
+        timeoutRef.id = null;
         const timestamp = new Date().toISOString();
         onChunk('[MOCKED RESPONSE] Hello! ');
         onChunk(`The current timestamp is ${timestamp}`);
