@@ -91,3 +91,34 @@ export function toTimestampMs(ts: string | Date | undefined, fallback: string): 
   if (!ts) return new Date(fallback).getTime();
   return typeof ts === 'string' ? new Date(ts).getTime() : (ts as Date).getTime();
 }
+
+export type SessionActivityEntryLike = { id: string; created_at: string; story?: StoryEntry[] };
+
+export function buildFullStoryItems(
+  sessionActivity: SessionActivityEntryLike[],
+  pastActivityFromMessages: SessionActivityEntryLike[],
+  storyItems: StoryEntry[]
+): StoryEntry[] {
+  const fromSession = sessionActivity.flatMap((a) => (a.story ?? []).map((s) => ({ ...s })));
+  const fromPast = pastActivityFromMessages.flatMap((a) => (a.story ?? []).map((s) => ({ ...s })));
+  const combined = filterVisibleStoryItems([...fromPast, ...fromSession, ...storyItems]);
+  const seen = new Set<string>();
+  return combined.filter((e) => {
+    if (!e?.id || seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+}
+
+export function computeSessionStats(
+  sessionActivity: SessionActivityEntryLike[],
+  pastActivityFromMessages: SessionActivityEntryLike[],
+  storyItems: StoryEntry[],
+  isStreaming: boolean
+): { totalActions: number; completed: number; processing: number } {
+  const fullStoryItems = buildFullStoryItems(sessionActivity, pastActivityFromMessages, storyItems);
+  const totalActions = fullStoryItems.length;
+  const completed = isStreaming ? Math.max(0, totalActions - 1) : totalActions;
+  const processing = isStreaming ? 1 : 0;
+  return { totalActions, completed, processing };
+}

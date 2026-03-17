@@ -2,6 +2,7 @@ import {
   Brain,
   ChevronDown,
   Key,
+  Loader2,
   LogOut,
   Menu,
   Mic,
@@ -9,6 +10,7 @@ import {
   RotateCw,
   Search,
   Send,
+  Sparkles,
   Square,
   X,
 } from 'lucide-react';
@@ -47,7 +49,8 @@ import {
 } from '../layout-constants';
 import { FileIcon } from '../file-icon';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
-import { formatSessionDurationMs, toTimestampMs } from '../agent-thinking-utils';
+import { buildFullStoryItems, computeSessionStats, formatSessionDurationMs, toTimestampMs } from '../agent-thinking-utils';
+import { useMobileBrainClasses } from '../chat/use-mobile-brain-classes';
 import type { ThinkingStep, ThinkingActivity } from '../chat/thinking-types';
 import {
   BUTTON_DESTRUCTIVE_GHOST,
@@ -445,6 +448,28 @@ export function ChatPage() {
     const isStreaming = state === CHAT_STATES.AWAITING_RESPONSE;
     return lastTs && firstTs ? (isStreaming ? Date.now() - firstTs : lastTs - firstTs) : 0;
   }, [sessionActivity, displayStory, state]);
+
+  const mobileSessionStats = useMemo(
+    () =>
+      computeSessionStats(
+        sessionActivity,
+        pastActivityFromMessages,
+        displayStory,
+        state === CHAT_STATES.AWAITING_RESPONSE
+      ),
+    [sessionActivity, pastActivityFromMessages, displayStory, state]
+  );
+
+  const mobileFullStoryItems = useMemo(
+    () => buildFullStoryItems(sessionActivity, pastActivityFromMessages, displayStory),
+    [sessionActivity, pastActivityFromMessages, displayStory]
+  );
+  const mobileLastStoryItem =
+    mobileFullStoryItems.length > 0 ? mobileFullStoryItems[mobileFullStoryItems.length - 1] : null;
+  const mobileBrainClasses = useMobileBrainClasses(
+    state === CHAT_STATES.AWAITING_RESPONSE,
+    mobileLastStoryItem
+  );
 
   const handleSend = useCallback(() => {
     const text = inputValue.trim();
@@ -926,6 +951,16 @@ export function ChatPage() {
           className={`border-b border-border/50 bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
           style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
         >
+          {isMobile && (
+            <style>{`
+              @keyframes statTick {
+                0% { opacity: 0.5; transform: translateY(4px) scale(1.2); }
+                60% { opacity: 1; transform: translateY(-1px) scale(1.04); }
+                100% { opacity: 1; transform: translateY(0) scale(1); }
+              }
+              .mobile-stat-tick { animation: statTick 0.32s cubic-bezier(0.34, 1.2, 0.64, 1) 1; }
+            `}</style>
+          )}
           <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="flex items-center gap-1.5 shrink-0 lg:hidden">
@@ -938,8 +973,8 @@ export function ChatPage() {
                   <Menu className="size-4 sm:size-5 shrink-0" />
                 </button>
               </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="font-semibold text-sm text-foreground truncate">
                     AI Assistant
                   </h2>
@@ -963,14 +998,43 @@ export function ChatPage() {
             </div>
             <div className="flex items-center gap-1 sm:gap-2">
               {isMobile && (
+                <p
+                  className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 shrink-0 mr-2"
+                  aria-label={`${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing`}
+                >
+                  <span key={`m-total-${mobileSessionStats.totalActions}`} className="text-foreground mobile-stat-tick" title="Total actions">
+                    {mobileSessionStats.totalActions}
+                  </span>
+                  <span className="text-muted-foreground/70">/</span>
+                  <span key={`m-done-${mobileSessionStats.completed}`} className="text-emerald-400 mobile-stat-tick" title="Completed">
+                    {mobileSessionStats.completed}
+                  </span>
+                  <span className="text-muted-foreground/70">/</span>
+                  <span key={`m-proc-${mobileSessionStats.processing}`} className="text-cyan-400 mobile-stat-tick" title="Processing">
+                    {mobileSessionStats.processing}
+                  </span>
+                </p>
+              )}
+              {isMobile && (
                 <button
                   type="button"
                   onClick={() => setRightSidebarOpen(true)}
-                  className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0"
+                  className="size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"
                   title="Agent activity"
                   aria-label="Open agent activity"
                 >
-                  <Brain className="size-4 sm:size-5" />
+                  <Brain className={`size-8 ${mobileBrainClasses.brain} transition-colors`} />
+                  {state === CHAT_STATES.AWAITING_RESPONSE ? (
+                    <Loader2
+                      className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
+                      aria-hidden
+                    />
+                  ) : (
+                    <Sparkles
+                      className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
+                      aria-hidden
+                    />
+                  )}
                 </button>
               )}
               {(state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR) && (

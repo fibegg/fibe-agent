@@ -727,10 +727,11 @@ export function AgentThinkingSidebar({
       <div className="min-h-0 overflow-visible flex-1 flex flex-col min-w-0">
       <style>{`
         @keyframes statTick {
-          from { opacity: 0.6; transform: scale(1.06); }
-          to { opacity: 1; transform: scale(1); }
+          0% { opacity: 0.5; transform: translateY(4px) scale(1.2); }
+          60% { opacity: 1; transform: translateY(-1px) scale(1.04); }
+          100% { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .stat-tick { animation: statTick 0.22s ease-out 1; }
+        .stat-tick { animation: statTick 0.32s cubic-bezier(0.34, 1.2, 0.64, 1) 1; }
         @keyframes brainDownloadPulse {
           0% { transform: scale(1); opacity: 1; color: inherit; }
           12% { transform: scale(1.25); opacity: 1; color: inherit; }
@@ -883,13 +884,13 @@ export function AgentThinkingSidebar({
               className="grid grid-cols-1 gap-px text-[10px] font-medium tabular-nums text-center text-muted-foreground [&>*]:bg-muted/30 [&>*]:rounded [&>*]:py-0.5 [&>*]:min-w-0"
               aria-label="Total / Completed / Processing"
             >
-              <span className="text-foreground stat-tick" title={STAT_TOOLTIPS.total}>
+              <span key={`total-${sessionStats.totalActions}`} className="text-foreground stat-tick" title={STAT_TOOLTIPS.total}>
                 {sessionStats.totalActions}
               </span>
-              <span className="text-emerald-400 stat-tick" title={STAT_TOOLTIPS.completed}>
+              <span key={`completed-${sessionStats.completed}`} className="text-emerald-400 stat-tick" title={STAT_TOOLTIPS.completed}>
                 {sessionStats.completed}
               </span>
-              <span className="text-cyan-400 stat-tick" title={STAT_TOOLTIPS.processing}>
+              <span key={`processing-${sessionStats.processing}`} className="text-cyan-400 stat-tick" title={STAT_TOOLTIPS.processing}>
                 {sessionStats.processing}
               </span>
             </div>
