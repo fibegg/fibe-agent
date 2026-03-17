@@ -104,4 +104,30 @@ describe('ActivityStoreService', () => {
     service.replaceStory('unknown-id', []);
     expect(service.getById(created.id)?.story).toHaveLength(1);
   });
+
+  test('replaceStory deduplicates story by id', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
+    const withDupes = [
+      { id: 'a', type: 'step', message: 'A', timestamp: '' },
+      { id: 'b', type: 'step', message: 'B', timestamp: '' },
+      { id: 'a', type: 'step', message: 'A again', timestamp: '' },
+    ];
+    service.replaceStory(created.id, withDupes);
+    const updated = service.getById(created.id);
+    expect(updated?.story).toHaveLength(2);
+    expect(updated?.story?.map((e) => e.id)).toEqual(['a', 'b']);
+  });
+
+  test('appendEntry does not add duplicate entry id', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    const first = { id: 'e1', type: 'stream_start', message: 'Started', timestamp: '' };
+    const created = service.createWithEntry(first);
+    service.appendEntry(created.id, { id: 'e1', type: 'step', message: 'Duplicate id', timestamp: '' });
+    const updated = service.getById(created.id);
+    expect(updated?.story).toHaveLength(1);
+    expect(updated?.story?.[0].message).toBe('Started');
+  });
 });

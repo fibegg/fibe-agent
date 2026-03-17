@@ -23,7 +23,8 @@ export function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/" element={<ChatPage />} />
-          <Route path="/activity/:id" element={<ActivityReviewPage />} />
+          <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+          <Route path="/activity" element={<ActivityReviewPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

@@ -22,6 +22,7 @@ export interface StoredMessage {
   created_at: string;
   imageUrls?: string[];
   story?: StoredStoryEntry[];
+  activityId?: string;
 }
 
 @Injectable()
@@ -57,6 +58,14 @@ export class MessageStoreService {
     const last = this.messages[this.messages.length - 1];
     if (last?.role === 'assistant' && Array.isArray(story)) {
       last.story = story;
+      void this.save();
+    }
+  }
+
+  setActivityIdForLastAssistant(activityId: string): void {
+    const last = this.messages[this.messages.length - 1];
+    if (last?.role === 'assistant') {
+      last.activityId = activityId;
       void this.save();
     }
   }

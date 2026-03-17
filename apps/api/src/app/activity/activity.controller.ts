@@ -12,6 +12,13 @@ export class ActivityController {
     return this.activityStore.all();
   }
 
+  @Get('activity/by-entry/:entryId')
+  getByStoryEntryId(@Param('entryId') entryId: string) {
+    const entry = this.activityStore.findByStoryEntryId(entryId);
+    if (!entry) throw new NotFoundException('Activity not found');
+    return entry;
+  }
+
   @Get('activity/:id')
   getById(@Param('id') id: string) {
     const entry = this.activityStore.getById(id);

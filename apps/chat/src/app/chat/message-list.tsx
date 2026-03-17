@@ -88,6 +88,7 @@ export interface ChatMessage {
     command?: string;
     path?: string;
   }>;
+  activityId?: string;
   optimistic?: boolean;
 }
 

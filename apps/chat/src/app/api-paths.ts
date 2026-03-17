@@ -6,4 +6,5 @@ export const API_PATHS = {
   PLAYGROUNDS: '/api/playgrounds',
   PLAYGROUNDS_FILE: '/api/playgrounds/file',
   ACTIVITY: '/api/activity',
+  ACTIVITY_BY_ENTRY: '/api/activity/by-entry',
 } as const;

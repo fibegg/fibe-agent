@@ -12,6 +12,16 @@ export interface StoredActivityEntry {
   story: StoredStoryEntry[];
 }
 
+function dedupeStoryById(story: StoredStoryEntry[]): StoredStoryEntry[] {
+  if (!Array.isArray(story) || story.length === 0) return story;
+  const seen = new Set<string>();
+  return story.filter((e) => {
+    if (!e?.id || seen.has(e.id)) return false;
+    seen.add(e.id);
+    return true;
+  });
+}
+
 @Injectable()
 export class ActivityStoreService {
   private readonly activityPath: string;
@@ -32,11 +42,17 @@ export class ActivityStoreService {
     return this.activities.find((a) => a.id === id);
   }
 
+  findByStoryEntryId(entryId: string): StoredActivityEntry | undefined {
+    return this.activities.find((a) =>
+      Array.isArray(a.story) && a.story.some((e) => e?.id === entryId)
+    );
+  }
+
   append(story: StoredStoryEntry[]): StoredActivityEntry {
     const entry: StoredActivityEntry = {
       id: randomUUID(),
       created_at: new Date().toISOString(),
-      story: Array.isArray(story) ? story : [],
+      story: dedupeStoryById(Array.isArray(story) ? story : []),
     };
     this.activities.push(entry);
     void this.save();
@@ -56,7 +72,7 @@ export class ActivityStoreService {
 
   appendEntry(activityId: string, storyEntry: StoredStoryEntry): void {
     const activity = this.activities.find((a) => a.id === activityId);
-    if (activity) {
+    if (activity && storyEntry?.id && !activity.story.some((e) => e.id === storyEntry.id)) {
       activity.story.push(storyEntry);
       void this.save();
     }
@@ -65,7 +81,7 @@ export class ActivityStoreService {
   replaceStory(activityId: string, story: StoredStoryEntry[]): void {
     const activity = this.activities.find((a) => a.id === activityId);
     if (activity) {
-      activity.story = Array.isArray(story) ? story : [];
+      activity.story = dedupeStoryById(Array.isArray(story) ? story : []);
       void this.save();
     }
   }
@@ -86,7 +102,11 @@ export class ActivityStoreService {
     if (!existsSync(this.activityPath)) return [];
     try {
       const data = JSON.parse(readFileSync(this.activityPath, 'utf8'));
-      return Array.isArray(data) ? data : [];
+      const list = Array.isArray(data) ? data : [];
+      return list.map((a: StoredActivityEntry) => ({
+        ...a,
+        story: dedupeStoryById(Array.isArray(a.story) ? a.story : []),
+      }));
     } catch {
       return [];
     }

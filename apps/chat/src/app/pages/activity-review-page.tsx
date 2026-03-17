@@ -1,10 +1,11 @@
 import { ArrowLeft, Brain, Loader2, Search, Settings, Sparkles, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '../api-paths';
 import {
+  filterVisibleStoryItems,
   getActivityIcon,
   getActivityLabel,
   getBlockVariant,
@@ -50,6 +51,11 @@ import {
 
 const ACTIVITY_POLL_INTERVAL_MS = 4000;
 const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isActivityId(id: string): boolean {
+  return UUID_REGEX.test(id);
+}
 
 const HIGHLIGHT_MARK_CLASS = 'bg-amber-400/40 text-amber-950 dark:bg-amber-400/50 dark:text-amber-100 rounded px-0.5';
 const SUSPICIOUS_SEGMENT_CLASS =
@@ -152,45 +158,46 @@ const BADGE_INACTIVE_STYLES: Record<string, string> = {
 
 function commandLabel(entry: StoryEntry): string {
   if (entry.command) return entry.command;
-  const raw = entry.message ?? entry.details ?? getActivityLabel(entry.type);
-  return String(raw).replace(/^Ran\s+/i, '');
+  const msg = entry.message?.trim();
+  if (msg && msg !== '{}') return msg.replace(/^Ran\s+/i, '');
+  return getActivityLabel(entry.type) || entry.type;
 }
 
-function getCopyableEntryText(entry: StoryEntry): string {
-  const label = getActivityLabel(entry.type) ?? entry.type;
-  const time = entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '';
+function getCopyableStoryText(story: StoryEntry): string {
+  const label = getActivityLabel(story.type) ?? story.type;
+  const time = story.timestamp ? new Date(story.timestamp).toLocaleString() : '';
   const parts = [`${label}${time ? ` · ${time}` : ''}`];
-  if (entry.message?.trim()) parts.push(entry.message.trim());
-  if (entry.details?.trim() && String(entry.details).trim() !== '{}') parts.push(entry.details.trim());
-  if (entry.type === 'tool_call' && entry.command) parts.push(`$ ${entry.command}`);
-  if (entry.type === 'file_created' && entry.path) parts.push(entry.path);
+  if (story.message?.trim()) parts.push(story.message.trim());
+  if (story.details?.trim() && String(story.details).trim() !== '{}') parts.push(story.details.trim());
+  if (story.type === 'tool_call' && story.command) parts.push(`$ ${story.command}`);
+  if (story.type === 'file_created' && story.path) parts.push(story.path);
   return parts.join('\n\n');
 }
 
-function getCopyableActivityText(story: StoryEntry[]): string {
-  return story.map(getCopyableEntryText).join('\n\n---\n\n');
+function getCopyableActivityText(stories: StoryEntry[]): string {
+  return stories.map(getCopyableStoryText).join('\n\n---\n\n');
 }
 
-function ResponseListRow({
-  entry,
+function StoryListRow({
+  story,
   isSelected,
   onSelect,
 }: {
-  entry: StoryEntry;
+  story: StoryEntry;
   isSelected: boolean;
   onSelect: () => void;
 }) {
-  const Icon = getActivityIcon(entry.type);
-  const label = getActivityLabel(entry.type);
-  const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
+  const Icon = getActivityIcon(story.type);
+  const label = getActivityLabel(story.type);
+  const iconColor = ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
   const summary =
-    entry.type === 'file_created'
-      ? entry.path ?? entry.details ?? entry.message
-      : entry.type === 'tool_call'
-        ? commandLabel(entry)
-        : entry.type === 'reasoning_start' || entry.type === 'reasoning_end'
-          ? (entry.details ?? '').trim().slice(0, 60) || 'Reasoning'
-          : entry.message?.slice(0, 60) ?? label;
+    story.type === 'file_created'
+      ? story.path ?? (story.details?.trim() !== '{}' ? story.details : undefined) ?? story.message ?? label
+      : story.type === 'tool_call'
+        ? commandLabel(story)
+        : story.type === 'reasoning_start' || story.type === 'reasoning_end'
+          ? (story.details ?? '').trim().slice(0, 60) || 'Reasoning'
+          : (story.message?.trim() !== '{}' ? story.message?.slice(0, 60) : undefined) ?? label;
 
   return (
     <button
@@ -200,29 +207,29 @@ function ResponseListRow({
     >
       <Icon className={`size-4 shrink-0 ${iconColor}`} />
       <span className="truncate text-left flex-1 min-w-0">{summary || label}</span>
-      <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>{formatRelativeTime(entry.timestamp)}</span>
+      <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>{formatRelativeTime(story.timestamp)}</span>
     </button>
   );
 }
 
-function ResponseDetail({ entry, highlightQuery }: { entry: StoryEntry; highlightQuery?: string }) {
-  const Icon = getActivityIcon(entry.type);
-  const label = getActivityLabel(entry.type);
-  const variant = getBlockVariant(entry);
-  const iconColor = ACTIVITY_ICON_COLOR[entry.type] ?? ACTIVITY_ICON_COLOR.default;
-  const isSingleRow = SINGLE_ROW_TYPES.has(entry.type);
+function StoryDetail({ story, highlightQuery }: { story: StoryEntry; highlightQuery?: string }) {
+  const Icon = getActivityIcon(story.type);
+  const label = getActivityLabel(story.type);
+  const variant = getBlockVariant(story);
+  const iconColor = ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
+  const isSingleRow = SINGLE_ROW_TYPES.has(story.type);
   const isThinkingBlock =
-    entry.type === 'reasoning_start' && (entry.details ?? '').trim().length > 0;
+    story.type === 'reasoning_start' && (story.details ?? '').trim().length > 0;
   const q = highlightQuery ?? '';
 
   if (isSingleRow) {
     const singleRowText =
-      entry.type === 'file_created'
-        ? entry.path ?? entry.details ?? entry.message
-        : entry.type === 'tool_call'
-          ? commandLabel(entry)
-          : entry.type === 'step'
-            ? entry.message
+      story.type === 'file_created'
+        ? story.path ?? story.details ?? story.message
+        : story.type === 'tool_call'
+          ? commandLabel(story)
+          : story.type === 'step'
+            ? story.message
             : label;
     return (
       <div
@@ -234,7 +241,7 @@ function ResponseDetail({ entry, highlightQuery }: { entry: StoryEntry; highligh
             {highlightText(String(singleRowText), q)}
           </p>
         </div>
-        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(entry.timestamp)}</span>
+        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(story.timestamp)}</span>
       </div>
     );
   }
@@ -246,29 +253,29 @@ function ResponseDetail({ entry, highlightQuery }: { entry: StoryEntry; highligh
           <Icon className={`size-4 shrink-0 ${iconColor}`} />
           <p className={ACTIVITY_LABEL}>{label}</p>
         </div>
-        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(entry.timestamp)}</span>
+        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(story.timestamp)}</span>
       </div>
       {isThinkingBlock ? (
         <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-[70vh] overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO} whitespace-pre-wrap`}>
-            {reasoningBodyWithHighlights(entry.details ?? '', q)}
+            {reasoningBodyWithHighlights(story.details ?? '', q)}
           </p>
         </div>
       ) : (
         <div className="mt-0.5">
-          {entry.message && (
-            <p className={ACTIVITY_BODY}>{highlightText(entry.message, q)}</p>
+          {story.message && (
+            <p className={ACTIVITY_BODY}>{highlightText(story.message, q)}</p>
           )}
-          {entry.details &&
-            entry.type !== 'reasoning_start' &&
-            String(entry.details).trim() !== '{}' && (
-              <p className="text-[10px] text-muted-foreground mt-0.5 break-words" title={entry.details}>
-                {highlightText(entry.details, q)}
+          {story.details &&
+            story.type !== 'reasoning_start' &&
+            String(story.details).trim() !== '{}' && (
+              <p className="text-[10px] text-muted-foreground mt-0.5 break-words" title={story.details}>
+                {highlightText(story.details, q)}
               </p>
             )}
-          {entry.type === 'tool_call' && entry.command && (
+          {story.type === 'tool_call' && story.command && (
             <pre className="mt-1 text-[11px] font-mono text-green-300/95 bg-background/40 rounded px-2 py-1 overflow-x-auto">
-              $ {highlightText(entry.command, q)}
+              $ {highlightText(story.command, q)}
             </pre>
           )}
         </div>
@@ -291,13 +298,35 @@ export interface ActivityReviewData {
   }>;
 }
 
+type StoryEntryWithActivity = StoryEntry & { _activityId: string; _activityCreatedAt: string };
+
+function flattenAllStories(activities: ActivityReviewData[]): StoryEntryWithActivity[] {
+  const seen = new Set<string>();
+  const out: StoryEntryWithActivity[] = [];
+  for (const a of activities) {
+    if (!Array.isArray(a.story)) continue;
+    for (const s of a.story) {
+      if (!s?.id || seen.has(s.id)) continue;
+      seen.add(s.id);
+      out.push({
+        ...s,
+        timestamp: s.timestamp,
+        _activityId: a.id,
+        _activityCreatedAt: a.created_at,
+      });
+    }
+  }
+  return filterVisibleStoryItems(out) as StoryEntryWithActivity[];
+}
+
 export function ActivityReviewPage() {
-  const { id } = useParams<{ id: string }>();
-  const [activity, setActivity] = useState<ActivityReviewData | null>(null);
+  const { activityStoryId } = useParams<{ activityStoryId?: string }>();
+  const navigate = useNavigate();
+  const [activities, setActivities] = useState<ActivityReviewData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
-  const [typeFilter, setTypeFilter] = useState<string | null>('reasoning');
+  const [typeFilter, setTypeFilter] = useState<string | null>(null);
   const [copyAnimating, setCopyAnimating] = useState(false);
   const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
@@ -305,50 +334,62 @@ export function ActivityReviewPage() {
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const storyEntries = useMemo((): StoryEntry[] => {
-    if (!activity?.story?.length) return [];
-    return activity.story.map((s) => ({
-      ...s,
-      timestamp: s.timestamp,
-    }));
-  }, [activity]);
+  const activityStories = useMemo(() => flattenAllStories(activities), [activities]);
 
-  const typeBadges = ACTIVITY_TYPE_FILTERS;
-
-  const filteredEntries = useMemo(() => {
-    let list = storyEntries;
-    if (typeFilter === 'reasoning') list = list.filter((e) => e.type === 'reasoning_start' || e.type === 'reasoning_end');
-    else if (typeFilter) list = list.filter((e) => e.type === typeFilter);
+  const filteredStories = useMemo(() => {
+    let list = activityStories;
+    if (typeFilter === 'reasoning') list = list.filter((s) => s.type === 'reasoning_start' || s.type === 'reasoning_end');
+    else if (typeFilter) list = list.filter((s) => s.type === typeFilter);
     const q = activitySearchQuery.trim().toLowerCase();
     if (!q) return list;
-    return list.filter((e) => {
-      const msg = (e.message ?? '').toLowerCase();
-      const details = (e.details ?? '').toLowerCase();
-      const cmd = (e.command ?? '').toLowerCase();
-      const path = (e.path ?? '').toLowerCase();
-      const label = (getActivityLabel(e.type) ?? '').toLowerCase();
+    return list.filter((s) => {
+      const msg = (s.message ?? '').toLowerCase();
+      const details = (s.details ?? '').toLowerCase();
+      const cmd = (s.command ?? '').toLowerCase();
+      const path = (s.path ?? '').toLowerCase();
+      const label = (getActivityLabel(s.type) ?? '').toLowerCase();
       return msg.includes(q) || details.includes(q) || cmd.includes(q) || path.includes(q) || label.includes(q);
     });
-  }, [storyEntries, typeFilter, activitySearchQuery]);
+  }, [activityStories, typeFilter, activitySearchQuery]);
 
-  const selectedEntry = useMemo(() => {
-    if (filteredEntries.length === 0) return null;
-    const idx = Math.min(selectedIndex, filteredEntries.length - 1);
-    return filteredEntries[idx];
-  }, [filteredEntries, selectedIndex]);
+  const selectedStory = useMemo(() => {
+    if (filteredStories.length === 0) return null;
+    const idx = Math.min(selectedIndex, filteredStories.length - 1);
+    return filteredStories[idx];
+  }, [filteredStories, selectedIndex]);
+
+  useEffect(() => {
+    if (!activityStoryId || filteredStories.length === 0) return;
+    if (isActivityId(activityStoryId)) {
+      const idx = filteredStories.findIndex(
+        (s) => (s as StoryEntryWithActivity)._activityId === activityStoryId
+      );
+      if (idx !== -1) setSelectedIndex(idx);
+      return;
+    }
+    const idx = filteredStories.findIndex((s) => s.id === activityStoryId);
+    if (idx !== -1) setSelectedIndex(idx);
+  }, [activityStoryId, filteredStories]);
 
   useEffect(() => {
     setSelectedIndex(0);
   }, [typeFilter]);
 
-  const handleSelectIndex = useCallback((index: number) => {
-    setSelectedIndex(index);
-  }, []);
+  const handleSelectStory = useCallback(
+    (index: number) => {
+      setSelectedIndex(index);
+      const story = filteredStories[index];
+      if (story?.id) navigate(`/activity/${story.id}`);
+    },
+    [filteredStories, navigate]
+  );
 
   const runCopyActivityWithAnimation = useCallback(async () => {
-    if (!activity || copyAnimating) return;
+    if (!selectedStory || copyAnimating) return;
+    const activity = activities.find((a) => a.id === (selectedStory as StoryEntryWithActivity)._activityId);
+    const storyItems = activity?.story ?? [];
     setCopyAnimating(true);
-    const text = getCopyableActivityText(activity.story);
+    const text = getCopyableActivityText(storyItems);
     try {
       await navigator.clipboard.writeText(text);
       const rect = brainButtonRef.current?.getBoundingClientRect();
@@ -361,34 +402,28 @@ export function ActivityReviewPage() {
     } finally {
       setTimeout(() => setCopyAnimating(false), 2200);
     }
-  }, [activity, copyAnimating]);
+  }, [selectedStory, activities, copyAnimating]);
 
   const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   useEffect(() => {
-    if (!id) {
-      setLoading(false);
-      setError('Missing activity ID');
-      return;
-    }
     let cancelled = false;
     setLoading(true);
     setError(null);
-    apiRequest(`${API_PATHS.ACTIVITY}/${id}`)
+    apiRequest(API_PATHS.ACTIVITY)
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) {
           const text = await res.text();
-          setError(res.status === 404 ? 'Activity not found' : text || 'Failed to load activity');
-          setActivity(null);
+          setError(text || 'Failed to load activities');
+          setActivities([]);
           return;
         }
-        const data = (await res.json()) as ActivityReviewData;
-        setActivity(data);
-        setSelectedIndex(0);
+        const data = (await res.json()) as ActivityReviewData[];
+        setActivities(Array.isArray(data) ? data : []);
       })
       .catch(() => {
-        if (!cancelled) setError('Failed to load activity');
+        if (!cancelled) setError('Failed to load activities');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -396,44 +431,40 @@ export function ActivityReviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, []);
 
   useEffect(() => {
-    if (!id || loading) return;
+    if (loading) return;
     const poll = () => {
-      apiRequest(`${API_PATHS.ACTIVITY}/${id}`)
+      apiRequest(API_PATHS.ACTIVITY)
         .then(async (res) => {
-          if (!res.ok) {
-            if (res.status === 404) return;
-            setError(await res.text().catch(() => 'Failed to load activity'));
-            return;
-          }
-          const data = (await res.json()) as ActivityReviewData;
-          setActivity(data);
+          if (!res.ok) return;
+          const data = (await res.json()) as ActivityReviewData[];
+          setActivities(Array.isArray(data) ? data : []);
           setError(null);
         })
-        .catch(() => {});
+        .catch(() => undefined);
     };
     const interval = setInterval(poll, ACTIVITY_POLL_INTERVAL_MS);
     return () => clearInterval(interval);
-  }, [id, loading]);
+  }, [loading]);
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-violet-950/10">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-violet-400" />
-          <span className="text-sm text-muted-foreground">Loading activity…</span>
+          <span className="text-sm text-muted-foreground">Loading activities…</span>
         </div>
       </div>
     );
   }
 
-  if (error || !activity) {
+  if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-violet-950/10">
         <div className="flex flex-col items-center gap-4 text-center px-4">
-          <p className="text-sm text-destructive">{error ?? 'Activity not found'}</p>
+          <p className="text-sm text-destructive">{error}</p>
           <Link
             to="/"
             className="text-sm text-violet-400 hover:text-violet-300 flex items-center gap-2"
@@ -446,7 +477,7 @@ export function ActivityReviewPage() {
     );
   }
 
-  const selectedIndexSafe = Math.min(selectedIndex, Math.max(0, filteredEntries.length - 1));
+  const selectedIndexSafe = Math.min(selectedIndex, Math.max(0, filteredStories.length - 1));
 
   return (
     <div className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10">
@@ -487,9 +518,9 @@ export function ActivityReviewPage() {
                 type="text"
                 value={activitySearchQuery}
                 onChange={(e) => setActivitySearchQuery(e.target.value)}
-                placeholder="Search activity..."
+                placeholder="Search stories..."
                 className={INPUT_SEARCH}
-                aria-label="Search activity list"
+                aria-label="Search stories"
               />
               {activitySearchQuery ? (
                 <button
@@ -511,7 +542,7 @@ export function ActivityReviewPage() {
             >
               All
             </button>
-            {typeBadges.map((filterKey) => {
+            {ACTIVITY_TYPE_FILTERS.map((filterKey) => {
               const label = getTypeFilterLabel(filterKey);
               const isActive = typeFilter === filterKey;
               const activeStyle = BADGE_ACTIVE_STYLES[filterKey] ?? 'bg-violet-500/20 text-violet-300 border-violet-500/40';
@@ -529,21 +560,21 @@ export function ActivityReviewPage() {
             })}
           </div>
           <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 min-h-0">
-            {filteredEntries.length === 0 ? (
+            {filteredStories.length === 0 ? (
               <p className="text-xs text-muted-foreground px-2 py-4">
-                {storyEntries.length === 0
-                  ? 'No responses in this activity.'
+                {activityStories.length === 0
+                  ? 'No stories yet.'
                   : activitySearchQuery.trim()
-                    ? 'No activity matches your search.'
-                    : `No ${getTypeFilterLabel(typeFilter)} responses.`}
+                    ? 'No stories match your search.'
+                    : `No ${getTypeFilterLabel(typeFilter)} stories.`}
               </p>
             ) : (
-              filteredEntries.map((entry, index) => (
-                <ResponseListRow
-                  key={entry.id}
-                  entry={entry}
+              filteredStories.map((story, index) => (
+                <StoryListRow
+                  key={story.id}
+                  story={story}
                   isSelected={index === selectedIndexSafe}
-                  onSelect={() => handleSelectIndex(index)}
+                  onSelect={() => handleSelectStory(index)}
                 />
               ))
             )}
@@ -612,7 +643,9 @@ export function ActivityReviewPage() {
                   document.body
                 )}
               <h1 className="font-semibold text-sm text-foreground truncate min-w-0 flex-1 pl-3">
-                Activity · {new Date(activity.created_at).toLocaleString()}
+                {selectedStory
+                  ? `${getActivityLabel(selectedStory.type)} · ${formatRelativeTime(selectedStory.timestamp)}`
+                  : 'All activities'}
               </h1>
             </div>
             <div className={SEARCH_ROW_WRAPPER}>
@@ -638,12 +671,12 @@ export function ActivityReviewPage() {
             </div>
           </div>
           <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-            {selectedEntry ? (
+            {selectedStory ? (
               <div className="w-full min-w-0">
-                <ResponseDetail entry={selectedEntry} highlightQuery={detailSearchQuery} />
+                <StoryDetail story={selectedStory} highlightQuery={detailSearchQuery} />
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Select a response from the list.</p>
+              <p className="text-sm text-muted-foreground">Select a story from the list.</p>
             )}
           </div>
         </main>

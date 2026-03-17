@@ -421,7 +421,11 @@ export function ChatPage() {
     () =>
       messages
         .filter((m) => m.role === 'assistant' && Array.isArray(m.story))
-        .map((m) => ({ id: m.created_at, created_at: m.created_at, story: m.story! })),
+        .map((m) => ({
+          id: m.activityId ?? m.created_at,
+          created_at: m.created_at,
+          story: m.story!,
+        })),
     [messages]
   );
 

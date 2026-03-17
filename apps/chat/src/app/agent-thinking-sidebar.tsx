@@ -61,6 +61,7 @@ const REASONING_MAX_HEIGHT_RATIO = 0.75;
 const COMMAND_GROUP_MIN = 3;
 
 const HIDDEN_WHEN_IDLE_TYPES = new Set(['stream_start', 'step']);
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 type StoryEntryWithActivityId = StoryEntry & { _activityId?: string };
 
@@ -68,12 +69,16 @@ export type DisplayItem =
   | { kind: 'entry'; entry: StoryEntry; activityId?: string }
   | { kind: 'command_group'; id: string; entries: StoryEntry[]; activityId?: string };
 
+function clickTarget(entry: StoryEntryWithActivityId): string | undefined {
+  return entry?._activityId ?? entry?.id;
+}
+
 function buildDisplayList(entries: StoryEntryWithActivityId[]): DisplayItem[] {
   const result: DisplayItem[] = [];
   let i = 0;
   while (i < entries.length) {
     if (entries[i].type !== 'tool_call') {
-      result.push({ kind: 'entry', entry: entries[i], activityId: entries[i]._activityId });
+      result.push({ kind: 'entry', entry: entries[i], activityId: clickTarget(entries[i]) });
       i++;
       continue;
     }
@@ -81,12 +86,12 @@ function buildDisplayList(entries: StoryEntryWithActivityId[]): DisplayItem[] {
     while (j < entries.length && entries[j].type === 'tool_call') j++;
     const runLength = j - i;
     const slice = entries.slice(i, j);
-    const activityId = slice[0]?._activityId;
+    const activityId = clickTarget(slice[0]!);
     if (runLength >= COMMAND_GROUP_MIN) {
       result.push({ kind: 'command_group', id: `cg-${entries[i].id}`, entries: slice, activityId });
       i = j;
     } else {
-      for (let k = i; k < j; k++) result.push({ kind: 'entry', entry: entries[k], activityId: entries[k]._activityId });
+      for (let k = i; k < j; k++) result.push({ kind: 'entry', entry: entries[k], activityId: clickTarget(entries[k]) });
       i = j;
     }
   }
@@ -485,9 +490,19 @@ export function AgentThinkingSidebar({
       (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp, _activityId: a.id }))
     );
     const fromPast = pastActivityFromMessages.flatMap((a) =>
-      (a.story ?? []).map((s) => ({ ...s, timestamp: s.timestamp }))
+      (a.story ?? []).map((s) => ({
+        ...s,
+        timestamp: s.timestamp,
+        _activityId: a.id && UUID_REGEX.test(a.id) ? a.id : undefined,
+      }))
     );
-    return filterVisibleStoryItems([...fromPast, ...fromSession, ...storyItems]) as StoryEntryWithActivityId[];
+    const combined = filterVisibleStoryItems([...fromPast, ...fromSession, ...storyItems]) as StoryEntryWithActivityId[];
+    const seen = new Set<string>();
+    return combined.filter((e) => {
+      if (!e?.id || seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    });
   }, [sessionActivity, pastActivityFromMessages, storyItems]);
 
   const sessionStats = useMemo(() => {

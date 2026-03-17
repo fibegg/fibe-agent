@@ -13,6 +13,7 @@ Nest Fastify API (project `api`).
 | POST   | /api/auth/login | No    | Body `{ password? }`. Returns `{ success, message?, token? }` or 401       |
 | GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls?, story? }[]` (story = activity timeline for assistant messages)     |
 | GET    | /api/activity   | Bearer| Returns array of stored activities `{ id, created_at, story }[]` (whole story per response, same shape as in `activity.json`)            |
+| GET    | /api/activity/by-entry/:entryId | Bearer| Returns the activity that contains the given story entry id (e.g. `act-1773772973309-a3rp0me`). Same response as `GET /api/activity/:id`. 404 if not found. |
 | GET    | /api/activity/:id | Bearer| Returns a single activity `{ id, created_at, story }`. 404 if not found. |
 | GET    | /api/uploads/:filename | Bearer | Serves an uploaded file (images, voice, or document attachments).        |
 | POST   | /api/uploads           | Bearer | Upload a file (multipart form field `file`). Returns `{ filename }`. Allowed: images, audio, PDF, Excel, Word, text, CSV, JSON, etc. Blocked: executables and scripts. Max 20MB. |

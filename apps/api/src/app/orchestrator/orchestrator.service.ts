@@ -497,15 +497,23 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private handleSubmitStory(story: StoredStoryEntry[]): void {
-    this.messageStore.setStoryForLastAssistant(story);
     if (this.currentActivityId) {
-      this.activityStore.replaceStory(this.currentActivityId, story);
       const entry = this.activityStore.getById(this.currentActivityId);
-      if (entry) {
-        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry });
+      const backendStory = entry?.story ?? [];
+      const useClientStory = story.length > backendStory.length;
+      const storyToUse = useClientStory ? story : backendStory;
+      if (useClientStory && entry) {
+        this.activityStore.replaceStory(this.currentActivityId, story);
+      }
+      this.messageStore.setStoryForLastAssistant(storyToUse);
+      this.messageStore.setActivityIdForLastAssistant(this.currentActivityId);
+      const finalEntry = this.activityStore.getById(this.currentActivityId);
+      if (finalEntry) {
+        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry: finalEntry });
       }
       this.currentActivityId = null;
     } else {
+      this.messageStore.setStoryForLastAssistant(story);
       const entry = this.activityStore.append(story);
       this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
     }
