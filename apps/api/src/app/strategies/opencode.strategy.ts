@@ -201,7 +201,8 @@ export class OpencodeStrategy implements AgentStrategy {
       let lineBuffer = '';
 
       /** Strip ANSI escape sequences so sidebar output is clean. */
-      const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '');
+      // eslint-disable-next-line no-control-regex
+      const stripAnsi = (s: string) => s.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '');
 
       opencodeProcess.stdout?.on('data', (data: Buffer | string) => {
         // OpenCode --format json outputs NDJSON (one JSON object per line)

@@ -88,6 +88,6 @@ describe('toolUseToEvent', () => {
       { command: 'echo', args: ['hello'] }
     );
     expect(event.details).toBeDefined();
-    expect(JSON.parse(event.details!)).toEqual({ command: 'echo', args: ['hello'] });
+    expect(JSON.parse(event.details as string)).toEqual({ command: 'echo', args: ['hello'] });
   });
 });

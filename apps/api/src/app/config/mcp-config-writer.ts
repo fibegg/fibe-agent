@@ -36,7 +36,8 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   }
 
   // Streamable-HTTP server — use mcp-remote proxy
-  const args = ['-y', 'mcp-remote', entry.serverUrl!];
+  const url = entry.serverUrl ?? '';
+  const args = ['-y', 'mcp-remote', url];
   if (entry.serverUrl && !entry.serverUrl.startsWith('https://')) {
     args.push('--allow-http');
   }

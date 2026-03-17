@@ -57,7 +57,7 @@ describe('GithubTokenRefreshService', () => {
       );
 
       // Verify MCP_CONFIG_JSON was updated
-      const config = JSON.parse(process.env.MCP_CONFIG_JSON!);
+      const config = JSON.parse(process.env.MCP_CONFIG_JSON as string);
       expect(config.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
         'ghs_fresh_token'
       );
@@ -143,7 +143,7 @@ describe('GithubTokenRefreshService', () => {
     try {
       await service.refreshToken();
 
-      const config = JSON.parse(process.env.MCP_CONFIG_JSON!);
+      const config = JSON.parse(process.env.MCP_CONFIG_JSON as string);
       expect(config.mcpServers['playgrounds-dev'].serverUrl).toBe(
         'https://test/mcp'
       );

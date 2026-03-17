@@ -251,8 +251,9 @@ export class OrchestratorService implements OnModuleInit {
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
 
     let systemPrompt = '';
-    if (this.config.getSystemPrompt()) {
-      systemPrompt = this.config.getSystemPrompt()!;
+    const configSystemPrompt = this.config.getSystemPrompt();
+    if (configSystemPrompt) {
+      systemPrompt = configSystemPrompt;
     } else if (this.cachedSystemPromptFromFile !== null) {
       systemPrompt = this.cachedSystemPromptFromFile;
     }

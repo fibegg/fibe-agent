@@ -94,7 +94,9 @@ describe('UploadsService', () => {
     const buf = Buffer.from('pdf content');
     const filename = await service.saveFileFromBuffer(buf, 'application/pdf');
     expect(filename).toMatch(/\.pdf$/);
-    expect(readFileSync(service.getPath(filename)!)).toEqual(buf);
+    const filePath = service.getPath(filename);
+    expect(filePath).toBeDefined();
+    expect(readFileSync(filePath as string)).toEqual(buf);
   });
 
   test('saveFileFromBuffer uses correct extension for spreadsheet and text', async () => {

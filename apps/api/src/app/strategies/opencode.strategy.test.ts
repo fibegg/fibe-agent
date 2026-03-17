@@ -8,7 +8,7 @@ import type { AuthConnection, LogoutConnection } from './strategy.types';
 const TEST_HOME = join(tmpdir(), `opencode-test-home-${process.pid}`);
 
 describe('OpencodeStrategy', () => {
-  let oldHome: string | undefined;
+  let _oldHome: string | undefined;
   const savedEnv: Record<string, string | undefined> = {};
 
   // Keys we may set/clear during tests
