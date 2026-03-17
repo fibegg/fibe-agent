@@ -55,6 +55,14 @@ describe('OrchestratorService', () => {
         void payload;
       },
     } as unknown as import('../phoenix-sync/phoenix-sync.service').PhoenixSyncService;
+    const chatPromptContext = {
+      buildFullPrompt: async (
+        text: string,
+        _imageUrls: string[],
+        _audioFilename: string | null,
+        _attachmentFilenames?: string[],
+      ) => text.trim(),
+    } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -63,7 +71,8 @@ describe('OrchestratorService', () => {
       strategyRegistry,
       uploadsService,
       playgroundsService,
-      phoenixSync
+      phoenixSync,
+      chatPromptContext,
     );
     await orch.onModuleInit();
     return orch;

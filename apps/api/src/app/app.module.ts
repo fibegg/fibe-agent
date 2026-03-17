@@ -15,6 +15,7 @@ import { MessagesController } from './messages/messages.controller';
 import { ModelStoreService } from './model-store/model-store.service';
 import { ModelOptionsController } from './model-options/model-options.controller';
 import { OrchestratorService } from './orchestrator/orchestrator.service';
+import { ChatPromptContextService } from './orchestrator/chat-prompt-context.service';
 import { StrategyRegistryService } from './strategies/strategy-registry.service';
 import { UploadsController } from './uploads/uploads.controller';
 import { UploadsService } from './uploads/uploads.service';
@@ -52,6 +53,7 @@ import { GithubTokenRefreshService } from './github-token-refresh/github-token-r
     ModelStoreService,
     StrategyRegistryService,
     OrchestratorService,
+    ChatPromptContextService,
     UploadsService,
     PlaygroundsService,
     PlaygroundWatcherService,

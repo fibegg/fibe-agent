@@ -1,7 +1,9 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "outDir": "dist",
+    "paths": { "@shared/*": ["../../shared/*"] },
     "module": "nodenext",
     "types": ["node"],
     "rootDir": "src",

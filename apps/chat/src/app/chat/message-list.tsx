@@ -2,7 +2,7 @@ import { useVirtualizer } from '@tanstack/react-virtual';
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import { RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
-import { API_PATHS } from '../api-paths';
+import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
 import { FileIcon } from '../file-icon';
 import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
 import { ThinkingAvatar, ThinkingState } from './thinking-state';
@@ -103,7 +103,7 @@ function formatTime(iso: string): string {
 }
 
 function getUploadSrc(filename: string): string {
-  const path = buildApiUrl(`${API_PATHS.UPLOADS}/${encodeURIComponent(filename)}`);
+  const path = buildApiUrl(API_PATH_UPLOADS_BY_FILENAME(filename));
   const token = getAuthTokenForRequest();
   return token ? `${path}?token=${encodeURIComponent(token)}` : path;
 }

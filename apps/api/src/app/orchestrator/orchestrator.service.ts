@@ -31,6 +31,7 @@ import {
 } from '../ws.constants';
 
 import { writeMcpConfig } from '../config/mcp-config-writer';
+import { ChatPromptContextService } from './chat-prompt-context.service';
 
 export interface OutboundEvent {
   type: string;
@@ -56,7 +57,8 @@ export class OrchestratorService implements OnModuleInit {
     private readonly strategyRegistry: StrategyRegistryService,
     private readonly uploadsService: UploadsService,
     private readonly playgroundsService: PlaygroundsService,
-    private readonly phoenixSync: PhoenixSyncService
+    private readonly phoenixSync: PhoenixSyncService,
+    private readonly chatPromptContext: ChatPromptContextService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
   }
@@ -285,59 +287,12 @@ export class OrchestratorService implements OnModuleInit {
       systemPrompt = this.cachedSystemPromptFromFile;
     }
 
-    let imageContext = '';
-    if (imageUrls.length) {
-      const paths = imageUrls
-        .map((f) => this.uploadsService.getPath(f))
-        .filter((p): p is string => p !== null);
-      imageContext = paths.length
-        ? `\n\nThe user attached ${paths.length} image(s). Full paths (for reference):\n${paths.map((p) => `- ${p}`).join('\n')}\n\n`
-        : '';
-    }
-
-    let voiceContext = '';
-    if (audioFilename) {
-      const path = this.uploadsService.getPath(audioFilename);
-      voiceContext = path ? `\n\nThe user attached a voice recording. File path: ${path}\n\n` : '';
-    }
-
-    let attachmentContext = '';
-    if (attachmentFilenames?.length) {
-      const paths = attachmentFilenames
-        .map((f) => this.uploadsService.getPath(f))
-        .filter((p): p is string => p !== null);
-      attachmentContext =
-        paths.length > 0
-          ? `\n\nThe user attached ${paths.length} file(s). Full paths (for reference):\n${paths.map((p) => `- ${p}`).join('\n')}\n\n`
-          : '';
-    }
-
-    const atPathRegex = /@([^\s@]+)/g;
-    const atPaths = [...new Set((text.match(atPathRegex) ?? []).map((m) => m.slice(1)))];
-    let fileContext = '';
-    if (atPaths.length) {
-      const blocks: string[] = [];
-      for (const relPath of atPaths) {
-        try {
-          const content = await this.playgroundsService.getFileContent(relPath);
-          blocks.push(`--- ${relPath} ---\n${content}\n---`);
-        } catch {
-          try {
-            const files = await this.playgroundsService.getFolderFileContents(relPath);
-            for (const { path: p, content } of files) {
-              blocks.push(`--- ${p} ---\n${content}\n---`);
-            }
-          } catch {
-            this.logger.warn(`Playground file or folder not found: ${relPath}`);
-          }
-        }
-      }
-      if (blocks.length) {
-        fileContext = `\n\nThe user referenced the following playground file(s)/folder(s). Contents:\n\n${blocks.join('\n\n')}\n\n`;
-      }
-    }
-
-    const fullPrompt = `${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
+    const fullPrompt = await this.chatPromptContext.buildFullPrompt(
+      text,
+      imageUrls,
+      audioFilename,
+      attachmentFilenames,
+    );
     const model = this.modelStore.get();
 
     const syntheticStepId = 'generating-response';
@@ -368,87 +323,7 @@ export class OrchestratorService implements OnModuleInit {
       timestamp: syntheticStep.timestamp.toISOString(),
     });
 
-    const callbacks: StreamingCallbacks = {
-      onReasoningStart: () => {
-        this._send(WS_EVENT.REASONING_START, {});
-      },
-      onReasoningChunk: (reasoningText) => {
-        this.reasoningTextAccumulated += reasoningText;
-        this._send(WS_EVENT.REASONING_CHUNK, { text: reasoningText });
-      },
-      onReasoningEnd: () => {
-        this._send(WS_EVENT.REASONING_END, {});
-        if (this.currentActivityId && this.reasoningTextAccumulated.trim()) {
-          const entry: StoredStoryEntry = {
-            id: randomUUID(),
-            type: 'reasoning_start',
-            message: 'Reasoning',
-            timestamp: new Date().toISOString(),
-            details: this.reasoningTextAccumulated.trim(),
-          };
-          this.activityStore.appendEntry(this.currentActivityId, entry);
-        }
-        this.reasoningTextAccumulated = '';
-      },
-      onStep: (step) => {
-        this._send(WS_EVENT.THINKING_STEP, {
-          id: step.id,
-          title: step.title,
-          status: step.status,
-          details: step.details,
-          timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : step.timestamp,
-        });
-        if (this.currentActivityId) {
-          const entry: StoredStoryEntry = {
-            id: step.id,
-            type: 'step',
-            message: step.title,
-            timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : String(step.timestamp),
-            details: step.details,
-          };
-          this.activityStore.appendEntry(this.currentActivityId, entry);
-        }
-      },
-      onTool: (event: ToolEvent) => {
-        if (event.kind === 'file_created') {
-          this._send(WS_EVENT.FILE_CREATED, {
-            name: event.name,
-            path: event.path,
-            summary: event.summary,
-          });
-          if (this.currentActivityId) {
-            const entry: StoredStoryEntry = {
-              id: randomUUID(),
-              type: 'file_created',
-              message: event.summary ?? event.name,
-              timestamp: new Date().toISOString(),
-              path: event.path,
-            };
-            this.activityStore.appendEntry(this.currentActivityId, entry);
-          }
-        } else {
-          this._send(WS_EVENT.TOOL_CALL, {
-            name: event.name,
-            path: event.path,
-            summary: event.summary,
-            command: event.command,
-            details: event.details,
-          });
-          if (this.currentActivityId) {
-            const entry: StoredStoryEntry = {
-              id: randomUUID(),
-              type: 'tool_call',
-              message: event.summary ?? event.name,
-              timestamp: new Date().toISOString(),
-              command: event.command,
-              details: event.details,
-            };
-            this.activityStore.appendEntry(this.currentActivityId, entry);
-          }
-        }
-      },
-    };
-
+    const callbacks = this.buildStreamingCallbacks();
     let accumulated = '';
 
     try {
@@ -468,6 +343,83 @@ export class OrchestratorService implements OnModuleInit {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  private buildStreamingCallbacks(): StreamingCallbacks {
+    return {
+      onReasoningStart: () => this._send(WS_EVENT.REASONING_START, {}),
+      onReasoningChunk: (reasoningText) => {
+        this.reasoningTextAccumulated += reasoningText;
+        this._send(WS_EVENT.REASONING_CHUNK, { text: reasoningText });
+      },
+      onReasoningEnd: () => {
+        this._send(WS_EVENT.REASONING_END, {});
+        if (this.currentActivityId && this.reasoningTextAccumulated.trim()) {
+          this.activityStore.appendEntry(this.currentActivityId, {
+            id: randomUUID(),
+            type: 'reasoning_start',
+            message: 'Reasoning',
+            timestamp: new Date().toISOString(),
+            details: this.reasoningTextAccumulated.trim(),
+          });
+        }
+        this.reasoningTextAccumulated = '';
+      },
+      onStep: (step) => {
+        this._send(WS_EVENT.THINKING_STEP, {
+          id: step.id,
+          title: step.title,
+          status: step.status,
+          details: step.details,
+          timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : step.timestamp,
+        });
+        if (this.currentActivityId) {
+          this.activityStore.appendEntry(this.currentActivityId, {
+            id: step.id,
+            type: 'step',
+            message: step.title,
+            timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : String(step.timestamp),
+            details: step.details,
+          });
+        }
+      },
+      onTool: (event: ToolEvent) => {
+        if (event.kind === 'file_created') {
+          this._send(WS_EVENT.FILE_CREATED, {
+            name: event.name,
+            path: event.path,
+            summary: event.summary,
+          });
+          if (this.currentActivityId) {
+            this.activityStore.appendEntry(this.currentActivityId, {
+              id: randomUUID(),
+              type: 'file_created',
+              message: event.summary ?? event.name,
+              timestamp: new Date().toISOString(),
+              path: event.path,
+            });
+          }
+        } else {
+          this._send(WS_EVENT.TOOL_CALL, {
+            name: event.name,
+            path: event.path,
+            summary: event.summary,
+            command: event.command,
+            details: event.details,
+          });
+          if (this.currentActivityId) {
+            this.activityStore.appendEntry(this.currentActivityId, {
+              id: randomUUID(),
+              type: 'tool_call',
+              message: event.summary ?? event.name,
+              timestamp: new Date().toISOString(),
+              command: event.command,
+              details: event.details,
+            });
+          }
+        }
+      },
+    };
   }
 
   private createAuthConnection(): AuthConnection {
