@@ -130,4 +130,32 @@ describe('ActivityStoreService', () => {
     expect(updated?.story).toHaveLength(1);
     expect(updated?.story?.[0].message).toBe('Started');
   });
+
+  test('getById returns undefined for unknown id', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    expect(service.getById('unknown')).toBeUndefined();
+  });
+
+  test('findByStoryEntryId returns activity containing the story entry', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    const created = service.createWithEntry({
+      id: 's1',
+      type: 'stream_start',
+      message: 'Start',
+      timestamp: '',
+    });
+    service.appendEntry(created.id, { id: 's2', type: 'step', message: 'Step', timestamp: '' });
+    const found = service.findByStoryEntryId('s2');
+    expect(found).toEqual(service.getById(created.id));
+    expect(found?.id).toBe(created.id);
+  });
+
+  test('findByStoryEntryId returns undefined when entry not in any activity', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
+    expect(service.findByStoryEntryId('other')).toBeUndefined();
+  });
 });

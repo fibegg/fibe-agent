@@ -320,7 +320,11 @@ function flattenAllStories(activities: ActivityReviewData[]): StoryEntryWithActi
 }
 
 export function ActivityReviewPage() {
-  const { activityStoryId } = useParams<{ activityStoryId?: string }>();
+  const { activityId: routeActivityId, storyId: routeStoryId, activityStoryId } = useParams<{
+    activityId?: string;
+    storyId?: string;
+    activityStoryId?: string;
+  }>();
   const navigate = useNavigate();
   const [activities, setActivities] = useState<ActivityReviewData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -359,17 +363,26 @@ export function ActivityReviewPage() {
   }, [filteredStories, selectedIndex]);
 
   useEffect(() => {
-    if (!activityStoryId || filteredStories.length === 0) return;
-    if (isActivityId(activityStoryId)) {
+    if (filteredStories.length === 0) return;
+    if (routeActivityId && routeStoryId) {
       const idx = filteredStories.findIndex(
-        (s) => (s as StoryEntryWithActivity)._activityId === activityStoryId
+        (s) => (s as StoryEntryWithActivity)._activityId === routeActivityId && s.id === routeStoryId
       );
       if (idx !== -1) setSelectedIndex(idx);
       return;
     }
-    const idx = filteredStories.findIndex((s) => s.id === activityStoryId);
+    const single = routeActivityId ?? routeStoryId ?? activityStoryId;
+    if (!single) return;
+    if (isActivityId(single)) {
+      const idx = filteredStories.findIndex(
+        (s) => (s as StoryEntryWithActivity)._activityId === single
+      );
+      if (idx !== -1) setSelectedIndex(idx);
+      return;
+    }
+    const idx = filteredStories.findIndex((s) => s.id === single);
     if (idx !== -1) setSelectedIndex(idx);
-  }, [activityStoryId, filteredStories]);
+  }, [routeActivityId, routeStoryId, activityStoryId, filteredStories]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -378,8 +391,11 @@ export function ActivityReviewPage() {
   const handleSelectStory = useCallback(
     (index: number) => {
       setSelectedIndex(index);
-      const story = filteredStories[index];
-      if (story?.id) navigate(`/activity/${story.id}`);
+      const story = filteredStories[index] as StoryEntryWithActivity | undefined;
+      if (!story?.id) return;
+      const aid = story._activityId;
+      if (aid) navigate(`/activity/${aid}/${story.id}`);
+      else navigate(`/activity/${story.id}`);
     },
     [filteredStories, navigate]
   );
@@ -410,7 +426,7 @@ export function ActivityReviewPage() {
     let cancelled = false;
     setLoading(true);
     setError(null);
-    apiRequest(API_PATHS.ACTIVITY)
+    apiRequest(API_PATHS.ACTIVITIES)
       .then(async (res) => {
         if (cancelled) return;
         if (!res.ok) {
@@ -436,7 +452,7 @@ export function ActivityReviewPage() {
   useEffect(() => {
     if (loading) return;
     const poll = () => {
-      apiRequest(API_PATHS.ACTIVITY)
+      apiRequest(API_PATHS.ACTIVITIES)
         .then(async (res) => {
           if (!res.ok) return;
           const data = (await res.json()) as ActivityReviewData[];

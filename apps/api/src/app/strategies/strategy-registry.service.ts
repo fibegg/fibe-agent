@@ -12,6 +12,7 @@ const PROVIDER_NAMES = [
   'claude-code',
   'openai-codex',
   'opencode',
+  'opencodex',
 ] as const;
 
 const DEFAULT_PROVIDER = 'claude-code';
@@ -33,6 +34,7 @@ export class StrategyRegistryService {
       case 'openai-codex':
         return new OpenaiCodexStrategy();
       case 'opencode':
+      case 'opencodex':
         return new OpencodeStrategy();
       default:
         throw new Error(

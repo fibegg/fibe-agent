@@ -12,16 +12,17 @@ Nest Fastify API (project `api`).
 | GET    | /api/health     | No    | Health check. Returns `{ status: 'ok' }`. Use for readiness/liveness probes. |
 | POST   | /api/auth/login | No    | Body `{ password? }`. Returns `{ success, message?, token? }` or 401       |
 | GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls?, story? }[]` (story = activity timeline for assistant messages)     |
-| GET    | /api/activity   | Bearer| Returns array of stored activities `{ id, created_at, story }[]` (whole story per response, same shape as in `activity.json`)            |
-| GET    | /api/activity/by-entry/:entryId | Bearer| Returns the activity that contains the given story entry id (e.g. `act-1773772973309-a3rp0me`). Same response as `GET /api/activity/:id`. 404 if not found. |
-| GET    | /api/activity/:id | Bearer| Returns a single activity `{ id, created_at, story }`. 404 if not found. |
+| GET    | /api/activities | Bearer| Returns array of stored activities `{ id, created_at, story }[]` (whole story per activity, same shape as in `activity.json`).            |
+| GET    | /api/activities/by-entry/:entryId | Bearer| Returns the activity that contains the given story entry id (e.g. `act-1773772973309-a3rp0me`). Same response as `GET /api/activities/:activityId`. 404 if not found. |
+| GET    | /api/activities/:activityId | Bearer| Returns a single activity `{ id, created_at, story }`. 404 if not found.   |
+| GET    | /api/activities/:activityId/:storyId | Bearer| Returns the activity; 404 if activity not found or story entry is not in that activity. Use for deep links to a specific story within an activity. |
 | GET    | /api/uploads/:filename | Bearer | Serves an uploaded file (images, voice, or document attachments).        |
 | POST   | /api/uploads           | Bearer | Upload a file (multipart form field `file`). Returns `{ filename }`. Allowed: images, audio, PDF, Excel, Word, text, CSV, JSON, etc. Blocked: executables and scripts. Max 20MB. |
 | GET    | /api/model-options | Bearer | Returns string array of model names from `MODEL_OPTIONS` env                |
 | GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
 | GET    | /api/playgrounds/file | Bearer | Query `path` = relative path. Returns `{ content: string }`; 404 if not found or not a file. |
 
-When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activity`, `GET /api/model-options`, `GET /api/playgrounds`, and `GET /api/playgrounds/file` require `Authorization: Bearer <password>` or `?token=<password>`.
+When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, and `GET /api/playgrounds/file` require `Authorization: Bearer <password>` or `?token=<password>`.
 
 ## Container logging
 
