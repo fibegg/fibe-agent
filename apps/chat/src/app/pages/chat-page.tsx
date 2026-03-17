@@ -22,6 +22,7 @@ import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
 import { MAIN_CONTENT_MIN_WIDTH_PX, SIDEBAR_COLLAPSED_WIDTH_PX, SIDEBAR_WIDTH_PX } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
+import { getActivityPath } from '../activity-path';
 import { ChatSettingsModal } from '../chat/chat-settings-modal';
 import { ChatHeader } from '../chat/chat-header';
 import { ChatErrorBanner } from '../chat/chat-error-banner';
@@ -376,7 +377,7 @@ export function ChatPage() {
               sessionActivity={sessionActivity}
               pastActivityFromMessages={pastActivityFromMessages}
               mobileOverlay
-              onActivityClick={(id) => navigate(`/activity/${id}`)}
+              onActivityClick={(payload) => navigate(getActivityPath(payload))}
             />
           </div>
         </>
@@ -532,7 +533,7 @@ export function ChatPage() {
           storyItems={displayStory}
           sessionActivity={sessionActivity}
           pastActivityFromMessages={pastActivityFromMessages}
-          onActivityClick={(id) => navigate(`/activity/${id}`)}
+          onActivityClick={(payload) => navigate(getActivityPath(payload))}
         />
       )}
     </div>
