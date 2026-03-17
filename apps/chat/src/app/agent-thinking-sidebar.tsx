@@ -231,7 +231,7 @@ const ActivityBlock = memo(function ActivityBlock({
   entry: StoryEntry;
   isStreaming: boolean;
   activityId?: string;
-  onActivityClick?: (activityId: string) => void;
+  onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
   lastStreamStartId?: string | null;
   isInCurrentRun?: boolean;
 }) {
@@ -261,7 +261,7 @@ const ActivityBlock = memo(function ActivityBlock({
     isClickable && activityId && onActivityClick ? (
       <button
         type="button"
-        onClick={() => onActivityClick(activityId)}
+        onClick={() => onActivityClick({ activityId, storyId: entry.id })}
         className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
       >
         {node}
@@ -350,7 +350,7 @@ const CommandGroupBlock = memo(function CommandGroupBlock({
   entries: StoryEntry[];
   defaultExpanded?: boolean;
   activityId?: string;
-  onActivityClick?: (activityId: string) => void;
+  onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const n = entries.length;
@@ -395,10 +395,11 @@ const CommandGroupBlock = memo(function CommandGroupBlock({
       )}
     </div>
   );
+  const firstEntryId = entries[0]?.id;
   return isClickable && activityId && onActivityClick ? (
     <button
       type="button"
-      onClick={() => onActivityClick(activityId)}
+      onClick={() => onActivityClick({ activityId, storyId: firstEntryId })}
       className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
     >
       {content}
@@ -419,7 +420,7 @@ interface AgentThinkingSidebarProps {
   sessionActivity?: SessionActivityEntry[];
   pastActivityFromMessages?: SessionActivityEntry[];
   mobileOverlay?: boolean;
-  onActivityClick?: (activityId: string) => void;
+  onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
 }
 
 export function AgentThinkingSidebar({
@@ -1040,7 +1041,7 @@ export function AgentThinkingSidebar({
               latestActivityId && onActivityClick ? (
                 <button
                   type="button"
-                  onClick={() => onActivityClick(latestActivityId)}
+                  onClick={() => onActivityClick({ activityId: latestActivityId })}
                   className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
                 >
                   <div

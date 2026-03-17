@@ -430,4 +430,105 @@ describe('AgentThinkingSidebar', () => {
     expect(summary).toBeTruthy();
     expect(summary?.classList.contains('overflow-y-auto')).toBe(true);
   });
+
+  it('calls onActivityClick with activityId and storyId when clicking a session activity entry', () => {
+    const onActivityClick = vi.fn();
+    const sessionActivity = [
+      {
+        id: 'act-uuid-1',
+        created_at: new Date().toISOString(),
+        story: [
+          { id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+          { id: 's2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'ls' },
+        ],
+      },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+        onActivityClick={onActivityClick}
+      />
+    );
+    const lsButton = screen.getByText('ls').closest('button');
+    fireEvent.click(lsButton!);
+    expect(onActivityClick).toHaveBeenCalledTimes(1);
+    expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'act-uuid-1', storyId: 's2' });
+  });
+
+  it('calls onActivityClick with activityId and storyId when clicking stream_start entry in list', () => {
+    const onActivityClick = vi.fn();
+    const sessionActivity = [
+      {
+        id: 'latest-act',
+        created_at: new Date().toISOString(),
+        story: [
+          { id: 'e1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+        ],
+      },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+        isStreaming
+        onActivityClick={onActivityClick}
+      />
+    );
+    const thinkingButtons = screen.getAllByText('Thinking...');
+    const listEntryButton = thinkingButtons[0].closest('button');
+    fireEvent.click(listEntryButton!);
+    expect(onActivityClick).toHaveBeenCalledTimes(1);
+    expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'latest-act', storyId: 'e1' });
+  });
+
+  it('calls onActivityClick with activityId only when clicking bottom reasoning block', () => {
+    const onActivityClick = vi.fn();
+    const sessionActivity = [
+      {
+        id: 'act-1',
+        created_at: new Date().toISOString(),
+        story: [
+          { id: 'e1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+        ],
+      },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+        reasoningText="Current reasoning content"
+        onActivityClick={onActivityClick}
+      />
+    );
+    const reasoningButton = screen.getByText(/Current reasoning content/).closest('button');
+    fireEvent.click(reasoningButton!);
+    expect(onActivityClick).toHaveBeenCalledTimes(1);
+    expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'act-1' });
+  });
+
+  it('calls onActivityClick with activityId and storyId when clicking command group wrapper', () => {
+    const onActivityClick = vi.fn();
+    const storyItems = [
+      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
+      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
+      { id: '3', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo c' },
+    ];
+    render(
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+        onActivityClick={onActivityClick}
+      />
+    );
+    const innerExpandButton = screen.getByText(/3 commands/).closest('button');
+    const outerWrapperButton = innerExpandButton?.parentElement?.parentElement as HTMLButtonElement;
+    fireEvent.click(outerWrapperButton);
+    expect(onActivityClick).toHaveBeenCalledTimes(1);
+    expect(onActivityClick).toHaveBeenCalledWith({ activityId: '1', storyId: '1' });
+  });
 });
