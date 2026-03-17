@@ -4,7 +4,7 @@ import { RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { API_PATHS } from '../api-paths';
 import { FileIcon } from '../file-icon';
-import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
+import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
 import { ThinkingAvatar, ThinkingState } from './thinking-state';
 import {
   AVATAR_ASSISTANT,
@@ -22,27 +22,32 @@ function MentionChipIcon({ path }: { path: string }) {
 }
 
 function MessageBodyWithMentions({ body }: { body: string }) {
-  const parts = body.split(AT_MENTION_REGEX);
+  const parts = parseMessageBodyParts(body);
   return (
-    <span className="whitespace-pre-wrap text-sm leading-relaxed inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
       {parts.map((part, i) => {
-        const match = part.match(/^@([^\s@]+)$/);
-        if (match) {
-          const path = match[1];
+        if (part.type === 'mention') {
           return (
             <span
-              key={`${i}-${path}`}
+              key={`${i}-${part.path}`}
               className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium bg-white/20 border border-white/30 text-violet-100 shadow-sm"
-              title={path}
+              title={part.path}
             >
-              <MentionChipIcon path={path} />
-              <span className="truncate max-w-[120px] sm:max-w-[160px]">{pathDisplayName(path)}</span>
+              <MentionChipIcon path={part.path} />
+              <span className="truncate max-w-[120px] sm:max-w-[160px]">{pathDisplayName(part.path)}</span>
             </span>
           );
         }
-        return <span key={i}>{part}</span>;
+        if (!part.content) return null;
+        return (
+          <span
+            key={i}
+            className={`${PROSE_MESSAGE} [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1`}
+            dangerouslySetInnerHTML={{ __html: renderMarkdown(part.content) }}
+          />
+        );
       })}
-    </span>
+    </div>
   );
 }
 

@@ -1,7 +1,5 @@
-import rootPackageJson from '../../../../package.json';
-
 const REPO_URL = 'https://github.com/playgroundsHQ/phoenix-agent-oauth';
-const VERSION = `v${rootPackageJson.version}`;
+const VERSION = `v${__APP_VERSION__}`;
 
 const VIOLET = '#7c3aed';
 const CYAN = '#22d3ee';

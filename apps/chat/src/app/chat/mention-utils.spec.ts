@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isLikelyFile, pathDisplayName } from './mention-utils';
+import { isLikelyFile, parseMessageBodyParts, pathDisplayName } from './mention-utils';
 
 describe('pathDisplayName', () => {
   it('returns last path segment for path with slashes', () => {
@@ -35,6 +35,26 @@ describe('isLikelyFile', () => {
 
   it('returns false for path with unknown extension', () => {
     expect(isLikelyFile('file.xyz')).toBe(false);
+  });
+});
+
+describe('parseMessageBodyParts', () => {
+  it('returns single text part when body has no mention at start or after whitespace', () => {
+    const body = "import js from '@eslint/js'";
+    expect(parseMessageBodyParts(body)).toEqual([{ type: 'text', content: body }]);
+  });
+
+  it('splits mention after whitespace and keeps code with @ as text', () => {
+    const body = "Check @apps/readme and from '@pkg/name'";
+    expect(parseMessageBodyParts(body)).toEqual([
+      { type: 'text', content: 'Check ' },
+      { type: 'mention', path: 'apps/readme' },
+      { type: 'text', content: " and from '@pkg/name'" },
+    ]);
+  });
+
+  it('treats @ at start of string as mention', () => {
+    expect(parseMessageBodyParts('@foo/bar')).toEqual([{ type: 'mention', path: 'foo/bar' }]);
   });
 });
 
