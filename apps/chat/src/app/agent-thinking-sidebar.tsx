@@ -20,8 +20,11 @@ import {
   type StoryEntry,
 } from './agent-thinking-utils';
 import {
-  parseThinkingSegments,
+  parseThinkingSegmentsWithAgreement,
   SUSPICIOUS_TOOLTIP,
+  AGREEMENT_TOOLTIP,
+  UNCERTAINTY_TOOLTIP,
+  QUESTION_TOOLTIP,
 } from './thinking-failure-patterns';
 import {
   ACTIVITY_BLOCK_BASE,
@@ -163,6 +166,12 @@ const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_cre
 
 const SUSPICIOUS_SEGMENT_CLASS =
   'bg-amber-500/25 text-amber-200 border-b border-amber-500/50 rounded-sm px-0.5';
+const AGREEMENT_SEGMENT_CLASS =
+  'bg-emerald-500/25 text-emerald-200 border-b border-emerald-500/50 rounded-sm px-0.5';
+const UNCERTAINTY_SEGMENT_CLASS =
+  'bg-amber-400/20 text-amber-100 border-b border-amber-400/40 rounded-sm px-0.5';
+const QUESTION_SEGMENT_CLASS =
+  'bg-sky-500/25 text-sky-200 border-b border-sky-500/50 rounded-sm px-0.5';
 
 const ThinkingTextWithHighlights = memo(function ThinkingTextWithHighlights({
   text,
@@ -171,23 +180,37 @@ const ThinkingTextWithHighlights = memo(function ThinkingTextWithHighlights({
   text: string;
   className?: string;
 }) {
-  const segments = useMemo(() => parseThinkingSegments(text), [text]);
+  const segments = useMemo(() => parseThinkingSegmentsWithAgreement(text), [text]);
   if (segments.length === 0) return null;
   return (
     <span className={className}>
-      {segments.map((seg, i) =>
-        seg.suspicious ? (
-          <mark
-            key={i}
-            className={SUSPICIOUS_SEGMENT_CLASS}
-            title={SUSPICIOUS_TOOLTIP}
-          >
-            {seg.text}
-          </mark>
-        ) : (
-          <span key={i}>{seg.text}</span>
-        )
-      )}
+      {segments.map((seg, i) => {
+        if (seg.kind === 'suspicious')
+          return (
+            <mark key={i} className={SUSPICIOUS_SEGMENT_CLASS} title={SUSPICIOUS_TOOLTIP}>
+              {seg.text}
+            </mark>
+          );
+        if (seg.kind === 'agreement')
+          return (
+            <mark key={i} className={AGREEMENT_SEGMENT_CLASS} title={AGREEMENT_TOOLTIP}>
+              {seg.text}
+            </mark>
+          );
+        if (seg.kind === 'uncertainty')
+          return (
+            <mark key={i} className={UNCERTAINTY_SEGMENT_CLASS} title={UNCERTAINTY_TOOLTIP}>
+              {seg.text}
+            </mark>
+          );
+        if (seg.kind === 'question')
+          return (
+            <mark key={i} className={QUESTION_SEGMENT_CLASS} title={QUESTION_TOOLTIP}>
+              {seg.text}
+            </mark>
+          );
+        return <span key={i}>{seg.text}</span>;
+      })}
     </span>
   );
 });
