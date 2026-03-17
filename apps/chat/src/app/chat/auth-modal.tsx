@@ -17,13 +17,14 @@ interface AuthModalProps {
 export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalProps) {
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!open) return null;
 
   const showUrl = authModal.authUrl && !authModal.isManualToken;
   const isDeviceCode = Boolean(authModal.deviceCode && !authModal.isManualToken);
   const codeLabel = authModal.isManualToken
-    ? 'Paste Claude Code OAuth Token'
+    ? 'Paste API Key or Token'
     : isDeviceCode
       ? 'One-time device code'
       : 'Paste authorization code';
@@ -37,7 +38,24 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
     setSubmitting(true);
     onSubmitCode(value);
     setCode('');
-    setSubmitting(false);
+    /* Keep submitting=true until modal closes via auth_success */
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && showSubmit) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const handleCopyDeviceCode = async () => {
+    const text = authModal.deviceCode ?? '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
   };
 
   return (
@@ -87,15 +105,35 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
             <label htmlFor="auth-code" className="block text-xs sm:text-sm font-medium text-foreground">
               {codeLabel}
             </label>
-            <input
-              id="auth-code"
-              type="text"
-              value={codeValue}
-              readOnly={readOnly}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Paste code here..."
-              className={INPUT_ROUNDED}
-            />
+            {authModal.isManualToken && (
+              <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                Enter your provider API key (e.g. ANTHROPIC_API_KEY, GEMINI_API_KEY) or OAuth token.
+              </p>
+            )}
+            <div className="relative">
+              <input
+                id="auth-code"
+                type={authModal.isManualToken ? 'password' : 'text'}
+                value={codeValue}
+                readOnly={readOnly}
+                onChange={(e) => setCode(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={authModal.isManualToken ? 'sk-...' : 'Paste code here...'}
+                className={INPUT_ROUNDED}
+                autoComplete="off"
+                autoFocus
+              />
+              {isDeviceCode && (
+                <button
+                  type="button"
+                  onClick={handleCopyDeviceCode}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                  title="Copy device code"
+                >
+                  {copied ? '✓ Copied' : 'Copy'}
+                </button>
+              )}
+            </div>
             {showSubmit && (
               <button
                 type="button"
@@ -103,7 +141,14 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 disabled={submitting}
                 className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-violet-500/20 disabled:opacity-50`}
               >
-                {submitting ? 'Submitting...' : 'Submit'}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Connecting…
+                  </span>
+                ) : (
+                  'Submit'
+                )}
               </button>
             )}
           </div>
