@@ -10,6 +10,13 @@ import {
   getBlockVariant,
   type StoryEntry,
 } from '../agent-thinking-utils';
+import {
+  parseThinkingSegmentsWithAgreement,
+  SUSPICIOUS_TOOLTIP,
+  AGREEMENT_TOOLTIP,
+  UNCERTAINTY_TOOLTIP,
+  QUESTION_TOOLTIP,
+} from '../thinking-failure-patterns';
 import { formatRelativeTime } from '../format-relative-time';
 import {
   MAIN_CONTENT_MIN_WIDTH_PX,
@@ -39,6 +46,14 @@ const ACTIVITY_POLL_INTERVAL_MS = 4000;
 const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
 
 const HIGHLIGHT_MARK_CLASS = 'bg-amber-400/40 text-amber-950 dark:bg-amber-400/50 dark:text-amber-100 rounded px-0.5';
+const SUSPICIOUS_SEGMENT_CLASS =
+  'bg-amber-500/25 text-amber-200 border-b border-amber-500/50 rounded-sm px-0.5';
+const AGREEMENT_SEGMENT_CLASS =
+  'bg-emerald-500/25 text-emerald-200 border-b border-emerald-500/50 rounded-sm px-0.5';
+const UNCERTAINTY_SEGMENT_CLASS =
+  'bg-amber-400/20 text-amber-100 border-b border-amber-400/40 rounded-sm px-0.5';
+const QUESTION_SEGMENT_CLASS =
+  'bg-sky-500/25 text-sky-200 border-b border-sky-500/50 rounded-sm px-0.5';
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -57,6 +72,43 @@ function highlightText(text: string, query: string): React.ReactNode {
     ) : (
       part
     )
+  );
+}
+
+function reasoningBodyWithHighlights(details: string, query: string): React.ReactNode {
+  const segments = parseThinkingSegmentsWithAgreement(details);
+  if (segments.length === 0) return details;
+  return (
+    <>
+      {segments.map((seg, i) => {
+        const inner = highlightText(seg.text, query);
+        if (seg.kind === 'suspicious')
+          return (
+            <mark key={i} className={SUSPICIOUS_SEGMENT_CLASS} title={SUSPICIOUS_TOOLTIP}>
+              {inner}
+            </mark>
+          );
+        if (seg.kind === 'agreement')
+          return (
+            <mark key={i} className={AGREEMENT_SEGMENT_CLASS} title={AGREEMENT_TOOLTIP}>
+              {inner}
+            </mark>
+          );
+        if (seg.kind === 'uncertainty')
+          return (
+            <mark key={i} className={UNCERTAINTY_SEGMENT_CLASS} title={UNCERTAINTY_TOOLTIP}>
+              {inner}
+            </mark>
+          );
+        if (seg.kind === 'question')
+          return (
+            <mark key={i} className={QUESTION_SEGMENT_CLASS} title={QUESTION_TOOLTIP}>
+              {inner}
+            </mark>
+          );
+        return <span key={i}>{inner}</span>;
+      })}
+    </>
   );
 }
 
@@ -187,7 +239,7 @@ function ResponseDetail({ entry, highlightQuery }: { entry: StoryEntry; highligh
       {isThinkingBlock ? (
         <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-[70vh] overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO} whitespace-pre-wrap`}>
-            {highlightText(entry.details ?? '', q)}
+            {reasoningBodyWithHighlights(entry.details ?? '', q)}
           </p>
         </div>
       ) : (

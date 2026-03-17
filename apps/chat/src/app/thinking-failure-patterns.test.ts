@@ -1,4 +1,11 @@
-import { parseThinkingSegments, SUSPICIOUS_TOOLTIP } from './thinking-failure-patterns';
+import {
+  parseThinkingSegments,
+  parseThinkingSegmentsWithAgreement,
+  SUSPICIOUS_TOOLTIP,
+  AGREEMENT_TOOLTIP,
+  UNCERTAINTY_TOOLTIP,
+  QUESTION_TOOLTIP,
+} from './thinking-failure-patterns';
 
 describe('parseThinkingSegments', () => {
   it('returns single non-suspicious segment when no patterns match', () => {
@@ -54,5 +61,83 @@ describe('SUSPICIOUS_TOOLTIP', () => {
   it('is a non-empty string', () => {
     expect(typeof SUSPICIOUS_TOOLTIP).toBe('string');
     expect(SUSPICIOUS_TOOLTIP.length).toBeGreaterThan(0);
+  });
+});
+
+describe('parseThinkingSegmentsWithAgreement', () => {
+  it('returns single normal segment when no patterns match', () => {
+    const out = parseThinkingSegmentsWithAgreement('User wants to get Github username.');
+    expect(out).toEqual([{ text: 'User wants to get Github username.', kind: 'normal' }]);
+  });
+
+  it('marks "good point" as agreement', () => {
+    const out = parseThinkingSegmentsWithAgreement('Good point, we should do that.');
+    expect(out.some((s) => s.kind === 'agreement' && s.text.toLowerCase().includes('good point'))).toBe(
+      true
+    );
+  });
+
+  it('marks "you\'re right" and "makes sense" as agreement', () => {
+    const out = parseThinkingSegmentsWithAgreement("You're right. That makes sense.");
+    expect(out.some((s) => s.kind === 'agreement')).toBe(true);
+  });
+
+  it('marks error as suspicious', () => {
+    const out = parseThinkingSegmentsWithAgreement('Error connecting.');
+    expect(out.some((s) => s.kind === 'suspicious' && s.text.toLowerCase().includes('error'))).toBe(
+      true
+    );
+  });
+
+  it('suspicious wins over agreement when overlapping', () => {
+    const out = parseThinkingSegmentsWithAgreement('Good point. But authentication fails. Agreed.');
+    const kinds = out.map((s) => s.kind);
+    expect(kinds).toContain('suspicious');
+    expect(kinds).toContain('agreement');
+  });
+
+  it('marks "I\'m not sure" as uncertainty', () => {
+    const out = parseThinkingSegmentsWithAgreement("I'm not sure which approach to take.");
+    expect(out.some((s) => s.kind === 'uncertainty' && s.text.toLowerCase().includes("i'm not sure"))).toBe(
+      true
+    );
+  });
+
+  it('marks "perhaps" and "maybe" as uncertainty', () => {
+    const out = parseThinkingSegmentsWithAgreement('Perhaps we could try. Maybe later.');
+    expect(out.some((s) => s.kind === 'uncertainty')).toBe(true);
+  });
+
+  it('marks "Should I" as question', () => {
+    const out = parseThinkingSegmentsWithAgreement('Should I run the tests first?');
+    expect(out.some((s) => s.kind === 'question' && s.text.toLowerCase().includes('should i'))).toBe(
+      true
+    );
+  });
+
+  it('marks "Would you prefer" as question', () => {
+    const out = parseThinkingSegmentsWithAgreement('Would you prefer option A or B?');
+    expect(out.some((s) => s.kind === 'question')).toBe(true);
+  });
+});
+
+describe('AGREEMENT_TOOLTIP', () => {
+  it('is a non-empty string', () => {
+    expect(typeof AGREEMENT_TOOLTIP).toBe('string');
+    expect(AGREEMENT_TOOLTIP.length).toBeGreaterThan(0);
+  });
+});
+
+describe('UNCERTAINTY_TOOLTIP', () => {
+  it('is a non-empty string', () => {
+    expect(typeof UNCERTAINTY_TOOLTIP).toBe('string');
+    expect(UNCERTAINTY_TOOLTIP.length).toBeGreaterThan(0);
+  });
+});
+
+describe('QUESTION_TOOLTIP', () => {
+  it('is a non-empty string', () => {
+    expect(typeof QUESTION_TOOLTIP).toBe('string');
+    expect(QUESTION_TOOLTIP.length).toBeGreaterThan(0);
   });
 });
