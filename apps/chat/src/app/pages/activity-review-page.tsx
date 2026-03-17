@@ -18,11 +18,13 @@ import {
   QUESTION_TOOLTIP,
 } from '../thinking-failure-patterns';
 import { formatRelativeTime } from '../format-relative-time';
+import { shouldHideThemeSwitch } from '../embed-config';
 import {
   MAIN_CONTENT_MIN_WIDTH_PX,
   PANEL_HEADER_MIN_HEIGHT_PX,
   RIGHT_SIDEBAR_WIDTH_PX,
 } from '../layout-constants';
+import { ThemeToggle } from '../theme-toggle';
 import {
   ACTIVITY_BLOCK_BASE,
   ACTIVITY_BLOCK_VARIANTS,
@@ -31,12 +33,16 @@ import {
   ACTIVITY_LABEL,
   ACTIVITY_MONO,
   ACTIVITY_TIMESTAMP,
+  BUTTON_ICON_ACCENT_SM,
+  CLEAR_BUTTON_POSITION,
   FLEX_ROW_CENTER,
   FLEX_ROW_CENTER_WRAP,
-  CLEAR_BUTTON_POSITION,
   INPUT_SEARCH,
+  MODAL_CARD,
+  MODAL_OVERLAY_DARK,
   SEARCH_ICON_POSITION,
   SEARCH_ROW_WRAPPER,
+  SETTINGS_CLOSE_BUTTON,
   SIDEBAR_HEADER,
   TREE_NODE_BASE,
   TREE_NODE_SELECTED,
@@ -120,6 +126,12 @@ const ACTIVITY_TYPE_FILTERS = [
   'file_created',
   'task_complete',
 ] as const;
+
+function getTypeFilterLabel(key: string | null): string {
+  if (key === 'reasoning') return 'Reasoning';
+  if (key === 'task_complete') return 'Complete';
+  return (getActivityLabel(key ?? '') || key) ?? '';
+}
 
 const BADGE_ACTIVE_STYLES: Record<string, string> = {
   reasoning: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
@@ -291,6 +303,7 @@ export function ActivityReviewPage() {
   const brainButtonRef = useRef<HTMLDivElement>(null);
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   const storyEntries = useMemo((): StoryEntry[] => {
     if (!activity?.story?.length) return [];
@@ -349,6 +362,8 @@ export function ActivityReviewPage() {
       setTimeout(() => setCopyAnimating(false), 2200);
     }
   }, [activity, copyAnimating]);
+
+  const closeSettings = useCallback(() => setSettingsOpen(false), []);
 
   useEffect(() => {
     if (!id) {
@@ -453,14 +468,18 @@ export function ActivityReviewPage() {
                 <ArrowLeft className="size-4 shrink-0" />
                 <span className="hidden sm:inline">Back</span>
               </Link>
-              <Link
-                to="/"
-                className="p-1.5 rounded-md text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 shrink-0"
-                title="Settings"
-                aria-label="Settings"
-              >
-                <Settings className="size-4" />
-              </Link>
+              <div className="flex items-center gap-1 ml-auto shrink-0">
+                <button
+                  type="button"
+                  className={BUTTON_ICON_ACCENT_SM}
+                  title="Settings"
+                  aria-label="Settings"
+                  onClick={() => setSettingsOpen(true)}
+                >
+                  <Settings className="size-3.5 sm:size-4" />
+                </button>
+                {!shouldHideThemeSwitch() && <ThemeToggle />}
+              </div>
             </div>
             <div className={SEARCH_ROW_WRAPPER}>
               <Search className={SEARCH_ICON_POSITION} aria-hidden />
@@ -493,12 +512,7 @@ export function ActivityReviewPage() {
               All
             </button>
             {typeBadges.map((filterKey) => {
-              const label =
-                filterKey === 'reasoning'
-                  ? 'Reasoning'
-                  : filterKey === 'task_complete'
-                    ? 'Complete'
-                    : (getActivityLabel(filterKey) || filterKey);
+              const label = getTypeFilterLabel(filterKey);
               const isActive = typeFilter === filterKey;
               const activeStyle = BADGE_ACTIVE_STYLES[filterKey] ?? 'bg-violet-500/20 text-violet-300 border-violet-500/40';
               const inactiveStyle = BADGE_INACTIVE_STYLES[filterKey] ?? 'hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30';
@@ -521,7 +535,7 @@ export function ActivityReviewPage() {
                   ? 'No responses in this activity.'
                   : activitySearchQuery.trim()
                     ? 'No activity matches your search.'
-                    : `No ${typeFilter === 'reasoning' ? 'Reasoning' : typeFilter === 'task_complete' ? 'Complete' : getActivityLabel(typeFilter || '') || typeFilter || ''} responses.`}
+                    : `No ${getTypeFilterLabel(typeFilter)} responses.`}
               </p>
             ) : (
               filteredEntries.map((entry, index) => (
@@ -634,6 +648,43 @@ export function ActivityReviewPage() {
           </div>
         </main>
       </div>
+      {settingsOpen && (
+        <>
+          <div className={MODAL_OVERLAY_DARK} aria-hidden onClick={closeSettings} />
+          <div
+            className={`fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 ${MODAL_CARD}`}
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="activity-settings-dialog-title"
+          >
+            <div className="flex items-center justify-between p-4 border-b border-border/50">
+              <h2 id="activity-settings-dialog-title" className="text-lg font-semibold text-foreground">
+                Settings
+              </h2>
+              <button
+                type="button"
+                onClick={closeSettings}
+                className={SETTINGS_CLOSE_BUTTON}
+                aria-label="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              {!shouldHideThemeSwitch() && (
+                <div className="flex items-center justify-between py-2">
+                  <span className="text-sm font-medium text-foreground">Dark mode</span>
+                  <ThemeToggle />
+                </div>
+              )}
+              <p className="text-xs text-muted-foreground pt-2">
+                v{__APP_VERSION__}
+              </p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
