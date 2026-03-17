@@ -17,6 +17,32 @@ import {
 import { ASSISTANT_AVATAR_URL, USER_AVATAR_URL } from './chat-avatar';
 import { renderMarkdown } from './markdown-cache';
 
+const prismLoaderPromise = import('../file-explorer/prism-loader');
+
+function highlightPrismInElement(container: HTMLElement): void {
+  const codes = container.querySelectorAll('pre code[class*="language-"]');
+  if (codes.length === 0) return;
+  prismLoaderPromise.then((m) => {
+    codes.forEach((el) => {
+      try {
+        m.highlightCodeElement(el as HTMLElement);
+      } catch {
+        // leave content as plain text if highlighting fails
+      }
+    });
+  });
+}
+
+const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1`;
+
+function MarkdownWithPrism({ html, className }: { html: string; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (ref.current) highlightPrismInElement(ref.current);
+  }, [html]);
+  return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 function MentionChipIcon({ path }: { path: string }) {
   return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
 }
@@ -40,11 +66,7 @@ function MessageBodyWithMentions({ body }: { body: string }) {
         }
         if (!part.content) return null;
         return (
-          <span
-            key={i}
-            className={`${PROSE_MESSAGE} [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1`}
-            dangerouslySetInnerHTML={{ __html: renderMarkdown(part.content) }}
-          />
+          <MarkdownWithPrism key={i} html={renderMarkdown(part.content)} className={USER_MESSAGE_MARKDOWN_CLASS} />
         );
       })}
     </div>
@@ -162,10 +184,7 @@ const MessageRow = memo(function MessageRow({
             </>
           ) : (
             <>
-              <div
-                className={PROSE_MESSAGE}
-                dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
-              />
+              <MarkdownWithPrism html={renderMarkdown(msg.body)} className={PROSE_MESSAGE} />
               {isNoOutput && onRetry && (
                 <button
                   type="button"
@@ -317,10 +336,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               }`}
             >
               {streamingText ? (
-                <div
-                  className={PROSE_MESSAGE}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(streamingText) }}
-                />
+                <MarkdownWithPrism html={renderMarkdown(streamingText)} className={PROSE_MESSAGE} />
               ) : (
                 <ThinkingState lastUserMessage={lastUserMessage} />
               )}

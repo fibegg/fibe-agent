@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { MentionInput } from './mention-input';
 
 describe('MentionInput', () => {
@@ -50,5 +50,17 @@ describe('MentionInput', () => {
     );
     const el = container.querySelector('#chat-input');
     expect(el).toBeTruthy();
+  });
+
+  it('syncs value with newlines so both lines appear in DOM', async () => {
+    const { container } = render(
+      <MentionInput value="line1\nline2" onChange={vi.fn()} placeholder="Test" />
+    );
+    const el = container.querySelector('[contenteditable="true"]') as HTMLElement;
+    expect(el).toBeTruthy();
+    await waitFor(() => {
+      expect(el.textContent).toContain('line1');
+      expect(el.textContent).toContain('line2');
+    });
   });
 });

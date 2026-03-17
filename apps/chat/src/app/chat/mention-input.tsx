@@ -32,6 +32,7 @@ function readDomFromEl(el: HTMLElement): Segment[] {
       const span = node as HTMLElement;
       const path = span.getAttribute('data-path');
       if (path) out.push({ type: 'mention', path });
+      else if (span.tagName === 'BR') out.push({ type: 'text', value: '\n' });
       else out.push({ type: 'text', value: span.textContent ?? '' });
     }
   }
@@ -50,6 +51,7 @@ function getCaretOffset(root: Node, sel: Selection): number {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       if (el.getAttribute?.('data-path')) offset += ('@' + (el.getAttribute('data-path') ?? '')).length;
+      else if (el.tagName === 'BR') offset += 1;
     }
     node = walker.nextNode();
   }
@@ -69,6 +71,7 @@ function setCaretOffset(root: HTMLElement, targetOffset: number): void {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       if (el.getAttribute?.('data-path')) len = ('@' + (el.getAttribute('data-path') ?? '')).length;
+      else if (el.tagName === 'BR') len = 1;
     }
     if (offset + len >= targetOffset) {
       const range = document.createRange();
@@ -174,20 +177,24 @@ export function MentionInput({
 }) {
   const divRef = useRef<HTMLDivElement>(null);
   const ref = inputRef ?? divRef;
-  const lastEmittedRef = useRef(value);
+  const lastSyncedValueRef = useRef<string | null>(null);
   const savedCaretRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || value === lastEmittedRef.current) return;
-    lastEmittedRef.current = value;
+    if (!el || value === lastSyncedValueRef.current) return;
+    lastSyncedValueRef.current = value;
     const segments = parseToSegments(value);
     el.innerHTML = '';
     const isEmpty = segments.length === 1 && segments[0]?.type === 'text' && segments[0].value === '';
     if (!isEmpty) {
       for (const s of segments) {
         if (s.type === 'text') {
-          el.appendChild(document.createTextNode(s.value));
+          const parts = s.value.split('\n');
+          for (let i = 0; i < parts.length; i++) {
+            if (i > 0) el.appendChild(document.createElement('br'));
+            if (parts[i].length > 0) el.appendChild(document.createTextNode(parts[i]));
+          }
         } else {
           const chipPath = s.path;
           const onRemove = () => {
@@ -224,6 +231,7 @@ export function MentionInput({
         const span = node as HTMLElement;
         const path = span.getAttribute('data-path');
         if (path) out.push({ type: 'mention', path });
+        else if (span.tagName === 'BR') out.push({ type: 'text', value: '\n' });
         else out.push({ type: 'text', value: span.textContent ?? '' });
       }
     }
@@ -236,9 +244,9 @@ export function MentionInput({
     const str = segmentsToStr(next);
     const sel = window.getSelection();
     const offset = sel && ref.current?.contains(sel.anchorNode) ? getCaretOffset(ref.current, sel) : str.length;
-    if (str !== lastEmittedRef.current) {
+    if (str !== lastSyncedValueRef.current) {
       savedCaretRef.current = sel && ref.current?.contains(sel.anchorNode) ? offset : null;
-      lastEmittedRef.current = str;
+      lastSyncedValueRef.current = str;
       onChange(str);
     }
     if (onValueAndCursor) {
@@ -271,7 +279,7 @@ export function MentionInput({
       if (onValueAndCursor) {
         onValueAndCursor(newVal, offset);
       } else {
-        lastEmittedRef.current = newVal;
+        lastSyncedValueRef.current = newVal;
         onChange(newVal);
         onCursorChange?.(offset);
       }
