@@ -40,7 +40,7 @@ Or start separately:
 
 Copy `.env.example` to `.env` and adjust. Main variables:
 
-- **API:** `PORT`, `AGENT_PASSWORD`, `AGENT_PROVIDER` (mock, gemini, claude-code, openai-codex, opencodex), `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`
+- **API:** `PORT`, `AGENT_PASSWORD`, `AGENT_PROVIDER` (mock, gemini, claude-code, openai-codex, opencode), `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`
 - **Chat:** `API_URL` (only if the API is not on the same origin or not proxied), `LOCK_CHAT_MODEL` (optional; when set, the model selector is disabled and only shows the model in use), `ASSISTANT_AVATAR_URL` (optional; URL for the assistant’s avatar), `USER_AVATAR_URL` (optional; URL for the user’s avatar)
 
 ## Project layout
