@@ -1,5 +1,7 @@
 import { marked } from 'marked';
 
+marked.setOptions({ gfm: true, breaks: true });
+
 const MAX_CACHE_SIZE = 200;
 
 function escapeHtml(str: string): string {

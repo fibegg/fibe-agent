@@ -112,6 +112,23 @@ describe('MessageList', () => {
     expect(screen.getByText(/text/)).toBeTruthy();
   });
 
+  it('renders user message body as markdown', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: 'Use **bold** and `code`',
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const strong = container.querySelector('strong');
+    expect(strong?.textContent).toBe('bold');
+    const code = container.querySelector('code');
+    expect(code?.textContent).toBe('code');
+  });
+
   it('renders user message with @path as badge showing path display name', () => {
     const messages: ChatMessage[] = [
       {

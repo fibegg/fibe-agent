@@ -21,6 +21,13 @@ describe('markdown-cache', () => {
     expect(html).toContain('bold');
   });
 
+  it('renders single newlines as line breaks', () => {
+    const html = renderMarkdown('line1\nline2');
+    expect(html).toContain('<br>');
+    expect(html).toContain('line1');
+    expect(html).toContain('line2');
+  });
+
   it('evicts oldest entries when over max size', () => {
     for (let i = 0; i < 250; i++) renderMarkdown(`text-${i}`);
     expect(getMarkdownCacheSize()).toBeLessThanOrEqual(200);
