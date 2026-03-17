@@ -3,6 +3,7 @@ import {
   CHAT_STATES,
   CHAT_INPUT_PLACEHOLDER,
   getChatInputPlaceholder,
+  isRetryableError,
   STATE_LABELS,
   RESPONSE_TIMEOUT_MS,
   RECONNECT_INTERVAL_MS,
@@ -55,5 +56,22 @@ describe('chat-state', () => {
     expect(getChatInputPlaceholder(CHAT_STATES.UNAUTHENTICATED)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
     expect(getChatInputPlaceholder(CHAT_STATES.AGENT_OFFLINE)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
     expect(getChatInputPlaceholder(CHAT_STATES.ERROR)).toBe(CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED);
+  });
+
+  it('isRetryableError returns false for null', () => {
+    expect(isRetryableError(null)).toBe(false);
+  });
+
+  it('isRetryableError returns false for Another session is already active', () => {
+    expect(isRetryableError('Another session is already active')).toBe(false);
+  });
+
+  it('isRetryableError returns false for Your session was taken over by another client', () => {
+    expect(isRetryableError('Your session was taken over by another client')).toBe(false);
+  });
+
+  it('isRetryableError returns true for other error messages', () => {
+    expect(isRetryableError('Response timed out. The AI took too long to respond.')).toBe(true);
+    expect(isRetryableError('An unexpected error occurred')).toBe(true);
   });
 });

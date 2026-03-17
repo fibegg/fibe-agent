@@ -43,6 +43,15 @@ export const WS_CLOSE = {
   SESSION_TAKEN_OVER: 4002,
 } as const;
 
+export const ERROR_MESSAGES_NO_RETRY: ReadonlySet<string> = new Set([
+  'Another session is already active',
+  'Your session was taken over by another client',
+]);
+
+export function isRetryableError(errorMessage: string | null): boolean {
+  return !!errorMessage && !ERROR_MESSAGES_NO_RETRY.has(errorMessage);
+}
+
 export interface ServerMessage {
   type: string;
   status?: string;

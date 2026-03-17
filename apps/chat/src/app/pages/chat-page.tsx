@@ -6,6 +6,7 @@ import {
   Menu,
   Mic,
   Paperclip,
+  RotateCw,
   Search,
   Send,
   X,
@@ -29,7 +30,7 @@ import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { shouldHideThemeSwitch } from '../embed-config';
 import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import { ThemeToggle } from '../theme-toggle';
-import { CHAT_STATES, getChatInputPlaceholder, STATE_LABELS } from '../chat/chat-state';
+import { CHAT_STATES, getChatInputPlaceholder, isRetryableError, STATE_LABELS } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { apiRequest, isAuthenticated, isChatModelLocked } from '../api-url';
 import { API_PATHS } from '../api-paths';
@@ -73,6 +74,7 @@ const MAX_PENDING_TOTAL = MAX_PENDING_IMAGES + MAX_PENDING_ATTACHMENTS;
 const ACCEPT_FILES =
   'image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.md,.rtf,application/pdf,text/plain,text/csv,application/json';
 const MOBILE_BREAKPOINT_PX = 1024;
+const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -278,7 +280,7 @@ export function ChatPage() {
       ]);
     },
     (finalText) => {
-      const text = finalText?.trim() || 'Process completed successfully but returned no output.';
+      const text = finalText?.trim() || NO_OUTPUT_MESSAGE;
       const log = activityLogRef.current;
       const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
         id,
@@ -465,6 +467,24 @@ export function ChatPage() {
     setPendingVoiceFilename(null);
     scroll.markJustSent();
   }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll]);
+
+  const handleSendContinue = useCallback(() => {
+    send({
+      action: 'send_chat_message',
+      text: 'Continue',
+    });
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', body: 'Continue', created_at: new Date().toISOString(), optimistic: true },
+    ]);
+    setLastSentMessage('Continue');
+    scroll.markJustSent();
+  }, [send, scroll]);
+
+  const handleRetryFromError = useCallback(() => {
+    dismissError();
+    handleSendContinue();
+  }, [dismissError, handleSendContinue]);
 
   const addImage = useCallback((dataUrl: string) => {
     setPendingImages((prev) => (prev.length < MAX_PENDING_IMAGES ? [...prev, dataUrl] : prev));
@@ -996,15 +1016,27 @@ export function ChatPage() {
           )}
         </header>
         {errorMessage && state === CHAT_STATES.ERROR && (
-          <div className="flex shrink-0 items-center justify-between px-4 py-2 bg-destructive/10 border-b border-border/50">
-            <span className="text-destructive text-sm">{errorMessage}</span>
-            <button
-              type="button"
-              onClick={dismissError}
-              className="text-muted-foreground hover:text-foreground text-sm"
-            >
-              Dismiss
-            </button>
+          <div className="flex shrink-0 items-center justify-between gap-2 px-4 py-2 bg-destructive/10 border-b border-border/50">
+            <span className="text-destructive text-sm flex-1 min-w-0">{errorMessage}</span>
+            <div className="flex items-center gap-2 shrink-0">
+              {isRetryableError(errorMessage) && (
+                <button
+                  type="button"
+                  onClick={handleRetryFromError}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-background/80 hover:bg-background border border-border text-foreground"
+                >
+                  <RotateCw className="size-3.5" aria-hidden />
+                  Retry
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={dismissError}
+                className="text-muted-foreground hover:text-foreground text-sm"
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         )}
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
@@ -1024,6 +1056,8 @@ export function ChatPage() {
                 bothSidebarsCollapsed={
                   !isMobile && sidebarCollapsed && rightSidebarCollapsed
                 }
+                noOutputBody={NO_OUTPUT_MESSAGE}
+                onRetry={handleSendContinue}
               />
               <div ref={scroll.endRef} />
             </div>

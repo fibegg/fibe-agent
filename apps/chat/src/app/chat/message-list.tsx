@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { Sparkles, User } from 'lucide-react';
+import { RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { API_PATHS } from '../api-paths';
 import { FileIcon } from '../file-icon';
@@ -85,12 +85,20 @@ const ROW_GAP = 24;
 const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
 const FULL_WIDTH = 'max-w-full';
 
+function isNoOutputMessage(msg: ChatMessage, noOutputBody?: string): boolean {
+  return msg.role === 'assistant' && !!noOutputBody && msg.body === noOutputBody;
+}
+
 const MessageRow = memo(function MessageRow({
   msg,
   maxWidthClass = DEFAULT_MAX_WIDTH,
+  onRetry,
+  isNoOutput,
 }: {
   msg: ChatMessage;
   maxWidthClass?: string;
+  onRetry?: () => void;
+  isNoOutput?: boolean;
 }) {
   return (
     <div
@@ -153,6 +161,16 @@ const MessageRow = memo(function MessageRow({
                 className={PROSE_MESSAGE}
                 dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.body) }}
               />
+              {isNoOutput && onRetry && (
+                <button
+                  type="button"
+                  onClick={onRetry}
+                  className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-background/80 hover:bg-background border border-border text-foreground"
+                >
+                  <RotateCw className="size-3.5" aria-hidden />
+                  Retry
+                </button>
+              )}
               <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
                 {formatTime(msg.created_at)}
               </p>
@@ -168,18 +186,28 @@ export interface MessageListHandle {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
 }
 
-export const MessageList = forwardRef<
-  MessageListHandle | null,
+export interface MessageListProps {
+  messages: ChatMessage[];
+  streamingText: string;
+  isStreaming: boolean;
+  lastUserMessage?: string | null;
+  scrollRef?: React.RefObject<HTMLDivElement | null>;
+  bothSidebarsCollapsed?: boolean;
+  noOutputBody?: string;
+  onRetry?: () => void;
+}
+
+export const MessageList = forwardRef<MessageListHandle | null, MessageListProps>(function MessageList(
   {
-    messages: ChatMessage[];
-    streamingText: string;
-    isStreaming: boolean;
-    lastUserMessage?: string | null;
-    scrollRef?: React.RefObject<HTMLDivElement | null>;
-    bothSidebarsCollapsed?: boolean;
-  }
->(function MessageList(
-  { messages, streamingText, isStreaming, lastUserMessage, scrollRef, bothSidebarsCollapsed },
+    messages,
+    streamingText,
+    isStreaming,
+    lastUserMessage,
+    scrollRef,
+    bothSidebarsCollapsed,
+    noOutputBody,
+    onRetry,
+  },
   ref
 ) {
   const maxWidthClass = bothSidebarsCollapsed ? FULL_WIDTH : DEFAULT_MAX_WIDTH;
@@ -247,7 +275,12 @@ export const MessageList = forwardRef<
               minHeight: virtualRow.size,
             }}
           >
-            <MessageRow msg={msg} maxWidthClass={maxWidthClass} />
+            <MessageRow
+              msg={msg}
+              maxWidthClass={maxWidthClass}
+              isNoOutput={isNoOutputMessage(msg, noOutputBody)}
+              onRetry={onRetry}
+            />
           </div>
         );
       })}
@@ -259,6 +292,8 @@ export const MessageList = forwardRef<
           key={msg.id ?? `${msg.created_at}-${msg.role}`}
           msg={msg}
           maxWidthClass={maxWidthClass}
+          isNoOutput={isNoOutputMessage(msg, noOutputBody)}
+          onRetry={onRetry}
         />
       ))}
     </div>

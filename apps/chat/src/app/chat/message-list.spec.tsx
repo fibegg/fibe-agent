@@ -1,6 +1,6 @@
 import { createRef } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent } from '@testing-library/react';
 import { MessageList, type ChatMessage, type MessageListHandle } from './message-list';
 
 vi.mock('../api-url', () => ({
@@ -182,5 +182,102 @@ describe('MessageList', () => {
       const handle = ref.current;
       if (handle) handle.scrollToBottom('smooth');
     });
+  });
+
+  const NO_OUTPUT_BODY = 'Process completed successfully but returned no output.';
+
+  it('does not render Retry when assistant message body does not match noOutputBody', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: 'Some reply',
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        streamingText=""
+        isStreaming={false}
+        noOutputBody={NO_OUTPUT_BODY}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+  });
+
+  it('does not render Retry when noOutputBody is not provided', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: NO_OUTPUT_BODY,
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} onRetry={vi.fn()} />
+    );
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+  });
+
+  it('does not render Retry when onRetry is not provided', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: NO_OUTPUT_BODY,
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        streamingText=""
+        isStreaming={false}
+        noOutputBody={NO_OUTPUT_BODY}
+      />
+    );
+    expect(screen.queryByRole('button', { name: /retry/i })).toBeNull();
+  });
+
+  it('renders Retry button when assistant message body matches noOutputBody and onRetry is provided', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: NO_OUTPUT_BODY,
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        streamingText=""
+        isStreaming={false}
+        noOutputBody={NO_OUTPUT_BODY}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('button', { name: /retry/i })).toBeTruthy();
+  });
+
+  it('calls onRetry when Retry button is clicked', () => {
+    const onRetry = vi.fn();
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: NO_OUTPUT_BODY,
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        streamingText=""
+        isStreaming={false}
+        noOutputBody={NO_OUTPUT_BODY}
+        onRetry={onRetry}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /retry/i }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
   });
 });
