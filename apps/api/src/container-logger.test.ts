@@ -43,33 +43,43 @@ describe('containerLog', () => {
     process.env.LOG_LEVEL = 'error';
     containerLog.error('fail');
     expect(stderr).toHaveLength(1);
-    expect(JSON.parse(stderr[0]!)).toMatchObject({ level: 'error', message: 'fail' });
+    const line = stderr[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string)).toMatchObject({ level: 'error', message: 'fail' });
   });
 
   test('error includes context when provided', () => {
     process.env.LOG_LEVEL = 'error';
     containerLog.error('msg', 'Ctx');
-    expect(JSON.parse(stderr[0]!).context).toBe('Ctx');
+    const line = stderr[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).context).toBe('Ctx');
   });
 
   test('error includes extra when provided', () => {
     process.env.LOG_LEVEL = 'error';
     containerLog.error('msg', undefined, { trace: 'stack' });
-    expect(JSON.parse(stderr[0]!).trace).toBe('stack');
+    const line = stderr[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).trace).toBe('stack');
   });
 
   test('warn writes to stderr with level warn', () => {
     process.env.LOG_LEVEL = 'warn';
     containerLog.warn('w');
     expect(stderr).toHaveLength(1);
-    expect(JSON.parse(stderr[0]!).level).toBe('warn');
+    const line = stderr[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).level).toBe('warn');
   });
 
   test('log writes to stdout with level log', () => {
     process.env.LOG_LEVEL = 'log';
     containerLog.log('hi');
     expect(stdout).toHaveLength(1);
-    expect(JSON.parse(stdout[0]!)).toMatchObject({ level: 'log', message: 'hi' });
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string)).toMatchObject({ level: 'log', message: 'hi' });
   });
 
   test('LOG_LEVEL error suppresses warn and log', () => {
@@ -105,7 +115,9 @@ describe('containerLog', () => {
   test('output has timestamp in ISO format', () => {
     process.env.LOG_LEVEL = 'log';
     containerLog.log('x');
-    const parsed = JSON.parse(stdout[0]!);
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    const parsed = JSON.parse(line as string);
     expect(parsed.timestamp).toBeDefined();
     expect(new Date(parsed.timestamp).toISOString()).toBe(parsed.timestamp);
   });
@@ -142,43 +154,57 @@ describe('ContainerLoggerService', () => {
     const logger = new ContainerLoggerService();
     logger.setContext('MyService');
     logger.log('hello');
-    expect(JSON.parse(stdout[0]!).context).toBe('MyService');
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).context).toBe('MyService');
   });
 
   test('constructor context is used when setContext not called', () => {
     const logger = new ContainerLoggerService('Init');
     logger.log('x');
-    expect(JSON.parse(stdout[0]!).context).toBe('Init');
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).context).toBe('Init');
   });
 
   test('log forwards to containerLog with context', () => {
     const logger = new ContainerLoggerService('L');
     logger.log('m');
-    expect(JSON.parse(stdout[0]!)).toMatchObject({ level: 'log', context: 'L', message: 'm' });
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string)).toMatchObject({ level: 'log', context: 'L', message: 'm' });
   });
 
   test('error forwards message and trace as extra', () => {
     const logger = new ContainerLoggerService('E');
     logger.error('err', 'trace line');
-    expect(JSON.parse(stderr[0]!).trace).toBe('trace line');
+    const line = stderr[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).trace).toBe('trace line');
   });
 
   test('warn forwards to containerLog', () => {
     const logger = new ContainerLoggerService('W');
     logger.warn('w');
-    expect(JSON.parse(stderr[0]!).level).toBe('warn');
+    const line = stderr[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).level).toBe('warn');
   });
 
   test('debug forwards to containerLog', () => {
     const logger = new ContainerLoggerService('D');
     logger.debug('d');
-    expect(JSON.parse(stdout[0]!).level).toBe('debug');
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).level).toBe('debug');
   });
 
   test('verbose forwards to containerLog', () => {
     const logger = new ContainerLoggerService('V');
     logger.verbose('v');
-    expect(JSON.parse(stdout[0]!).level).toBe('verbose');
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).level).toBe('verbose');
   });
 });
 
@@ -208,7 +234,9 @@ describe('logRequest', () => {
       statusCode: 200,
       durationMs: 5,
     });
-    const parsed = JSON.parse(stdout[0]!);
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    const parsed = JSON.parse(line as string);
     expect(parsed.context).toBe('http');
     expect(parsed.message).toBe('request');
   });
@@ -221,7 +249,9 @@ describe('logRequest', () => {
       statusCode: 401,
       durationMs: 10,
     });
-    const parsed = JSON.parse(stdout[0]!);
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    const parsed = JSON.parse(line as string);
     expect(parsed.requestId).toBe('r2');
     expect(parsed.method).toBe('POST');
     expect(parsed.url).toBe('/api/auth/login');
@@ -262,26 +292,34 @@ describe('logWs', () => {
 
   test('connect event writes context ws and message connect', () => {
     logWs({ event: 'connect' });
-    const parsed = JSON.parse(stdout[0]!);
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    const parsed = JSON.parse(line as string);
     expect(parsed.context).toBe('ws');
     expect(parsed.message).toBe('connect');
   });
 
   test('disconnect event can include closeCode', () => {
     logWs({ event: 'disconnect', closeCode: 4001 });
-    expect(JSON.parse(stdout[0]!).closeCode).toBe(4001);
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).closeCode).toBe(4001);
   });
 
   test('action event includes action name', () => {
     logWs({ event: 'action', action: 'send_chat_message' });
-    const parsed = JSON.parse(stdout[0]!);
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    const parsed = JSON.parse(line as string);
     expect(parsed.message).toBe('action');
     expect(parsed.action).toBe('send_chat_message');
   });
 
   test('disconnect can include error', () => {
     logWs({ event: 'disconnect', error: 'Connection reset' });
-    expect(JSON.parse(stdout[0]!).error).toBe('Connection reset');
+    const line = stdout[0];
+    expect(line).toBeDefined();
+    expect(JSON.parse(line as string).error).toBe('Connection reset');
   });
 
   test('does not write when LOG_LEVEL is error', () => {
