@@ -1,4 +1,7 @@
-import { Key, LogOut, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Key, Loader2, LogOut, X } from 'lucide-react';
+import { apiRequest } from '../api-url';
+import { API_PATHS } from '../api-paths';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from './chat-state';
 import type { ChatState } from './chat-state';
@@ -10,6 +13,13 @@ import {
   MODAL_OVERLAY_DARK,
   SETTINGS_CLOSE_BUTTON,
 } from '../ui-classes';
+
+interface InitStatusResponse {
+  state: 'disabled' | 'pending' | 'running' | 'done' | 'failed';
+  output?: string;
+  error?: string;
+  finishedAt?: string;
+}
 
 export interface ChatSettingsModalProps {
   open: boolean;
@@ -28,6 +38,24 @@ export function ChatSettingsModal({
   onReauthenticate,
   onLogout,
 }: ChatSettingsModalProps) {
+  const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    apiRequest(API_PATHS.INIT_STATUS)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: InitStatusResponse | null) => {
+        if (!cancelled && data) setInitStatus(data);
+      })
+      .catch(() => {
+        if (!cancelled) setInitStatus(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const handleAuthClick = () => {
@@ -89,6 +117,30 @@ export function ChatSettingsModal({
               <LogOut className="size-4" />
               Logout
             </button>
+          )}
+          {initStatus && (
+            <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="font-medium text-foreground">Post-init script</span>
+                {initStatus.state === 'running' && (
+                  <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                )}
+                <span className="text-muted-foreground">
+                  {initStatus.state === 'disabled' && 'Not configured'}
+                  {initStatus.state === 'pending' && 'Pending'}
+                  {initStatus.state === 'running' && 'Running…'}
+                  {initStatus.state === 'done' && 'Done'}
+                  {initStatus.state === 'failed' && 'Failed'}
+                </span>
+              </div>
+              {(initStatus.error || (initStatus.output && initStatus.output.trim())) && (
+                <pre className="mt-2 max-h-24 overflow-auto break-all rounded bg-background/50 p-2 text-xs text-muted-foreground">
+                  {initStatus.error}
+                  {initStatus.error && initStatus.output?.trim() ? '\n\n' : ''}
+                  {initStatus.output?.trim()}
+                </pre>
+              )}
+            </div>
           )}
           <p className="text-xs text-muted-foreground pt-2">v{__APP_VERSION__}</p>
         </div>

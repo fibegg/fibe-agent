@@ -21,6 +21,7 @@ import { UploadsController } from './uploads/uploads.controller';
 import { UploadsService } from './uploads/uploads.service';
 import { PlaygroundsController } from './playgrounds/playgrounds.controller';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
+import { InitStatusController } from './init-status/init-status.controller';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
 import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
 import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
@@ -43,6 +44,7 @@ import { SteeringService } from './steering/steering.service';
     ModelOptionsController,
     UploadsController,
     PlaygroundsController,
+    InitStatusController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
