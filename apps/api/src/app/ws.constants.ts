@@ -47,6 +47,7 @@ export const AUTH_STATUS = {
 
 export const ERROR_CODE = {
   NEED_AUTH: 'NEED_AUTH',
+  AGENT_BUSY: 'AGENT_BUSY',
 } as const;
 
 export const WS_CLOSE = {

@@ -24,8 +24,9 @@ Path constants are defined in `shared/api-paths.ts` (`API_PATHS.*`, `API_PATH_UP
 | GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
 | GET    | /api/playgrounds/file | Bearer | Query `path` = relative path. Returns `{ content: string }`; 404 if not found or not a file. |
 | GET    | /api/init-status      | Bearer | Post-init script status. Returns `{ state: 'disabled'|'pending'|'running'|'done'|'failed', output?, error?, finishedAt? }`. |
+| POST   | /api/agent/send-message | Bearer | Send a message to the agent asynchronously. Body: `{ text, images?, attachmentFilenames? }`. Returns `202` with `{ accepted: true, messageId }` when the message is accepted for processing. Rejects with `400` (empty text), `403` (NEED_AUTH), or `409` (AGENT_BUSY). Intended for webhooks and integrations (e.g. Sentry). |
 
-When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, `GET /api/playgrounds/file`, and `GET /api/init-status` require `Authorization: Bearer <password>` or `?token=<password>`.
+When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, `GET /api/playgrounds/file`, `GET /api/init-status`, and `POST /api/agent/send-message` require `Authorization: Bearer <password>` or `?token=<password>`.
 
 ## Container logging
 

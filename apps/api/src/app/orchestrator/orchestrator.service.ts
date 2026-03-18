@@ -262,21 +262,42 @@ export class OrchestratorService implements OnModuleInit {
     this.strategy.executeLogout(connection);
   }
 
-  private async handleChatMessage(
+  async sendMessageFromApi(
+    text: string,
+    images?: string[],
+    attachmentFilenames?: string[]
+  ): Promise<{ accepted: boolean; messageId?: string; error?: string }> {
+    await this.checkAndSendAuthStatus();
+    if (!this.isAuthenticated) {
+      return { accepted: false, error: ERROR_CODE.NEED_AUTH };
+    }
+    if (this.isProcessing) {
+      return { accepted: false, error: ERROR_CODE.AGENT_BUSY };
+    }
+    this.isProcessing = true;
+    this.steering.resetQueue();
+    this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
+    const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } =
+      await this.addUserMessageAndEmit(text, images, undefined, undefined, attachmentFilenames);
+    void this.runAgentResponse(_text, urls, af, att).catch((err) =>
+      this.logger.warn('REST send-message agent run failed', err)
+    );
+    return { accepted: true, messageId };
+  }
+
+  private async addUserMessageAndEmit(
     text: string,
     images?: string[],
     audio?: string,
     audioFilenameFromClient?: string,
     attachmentFilenames?: string[]
-  ): Promise<void> {
-    if (!this.isAuthenticated) {
-      this._send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
-      return;
-    }
-    this.isProcessing = true;
-    this.steering.resetQueue();
-    this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
-
+  ): Promise<{
+    messageId: string;
+    text: string;
+    imageUrls: string[];
+    audioFilename: string | null;
+    attachmentFilenames: string[] | undefined;
+  }> {
     const imageUrls: string[] = [];
     if (images?.length) {
       for (const dataUrl of images) {
@@ -287,7 +308,6 @@ export class OrchestratorService implements OnModuleInit {
         }
       }
     }
-
     let audioFilename: string | null = audioFilenameFromClient ?? null;
     if (!audioFilename && audio) {
       try {
@@ -296,26 +316,28 @@ export class OrchestratorService implements OnModuleInit {
         this.logger.warn('Failed to save voice recording, skipping');
       }
     }
-
-    const userMessage = this.messageStore.add('user', text, imageUrls.length ? imageUrls : undefined);
+    const userMessage = this.messageStore.add(
+      'user',
+      text,
+      imageUrls.length ? imageUrls : undefined
+    );
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
-
-    let systemPrompt = '';
-    const configSystemPrompt = this.config.getSystemPrompt();
-    if (configSystemPrompt) {
-      systemPrompt = configSystemPrompt;
-    } else if (this.cachedSystemPromptFromFile !== null) {
-      systemPrompt = this.cachedSystemPromptFromFile;
-    }
-
-    const fullPrompt = await this.chatPromptContext.buildFullPrompt(
+    return {
+      messageId: userMessage.id,
       text,
       imageUrls,
       audioFilename,
       attachmentFilenames,
-    );
-    const model = this.modelStore.get();
+    };
+  }
 
+  private async runAgentResponse(
+    text: string,
+    imageUrls: string[],
+    audioFilename: string | null,
+    attachmentFilenames?: string[]
+  ): Promise<void> {
+    let accumulated = '';
     const syntheticStepId = 'generating-response';
     const syntheticStep: ThinkingStep = {
       id: syntheticStepId,
@@ -323,32 +345,42 @@ export class OrchestratorService implements OnModuleInit {
       status: 'processing',
       timestamp: new Date(),
     };
-    this._send(WS_EVENT.STREAM_START, { model });
-    const streamStartEntry: StoredStoryEntry = {
-      id: randomUUID(),
-      type: 'stream_start',
-      message: 'Response started',
-      timestamp: new Date().toISOString(),
-      details: model ? `Model: ${model}` : undefined,
-    };
-    const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
-    this.currentActivityId = currentActivity.id;
-    this.reasoningTextAccumulated = '';
-    this._send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
-
-    this._send(WS_EVENT.THINKING_STEP, {
-      id: syntheticStep.id,
-      title: syntheticStep.title,
-      status: syntheticStep.status,
-      details: syntheticStep.details,
-      timestamp: syntheticStep.timestamp.toISOString(),
-    });
-
-    this.lastStreamUsage = undefined;
-    const callbacks = this.buildStreamingCallbacks();
-    let accumulated = '';
-
     try {
+      let systemPrompt = '';
+      const configSystemPrompt = this.config.getSystemPrompt();
+      if (configSystemPrompt) {
+        systemPrompt = configSystemPrompt;
+      } else if (this.cachedSystemPromptFromFile !== null) {
+        systemPrompt = this.cachedSystemPromptFromFile;
+      }
+      const fullPrompt = await this.chatPromptContext.buildFullPrompt(
+        text,
+        imageUrls,
+        audioFilename,
+        attachmentFilenames
+      );
+      const model = this.modelStore.get();
+      this._send(WS_EVENT.STREAM_START, { model });
+      const streamStartEntry: StoredStoryEntry = {
+        id: randomUUID(),
+        type: 'stream_start',
+        message: 'Response started',
+        timestamp: new Date().toISOString(),
+        details: model ? `Model: ${model}` : undefined,
+      };
+      const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
+      this.currentActivityId = currentActivity.id;
+      this.reasoningTextAccumulated = '';
+      this._send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
+      this._send(WS_EVENT.THINKING_STEP, {
+        id: syntheticStep.id,
+        title: syntheticStep.title,
+        status: syntheticStep.status,
+        details: syntheticStep.details,
+        timestamp: syntheticStep.timestamp.toISOString(),
+      });
+      this.lastStreamUsage = undefined;
+      const callbacks = this.buildStreamingCallbacks();
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
@@ -365,6 +397,31 @@ export class OrchestratorService implements OnModuleInit {
     } finally {
       this.isProcessing = false;
     }
+  }
+
+  private async handleChatMessage(
+    text: string,
+    images?: string[],
+    audio?: string,
+    audioFilenameFromClient?: string,
+    attachmentFilenames?: string[]
+  ): Promise<void> {
+    if (!this.isAuthenticated) {
+      this._send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
+      return;
+    }
+    this.isProcessing = true;
+    this.steering.resetQueue();
+    this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
+    const { text: _t, imageUrls, audioFilename, attachmentFilenames: att } =
+      await this.addUserMessageAndEmit(
+        text,
+        images,
+        audio,
+        audioFilenameFromClient,
+        attachmentFilenames
+      );
+    await this.runAgentResponse(_t, imageUrls, audioFilename, att);
   }
 
   private buildStreamingCallbacks(): StreamingCallbacks {

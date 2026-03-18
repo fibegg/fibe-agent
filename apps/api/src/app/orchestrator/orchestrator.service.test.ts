@@ -10,7 +10,7 @@ import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { SteeringService } from '../steering/steering.service';
-import { WS_ACTION, WS_EVENT, AUTH_STATUS } from '../ws.constants';
+import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '../ws.constants';
 
 describe('OrchestratorService', () => {
   let dataDir: string;
@@ -248,5 +248,23 @@ describe('OrchestratorService', () => {
     // At stream start, queue_updated with count 0 should be emitted
     const queueResetEvent = events.find((e) => e.type === WS_EVENT.QUEUE_UPDATED && e.data.count === 0);
     expect(queueResetEvent).toBeDefined();
+  });
+
+  test('sendMessageFromApi returns AGENT_BUSY when isProcessing', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    orch.isProcessing = true;
+    const result = await orch.sendMessageFromApi('hello');
+    expect(result.accepted).toBe(false);
+    expect(result.error).toBe(ERROR_CODE.AGENT_BUSY);
+  });
+
+  test('sendMessageFromApi returns accepted and messageId when authenticated', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const result = await orch.sendMessageFromApi('ping');
+    expect(result.accepted).toBe(true);
+    expect(result.messageId).toBeDefined();
+    expect(typeof result.messageId).toBe('string');
   });
 });
