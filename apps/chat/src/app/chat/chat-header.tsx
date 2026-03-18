@@ -105,7 +105,7 @@ export function ChatHeader({
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-1 sm:gap-2">
+        <div className="flex items-center gap-1 sm:gap-2 min-w-0">
           {isMobile && (
             <p
               className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 shrink-0 mr-2"

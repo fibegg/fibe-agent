@@ -33,7 +33,7 @@ function highlightPrismInElement(container: HTMLElement): void {
   });
 }
 
-const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1`;
+const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0`;
 
 function MarkdownWithPrism({ html, className }: { html: string; className?: string }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -296,9 +296,10 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     >
       {virtualItems.map((virtualRow) => {
         const msg = messages[virtualRow.index];
+        const rowKey = msg.id ?? `msg-${virtualRow.index}-${msg.created_at}-${msg.role}`;
         return (
           <div
-            key={msg.id ?? `${msg.created_at}-${msg.role}`}
+            key={rowKey}
             data-index={virtualRow.index}
             ref={virtualizer.measureElement}
             className="absolute left-0 w-full"
@@ -319,9 +320,9 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     </div>
   ) : (
     <div className="space-y-4 sm:space-y-6">
-      {messages.map((msg) => (
+      {messages.map((msg, i) => (
         <MessageRow
-          key={msg.id ?? `${msg.created_at}-${msg.role}`}
+          key={msg.id ?? `msg-${i}-${msg.created_at}-${msg.role}`}
           msg={msg}
           maxWidthClass={maxWidthClass}
           isNoOutput={isNoOutputMessage(msg, noOutputBody)}
