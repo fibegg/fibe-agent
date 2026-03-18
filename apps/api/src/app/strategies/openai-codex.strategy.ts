@@ -80,7 +80,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       onData: (output) => {
         // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
         const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
-        const urlMatch = clean.match(/https:\/\/[^\s\"'>]+/);
+        const urlMatch = clean.match(/https:\/\/[^\s"'>]+/);
         if (urlMatch && !authUrlExtracted) {
           authUrlExtracted = true;
           this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);

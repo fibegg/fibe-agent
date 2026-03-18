@@ -137,15 +137,18 @@ describe('OpenaiCodexStrategy', () => {
     process.env.OPENAI_API_KEY = 'sk-ok';
     const strategy = new OpenaiCodexStrategy(true);
     let successCalled = false;
+    const noop = () => {
+      return;
+    };
     const connection = {
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
-      sendAuthManualToken: () => {},
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendAuthManualToken: noop,
       sendAuthSuccess: () => {
         successCalled = true;
       },
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthStatus: noop,
+      sendError: noop,
     };
     strategy.executeAuth(connection);
     expect(successCalled).toBe(true);

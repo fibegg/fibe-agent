@@ -31,15 +31,18 @@ describe('GeminiStrategy API token mode', () => {
     process.env.GEMINI_API_KEY = 'test-key';
     const strategy = new GeminiStrategy(true);
     let successCalled = false;
+    const noop = () => {
+      return;
+    };
     const connection = {
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
-      sendAuthManualToken: () => {},
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendAuthManualToken: noop,
       sendAuthSuccess: () => {
         successCalled = true;
       },
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthStatus: noop,
+      sendError: noop,
     };
     strategy.executeAuth(connection);
     expect(successCalled).toBe(true);
@@ -48,15 +51,18 @@ describe('GeminiStrategy API token mode', () => {
   test('executeAuth sends sendAuthManualToken when GEMINI_API_KEY is missing in api-token mode', () => {
     const strategy = new GeminiStrategy(true);
     let manualTokenCalled = false;
+    const noop = () => {
+      return;
+    };
     const connection = {
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
       sendAuthManualToken: () => {
         manualTokenCalled = true;
       },
-      sendAuthSuccess: () => {},
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthSuccess: noop,
+      sendAuthStatus: noop,
+      sendError: noop,
     };
     strategy.executeAuth(connection);
     expect(manualTokenCalled).toBe(true);
@@ -65,15 +71,18 @@ describe('GeminiStrategy API token mode', () => {
   test('submitAuthCode in api-token mode stores token and sends authSuccess', async () => {
     const strategy = new GeminiStrategy(true);
     let successCalled = false;
+    const noop = () => {
+      return;
+    };
     const connection = {
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
-      sendAuthManualToken: () => {},
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendAuthManualToken: noop,
       sendAuthSuccess: () => {
         successCalled = true;
       },
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthStatus: noop,
+      sendError: noop,
     };
     strategy.executeAuth(connection);
     strategy.submitAuthCode('stored-key');
@@ -84,13 +93,16 @@ describe('GeminiStrategy API token mode', () => {
 
   test('checkAuthStatus returns true in api-token mode when only _apiToken is set', async () => {
     const strategy = new GeminiStrategy(true);
+    const noop = () => {
+      return;
+    };
     const connection = {
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
-      sendAuthManualToken: () => {},
-      sendAuthSuccess: () => {},
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendAuthManualToken: noop,
+      sendAuthSuccess: noop,
+      sendAuthStatus: noop,
+      sendError: noop,
     };
     strategy.executeAuth(connection);
     strategy.submitAuthCode('pastede-key');
