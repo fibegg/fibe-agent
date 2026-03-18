@@ -1,10 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   filterVisibleStoryItems,
+  formatCompactInteger,
+  formatSessionDurationMs,
   getActivityIcon,
   getActivityLabel,
   getBlockVariant,
-  formatSessionDurationMs,
   toTimestampMs,
 } from './agent-thinking-utils';
 import type { StoryEntry } from './agent-thinking-utils';
@@ -106,6 +107,25 @@ describe('formatSessionDurationMs', () => {
 
   it('includes hours when present', () => {
     expect(formatSessionDurationMs(3665000)).toBe('1h 1m 5s');
+  });
+});
+
+describe('formatCompactInteger', () => {
+  it('returns plain number when under 1000', () => {
+    expect(formatCompactInteger(0)).toBe('0');
+    expect(formatCompactInteger(999)).toBe('999');
+  });
+
+  it('formats thousands with k', () => {
+    expect(formatCompactInteger(1000)).toBe('1k');
+    expect(formatCompactInteger(1500)).toBe('1.5k');
+    expect(formatCompactInteger(12345)).toBe('12.3k');
+  });
+
+  it('formats millions with M', () => {
+    expect(formatCompactInteger(1_000_000)).toBe('1M');
+    expect(formatCompactInteger(1_500_000)).toBe('1.5M');
+    expect(formatCompactInteger(12_300_000)).toBe('12.3M');
   });
 });
 

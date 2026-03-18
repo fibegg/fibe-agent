@@ -20,6 +20,7 @@ import type {
   LogoutConnection,
   StreamingCallbacks,
   ThinkingStep,
+  TokenUsage,
   ToolEvent,
 } from '../strategies/strategy.types';
 import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
@@ -50,6 +51,7 @@ export class OrchestratorService implements OnModuleInit {
   private cachedSystemPromptFromFile: string | null = null;
   private currentActivityId: string | null = null;
   private reasoningTextAccumulated = '';
+  private lastStreamUsage: TokenUsage | undefined = undefined;
 
   constructor(
     private readonly activityStore: ActivityStoreService,
@@ -96,7 +98,8 @@ export class OrchestratorService implements OnModuleInit {
   private finishStream(
     accumulated: string,
     stepId: string,
-    step: ThinkingStep
+    step: ThinkingStep,
+    usage?: TokenUsage
   ): void {
     const finalText = accumulated || 'The agent produced no visible output.';
     this.messageStore.add('assistant', finalText);
@@ -108,7 +111,15 @@ export class OrchestratorService implements OnModuleInit {
       details: step.details,
       timestamp: new Date().toISOString(),
     });
-    this._send(WS_EVENT.STREAM_END, {});
+    this._send(WS_EVENT.STREAM_END, usage ? { usage } : {});
+    if (this.currentActivityId && usage) {
+      this.activityStore.setUsage(this.currentActivityId, usage);
+      const entry = this.activityStore.getById(this.currentActivityId);
+      if (entry) {
+        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry });
+      }
+    }
+    this.lastStreamUsage = undefined;
   }
 
   ensureStrategySettings(): void {
@@ -331,6 +342,7 @@ export class OrchestratorService implements OnModuleInit {
       timestamp: syntheticStep.timestamp.toISOString(),
     });
 
+    this.lastStreamUsage = undefined;
     const callbacks = this.buildStreamingCallbacks();
     let accumulated = '';
 
@@ -339,11 +351,11 @@ export class OrchestratorService implements OnModuleInit {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
       }, callbacks, systemPrompt || undefined);
-      this.finishStream(accumulated, syntheticStepId, syntheticStep);
+      this.finishStream(accumulated, syntheticStepId, syntheticStep, this.lastStreamUsage);
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       if (raw === INTERRUPTED_MESSAGE) {
-        this.finishStream(accumulated, syntheticStepId, syntheticStep);
+        this.finishStream(accumulated, syntheticStepId, syntheticStep, this.lastStreamUsage);
       } else {
         const message = raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
         this._send(WS_EVENT.ERROR, { message });
@@ -393,6 +405,9 @@ export class OrchestratorService implements OnModuleInit {
       },
       onAuthRequired: (url) => {
         this._send(WS_EVENT.AUTH_URL_GENERATED, { url });
+      },
+      onUsage: (usage) => {
+        this.lastStreamUsage = usage;
       },
       onTool: (event: ToolEvent) => {
         if (event.kind === 'file_created') {

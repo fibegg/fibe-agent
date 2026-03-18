@@ -4,6 +4,7 @@ import { Clock, RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
 import { FileIcon } from '../file-icon';
+import { formatCompactInteger } from '../agent-thinking-utils';
 import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
 import { ThinkingAvatar, ThinkingState } from './thinking-state';
 import {
@@ -91,6 +92,7 @@ export interface ChatMessage {
   activityId?: string;
   optimistic?: boolean;
   queued?: boolean;
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 function formatTime(iso: string): string {
@@ -203,8 +205,13 @@ const MessageRow = memo(function MessageRow({
                   Retry
                 </button>
               )}
-              <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground">
+              <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
                 {formatTime(msg.created_at)}
+                {msg.usage && (
+                  <span className="tabular-nums">
+                    {formatCompactInteger(msg.usage.inputTokens)} in / {formatCompactInteger(msg.usage.outputTokens)} out
+                  </span>
+                )}
               </p>
             </>
           )}

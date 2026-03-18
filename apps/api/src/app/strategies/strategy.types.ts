@@ -32,6 +32,11 @@ export interface ToolEvent {
   details?: string;
 }
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface StreamingCallbacks {
   onReasoningStart?: () => void;
   onReasoningChunk?: (text: string) => void;
@@ -39,6 +44,7 @@ export interface StreamingCallbacks {
   onStep?: (step: ThinkingStep) => void;
   onTool?: (event: ToolEvent) => void;
   onAuthRequired?: (url: string) => void;
+  onUsage?: (usage: TokenUsage) => void;
 }
 
 export const INTERRUPTED_MESSAGE = 'INTERRUPTED';

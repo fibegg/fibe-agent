@@ -87,4 +87,22 @@ describe('useChatDisplayState', () => {
     const { result } = renderHook(() => useChatDisplayState(baseParams));
     expect(result.current.mobileBrainClasses).toEqual({ brain: 'brain-c', accent: 'accent-c' });
   });
+
+  it('returns sessionTokenUsage null when no assistant messages have usage', () => {
+    const messages = [
+      { role: 'user', body: 'hi', created_at: '' },
+      { role: 'assistant', body: 'hey', created_at: '' },
+    ];
+    const { result } = renderHook(() => useChatDisplayState({ ...baseParams, messages }));
+    expect(result.current.sessionTokenUsage).toBeNull();
+  });
+
+  it('returns sessionTokenUsage sum when assistant messages have usage', () => {
+    const messages = [
+      { role: 'assistant', body: 'a', created_at: '', usage: { inputTokens: 10, outputTokens: 20 } },
+      { role: 'assistant', body: 'b', created_at: '', usage: { inputTokens: 5, outputTokens: 15 } },
+    ];
+    const { result } = renderHook(() => useChatDisplayState({ ...baseParams, messages }));
+    expect(result.current.sessionTokenUsage).toEqual({ inputTokens: 15, outputTokens: 35 });
+  });
 });

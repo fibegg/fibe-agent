@@ -2,7 +2,7 @@ import { Brain, Loader2, Menu, Search, Sparkles, X } from 'lucide-react';
 import { ModelSelector } from './model-selector';
 import { CHAT_STATES } from './chat-state';
 import { STATE_LABELS, truncateError } from './chat-state';
-import { formatSessionDurationMs } from '../agent-thinking-utils';
+import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
 import { HEADER_FIRST_ROW, HEADER_PADDING, INPUT_SEARCH, SEARCH_ICON_POSITION, SEARCH_ROW_WRAPPER, CLEAR_BUTTON_POSITION } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 
@@ -12,6 +12,7 @@ export interface ChatHeaderProps {
   errorMessage: string | null;
   sessionTimeMs: number;
   mobileSessionStats: { totalActions: number; completed: number; processing: number };
+  sessionTokenUsage?: { inputTokens: number; outputTokens: number } | null;
   mobileBrainClasses: { brain: string; accent: string };
   statusClass: string;
   showModelSelector: boolean;
@@ -37,6 +38,7 @@ export function ChatHeader({
   errorMessage,
   sessionTimeMs,
   mobileSessionStats,
+  sessionTokenUsage = null,
   mobileBrainClasses,
   statusClass,
   showModelSelector,
@@ -108,8 +110,8 @@ export function ChatHeader({
         <div className="flex items-center gap-1 sm:gap-2 min-w-0">
           {isMobile && (
             <p
-              className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 shrink-0 mr-2"
-              aria-label={`${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing`}
+              className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"
+              aria-label={`${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} in / ${sessionTokenUsage.outputTokens} out` : ''}`}
             >
               <span
                 key={`m-total-${mobileSessionStats.totalActions}`}
@@ -134,6 +136,14 @@ export function ChatHeader({
               >
                 {mobileSessionStats.processing}
               </span>
+              {sessionTokenUsage && (
+                <>
+                  <span className="text-muted-foreground/70">·</span>
+                  <span className="text-violet-300/90" title="Token usage (input / output)">
+                    {formatCompactInteger(sessionTokenUsage.inputTokens)} in / {formatCompactInteger(sessionTokenUsage.outputTokens)} out
+                  </span>
+                </>
+              )}
             </p>
           )}
           {isMobile && (

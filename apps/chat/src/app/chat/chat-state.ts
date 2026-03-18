@@ -85,6 +85,7 @@ export interface ServerMessage {
   activity?: StoredActivityEntry[];
   entry?: StoredActivityEntry;
   count?: number;
+  usage?: { inputTokens: number; outputTokens: number };
 }
 
 export interface StoredStoryEntry {
@@ -101,4 +102,5 @@ export interface StoredActivityEntry {
   id: string;
   created_at: string;
   story: StoredStoryEntry[];
+  usage?: { inputTokens: number; outputTokens: number };
 }

@@ -13,10 +13,10 @@ Path constants are defined in `shared/api-paths.ts` (`API_PATHS.*`, `API_PATH_UP
 | GET    | /api            | No    | Returns `{ message: 'Hello API' }`                                          |
 | GET    | /api/health     | No    | Health check. Returns `{ status: 'ok' }`. Use for readiness/liveness probes. |
 | POST   | /api/auth/login | No    | Body `{ password? }`. Returns `{ success, message?, token? }` or 401       |
-| GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls?, story? }[]` (story = activity timeline for assistant messages)     |
-| GET    | /api/activities | Bearer| Returns array of stored activities `{ id, created_at, story }[]` (whole story per activity, same shape as in `activity.json`).            |
+| GET    | /api/messages   | Bearer| Returns array of messages `{ id, role, body, created_at, imageUrls?, story?, activityId?, usage? }[]` (story = activity timeline for assistant messages; optional `usage: { inputTokens, outputTokens }` is filled from the linked activity when present in activity store).     |
+| GET    | /api/activities | Bearer| Returns array of stored activities `{ id, created_at, story, usage? }[]` (whole story per activity; optional `usage: { inputTokens, outputTokens }` when the run reported token counts).            |
 | GET    | /api/activities/by-entry/:entryId | Bearer| Returns the activity that contains the given story entry id (e.g. `act-1773772973309-a3rp0me`). Same response as `GET /api/activities/:activityId`. 404 if not found. |
-| GET    | /api/activities/:activityId | Bearer| Returns a single activity `{ id, created_at, story }`. 404 if not found.   |
+| GET    | /api/activities/:activityId | Bearer| Returns a single activity `{ id, created_at, story, usage? }`. 404 if not found.   |
 | GET    | /api/activities/:activityId/:storyId | Bearer| Returns the activity; 404 if activity not found or story entry is not in that activity. Use for deep links to a specific story within an activity. |
 | GET    | /api/uploads/:filename | Bearer | Serves an uploaded file (images, voice, or document attachments).        |
 | POST   | /api/uploads           | Bearer | Upload a file (multipart form field `file`). Returns `{ filename }`. Allowed: images, audio, PDF, Excel, Word, text, CSV, JSON, etc. Blocked: executables and scripts. Max 20MB. |
@@ -86,7 +86,7 @@ Each message is an object with a `type` and optional extra fields.
 | message             | id?, role, body, created_at, imageUrls?, story? | Persisted message (imageUrls = upload filenames; story = activity timeline for assistant messages) |
 | stream_start        | model?              | Start of assistant stream; optional current model name for thinking UI |
 | stream_chunk        | text                | Chunk of assistant response          |
-| stream_end          | —                   | End of stream                        |
+| stream_end          | usage?              | End of stream; optional `usage: { inputTokens, outputTokens }` when the provider reports token counts. |
 | model_updated       | model               | Current model name                   |
 | reasoning_start     | —                   | Start of reasoning/thinking stream (optional) |
 | reasoning_chunk     | text                | Chunk of reasoning text              |

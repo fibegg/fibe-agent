@@ -290,6 +290,14 @@ export class ClaudeCodeStrategy implements AgentStrategy {
       let errorResult = '';
       let stdoutBuffer = '';
       let inThinking = false;
+      let streamUsage: { inputTokens: number; outputTokens: number } | null = null;
+
+      const applyUsage = (u: { input_tokens?: number; output_tokens?: number } | undefined) => {
+        if (!u) return;
+        const inT = typeof u.input_tokens === 'number' ? u.input_tokens : streamUsage?.inputTokens ?? 0;
+        const outT = typeof u.output_tokens === 'number' ? u.output_tokens : streamUsage?.outputTokens ?? 0;
+        streamUsage = { inputTokens: inT, outputTokens: outT };
+      };
 
       const handleStreamJsonLine = (line: string) => {
         line = line.trim();
@@ -302,10 +310,32 @@ export class ClaudeCodeStrategy implements AgentStrategy {
               index?: number;
               delta?: { type?: string; text?: string; thinking?: string };
               content_block?: { type?: string; name?: string; input?: unknown };
+              message?: { usage?: { input_tokens?: number; output_tokens?: number } };
+              usage?: { input_tokens?: number; output_tokens?: number };
             };
           };
+          if (obj.type === 'message_start') {
+            const msg = (obj as { message?: { usage?: { input_tokens?: number; output_tokens?: number } } }).message;
+            if (msg?.usage) applyUsage(msg.usage);
+          }
+          if (obj.type === 'message_delta') {
+            const u = (obj as { usage?: { input_tokens?: number; output_tokens?: number } }).usage;
+            if (u) applyUsage(u);
+          }
+          if (obj.type === 'message_stop' && streamUsage) {
+            callbacks?.onUsage?.({ inputTokens: streamUsage.inputTokens, outputTokens: streamUsage.outputTokens });
+          }
           if (obj.type !== 'stream_event' || !obj.event) return;
           const ev = obj.event;
+          if (ev.type === 'message_start' && ev.message?.usage) {
+            applyUsage(ev.message.usage);
+          }
+          if (ev.type === 'message_delta' && ev.usage) {
+            applyUsage(ev.usage);
+          }
+          if (ev.type === 'message_stop' && streamUsage) {
+            callbacks?.onUsage?.({ inputTokens: streamUsage.inputTokens, outputTokens: streamUsage.outputTokens });
+          }
           if (ev.type === 'content_block_delta' && ev.delta) {
             if (ev.delta.type === 'text_delta' && ev.delta.text) {
               if (inThinking) {

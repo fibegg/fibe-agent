@@ -6,10 +6,16 @@ import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import type { StoredStoryEntry } from '../message-store/message-store.service';
 
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
 export interface StoredActivityEntry {
   id: string;
   created_at: string;
   story: StoredStoryEntry[];
+  usage?: TokenUsage;
 }
 
 function dedupeStoryById(story: StoredStoryEntry[]): StoredStoryEntry[] {
@@ -82,6 +88,14 @@ export class ActivityStoreService {
     const activity = this.activities.find((a) => a.id === activityId);
     if (activity) {
       activity.story = dedupeStoryById(Array.isArray(story) ? story : []);
+      void this.save();
+    }
+  }
+
+  setUsage(activityId: string, usage: TokenUsage): void {
+    const activity = this.activities.find((a) => a.id === activityId);
+    if (activity) {
+      activity.usage = usage;
       void this.save();
     }
   }

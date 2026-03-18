@@ -105,6 +105,24 @@ describe('ActivityStoreService', () => {
     expect(service.getById(created.id)?.story).toHaveLength(1);
   });
 
+  test('setUsage stores token usage on activity', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
+    expect(service.getById(created.id)?.usage).toBeUndefined();
+    service.setUsage(created.id, { inputTokens: 100, outputTokens: 200 });
+    const updated = service.getById(created.id);
+    expect(updated?.usage).toEqual({ inputTokens: 100, outputTokens: 200 });
+  });
+
+  test('setUsage does nothing for unknown activity id', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new ActivityStoreService(config as never);
+    service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
+    service.setUsage('unknown-id', { inputTokens: 1, outputTokens: 2 });
+    expect(service.all().every((a) => a.usage === undefined)).toBe(true);
+  });
+
   test('replaceStory deduplicates story by id', () => {
     const config = { getDataDir: () => dataDir };
     const service = new ActivityStoreService(config as never);

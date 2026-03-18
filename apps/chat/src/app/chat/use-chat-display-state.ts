@@ -93,6 +93,18 @@ export function useChatDisplayState({
     [sessionActivity, pastActivityFromMessages, displayStory, state]
   );
 
+  const sessionTokenUsage = useMemo(() => {
+    let inputTokens = 0;
+    let outputTokens = 0;
+    for (const m of messages) {
+      if (m.role === 'assistant' && m.usage) {
+        inputTokens += m.usage.inputTokens;
+        outputTokens += m.usage.outputTokens;
+      }
+    }
+    return inputTokens > 0 || outputTokens > 0 ? { inputTokens, outputTokens } : null;
+  }, [messages]);
+
   const mobileFullStoryItems = useMemo(
     () => buildFullStoryItems(sessionActivity, pastActivityFromMessages, displayStory),
     [sessionActivity, pastActivityFromMessages, displayStory]
@@ -118,5 +130,6 @@ export function useChatDisplayState({
     mobileFullStoryItems,
     mobileLastStoryItem,
     mobileBrainClasses,
+    sessionTokenUsage,
   };
 }

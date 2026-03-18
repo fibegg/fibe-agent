@@ -87,6 +87,18 @@ export function formatSessionDurationMs(ms: number): string {
   return parts.join(' ');
 }
 
+export function formatCompactInteger(n: number): string {
+  if (n >= 1_000_000) {
+    const v = n / 1_000_000;
+    return v % 1 === 0 ? `${v}M` : `${v.toFixed(1)}M`;
+  }
+  if (n >= 1_000) {
+    const v = n / 1_000;
+    return v % 1 === 0 ? `${v}k` : `${v.toFixed(1)}k`;
+  }
+  return String(n);
+}
+
 export function toTimestampMs(ts: string | Date | undefined, fallback: string): number {
   if (!ts) return new Date(fallback).getTime();
   return typeof ts === 'string' ? new Date(ts).getTime() : (ts as Date).getTime();

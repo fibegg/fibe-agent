@@ -145,7 +145,7 @@ export function ChatPage() {
       setStreamingText('');
       resetForNewStream(data);
     },
-    (finalText) => {
+    (finalText, usage) => {
       const text = finalText?.trim() || NO_OUTPUT_MESSAGE;
       const log = activityLogRef.current;
       const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
@@ -164,6 +164,7 @@ export function ChatPage() {
           body: text,
           created_at: new Date().toISOString(),
           story: storyForApi,
+          ...(usage ? { usage } : {}),
         },
       ]);
       sendRef.current({ action: 'submit_story', story: storyForApi });
@@ -211,6 +212,7 @@ export function ChatPage() {
     sessionTimeMs,
     mobileSessionStats,
     mobileBrainClasses,
+    sessionTokenUsage,
   } = useChatDisplayState({
     messages,
     searchQuery,
@@ -399,6 +401,7 @@ export function ChatPage() {
               storyItems={displayStory}
               sessionActivity={sessionActivity}
               pastActivityFromMessages={pastActivityFromMessages}
+              sessionTokenUsage={sessionTokenUsage}
               mobileOverlay
               onActivityClick={(payload) => navigate(getActivityPath(payload))}
             />
@@ -439,6 +442,7 @@ export function ChatPage() {
           errorMessage={errorMessage}
           sessionTimeMs={sessionTimeMs}
           mobileSessionStats={mobileSessionStats}
+          sessionTokenUsage={sessionTokenUsage}
           mobileBrainClasses={mobileBrainClasses}
           statusClass={statusClass}
           showModelSelector={showModelSelector}
@@ -556,6 +560,7 @@ export function ChatPage() {
           storyItems={displayStory}
           sessionActivity={sessionActivity}
           pastActivityFromMessages={pastActivityFromMessages}
+          sessionTokenUsage={sessionTokenUsage}
           onActivityClick={(payload) => navigate(getActivityPath(payload))}
         />
       )}

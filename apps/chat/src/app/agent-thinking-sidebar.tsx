@@ -13,6 +13,7 @@ import type { ThinkingStep } from './chat/thinking-types';
 import { TypingText } from './chat/typing-text';
 import {
   filterVisibleStoryItems,
+  formatCompactInteger,
   getActivityIcon,
   getActivityLabel,
   getBlockVariant,
@@ -419,6 +420,7 @@ interface AgentThinkingSidebarProps {
   storyItems?: StoryEntry[];
   sessionActivity?: SessionActivityEntry[];
   pastActivityFromMessages?: SessionActivityEntry[];
+  sessionTokenUsage?: { inputTokens: number; outputTokens: number } | null;
   mobileOverlay?: boolean;
   onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
 }
@@ -433,6 +435,7 @@ export function AgentThinkingSidebar({
   storyItems = [],
   sessionActivity = [],
   pastActivityFromMessages = [],
+  sessionTokenUsage = null,
   mobileOverlay = false,
   onActivityClick,
 }: AgentThinkingSidebarProps) {
@@ -836,6 +839,17 @@ export function AgentThinkingSidebar({
                       {STAT_TOOLTIPS.processing}
                     </span>
                   </span>
+                  {sessionTokenUsage && (
+                    <>
+                      <span className="text-muted-foreground/70">·</span>
+                      <span
+                        className="text-violet-300/90"
+                        title="Token usage (input / output)"
+                      >
+                        {formatCompactInteger(sessionTokenUsage.inputTokens)} in / {formatCompactInteger(sessionTokenUsage.outputTokens)} out
+                      </span>
+                    </>
+                  )}
                 </p>
               )}
             </div>
