@@ -139,6 +139,53 @@ export class OpencodeStrategy implements AgentStrategy {
     return !hasEnvApiKey() && this.getStoredApiKey() !== null;
   }
 
+  private static readonly LIST_MODELS_TIMEOUT_MS = 15_000;
+
+  listModels(): Promise<string[]> {
+    return new Promise((resolve) => {
+      const env: NodeJS.ProcessEnv = { ...process.env };
+      const storedKey = this.getStoredApiKey();
+      if (storedKey) {
+        for (const varName of API_KEY_ENV_VARS) {
+          if (!env[varName]?.trim()) {
+            env[varName] = storedKey;
+          }
+        }
+      }
+
+      let stdout = '';
+      const proc = spawn('opencode', ['models'], {
+        env,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+
+      const timer = setTimeout(() => {
+        proc.kill();
+        this.logger.warn('opencode models timed out');
+        resolve([]);
+      }, OpencodeStrategy.LIST_MODELS_TIMEOUT_MS);
+
+      proc.stdout?.on('data', (data: Buffer | string) => {
+        stdout += data.toString();
+      });
+
+      proc.on('close', () => {
+        clearTimeout(timer);
+        const models = stdout
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
+        resolve(models);
+      });
+
+      proc.on('error', (err) => {
+        clearTimeout(timer);
+        this.logger.warn('opencode models failed', err.message);
+        resolve([]);
+      });
+    });
+  }
+
   interruptAgent(): void {
     this.streamInterrupted = true;
     this.currentStreamProcess?.kill();

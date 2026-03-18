@@ -51,6 +51,7 @@ export interface AgentStrategy {
   executeLogout(connection: LogoutConnection): void;
   checkAuthStatus(): Promise<boolean>;
   getModelArgs?(model: string): string[];
+  listModels?(): Promise<string[]>;
   interruptAgent?(): void;
   executePromptStreaming(
     prompt: string,

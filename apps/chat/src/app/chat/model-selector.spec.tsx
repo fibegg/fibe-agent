@@ -116,4 +116,101 @@ describe('ModelSelector', () => {
     expect(onInputChange).toHaveBeenCalledWith('custom');
     expect(onSelect).toHaveBeenCalledWith('custom');
   });
+
+  it('renders refresh button when onRefresh is provided', () => {
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['a']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+        onRefresh={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    expect(screen.getByRole('button', { name: 'Refresh models' })).toBeTruthy();
+  });
+
+  it('does not render refresh button when onRefresh is undefined', () => {
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['a']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    expect(screen.queryByRole('button', { name: 'Refresh models' })).toBeNull();
+  });
+
+  it('calls onRefresh when refresh button is clicked', () => {
+    const onRefresh = vi.fn();
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['a']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+        onRefresh={onRefresh}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }));
+    expect(onRefresh).toHaveBeenCalledOnce();
+  });
+
+  it('disables refresh button when refreshing is true', () => {
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['a']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+        onRefresh={vi.fn()}
+        refreshing
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    const btn = screen.getByRole('button', { name: 'Refresh models' });
+    expect(btn.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('renders search input and filters options', () => {
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['flash', 'pro', 'ultra']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    const searchInput = screen.getByLabelText('Search models');
+    expect(searchInput).toBeTruthy();
+    fireEvent.change(searchInput, { target: { value: 'pro' } });
+    expect(screen.getByRole('option', { name: 'pro' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: 'flash' })).toBeNull();
+    expect(screen.queryByRole('option', { name: 'ultra' })).toBeNull();
+  });
+
+  it('shows no-match message when search has no results', () => {
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['flash', 'pro']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+    fireEvent.change(screen.getByLabelText('Search models'), { target: { value: 'xyz' } });
+    expect(screen.getByText(/No models match/)).toBeTruthy();
+  });
 });

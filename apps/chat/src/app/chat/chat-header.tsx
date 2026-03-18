@@ -27,6 +27,8 @@ export interface ChatHeaderProps {
   onOpenMenu: () => void;
   onOpenActivity: () => void;
   modelLocked: boolean;
+  onRefreshModels?: () => void;
+  refreshingModels?: boolean;
 }
 
 export function ChatHeader({
@@ -50,6 +52,8 @@ export function ChatHeader({
   onOpenMenu,
   onOpenActivity,
   modelLocked,
+  onRefreshModels,
+  refreshingModels,
 }: ChatHeaderProps) {
   return (
     <header
@@ -170,6 +174,8 @@ export function ChatHeader({
             onInputChange={onModelInputChange}
             visible={showModelSelector}
             modelLocked={modelLocked}
+            onRefresh={onRefreshModels}
+            refreshing={refreshingModels}
           />
           {state === CHAT_STATES.UNAUTHENTICATED && (
             <button

@@ -41,6 +41,10 @@ export class MockStrategy implements AgentStrategy {
     return Promise.resolve(true);
   }
 
+  listModels(): Promise<string[]> {
+    return Promise.resolve(['mock-model-a', 'mock-model-b', 'mock-model-c']);
+  }
+
   interruptAgent(): void {
     this.streamCancel?.();
   }

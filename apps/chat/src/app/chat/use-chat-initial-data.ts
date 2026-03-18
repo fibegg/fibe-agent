@@ -8,6 +8,7 @@ export function useChatInitialData(authenticated: boolean) {
   const navigate = useNavigate();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [refreshingModels, setRefreshingModels] = useState(false);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -34,6 +35,21 @@ export function useChatInitialData(authenticated: boolean) {
     }
   }, []);
 
+  const refreshModelOptions = useCallback(async () => {
+    setRefreshingModels(true);
+    try {
+      const res = await apiRequest(API_PATHS.REFRESH_MODEL_OPTIONS, { method: 'POST' });
+      if (res.ok) {
+        const data = (await res.json()) as string[];
+        setModelOptions(Array.isArray(data) ? data : []);
+      }
+    } catch {
+      // Silently fail — keep existing options
+    } finally {
+      setRefreshingModels(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (authenticated) {
       loadMessages();
@@ -41,5 +57,5 @@ export function useChatInitialData(authenticated: boolean) {
     }
   }, [authenticated, loadMessages, loadModelOptions]);
 
-  return { messages, setMessages, modelOptions, loadMessages };
+  return { messages, setMessages, modelOptions, refreshingModels, loadMessages, refreshModelOptions };
 }

@@ -39,7 +39,7 @@ export function ChatPage() {
   const handleSendRef = useRef<() => void>(() => undefined);
 
   const authenticated = isAuthenticated();
-  const { messages, setMessages, modelOptions } = useChatInitialData(authenticated);
+  const { messages, setMessages, modelOptions, refreshingModels, refreshModelOptions } = useChatInitialData(authenticated);
   const scroll = useScrollToBottom([messages, streamingText]);
 
   const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, refetch: refetchPlaygrounds } =
@@ -454,6 +454,8 @@ export function ChatPage() {
           onOpenMenu={() => setSidebarOpen(true)}
           onOpenActivity={() => setRightSidebarOpen(true)}
           modelLocked={isChatModelLocked()}
+          onRefreshModels={refreshModelOptions}
+          refreshingModels={refreshingModels}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
