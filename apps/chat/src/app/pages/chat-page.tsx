@@ -489,10 +489,7 @@ export function ChatPage() {
           {!scroll.isAtBottom && (
             <button
               type="button"
-              onClick={() => {
-                messageListRef.current?.scrollToBottom('smooth');
-                scroll.scrollToBottom('smooth');
-              }}
+              onClick={() => scroll.scrollToBottom('smooth')}
               className="absolute bottom-4 right-4 sm:right-6 md:right-8 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-card/95 border border-border shadow-lg text-sm font-medium text-foreground hover:bg-violet-500/10 hover:border-violet-500/30 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2 focus:ring-offset-background transition-colors"
               aria-label="Jump to latest messages"
             >

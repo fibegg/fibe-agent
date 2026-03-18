@@ -227,7 +227,7 @@ export function ModelSelector({
                 </div>
 
                 {/* Options list */}
-                <div className="overflow-auto flex-1">
+                <div className="overflow-auto flex-1 min-h-0">
                   <button
                     type="button"
                     role="option"

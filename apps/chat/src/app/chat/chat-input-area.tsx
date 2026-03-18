@@ -194,18 +194,18 @@ export function ChatInputArea({
               type="button"
               onClick={onVoiceToggle}
               disabled={!isReady}
-              className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
+              className={`rounded-md flex items-center justify-center transition-colors shrink-0 ${
                 voiceRecorder.isRecording
-                  ? 'bg-destructive/90 hover:bg-destructive text-white'
-                  : 'text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
+                  ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-white'
+                  : 'size-8 sm:size-9 text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
               }`}
               title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
               aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
             >
               {voiceRecorder.isRecording ? (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
-                  <span className="text-xs tabular-nums ml-1">
+                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                  <span className="text-xs tabular-nums ml-1 truncate">
                     {Math.floor(voiceRecorder.recordingTimeSec / 60)}:
                     {(voiceRecorder.recordingTimeSec % 60).toString().padStart(2, '0')}
                   </span>
