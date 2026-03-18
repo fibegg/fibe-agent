@@ -64,7 +64,7 @@ export function useChatWebSocket(
   onMessage?: (data: ServerMessage) => void,
   onStreamChunk?: (text: string) => void,
   onStreamStart?: (data?: { model?: string }) => void,
-  onStreamEnd?: (finalText: string, usage?: { inputTokens: number; outputTokens: number }) => void,
+  onStreamEnd?: (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void
 ): UseChatWebSocketResult {
@@ -240,7 +240,8 @@ export function useChatWebSocket(
           typeof data.usage.outputTokens === 'number'
             ? { inputTokens: data.usage.inputTokens, outputTokens: data.usage.outputTokens }
             : undefined;
-        onStreamEndRef.current?.(finalText, usage);
+        const model = typeof data.model === 'string' ? data.model : undefined;
+        onStreamEndRef.current?.(finalText, usage, model);
         streamingAccumulatorRef.current = '';
         transition(setState, CHAT_STATES.AUTHENTICATED);
         return;

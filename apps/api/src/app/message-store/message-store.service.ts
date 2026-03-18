@@ -23,6 +23,7 @@ export interface StoredMessage {
   imageUrls?: string[];
   story?: StoredStoryEntry[];
   activityId?: string;
+  model?: string;
 }
 
 @Injectable()
@@ -41,13 +42,14 @@ export class MessageStoreService {
     return this.messages;
   }
 
-  add(role: string, body: string, imageUrls?: string[]): StoredMessage {
+  add(role: string, body: string, imageUrls?: string[], model?: string): StoredMessage {
     const message: StoredMessage = {
       id: randomUUID(),
       role,
       body,
       created_at: new Date().toISOString(),
       ...(imageUrls?.length ? { imageUrls } : {}),
+      ...(model ? { model } : {}),
     };
     this.messages.push(message);
     void this.save();

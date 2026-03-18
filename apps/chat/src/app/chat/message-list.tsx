@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { Clock, RotateCw, Sparkles, User } from 'lucide-react';
+import { Brain, Clock, RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
 import { FileIcon } from '../file-icon';
@@ -93,6 +93,7 @@ export interface ChatMessage {
   optimistic?: boolean;
   queued?: boolean;
   usage?: { inputTokens: number; outputTokens: number };
+  model?: string;
 }
 
 function formatTime(iso: string): string {
@@ -205,14 +206,20 @@ const MessageRow = memo(function MessageRow({
                   Retry
                 </button>
               )}
-              <p className="text-xs mt-1.5 sm:mt-2 text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                {formatTime(msg.created_at)}
-                {msg.usage && (
-                  <span className="tabular-nums">
-                    {formatCompactInteger(msg.usage.inputTokens)} in / {formatCompactInteger(msg.usage.outputTokens)} out
-                  </span>
-                )}
-              </p>
+              <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 min-h-[1.25rem]">
+                <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  {formatTime(msg.created_at)}
+                  {msg.usage && (
+                    <span className="tabular-nums">
+                      {formatCompactInteger(msg.usage.inputTokens)} in / {formatCompactInteger(msg.usage.outputTokens)} out
+                    </span>
+                  )}
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none" title={msg.model ? `Processed by ${msg.model}` : undefined}>
+                  <Brain className="size-3 shrink-0" aria-hidden />
+                  {msg.model ?? '—'}
+                </p>
+              </div>
             </>
           )}
         </div>

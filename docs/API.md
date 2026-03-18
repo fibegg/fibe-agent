@@ -85,10 +85,10 @@ Each message is an object with a `type` and optional extra fields.
 | logout_output       | text                | Logout CLI output                    |
 | logout_success      | —                   | Logout completed                     |
 | error               | message             | Error message                        |
-| message             | id?, role, body, created_at, imageUrls?, story? | Persisted message (imageUrls = upload filenames; story = activity timeline for assistant messages) |
+| message             | id?, role, body, created_at, imageUrls?, story?, model? | Persisted message (imageUrls = upload filenames; story = activity timeline for assistant messages; model = name of model that produced assistant message) |
 | stream_start        | model?              | Start of assistant stream; optional current model name for thinking UI |
 | stream_chunk        | text                | Chunk of assistant response          |
-| stream_end          | usage?              | End of stream; optional `usage: { inputTokens, outputTokens }` when the provider reports token counts. |
+| stream_end          | usage?, model?      | End of stream; optional `usage: { inputTokens, outputTokens }`; optional `model` (name of model that produced the response) for per-message display. |
 | model_updated       | model               | Current model name                   |
 | reasoning_start     | —                   | Start of reasoning/thinking stream (optional) |
 | reasoning_chunk     | text                | Chunk of reasoning text              |

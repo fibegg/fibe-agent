@@ -63,6 +63,14 @@ describe('MessageStoreService', () => {
     expect(service.all()[0].story).toBeUndefined();
   });
 
+  test('add with model stores model on message', () => {
+    const config = { getDataDir: () => dataDir };
+    const service = new MessageStoreService(config as never);
+    const msg = service.add('assistant', 'hi', undefined, 'gpt-4o');
+    expect(msg.model).toBe('gpt-4o');
+    expect(service.all()[0].model).toBe('gpt-4o');
+  });
+
   test('setStoryForLastAssistant does nothing when messages is empty', () => {
     const config = { getDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);

@@ -21,7 +21,7 @@ const AUTH_MODE_NAMES = ['oauth', 'api-token'] as const;
 type ProviderName = (typeof PROVIDER_NAMES)[number];
 type AuthMode = (typeof AUTH_MODE_NAMES)[number];
 
-const DEFAULT_PROVIDER: ProviderName = 'claude-code';
+export const DEFAULT_PROVIDER: ProviderName = 'claude-code';
 const DEFAULT_AUTH_MODE: AuthMode = 'oauth';
 
 function resolveAuthMode(): AuthMode {

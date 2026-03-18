@@ -24,7 +24,7 @@ import type {
   ToolEvent,
 } from '../strategies/strategy.types';
 import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
-import { StrategyRegistryService } from '../strategies/strategy-registry.service';
+import { DEFAULT_PROVIDER, StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
   AUTH_STATUS as AUTH_STATUS_VAL,
   ERROR_CODE,
@@ -102,7 +102,9 @@ export class OrchestratorService implements OnModuleInit {
     usage?: TokenUsage
   ): void {
     const finalText = accumulated || 'The agent produced no visible output.';
-    this.messageStore.add('assistant', finalText);
+    const storedModel = (this.modelStore.get() || '').trim();
+    const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
+    this.messageStore.add('assistant', finalText, undefined, model);
     void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
     this._send(WS_EVENT.THINKING_STEP, {
       id: stepId,
@@ -111,7 +113,7 @@ export class OrchestratorService implements OnModuleInit {
       details: step.details,
       timestamp: new Date().toISOString(),
     });
-    this._send(WS_EVENT.STREAM_END, usage ? { usage } : {});
+    this._send(WS_EVENT.STREAM_END, { ...(usage ? { usage } : {}), model });
     if (this.currentActivityId && usage) {
       this.activityStore.setUsage(this.currentActivityId, usage);
       const entry = this.activityStore.getById(this.currentActivityId);

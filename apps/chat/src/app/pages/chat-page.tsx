@@ -88,6 +88,7 @@ export function ChatPage() {
     handleMentionClose,
   } = useChatInput({ playgroundEntries, onSendRef: handleSendRef });
   const messageListRef = useRef<MessageListHandle | null>(null);
+  const streamModelRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!authenticated) {
@@ -97,7 +98,7 @@ export function ChatPage() {
 
   const handleMessage = useCallback((data: ServerMessage) => {
     if (data.type === 'message' && data.role && data.body !== undefined) {
-      const payload = data as { id?: string; imageUrls?: string[] };
+      const payload = data as { id?: string; imageUrls?: string[]; model?: string };
       const role = data.role as string;
       const body = data.body ?? '';
       const created_at = (data.created_at as string) ?? new Date().toISOString();
@@ -107,6 +108,7 @@ export function ChatPage() {
         body,
         created_at,
         ...(payload.imageUrls?.length ? { imageUrls: payload.imageUrls } : {}),
+        ...(payload.model ? { model: payload.model } : {}),
       };
       setMessages((prev) => {
         const last = prev[prev.length - 1];
@@ -143,9 +145,10 @@ export function ChatPage() {
     (chunk) => flushSync(() => setStreamingText((prev) => prev + chunk)),
     (data) => {
       setStreamingText('');
+      streamModelRef.current = data?.model ?? null;
       resetForNewStream(data);
     },
-    (finalText, usage) => {
+    (finalText, usage, model) => {
       const text = finalText?.trim() || NO_OUTPUT_MESSAGE;
       const log = activityLogRef.current;
       const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
@@ -157,6 +160,8 @@ export function ChatPage() {
         ...(command !== undefined ? { command } : {}),
         ...(path !== undefined ? { path } : {}),
       }));
+      const modelForMessage = model ?? streamModelRef.current ?? undefined;
+      streamModelRef.current = null;
       setMessages((m) => [
         ...m,
         {
@@ -165,6 +170,7 @@ export function ChatPage() {
           created_at: new Date().toISOString(),
           story: storyForApi,
           ...(usage ? { usage } : {}),
+          ...(modelForMessage ? { model: modelForMessage } : {}),
         },
       ]);
       sendRef.current({ action: 'submit_story', story: storyForApi });

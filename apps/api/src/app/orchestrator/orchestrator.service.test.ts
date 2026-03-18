@@ -180,6 +180,18 @@ describe('OrchestratorService', () => {
     expect(thinkingStep?.data.status).toBe('processing');
   });
 
+  test('send_chat_message sends stream_end with model', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    const streamEnd = events.find((e) => e.type === WS_EVENT.STREAM_END);
+    expect(streamEnd).toBeDefined();
+    expect(streamEnd?.data.model).toBeDefined();
+    expect(typeof streamEnd?.data.model).toBe('string');
+  });
+
   test('handleClientMessage interrupt_agent when not processing does nothing', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string }> = [];
