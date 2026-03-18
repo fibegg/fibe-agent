@@ -8,6 +8,7 @@ export const API_PATHS = {
   PLAYGROUNDS_FILE: '/api/playgrounds/file',
   ACTIVITIES: '/api/activities',
   ACTIVITIES_BY_ENTRY: '/api/activities/by-entry',
+  INIT_STATUS: '/api/init-status',
 } as const;
 
 export const API_PATH_UPLOADS_BY_FILENAME = (filename: string) =>

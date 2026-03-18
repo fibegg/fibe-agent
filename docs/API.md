@@ -23,16 +23,18 @@ Path constants are defined in `shared/api-paths.ts` (`API_PATHS.*`, `API_PATH_UP
 | GET    | /api/model-options | Bearer | Returns string array of model names from `MODEL_OPTIONS` env                |
 | GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
 | GET    | /api/playgrounds/file | Bearer | Query `path` = relative path. Returns `{ content: string }`; 404 if not found or not a file. |
+| GET    | /api/init-status      | Bearer | Post-init script status. Returns `{ state: 'disabled'|'pending'|'running'|'done'|'failed', output?, error?, finishedAt? }`. |
 
-When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, and `GET /api/playgrounds/file` require `Authorization: Bearer <password>` or `?token=<password>`.
+When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, `GET /api/playgrounds/file`, and `GET /api/init-status` require `Authorization: Bearer <password>` or `?token=<password>`.
 
 ## Container logging
 
 All API logs are written as **one JSON object per line** to stdout/stderr so container and log aggregators can parse and filter by level, context, or request ID.
 
-| Env var     | Values (case-insensitive) | Description |
-|-------------|----------------------------|-------------|
-| `LOG_LEVEL` | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` | Minimum level emitted. `info` and `log` are equivalent. |
+| Env var             | Description |
+|---------------------|-------------|
+| `POST_INIT_SCRIPT`  | Optional. Shell script run once on first container load (e.g. to install tools). State is stored under `DATA_DIR` and exposed at `GET /api/init-status`. |
+| `LOG_LEVEL`         | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` (case-insensitive). Minimum level emitted. `info` and `log` are equivalent. |
 
 **Log shape:** `{ "timestamp": "<ISO8601>", "level": "log", "context": "<optional>", "message": "<string>", ... }`
 

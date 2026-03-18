@@ -12,6 +12,8 @@ describe('ConfigService', () => {
     envBackup.DATA_DIR = process.env.DATA_DIR;
     envBackup.SYSTEM_PROMPT_PATH = process.env.SYSTEM_PROMPT_PATH;
     envBackup.PLAYGROUNDS_DIR = process.env.PLAYGROUNDS_DIR;
+    envBackup.POST_INIT_SCRIPT = process.env.POST_INIT_SCRIPT;
+    envBackup.PSOT_INIT_SCRIPT = process.env.PSOT_INIT_SCRIPT;
   });
 
   afterEach(() => {
@@ -21,6 +23,8 @@ describe('ConfigService', () => {
     process.env.DATA_DIR = envBackup.DATA_DIR;
     process.env.SYSTEM_PROMPT_PATH = envBackup.SYSTEM_PROMPT_PATH;
     process.env.PLAYGROUNDS_DIR = envBackup.PLAYGROUNDS_DIR;
+    process.env.POST_INIT_SCRIPT = envBackup.POST_INIT_SCRIPT;
+    process.env.PSOT_INIT_SCRIPT = envBackup.PSOT_INIT_SCRIPT;
   });
 
   test('getAgentPassword returns undefined when AGENT_PASSWORD not set', () => {
@@ -89,5 +93,33 @@ describe('ConfigService', () => {
   test('getPlaygroundsDir returns default under cwd when not set', () => {
     delete process.env.PLAYGROUNDS_DIR;
     expect(new ConfigService().getPlaygroundsDir()).toBe(join(process.cwd(), 'playground'));
+  });
+
+  test('getPostInitScript returns undefined when neither env set', () => {
+    delete process.env.POST_INIT_SCRIPT;
+    delete process.env.PSOT_INIT_SCRIPT;
+    expect(new ConfigService().getPostInitScript()).toBeUndefined();
+  });
+
+  test('getPostInitScript returns POST_INIT_SCRIPT when set', () => {
+    process.env.POST_INIT_SCRIPT = 'echo hello';
+    expect(new ConfigService().getPostInitScript()).toBe('echo hello');
+  });
+
+  test('getPostInitScript returns PSOT_INIT_SCRIPT when POST_INIT_SCRIPT not set', () => {
+    delete process.env.POST_INIT_SCRIPT;
+    process.env.PSOT_INIT_SCRIPT = 'echo typo';
+    expect(new ConfigService().getPostInitScript()).toBe('echo typo');
+  });
+
+  test('getPostInitScript prefers POST_INIT_SCRIPT over PSOT_INIT_SCRIPT', () => {
+    process.env.POST_INIT_SCRIPT = 'correct';
+    process.env.PSOT_INIT_SCRIPT = 'typo';
+    expect(new ConfigService().getPostInitScript()).toBe('correct');
+  });
+
+  test('getPostInitScript returns undefined for empty or whitespace', () => {
+    process.env.POST_INIT_SCRIPT = '   ';
+    expect(new ConfigService().getPostInitScript()).toBeUndefined();
   });
 });

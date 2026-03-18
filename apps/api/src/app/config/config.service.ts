@@ -53,4 +53,9 @@ export class ConfigService {
   isPhoenixSyncEnabled(): boolean {
     return process.env.PHOENIX_SYNC_ENABLED === 'true';
   }
+
+  getPostInitScript(): string | undefined {
+    const v = process.env.POST_INIT_SCRIPT ?? process.env.PSOT_INIT_SCRIPT;
+    return v?.trim() || undefined;
+  }
 }
