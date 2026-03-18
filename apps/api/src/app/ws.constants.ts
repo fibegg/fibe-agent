@@ -6,6 +6,7 @@ export const WS_ACTION = {
   REAUTHENTICATE: 'reauthenticate',
   LOGOUT: 'logout',
   SEND_CHAT_MESSAGE: 'send_chat_message',
+  QUEUE_MESSAGE: 'queue_message',
   SUBMIT_STORY: 'submit_story',
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
@@ -36,6 +37,7 @@ export const WS_EVENT = {
   ACTIVITY_APPENDED: 'activity_appended',
   ACTIVITY_UPDATED: 'activity_updated',
   PLAYGROUND_CHANGED: 'playground_changed',
+  QUEUE_UPDATED: 'queue_updated',
 } as const;
 
 export const AUTH_STATUS = {
@@ -45,7 +47,6 @@ export const AUTH_STATUS = {
 
 export const ERROR_CODE = {
   NEED_AUTH: 'NEED_AUTH',
-  BLOCKED: 'BLOCKED',
 } as const;
 
 export const WS_CLOSE = {

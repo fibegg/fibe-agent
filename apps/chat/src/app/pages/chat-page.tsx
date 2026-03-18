@@ -111,7 +111,7 @@ export function ChatPage() {
       setMessages((prev) => {
         const last = prev[prev.length - 1];
         if (last?.role === 'user' && last?.optimistic && last.body === body) {
-          return [...prev.slice(0, -1), { ...serverMsg }];
+          return [...prev.slice(0, -1), { ...serverMsg, ...(last.queued ? { queued: true } : {}) }];
         }
         return [...prev, serverMsg];
       });
@@ -128,6 +128,7 @@ export function ChatPage() {
     errorMessage,
     authModal,
     sessionActivity,
+    queuedCount,
     send,
     reconnect,
     startAuth,
@@ -221,26 +222,35 @@ export function ChatPage() {
 
   const handleSend = useCallback(() => {
     const text = inputValue.trim();
+    const isQueuing = state === CHAT_STATES.AWAITING_RESPONSE;
     const hasVoice = !!pendingVoiceFilename || !!pendingVoice;
     const hasContent =
       text || pendingImages.length > 0 || hasVoice || pendingAttachments.length > 0;
-    if (!hasContent || state !== CHAT_STATES.AUTHENTICATED) return;
-    send({
-      action: 'send_chat_message',
-      text: text || '',
-      ...(pendingImages.length ? { images: pendingImages } : {}),
-      ...(pendingVoiceFilename ? { audioFilename: pendingVoiceFilename } : pendingVoice ? { audio: pendingVoice } : {}),
-      ...(pendingAttachments.length ? { attachmentFilenames: pendingAttachments.map((a) => a.filename) } : {}),
-    });
+    if (!hasContent) return;
+    if (!isQueuing && state !== CHAT_STATES.AUTHENTICATED) return;
+
+    if (isQueuing) {
+      // Queue mode — text only
+      if (!text) return;
+      send({ action: 'queue_message', text });
+    } else {
+      send({
+        action: 'send_chat_message',
+        text: text || '',
+        ...(pendingImages.length ? { images: pendingImages } : {}),
+        ...(pendingVoiceFilename ? { audioFilename: pendingVoiceFilename } : pendingVoice ? { audio: pendingVoice } : {}),
+        ...(pendingAttachments.length ? { attachmentFilenames: pendingAttachments.map((a) => a.filename) } : {}),
+      });
+    }
     if (text) {
       setMessages((prev) => [
         ...prev,
-        { role: 'user', body: text, created_at: new Date().toISOString(), optimistic: true },
+        { role: 'user', body: text, created_at: new Date().toISOString(), optimistic: true, ...(isQueuing ? { queued: true } : {}) },
       ]);
     }
     setLastSentMessage(text || null);
     setInputState({ value: '', cursor: 0 });
-    clearPending();
+    if (!isQueuing) clearPending();
     scroll.markJustSent();
   }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll, clearPending]);
 
@@ -265,6 +275,19 @@ export function ChatPage() {
   useEffect(() => {
     handleSendRef.current = handleSend;
   }, [handleSend]);
+
+  // Clear queued badges when queuedCount drops from >0 to 0 (new session started)
+  const prevQueuedCountRef = useRef(0);
+  useEffect(() => {
+    const wasPositive = prevQueuedCountRef.current > 0;
+    prevQueuedCountRef.current = queuedCount;
+    if (wasPositive && queuedCount === 0) {
+      setMessages((prev) => {
+        if (!prev.some((m) => m.queued)) return prev;
+        return prev.map((m) => (m.queued ? { ...m, queued: false } : m));
+      });
+    }
+  }, [queuedCount]);
 
   const uploadVoiceFile = useCallback(
     async (blob: Blob): Promise<string | null> => {
@@ -519,6 +542,7 @@ export function ChatPage() {
           onInterrupt={interruptAgent}
           onVoiceToggle={handleVoiceToggle}
           maxPendingTotal={MAX_PENDING_TOTAL}
+          queuedCount={queuedCount}
         />
         </div>
       </main>

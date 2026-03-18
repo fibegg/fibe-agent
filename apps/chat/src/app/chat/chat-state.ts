@@ -25,7 +25,7 @@ export const STATE_LABELS: Record<ChatState, string> = {
 export const CHAT_INPUT_PLACEHOLDER = {
   AUTH_REQUIRED: 'Complete authentication to start chatting...',
   READY: 'Ask me anything...',
-  WORKING: 'Working...',
+  WORKING: 'Queue a message for the agent...',
 } as const;
 
 export function getChatInputPlaceholder(state: ChatState): string {
@@ -84,6 +84,7 @@ export interface ServerMessage {
   command?: string;
   activity?: StoredActivityEntry[];
   entry?: StoredActivityEntry;
+  count?: number;
 }
 
 export interface StoredStoryEntry {

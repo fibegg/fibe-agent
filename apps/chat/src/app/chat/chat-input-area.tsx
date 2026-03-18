@@ -42,6 +42,7 @@ export interface ChatInputAreaProps {
   onInterrupt: () => void;
   onVoiceToggle: () => void;
   maxPendingTotal: number;
+  queuedCount?: number;
 }
 
 export function ChatInputArea({
@@ -72,10 +73,14 @@ export function ChatInputArea({
   onInterrupt,
   onVoiceToggle,
   maxPendingTotal,
+  queuedCount = 0,
 }: ChatInputAreaProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isWorking = state === CHAT_STATES.AWAITING_RESPONSE;
+  const isReady = state === CHAT_STATES.AUTHENTICATED;
+  const canType = isReady || isWorking;
   const canAttach =
-    state === CHAT_STATES.AUTHENTICATED &&
+    isReady &&
     pendingImages.length + pendingAttachments.length < maxPendingTotal;
 
   return (
@@ -170,7 +175,7 @@ export function ChatInputArea({
               onValueAndCursor={onInputChange}
               onCursorChange={onCursorChange}
               placeholder={placeholder}
-              disabled={state !== CHAT_STATES.AUTHENTICATED}
+              disabled={!canType}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
               className="w-full bg-transparent"
@@ -188,7 +193,7 @@ export function ChatInputArea({
             <button
               type="button"
               onClick={onVoiceToggle}
-              disabled={state !== CHAT_STATES.AUTHENTICATED}
+              disabled={!isReady}
               className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
                 voiceRecorder.isRecording
                   ? 'bg-destructive/90 hover:bg-destructive text-white'
@@ -210,20 +215,37 @@ export function ChatInputArea({
               )}
             </button>
           )}
-          {state === CHAT_STATES.AWAITING_RESPONSE ? (
-            <button
-              type="button"
-              onClick={onInterrupt}
-              className="size-8 sm:size-9 rounded-md flex items-center justify-center border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Stop"
-            >
-              <Square className="size-3.5 sm:size-4 fill-current" />
-            </button>
+          {isWorking ? (
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={onSend}
+                disabled={!inputValue.trim()}
+                className="relative size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-30 transition-opacity"
+                aria-label="Queue message"
+                title="Queue message for agent"
+              >
+                <Send className="size-3.5 sm:size-4" />
+                {queuedCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center leading-none">
+                    {queuedCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={onInterrupt}
+                className="size-8 sm:size-9 rounded-md flex items-center justify-center border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Stop"
+              >
+                <Square className="size-3.5 sm:size-4 fill-current" />
+              </button>
+            </div>
           ) : (
             <button
               type="button"
               onClick={onSend}
-              disabled={state !== CHAT_STATES.AUTHENTICATED}
+              disabled={!isReady}
               className="size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
               aria-label="Send"
             >

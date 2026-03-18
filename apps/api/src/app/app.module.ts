@@ -24,6 +24,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
 import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
 import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
+import { SteeringService } from './steering/steering.service';
 
 @Module({
   imports: [
@@ -59,6 +60,7 @@ import { GithubTokenRefreshService } from './github-token-refresh/github-token-r
     PlaygroundWatcherService,
     PhoenixSyncService,
     GithubTokenRefreshService,
+    SteeringService,
   ],
 })
 export class AppModule {}

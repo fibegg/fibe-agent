@@ -29,6 +29,7 @@ export interface UseChatWebSocketResult {
   errorMessage: string | null;
   authModal: AuthModalState;
   sessionActivity: StoredActivityEntry[];
+  queuedCount: number;
   send: (msg: Record<string, unknown>) => void;
   reconnect: () => void;
   startAuth: () => void;
@@ -76,6 +77,7 @@ export function useChatWebSocket(
     isManualToken: false,
   });
   const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
+  const [queuedCount, setQueuedCount] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -319,6 +321,11 @@ export function useChatWebSocket(
         onPlaygroundChangedRef.current?.();
         return;
       }
+
+      if (data.type === 'queue_updated') {
+        setQueuedCount(typeof data.count === 'number' ? data.count : 0);
+        return;
+      }
     };
 
     ws.onclose = (event: CloseEvent) => {
@@ -420,6 +427,7 @@ export function useChatWebSocket(
     errorMessage,
     authModal,
     sessionActivity,
+    queuedCount,
     send,
     reconnect,
     startAuth,

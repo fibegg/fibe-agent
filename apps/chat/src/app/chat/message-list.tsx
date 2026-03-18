@@ -1,6 +1,6 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { RotateCw, Sparkles, User } from 'lucide-react';
+import { Clock, RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
 import { FileIcon } from '../file-icon';
@@ -90,6 +90,7 @@ export interface ChatMessage {
   }>;
   activityId?: string;
   optimistic?: boolean;
+  queued?: boolean;
 }
 
 function formatTime(iso: string): string {
@@ -179,8 +180,14 @@ const MessageRow = memo(function MessageRow({
               ) : (
                 <MessageBodyWithMentions body={msg.body} />
               )}
-              <p className="text-xs mt-1.5 sm:mt-2 text-violet-200">
+              <p className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center gap-1.5">
                 {formatTime(msg.created_at)}
+                {msg.queued && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-medium leading-none">
+                    <Clock className="size-2.5" aria-hidden />
+                    Queued
+                  </span>
+                )}
               </p>
             </>
           ) : (

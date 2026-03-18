@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   getStoredTheme,
   setStoredTheme,
@@ -10,9 +10,26 @@ import {
 
 const STORAGE_KEY = 'chat-theme';
 
+/* jsdom may provide a minimal localStorage stub missing removeItem/clear.
+   Create a proper in-memory implementation and install it globally. */
+let store: Record<string, string> = {};
+const storageMock: Storage = {
+  get length() { return Object.keys(store).length; },
+  key(index: number) { return Object.keys(store)[index] ?? null; },
+  getItem(key: string) { return key in store ? store[key] : null; },
+  setItem(key: string, value: string) { store[key] = String(value); },
+  removeItem(key: string) { delete store[key]; },
+  clear() { store = {}; },
+};
+vi.stubGlobal('localStorage', storageMock);
+
+function resetStorage() {
+  store = {};
+}
+
 describe('getStoredTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
   });
 
   it('returns null when nothing stored', () => {
@@ -37,7 +54,7 @@ describe('getStoredTheme', () => {
 
 describe('setStoredTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
     document.documentElement.classList.remove('dark');
   });
 
@@ -72,7 +89,7 @@ describe('isDark', () => {
 
 describe('toggleTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
     document.documentElement.classList.remove('dark');
   });
 
@@ -119,7 +136,7 @@ describe('isSetThemeMessage', () => {
 
 describe('initTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
     document.documentElement.classList.remove('dark');
   });
 

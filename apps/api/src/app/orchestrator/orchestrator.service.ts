@@ -11,6 +11,7 @@ import {
 } from '../message-store/message-store.service';
 import { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
+import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { UploadsService } from '../uploads/uploads.service';
 import type {
@@ -31,6 +32,7 @@ import {
 } from '../ws.constants';
 
 import { writeMcpConfig } from '../config/mcp-config-writer';
+
 import { ChatPromptContextService } from './chat-prompt-context.service';
 
 export interface OutboundEvent {
@@ -59,6 +61,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly playgroundsService: PlaygroundsService,
     private readonly phoenixSync: PhoenixSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
+    private readonly steering: SteeringService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
     void this.playgroundsService;
@@ -146,13 +149,20 @@ export class OrchestratorService implements OnModuleInit {
         this.handleLogout();
         break;
       case WS_ACTION.SEND_CHAT_MESSAGE:
-        await this.handleChatMessage(
-          msg.text ?? '',
-          msg.images,
-          msg.audio,
-          msg.audioFilename,
-          msg.attachmentFilenames
-        );
+        if (this.isProcessing) {
+          this.handleQueueMessage(msg.text ?? '');
+        } else {
+          await this.handleChatMessage(
+            msg.text ?? '',
+            msg.images,
+            msg.audio,
+            msg.audioFilename,
+            msg.attachmentFilenames
+          );
+        }
+        break;
+      case WS_ACTION.QUEUE_MESSAGE:
+        this.handleQueueMessage(msg.text ?? '');
         break;
       case WS_ACTION.SUBMIT_STORY:
         this.handleSubmitStory(msg.story ?? []);
@@ -250,12 +260,9 @@ export class OrchestratorService implements OnModuleInit {
       this._send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
       return;
     }
-    if (this.isProcessing) {
-      this._send(WS_EVENT.ERROR, { message: ERROR_CODE.BLOCKED });
-      return;
-    }
-
     this.isProcessing = true;
+    this.steering.resetQueue();
+    this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
 
     const imageUrls: string[] = [];
     if (images?.length) {
@@ -421,6 +428,15 @@ export class OrchestratorService implements OnModuleInit {
         }
       },
     };
+  }
+
+  private handleQueueMessage(text: string): void {
+    if (!text.trim()) return;
+    this.steering.enqueue(text);
+    const userMessage = this.messageStore.add('user', text);
+    this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
+    this._send(WS_EVENT.QUEUE_UPDATED, { count: this.steering.count });
+    void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
   }
 
   private createAuthConnection(): AuthConnection {

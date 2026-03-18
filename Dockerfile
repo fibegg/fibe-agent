@@ -102,6 +102,7 @@ RUN npx -y playwright install-deps chromium
 EXPOSE 3000
 
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
+    && touch /app/data/STEERING.md \
     && if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \

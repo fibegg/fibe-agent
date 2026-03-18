@@ -1,3 +1,11 @@
+import { vi } from 'vitest';
+
+// Mock prism-loader to prevent 80+ prismjs dynamic imports from racing
+// against test worker shutdown (causes "Closing rpc while fetch was pending").
+vi.mock('./file-explorer/prism-loader', () => ({
+  highlightCodeElement: vi.fn(),
+}));
+
 import { render } from '@testing-library/react';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 

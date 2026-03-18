@@ -9,6 +9,7 @@ import { ModelStoreService } from '../model-store/model-store.service';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
+import { SteeringService } from '../steering/steering.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS } from '../ws.constants';
 
 describe('OrchestratorService', () => {
@@ -63,6 +64,8 @@ describe('OrchestratorService', () => {
         _attachmentFilenames?: string[],
       ) => text.trim(),
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
+    const steering = new SteeringService(config as never);
+    steering.onModuleInit();
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -73,6 +76,7 @@ describe('OrchestratorService', () => {
       playgroundsService,
       phoenixSync,
       chatPromptContext,
+      steering,
     );
     await orch.onModuleInit();
     return orch;
@@ -195,5 +199,42 @@ describe('OrchestratorService', () => {
     expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
     expect(orch.isProcessing).toBe(false);
+  });
+
+  test('send_chat_message while processing queues the message instead of blocking', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    const promise = orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'first' });
+    // While processing, send another message — should be queued
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'queued msg' });
+    await promise;
+    const queueEvents = events.filter((e) => e.type === WS_EVENT.QUEUE_UPDATED);
+    expect(queueEvents.length).toBeGreaterThanOrEqual(1);
+    const msgEvents = events.filter((e) => e.type === WS_EVENT.MESSAGE);
+    expect(msgEvents.some((e) => (e.data as Record<string, unknown>).body === 'queued msg')).toBe(true);
+  });
+
+  test('queue_message action queues and emits message + queue_updated', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    orch.isProcessing = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.QUEUE_MESSAGE, text: 'steer this way' });
+    expect(events.some((e) => e.type === WS_EVENT.MESSAGE)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.QUEUE_UPDATED && (e.data as Record<string, unknown>).count === 1)).toBe(true);
+  });
+
+  test('queue resets when a new streaming session starts', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'go' });
+    // At stream start, queue_updated with count 0 should be emitted
+    const queueResetEvent = events.find((e) => e.type === WS_EVENT.QUEUE_UPDATED && e.data.count === 0);
+    expect(queueResetEvent).toBeDefined();
   });
 });
