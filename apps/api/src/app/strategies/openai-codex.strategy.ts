@@ -1,6 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, unlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
@@ -8,6 +8,7 @@ import { runAuthProcess } from './auth-process-helper';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
 const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
+const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 
 function getCodexHome(): string {
   return process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
@@ -39,16 +40,32 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   private authCancel: (() => void) | null = null;
   private currentStreamProcess: ChildProcess | null = null;
   private streamInterrupted = false;
+  private readonly useApiTokenMode: boolean;
+
+  constructor(useApiTokenMode = false) {
+    this.useApiTokenMode = useApiTokenMode;
+  }
 
   ensureSettings(): void {
     const codexHome = getCodexHome();
     if (!existsSync(codexHome)) {
       mkdirSync(codexHome, { recursive: true });
     }
+    if (this.useApiTokenMode) {
+      const key = process.env[OPENAI_API_KEY_ENV]?.trim();
+      if (key) {
+        const authPath = join(codexHome, 'auth.json');
+        writeFileSync(authPath, JSON.stringify({ api_key: key }), { mode: 0o600 });
+      }
+    }
   }
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
+    if (this.useApiTokenMode && process.env[OPENAI_API_KEY_ENV]?.trim()) {
+      this.currentConnection.sendAuthSuccess();
+      return;
+    }
     this.ensureSettings();
     connection.sendAuthUrlGenerated('https://auth.openai.com/device');
 
@@ -63,7 +80,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       onData: (output) => {
         // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
         const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
-        const urlMatch = clean.match(/https:\/\/[^\s"'>]+/);
+        const urlMatch = clean.match(/https:\/\/[^\s\"'>]+/);
         if (urlMatch && !authUrlExtracted) {
           authUrlExtracted = true;
           this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
@@ -150,6 +167,10 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   }
 
   checkAuthStatus(): Promise<boolean> {
+    if (this.useApiTokenMode && process.env[OPENAI_API_KEY_ENV]?.trim()) {
+      return Promise.resolve(true);
+    }
+
     return new Promise((resolve) => {
       const authFile = join(getCodexHome(), 'auth.json');
       if (!existsSync(authFile)) {
@@ -180,6 +201,9 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
+      if (this.useApiTokenMode) {
+        this.ensureSettings();
+      }
       const playgroundDir = join(process.cwd(), 'playground');
       if (!existsSync(playgroundDir)) {
         mkdirSync(playgroundDir, { recursive: true });

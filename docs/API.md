@@ -112,3 +112,22 @@ When the chat app is loaded inside an iframe (e.g. Phoenix frame), the following
 
 - **Auto-auth:** `{ action: 'auto_auth', password: '<internal_password>' }` — chat calls `POST /api/auth/login` and stores the token.
 - **Set theme:** `{ action: 'set_theme', theme: 'light' | 'dark' }` — applied when `VITE_THEME_SOURCE=frame`. Theme is also persisted to `localStorage` so it survives refresh.
+
+## Agent providers and auth modes
+
+The backend talks to external model providers via CLI-based strategies. Two env vars control which agent is active and how it authenticates:
+
+- `AGENT_PROVIDER`: `mock` | `gemini` | `claude-code` | `openai` | `openai-codex` | `opencode` (default `claude-code`)
+- `AGENT_AUTH_MODE`: `oauth` (default) | `api-token`
+
+When `AGENT_AUTH_MODE=api-token`, the strategies skip interactive OAuth/device flows and rely on provider API tokens from env vars:
+
+- Claude Code: `CLAUDE_CODE_OAUTH_TOKEN` or `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY`)
+- Gemini: `GEMINI_API_KEY`
+- OpenAI Codex: `OPENAI_API_KEY`
+- OpenCode: any of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` (existing behavior)
+
+In `api-token` mode:
+
+- `check_auth_status` uses the presence of these env vars as the source of truth.
+- `initiate_auth` immediately succeeds when the relevant env var is set; otherwise it reports `unauthenticated` without opening a browser.

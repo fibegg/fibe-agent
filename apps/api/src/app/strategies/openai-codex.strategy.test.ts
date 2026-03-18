@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { OpenaiCodexStrategy } from './openai-codex.strategy';
@@ -12,6 +12,7 @@ describe('OpenaiCodexStrategy', () => {
   beforeEach(() => {
     savedEnv.HOME = process.env.HOME;
     savedEnv.SESSION_DIR = process.env.SESSION_DIR;
+    savedEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     process.env.HOME = TEST_HOME;
     process.env.SESSION_DIR = join(TEST_HOME, '.codex');
     if (existsSync(TEST_HOME)) {
@@ -24,6 +25,8 @@ describe('OpenaiCodexStrategy', () => {
     process.env.HOME = savedEnv.HOME;
     if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
     else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
+    if (savedEnv.OPENAI_API_KEY === undefined) delete process.env.OPENAI_API_KEY;
+    else process.env.OPENAI_API_KEY = savedEnv.OPENAI_API_KEY;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
     }
@@ -100,5 +103,51 @@ describe('OpenaiCodexStrategy', () => {
     process.env.SESSION_DIR = join(TEST_HOME, '.codex');
     const strategy = new OpenaiCodexStrategy();
     expect(() => strategy.clearCredentials()).not.toThrow();
+  });
+
+  test('checkAuthStatus returns true in api-token mode when OPENAI_API_KEY is set', async () => {
+    process.env.OPENAI_API_KEY = 'sk-test-token';
+    const strategy = new OpenaiCodexStrategy(true);
+    const result = await strategy.checkAuthStatus();
+    expect(result).toBe(true);
+  });
+
+  test('ensureSettings in api-token mode writes auth.json when OPENAI_API_KEY is set', () => {
+    process.env.OPENAI_API_KEY = 'sk-env-key';
+    const codexDir = join(TEST_HOME, '.codex');
+    process.env.SESSION_DIR = codexDir;
+    const strategy = new OpenaiCodexStrategy(true);
+    strategy.ensureSettings();
+    expect(existsSync(join(codexDir, 'auth.json'))).toBe(true);
+    const content = readFileSync(join(codexDir, 'auth.json'), 'utf8');
+    expect(JSON.parse(content)).toEqual({ api_key: 'sk-env-key' });
+  });
+
+  test('ensureSettings in api-token mode does not write auth.json when OPENAI_API_KEY is empty', () => {
+    delete process.env.OPENAI_API_KEY;
+    const codexDir = join(TEST_HOME, '.codex');
+    process.env.SESSION_DIR = codexDir;
+    mkdirSync(codexDir, { recursive: true });
+    const strategy = new OpenaiCodexStrategy(true);
+    strategy.ensureSettings();
+    expect(existsSync(join(codexDir, 'auth.json'))).toBe(false);
+  });
+
+  test('executeAuth in api-token mode sends authSuccess when OPENAI_API_KEY is set', () => {
+    process.env.OPENAI_API_KEY = 'sk-ok';
+    const strategy = new OpenaiCodexStrategy(true);
+    let successCalled = false;
+    const connection = {
+      sendAuthUrlGenerated: () => {},
+      sendDeviceCode: () => {},
+      sendAuthManualToken: () => {},
+      sendAuthSuccess: () => {
+        successCalled = true;
+      },
+      sendAuthStatus: () => {},
+      sendError: () => {},
+    };
+    strategy.executeAuth(connection);
+    expect(successCalled).toBe(true);
   });
 });

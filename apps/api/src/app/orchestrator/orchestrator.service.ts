@@ -391,6 +391,9 @@ export class OrchestratorService implements OnModuleInit {
           });
         }
       },
+      onAuthRequired: (url) => {
+        this._send(WS_EVENT.AUTH_URL_GENERATED, { url });
+      },
       onTool: (event: ToolEvent) => {
         if (event.kind === 'file_created') {
           this._send(WS_EVENT.FILE_CREATED, {

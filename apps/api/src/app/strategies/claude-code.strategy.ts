@@ -4,8 +4,15 @@ import { join } from 'node:path';
 import type { AuthConnection, LogoutConnection, ToolEvent } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
-const CLAUDE_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.claude');
-const TOKEN_FILE_PATH = join(CLAUDE_CONFIG_DIR, 'agent_token.txt');
+const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
+
+function getClaudeConfigDir(): string {
+  return join(process.env.HOME ?? '/home/node', '.claude');
+}
+
+function getTokenFilePath(): string {
+  return join(getClaudeConfigDir(), 'agent_token.txt');
+}
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 
 const FILE_WRITING_TOOL_NAMES = ['write_file', 'edit_file', 'search_replace'];
@@ -78,26 +85,57 @@ export class ClaudeCodeStrategy implements AgentStrategy {
   private _hasSession = false;
   private currentStreamProcess: ChildProcess | null = null;
   private streamInterrupted = false;
+  private readonly useApiTokenMode: boolean;
+
+  constructor(useApiTokenMode = false) {
+    this.useApiTokenMode = useApiTokenMode;
+  }
+
+  private getEnvToken(): string | null {
+    for (const key of ENV_TOKEN_VARS) {
+      const value = process.env[key];
+      if (value && value.trim()) {
+        return value.trim();
+      }
+    }
+    return null;
+  }
 
   private getToken(): string | null {
-    if (existsSync(TOKEN_FILE_PATH)) {
-      return readFileSync(TOKEN_FILE_PATH, 'utf8').trim();
+    if (this.useApiTokenMode) {
+      const envToken = this.getEnvToken();
+      if (envToken) return envToken;
+    }
+    const tokenPath = getTokenFilePath();
+    if (existsSync(tokenPath)) {
+      return readFileSync(tokenPath, 'utf8').trim();
     }
     return null;
   }
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
+    const token = this.getToken();
+    if (this.useApiTokenMode) {
+      if (token) {
+        this._hasSession = true;
+        connection.sendAuthSuccess();
+      } else {
+        connection.sendAuthStatus('unauthenticated');
+      }
+      return;
+    }
     connection.sendAuthManualToken();
   }
 
   submitAuthCode(code: string): void {
     const trimmed = (code ?? '').trim();
     if (trimmed) {
-      if (!existsSync(CLAUDE_CONFIG_DIR)) {
-        mkdirSync(CLAUDE_CONFIG_DIR, { recursive: true });
+      const configDir = getClaudeConfigDir();
+      if (!existsSync(configDir)) {
+        mkdirSync(configDir, { recursive: true });
       }
-      writeFileSync(TOKEN_FILE_PATH, trimmed, { mode: 0o600 });
+      writeFileSync(getTokenFilePath(), trimmed, { mode: 0o600 });
       if (this.currentConnection) {
         this.currentConnection.sendAuthSuccess();
       }
@@ -112,8 +150,9 @@ export class ClaudeCodeStrategy implements AgentStrategy {
   }
 
   clearCredentials(): void {
-    if (existsSync(TOKEN_FILE_PATH)) {
-      rmSync(TOKEN_FILE_PATH, { force: true });
+    const tokenPath = getTokenFilePath();
+    if (existsSync(tokenPath)) {
+      rmSync(tokenPath, { force: true });
     }
   }
 
@@ -145,6 +184,10 @@ export class ClaudeCodeStrategy implements AgentStrategy {
 
   checkAuthStatus(): Promise<boolean> {
     const AUTH_STATUS_TIMEOUT_MS = 10_000;
+
+    if (this.useApiTokenMode) {
+      return Promise.resolve(this.getToken() !== null);
+    }
 
     return new Promise((resolve) => {
       const token = this.getToken();

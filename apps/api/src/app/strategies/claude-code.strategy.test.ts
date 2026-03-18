@@ -1,5 +1,10 @@
-import { describe, test, expect } from 'bun:test';
-import { toolUseToEvent } from './claude-code.strategy';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { ClaudeCodeStrategy, toolUseToEvent } from './claude-code.strategy';
+
+const CLAUDE_TEST_HOME = join(tmpdir(), `claude-test-home-${process.pid}`);
 
 describe('toolUseToEvent', () => {
   test('returns file_created for write_file with path', () => {
@@ -91,3 +96,46 @@ describe('toolUseToEvent', () => {
     expect(JSON.parse(event.details as string)).toEqual({ command: 'echo', args: ['hello'] });
   });
 });
+
+const CLAUDE_ENV_TOKEN_KEYS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
+
+describe('ClaudeCodeStrategy API token mode', () => {
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    savedEnv.HOME = process.env.HOME;
+    process.env.HOME = CLAUDE_TEST_HOME;
+    if (!existsSync(CLAUDE_TEST_HOME)) {
+      mkdirSync(CLAUDE_TEST_HOME, { recursive: true });
+    }
+    for (const key of CLAUDE_ENV_TOKEN_KEYS) {
+      savedEnv[key] = process.env[key];
+      delete process.env[key];
+    }
+  });
+
+  afterEach(() => {
+    process.env.HOME = savedEnv.HOME;
+    for (const key of CLAUDE_ENV_TOKEN_KEYS) {
+      if (savedEnv[key] === undefined) delete process.env[key];
+      else process.env[key] = savedEnv[key];
+    }
+    if (existsSync(CLAUDE_TEST_HOME)) {
+      rmSync(CLAUDE_TEST_HOME, { recursive: true, force: true });
+    }
+  });
+
+  test('checkAuthStatus returns false in api-token mode when no env token is set', async () => {
+    const strategy = new ClaudeCodeStrategy(true);
+    const result = await strategy.checkAuthStatus();
+    expect(result).toBe(false);
+  });
+
+  test('checkAuthStatus returns true in api-token mode when CLAUDE_CODE_OAUTH_TOKEN is set', async () => {
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = 'test-token';
+    const strategy = new ClaudeCodeStrategy(true);
+    const result = await strategy.checkAuthStatus();
+    expect(result).toBe(true);
+  });
+});
+

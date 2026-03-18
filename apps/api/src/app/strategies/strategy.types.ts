@@ -38,6 +38,7 @@ export interface StreamingCallbacks {
   onReasoningEnd?: () => void;
   onStep?: (step: ThinkingStep) => void;
   onTool?: (event: ToolEvent) => void;
+  onAuthRequired?: (url: string) => void;
 }
 
 export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
