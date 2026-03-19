@@ -197,7 +197,7 @@ function MentionChipIcon({ path }: { path: string }) {
 function MessageBodyWithMentions({ body }: { body: string }) {
   const parts = parseMessageBodyParts(body);
   return (
-    <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-1">
+    <div className="flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1">
       {parts.map((part, i) => {
         if (part.type === 'mention') {
           return (
@@ -310,7 +310,7 @@ const MessageRow = memo(function MessageRow({
       </div>
       <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
         <div
-          className={`${maxWidthClass} px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
+          className={`${maxWidthClass} min-w-0 px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
             msg.role === 'user' ? `rounded-tr-sm ${BUBBLE_USER}` : BUBBLE_ASSISTANT
           }`}
         >
@@ -463,7 +463,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
   const listContent = scrollRef && virtualItems ? (
     <div
       className="w-full relative"
-      style={{ height: totalHeight, contain: 'layout paint' } as React.CSSProperties}
+      style={{ height: totalHeight, contain: 'layout' } as React.CSSProperties}
     >
       {virtualItems.map((virtualRow) => {
         const msg = messages[virtualRow.index];
@@ -511,7 +511,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
           <ThinkingAvatar />
           <div className="flex-1 min-w-0">
             <div
-              className={`${maxWidthClass} px-4 py-3 ${
+              className={`${maxWidthClass} min-w-0 px-4 py-3 ${
                 streamingText ? BUBBLE_ASSISTANT : BUBBLE_TYPING
               }`}
             >

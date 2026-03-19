@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isLikelyFile, parseMessageBodyParts, pathDisplayName } from './mention-utils';
+import {
+  isLikelyFile,
+  isPlausibleFileMentionPath,
+  parseMessageBodyParts,
+  pathDisplayName,
+} from './mention-utils';
 
 describe('pathDisplayName', () => {
   it('returns last path segment for path with slashes', () => {
@@ -38,9 +43,38 @@ describe('isLikelyFile', () => {
   });
 });
 
+describe('isPlausibleFileMentionPath', () => {
+  it('returns false for CSS at-rules and preprocessor keywords', () => {
+    expect(isPlausibleFileMentionPath('media')).toBe(false);
+    expect(isPlausibleFileMentionPath('import')).toBe(false);
+    expect(isPlausibleFileMentionPath('keyframes')).toBe(false);
+  });
+
+  it('returns false for PascalCase decorator-style tokens', () => {
+    expect(isPlausibleFileMentionPath('Component')).toBe(false);
+    expect(isPlausibleFileMentionPath('Injectable')).toBe(false);
+  });
+
+  it('returns true for path segments and known file extensions', () => {
+    expect(isPlausibleFileMentionPath('examples')).toBe(true);
+    expect(isPlausibleFileMentionPath('src/app.ts')).toBe(true);
+    expect(isPlausibleFileMentionPath('readme.md')).toBe(true);
+  });
+});
+
 describe('parseMessageBodyParts', () => {
   it('returns single text part when body has no mention at start or after whitespace', () => {
     const body = "import js from '@eslint/js'";
+    expect(parseMessageBodyParts(body)).toEqual([{ type: 'text', content: body }]);
+  });
+
+  it('does not treat CSS @media as a file mention', () => {
+    const body = '@media (min-width: 768px) { .x { width: 1px; } }';
+    expect(parseMessageBodyParts(body)).toEqual([{ type: 'text', content: body }]);
+  });
+
+  it('does not treat newline-prefixed @media as a file mention', () => {
+    const body = '.a{color:red}\n@media (min-width: 768px){.b{width:1px}}';
     expect(parseMessageBodyParts(body)).toEqual([{ type: 'text', content: body }]);
   });
 
