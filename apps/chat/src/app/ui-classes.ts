@@ -75,7 +75,7 @@ export const BUBBLE_USER =
   'rounded-2xl rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20';
 
 export const PROSE_MESSAGE =
-  'markdown-body prose prose-sm max-w-none dark:prose-invert text-sm sm:text-[14px] break-words';
+  'markdown-body prose prose-sm max-w-none min-w-0 dark:prose-invert text-sm sm:text-[14px] break-words';
 
 export const SIDEBAR_PANEL =
   'relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-purple-950/5 border-l border-violet-500/20 transition-all duration-300';

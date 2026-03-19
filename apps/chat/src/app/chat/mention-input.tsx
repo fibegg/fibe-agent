@@ -1,20 +1,15 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { getFileIconInfo, type FileIconId } from '../file-extension-icons';
-import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
+import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
 import { readDomFromEl, segmentsToStr, type ContentEditableSegment } from './contenteditable-serialize';
 
 type Segment = ContentEditableSegment;
 
 function parseToSegments(str: string): Segment[] {
   if (!str) return [{ type: 'text', value: '' }];
-  const parts = str.split(AT_MENTION_REGEX);
-  const segments: Segment[] = [];
-  for (const p of parts) {
-    const m = p.match(/^@([^\s@]+)$/);
-    if (m) segments.push({ type: 'mention', path: m[1] ?? '' });
-    else segments.push({ type: 'text', value: p });
-  }
-  return segments;
+  return parseMessageBodyParts(str).map((p) =>
+    p.type === 'text' ? { type: 'text', value: p.content } : { type: 'mention', path: p.path }
+  );
 }
 
 function getCaretOffset(root: Node, sel: Selection): number {

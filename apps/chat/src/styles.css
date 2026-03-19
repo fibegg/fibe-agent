@@ -251,7 +251,6 @@ body {
 .chat-messages-scroll {
   scrollbar-width: none;
   -ms-overflow-style: none;
-  contain: paint;
   transform: translateZ(0);
 }
 
@@ -300,6 +299,8 @@ body {
   padding: 0.75rem 1rem;
   border-radius: var(--radius-lg);
   overflow-x: auto;
+  max-width: 100%;
+  min-width: 0;
   margin-bottom: 0.5em;
   border: 1px solid var(--border);
   white-space: pre-wrap;
@@ -324,6 +325,9 @@ body {
 .chat-user-markdown-body pre[data-code-lang]::before {
   content: attr(data-code-lang);
   display: block;
+  width: fit-content;
+  max-width: 100%;
+  box-sizing: border-box;
   font-family: var(--font-sans);
   font-size: 0.6875rem;
   font-weight: 600;
@@ -331,9 +335,9 @@ body {
   color: rgba(255, 255, 255, 0.92);
   padding: 0.4rem 0.75rem 0.35rem;
   margin: 0 0 0.5rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-  background: rgba(0, 0, 0, 0.22);
-  border-radius: calc(var(--radius-lg) - 2px) calc(var(--radius-lg) - 2px) 0 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: var(--radius-md);
 }
 
 .prose-invert .markdown-body code {

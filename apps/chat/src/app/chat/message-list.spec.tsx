@@ -133,7 +133,7 @@ describe('MessageList', () => {
     const messages: ChatMessage[] = [
       {
         role: 'user',
-        body: '```ts\nfunction test() {}\n```',
+        body: "```ts\n// One more line at the start :D\nfunction test() {\n  console.log('hello world');\n}\n```",
         created_at: '2025-03-11T17:00:00.000Z',
       },
     ];
@@ -144,7 +144,9 @@ describe('MessageList', () => {
     expect(pre).toBeTruthy();
     const code = container.querySelector('code.language-typescript');
     expect(code).toBeTruthy();
-    expect(code?.textContent?.trim()).toBe('function test() {}');
+    expect(code?.textContent?.trim()).toBe(
+      "// One more line at the start :D\nfunction test() {\n  console.log('hello world');\n}"
+    );
   });
 
   it('wraps raw HTML pre from marked into pre code for Prism', () => {
