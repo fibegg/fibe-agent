@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
+import { extFromMimetype } from './uploads-handler';
 
 const DATA_URL_REGEX = /^data:([^;]+);base64,(.+)$/;
 
@@ -18,10 +20,10 @@ export class UploadsService {
   constructor(private readonly config: ConfigService) {}
 
   getUploadsDir(): string {
-    return join(this.config.getDataDir(), 'uploads');
+    return join(this.config.getConversationDataDir(), 'uploads');
   }
 
-  saveImage(dataUrl: string): string {
+  async saveImage(dataUrl: string): Promise<string> {
     this.ensureUploadsDir();
     const match = dataUrl.match(DATA_URL_REGEX);
     const ext = match?.[1]?.startsWith('image/')
@@ -33,7 +35,7 @@ export class UploadsService {
     return this.writeFile(ext, Buffer.from(base64, 'base64'));
   }
 
-  saveAudio(dataUrl: string): string {
+  async saveAudio(dataUrl: string): Promise<string> {
     this.ensureUploadsDir();
     const match = dataUrl.match(DATA_URL_REGEX);
     const mime = match?.[1] ?? 'audio/webm';
@@ -42,9 +44,15 @@ export class UploadsService {
     return this.writeFile(ext, Buffer.from(base64, 'base64'));
   }
 
-  saveAudioFromBuffer(buffer: Buffer, mimeType: string): string {
+  async saveAudioFromBuffer(buffer: Buffer, mimeType: string): Promise<string> {
     this.ensureUploadsDir();
     const ext = audioExtFromMime(mimeType);
+    return this.writeFile(ext, buffer);
+  }
+
+  async saveFileFromBuffer(buffer: Buffer, mimetype: string): Promise<string> {
+    this.ensureUploadsDir();
+    const ext = extFromMimetype(mimetype);
     return this.writeFile(ext, buffer);
   }
 
@@ -59,9 +67,9 @@ export class UploadsService {
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 
-  private writeFile(ext: string, buffer: Buffer): string {
+  private async writeFile(ext: string, buffer: Buffer): Promise<string> {
     const filename = `${randomUUID()}.${ext}`;
-    writeFileSync(join(this.getUploadsDir(), filename), buffer);
+    await writeFile(join(this.getUploadsDir(), filename), buffer);
     return filename;
   }
 

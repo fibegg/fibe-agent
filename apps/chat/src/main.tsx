@@ -2,9 +2,11 @@ import { StrictMode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import * as ReactDOM from 'react-dom/client';
 import { initTheme } from './app/theme';
-import './app/postmessage-auth'; // Register postMessage listener before React mounts
+import './app/postmessage-auth';
+import { logConsoleBanner } from './app/console-banner';
 import App from './app/app';
 
+logConsoleBanner();
 initTheme();
 
 const root = ReactDOM.createRoot(

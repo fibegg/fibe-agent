@@ -11,7 +11,7 @@ export function isScrollAtBottom(
   return scrollHeight - scrollTop - clientHeight <= thresholdPx;
 }
 
-export function useScrollToBottom(scrollDeps: unknown[]) {
+export function useScrollToBottom(whenToScroll: unknown) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const userWasAtBottomRef = useRef(true);
@@ -42,14 +42,21 @@ export function useScrollToBottom(scrollDeps: unknown[]) {
 
   useEffect(() => {
     if (!userWasAtBottomRef.current && !userJustSentRef.current) return;
+    let cancelled = false;
     const id = requestAnimationFrame(() => {
-      endRef.current?.scrollIntoView({ behavior: 'smooth' });
-      userJustSentRef.current = false;
-      userWasAtBottomRef.current = true;
-      setIsAtBottom(true);
+      requestAnimationFrame(() => {
+        if (cancelled) return;
+        endRef.current?.scrollIntoView({ behavior: 'smooth' });
+        userJustSentRef.current = false;
+        userWasAtBottomRef.current = true;
+        setIsAtBottom(true);
+      });
     });
-    return () => cancelAnimationFrame(id);
-  }, scrollDeps);
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(id);
+    };
+  }, [whenToScroll]);
 
   const onScroll = useCallback(() => {
     checkAtBottom();

@@ -16,19 +16,19 @@ describe('PlaygroundsService', () => {
     rmSync(playgroundDir, { recursive: true, force: true });
   });
 
-  test('getTree returns empty array when directory is empty', () => {
+  test('getTree returns empty array when directory is empty', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(service.getTree()).toEqual([]);
+    expect(await service.getTree()).toEqual([]);
   });
 
-  test('getTree returns directories first then files, each sorted by name', () => {
+  test('getTree returns directories first then files, each sorted by name', async () => {
     writeFileSync(join(playgroundDir, 'b.txt'), '');
     writeFileSync(join(playgroundDir, 'a.txt'), '');
     mkdirSync(join(playgroundDir, 'dir'));
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    const tree = service.getTree();
+    const tree = await service.getTree();
     expect(tree.length).toBe(3);
     expect(tree[0].name).toBe('dir');
     expect(tree[0].type).toBe('directory');
@@ -39,18 +39,18 @@ describe('PlaygroundsService', () => {
     expect(tree[2].type).toBe('file');
   });
 
-  test('getTree skips dotfiles and dotdirs', () => {
+  test('getTree skips dotfiles and dotdirs', async () => {
     writeFileSync(join(playgroundDir, '.hidden'), '');
     writeFileSync(join(playgroundDir, 'visible'), '');
     mkdirSync(join(playgroundDir, '.dotdir'));
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    const tree = service.getTree();
+    const tree = await service.getTree();
     expect(tree.length).toBe(1);
     expect(tree[0].name).toBe('visible');
   });
 
-  test('getTree skips node_modules and .git', () => {
+  test('getTree skips node_modules and .git', async () => {
     mkdirSync(join(playgroundDir, 'node_modules'));
     writeFileSync(join(playgroundDir, 'node_modules', 'pkg.js'), '');
     mkdirSync(join(playgroundDir, '.git'));
@@ -59,19 +59,19 @@ describe('PlaygroundsService', () => {
     writeFileSync(join(playgroundDir, 'src', 'index.ts'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    const tree = service.getTree();
+    const tree = await service.getTree();
     expect(tree.length).toBe(1);
     expect(tree[0].name).toBe('src');
     expect(tree.map((e) => e.name)).not.toContain('node_modules');
     expect(tree.map((e) => e.name)).not.toContain('.git');
   });
 
-  test('getTree returns nested structure with relative paths', () => {
+  test('getTree returns nested structure with relative paths', async () => {
     mkdirSync(join(playgroundDir, 'sub'));
     writeFileSync(join(playgroundDir, 'sub', 'file.ts'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    const tree = service.getTree();
+    const tree = await service.getTree();
     expect(tree.length).toBe(1);
     expect(tree[0].path).toBe('sub');
     expect(tree[0].children?.length).toBe(1);
@@ -79,66 +79,66 @@ describe('PlaygroundsService', () => {
     expect(tree[0].children?.[0].name).toBe('file.ts');
   });
 
-  test('getTree returns empty array when directory does not exist', () => {
+  test('getTree returns empty array when directory does not exist', async () => {
     const config = { getPlaygroundsDir: () => join(playgroundDir, 'nonexistent') };
     const service = new PlaygroundsService(config as never);
-    expect(service.getTree()).toEqual([]);
+    expect(await service.getTree()).toEqual([]);
   });
 
-  test('getFileContent returns file content for valid path', () => {
+  test('getFileContent returns file content for valid path', async () => {
     writeFileSync(join(playgroundDir, 'readme.md'), '# Hello\n');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(service.getFileContent('readme.md')).toBe('# Hello\n');
+    expect(await service.getFileContent('readme.md')).toBe('# Hello\n');
   });
 
-  test('getFileContent returns content for file in subdirectory', () => {
+  test('getFileContent returns content for file in subdirectory', async () => {
     mkdirSync(join(playgroundDir, 'src'));
     writeFileSync(join(playgroundDir, 'src', 'index.ts'), 'export {};');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(service.getFileContent('src/index.ts')).toBe('export {};');
+    expect(await service.getFileContent('src/index.ts')).toBe('export {};');
   });
 
-  test('getFileContent throws NotFoundException for path traversal', () => {
+  test('getFileContent throws NotFoundException for path traversal', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('../../etc/passwd')).toThrow(NotFoundException);
+    await expect(service.getFileContent('../../etc/passwd')).rejects.toThrow(NotFoundException);
   });
 
-  test('getFileContent throws NotFoundException for directory', () => {
+  test('getFileContent throws NotFoundException for directory', async () => {
     mkdirSync(join(playgroundDir, 'dir'));
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('dir')).toThrow(NotFoundException);
+    await expect(service.getFileContent('dir')).rejects.toThrow(NotFoundException);
   });
 
-  test('getFileContent throws NotFoundException for missing file', () => {
+  test('getFileContent throws NotFoundException for missing file', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('missing.txt')).toThrow(NotFoundException);
+    await expect(service.getFileContent('missing.txt')).rejects.toThrow(NotFoundException);
   });
 
-  test('getFileContent throws NotFoundException for path under node_modules or .git', () => {
+  test('getFileContent throws NotFoundException for path under node_modules or .git', async () => {
     mkdirSync(join(playgroundDir, 'node_modules'), { recursive: true });
     writeFileSync(join(playgroundDir, 'node_modules', 'pkg.js'), '');
     mkdirSync(join(playgroundDir, '.git'), { recursive: true });
     writeFileSync(join(playgroundDir, '.git', 'config'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('node_modules/pkg.js')).toThrow(NotFoundException);
-    expect(() => service.getFileContent('.git/config')).toThrow(NotFoundException);
+    await expect(service.getFileContent('node_modules/pkg.js')).rejects.toThrow(NotFoundException);
+    await expect(service.getFileContent('.git/config')).rejects.toThrow(NotFoundException);
   });
 
-  test('getFileContent throws NotFoundException when path has node_modules or .git as segment', () => {
+  test('getFileContent throws NotFoundException when path has node_modules or .git as segment', async () => {
     mkdirSync(join(playgroundDir, 'foo', 'node_modules', 'pkg'), { recursive: true });
     writeFileSync(join(playgroundDir, 'foo', 'node_modules', 'pkg', 'index.js'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFileContent('foo/node_modules/pkg/index.js')).toThrow(NotFoundException);
+    await expect(service.getFileContent('foo/node_modules/pkg/index.js')).rejects.toThrow(NotFoundException);
   });
 
-  test('getFolderFileContents returns all file contents under folder', () => {
+  test('getFolderFileContents returns all file contents under folder', async () => {
     mkdirSync(join(playgroundDir, 'docs'));
     writeFileSync(join(playgroundDir, 'docs', 'a.md'), '# A');
     writeFileSync(join(playgroundDir, 'docs', 'b.md'), '# B');
@@ -146,7 +146,7 @@ describe('PlaygroundsService', () => {
     writeFileSync(join(playgroundDir, 'docs', 'nested', 'c.txt'), 'C');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    const result = service.getFolderFileContents('docs');
+    const result = await service.getFolderFileContents('docs');
     expect(result.length).toBe(3);
     const paths = result.map((r) => r.path).sort();
     expect(paths).toEqual(['docs/a.md', 'docs/b.md', 'docs/nested/c.txt']);
@@ -154,7 +154,7 @@ describe('PlaygroundsService', () => {
     expect(result.find((r) => r.path === 'docs/nested/c.txt')?.content).toBe('C');
   });
 
-  test('getFolderFileContents skips node_modules and .git', () => {
+  test('getFolderFileContents skips node_modules and .git', async () => {
     mkdirSync(join(playgroundDir, 'docs'), { recursive: true });
     writeFileSync(join(playgroundDir, 'docs', 'readme.md'), '# Docs');
     mkdirSync(join(playgroundDir, 'docs', 'node_modules'));
@@ -163,24 +163,24 @@ describe('PlaygroundsService', () => {
     writeFileSync(join(playgroundDir, 'docs', '.git', 'HEAD'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    const result = service.getFolderFileContents('docs');
+    const result = await service.getFolderFileContents('docs');
     expect(result.length).toBe(1);
     expect(result[0].path).toBe('docs/readme.md');
   });
 
-  test('getFolderFileContents throws NotFoundException for node_modules or .git', () => {
+  test('getFolderFileContents throws NotFoundException for node_modules or .git', async () => {
     mkdirSync(join(playgroundDir, 'node_modules'), { recursive: true });
     mkdirSync(join(playgroundDir, '.git'), { recursive: true });
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFolderFileContents('node_modules')).toThrow(NotFoundException);
-    expect(() => service.getFolderFileContents('.git')).toThrow(NotFoundException);
+    await expect(service.getFolderFileContents('node_modules')).rejects.toThrow(NotFoundException);
+    await expect(service.getFolderFileContents('.git')).rejects.toThrow(NotFoundException);
   });
 
-  test('getFolderFileContents throws NotFoundException for file path', () => {
+  test('getFolderFileContents throws NotFoundException for file path', async () => {
     writeFileSync(join(playgroundDir, 'file.txt'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    expect(() => service.getFolderFileContents('file.txt')).toThrow(NotFoundException);
+    await expect(service.getFolderFileContents('file.txt')).rejects.toThrow(NotFoundException);
   });
 });

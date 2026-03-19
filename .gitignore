@@ -48,3 +48,7 @@ vitest.config.*.timestamp*
 test-output
 **/playwright-report/
 **/test-results/
+
+designs/
+
+.env

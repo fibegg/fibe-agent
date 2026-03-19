@@ -1,8 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
+
+export interface StoredStoryEntry {
+  id: string;
+  type: string;
+  message: string;
+  timestamp: string;
+  details?: string;
+  command?: string;
+  path?: string;
+}
 
 export interface StoredMessage {
   id: string;
@@ -10,6 +21,9 @@ export interface StoredMessage {
   body: string;
   created_at: string;
   imageUrls?: string[];
+  story?: StoredStoryEntry[];
+  activityId?: string;
+  model?: string;
 }
 
 @Injectable()
@@ -18,7 +32,7 @@ export class MessageStoreService {
   private messages: StoredMessage[] = [];
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     this.messagesPath = join(dataDir, 'messages.json');
     this.ensureDataDir();
     this.messages = this.load();
@@ -28,26 +42,43 @@ export class MessageStoreService {
     return this.messages;
   }
 
-  add(role: string, body: string, imageUrls?: string[]): StoredMessage {
+  add(role: string, body: string, imageUrls?: string[], model?: string): StoredMessage {
     const message: StoredMessage = {
       id: randomUUID(),
       role,
       body,
       created_at: new Date().toISOString(),
       ...(imageUrls?.length ? { imageUrls } : {}),
+      ...(model ? { model } : {}),
     };
     this.messages.push(message);
-    this.save();
+    void this.save();
     return message;
+  }
+
+  setStoryForLastAssistant(story: StoredStoryEntry[]): void {
+    const last = this.messages[this.messages.length - 1];
+    if (last?.role === 'assistant' && Array.isArray(story)) {
+      last.story = story;
+      void this.save();
+    }
+  }
+
+  setActivityIdForLastAssistant(activityId: string): void {
+    const last = this.messages[this.messages.length - 1];
+    if (last?.role === 'assistant') {
+      last.activityId = activityId;
+      void this.save();
+    }
   }
 
   clear(): void {
     this.messages = [];
-    this.save();
+    void this.save();
   }
 
   private ensureDataDir(): void {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }
@@ -62,8 +93,8 @@ export class MessageStoreService {
     }
   }
 
-  private save(): void {
-    writeFileSync(
+  private async save(): Promise<void> {
+    await writeFile(
       this.messagesPath,
       JSON.stringify(this.messages, null, 2)
     );

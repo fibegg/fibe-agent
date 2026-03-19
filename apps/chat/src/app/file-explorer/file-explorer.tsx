@@ -1,8 +1,6 @@
 import {
   ChevronDown,
   ChevronRight,
-  ChevronsDown,
-  ChevronsRight,
   Copy,
   Download,
   FileText,
@@ -13,92 +11,30 @@ import {
   X,
 } from 'lucide-react';
 import { FileIcon } from '../file-icon';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import Prism from 'prismjs';
-import 'prismjs/themes/prism-tomorrow.css';
-import 'prismjs/plugins/line-numbers/prism-line-numbers';
-import 'prismjs/plugins/line-numbers/prism-line-numbers.css';
-import 'prismjs/components/prism-markup';
-import 'prismjs/components/prism-markup-templating';
-import 'prismjs/components/prism-css';
-import 'prismjs/components/prism-clike';
-import 'prismjs/components/prism-javascript';
-import 'prismjs/components/prism-typescript';
-import 'prismjs/components/prism-jsx';
-import 'prismjs/components/prism-tsx';
-import 'prismjs/components/prism-json';
-import 'prismjs/components/prism-json5';
-import 'prismjs/components/prism-bash';
-import 'prismjs/components/prism-python';
-import 'prismjs/components/prism-yaml';
-import 'prismjs/components/prism-sql';
-import 'prismjs/components/prism-scss';
-import 'prismjs/components/prism-ruby';
-import 'prismjs/components/prism-go';
-import 'prismjs/components/prism-go-module';
-import 'prismjs/components/prism-rust';
-import 'prismjs/components/prism-java';
-import 'prismjs/components/prism-kotlin';
-import 'prismjs/components/prism-swift';
-import 'prismjs/components/prism-php';
-import 'prismjs/components/prism-csharp';
-import 'prismjs/components/prism-c';
-import 'prismjs/components/prism-cpp';
-import 'prismjs/components/prism-markdown';
-import 'prismjs/components/prism-zig';
-import 'prismjs/components/prism-lua';
-import 'prismjs/components/prism-dart';
-import 'prismjs/components/prism-haskell';
-import 'prismjs/components/prism-scala';
-import 'prismjs/components/prism-nim';
-import 'prismjs/components/prism-elixir';
-import 'prismjs/components/prism-erlang';
-import 'prismjs/components/prism-clojure';
-import 'prismjs/components/prism-groovy';
-import 'prismjs/components/prism-perl';
-import 'prismjs/components/prism-powershell';
-import 'prismjs/components/prism-fsharp';
-import 'prismjs/components/prism-ocaml';
-import 'prismjs/components/prism-solidity';
-import 'prismjs/components/prism-toml';
-import 'prismjs/components/prism-docker';
-import 'prismjs/components/prism-makefile';
-import 'prismjs/components/prism-cmake';
-import 'prismjs/components/prism-gradle';
-import 'prismjs/components/prism-ini';
-import 'prismjs/components/prism-graphql';
-import 'prismjs/components/prism-pug';
-import 'prismjs/components/prism-less';
-import 'prismjs/components/prism-stylus';
-import 'prismjs/components/prism-coffeescript';
-import 'prismjs/components/prism-julia';
-import 'prismjs/components/prism-r';
-import 'prismjs/components/prism-basic';
-import 'prismjs/components/prism-vbnet';
-import 'prismjs/components/prism-protobuf';
-import 'prismjs/components/prism-nginx';
-import 'prismjs/components/prism-diff';
-import 'prismjs/components/prism-csv';
-import 'prismjs/components/prism-rest';
-import 'prismjs/components/prism-latex';
-import 'prismjs/components/prism-objectivec';
-import 'prismjs/components/prism-gdscript';
-import 'prismjs/components/prism-glsl';
-import 'prismjs/components/prism-verilog';
-import 'prismjs/components/prism-vhdl';
-import 'prismjs/components/prism-wasm';
-import 'prismjs/components/prism-d';
-import 'prismjs/components/prism-crystal';
-import 'prismjs/components/prism-fortran';
-import 'prismjs/components/prism-nix';
-import 'prismjs/components/prism-hcl';
-import 'prismjs/components/prism-properties';
-import 'prismjs/components/prism-editorconfig';
-import 'prismjs/components/prism-dot';
-import 'prismjs/components/prism-mermaid';
-import { getApiUrl, getAuthTokenForRequest } from '../api-url';
-import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiRequest } from '../api-url';
+import { API_PATHS } from '../api-paths';
+import { PANEL_HEADER_MIN_HEIGHT_PX, REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
+import { shouldHideThemeSwitch } from '../embed-config';
+import { SidebarToggle } from '../sidebar-toggle';
 import { ThemeToggle } from '../theme-toggle';
+import {
+  BUTTON_GHOST_ACCENT,
+  BUTTON_ICON_ACCENT,
+  BUTTON_ICON_ACCENT_SM,
+  BUTTON_ICON_MUTED,
+  CARD_HEADER,
+  CLEAR_BUTTON_POSITION,
+  HEADER_FIRST_ROW,
+  HEADER_PADDING,
+  INPUT_SEARCH,
+  LOGO_ICON_BOX,
+  MODAL_OVERLAY,
+  SEARCH_ICON_POSITION,
+  SEARCH_ROW_WRAPPER,
+  TREE_NODE_BASE,
+  TREE_NODE_SELECTED,
+} from '../ui-classes';
 
 const PRISM_LANGUAGES: Record<string, string> = {
   js: 'javascript',
@@ -246,20 +182,9 @@ export interface PlaygroundEntry {
   children?: PlaygroundEntry[];
 }
 
-const PLAYGROUNDS_LABEL = 'playground/';
-const SIDEBAR_TITLE = 'Quantum Storage';
-const SIDEBAR_SUBTITLE = `Phoenix v${__APP_VERSION__}`;
-
-function getAllDirPaths(entries: PlaygroundEntry[]): string[] {
-  const out: string[] = [];
-  for (const e of entries) {
-    if (e.type === 'directory') {
-      out.push(e.path);
-      if (e.children?.length) out.push(...getAllDirPaths(e.children));
-    }
-  }
-  return out;
-}
+const SIDEBAR_TITLE = 'Standalone';
+const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
+const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
 
 function getDirPathsAtDepth(entries: PlaygroundEntry[], depth: number): string[] {
   if (depth === 0) {
@@ -278,16 +203,15 @@ function getDirPathsAtDepth(entries: PlaygroundEntry[], depth: number): string[]
   return out;
 }
 
-function getMaxExpandedDepth(entries: PlaygroundEntry[], expanded: Set<string>): number {
-  let d = 0;
-  let max = -1;
-  while (true) {
-    const paths = getDirPathsAtDepth(entries, d);
-    if (paths.length === 0) break;
-    if (paths.some((p) => expanded.has(p))) max = d;
-    d++;
+function findEntryByPath(entries: PlaygroundEntry[], path: string): PlaygroundEntry | null {
+  for (const e of entries) {
+    if (e.path === path) return e;
+    if (e.children?.length) {
+      const found = findEntryByPath(e.children, path);
+      if (found) return found;
+    }
   }
-  return max;
+  return null;
 }
 
 function filterTreeByQuery(entries: PlaygroundEntry[], query: string): PlaygroundEntry[] {
@@ -308,16 +232,34 @@ function filterTreeByQuery(entries: PlaygroundEntry[], query: string): Playgroun
   return entries.map(build).filter((e): e is PlaygroundEntry => e != null);
 }
 
-function FileDetailsDialog({
+const LANGUAGE_LABEL: Record<string, string> = {
+  plain: 'Plain text',
+  markdown: 'Markdown',
+  javascript: 'JavaScript',
+  typescript: 'TypeScript',
+  json: 'JSON',
+  html: 'HTML',
+  css: 'CSS',
+  python: 'Python',
+  bash: 'Bash',
+};
+
+type PrismLoader = { highlightCodeElement: (el: HTMLElement) => void };
+
+export function FileViewerPanel({
   entry,
   onClose,
+  inline = false,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
+  inline?: boolean;
 }) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [searchInFile, setSearchInFile] = useState('');
+  const [prismLoader, setPrismLoader] = useState<PrismLoader | null>(null);
   const codeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -333,14 +275,10 @@ function FileDetailsDialog({
     setLoading(true);
     setFetchError(null);
     setContent(null);
-    const base = getApiUrl();
-    const url = `${base || ''}/api/playgrounds/file?path=${encodeURIComponent(entry.path)}`;
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    fetch(url, { headers })
-      .then(async (res) => {
+    const path = `${API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
+    void (async () => {
+      try {
+        const res = await apiRequest(path);
         if (cancelled) return;
         if (!res.ok) {
           if (res.status === 404) {
@@ -352,15 +290,16 @@ function FileDetailsDialog({
         }
         const data = (await res.json()) as { content?: string };
         const text = typeof data.content === 'string' ? data.content : '';
-        setContent(text);
-        setFetchError(null);
-      })
-      .catch((e) => {
+        if (!cancelled) {
+          setContent(text);
+          setFetchError(null);
+        }
+      } catch (e) {
         if (!cancelled) setFetchError(e instanceof Error ? e.message : 'Failed to load file');
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -368,15 +307,22 @@ function FileDetailsDialog({
 
   const language = getPrismLanguage(entry.name);
   const languageClass = language === 'plain' ? '' : `language-${language}`;
+  const languageLabel = LANGUAGE_LABEL[language] ?? (language === 'plain' ? 'Plain text' : language);
+  const lineCount = content !== null ? content.split('\n').length : null;
 
   useEffect(() => {
-    if (!content || loading || fetchError || !codeRef.current || language === 'plain') return;
+    if (!content || loading || language === 'plain') return;
+    import('./prism-loader').then((m) => setPrismLoader(m));
+  }, [content, loading, language]);
+
+  useEffect(() => {
+    if (!content || loading || fetchError || !codeRef.current || language === 'plain' || !prismLoader) return;
     try {
-      Prism.highlightElement(codeRef.current);
+      prismLoader.highlightCodeElement(codeRef.current);
     } catch {
       // Leave existing text content if highlighting fails
     }
-  }, [content, loading, fetchError, language]);
+  }, [content, loading, fetchError, language, prismLoader]);
 
   const handleCopy = useCallback(() => {
     if (content === null) return;
@@ -395,110 +341,140 @@ function FileDetailsDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
+      className={`flex flex-col overflow-hidden bg-card ${inline ? 'flex-1 min-h-0 rounded-none border-0' : 'w-full max-w-[95vw] sm:max-w-[90vw] sm:w-[90vw] h-[85vh] sm:h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card'}`}
+      style={inline ? undefined : { backgroundColor: 'var(--card)' }}
+      onClick={inline ? undefined : (e) => e.stopPropagation()}
     >
-      <div
-        className="flex flex-col w-full max-w-[95vw] sm:max-w-[90vw] sm:w-[90vw] h-[85vh] sm:h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card overflow-hidden"
-        style={{ backgroundColor: 'var(--card)' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-4 sm:p-6 border-b border-border-subtle bg-gradient-to-r from-violet-500/10 via-purple-500/5 to-violet-500/10 backdrop-blur-sm shrink-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-start gap-2 sm:gap-4 min-w-0">
-              <div className="size-10 sm:size-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0">
-                <FileText className="size-5 sm:size-6 text-white" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 sm:gap-3">
-                  <h2 className="text-xl font-semibold text-foreground">File viewer</h2>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="size-8 rounded-full hover:bg-muted/50 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0"
-                    aria-label="Close"
-                  >
-                    <X className="size-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1 truncate" title={entry.name}>
-                  {entry.name}
-                </p>
-              </div>
+      <div className={CARD_HEADER} style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}>
+        <div className={`flex items-center justify-between gap-2 min-w-0 ${HEADER_FIRST_ROW}`}>
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={LOGO_ICON_BOX}>
+              <FileText className="size-5 text-white" />
             </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-sm text-foreground truncate" title={entry.name}>
+                {entry.name}
+              </h2>
+              <p className="text-[10px] text-muted-foreground mt-0.5">
+                {languageLabel}
+                {lineCount !== null ? ` - ${lineCount} lines` : ''}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopy}
+              disabled={content === null || loading}
+              className={BUTTON_GHOST_ACCENT}
+            >
+              <Copy className="size-3" />
+              Copy
+            </button>
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={content === null || loading}
+              className={BUTTON_GHOST_ACCENT}
+            >
+              <Download className="size-3" />
+              Download
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className={`${BUTTON_ICON_MUTED} size-8`}
+              aria-label="Close"
+            >
+              <X className="size-4" />
+            </button>
           </div>
         </div>
+        <div className={SEARCH_ROW_WRAPPER}>
+          <Search className={SEARCH_ICON_POSITION} />
+          <input
+            type="text"
+            value={searchInFile}
+            onChange={(e) => setSearchInFile(e.target.value)}
+            placeholder="Search in file..."
+            className={INPUT_SEARCH}
+          />
+          {searchInFile && (
+            <button
+              type="button"
+              onClick={() => setSearchInFile('')}
+              className={CLEAR_BUTTON_POSITION}
+              aria-label="Clear search"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
 
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-          <div className="px-4 py-3 border-b border-border-subtle bg-muted/30 backdrop-blur-sm shrink-0 flex items-center justify-between">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              {language === 'plain' ? 'Plain text' : language}
-            </span>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={handleCopy}
-                disabled={content === null || loading}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50"
-              >
-                <Copy className="size-3" />
-                Copy
-              </button>
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={content === null || loading}
-                className="flex items-center gap-1.5 rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50"
-              >
-                <Download className="size-3" />
-                Download
-              </button>
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        <div className="flex-1 overflow-auto min-h-0 bg-[#2d2d2d] dark:bg-[#1e1e1e]">
+          {loading && (
+            <div className="p-4 flex items-center justify-center text-sm text-muted-foreground">
+              Loading…
             </div>
-          </div>
-          <div className="flex-1 overflow-auto min-h-0 bg-[#2d2d2d] dark:bg-[#1e1e1e]">
-            {loading && (
-              <div className="p-4 flex items-center justify-center text-sm text-muted-foreground">
-                Loading…
-              </div>
-            )}
-            {fetchError && (
-              <div className="p-4 rounded-xl border border-border-subtle bg-muted/20 m-4 text-center">
-                <p className="text-sm text-muted-foreground">{fetchError}</p>
-              </div>
-            )}
-            {!loading && !fetchError && content !== null && content.length > 0 && (
-              <pre className="line-numbers !m-0 !rounded-none !bg-transparent p-4 text-sm font-mono min-h-full" key={entry.path}>
-                <code ref={codeRef} className={languageClass}>
-                  {content}
-                </code>
-              </pre>
-            )}
-            {!loading && !fetchError && content !== null && content.length === 0 && (
-              <div className="p-4 text-sm text-muted-foreground">Empty file</div>
-            )}
-          </div>
+          )}
+          {fetchError && (
+            <div className="p-4 rounded-xl border border-border-subtle bg-muted/20 m-4 text-center">
+              <p className="text-sm text-muted-foreground">{fetchError}</p>
+            </div>
+          )}
+          {!loading && !fetchError && content !== null && content.length > 0 && (
+            <pre className="line-numbers !m-0 !rounded-none !bg-transparent p-4 text-sm font-mono min-h-full" key={entry.path}>
+              <code ref={codeRef} className={languageClass}>
+                {content}
+              </code>
+            </pre>
+          )}
+          {!loading && !fetchError && content !== null && content.length === 0 && (
+            <div className="p-4 text-sm text-muted-foreground">Empty file</div>
+          )}
         </div>
       </div>
     </div>
   );
 }
 
-function TreeNode({
+function FileDetailsDialog({
+  entry,
+  onClose,
+}: {
+  entry: PlaygroundEntry;
+  onClose: () => void;
+}) {
+  return (
+    <div className={MODAL_OVERLAY} onClick={onClose}>
+      <div onClick={(e) => e.stopPropagation()}>
+        <FileViewerPanel entry={entry} onClose={onClose} />
+      </div>
+    </div>
+  );
+}
+
+const TreeNode = memo(function TreeNode({
   entry,
   depth,
   expanded,
   onToggle,
   onFileClick,
+  selectedPath,
 }: {
   entry: PlaygroundEntry;
   depth: number;
   expanded: Set<string>;
   onToggle: (path: string) => void;
   onFileClick?: (entry: PlaygroundEntry) => void;
+  selectedPath?: string | null;
 }) {
   const isDir = entry.type === 'directory';
   const isOpen = expanded.has(entry.path);
   const hasChildren = isDir && (entry.children?.length ?? 0) > 0;
+  const isSelected = selectedPath === entry.path;
 
   const handleClick = useCallback(() => {
     if (isDir) {
@@ -513,7 +489,7 @@ function TreeNode({
       <button
         type="button"
         onClick={handleClick}
-        className="w-full flex items-center gap-1.5 px-2 py-1 text-left text-xs rounded-md cursor-pointer transition-all hover:bg-muted/50 focus:outline-none focus:ring-1 focus:ring-violet-500/30 focus:bg-violet-500/5"
+        className={`${TREE_NODE_BASE} ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'}`}
         style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
       >
         <span className="w-3 flex shrink-0 items-center justify-center text-foreground/70 dark:text-muted-foreground" aria-hidden>
@@ -529,14 +505,14 @@ function TreeNode({
         </span>
         {isDir ? (
           isOpen ? (
-            <FolderOpen className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
+            <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
           ) : (
-            <Folder className="size-3.5 shrink-0 text-violet-600 dark:text-violet-400" aria-hidden />
+            <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
           )
         ) : (
           <FileIcon pathOrName={entry.name} />
         )}
-        <span className="min-w-0 flex-1 truncate text-foreground">{entry.name}</span>
+        <span className={`min-w-0 flex-1 truncate ${isSelected ? 'text-violet-400' : 'text-foreground'}`}>{entry.name}</span>
       </button>
       {isDir && hasChildren && isOpen && (
         <div>
@@ -548,65 +524,112 @@ function TreeNode({
               expanded={expanded}
               onToggle={onToggle}
               onFileClick={onFileClick}
+              selectedPath={selectedPath}
             />
           ))}
         </div>
       )}
     </div>
   );
-}
+});
+
+const isControlledTree = (t: PlaygroundEntry[] | null | undefined): t is PlaygroundEntry[] =>
+  Array.isArray(t);
 
 export function FileExplorer({
-  fullWidth: _fullWidth,
   collapsed,
   onSettingsClick,
   onClose,
+  onToggleCollapse,
+  onFileSelect,
+  selectedPath: selectedPathProp,
+  refreshTrigger,
+  tree: treeProp,
 }: {
-  fullWidth?: boolean;
   collapsed?: boolean;
   onSettingsClick?: () => void;
   onClose?: () => void;
+  onToggleCollapse?: () => void;
+  onFileSelect?: (entry: PlaygroundEntry) => void;
+  selectedPath?: string | null;
+  refreshTrigger?: number;
+  tree?: PlaygroundEntry[] | null;
 } = {}) {
-  const [tree, setTree] = useState<PlaygroundEntry[]>([]);
+  const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFile, setSelectedFile] = useState<PlaygroundEntry | null>(null);
+  const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
+
+  const controlled = isControlledTree(treeProp);
+  const tree = controlled ? treeProp : internalTree;
+  const loadingState = controlled ? false : loading;
+
+  const selectedFile = selectedPathProp !== undefined
+    ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
+    : selectedFileLocal;
+
+  const refetch = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    try {
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS, { signal });
+      if (res.status === 401) {
+        setInternalTree([]);
+        return;
+      }
+      if (!res.ok) throw new Error('Failed to load playgrounds');
+      const data = (await res.json()) as PlaygroundEntry[];
+      const list = Array.isArray(data) ? data : [];
+      setInternalTree(list);
+      setError(null);
+      if (list.length > 0) {
+        setExpanded((prev) => new Set(getDirPathsAtDepth(list, 0)));
+      }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      setInternalTree([]);
+      setError(e instanceof Error ? e.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
+    if (controlled) return;
     const ac = new AbortController();
-    const base = getApiUrl();
-    const url = base ? `${base}/api/playgrounds` : '/api/playgrounds';
-    const token = getAuthTokenForRequest();
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
-
-    (async () => {
-      try {
-        const res = await fetch(url, { headers, signal: ac.signal });
-        if (res.status === 401) {
-          setTree([]);
-          return;
-        }
-        if (!res.ok) throw new Error('Failed to load playgrounds');
-        const data = (await res.json()) as PlaygroundEntry[];
-        const list = Array.isArray(data) ? data : [];
-        setTree(list);
-        setError(null);
-        if (list.length > 0) {
-          setExpanded(new Set(getDirPathsAtDepth(list, 0)));
-        }
-      } catch (e) {
-        if ((e as Error).name === 'AbortError') return;
-        setTree([]);
-        setError(e instanceof Error ? e.message : 'Failed to load');
-      } finally {
-        setLoading(false);
-      }
-    })();
+    void refetch(ac.signal);
     return () => ac.abort();
-  }, []);
+  }, [controlled, refetch]);
+
+  useEffect(() => {
+    if (controlled || refreshTrigger === undefined) return;
+    void refetch();
+  }, [controlled, refreshTrigger, refetch]);
+
+  useEffect(() => {
+    if (controlled || internalTree.length > 0 || loading) return;
+    const id = setInterval(() => void refetch(), REFETCH_WHEN_EMPTY_MS);
+    return () => clearInterval(id);
+  }, [controlled, internalTree.length, loading, refetch]);
+
+  const refetchRef = useRef(refetch);
+  refetchRef.current = refetch;
+  useEffect(() => {
+    if (controlled) return;
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') refetchRef.current();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, [controlled]);
+
+  const hasSetInitialExpand = useRef(false);
+  useEffect(() => {
+    if (!controlled || !treeProp?.length || hasSetInitialExpand.current) return;
+    hasSetInitialExpand.current = true;
+    setExpanded(new Set(getDirPathsAtDepth(treeProp, 0)));
+  }, [controlled, treeProp]);
 
   const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -617,84 +640,48 @@ export function FileExplorer({
     });
   }, []);
 
-  const expandOneLevel = useCallback(() => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      const maxD = getMaxExpandedDepth(tree, prev);
-      getDirPathsAtDepth(tree, maxD + 1).forEach((p) => next.add(p));
-      return next;
-    });
-  }, [tree]);
-
-  const collapseOneLevel = useCallback(() => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      const maxD = getMaxExpandedDepth(tree, prev);
-      if (maxD >= 0) getDirPathsAtDepth(tree, maxD).forEach((p) => next.delete(p));
-      return next;
-    });
-  }, [tree]);
-
-  const expandAll = useCallback(() => {
-    setExpanded(new Set(getAllDirPaths(tree)));
-  }, [tree]);
-
-  const collapseAll = useCallback(() => {
-    setExpanded(new Set());
-  }, []);
-
-  const handleFileClick = useCallback((entry: PlaygroundEntry) => {
-    if (entry.type === 'file') setSelectedFile(entry);
-  }, []);
+  const handleFileClick = useCallback(
+    (entry: PlaygroundEntry) => {
+      if (entry.type !== 'file') return;
+      if (onFileSelect) {
+        onFileSelect(entry);
+      } else {
+        setSelectedFileLocal(entry);
+      }
+    },
+    [onFileSelect]
+  );
 
   const filteredTree = useMemo(() => filterTreeByQuery(tree, searchQuery), [tree, searchQuery]);
-  const playgroundLabel = useMemo(
-    () => (tree.length === 1 && tree[0].type === 'directory' ? `${tree[0].name}/` : PLAYGROUNDS_LABEL),
-    [tree]
-  );
   const openFileEntry =
-    selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
+    !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
 
-  const toolbarBtnClass =
-    'rounded-md text-[9px] sm:text-[10px] font-medium text-foreground dark:text-white hover:bg-violet-500/10 hover:text-violet-600 dark:hover:text-violet-400 transition-colors';
-
-  if (collapsed) {
-    return (
-      <>
-        <div className="flex min-h-0 w-full flex-1 flex-col items-center bg-card/30 py-4 backdrop-blur-xl">
-          <div className="flex flex-col items-center gap-3">
-            <AnimatedPhoenixLogo className="size-8 text-violet-500" />
-            <div className="flex flex-col gap-1">
-              <button
-                type="button"
-                className="flex size-8 items-center justify-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
-                title="Settings"
-                aria-label="Settings"
-                onClick={onSettingsClick}
-              >
-                <Settings className="size-4" />
-              </button>
-              <ThemeToggle />
-            </div>
-          </div>
+  const collapsedContent = (
+    <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 pt-3 pb-4 backdrop-blur-xl">
+      <div className="flex flex-col items-center gap-3">
+          <button
+            type="button"
+            className={`${BUTTON_ICON_ACCENT} size-9`}
+            title="Settings"
+            aria-label="Settings"
+            onClick={onSettingsClick}
+          >
+            <Settings className="size-4" />
+          </button>
+          {!shouldHideThemeSwitch() && <ThemeToggle />}
         </div>
-        {openFileEntry && (
-          <FileDetailsDialog entry={openFileEntry} onClose={() => setSelectedFile(null)} />
-        )}
-      </>
-    );
-  }
+    </div>
+  );
 
-  return (
-    <>
+  const expandedContent = (
+    <div className="min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl border-r border-border/50">
       <div
-        className="min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl"
+        className={`border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0 ${HEADER_PADDING}`}
+        style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
       >
-      <div className="p-3 sm:p-4 border-b border-border-subtle bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <AnimatedPhoenixLogo className="size-7 sm:size-8 text-violet-500" />
-            <div>
+        <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="min-w-0">
               <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
               <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
             </div>
@@ -702,19 +689,19 @@ export function FileExplorer({
           <div className="flex items-center gap-1">
             <button
               type="button"
-              className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-600 dark:text-violet-400 hover:bg-violet-500/10 transition-colors"
+              className={BUTTON_ICON_ACCENT_SM}
               title="Settings"
               aria-label="Settings"
               onClick={onSettingsClick}
             >
               <Settings className="size-3.5 sm:size-4" />
             </button>
-            <ThemeToggle />
+            {!shouldHideThemeSwitch() && <ThemeToggle />}
             {onClose && (
               <button
                 type="button"
                 onClick={onClose}
-                className="size-7 sm:size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
+                className={`${BUTTON_ICON_MUTED} size-7 sm:size-8`}
                 aria-label="Close"
               >
                 <X className="size-3.5 sm:size-4" />
@@ -722,65 +709,29 @@ export function FileExplorer({
             )}
           </div>
         </div>
-        <div className="relative mb-2">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 sm:size-3.5 text-muted-foreground pointer-events-none" />
+        <div className={SEARCH_ROW_WRAPPER}>
+          <Search className={SEARCH_ICON_POSITION} aria-hidden />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search files..."
-            className={`w-full h-7 sm:h-8 pl-7 sm:pl-8 text-[11px] sm:text-xs rounded-md bg-input-bg border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:border-violet-500/30 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 ${searchQuery ? 'pr-7 sm:pr-8' : 'pr-2'}`}
+            className={INPUT_SEARCH}
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground rounded p-0.5"
+              className={CLEAR_BUTTON_POSITION}
               aria-label="Clear search"
             >
-              <X className="size-3 sm:size-3.5" />
+              <X className="size-3.5" />
             </button>
           )}
         </div>
-        <div className="flex gap-1.5">
-          <button
-            type="button"
-            onClick={expandOneLevel}
-            className={`flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 px-2 ${toolbarBtnClass}`}
-          >
-            <ChevronsDown className="size-2.5 sm:size-3 shrink-0 mr-1" />
-            <span className="truncate">Expand<span className="hidden sm:inline"> Level</span></span>
-          </button>
-          <button
-            type="button"
-            onClick={collapseOneLevel}
-            className={`flex-1 min-w-0 h-6 sm:h-7 flex items-center justify-center gap-1 px-2 ${toolbarBtnClass}`}
-          >
-            <ChevronsRight className="size-2.5 sm:size-3 shrink-0 mr-1" />
-            <span className="truncate">Collapse<span className="hidden sm:inline"> Level</span></span>
-          </button>
-          <button
-            type="button"
-            onClick={expandAll}
-            className={`h-7 flex items-center justify-center px-2 text-[10px] ${toolbarBtnClass}`}
-            title="Expand All"
-            aria-label="Expand all"
-          >
-            <ChevronsDown className="size-3" />
-          </button>
-          <button
-            type="button"
-            onClick={collapseAll}
-            className={`h-7 flex items-center justify-center px-2 text-[10px] ${toolbarBtnClass}`}
-            title="Collapse All"
-            aria-label="Collapse all"
-          >
-            <ChevronsRight className="size-3" />
-          </button>
-        </div>
       </div>
       <div className="flex-1 overflow-auto py-2">
-        {loading && (
+        {loadingState && tree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             Loading…
           </div>
@@ -788,19 +739,18 @@ export function FileExplorer({
         {error && (
           <div className="px-3 py-2 text-xs text-destructive">{error}</div>
         )}
-        {!loading && !error && tree.length === 0 && (
-          <div className="px-3 py-2 text-xs text-muted-foreground">
-            No files in {playgroundLabel}
+        {!loadingState && !error && tree.length === 0 && (
+          <div className="px-3 py-4 text-sm text-muted-foreground">
+            {EMPTY_PLAYGROUND_MESSAGE}
           </div>
         )}
-        {!loading && !error && tree.length > 0 && filteredTree.length === 0 && (
+        {!error && tree.length > 0 && filteredTree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             No matches for &quot;{searchQuery}&quot;
           </div>
         )}
-        {!loading && !error && filteredTree.length > 0 && (
-          <div className="p-2">
-            <div className="px-2 py-1 text-[10px] text-muted-foreground font-medium">{playgroundLabel}</div>
+        {!error && filteredTree.length > 0 && (
+          <div className="p-2 animate-file-explorer-in">
             {filteredTree.map((entry) => (
               <TreeNode
                 key={entry.path}
@@ -809,14 +759,36 @@ export function FileExplorer({
                 expanded={expanded}
                 onToggle={handleToggle}
                 onFileClick={handleFileClick}
+                selectedPath={selectedPathProp ?? openFileEntry?.path ?? null}
               />
             ))}
           </div>
         )}
       </div>
-      </div>
+    </div>
+  );
+
+  const content = collapsed ? collapsedContent : expandedContent;
+
+  return (
+    <>
+      {onToggleCollapse && collapsed !== undefined && tree.length > 0 ? (
+        <div className="relative h-full flex flex-col min-h-0 flex-1">
+          {content}
+          <SidebarToggle
+            isCollapsed={collapsed}
+            onClick={onToggleCollapse}
+            side="left"
+            ariaLabel={
+              collapsed ? 'Expand file explorer' : 'Collapse file explorer'
+            }
+          />
+        </div>
+      ) : (
+        content
+      )}
       {openFileEntry && (
-        <FileDetailsDialog entry={openFileEntry} onClose={() => setSelectedFile(null)} />
+        <FileDetailsDialog entry={openFileEntry} onClose={() => setSelectedFileLocal(null)} />
       )}
     </>
   );

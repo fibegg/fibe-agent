@@ -68,8 +68,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev'],
-        env: { AUTHORIZATION: 'Bearer plgr_test_key123' },
+        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer plgr_test_key123'],
       });
     });
 
@@ -104,7 +103,6 @@ describe('writeMcpConfig', () => {
       expect(config.mcpServers['Sentry']).toEqual({
         command: 'npx',
         args: ['-y', 'mcp-remote', 'https://mcp.sentry.dev/mcp'],
-        env: { AUTHORIZATION: '' },
       });
     });
 
@@ -150,6 +148,34 @@ describe('writeMcpConfig', () => {
         args: ['mcp-server-docker'],
       });
     });
+
+    it('includes --allow-http flag for non-HTTPS server URLs', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          'local-dev': {
+            serverUrl: 'http://rails.test:3000/mcp',
+            authHeader: 'Bearer dev_key',
+          },
+        },
+      });
+      writeMcpConfig();
+      const config = JSON.parse(
+        readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
+      );
+      expect(config.mcpServers['local-dev']).toEqual({
+        command: 'npx',
+        args: ['-y', 'mcp-remote', 'http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer dev_key'],
+      });
+    });
+
+    it('does NOT include --allow-http for HTTPS server URLs', () => {
+      writeMcpConfig();
+      const config = JSON.parse(
+        readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
+      );
+      // Default setup uses https://my.playgrounds.dev
+      expect(config.mcpServers['playgrounds-dev'].args).not.toContain('--allow-http');
+    });
   });
 
   describe('claude-code provider', () => {
@@ -166,15 +192,14 @@ describe('writeMcpConfig', () => {
       delete process.env.DOCKER_MCP_CONFIG_JSON;
     });
 
-    it('writes settings.json with mcpServers block', () => {
+    it('writes .claude.json with mcpServers block', () => {
       writeMcpConfig();
-      const configPath = join(testHome, '.claude', 'settings.json');
+      const configPath = join(testHome, '.claude.json');
       expect(existsSync(configPath)).toBe(true);
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev'],
-        env: { AUTHORIZATION: 'Bearer plgr_test_key456' },
+        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer plgr_test_key456'],
       });
     });
 
@@ -186,10 +211,20 @@ describe('writeMcpConfig', () => {
       });
       writeMcpConfig();
       const config = JSON.parse(
-        readFileSync(join(testHome, '.claude', 'settings.json'), 'utf8'),
+        readFileSync(join(testHome, '.claude.json'), 'utf8'),
       );
       expect(Object.keys(config.mcpServers)).toContain('playgrounds-dev');
       expect(Object.keys(config.mcpServers)).toContain('docker');
+    });
+
+    it('preserves existing .claude.json content', () => {
+      writeFileSync(join(testHome, '.claude.json'), JSON.stringify({ userID: 'abc123', firstStartTime: '2026-01-01' }));
+
+      writeMcpConfig();
+      const config = JSON.parse(readFileSync(join(testHome, '.claude.json'), 'utf8'));
+      expect(config.userID).toBe('abc123');
+      expect(config.firstStartTime).toBe('2026-01-01');
+      expect(config.mcpServers['playgrounds-dev']).toBeDefined();
     });
   });
 
@@ -214,7 +249,6 @@ describe('writeMcpConfig', () => {
       const content = readFileSync(configPath, 'utf8');
       expect(content).toContain('[mcp_servers."playgrounds-dev"]');
       expect(content).toContain('url = "https://my.playgrounds.dev"');
-      expect(content).toContain('AUTHORIZATION = "Bearer plgr_test_key789"');
     });
 
     it('preserves existing config.toml content', () => {
@@ -241,6 +275,21 @@ describe('writeMcpConfig', () => {
       expect(content).toContain('command = "uvx"');
       expect(content).toContain('args = ["mcp-server-docker"]');
     });
+
+    it('replacing block with args array does not corrupt toml', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          github: { command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'] },
+        },
+      });
+      writeMcpConfig();
+      const contentAfterFirst = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
+      expect(contentAfterFirst).toContain('args = ["-y", "@modelcontextprotocol/server-github"]');
+      writeMcpConfig();
+      const contentAfterSecond = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
+      expect(contentAfterSecond).not.toMatch(/^\s*\]\s*$/m);
+      expect(contentAfterSecond).toContain('[mcp_servers."github"]');
+    });
   });
 
   describe('legacy format support', () => {
@@ -257,8 +306,7 @@ describe('writeMcpConfig', () => {
       );
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev'],
-        env: { AUTHORIZATION: 'Bearer legacy_key' },
+        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer legacy_key'],
       });
     });
   });

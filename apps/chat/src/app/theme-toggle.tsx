@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getStoredTheme, isDark, toggleTheme as doToggle } from './theme';
+import { BUTTON_ICON_ACCENT_SM } from './ui-classes';
 
 export function ThemeToggle() {
   const [dark, setDark] = useState(
@@ -26,7 +27,7 @@ export function ThemeToggle() {
     <button
       type="button"
       onClick={handleClick}
-      className="size-7 sm:size-8 flex items-center justify-center rounded-md text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors"
+      className={BUTTON_ICON_ACCENT_SM}
       aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
     >
       {dark ? (

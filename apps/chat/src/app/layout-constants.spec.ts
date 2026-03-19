@@ -1,20 +1,46 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
+  MAIN_CONTENT_MIN_WIDTH_PX,
+  PANEL_HEADER_MIN_HEIGHT_PX,
   SIDEBAR_COLLAPSED_WIDTH_PX,
   SIDEBAR_COLLAPSE_STORAGE_KEY,
   SIDEBAR_WIDTH_PX,
+  RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
+  RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY,
+  RIGHT_SIDEBAR_WIDTH_PX,
   getInitialSidebarCollapsed,
   persistSidebarCollapsed,
+  getInitialRightSidebarCollapsed,
+  persistRightSidebarCollapsed,
 } from './layout-constants';
 
 describe('layout-constants', () => {
   it('exports expected sidebar width values', () => {
-    expect(SIDEBAR_WIDTH_PX).toBe(320);
+    expect(SIDEBAR_WIDTH_PX).toBe(280);
     expect(SIDEBAR_COLLAPSED_WIDTH_PX).toBe(56);
+  });
+
+  it('exports main content min width', () => {
+    expect(MAIN_CONTENT_MIN_WIDTH_PX).toBe(260);
+  });
+
+  it('exports panel header min height', () => {
+    expect(PANEL_HEADER_MIN_HEIGHT_PX).toBe(128);
   });
 
   it('exports storage key for sidebar collapse', () => {
     expect(SIDEBAR_COLLAPSE_STORAGE_KEY).toBe('phoenix-sidebar-collapsed');
+  });
+
+  it('exports expected right sidebar width values', () => {
+    expect(RIGHT_SIDEBAR_WIDTH_PX).toBe(280);
+    expect(RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX).toBe(48);
+  });
+
+  it('exports storage key for right sidebar collapse', () => {
+    expect(RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY).toBe(
+      'phoenix-right-sidebar-collapsed'
+    );
   });
 });
 
@@ -87,5 +113,48 @@ describe('persistSidebarCollapsed', () => {
       throw new Error('quota exceeded');
     });
     expect(() => persistSidebarCollapsed(true)).not.toThrow();
+  });
+});
+
+describe('getInitialRightSidebarCollapsed', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns false when key is missing', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    expect(getInitialRightSidebarCollapsed()).toBe(false);
+  });
+
+  it('returns true when key is "true"', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue('true');
+    expect(getInitialRightSidebarCollapsed()).toBe(true);
+  });
+});
+
+describe('persistRightSidebarCollapsed', () => {
+  const key = RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY;
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('writes "true" when collapsed is true', () => {
+    persistRightSidebarCollapsed(true);
+    expect(localStorage.setItem).toHaveBeenCalledWith(key, 'true');
   });
 });

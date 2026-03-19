@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getThinkingLines } from './thinking-copy';
+import { ASSISTANT_AVATAR_URL } from './chat-avatar';
 
 const CYCLE_MS = 2400;
 
@@ -17,17 +18,17 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
 
   return (
     <div className="flex items-center gap-3 py-0.5">
-      <div className="flex gap-1 shrink-0">
+      <div className="flex gap-1.5 shrink-0">
         <span
           className="size-2 rounded-full bg-violet-400 animate-thinking-bounce"
           style={{ animationDelay: '0ms' }}
         />
         <span
-          className="size-2 rounded-full bg-purple-400 animate-thinking-bounce"
+          className="size-2 rounded-full bg-violet-400 animate-thinking-bounce"
           style={{ animationDelay: '150ms' }}
         />
         <span
-          className="size-2 rounded-full bg-fuchsia-400 animate-thinking-bounce"
+          className="size-2 rounded-full bg-violet-400 animate-thinking-bounce"
           style={{ animationDelay: '300ms' }}
         />
       </div>
@@ -42,6 +43,13 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
 }
 
 export function ThinkingAvatar() {
+  if (ASSISTANT_AVATAR_URL) {
+    return (
+      <div className="size-8 rounded-lg flex-shrink-0 overflow-hidden bg-muted">
+        <img src={ASSISTANT_AVATAR_URL} alt="" className="size-full object-cover" />
+      </div>
+    );
+  }
   return (
     <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white flex-shrink-0 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-thinking-shine" />

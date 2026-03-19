@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileExplorer, type PlaygroundEntry } from './file-explorer';
+import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from './file-explorer';
 
 vi.mock('../api-url', () => ({
-  getApiUrl: () => '',
-  getAuthTokenForRequest: () => '',
+  apiRequest: (path: string, options?: RequestInit) => fetch(path, options),
 }));
 
 describe('FileExplorer', () => {
@@ -16,7 +15,7 @@ describe('FileExplorer', () => {
     vi.unstubAllGlobals();
   });
 
-  it('shows playground/ label when tree is loaded', async () => {
+  it('shows empty playground message when tree is loaded with no files', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -24,9 +23,9 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/No files in playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.getByText(/playground\//)).toBeTruthy();
+    expect(screen.getByText("You don't have any files in the playground.")).toBeTruthy();
   });
 
   it('shows loading state initially', () => {
@@ -37,7 +36,7 @@ describe('FileExplorer', () => {
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
-  it('shows empty message when API returns empty array', async () => {
+  it('shows empty playground message when API returns empty array', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -45,8 +44,22 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/No files in playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
+    expect(screen.getByText("You don't have any files in the playground.")).toBeTruthy();
+  });
+
+  it('does not render expand/collapse button when tree is empty', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [] as PlaygroundEntry[],
+    });
+    render(<FileExplorer collapsed onToggleCollapse={vi.fn()} />);
+    await waitFor(() => {
+      expect(screen.queryByText('Loading…')).toBeNull();
+    });
+    expect(screen.queryByRole('button', { name: 'Expand file explorer' })).toBeNull();
   });
 
   it('shows error when fetch fails', async () => {
@@ -68,7 +81,7 @@ describe('FileExplorer', () => {
     });
   });
 
-  it('shows single top-level directory name as label when tree has one dir', async () => {
+  it('shows tree with single top-level directory when tree has one dir', async () => {
     const tree: PlaygroundEntry[] = [
       {
         name: 'zcss',
@@ -84,12 +97,35 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText('zcss/')).toBeTruthy();
+      expect(screen.getByText('zcss')).toBeTruthy();
     });
-    expect(screen.getByText('zcss')).toBeTruthy();
+    expect(screen.getByText('build.zig')).toBeTruthy();
   });
 
-  it('shows Phoenix version in sidebar', async () => {
+  it('shows file tree when refetching and tree already has files', async () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'src', path: 'src', type: 'directory', children: [] },
+    ];
+    (fetch as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => tree,
+      })
+      .mockImplementation(
+        () => new Promise(() => undefined)
+      );
+    const { rerender } = render(<FileExplorer refreshTrigger={0} />);
+    await waitFor(() => {
+      expect(screen.getByText('src')).toBeTruthy();
+    });
+    rerender(<FileExplorer refreshTrigger={1} />);
+    await act(() => Promise.resolve());
+    expect(screen.getByText('src')).toBeTruthy();
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  it('shows version in sidebar', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -97,7 +133,7 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/Phoenix v/)).toBeTruthy();
+      expect(screen.getByText(/v[\d.]/)).toBeTruthy();
     });
   });
 
@@ -173,10 +209,10 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.getByText('readme.md')).toBeTruthy();
     });
-    expect(screen.queryByRole('heading', { name: 'File viewer' })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'readme.md' })).toBeNull();
     fireEvent.click(screen.getByText('readme.md'));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'File viewer' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'readme.md' })).toBeTruthy();
     });
     expect(screen.getAllByText('readme.md').length).toBeGreaterThanOrEqual(1);
   });
@@ -190,7 +226,7 @@ describe('FileExplorer', () => {
     const onSettingsClick = vi.fn();
     render(<FileExplorer onSettingsClick={onSettingsClick} />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect(onSettingsClick).toHaveBeenCalledTimes(1);
@@ -204,7 +240,7 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     expect(() => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))).not.toThrow();
   });
@@ -218,7 +254,7 @@ describe('FileExplorer', () => {
     const onClose = vi.fn();
     render(<FileExplorer onClose={onClose} />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     expect(screen.getByRole('button', { name: 'Close' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
@@ -233,7 +269,7 @@ describe('FileExplorer', () => {
     });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
     expect(screen.queryByRole('button', { name: 'Close' })).toBeNull();
   });
@@ -257,7 +293,7 @@ describe('FileExplorer', () => {
     render(<FileExplorer collapsed={false} />);
     expect(screen.getByPlaceholderText('Search files...')).toBeTruthy();
     await waitFor(() => {
-      expect(screen.getByText(/playground\//)).toBeTruthy();
+      expect(screen.queryByText('Loading…')).toBeNull();
     });
   });
 
@@ -297,7 +333,7 @@ describe('FileExplorer', () => {
     });
     fireEvent.click(screen.getByText('app.js'));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'File viewer' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'app.js' })).toBeTruthy();
     });
     await waitFor(() => {
       expect(screen.getByText(/const x = 1;/)).toBeTruthy();
@@ -325,7 +361,7 @@ describe('FileExplorer', () => {
     });
     fireEvent.click(screen.getByText('readme.md'));
     await waitFor(() => {
-      expect(screen.getByText('markdown')).toBeTruthy();
+      expect(screen.getByText(/Markdown/)).toBeTruthy();
     });
   });
 
@@ -476,11 +512,11 @@ describe('FileExplorer', () => {
     });
     fireEvent.click(screen.getByText('f.js'));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'File viewer' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'f.js' })).toBeTruthy();
     });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'File viewer' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'f.js' })).toBeNull();
     });
   });
 
@@ -505,11 +541,11 @@ describe('FileExplorer', () => {
     });
     fireEvent.click(screen.getByText('a.js'));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'File viewer' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'a.js' })).toBeTruthy();
     });
     fireEvent.keyDown(window, { key: 'Escape' });
     await waitFor(() => {
-      expect(screen.queryByRole('heading', { name: 'File viewer' })).toBeNull();
+      expect(screen.queryByRole('heading', { name: 'a.js' })).toBeNull();
     });
   });
 
@@ -534,7 +570,7 @@ describe('FileExplorer', () => {
     });
     fireEvent.click(screen.getByText('slow.js'));
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: 'File viewer' })).toBeTruthy();
+      expect(screen.getByRole('heading', { name: 'slow.js' })).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: 'Copy' }).hasAttribute('disabled')).toBe(true);
     expect(screen.getByRole('button', { name: 'Download' }).hasAttribute('disabled')).toBe(true);
@@ -546,5 +582,37 @@ describe('FileExplorer', () => {
         json: async () => ({ content: 'done' }),
       });
     });
+  });
+});
+
+describe('FileViewerPanel', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn());
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('renders inline with file content and calls onClose when Close is clicked', async () => {
+    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ content: 'body { color: red; }' }),
+    });
+    const onClose = vi.fn();
+    render(
+      <FileViewerPanel
+        entry={{ name: 'style.css', path: 'style.css', type: 'file' }}
+        onClose={onClose}
+        inline
+      />
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/color: red/)).toBeTruthy();
+    });
+    expect(screen.getByRole('heading', { name: 'style.css' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

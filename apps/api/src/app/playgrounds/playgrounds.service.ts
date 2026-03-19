@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
@@ -23,71 +23,97 @@ function pathInIgnoredDir(relPath: string): boolean {
 export class PlaygroundsService {
   constructor(private readonly config: ConfigService) {}
 
-  getTree(): PlaygroundEntry[] {
+  async getTree(): Promise<PlaygroundEntry[]> {
     return this.readDir(this.config.getPlaygroundsDir(), '');
   }
 
-  getFileContent(relativePath: string): string {
+  async getFileContent(relativePath: string): Promise<string> {
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
     if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
       throw new NotFoundException('File not found');
     }
-    if (!existsSync(absPath) || !statSync(absPath).isFile()) {
+    let st: Awaited<ReturnType<typeof stat>>;
+    try {
+      st = await stat(absPath);
+    } catch {
       throw new NotFoundException('File not found');
     }
-    return readFileSync(absPath, 'utf-8');
+    if (!st.isFile()) {
+      throw new NotFoundException('File not found');
+    }
+    return readFile(absPath, 'utf-8');
   }
 
-  getFolderFileContents(relativePath: string): { path: string; content: string }[] {
+  async getFolderFileContents(
+    relativePath: string
+  ): Promise<{ path: string; content: string }[]> {
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
     if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
       throw new NotFoundException('Folder not found');
     }
-    if (!existsSync(absPath) || !statSync(absPath).isDirectory()) {
+    let st: Awaited<ReturnType<typeof stat>>;
+    try {
+      st = await stat(absPath);
+    } catch {
+      throw new NotFoundException('Folder not found');
+    }
+    if (!st.isDirectory()) {
       throw new NotFoundException('Folder not found');
     }
     return this.collectFileContents(absPath, rel);
   }
 
-  private collectFileContents(absPath: string, relPath: string): { path: string; content: string }[] {
+  private async collectFileContents(
+    absPath: string,
+    relPath: string
+  ): Promise<{ path: string; content: string }[]> {
     if (IGNORED_NAMES.has(basename(absPath))) return [];
     const result: { path: string; content: string }[] = [];
-    const entries = readdirSync(absPath, { withFileTypes: true });
+    let entries: { name: string | Buffer; isFile: () => boolean; isDirectory: () => boolean }[];
+    try {
+      entries = await readdir(absPath, { withFileTypes: true });
+    } catch {
+      return [];
+    }
     for (const e of entries) {
-      if (e.name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(e.name)) continue;
-      const childRel = relPath ? `${relPath}/${e.name}` : e.name;
-      const childAbs = join(absPath, e.name);
+      const name = typeof e.name === 'string' ? e.name : String(e.name);
+      if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
+      const childRel = relPath ? `${relPath}/${name}` : name;
+      const childAbs = join(absPath, name);
       if (e.isFile()) {
         try {
-          result.push({ path: childRel, content: readFileSync(childAbs, 'utf-8') });
+          const content = await readFile(childAbs, 'utf-8');
+          result.push({ path: childRel, content });
         } catch {
           /* skip unreadable files */
         }
       } else if (e.isDirectory()) {
-        result.push(...this.collectFileContents(childAbs, childRel));
+        const sub = await this.collectFileContents(childAbs, childRel);
+        result.push(...sub);
       }
     }
     return result;
   }
 
-  private readDir(absPath: string, relativePath: string): PlaygroundEntry[] {
+  private async readDir(absPath: string, relativePath: string): Promise<PlaygroundEntry[]> {
     if (IGNORED_NAMES.has(basename(absPath))) return [];
     try {
-      const entries = readdirSync(absPath, { withFileTypes: true });
+      const entries = await readdir(absPath, { withFileTypes: true });
       const result: PlaygroundEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
       const files: { name: string; rel: string }[] = [];
       for (const e of entries) {
-        if (e.name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(e.name)) continue;
-        const rel = relativePath ? `${relativePath}/${e.name}` : e.name;
+        const name = typeof e.name === 'string' ? e.name : String(e.name);
+        if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
+        const rel = relativePath ? `${relativePath}/${name}` : name;
         if (e.isDirectory()) {
-          dirs.push({ name: e.name, abs: join(absPath, e.name), rel });
+          dirs.push({ name, abs: join(absPath, name), rel });
         } else if (e.isFile()) {
-          files.push({ name: e.name, rel });
+          files.push({ name, rel });
         }
       }
       dirs.sort((a, b) => a.name.localeCompare(b.name));
@@ -97,7 +123,7 @@ export class PlaygroundsService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: this.readDir(d.abs, d.rel),
+          children: await this.readDir(d.abs, d.rel),
         });
       }
       for (const f of files) {

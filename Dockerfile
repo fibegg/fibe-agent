@@ -12,11 +12,13 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g @anthropic-ai/claude-code@2.1.50; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
     npm install -g @openai/codex@0.104.0; \
+    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
+    npm install -g opencode-ai; \
     fi
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
-FROM oven/bun:1.3.9-slim AS builder
+FROM oven/bun:1.3.11-slim AS builder
 
 ARG BUILDKIT_INLINE_CACHE=1
 
@@ -38,12 +40,36 @@ RUN bunx nx run-many --targets=build --projects=api,chat
 FROM node:24-slim
 
 ARG BUILDKIT_INLINE_CACHE=1
+ARG GIT_SHA
+ENV GIT_SHA=$GIT_SHA
 
 # Unconditional packages — cached across all provider variants
 RUN apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
     jq less tree wget zip unzip openssh-client docker.io \
-    && rm -rf /var/lib/apt/lists/*
+    # Tier 1 – essential agent tooling
+    python3 python3-venv \
+    ripgrep fd-find \
+    make file patch \
+    ca-certificates \
+    # Tier 2 – extended agent tooling
+    sqlite3 pandoc htop strace \
+    imagemagick ffmpeg ghostscript \
+    # Tier 3 – native compilation support
+    build-essential \
+    && rm -rf /var/lib/apt/lists/* \
+    && ln -sf /usr/bin/fdfind /usr/local/bin/fd
+
+# uv – ultrafast Python package/project manager (single static binary)
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+# uvx wrapper – some uv versions don't handle argv[0]=="uvx" correctly,
+# so we use a shell script that delegates to `uv tool run` instead of a symlink.
+RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
+    && chmod +x /usr/local/bin/uvx
+
+# Deno – secure JS/TS runtime for quick scripting
+ENV DENO_INSTALL=/usr/local
+RUN curl -fsSL https://deno.land/install.sh | sh
 
 # Conditional packages — only busts cache for claude_code builds
 ARG AGENT_PROVIDER=gemini
@@ -65,19 +91,34 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
+# @playwright/mcp – globally install so the agent can use it without npx download.
+# Pin version to keep browser↔library alignment deterministic.
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g @playwright/mcp@0.0.68
+
+# System libraries required by Chromium (must run as root).
+RUN npx -y playwright install-deps chromium
+
 EXPOSE 3000
 
-RUN mkdir -p /app/data /app/playground \
+RUN mkdir -p /app/data /app/playground /home/node/.cache \
+    && touch /app/data/STEERING.md \
     && if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
     mkdir -p /home/node/.codex && chown -R node:node /home/node/.codex; \
     elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
     mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
+    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
+    mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
     fi \
-    && chown -R node:node /app/data /app/playground
+    && chown -R node:node /app/data /app/playground /home/node/.cache
 
 USER node
+
+# Download Chromium browser binary as node so it lands in /home/node/.cache
+# and is accessible at runtime (container runs as USER node).
+RUN npx -y playwright install chromium
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 

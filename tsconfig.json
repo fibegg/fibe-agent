@@ -4,13 +4,13 @@
   "files": [],
   "references": [
     {
-      "path": "./apps/chat-e2e"
+      "path": "./apps/e2e-chat"
     },
     {
       "path": "./apps/chat"
     },
     {
-      "path": "./apps/api-e2e"
+      "path": "./apps/e2e-api"
     },
     {
       "path": "./apps/api"
