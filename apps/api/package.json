@@ -1,13 +1,12 @@
 {
   "name": "@playgrounds.dev/api",
-  "version": "0.0.2",
+  "version": "0.0.1",
   "private": true,
   "nx": {
     "name": "api",
     "targets": {
       "build": {
         "executor": "nx:run-commands",
-        "outputs": ["{projectRoot}/dist"],
         "options": {
           "command": "webpack-cli build",
           "args": [
@@ -80,10 +79,10 @@
       "test": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "bun test --preload ./test-setup.ts --serial",
+          "command": "bun test --preload ./test-setup.ts",
           "cwd": "apps/api"
         },
-        "dependsOn": ["build"]
+        "dependsOn": []
       },
       "typecheck": {
         "executor": "nx:run-commands",
