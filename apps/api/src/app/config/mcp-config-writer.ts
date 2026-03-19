@@ -36,11 +36,15 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   }
 
   // Streamable-HTTP server — use mcp-remote proxy
-  return {
-    command: 'npx',
-    args: ['-y', 'mcp-remote', entry.serverUrl!],
-    env: { AUTHORIZATION: entry.authHeader ?? '' },
-  };
+  const url = entry.serverUrl ?? '';
+  const args = ['-y', 'mcp-remote', url];
+  if (entry.serverUrl && !entry.serverUrl.startsWith('https://')) {
+    args.push('--allow-http');
+  }
+  if (entry.authHeader) {
+    args.push('--header', `Authorization:${entry.authHeader}`);
+  }
+  return { command: 'npx', args };
 }
 
 /**
@@ -65,11 +69,10 @@ function toTomlBlock(name: string, entry: McpServerEntry): string {
     return lines.join('\n');
   }
 
-  // Streamable-HTTP
+  // Streamable-HTTP — Codex does not support env for url-based servers; use bearer_token_env_var if needed
   return [
     `[mcp_servers."${name}"]`,
     `url = "${entry.serverUrl}"`,
-    `env = { AUTHORIZATION = "${entry.authHeader ?? ''}" }`,
   ].join('\n');
 }
 
@@ -116,12 +119,12 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   },
 
   /**
-   * Claude Code: ~/.claude/settings.json
-   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
+   * Claude Code: ~/.claude.json
+   * User-scoped MCP servers live in ~/.claude.json (not ~/.claude/settings.json).
+   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } }, ...otherKeys }
    */
   'claude-code': (servers) => {
-    const dir = join(getHome(), '.claude');
-    const configPath = join(dir, 'settings.json');
+    const configPath = join(getHome(), '.claude.json');
     let existing: Record<string, unknown> = {};
 
     try {
@@ -131,8 +134,6 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     } catch {
       /* start fresh */
     }
-
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
     const nativeServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
@@ -169,11 +170,13 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
 
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-    // Remove any existing [mcp_servers."..."] blocks that we're about to write
+    // Remove any existing [mcp_servers."..."] blocks that we're about to write.
+    // Match through to the next table header or EOF so we don't cut inside args = [...].
     let cleaned = existingContent;
     for (const name of Object.keys(servers)) {
+      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const pattern = new RegExp(
-        `\\[mcp_servers\\."${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"\\][^[]*`,
+        `(\\[mcp_servers\\."${escaped}"\\][\\s\\S]*?)(?=\\n\\[mcp_servers\\.|$)`,
         'gs',
       );
       cleaned = cleaned.replace(pattern, '');

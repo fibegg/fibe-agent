@@ -6,8 +6,11 @@ export const WS_ACTION = {
   REAUTHENTICATE: 'reauthenticate',
   LOGOUT: 'logout',
   SEND_CHAT_MESSAGE: 'send_chat_message',
+  QUEUE_MESSAGE: 'queue_message',
+  SUBMIT_STORY: 'submit_story',
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
+  INTERRUPT_AGENT: 'interrupt_agent',
 } as const;
 
 export const WS_EVENT = {
@@ -24,6 +27,17 @@ export const WS_EVENT = {
   STREAM_CHUNK: 'stream_chunk',
   STREAM_END: 'stream_end',
   MODEL_UPDATED: 'model_updated',
+  REASONING_START: 'reasoning_start',
+  REASONING_CHUNK: 'reasoning_chunk',
+  REASONING_END: 'reasoning_end',
+  THINKING_STEP: 'thinking_step',
+  TOOL_CALL: 'tool_call',
+  FILE_CREATED: 'file_created',
+  ACTIVITY_SNAPSHOT: 'activity_snapshot',
+  ACTIVITY_APPENDED: 'activity_appended',
+  ACTIVITY_UPDATED: 'activity_updated',
+  PLAYGROUND_CHANGED: 'playground_changed',
+  QUEUE_UPDATED: 'queue_updated',
 } as const;
 
 export const AUTH_STATUS = {
@@ -33,5 +47,11 @@ export const AUTH_STATUS = {
 
 export const ERROR_CODE = {
   NEED_AUTH: 'NEED_AUTH',
-  BLOCKED: 'BLOCKED',
+  AGENT_BUSY: 'AGENT_BUSY',
+} as const;
+
+export const WS_CLOSE = {
+  ANOTHER_SESSION_ACTIVE: 4000,
+  UNAUTHORIZED: 4001,
+  SESSION_TAKEN_OVER: 4002,
 } as const;

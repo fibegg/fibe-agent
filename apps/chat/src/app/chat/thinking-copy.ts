@@ -1,5 +1,5 @@
 const DEFAULT_LINES = [
-  'Consulting the phoenix...',
+  'Gathering thoughts...',
   'Stoking the flames...',
   'Gathering stardust...',
   'Connecting neurons...',
@@ -12,14 +12,6 @@ const DEFAULT_LINES = [
 ];
 
 const EASTER_EGG_TRIGGERS: { pattern: RegExp | ((s: string) => boolean); lines: string[] }[] = [
-  {
-    pattern: /\bphoenix\b/i,
-    lines: [
-      'The phoenix is rising from the ashes...',
-      'Channeling fire and renewal...',
-      'Feathers aflame with inspiration...',
-    ],
-  },
   {
     pattern: /\b(42|answer to life)\b/i,
     lines: [
@@ -97,15 +89,3 @@ export function getThinkingLines(lastUserMessage: string | null | undefined): st
   return DEFAULT_LINES;
 }
 
-const STATUS_LABELS = [
-  'Thinking...',
-  'Consulting the phoenix...',
-  'Brewing ideas...',
-  'One moment...',
-  'Working on it...',
-];
-
-export function getThinkingStatusLabels(lastUserMessage: string | null | undefined): string[] {
-  const lines = getThinkingLines(lastUserMessage);
-  return lines.length > 0 ? lines : STATUS_LABELS;
-}

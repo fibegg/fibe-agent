@@ -8,16 +8,25 @@ import { AppService } from './app.service';
 import { ConfigService } from './config/config.service';
 import { AgentAuthGuard } from './auth/agent-auth.guard';
 import { AuthController } from './auth/auth.controller';
+import { ActivityController } from './activity/activity.controller';
+import { ActivityStoreService } from './activity-store/activity-store.service';
 import { MessageStoreService } from './message-store/message-store.service';
 import { MessagesController } from './messages/messages.controller';
 import { ModelStoreService } from './model-store/model-store.service';
 import { ModelOptionsController } from './model-options/model-options.controller';
 import { OrchestratorService } from './orchestrator/orchestrator.service';
+import { ChatPromptContextService } from './orchestrator/chat-prompt-context.service';
 import { StrategyRegistryService } from './strategies/strategy-registry.service';
 import { UploadsController } from './uploads/uploads.controller';
 import { UploadsService } from './uploads/uploads.service';
 import { PlaygroundsController } from './playgrounds/playgrounds.controller';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
+import { InitStatusController } from './init-status/init-status.controller';
+import { AgentController } from './agent/agent.controller';
+import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
+import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
+import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
+import { SteeringService } from './steering/steering.service';
 
 @Module({
   imports: [
@@ -30,23 +39,32 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
   ],
   controllers: [
     AppController,
+    ActivityController,
     AuthController,
     MessagesController,
     ModelOptionsController,
     UploadsController,
     PlaygroundsController,
+    InitStatusController,
+    AgentController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     AppService,
     ConfigService,
     AgentAuthGuard,
+    ActivityStoreService,
     MessageStoreService,
     ModelStoreService,
     StrategyRegistryService,
     OrchestratorService,
+    ChatPromptContextService,
     UploadsService,
     PlaygroundsService,
+    PlaygroundWatcherService,
+    PhoenixSyncService,
+    GithubTokenRefreshService,
+    SteeringService,
   ],
 })
 export class AppModule {}

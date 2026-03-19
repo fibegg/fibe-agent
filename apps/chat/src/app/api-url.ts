@@ -1,11 +1,27 @@
+import { API_PATHS } from './api-paths';
+
 export function getApiUrl(): string {
-  const env = import.meta.env.VITE_API_URL as string | undefined;
+  const env = typeof __API_URL__ !== 'undefined' ? __API_URL__ : '';
   if (env) return env.replace(/\/$/, '');
   return '';
 }
 
+export function buildApiUrl(path: string): string {
+  const base = getApiUrl();
+  if (base) return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  return path.startsWith('/') ? path : `/${path}`;
+}
+
+export function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
+  const url = buildApiUrl(path);
+  const token = getAuthTokenForRequest();
+  const headers = new Headers(options.headers);
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return fetch(url, { ...options, headers });
+}
+
 export function isChatModelLocked(): boolean {
-  const v = import.meta.env.VITE_LOCK_CHAT_MODEL as string | undefined;
+  const v = typeof __LOCK_CHAT_MODEL__ !== 'undefined' ? __LOCK_CHAT_MODEL__ : '';
   return (
     typeof v === 'string' &&
     v.length > 0 &&
@@ -52,4 +68,28 @@ export function isAuthenticated(): boolean {
 export function getAuthTokenForRequest(): string {
   const t = getToken();
   return t === NO_PASSWORD_SENTINEL ? '' : t;
+}
+
+export async function loginWithPassword(
+  password: string
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const res = await apiRequest(API_PATHS.AUTH_LOGIN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password }),
+    });
+    const data = (await res.json()) as {
+      success?: boolean;
+      token?: string;
+      error?: string;
+    };
+    if (res.ok && data.success) {
+      setToken(data.token ?? '');
+      return { success: true };
+    }
+    return { success: false, error: data.error };
+  } catch {
+    return { success: false, error: 'Connection error. Please try again.' };
+  }
 }

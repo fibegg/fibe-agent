@@ -1,5 +1,11 @@
 import { useState } from 'react';
 import type { AuthModalState } from './use-chat-websocket';
+import {
+  BUTTON_ICON_MUTED,
+  BUTTON_PRIMARY_ROUNDED,
+  INPUT_ROUNDED,
+  MODAL_OVERLAY_CENTER,
+} from '../ui-classes';
 
 interface AuthModalProps {
   open: boolean;
@@ -11,13 +17,14 @@ interface AuthModalProps {
 export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalProps) {
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   if (!open) return null;
 
   const showUrl = authModal.authUrl && !authModal.isManualToken;
   const isDeviceCode = Boolean(authModal.deviceCode && !authModal.isManualToken);
   const codeLabel = authModal.isManualToken
-    ? 'Paste Claude Code OAuth Token'
+    ? 'Paste API Key or Token'
     : isDeviceCode
       ? 'One-time device code'
       : 'Paste authorization code';
@@ -31,14 +38,28 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
     setSubmitting(true);
     onSubmitCode(value);
     setCode('');
-    setSubmitting(false);
+    /* Keep submitting=true until modal closes via auth_success */
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && showSubmit) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  const handleCopyDeviceCode = async () => {
+    const text = authModal.deviceCode ?? '';
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard unavailable */ }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-      onClick={onClose}
-    >
+    <div className={MODAL_OVERLAY_CENTER} onClick={onClose}>
       <div
         className="border border-border rounded-2xl shadow-card overflow-hidden w-full max-w-lg"
         style={{ backgroundColor: 'var(--card)' }}
@@ -54,7 +75,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           <button
             type="button"
             onClick={onClose}
-            className="size-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-violet-500/10 transition-colors"
+            className={`${BUTTON_ICON_MUTED} size-8`}
             aria-label="Close"
           >
             &times;
@@ -70,7 +91,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 href={authModal.authUrl ?? '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/30 transition-opacity"
+                className={`${BUTTON_PRIMARY_ROUNDED} inline-flex`}
               >
                 <ExternalIcon className="size-3.5" />
                 Open Authentication URL
@@ -84,23 +105,50 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
             <label htmlFor="auth-code" className="block text-xs sm:text-sm font-medium text-foreground">
               {codeLabel}
             </label>
-            <input
-              id="auth-code"
-              type="text"
-              value={codeValue}
-              readOnly={readOnly}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="Paste code here..."
-              className="w-full px-3 py-2.5 rounded-xl bg-background/50 border border-border text-foreground placeholder-muted-foreground focus:border-violet-500/50 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 outline-none transition-shadow"
-            />
+            {authModal.isManualToken && (
+              <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                Enter your provider API key (e.g. ANTHROPIC_API_KEY, GEMINI_API_KEY) or OAuth token.
+              </p>
+            )}
+            <div className="relative">
+              <input
+                id="auth-code"
+                type={authModal.isManualToken ? 'password' : 'text'}
+                value={codeValue}
+                readOnly={readOnly}
+                onChange={(e) => setCode(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={authModal.isManualToken ? 'sk-...' : 'Paste code here...'}
+                className={INPUT_ROUNDED}
+                autoComplete="off"
+                autoFocus
+              />
+              {isDeviceCode && (
+                <button
+                  type="button"
+                  onClick={handleCopyDeviceCode}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                  title="Copy device code"
+                >
+                  {copied ? '✓ Copied' : 'Copy'}
+                </button>
+              )}
+            </div>
             {showSubmit && (
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="w-full py-2.5 rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/20 disabled:opacity-50 transition-opacity"
+                className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-violet-500/20 disabled:opacity-50`}
               >
-                {submitting ? 'Submitting...' : 'Submit'}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Connecting…
+                  </span>
+                ) : (
+                  'Submit'
+                )}
               </button>
             )}
           </div>

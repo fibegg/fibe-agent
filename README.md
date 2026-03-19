@@ -4,7 +4,7 @@ Nx monorepo: **api** (NestJS + Fastify) and **chat** (React + Vite). The API run
 
 ## Run API + Chat
 
-Use **Bun** for fastest installs and script runs (`bun install`, `bun run dev`). npm works too.
+Use **Bun** for installs and scripts (`bun install`, `bun run dev`). The repo keeps **`bun.lock`** (for Bun/CI/Docker) and **`package-lock.json`** (for `npm install`). Bun reads **`bun.lock` when it exists** and only migrates from `package-lock.json` if `bun.lock` is missing—do not delete `bun.lock` and then run `bun install`, or workspace installs can break with `FileNotFound` cache errors.
 
 **Quick dev** (API + chat in parallel): `bun run dev`
 
@@ -31,7 +31,7 @@ Or start separately:
    With the default Vite proxy, the chat app will use `http://localhost:3000` for `/api` and `/ws`. If the API runs on another host/port, set:
 
    ```sh
-   VITE_API_URL=http://localhost:3000
+   API_URL=http://localhost:3000
    ```
 
 3. Open **http://localhost:3100**. If `AGENT_PASSWORD` is set, log in with that password first, then use the chat.
@@ -40,13 +40,14 @@ Or start separately:
 
 Copy `.env.example` to `.env` and adjust. Main variables:
 
-- **API:** `PORT`, `AGENT_PASSWORD`, `AGENT_PROVIDER` (mock, gemini, claude-code, openai-codex, opencodex), `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`
-- **Chat:** `VITE_API_URL` (only if the API is not on the same origin or not proxied), `VITE_LOCK_CHAT_MODEL` (optional; when set, the model selector is disabled and only shows the model in use)
+- **API:** `PORT`, `AGENT_PASSWORD`, `AGENT_PROVIDER` (mock, gemini, claude-code, openai-codex, opencode), `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`
+- **Chat:** `API_URL` (only if the API is not on the same origin or not proxied), `LOCK_CHAT_MODEL` (optional; when set, the model selector is disabled and only shows the model in use), `ASSISTANT_AVATAR_URL` (optional; URL for the assistant’s avatar), `USER_AVATAR_URL` (optional; URL for the user’s avatar)
 
 ## Project layout
 
 - `apps/api` – NestJS API, WebSocket at `/ws`, REST under `/api`
-- `apps/chat` – React chat UI (login, chat, auth modal, model selector)
+- `apps/chat` – React chat UI (login, chat, auth modal, model selector); messages render GitHub-flavored Markdown, and the copy icon on each bubble copies the **raw** message text (including markdown). Long, fence-less TypeScript pasted as one line is reflowed and shown as a code block **in the UI only** (stored text is unchanged).
+- `apps/e2e-api`, `apps/e2e-chat` – Playwright / Bun e2e (named so `bun test apps/api` does not pick up e2e specs by prefix)
 - `docs/API.md` – REST and WebSocket contract
 
 ## Scripts

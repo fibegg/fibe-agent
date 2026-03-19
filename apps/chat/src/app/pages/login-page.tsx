@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AnimatedPhoenixLogo } from '../animated-phoenix-logo';
-import { getApiUrl, setToken, isAuthenticated } from '../api-url';
+import { loginWithPassword, isAuthenticated } from '../api-url';
+import { PhoenixLogo } from '../phoenix-logo';
 import { waitForAutoAuth } from '../postmessage-auth';
 
 export function LoginPage() {
@@ -10,9 +10,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [autoAuthPending, setAutoAuthPending] = useState(window !== window.parent);
   const navigate = useNavigate();
-  const base = getApiUrl();
 
-  // Try postMessage auto-auth when embedded in an iframe
   useEffect(() => {
     if (window === window.parent) return;
     if (isAuthenticated()) {
@@ -20,14 +18,15 @@ export function LoginPage() {
       return;
     }
     let cancelled = false;
-    waitForAutoAuth().then((success) => {
+    void (async () => {
+      const success = await waitForAutoAuth();
       if (cancelled) return;
       setAutoAuthPending(false);
-      if (success) {
-        navigate('/', { replace: true });
-      }
-    });
-    return () => { cancelled = true; };
+      if (success) navigate('/', { replace: true });
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -35,21 +34,12 @@ export function LoginPage() {
     setError('');
     setLoading(true);
     try {
-      const url = base ? `${base}/api/auth/login` : '/api/auth/login';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const data = (await res.json()) as { success?: boolean; token?: string; error?: string };
-      if (res.ok && data.success) {
-        setToken(data.token ?? '');
+      const result = await loginWithPassword(password);
+      if (result.success) {
         navigate('/', { replace: true });
       } else {
-        setError(data.error ?? 'Authentication failed');
+        setError(result.error ?? 'Authentication failed');
       }
-    } catch {
-      setError('Connection error. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -60,7 +50,6 @@ export function LoginPage() {
     return (
       <div className="w-full h-full min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-950 via-violet-950 to-slate-900">
         <div className="text-center space-y-4">
-          <AnimatedPhoenixLogo className="size-16 mx-auto" />
           <div className="flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
             <span className="text-sm text-violet-300/60">Connecting...</span>
@@ -104,28 +93,9 @@ export function LoginPage() {
 
       <div className="relative z-10 w-full max-w-md px-4">
         <div className="bg-slate-800/40 backdrop-blur-2xl border border-violet-500/20 rounded-2xl shadow-[0_0_50px_rgba(139,92,246,0.3)] p-6 sm:p-8">
-            <div className="flex items-center justify-between mb-4 sm:mb-6">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-violet-500/10 rounded-lg border border-violet-500/20">
-                  <KeyIcon className="size-4 sm:size-5 text-violet-400" />
-                </div>
-                <div>
-                  <h1 className="text-base sm:text-lg font-semibold text-white">
-                    Agent Authentication
-                  </h1>
-                  <p className="text-[10px] sm:text-xs text-violet-300/60">
-                    Quantum Storage Access
-                  </p>
-                </div>
-              </div>
-              <div className="p-1.5 sm:p-2 bg-violet-500/5 rounded-lg border border-violet-500/10">
-                <SparklesIcon className="size-3 sm:size-4 text-violet-400/50" />
-              </div>
-            </div>
-
-            <div className="flex justify-center mb-4 sm:mb-6">
-              <AnimatedPhoenixLogo className="size-16 sm:size-20" />
-            </div>
+          <div className="flex justify-center mb-4 sm:mb-6">
+            <PhoenixLogo className="size-16 sm:size-20 object-contain" />
+          </div>
 
           {error && (
             <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm border border-destructive/20">
@@ -166,29 +136,12 @@ export function LoginPage() {
 
           <div className="mt-4 sm:mt-6 text-center">
             <p className="text-[10px] sm:text-xs text-violet-300/40">
-              Protected by Quantum Encryption • Phoenix v{__APP_VERSION__}
+              v{__APP_VERSION__}
             </p>
           </div>
         </div>
         <div className="absolute inset-0 bg-gradient-to-t from-violet-500/20 to-transparent blur-3xl -z-10 scale-150" />
       </div>
     </div>
-  );
-}
-
-
-function KeyIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
-    </svg>
-  );
-}
-
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
-      <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
-    </svg>
   );
 }

@@ -1,17 +1,35 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   getStoredTheme,
   setStoredTheme,
   isDark,
   toggleTheme,
   initTheme,
+  isSetThemeMessage,
 } from './theme';
 
 const STORAGE_KEY = 'chat-theme';
 
+/* jsdom may provide a minimal localStorage stub missing removeItem/clear.
+   Create a proper in-memory implementation and install it globally. */
+let store: Record<string, string> = {};
+const storageMock: Storage = {
+  get length() { return Object.keys(store).length; },
+  key(index: number) { return Object.keys(store)[index] ?? null; },
+  getItem(key: string) { return key in store ? store[key] : null; },
+  setItem(key: string, value: string) { store[key] = String(value); },
+  removeItem(key: string) { delete store[key]; },
+  clear() { store = {}; },
+};
+vi.stubGlobal('localStorage', storageMock);
+
+function resetStorage() {
+  store = {};
+}
+
 describe('getStoredTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
   });
 
   it('returns null when nothing stored', () => {
@@ -36,7 +54,7 @@ describe('getStoredTheme', () => {
 
 describe('setStoredTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
     document.documentElement.classList.remove('dark');
   });
 
@@ -71,7 +89,7 @@ describe('isDark', () => {
 
 describe('toggleTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
     document.documentElement.classList.remove('dark');
   });
 
@@ -90,9 +108,35 @@ describe('toggleTheme', () => {
   });
 });
 
+describe('isSetThemeMessage', () => {
+  it('returns true for valid light message', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'light' })).toBe(true);
+  });
+
+  it('returns true for valid dark message', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dark' })).toBe(true);
+  });
+
+  it('returns false for null', () => {
+    expect(isSetThemeMessage(null)).toBe(false);
+  });
+
+  it('returns false for wrong action', () => {
+    expect(isSetThemeMessage({ action: 'other', theme: 'dark' })).toBe(false);
+  });
+
+  it('returns false for invalid theme', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'system' })).toBe(false);
+  });
+
+  it('returns false for non-object', () => {
+    expect(isSetThemeMessage('set_theme')).toBe(false);
+  });
+});
+
 describe('initTheme', () => {
   beforeEach(() => {
-    localStorage.removeItem(STORAGE_KEY);
+    resetStorage();
     document.documentElement.classList.remove('dark');
   });
 

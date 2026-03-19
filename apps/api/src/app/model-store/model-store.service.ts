@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 
@@ -9,7 +10,7 @@ export class ModelStoreService {
   private cached: string | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     this.modelPath = join(dataDir, 'model.json');
     this.ensureDataDir();
   }
@@ -38,7 +39,7 @@ export class ModelStoreService {
   set(model: string): string {
     const value = (model ?? '').trim();
     this.cached = value;
-    writeFileSync(
+    void writeFile(
       this.modelPath,
       JSON.stringify({ model: value }, null, 2)
     );
@@ -46,7 +47,7 @@ export class ModelStoreService {
   }
 
   private ensureDataDir(): void {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }

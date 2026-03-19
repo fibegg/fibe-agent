@@ -1,42 +1,16 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { getFileIconInfo, type FileIconId } from '../file-extension-icons';
-import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
+import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
+import { readDomFromEl, segmentsToStr, type ContentEditableSegment } from './contenteditable-serialize';
+import { getClipboardTextForContentEditablePaste } from './use-chat-attachments';
 
-type Segment = { type: 'text'; value: string } | { type: 'mention'; path: string };
+type Segment = ContentEditableSegment;
 
 function parseToSegments(str: string): Segment[] {
   if (!str) return [{ type: 'text', value: '' }];
-  const parts = str.split(AT_MENTION_REGEX);
-  const segments: Segment[] = [];
-  for (const p of parts) {
-    const m = p.match(/^@([^\s@]+)$/);
-    if (m) segments.push({ type: 'mention', path: m[1] ?? '' });
-    else segments.push({ type: 'text', value: p });
-  }
-  return segments;
-}
-
-function segmentsToStr(segments: Segment[]): string {
-  return segments
-    .map((s) => (s.type === 'text' ? s.value : `@${s.path}`))
-    .join('');
-}
-
-function readDomFromEl(el: HTMLElement): Segment[] {
-  const out: Segment[] = [];
-  for (const node of Array.from(el.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const v = node.textContent ?? '';
-      if (v) out.push({ type: 'text', value: v });
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const span = node as HTMLElement;
-      const path = span.getAttribute('data-path');
-      if (path) out.push({ type: 'mention', path });
-      else out.push({ type: 'text', value: span.textContent ?? '' });
-    }
-  }
-  if (out.length === 0) return [{ type: 'text', value: '' }];
-  return out;
+  return parseMessageBodyParts(str).map((p) =>
+    p.type === 'text' ? { type: 'text', value: p.content } : { type: 'mention', path: p.path }
+  );
 }
 
 function getCaretOffset(root: Node, sel: Selection): number {
@@ -50,6 +24,7 @@ function getCaretOffset(root: Node, sel: Selection): number {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       if (el.getAttribute?.('data-path')) offset += ('@' + (el.getAttribute('data-path') ?? '')).length;
+      else if (el.tagName === 'BR') offset += 1;
     }
     node = walker.nextNode();
   }
@@ -69,6 +44,7 @@ function setCaretOffset(root: HTMLElement, targetOffset: number): void {
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       if (el.getAttribute?.('data-path')) len = ('@' + (el.getAttribute('data-path') ?? '')).length;
+      else if (el.tagName === 'BR') len = 1;
     }
     if (offset + len >= targetOffset) {
       const range = document.createRange();
@@ -174,20 +150,24 @@ export function MentionInput({
 }) {
   const divRef = useRef<HTMLDivElement>(null);
   const ref = inputRef ?? divRef;
-  const lastEmittedRef = useRef(value);
+  const lastSyncedValueRef = useRef<string | null>(null);
   const savedCaretRef = useRef<number | null>(null);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || value === lastEmittedRef.current) return;
-    lastEmittedRef.current = value;
+    if (!el || value === lastSyncedValueRef.current) return;
+    lastSyncedValueRef.current = value;
     const segments = parseToSegments(value);
     el.innerHTML = '';
     const isEmpty = segments.length === 1 && segments[0]?.type === 'text' && segments[0].value === '';
     if (!isEmpty) {
       for (const s of segments) {
         if (s.type === 'text') {
-          el.appendChild(document.createTextNode(s.value));
+          const parts = s.value.split('\n');
+          for (let i = 0; i < parts.length; i++) {
+            if (i > 0) el.appendChild(document.createElement('br'));
+            if (parts[i].length > 0) el.appendChild(document.createTextNode(parts[i]));
+          }
         } else {
           const chipPath = s.path;
           const onRemove = () => {
@@ -215,20 +195,7 @@ export function MentionInput({
   const readDomToSegments = useCallback((): Segment[] => {
     const el = ref.current;
     if (!el) return [];
-    const out: Segment[] = [];
-    for (const node of Array.from(el.childNodes)) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const v = node.textContent ?? '';
-        if (v) out.push({ type: 'text', value: v });
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const span = node as HTMLElement;
-        const path = span.getAttribute('data-path');
-        if (path) out.push({ type: 'mention', path });
-        else out.push({ type: 'text', value: span.textContent ?? '' });
-      }
-    }
-    if (out.length === 0) return [{ type: 'text', value: '' }];
-    return out;
+    return readDomFromEl(el);
   }, [ref]);
 
   const handleInput = useCallback(() => {
@@ -236,9 +203,9 @@ export function MentionInput({
     const str = segmentsToStr(next);
     const sel = window.getSelection();
     const offset = sel && ref.current?.contains(sel.anchorNode) ? getCaretOffset(ref.current, sel) : str.length;
-    if (str !== lastEmittedRef.current) {
+    if (str !== lastSyncedValueRef.current) {
       savedCaretRef.current = sel && ref.current?.contains(sel.anchorNode) ? offset : null;
-      lastEmittedRef.current = str;
+      lastSyncedValueRef.current = str;
       onChange(str);
     }
     if (onValueAndCursor) {
@@ -254,6 +221,27 @@ export function MentionInput({
       onCursorChange?.(getCaretOffset(ref.current, sel));
     }
   }, [onCursorChange, ref]);
+
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const text = getClipboardTextForContentEditablePaste(e.clipboardData);
+      if (text === null) {
+        onPaste?.(e);
+        return;
+      }
+      const root = ref.current;
+      const sel = window.getSelection();
+      if (!root || !sel?.rangeCount || !sel.anchorNode || !root.contains(sel.anchorNode)) {
+        onPaste?.(e);
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      document.execCommand('insertText', false, text);
+      handleInput();
+    },
+    [onPaste, handleInput, ref]
+  );
 
   const removeChipAtPath = useCallback(
     (path: string) => {
@@ -271,7 +259,7 @@ export function MentionInput({
       if (onValueAndCursor) {
         onValueAndCursor(newVal, offset);
       } else {
-        lastEmittedRef.current = newVal;
+        lastSyncedValueRef.current = newVal;
         onChange(newVal);
         onCursorChange?.(offset);
       }
@@ -336,7 +324,7 @@ export function MentionInput({
       }
       onKeyDown?.(e);
     },
-    [onChange, onCursorChange, onValueAndCursor, onKeyDown, ref, removeChipAtPath]
+    [onKeyDown, ref, removeChipAtPath]
   );
 
   return (
@@ -349,11 +337,11 @@ export function MentionInput({
       aria-multiline="true"
       aria-label={placeholder}
       data-placeholder={placeholder}
-      className={`min-h-[24px] max-h-32 overflow-y-auto py-2 outline-none resize-none text-xs sm:text-sm text-foreground [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground ${className ?? ''}`}
+      className={`min-h-[24px] max-h-32 overflow-y-auto py-2 outline-none resize-none text-[16px] sm:text-sm text-foreground [&:empty]:before:content-[attr(data-placeholder)] [&:empty]:before:text-muted-foreground ${className ?? ''}`}
       onInput={handleInput}
       onSelect={handleSelect}
       onKeyDown={handleKeyDown}
-      onPaste={onPaste}
+      onPaste={handlePaste}
     />
   );
 }

@@ -13,6 +13,46 @@ export interface LogoutConnection {
   sendError(message: string): void;
 }
 
+export type ThinkingStepStatus = 'pending' | 'processing' | 'complete';
+
+export interface ThinkingStep {
+  id: string;
+  title: string;
+  status: ThinkingStepStatus;
+  details?: string;
+  timestamp: Date;
+}
+
+export interface ToolEvent {
+  kind: 'file_created' | 'tool_call';
+  name: string;
+  path?: string;
+  summary?: string;
+  command?: string;
+  details?: string;
+}
+
+export interface TokenUsage {
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface StreamingCallbacks {
+  onReasoningStart?: () => void;
+  onReasoningChunk?: (text: string) => void;
+  onReasoningEnd?: () => void;
+  onStep?: (step: ThinkingStep) => void;
+  onTool?: (event: ToolEvent) => void;
+  onAuthRequired?: (url: string) => void;
+  onUsage?: (usage: TokenUsage) => void;
+}
+
+export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
+
+export interface ConversationDataDirProvider {
+  getConversationDataDir(): string;
+}
+
 export interface AgentStrategy {
   ensureSettings?(): void;
   executeAuth(connection: AuthConnection): void;
@@ -22,9 +62,13 @@ export interface AgentStrategy {
   executeLogout(connection: LogoutConnection): void;
   checkAuthStatus(): Promise<boolean>;
   getModelArgs?(model: string): string[];
+  listModels?(): Promise<string[]>;
+  interruptAgent?(): void;
   executePromptStreaming(
     prompt: string,
     model: string,
-    onChunk: (chunk: string) => void
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
+    systemPrompt?: string
   ): Promise<void>;
 }

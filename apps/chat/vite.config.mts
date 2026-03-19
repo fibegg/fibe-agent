@@ -8,15 +8,32 @@ const rootPkg = JSON.parse(
   readFileSync(join(import.meta.dirname, '../../package.json'), 'utf-8')
 ) as { version: string };
 
+const CHAT_ENV_KEYS = [
+  'API_URL',
+  'LOCK_CHAT_MODEL',
+  'USER_AVATAR_URL',
+  'ASSISTANT_AVATAR_URL',
+] as const;
+
+function chatEnvDefine() {
+  const entries = CHAT_ENV_KEYS.map((key) => [
+    `__${key}__`,
+    JSON.stringify(process.env[key] ?? ''),
+  ]);
+  return Object.fromEntries(entries);
+}
+
 export default defineConfig(() => ({
   define: {
     __APP_VERSION__: JSON.stringify(rootPkg.version),
+    ...chatEnvDefine(),
   },
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/chat',
   server: {
     port: 3100,
     host: 'localhost',
+    allowedHosts: ['.ngrok-free.dev'],
     proxy: {
       '/api': 'http://localhost:3000',
       '/ws': { target: 'http://localhost:3000', ws: true },
@@ -25,6 +42,9 @@ export default defineConfig(() => ({
   preview: {
     port: 4300,
     host: 'localhost',
+  },
+  resolve: {
+    alias: { '@shared': join(import.meta.dirname, '../../shared') },
   },
   plugins: [react()],
   // Uncomment this if you are using workers.
@@ -44,8 +64,14 @@ export default defineConfig(() => ({
           if (id.includes('node_modules/react/') || id.includes('node_modules/react-dom/') || id.includes('node_modules/react-router')) {
             return 'vendor-react';
           }
-          if (id.includes('node_modules/marked') || id.includes('node_modules/prismjs')) {
+          if (id.includes('node_modules/lucide-react')) {
+            return 'vendor-lucide';
+          }
+          if (id.includes('node_modules/marked')) {
             return 'vendor-markdown';
+          }
+          if (id.includes('node_modules/prismjs')) {
+            return 'vendor-prism';
           }
           return undefined;
         },
