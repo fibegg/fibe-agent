@@ -18,7 +18,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
-FROM oven/bun:1.3.10-slim AS builder
+FROM oven/bun:1.3.11-slim AS builder
 
 ARG BUILDKIT_INLINE_CACHE=1
 
