@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { getFileIconInfo, type FileIconId } from '../file-extension-icons';
 import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
 import { readDomFromEl, segmentsToStr, type ContentEditableSegment } from './contenteditable-serialize';
+import { getClipboardTextForContentEditablePaste } from './use-chat-attachments';
 
 type Segment = ContentEditableSegment;
 
@@ -221,6 +222,27 @@ export function MentionInput({
     }
   }, [onCursorChange, ref]);
 
+  const handlePaste = useCallback(
+    (e: React.ClipboardEvent) => {
+      const text = getClipboardTextForContentEditablePaste(e.clipboardData);
+      if (text === null) {
+        onPaste?.(e);
+        return;
+      }
+      const root = ref.current;
+      const sel = window.getSelection();
+      if (!root || !sel?.rangeCount || !sel.anchorNode || !root.contains(sel.anchorNode)) {
+        onPaste?.(e);
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      document.execCommand('insertText', false, text);
+      handleInput();
+    },
+    [onPaste, handleInput, ref]
+  );
+
   const removeChipAtPath = useCallback(
     (path: string) => {
       const root = ref.current;
@@ -319,7 +341,7 @@ export function MentionInput({
       onInput={handleInput}
       onSelect={handleSelect}
       onKeyDown={handleKeyDown}
-      onPaste={onPaste}
+      onPaste={handlePaste}
     />
   );
 }
