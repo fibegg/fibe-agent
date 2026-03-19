@@ -275,13 +275,19 @@ export class ClaudeCodeStrategy implements AgentStrategy {
 
       const useStreamJson = !!callbacks;
       const args = [
+        'IS_SANDBOX=1',
         ...(this._hasSession ? ['--continue'] : []),
         '-p',
         prompt,
         '--dangerously-skip-permissions',
         ...(systemPrompt ? ['--system-prompt', systemPrompt] : []),
         ...(useStreamJson
-          ? ['--output-format', 'stream-json', '--include-partial-messages', '--verbose']
+          ? [
+              '--output-format',
+              'stream-json',
+              '--include-partial-messages',
+              '--verbose',
+            ]
           : []),
       ];
       for (const dir of this.getPlaygroundDirs()) {
