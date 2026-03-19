@@ -10,7 +10,9 @@ export class MockStrategy implements AgentStrategy {
   private readonly logger = new Logger(MockStrategy.name);
   private streamCancel: (() => void) | null = null;
 
-  constructor(_config?: ConversationDataDirProvider) {}
+  constructor(_config?: ConversationDataDirProvider) {
+    void _config;
+  }
 
   executeAuth(connection: AuthConnection): void {
     this.logger.log('executeAuth: Mocking auth success in 1s');

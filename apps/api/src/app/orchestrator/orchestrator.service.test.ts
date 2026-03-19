@@ -14,15 +14,18 @@ import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '../ws.constants';
 
 describe('OrchestratorService', () => {
   let dataDir: string;
+  let lastSteering: SteeringService | undefined;
   const envBackup = process.env.AGENT_PROVIDER;
 
   beforeEach(() => {
+    lastSteering = undefined;
     dataDir = mkdtempSync(join(tmpdir(), 'orch-'));
     process.env.AGENT_PROVIDER = 'mock';
   });
 
   afterEach(async () => {
     process.env.AGENT_PROVIDER = envBackup;
+    await lastSteering?.awaitPendingWrites();
     await new Promise((r) => setTimeout(r, 50));
     rmSync(dataDir, { recursive: true, force: true });
   });
@@ -66,6 +69,7 @@ describe('OrchestratorService', () => {
       ) => text.trim(),
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
     const steering = new SteeringService(config as never);
+    lastSteering = steering;
     steering.onModuleInit();
     const orch = new OrchestratorService(
       activityStore,

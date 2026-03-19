@@ -15,7 +15,8 @@ describe('SteeringService', () => {
     service.onModuleInit();
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await service.awaitPendingWrites();
     rmSync(dataDir, { recursive: true, force: true });
   });
 

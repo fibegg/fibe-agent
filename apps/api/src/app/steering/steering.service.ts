@@ -52,6 +52,10 @@ export class SteeringService implements OnModuleInit {
     this.queue = [];
   }
 
+  async awaitPendingWrites(): Promise<void> {
+    await this.writeChain;
+  }
+
   private ensureFile(): void {
     const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {

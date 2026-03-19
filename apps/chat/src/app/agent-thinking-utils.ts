@@ -108,11 +108,19 @@ export type SessionActivityEntryLike = { id: string; created_at: string; story?:
 
 const STORY_ID_PREFIX = 'story';
 
-function contentSignature(e: { type?: string; message?: string; details?: string; command?: string; path?: string }): string {
+type ContentSignatureFields = {
+  type?: string;
+  message?: string;
+  details?: string;
+  command?: string;
+  path?: string;
+};
+
+function contentSignature(e: ContentSignatureFields): string {
   return `${e.type ?? ''}|${e.message ?? ''}|${e.details ?? ''}|${e.command ?? ''}|${e.path ?? ''}`;
 }
 
-export function ensureUniqueStoryIds<T extends { id?: string }>(entries: T[]): T[] {
+export function ensureUniqueStoryIds<T extends { id?: string } & ContentSignatureFields>(entries: T[]): T[] {
   const byId = new Map<string, { signature: string; nextSuffix: number }>();
   const result: T[] = [];
   for (let i = 0; i < entries.length; i++) {
