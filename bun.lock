@@ -73,7 +73,7 @@
     },
     "apps/api": {
       "name": "@playgrounds.dev/api",
-      "version": "0.0.2",
+      "version": "0.0.1",
       "dependencies": {
         "@fastify/helmet": "^13.0.2",
         "@fastify/multipart": "^9.0.1",
@@ -95,16 +95,16 @@
         "@types/ws": "^8.5.0",
       },
     },
-    "apps/api-e2e": {
-      "name": "@playgrounds.dev/api-e2e",
-      "version": "0.0.1",
-    },
     "apps/chat": {
       "name": "@playgrounds.dev/chat",
+      "version": "0.0.3",
+    },
+    "apps/e2e-api": {
+      "name": "@playgrounds.dev/e2e-api",
       "version": "0.0.1",
     },
-    "apps/chat-e2e": {
-      "name": "@playgrounds.dev/chat-e2e",
+    "apps/e2e-chat": {
+      "name": "@playgrounds.dev/e2e-chat",
       "version": "0.0.1",
     },
   },
@@ -827,11 +827,11 @@
 
     "@playgrounds.dev/api": ["@playgrounds.dev/api@workspace:apps/api"],
 
-    "@playgrounds.dev/api-e2e": ["@playgrounds.dev/api-e2e@workspace:apps/api-e2e"],
-
     "@playgrounds.dev/chat": ["@playgrounds.dev/chat@workspace:apps/chat"],
 
-    "@playgrounds.dev/chat-e2e": ["@playgrounds.dev/chat-e2e@workspace:apps/chat-e2e"],
+    "@playgrounds.dev/e2e-api": ["@playgrounds.dev/e2e-api@workspace:apps/e2e-api"],
+
+    "@playgrounds.dev/e2e-chat": ["@playgrounds.dev/e2e-chat@workspace:apps/e2e-chat"],
 
     "@playwright/test": ["@playwright/test@1.58.2", "", { "dependencies": { "playwright": "1.58.2" }, "bin": { "playwright": "cli.js" } }, "sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA=="],
 

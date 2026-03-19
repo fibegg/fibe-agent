@@ -1,9 +1,9 @@
 {
-  "name": "@playgrounds.dev/api-e2e",
+  "name": "@playgrounds.dev/e2e-api",
   "version": "0.0.1",
   "private": true,
   "nx": {
-    "name": "api-e2e",
+    "name": "e2e-api",
     "implicitDependencies": [
       "api"
     ],
@@ -12,14 +12,14 @@
         "executor": "nx:run-commands",
         "options": {
           "command": "tsc -p tsconfig.typecheck.json --noEmit",
-          "cwd": "apps/api-e2e"
+          "cwd": "apps/e2e-api"
         }
       },
       "e2e": {
         "executor": "nx:run-commands",
         "options": {
           "command": "sh -c '(cd ../api && node dist/main.js) & sleep 3 && bun test --preload ./src/support/test-setup.ts'",
-          "cwd": "apps/api-e2e"
+          "cwd": "apps/e2e-api"
         },
         "dependsOn": [
           "api:build:development"

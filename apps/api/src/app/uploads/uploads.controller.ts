@@ -22,7 +22,7 @@ export class UploadsController {
 
   @Post()
   async uploadFile(@Req() req: FastifyRequest): Promise<{ filename: string }> {
-    const data = await (req as { file: () => Promise<MultipartFileResult> }).file();
+    const data = await (req as unknown as { file: () => Promise<MultipartFileResult> }).file();
     return processUploadFile(data, (buffer, mimetype) =>
       this.uploads.saveFileFromBuffer(buffer, mimetype)
     );

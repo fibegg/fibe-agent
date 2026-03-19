@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('@playgrounds.dev/chat-e2e', () => {
+test.describe('@playgrounds.dev/e2e-chat', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('domcontentloaded');

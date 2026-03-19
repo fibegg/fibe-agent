@@ -47,6 +47,7 @@ Copy `.env.example` to `.env` and adjust. Main variables:
 
 - `apps/api` – NestJS API, WebSocket at `/ws`, REST under `/api`
 - `apps/chat` – React chat UI (login, chat, auth modal, model selector)
+- `apps/e2e-api`, `apps/e2e-chat` – Playwright / Bun e2e (named so `bun test apps/api` does not pick up e2e specs by prefix)
 - `docs/API.md` – REST and WebSocket contract
 
 ## Scripts
