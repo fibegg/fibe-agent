@@ -1,6 +1,6 @@
 import { createRef } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, act, fireEvent } from '@testing-library/react';
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
 import { MessageList, type ChatMessage, type MessageListHandle } from './message-list';
 
 vi.mock('../api-url', () => ({
@@ -142,9 +142,66 @@ describe('MessageList', () => {
     );
     const pre = container.querySelector('pre');
     expect(pre).toBeTruthy();
-    const code = container.querySelector('code.language-ts');
+    const code = container.querySelector('code.language-typescript');
     expect(code).toBeTruthy();
     expect(code?.textContent?.trim()).toBe('function test() {}');
+  });
+
+  it('wraps raw HTML pre from marked into pre code for Prism', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: "<pre>function test() { console.log('hello world'); }</pre>",
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const blockCode = container.querySelector('pre > code.language-none');
+    expect(blockCode).toBeTruthy();
+    expect(blockCode?.textContent).toContain('function test()');
+  });
+
+  it('renders user fenced code block without language as pre code', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: '```\nhello\n```',
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    expect(container.querySelector('pre > code')).toBeTruthy();
+  });
+
+  it('renders minified single-line user TypeScript as a typescript code block', () => {
+    const body =
+      "import type { LoggerService } from '@nestjs/common';const LOG_LEVELS = ['error', 'warn'] as const;type LogLevel = (typeof LOG_LEVELS)[number];";
+    const messages: ChatMessage[] = [
+      { role: 'user', body, created_at: '2025-03-11T17:00:00.000Z' },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    expect(container.querySelector('pre code.language-typescript')).toBeTruthy();
+  });
+
+  it('sets data-code-lang on user message pre when rendering a code block', async () => {
+    const body = '```ts\nconst x = 1\n```';
+    const messages: ChatMessage[] = [
+      { role: 'user', body, created_at: '2025-03-11T17:00:00.000Z' },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    await waitFor(() => {
+      expect(container.querySelector('pre[data-code-lang]')?.getAttribute('data-code-lang')).toBe(
+        'TypeScript'
+      );
+    });
   });
 
   it('renders user message with @path as badge showing path display name', () => {
@@ -314,5 +371,61 @@ describe('MessageList', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: /retry/i }));
     expect(onRetry).toHaveBeenCalledTimes(1);
+  });
+
+  describe('copy raw message', () => {
+    let writeText: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      writeText = vi.fn().mockResolvedValue(undefined);
+      Object.defineProperty(globalThis.navigator, 'clipboard', {
+        value: { writeText },
+        configurable: true,
+        writable: true,
+      });
+    });
+
+    it('writes user message body to the clipboard when copy is clicked', async () => {
+      const body = 'Hello **raw**';
+      const messages: ChatMessage[] = [
+        { role: 'user', body, created_at: '2025-03-11T17:00:00.000Z' },
+      ];
+      render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
+      fireEvent.click(screen.getByRole('button', { name: /Copy raw user message/i }));
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith(body);
+      });
+    });
+
+    it('writes assistant message body to the clipboard when copy is clicked', async () => {
+      const body = 'Reply with `code`';
+      const messages: ChatMessage[] = [
+        { role: 'assistant', body, created_at: '2025-03-11T17:01:00.000Z' },
+      ];
+      render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
+      fireEvent.click(screen.getByRole('button', { name: /Copy raw assistant message/i }));
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith(body);
+      });
+    });
+
+    it('does not render a copy control for a user message with an empty body', () => {
+      const messages: ChatMessage[] = [
+        { role: 'user', body: '', created_at: '2025-03-11T17:00:00.000Z' },
+      ];
+      render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
+      expect(screen.queryByRole('button', { name: /Copy raw user message/i })).toBeNull();
+    });
+
+    it('writes streaming text to the clipboard when copy is clicked', async () => {
+      const streamingText = 'Partial **markdown**';
+      render(
+        <MessageList messages={[]} streamingText={streamingText} isStreaming={true} />
+      );
+      fireEvent.click(screen.getByRole('button', { name: /Copy raw assistant message/i }));
+      await waitFor(() => {
+        expect(writeText).toHaveBeenCalledWith(streamingText);
+      });
+    });
   });
 });

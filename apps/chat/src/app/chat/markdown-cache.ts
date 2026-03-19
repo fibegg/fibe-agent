@@ -18,7 +18,9 @@ function evictOldest(): void {
 }
 
 export function renderMarkdown(text: string): string {
-  if (cache.has(text)) return cache.get(text)!;
+  if (cache.has(text)) {
+    return cache.get(text)!;
+  }
   try {
     const out = marked.parse(text);
     const html = typeof out === 'string' ? out : escapeHtml(text);

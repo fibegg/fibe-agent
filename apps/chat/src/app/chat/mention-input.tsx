@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { getFileIconInfo, type FileIconId } from '../file-extension-icons';
 import { AT_MENTION_REGEX, pathDisplayName } from './mention-utils';
+import { readDomFromEl, segmentsToStr, type ContentEditableSegment } from './contenteditable-serialize';
 
-type Segment = { type: 'text'; value: string } | { type: 'mention'; path: string };
+type Segment = ContentEditableSegment;
 
 function parseToSegments(str: string): Segment[] {
   if (!str) return [{ type: 'text', value: '' }];
@@ -14,30 +15,6 @@ function parseToSegments(str: string): Segment[] {
     else segments.push({ type: 'text', value: p });
   }
   return segments;
-}
-
-function segmentsToStr(segments: Segment[]): string {
-  return segments
-    .map((s) => (s.type === 'text' ? s.value : `@${s.path}`))
-    .join('');
-}
-
-function readDomFromEl(el: HTMLElement): Segment[] {
-  const out: Segment[] = [];
-  for (const node of Array.from(el.childNodes)) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const v = node.textContent ?? '';
-      if (v) out.push({ type: 'text', value: v });
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const span = node as HTMLElement;
-      const path = span.getAttribute('data-path');
-      if (path) out.push({ type: 'mention', path });
-      else if (span.tagName === 'BR') out.push({ type: 'text', value: '\n' });
-      else out.push({ type: 'text', value: span.textContent ?? '' });
-    }
-  }
-  if (out.length === 0) return [{ type: 'text', value: '' }];
-  return out;
 }
 
 function getCaretOffset(root: Node, sel: Selection): number {
@@ -222,21 +199,7 @@ export function MentionInput({
   const readDomToSegments = useCallback((): Segment[] => {
     const el = ref.current;
     if (!el) return [];
-    const out: Segment[] = [];
-    for (const node of Array.from(el.childNodes)) {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const v = node.textContent ?? '';
-        if (v) out.push({ type: 'text', value: v });
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const span = node as HTMLElement;
-        const path = span.getAttribute('data-path');
-        if (path) out.push({ type: 'mention', path });
-        else if (span.tagName === 'BR') out.push({ type: 'text', value: '\n' });
-        else out.push({ type: 'text', value: span.textContent ?? '' });
-      }
-    }
-    if (out.length === 0) return [{ type: 'text', value: '' }];
-    return out;
+    return readDomFromEl(el);
   }, [ref]);
 
   const handleInput = useCallback(() => {

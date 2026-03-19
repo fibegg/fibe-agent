@@ -1,6 +1,15 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { forwardRef, memo, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
-import { Brain, Clock, RotateCw, Sparkles, User } from 'lucide-react';
+import {
+  forwardRef,
+  memo,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
+import { Brain, Check, Clock, Copy, RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
 import { FileIcon } from '../file-icon';
@@ -17,32 +26,170 @@ import {
 } from '../ui-classes';
 import { ASSISTANT_AVATAR_URL, USER_AVATAR_URL } from './chat-avatar';
 import { renderMarkdown } from './markdown-cache';
+import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
 
 const prismLoaderPromise = import('../file-explorer/prism-loader');
 
-function highlightPrismInElement(container: HTMLElement): void {
-  const codes = container.querySelectorAll('pre code[class*="language-"]');
-  if (codes.length === 0) return;
-  prismLoaderPromise.then((m) => {
-    codes.forEach((el) => {
-      try {
-        m.highlightCodeElement(el as HTMLElement);
-      } catch {
-        // leave content as plain text if highlighting fails
-      }
-    });
+const PRISM_LANG_LABEL: Record<string, string> = {
+  none: 'Plain text',
+  typescript: 'TypeScript',
+  ts: 'TypeScript',
+  javascript: 'JavaScript',
+  js: 'JavaScript',
+  tsx: 'TSX',
+  jsx: 'JSX',
+  json: 'JSON',
+  yaml: 'YAML',
+  yml: 'YAML',
+  python: 'Python',
+  py: 'Python',
+  bash: 'Bash',
+  sh: 'Shell',
+  rust: 'Rust',
+  go: 'Go',
+  css: 'CSS',
+  html: 'HTML',
+  sql: 'SQL',
+};
+
+function normalizeBarePreElements(root: HTMLElement): void {
+  root.querySelectorAll('pre').forEach((pre) => {
+    if (pre.querySelector('code')) return;
+    if (!pre.firstChild) return;
+    const code = document.createElement('code');
+    code.className = 'language-none';
+    while (pre.firstChild) {
+      code.appendChild(pre.firstChild);
+    }
+    pre.appendChild(code);
   });
 }
 
-const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0`;
-
-function MarkdownWithPrism({ html, className }: { html: string; className?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (ref.current) highlightPrismInElement(ref.current);
-  }, [html]);
-  return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+function annotateChatCodeBlockLabels(root: HTMLElement): void {
+  root.querySelectorAll('pre > code[class*="language-"]').forEach((el) => {
+    const code = el as HTMLElement;
+    const pre = code.parentElement;
+    if (!pre || pre.tagName !== 'PRE') return;
+    const m = /(?:^|\s)language-([\w-]+)/.exec(code.className);
+    const id = m?.[1]?.toLowerCase() ?? '';
+    if (!id) return;
+    pre.setAttribute(
+      'data-code-lang',
+      PRISM_LANG_LABEL[id] ?? id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, ' ')
+    );
+  });
 }
+
+function schedulePrismHighlightForRoot(root: HTMLElement, shouldAbort: () => boolean): void {
+  prismLoaderPromise.then((m) => {
+    if (shouldAbort() || !root.isConnected) return;
+    const codes = root.querySelectorAll('pre code');
+    for (let i = 0; i < codes.length; i++) {
+      if (shouldAbort() || !root.isConnected) return;
+      try {
+        m.highlightCodeElement(codes[i] as HTMLElement);
+      } catch {
+        /* keep plain text */
+      }
+    }
+  });
+}
+
+const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} chat-user-markdown-body [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0 [&_.markdown-body]:min-w-0 [&_pre]:block [&_pre]:w-full [&_pre]:min-w-0 [&_pre]:shrink-0 [&_pre]:basis-full [&_pre]:bg-black/25 [&_pre]:border-white/25 [&_pre]:text-violet-50 [&_pre_code]:text-inherit`;
+
+const COPY_SUCCESS_LABEL = 'Copied';
+const COPY_SUCCESS_FEEDBACK_MS = 2000;
+
+function copyRawMessageTitle(visualVariant: 'user' | 'assistant'): string {
+  return visualVariant === 'user' ? 'Copy raw user message' : 'Copy raw assistant message';
+}
+
+const COPY_BUTTON_CLASS_USER =
+  'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-violet-200/90 hover:text-violet-50 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-200/50';
+const COPY_BUTTON_CLASS_ASSISTANT =
+  'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
+
+function CopyRawMessageButton({
+  rawText,
+  visualVariant,
+}: {
+  rawText: string;
+  visualVariant: 'user' | 'assistant';
+}) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearTimer = useCallback(() => {
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => () => clearTimer(), [clearTimer]);
+
+  const handleClick = useCallback(async () => {
+    if (!rawText) return;
+    try {
+      await navigator.clipboard.writeText(rawText);
+      setCopied(true);
+      clearTimer();
+      timeoutRef.current = setTimeout(() => setCopied(false), COPY_SUCCESS_FEEDBACK_MS);
+    } catch {
+      setCopied(false);
+    }
+  }, [rawText, clearTimer]);
+
+  if (!rawText) return null;
+
+  const btnClass =
+    visualVariant === 'user' ? COPY_BUTTON_CLASS_USER : COPY_BUTTON_CLASS_ASSISTANT;
+
+  const idleLabel = copyRawMessageTitle(visualVariant);
+
+  return (
+    <button
+      type="button"
+      onClick={() => void handleClick()}
+      className={btnClass}
+      title={copied ? COPY_SUCCESS_LABEL : idleLabel}
+      aria-label={copied ? COPY_SUCCESS_LABEL : idleLabel}
+    >
+      {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+    </button>
+  );
+}
+
+const MarkdownWithPrism = memo(
+  function MarkdownWithPrism({
+    html,
+    className,
+    codeLangBadge,
+  }: {
+    html: string;
+    className?: string;
+    codeLangBadge?: boolean;
+  }) {
+    const ref = useRef<HTMLDivElement>(null);
+    useLayoutEffect(() => {
+      if (!ref.current) return;
+      const root = ref.current;
+      let cancelled = false;
+      const shouldAbort = () => cancelled;
+      normalizeBarePreElements(root);
+      if (codeLangBadge) annotateChatCodeBlockLabels(root);
+      schedulePrismHighlightForRoot(root, shouldAbort);
+      return () => {
+        cancelled = true;
+      };
+    }, [html, codeLangBadge]);
+    return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+  },
+  (prev, next) =>
+    prev.html === next.html &&
+    prev.className === next.className &&
+    prev.codeLangBadge === next.codeLangBadge
+);
 
 function MentionChipIcon({ path }: { path: string }) {
   return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
@@ -67,7 +214,12 @@ function MessageBodyWithMentions({ body }: { body: string }) {
         }
         if (!part.content) return null;
         return (
-          <MarkdownWithPrism key={i} html={renderMarkdown(part.content)} className={USER_MESSAGE_MARKDOWN_CLASS} />
+          <MarkdownWithPrism
+            key={i}
+            html={renderMarkdown(prepareUserMessageMarkdownForRender(part.content))}
+            className={USER_MESSAGE_MARKDOWN_CLASS}
+            codeLangBadge
+          />
         );
       })}
     </div>
@@ -183,15 +335,18 @@ const MessageRow = memo(function MessageRow({
               ) : (
                 <MessageBodyWithMentions body={msg.body} />
               )}
-              <p className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center gap-1.5">
-                {formatTime(msg.created_at)}
-                {msg.queued && (
-                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-medium leading-none">
-                    <Clock className="size-2.5" aria-hidden />
-                    Queued
-                  </span>
-                )}
-              </p>
+              <div className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center justify-between gap-2 min-h-[1.25rem]">
+                <p className="flex flex-wrap items-center gap-1.5 min-w-0">
+                  {formatTime(msg.created_at)}
+                  {msg.queued && (
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-medium leading-none">
+                      <Clock className="size-2.5" aria-hidden />
+                      Queued
+                    </span>
+                  )}
+                </p>
+                <CopyRawMessageButton rawText={msg.body} visualVariant="user" />
+              </div>
             </>
           ) : (
             <>
@@ -207,14 +362,17 @@ const MessageRow = memo(function MessageRow({
                 </button>
               )}
               <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 min-h-[1.25rem]">
-                <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                  {formatTime(msg.created_at)}
-                  {msg.usage && (
-                    <span className="tabular-nums">
-                      {formatCompactInteger(msg.usage.inputTokens)} in / {formatCompactInteger(msg.usage.outputTokens)} out
-                    </span>
-                  )}
-                </p>
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                  <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                    {formatTime(msg.created_at)}
+                    {msg.usage && (
+                      <span className="tabular-nums">
+                        {formatCompactInteger(msg.usage.inputTokens)} in / {formatCompactInteger(msg.usage.outputTokens)} out
+                      </span>
+                    )}
+                  </p>
+                  <CopyRawMessageButton rawText={msg.body} visualVariant="assistant" />
+                </div>
                 <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none" title={msg.model ? `Processed by ${msg.model}` : undefined}>
                   <Brain className="size-3 shrink-0" aria-hidden />
                   {msg.model ?? '—'}
@@ -359,7 +517,12 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               }`}
             >
               {streamingText ? (
-                <MarkdownWithPrism html={renderMarkdown(streamingText)} className={PROSE_MESSAGE} />
+                <>
+                  <MarkdownWithPrism html={renderMarkdown(streamingText)} className={PROSE_MESSAGE} />
+                  <div className="mt-2 flex justify-end">
+                    <CopyRawMessageButton rawText={streamingText} visualVariant="assistant" />
+                  </div>
+                </>
               ) : (
                 <ThinkingState lastUserMessage={lastUserMessage} />
               )}

@@ -46,7 +46,7 @@ Copy `.env.example` to `.env` and adjust. Main variables:
 ## Project layout
 
 - `apps/api` – NestJS API, WebSocket at `/ws`, REST under `/api`
-- `apps/chat` – React chat UI (login, chat, auth modal, model selector)
+- `apps/chat` – React chat UI (login, chat, auth modal, model selector); messages render GitHub-flavored Markdown, and the copy icon on each bubble copies the **raw** message text (including markdown). Long, fence-less TypeScript pasted as one line is reflowed and shown as a code block **in the UI only** (stored text is unchanged).
 - `apps/e2e-api`, `apps/e2e-chat` – Playwright / Bun e2e (named so `bun test apps/api` does not pick up e2e specs by prefix)
 - `docs/API.md` – REST and WebSocket contract
 
