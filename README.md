@@ -4,7 +4,7 @@ Nx monorepo: **api** (NestJS + Fastify) and **chat** (React + Vite). The API run
 
 ## Run API + Chat
 
-Use **Bun** for fastest installs and script runs (`bun install`, `bun run dev`). npm works too.
+Use **Bun** for installs and scripts (`bun install`, `bun run dev`). The repo keeps **`bun.lock`** (for Bun/CI/Docker) and **`package-lock.json`** (for `npm install`). Bun reads **`bun.lock` when it exists** and only migrates from `package-lock.json` if `bun.lock` is missing—do not delete `bun.lock` and then run `bun install`, or workspace installs can break with `FileNotFound` cache errors.
 
 **Quick dev** (API + chat in parallel): `bun run dev`
 
