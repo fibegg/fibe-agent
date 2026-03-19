@@ -275,7 +275,6 @@ export class ClaudeCodeStrategy implements AgentStrategy {
 
       const useStreamJson = !!callbacks;
       const args = [
-        'IS_SANDBOX=1',
         ...(this._hasSession ? ['--continue'] : []),
         '-p',
         prompt,
