@@ -27,7 +27,7 @@
 | **Real-time chat** | WebSocket at `/ws` with structured client/server actions, single active session semantics, and [documented close codes](docs/API.md#websocket). |
 | **REST + integrations** | Messages, activities, uploads, playgrounds, init scripts, and `POST /api/agent/send-message` for async hooks—see [docs/API.md](docs/API.md). |
 | **Structured logs** | JSON-per-line logging for containers and aggregators (`LOG_LEVEL`, request IDs, HTTP and WS context)—[details](docs/API.md#container-logging). |
-| **E2E & CI** | Playwright suites under `apps/e2e-api` and `apps/e2e-chat`; GitHub Actions runs lint, build, and typecheck on every push/PR. |
+| **E2E & CI** | Playwright suites under `apps/e2e-api` and `apps/e2e-chat`; GitHub Actions runs lint, build, typecheck, and unit tests on every push/PR. |
 | **Docker** | Multi-arch images published to **GHCR** per provider (`gemini`, `claude-code`, `openai-codex`, `opencode`)—see [CI workflow](.github/workflows/ci.yml). |
 
 ## Architecture
@@ -118,8 +118,8 @@ OpenCode and multi-key setups are documented inline in [`.env.example`](.env.exa
 | **test** | `bun run test` | Unit tests |
 | **typecheck** | `bun run typecheck` | Type-check all projects |
 | **e2e** | `bun run e2e` | Playwright e2e targets |
-| **ci** | `bun run ci` | Lint, build, and typecheck (matches the main CI job) |
-| **ci:test** | `bun run ci:test` | Same as **ci** plus unit tests |
+| **ci** | `bun run ci` | Lint, build, typecheck, and unit tests (matches the main CI job) |
+| **ci:notest** | `bun run ci:notest` | Lint, build, and typecheck only (faster local checks) |
 
 ## Container images
 

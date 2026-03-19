@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api-url';
-import { API_PATHS } from '../api-paths';
+import { API_PATHS } from '@shared/api-paths';
 import type { ChatMessage } from './message-list';
 
 export function useChatInitialData(authenticated: boolean) {

@@ -1,4 +1,4 @@
-import { API_PATHS } from './api-paths';
+import { API_PATHS } from '@shared/api-paths';
 
 export function getApiUrl(): string {
   const env = typeof __API_URL__ !== 'undefined' ? __API_URL__ : '';

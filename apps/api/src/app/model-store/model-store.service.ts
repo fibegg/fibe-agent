@@ -1,17 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
+import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
 
 @Injectable()
 export class ModelStoreService {
   private readonly modelPath: string;
+  private readonly jsonWriter: SequentialJsonWriter;
   private cached: string | null = null;
 
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.modelPath = join(dataDir, 'model.json');
+    this.jsonWriter = new SequentialJsonWriter(this.modelPath, () => ({
+      model: this.cached ?? '',
+    }));
     this.ensureDataDir();
   }
 
@@ -39,10 +43,7 @@ export class ModelStoreService {
   set(model: string): string {
     const value = (model ?? '').trim();
     this.cached = value;
-    void writeFile(
-      this.modelPath,
-      JSON.stringify({ model: value }, null, 2)
-    );
+    this.jsonWriter.schedule();
     return value;
   }
 

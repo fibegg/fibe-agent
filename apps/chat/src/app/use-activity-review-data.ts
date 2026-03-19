@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from './api-url';
-import { API_PATHS } from './api-paths';
+import { API_PATHS } from '@shared/api-paths';
 import { filterVisibleStoryItems, getActivityLabel, type StoryEntry } from './agent-thinking-utils';
 import { getCopyableActivityText } from './activity-review-utils';
 

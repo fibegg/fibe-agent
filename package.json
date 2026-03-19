@@ -1,6 +1,6 @@
 {
   "name": "phoenix-agent",
-  "version": "1.8.7",
+  "version": "1.8.8",
   "license": "MIT",
   "packageManager": "bun@1.3.11",
   "scripts": {
@@ -11,8 +11,8 @@
     "test:integration": "echo 'No integration tests configured'",
     "typecheck": "nx run-many -t typecheck",
     "e2e": "nx run-many -t e2e",
-    "ci": "nx run-many -t lint,build,typecheck --parallel=8",
-    "ci:test": "nx run-many -t lint,build,typecheck,test --parallel=8"
+    "ci": "nx run-many -t lint,build,typecheck,test --parallel=8",
+    "ci:notest": "nx run-many -t lint,build,typecheck --parallel=8"
   },
   "private": true,
   "dependencies": {
@@ -22,7 +22,6 @@
     "prismjs": "^1.29.0",
     "@nestjs/common": "^11.0.0",
     "@nestjs/core": "^11.0.0",
-    "axios": "^1.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "marked": "^15.0.0",

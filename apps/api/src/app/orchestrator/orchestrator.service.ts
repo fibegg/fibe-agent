@@ -18,13 +18,11 @@ import type {
   AgentStrategy,
   AuthConnection,
   LogoutConnection,
-  StreamingCallbacks,
   ThinkingStep,
   TokenUsage,
-  ToolEvent,
 } from '../strategies/strategy.types';
 import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
-import { DEFAULT_PROVIDER, StrategyRegistryService } from '../strategies/strategy-registry.service';
+import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
   AUTH_STATUS as AUTH_STATUS_VAL,
   ERROR_CODE,
@@ -35,6 +33,8 @@ import {
 import { writeMcpConfig } from '../config/mcp-config-writer';
 
 import { ChatPromptContextService } from './chat-prompt-context.service';
+import { finishAgentStream, type FinishAgentStreamDeps } from './finish-agent-stream';
+import { createStreamingCallbacks } from './orchestrator-streaming-callbacks';
 
 export interface OutboundEvent {
   type: string;
@@ -95,33 +95,19 @@ export class OrchestratorService implements OnModuleInit {
     this.outbound$.next({ type, data });
   }
 
-  private finishStream(
-    accumulated: string,
-    stepId: string,
-    step: ThinkingStep,
-    usage?: TokenUsage
-  ): void {
-    const finalText = accumulated || 'The agent produced no visible output.';
-    const storedModel = (this.modelStore.get() || '').trim();
-    const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
-    this.messageStore.add('assistant', finalText, undefined, model);
-    void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
-    this._send(WS_EVENT.THINKING_STEP, {
-      id: stepId,
-      title: step.title,
-      status: 'complete',
-      details: step.details,
-      timestamp: new Date().toISOString(),
-    });
-    this._send(WS_EVENT.STREAM_END, { ...(usage ? { usage } : {}), model });
-    if (this.currentActivityId && usage) {
-      this.activityStore.setUsage(this.currentActivityId, usage);
-      const entry = this.activityStore.getById(this.currentActivityId);
-      if (entry) {
-        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry });
-      }
-    }
-    this.lastStreamUsage = undefined;
+  private finishStreamDeps(): FinishAgentStreamDeps {
+    return {
+      messageStore: this.messageStore,
+      modelStore: this.modelStore,
+      activityStore: this.activityStore,
+      phoenixSync: this.phoenixSync,
+      send: (type: string, data?: Record<string, unknown>) =>
+        this._send(type, data ?? {}),
+      getCurrentActivityId: () => this.currentActivityId,
+      clearLastStreamUsage: () => {
+        this.lastStreamUsage = undefined;
+      },
+    };
   }
 
   ensureStrategySettings(): void {
@@ -380,16 +366,44 @@ export class OrchestratorService implements OnModuleInit {
         timestamp: syntheticStep.timestamp.toISOString(),
       });
       this.lastStreamUsage = undefined;
-      const callbacks = this.buildStreamingCallbacks();
+      const streamDeps = {
+        send: (type: string, data?: Record<string, unknown>) =>
+          this._send(type, data ?? {}),
+        activityStore: this.activityStore,
+        getCurrentActivityId: () => this.currentActivityId,
+        getReasoningText: () => this.reasoningTextAccumulated,
+        appendReasoningText: (t: string) => {
+          this.reasoningTextAccumulated += t;
+        },
+        clearReasoningText: () => {
+          this.reasoningTextAccumulated = '';
+        },
+        setLastStreamUsage: (u: TokenUsage | undefined) => {
+          this.lastStreamUsage = u;
+        },
+      };
+      const callbacks = createStreamingCallbacks(streamDeps);
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
       }, callbacks, systemPrompt || undefined);
-      this.finishStream(accumulated, syntheticStepId, syntheticStep, this.lastStreamUsage);
+      finishAgentStream(
+        this.finishStreamDeps(),
+        accumulated,
+        syntheticStepId,
+        syntheticStep,
+        this.lastStreamUsage
+      );
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       if (raw === INTERRUPTED_MESSAGE) {
-        this.finishStream(accumulated, syntheticStepId, syntheticStep, this.lastStreamUsage);
+        finishAgentStream(
+          this.finishStreamDeps(),
+          accumulated,
+          syntheticStepId,
+          syntheticStep,
+          this.lastStreamUsage
+        );
       } else {
         const message = raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
         this._send(WS_EVENT.ERROR, { message });
@@ -422,89 +436,6 @@ export class OrchestratorService implements OnModuleInit {
         attachmentFilenames
       );
     await this.runAgentResponse(_t, imageUrls, audioFilename, att);
-  }
-
-  private buildStreamingCallbacks(): StreamingCallbacks {
-    return {
-      onReasoningStart: () => this._send(WS_EVENT.REASONING_START, {}),
-      onReasoningChunk: (reasoningText) => {
-        this.reasoningTextAccumulated += reasoningText;
-        this._send(WS_EVENT.REASONING_CHUNK, { text: reasoningText });
-      },
-      onReasoningEnd: () => {
-        this._send(WS_EVENT.REASONING_END, {});
-        if (this.currentActivityId && this.reasoningTextAccumulated.trim()) {
-          this.activityStore.appendEntry(this.currentActivityId, {
-            id: randomUUID(),
-            type: 'reasoning_start',
-            message: 'Reasoning',
-            timestamp: new Date().toISOString(),
-            details: this.reasoningTextAccumulated.trim(),
-          });
-        }
-        this.reasoningTextAccumulated = '';
-      },
-      onStep: (step) => {
-        this._send(WS_EVENT.THINKING_STEP, {
-          id: step.id,
-          title: step.title,
-          status: step.status,
-          details: step.details,
-          timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : step.timestamp,
-        });
-        if (this.currentActivityId) {
-          this.activityStore.appendEntry(this.currentActivityId, {
-            id: step.id,
-            type: 'step',
-            message: step.title,
-            timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : String(step.timestamp),
-            details: step.details,
-          });
-        }
-      },
-      onAuthRequired: (url) => {
-        this._send(WS_EVENT.AUTH_URL_GENERATED, { url });
-      },
-      onUsage: (usage) => {
-        this.lastStreamUsage = usage;
-      },
-      onTool: (event: ToolEvent) => {
-        if (event.kind === 'file_created') {
-          this._send(WS_EVENT.FILE_CREATED, {
-            name: event.name,
-            path: event.path,
-            summary: event.summary,
-          });
-          if (this.currentActivityId) {
-            this.activityStore.appendEntry(this.currentActivityId, {
-              id: randomUUID(),
-              type: 'file_created',
-              message: event.summary ?? event.name,
-              timestamp: new Date().toISOString(),
-              path: event.path,
-            });
-          }
-        } else {
-          this._send(WS_EVENT.TOOL_CALL, {
-            name: event.name,
-            path: event.path,
-            summary: event.summary,
-            command: event.command,
-            details: event.details,
-          });
-          if (this.currentActivityId) {
-            this.activityStore.appendEntry(this.currentActivityId, {
-              id: randomUUID(),
-              type: 'tool_call',
-              message: event.summary ?? event.name,
-              timestamp: new Date().toISOString(),
-              command: event.command,
-              details: event.details,
-            });
-          }
-        }
-      },
-    };
   }
 
   private handleQueueMessage(text: string): void {

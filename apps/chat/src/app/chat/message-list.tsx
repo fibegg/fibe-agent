@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { Brain, Check, Clock, Copy, RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
-import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
+import { API_PATH_UPLOADS_BY_FILENAME } from '@shared/api-paths';
 import { FileIcon } from '../file-icon';
 import { formatCompactInteger } from '../agent-thinking-utils';
 import { parseMessageBodyParts, pathDisplayName } from './mention-utils';

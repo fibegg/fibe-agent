@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
+import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
 import type { StoredStoryEntry } from '../message-store/message-store.service';
 
 export interface TokenUsage {
@@ -31,11 +31,13 @@ function dedupeStoryById(story: StoredStoryEntry[]): StoredStoryEntry[] {
 @Injectable()
 export class ActivityStoreService {
   private readonly activityPath: string;
+  private readonly jsonWriter: SequentialJsonWriter;
   private activities: StoredActivityEntry[] = [];
 
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.activityPath = join(dataDir, 'activity.json');
+    this.jsonWriter = new SequentialJsonWriter(this.activityPath, () => this.activities);
     this.ensureDataDir();
     this.activities = this.load();
   }
@@ -61,7 +63,7 @@ export class ActivityStoreService {
       story: dedupeStoryById(Array.isArray(story) ? story : []),
     };
     this.activities.push(entry);
-    void this.save();
+    this.jsonWriter.schedule();
     return entry;
   }
 
@@ -72,7 +74,7 @@ export class ActivityStoreService {
       story: [firstEntry],
     };
     this.activities.push(entry);
-    void this.save();
+    this.jsonWriter.schedule();
     return entry;
   }
 
@@ -80,7 +82,7 @@ export class ActivityStoreService {
     const activity = this.activities.find((a) => a.id === activityId);
     if (activity && storyEntry?.id && !activity.story.some((e) => e.id === storyEntry.id)) {
       activity.story.push(storyEntry);
-      void this.save();
+      this.jsonWriter.schedule();
     }
   }
 
@@ -88,7 +90,7 @@ export class ActivityStoreService {
     const activity = this.activities.find((a) => a.id === activityId);
     if (activity) {
       activity.story = dedupeStoryById(Array.isArray(story) ? story : []);
-      void this.save();
+      this.jsonWriter.schedule();
     }
   }
 
@@ -96,13 +98,13 @@ export class ActivityStoreService {
     const activity = this.activities.find((a) => a.id === activityId);
     if (activity) {
       activity.usage = usage;
-      void this.save();
+      this.jsonWriter.schedule();
     }
   }
 
   clear(): void {
     this.activities = [];
-    void this.save();
+    this.jsonWriter.schedule();
   }
 
   private ensureDataDir(): void {
@@ -126,10 +128,4 @@ export class ActivityStoreService {
     }
   }
 
-  private async save(): Promise<void> {
-    await writeFile(
-      this.activityPath,
-      JSON.stringify(this.activities, null, 2)
-    );
-  }
 }

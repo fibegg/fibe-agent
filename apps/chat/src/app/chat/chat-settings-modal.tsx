@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Key, Loader2, LogOut, X } from 'lucide-react';
 import { apiRequest } from '../api-url';
-import { API_PATHS } from '../api-paths';
+import { API_PATHS } from '@shared/api-paths';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from './chat-state';
 import type { ChatState } from './chat-state';

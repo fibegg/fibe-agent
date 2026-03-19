@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { apiRequest } from '../api-url';
-import { API_PATHS } from '../api-paths';
+import { API_PATHS } from '@shared/api-paths';
 import { REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
 
 export interface PlaygroundEntryItem {
