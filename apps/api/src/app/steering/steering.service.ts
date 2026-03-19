@@ -19,7 +19,7 @@ export class SteeringService implements OnModuleInit {
   private writeChain: Promise<void> = Promise.resolve();
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     this.steeringPath = join(dataDir, 'STEERING.md');
   }
 
@@ -53,7 +53,7 @@ export class SteeringService implements OnModuleInit {
   }
 
   private ensureFile(): void {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }

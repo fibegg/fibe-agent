@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
+import type { ConversationDataDirProvider } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
 const MOCK_AUTH_DELAY_MS = 1000;
@@ -8,6 +9,8 @@ const MOCK_LOGOUT_DELAY_MS = 500;
 export class MockStrategy implements AgentStrategy {
   private readonly logger = new Logger(MockStrategy.name);
   private streamCancel: (() => void) | null = null;
+
+  constructor(_config?: ConversationDataDirProvider) {}
 
   executeAuth(connection: AuthConnection): void {
     this.logger.log('executeAuth: Mocking auth success in 1s');

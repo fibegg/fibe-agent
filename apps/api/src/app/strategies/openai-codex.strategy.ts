@@ -2,11 +2,12 @@ import { Logger } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AuthConnection, LogoutConnection } from './strategy.types';
+import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 import { runAuthProcess } from './auth-process-helper';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
+const CODEX_HOME_SUBDIR = 'codex';
 const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 
@@ -41,13 +42,22 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   private currentStreamProcess: ChildProcess | null = null;
   private streamInterrupted = false;
   private readonly useApiTokenMode: boolean;
+  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
 
-  constructor(useApiTokenMode = false) {
+  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     this.useApiTokenMode = useApiTokenMode;
+    this.conversationDataDir = conversationDataDir;
+  }
+
+  private getCodexHomeForSession(): string {
+    if (this.conversationDataDir) {
+      return join(this.conversationDataDir.getConversationDataDir(), CODEX_HOME_SUBDIR);
+    }
+    return getCodexHome();
   }
 
   ensureSettings(): void {
-    const codexHome = getCodexHome();
+    const codexHome = this.getCodexHomeForSession();
     if (!existsSync(codexHome)) {
       mkdirSync(codexHome, { recursive: true });
     }
@@ -71,7 +81,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
 
     let authUrlExtracted = false;
     let deviceCodeExtracted = false;
-    const codexHome = getCodexHome();
+    const codexHome = this.getCodexHomeForSession();
     const env = { ...process.env, CODEX_HOME: codexHome };
 
     const codexCmd = getCodexCommand();
@@ -135,14 +145,14 @@ export class OpenaiCodexStrategy implements AgentStrategy {
   }
 
   clearCredentials(): void {
-    const authFile = join(getCodexHome(), 'auth.json');
+    const authFile = join(this.getCodexHomeForSession(), 'auth.json');
     if (existsSync(authFile)) {
       unlinkSync(authFile);
     }
   }
 
   executeLogout(connection: LogoutConnection): void {
-    const env = { ...process.env, CODEX_HOME: getCodexHome() };
+    const env = { ...process.env, CODEX_HOME: this.getCodexHomeForSession() };
     const logoutProcess = spawn(getCodexCommand(), ['logout'], {
       env,
       shell: false,
@@ -172,7 +182,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     }
 
     return new Promise((resolve) => {
-      const authFile = join(getCodexHome(), 'auth.json');
+      const authFile = join(this.getCodexHomeForSession(), 'auth.json');
       if (!existsSync(authFile)) {
         resolve(false);
         return;
@@ -211,7 +221,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
       const codexCmd = getCodexCommand();
       const codexArgs = ['exec', '--yolo', effectivePrompt];
-      const env = { ...process.env, CODEX_HOME: getCodexHome() };
+      const env = { ...process.env, CODEX_HOME: this.getCodexHomeForSession() };
 
       const codexProcess = spawn(codexCmd, codexArgs, {
         env,

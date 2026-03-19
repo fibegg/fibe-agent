@@ -32,7 +32,7 @@ export class MessageStoreService {
   private messages: StoredMessage[] = [];
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     this.messagesPath = join(dataDir, 'messages.json');
     this.ensureDataDir();
     this.messages = this.load();
@@ -78,7 +78,7 @@ export class MessageStoreService {
   }
 
   private ensureDataDir(): void {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }

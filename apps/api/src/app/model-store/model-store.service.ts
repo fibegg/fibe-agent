@@ -10,7 +10,7 @@ export class ModelStoreService {
   private cached: string | null = null;
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     this.modelPath = join(dataDir, 'model.json');
     this.ensureDataDir();
   }
@@ -47,7 +47,7 @@ export class ModelStoreService {
   }
 
   private ensureDataDir(): void {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }

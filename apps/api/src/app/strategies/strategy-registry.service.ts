@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '../config/config.service';
 import { ClaudeCodeStrategy } from './claude-code.strategy';
 import { GeminiStrategy } from './gemini.strategy';
 import { MockStrategy } from './mock.strategy';
@@ -33,6 +34,8 @@ function resolveAuthMode(): AuthMode {
 
 @Injectable()
 export class StrategyRegistryService {
+  constructor(private readonly config: ConfigService) {}
+
   resolveStrategy(): AgentStrategy {
     const providerName =
       (process.env.AGENT_PROVIDER as ProviderName | undefined) ?? DEFAULT_PROVIDER;
@@ -41,17 +44,17 @@ export class StrategyRegistryService {
 
     switch (providerName) {
       case 'mock':
-        return new MockStrategy();
+        return new MockStrategy(this.config);
       case 'gemini':
-        return new GeminiStrategy(useApiToken);
+        return new GeminiStrategy(useApiToken, this.config);
       case 'claude-code':
-        return new ClaudeCodeStrategy(useApiToken);
+        return new ClaudeCodeStrategy(useApiToken, this.config);
       case 'openai':
       case 'openai-codex':
-        return new OpenaiCodexStrategy(useApiToken);
+        return new OpenaiCodexStrategy(useApiToken, this.config);
       case 'opencode':
       case 'opencodex':
-        return new OpencodeStrategy();
+        return new OpencodeStrategy(this.config);
       default:
         throw new Error(
           `Unknown AGENT_PROVIDER: '${providerName}'. Available: ${PROVIDER_NAMES.join(', ')}`

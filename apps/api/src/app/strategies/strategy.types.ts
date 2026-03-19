@@ -49,6 +49,10 @@ export interface StreamingCallbacks {
 
 export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
 
+export interface ConversationDataDirProvider {
+  getConversationDataDir(): string;
+}
+
 export interface AgentStrategy {
   ensureSettings?(): void;
   executeAuth(connection: AuthConnection): void;

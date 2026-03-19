@@ -2,10 +2,12 @@ import { Logger } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AuthConnection, LogoutConnection } from './strategy.types';
+import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
+const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
+const SESSION_MARKER_FILE = '.opencode_session';
 
 /**
  * Well-known API key env vars that OpenCode CLI can read.
@@ -38,6 +40,18 @@ export class OpencodeStrategy implements AgentStrategy {
   private currentConnection: AuthConnection | null = null;
   private currentStreamProcess: ChildProcess | null = null;
   private streamInterrupted = false;
+  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
+
+  constructor(conversationDataDir?: ConversationDataDirProvider) {
+    this.conversationDataDir = conversationDataDir;
+  }
+
+  private getOpencodeWorkspaceDir(): string {
+    if (this.conversationDataDir) {
+      return join(this.conversationDataDir.getConversationDataDir(), OPENCODE_WORKSPACE_SUBDIR);
+    }
+    return PLAYGROUND_DIR;
+  }
 
   /**
    * Reads a manually stored API key from the auth file (set via auth modal).
@@ -200,13 +214,18 @@ export class OpencodeStrategy implements AgentStrategy {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
-      if (!existsSync(PLAYGROUND_DIR)) {
-        mkdirSync(PLAYGROUND_DIR, { recursive: true });
+      const workspaceDir = this.getOpencodeWorkspaceDir();
+      if (!existsSync(workspaceDir)) {
+        mkdirSync(workspaceDir, { recursive: true });
       }
+      const hasSession = this.conversationDataDir
+        ? existsSync(join(workspaceDir, SESSION_MARKER_FILE))
+        : false;
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
       const opencodeArgs = [
         'run',
+        ...(hasSession ? ['--continue'] : []),
         '--format', 'json',
         '--thinking',
         ...this.getModelArgs(model),
@@ -243,7 +262,7 @@ export class OpencodeStrategy implements AgentStrategy {
 
       const opencodeProcess = spawn('opencode', opencodeArgs, {
         env,
-        cwd: PLAYGROUND_DIR,
+        cwd: workspaceDir,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
       this.currentStreamProcess = opencodeProcess;
@@ -356,6 +375,13 @@ export class OpencodeStrategy implements AgentStrategy {
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
+          if (this.conversationDataDir) {
+            try {
+              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), '');
+            } catch {
+              /* ignore */
+            }
+          }
           resolve();
         }
       });

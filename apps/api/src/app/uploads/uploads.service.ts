@@ -20,7 +20,7 @@ export class UploadsService {
   constructor(private readonly config: ConfigService) {}
 
   getUploadsDir(): string {
-    return join(this.config.getDataDir(), 'uploads');
+    return join(this.config.getConversationDataDir(), 'uploads');
   }
 
   async saveImage(dataUrl: string): Promise<string> {

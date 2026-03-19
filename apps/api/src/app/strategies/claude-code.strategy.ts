@@ -1,7 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AuthConnection, LogoutConnection, ToolEvent } from './strategy.types';
+import type { AuthConnection, ConversationDataDirProvider, LogoutConnection, ToolEvent } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 
 const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
@@ -14,6 +14,8 @@ function getTokenFilePath(): string {
   return join(getClaudeConfigDir(), 'agent_token.txt');
 }
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
+const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
+const SESSION_MARKER_FILE = '.claude_session';
 
 const FILE_WRITING_TOOL_NAMES = ['write_file', 'edit_file', 'search_replace'];
 
@@ -86,9 +88,18 @@ export class ClaudeCodeStrategy implements AgentStrategy {
   private currentStreamProcess: ChildProcess | null = null;
   private streamInterrupted = false;
   private readonly useApiTokenMode: boolean;
+  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
 
-  constructor(useApiTokenMode = false) {
+  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     this.useApiTokenMode = useApiTokenMode;
+    this.conversationDataDir = conversationDataDir;
+  }
+
+  private getClaudeWorkspaceDir(): string {
+    if (this.conversationDataDir) {
+      return join(this.conversationDataDir.getConversationDataDir(), CLAUDE_WORKSPACE_SUBDIR);
+    }
+    return PLAYGROUND_DIR;
   }
 
   private getEnvToken(): string | null {
@@ -254,13 +265,16 @@ export class ClaudeCodeStrategy implements AgentStrategy {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
-      if (!existsSync(PLAYGROUND_DIR)) {
-        mkdirSync(PLAYGROUND_DIR, { recursive: true });
+      const workspaceDir = this.getClaudeWorkspaceDir();
+      if (!existsSync(workspaceDir)) {
+        mkdirSync(workspaceDir, { recursive: true });
+      }
+      if (this.conversationDataDir) {
+        this._hasSession = existsSync(join(workspaceDir, SESSION_MARKER_FILE));
       }
 
       const useStreamJson = !!callbacks;
       const args = [
-        'IS_SANDBOX=1',
         ...(this._hasSession ? ['--continue'] : []),
         '-p',
         prompt,
@@ -282,7 +296,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
           BROWSER: '/bin/true',
           DISPLAY: '',
         },
-        cwd: PLAYGROUND_DIR,
+        cwd: workspaceDir,
         shell: false,
       });
       this.currentStreamProcess = claudeProcess;
@@ -397,6 +411,13 @@ export class ClaudeCodeStrategy implements AgentStrategy {
           reject(new Error(errorResult || `Process exited with code ${code}`));
         } else {
           this._hasSession = true;
+          if (this.conversationDataDir) {
+            try {
+              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), '');
+            } catch {
+              /* ignore */
+            }
+          }
           resolve();
         }
       });

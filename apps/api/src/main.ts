@@ -171,7 +171,7 @@ async function bootstrap() {
   const postInitScript = config.getPostInitScript();
   if (postInitScript) {
     void runPostInitOnce(
-      config.getDataDir(),
+      config.getConversationDataDir(),
       postInitScript,
       config.getPlaygroundsDir()
     );

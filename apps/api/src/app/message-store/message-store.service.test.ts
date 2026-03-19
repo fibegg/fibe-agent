@@ -17,13 +17,13 @@ describe('MessageStoreService', () => {
   });
 
   test('all returns empty array initially', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     expect(service.all()).toEqual([]);
   });
 
   test('add appends message and returns it', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     const msg = service.add('user', 'hello');
     expect(msg.role).toBe('user');
@@ -34,7 +34,7 @@ describe('MessageStoreService', () => {
   });
 
   test('clear removes all messages', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     service.add('user', 'a');
     service.clear();
@@ -42,7 +42,7 @@ describe('MessageStoreService', () => {
   });
 
   test('setStoryForLastAssistant attaches story to last assistant message', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     service.add('user', 'hi');
     service.add('assistant', 'hello');
@@ -56,7 +56,7 @@ describe('MessageStoreService', () => {
   });
 
   test('setStoryForLastAssistant does nothing when last message is not assistant', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     service.add('user', 'hi');
     service.setStoryForLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
@@ -64,7 +64,7 @@ describe('MessageStoreService', () => {
   });
 
   test('add with model stores model on message', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     const msg = service.add('assistant', 'hi', undefined, 'gpt-4o');
     expect(msg.model).toBe('gpt-4o');
@@ -72,7 +72,7 @@ describe('MessageStoreService', () => {
   });
 
   test('setStoryForLastAssistant does nothing when messages is empty', () => {
-    const config = { getDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     service.setStoryForLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
     expect(service.all()).toHaveLength(0);

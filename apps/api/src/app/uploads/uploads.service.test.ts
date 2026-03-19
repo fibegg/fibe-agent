@@ -6,11 +6,12 @@ import { UploadsService } from './uploads.service';
 
 describe('UploadsService', () => {
   let dataDir: string;
-  const config = { getDataDir: () => '' };
+  const config = { getDataDir: () => '', getConversationDataDir: () => '' };
 
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'uploads-'));
-    (config as { getDataDir: () => string }).getDataDir = () => dataDir;
+    (config as { getDataDir: () => string; getConversationDataDir: () => string }).getDataDir = () => dataDir;
+    (config as { getDataDir: () => string; getConversationDataDir: () => string }).getConversationDataDir = () => dataDir;
   });
 
   afterEach(() => {
@@ -83,7 +84,7 @@ describe('UploadsService', () => {
 
   test('saveAudioFromBuffer creates uploads dir when missing', async () => {
     const subDir = join(dataDir, 'nested');
-    (config as { getDataDir: () => string }).getDataDir = () => subDir;
+    (config as { getConversationDataDir: () => string }).getConversationDataDir = () => subDir;
     const service = new UploadsService(config as never);
     const filename = await service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
     expect(service.getPath(filename)).toBe(join(subDir, 'uploads', filename));

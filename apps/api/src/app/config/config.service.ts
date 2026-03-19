@@ -1,6 +1,18 @@
 import { join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 
+const CONVERSATION_ID_SAFE_REGEX = /[a-zA-Z0-9_-]/;
+
+function sanitizeConversationId(id: string): string {
+  const sanitized = id
+    .split('')
+    .map((c) => (CONVERSATION_ID_SAFE_REGEX.test(c) ? c : '_'))
+    .join('')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return sanitized || 'default';
+}
+
 @Injectable()
 export class ConfigService {
   getAgentPassword(): string | undefined {
@@ -21,6 +33,18 @@ export class ConfigService {
 
   getDataDir(): string {
     return process.env.DATA_DIR ?? join(process.cwd(), 'data');
+  }
+
+  getConversationId(): string {
+    const raw =
+      process.env.PHOENIX_AGENT_ID?.trim() ??
+      process.env.CONVERSATION_ID?.trim() ??
+      'default';
+    return raw || 'default';
+  }
+
+  getConversationDataDir(): string {
+    return join(this.getDataDir(), sanitizeConversationId(this.getConversationId()));
   }
 
   getSystemPromptPath(): string {

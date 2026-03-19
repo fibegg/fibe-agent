@@ -2,13 +2,15 @@ import { Logger } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AuthConnection, LogoutConnection } from './strategy.types';
+import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 import { runAuthProcess } from './auth-process-helper';
 
 const GEMINI_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.gemini');
 const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
+const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
+const SESSION_MARKER_FILE = '.gemini_session';
 
 export class GeminiStrategy implements AgentStrategy {
   private readonly logger = new Logger(GeminiStrategy.name);
@@ -20,9 +22,18 @@ export class GeminiStrategy implements AgentStrategy {
   private streamInterrupted = false;
   private readonly useApiTokenMode: boolean;
   private _apiToken: string | null = null;
+  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
 
-  constructor(useApiTokenMode = false) {
+  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     this.useApiTokenMode = useApiTokenMode;
+    this.conversationDataDir = conversationDataDir;
+  }
+
+  private getGeminiWorkspaceDir(): string {
+    if (this.conversationDataDir) {
+      return join(this.conversationDataDir.getConversationDataDir(), GEMINI_WORKSPACE_SUBDIR);
+    }
+    return join(process.cwd(), 'playground');
   }
 
   ensureSettings(): void {
@@ -264,9 +275,12 @@ export class GeminiStrategy implements AgentStrategy {
       if (!this.useApiTokenMode) {
         this.ensureSettings();
       }
-      const playgroundDir = join(process.cwd(), 'playground');
-      if (!existsSync(playgroundDir)) {
-        mkdirSync(playgroundDir, { recursive: true });
+      const workspaceDir = this.getGeminiWorkspaceDir();
+      if (!existsSync(workspaceDir)) {
+        mkdirSync(workspaceDir, { recursive: true });
+      }
+      if (this.conversationDataDir) {
+        this._hasSession = existsSync(join(workspaceDir, SESSION_MARKER_FILE));
       }
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
@@ -288,7 +302,7 @@ export class GeminiStrategy implements AgentStrategy {
 
       const geminiProcess = spawn('gemini', geminiArgs, {
         env,
-        cwd: playgroundDir,
+        cwd: workspaceDir,
         shell: false,
       });
       this.currentStreamProcess = geminiProcess;
@@ -355,6 +369,13 @@ export class GeminiStrategy implements AgentStrategy {
         }
         if (code === 0 || code === null) {
           this._hasSession = true;
+          if (this.conversationDataDir) {
+            try {
+              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), '');
+            } catch {
+              /* ignore */
+            }
+          }
           resolve();
         } else {
           reject(

@@ -17,7 +17,7 @@ export class InitStatusController {
   @Get('init-status')
   getStatus(): InitStatusResponse {
     const script = this.config.getPostInitScript();
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     const stateFile = readPostInitState(dataDir);
     return buildInitStatusResponse(script, stateFile);
   }

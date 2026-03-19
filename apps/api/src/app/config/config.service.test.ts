@@ -14,6 +14,8 @@ describe('ConfigService', () => {
     envBackup.PLAYGROUNDS_DIR = process.env.PLAYGROUNDS_DIR;
     envBackup.POST_INIT_SCRIPT = process.env.POST_INIT_SCRIPT;
     envBackup.PSOT_INIT_SCRIPT = process.env.PSOT_INIT_SCRIPT;
+    envBackup.PHOENIX_AGENT_ID = process.env.PHOENIX_AGENT_ID;
+    envBackup.CONVERSATION_ID = process.env.CONVERSATION_ID;
   });
 
   afterEach(() => {
@@ -25,6 +27,8 @@ describe('ConfigService', () => {
     process.env.PLAYGROUNDS_DIR = envBackup.PLAYGROUNDS_DIR;
     process.env.POST_INIT_SCRIPT = envBackup.POST_INIT_SCRIPT;
     process.env.PSOT_INIT_SCRIPT = envBackup.PSOT_INIT_SCRIPT;
+    process.env.PHOENIX_AGENT_ID = envBackup.PHOENIX_AGENT_ID;
+    process.env.CONVERSATION_ID = envBackup.CONVERSATION_ID;
   });
 
   test('getAgentPassword returns undefined when AGENT_PASSWORD not set', () => {
@@ -121,5 +125,67 @@ describe('ConfigService', () => {
   test('getPostInitScript returns undefined for empty or whitespace', () => {
     process.env.POST_INIT_SCRIPT = '   ';
     expect(new ConfigService().getPostInitScript()).toBeUndefined();
+  });
+
+  test('getConversationId returns default when neither env set', () => {
+    delete process.env.PHOENIX_AGENT_ID;
+    delete process.env.CONVERSATION_ID;
+    expect(new ConfigService().getConversationId()).toBe('default');
+  });
+
+  test('getConversationId returns PHOENIX_AGENT_ID when set', () => {
+    process.env.PHOENIX_AGENT_ID = 'agent-123';
+    delete process.env.CONVERSATION_ID;
+    expect(new ConfigService().getConversationId()).toBe('agent-123');
+  });
+
+  test('getConversationId prefers PHOENIX_AGENT_ID over CONVERSATION_ID', () => {
+    process.env.PHOENIX_AGENT_ID = 'phoenix-id';
+    process.env.CONVERSATION_ID = 'conv-id';
+    expect(new ConfigService().getConversationId()).toBe('phoenix-id');
+  });
+
+  test('getConversationId returns CONVERSATION_ID when PHOENIX_AGENT_ID not set', () => {
+    delete process.env.PHOENIX_AGENT_ID;
+    process.env.CONVERSATION_ID = 'conv-456';
+    expect(new ConfigService().getConversationId()).toBe('conv-456');
+  });
+
+  test('getConversationId trims whitespace', () => {
+    process.env.PHOENIX_AGENT_ID = '  id-with-spaces  ';
+    expect(new ConfigService().getConversationId()).toBe('id-with-spaces');
+  });
+
+  test('getConversationId returns default when value is empty after trim', () => {
+    process.env.PHOENIX_AGENT_ID = '   ';
+    expect(new ConfigService().getConversationId()).toBe('default');
+  });
+
+  test('getConversationDataDir is under getDataDir and includes sanitized id', () => {
+    process.env.DATA_DIR = '/base';
+    process.env.PHOENIX_AGENT_ID = 'agent_1';
+    const config = new ConfigService();
+    expect(config.getConversationDataDir()).toBe('/base/agent_1');
+  });
+
+  test('getConversationDataDir sanitizes path-unsafe characters', () => {
+    process.env.DATA_DIR = '/base';
+    process.env.PHOENIX_AGENT_ID = 'agent/with..slashes';
+    const config = new ConfigService();
+    expect(config.getConversationDataDir()).toBe('/base/agent_with_slashes');
+  });
+
+  test('getConversationDataDir uses default when id would be empty after sanitize', () => {
+    process.env.DATA_DIR = '/base';
+    process.env.PHOENIX_AGENT_ID = '../..';
+    const config = new ConfigService();
+    expect(config.getConversationDataDir()).toBe('/base/default');
+  });
+
+  test('getConversationDataDir keeps alphanumeric dash underscore', () => {
+    process.env.DATA_DIR = '/data';
+    process.env.PHOENIX_AGENT_ID = 'abc-123_XYZ';
+    const config = new ConfigService();
+    expect(config.getConversationDataDir()).toBe('/data/abc-123_XYZ');
   });
 });

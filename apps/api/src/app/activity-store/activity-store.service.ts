@@ -34,7 +34,7 @@ export class ActivityStoreService {
   private activities: StoredActivityEntry[] = [];
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     this.activityPath = join(dataDir, 'activity.json');
     this.ensureDataDir();
     this.activities = this.load();
@@ -106,7 +106,7 @@ export class ActivityStoreService {
   }
 
   private ensureDataDir(): void {
-    const dataDir = this.config.getDataDir();
+    const dataDir = this.config.getConversationDataDir();
     if (!existsSync(dataDir)) {
       mkdirSync(dataDir, { recursive: true });
     }

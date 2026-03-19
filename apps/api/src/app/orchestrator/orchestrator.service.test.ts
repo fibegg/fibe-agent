@@ -30,6 +30,7 @@ describe('OrchestratorService', () => {
   async function createOrchestrator(): Promise<OrchestratorService> {
     const config = {
       getDataDir: () => dataDir,
+      getConversationDataDir: () => dataDir,
       getSystemPromptPath: () => join(dataDir, 'nonexistent.md'),
       getSystemPrompt: () => undefined,
       getModelOptions: () => [],
@@ -38,7 +39,7 @@ describe('OrchestratorService', () => {
     const activityStore = new ActivityStoreService(config as never);
     const messageStore = new MessageStoreService(config as never);
     const modelStore = new ModelStoreService(config as never);
-    const strategyRegistry = new StrategyRegistryService();
+    const strategyRegistry = new StrategyRegistryService(config as never);
     const uploadsService = new UploadsService(config as never);
     const playgroundsService = {
       getFileContent: async () => {
@@ -135,7 +136,7 @@ describe('OrchestratorService', () => {
   test('handleClientMessage send_chat_message with audioFilename streams response', async () => {
     const orch = await createOrchestrator();
     orch.isAuthenticated = true;
-    const uploads = new UploadsService({ getDataDir: () => dataDir } as never);
+    const uploads = new UploadsService({ getDataDir: () => dataDir, getConversationDataDir: () => dataDir } as never);
     const filename = await uploads.saveAudioFromBuffer(Buffer.from('audio'), 'audio/webm');
     const events: Array<{ type: string }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
