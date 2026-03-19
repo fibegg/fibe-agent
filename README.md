@@ -1,65 +1,134 @@
-# Phoenix Agent (Nx)
+<p align="center">
+  <img src="apps/chat/public/phoenix.png" alt="Phoenix" width="128" height="128" />
+</p>
 
-Nx monorepo: **api** (NestJS + Fastify) and **chat** (React + Vite). The API runs the agent (Gemini, Claude Code, OpenAI Codex, or mock); the chat app is the UI.
+<h1 align="center">Phoenix Agent</h1>
 
-## Run API + Chat
+<p align="center">
+  <strong>Agent orchestration, chat UI, and OAuth-ready APIs—built as a production-grade Nx monorepo.</strong>
+</p>
 
-Use **Bun** for installs and scripts (`bun install`, `bun run dev`). The repo keeps **`bun.lock`** (for Bun/CI/Docker) and **`package-lock.json`** (for `npm install`). Bun reads **`bun.lock` when it exists** and only migrates from `package-lock.json` if `bun.lock` is missing—do not delete `bun.lock` and then run `bun install`, or workspace installs can break with `FileNotFound` cache errors.
+<p align="center">
+  <a href="https://github.com/phoenix-playgrounds/phoenix-agent-oauth/actions/workflows/ci.yml"><img src="https://github.com/phoenix-playgrounds/phoenix-agent-oauth/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.3.11-000?logo=bun&logoColor=white" alt="Bun" /></a>
+  <a href="https://nx.dev"><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></a>
+  <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License MIT" />
+</p>
 
-**Quick dev** (API + chat in parallel): `bun run dev`
+---
 
-Or start separately:
+**Phoenix Agent** pairs a **NestJS + Fastify** API with a **React + Vite** chat client. The API drives coding agents (Gemini, Claude Code, OpenAI Codex, OpenCode, or a mock provider); the UI handles login, streaming replies, model selection, markdown rendering, and provider OAuth when you need it.
 
-1. **Start the API** (port 3000):
+## Highlights
 
-   ```sh
-   bunx nx serve api
-   ```
+| | |
+| --- | --- |
+| **Multi-provider** | Switch agents via `AGENT_PROVIDER`; optional stored credentials and session dirs for containerized deploys. |
+| **Real-time chat** | WebSocket at `/ws` with structured client/server actions, single active session semantics, and [documented close codes](docs/API.md#websocket). |
+| **REST + integrations** | Messages, activities, uploads, playgrounds, init scripts, and `POST /api/agent/send-message` for async hooks—see [docs/API.md](docs/API.md). |
+| **Structured logs** | JSON-per-line logging for containers and aggregators (`LOG_LEVEL`, request IDs, HTTP and WS context)—[details](docs/API.md#container-logging). |
+| **E2E & CI** | Playwright suites under `apps/e2e-api` and `apps/e2e-chat`; GitHub Actions runs lint, build, and typecheck on every push/PR. |
+| **Docker** | Multi-arch images published to **GHCR** per provider (`gemini`, `claude-code`, `openai-codex`, `opencode`)—see [CI workflow](.github/workflows/ci.yml). |
 
-   Set `AGENT_PROVIDER=mock` if you don’t have a provider CLI installed:
+## Architecture
 
-   ```sh
-   AGENT_PROVIDER=mock bunx nx serve api
-   ```
+```mermaid
+flowchart LR
+  subgraph client [Chat UI]
+    Vite[Vite + React]
+  end
+  subgraph api [API]
+    Nest[NestJS + Fastify]
+    WS["/ws"]
+    REST["/api/*"]
+  end
+  subgraph agents [Agent backends]
+    P[Provider CLIs / APIs]
+  end
+  Vite --> REST
+  Vite --> WS
+  Nest --> P
+```
 
-2. **Start the chat app** (port 3100):
+## Quick start
 
-   ```sh
-   bunx nx serve chat
-   ```
+**Prerequisites:** [Bun](https://bun.sh) (version pinned in `package.json` as `packageManager`).
 
-   With the default Vite proxy, the chat app will use `http://localhost:3000` for `/api` and `/ws`. If the API runs on another host/port, set:
+```sh
+bun install
+bun run dev
+```
 
-   ```sh
-   API_URL=http://localhost:3000
-   ```
+- **API:** [http://localhost:3000](http://localhost:3000) — health at `/api/health`
+- **Chat:** [http://localhost:3100](http://localhost:3100) — Vite proxies `/api` and `/ws` to the API by default
 
-3. Open **http://localhost:3100**. If `AGENT_PASSWORD` is set, log in with that password first, then use the chat.
+No provider CLI yet? Use the mock agent:
+
+```sh
+AGENT_PROVIDER=mock bunx nx serve api
+```
+
+If the API runs on another host or port:
+
+```sh
+API_URL=http://localhost:3000 bunx nx serve chat
+```
+
+When `AGENT_PASSWORD` is set, open the chat and sign in with that password before sending messages.
+
+### Run services separately
+
+| App | Command | Default port |
+| --- | --- | ---: |
+| API | `bunx nx serve api` | 3000 |
+| Chat | `bunx nx serve chat` | 3100 |
+
+## Lockfiles and installs
+
+This repo keeps **`bun.lock`** for Bun, CI, and Docker, and **`package-lock.json`** for npm compatibility.
+
+Bun prefers `bun.lock` when it exists. **Do not delete `bun.lock` and then run `bun install` without restoring it**—workspace installs can fail with cache/`FileNotFound`-style errors. For reproducible CI, commit `bun.lock` and use `bun install --frozen-lockfile` in automation (as in CI).
 
 ## Environment
 
-Copy `.env.example` to `.env` and adjust. Main variables:
+Copy `.env.example` to `.env` and adjust.
 
-- **API:** `PORT`, `AGENT_PASSWORD`, `AGENT_PROVIDER` (mock, gemini, claude-code, openai-codex, opencode), `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`
-- **Chat:** `API_URL` (only if the API is not on the same origin or not proxied), `LOCK_CHAT_MODEL` (optional; when set, the model selector is disabled and only shows the model in use), `ASSISTANT_AVATAR_URL` (optional; URL for the assistant’s avatar), `USER_AVATAR_URL` (optional; URL for the user’s avatar)
+**API (summary):** `PORT`, `CORS_ORIGINS`, `FRAME_ANCESTORS`, `AGENT_PASSWORD`, `AGENT_PROVIDER`, `MODEL_OPTIONS`, `DATA_DIR`, `SYSTEM_PROMPT_PATH`, `PHOENIX_AGENT_ID` / `CONVERSATION_ID`, provider keys (`GEMINI_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY`, …), `SESSION_DIR`, `AGENT_CREDENTIALS_JSON`, `POST_INIT_SCRIPT`, `LOG_LEVEL`.
+
+**Chat (optional):** `API_URL`, `LOCK_CHAT_MODEL`, `ASSISTANT_AVATAR_URL`, `USER_AVATAR_URL`.
+
+OpenCode and multi-key setups are documented inline in [`.env.example`](.env.example).
 
 ## Project layout
 
-- `apps/api` – NestJS API, WebSocket at `/ws`, REST under `/api`
-- `apps/chat` – React chat UI (login, chat, auth modal, model selector); messages render GitHub-flavored Markdown, and the copy icon on each bubble copies the **raw** message text (including markdown). Long, fence-less TypeScript pasted as one line is reflowed and shown as a code block **in the UI only** (stored text is unchanged).
-- `apps/e2e-api`, `apps/e2e-chat` – Playwright / Bun e2e (named so `bun test apps/api` does not pick up e2e specs by prefix)
-- `docs/API.md` – REST and WebSocket contract
+| Path | Role |
+| --- | --- |
+| `apps/api` | NestJS API, WebSocket `/ws`, REST under `/api` |
+| `apps/chat` | React chat UI (login, OAuth modal, model selector, GFM markdown, copy raw message, TS one-line reflow in UI only) |
+| `apps/e2e-api`, `apps/e2e-chat` | Playwright e2e (named so `bun test apps/api` does not pick up e2e by path prefix) |
+| `docs/API.md` | REST, WebSocket, and container logging contract |
 
 ## Scripts
 
-| Script       | Command        | Description                    |
-|-------------|----------------|--------------------------------|
-| **dev**     | `bun run dev`  | API + chat in parallel         |
-| **build**   | `bun run build`| Build all apps                 |
-| **lint**    | `bun run lint` | Lint all projects              |
-| **test**    | `bun run test` | Run unit tests                 |
+| Script | Command | Description |
+| --- | --- | --- |
+| **dev** | `bun run dev` | API + chat in parallel |
+| **build** | `bun run build` | Build all apps |
+| **lint** | `bun run lint` | Lint all projects |
+| **test** | `bun run test` | Unit tests |
 | **typecheck** | `bun run typecheck` | Type-check all projects |
-| **e2e**     | `bun run e2e`  | Run E2E tests                  |
-| **ci**      | `bun run ci`   | Lint, test, build, typecheck, e2e (CI pipeline) |
+| **e2e** | `bun run e2e` | Playwright e2e targets |
+| **ci** | `bun run ci` | Lint, build, and typecheck (matches the main CI job) |
+| **ci:test** | `bun run ci:test` | Same as **ci** plus unit tests |
 
-GitHub Actions CI uses Bun and runs `bun run ci`. For reproducible CI, run `bun install` locally once and commit `bun.lock`, then the workflow can use `bun install --frozen-lockfile` in the test job.
+## Container images
+
+On push to `main` or `dev`, CI builds and pushes provider-specific images to GitHub Container Registry:
+
+`ghcr.io/phoenix-playgrounds/phoenix-agent-oauth:<provider>-<tag>`
+
+Providers align with `AGENT_PROVIDER` build args: `gemini`, `claude-code`, `openai-codex`, `opencode`. See the [Dockerfile](Dockerfile) and [CI workflow](.github/workflows/ci.yml) for build arguments and tags.
+
+## License
+
+MIT (see `package.json`).
