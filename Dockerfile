@@ -33,6 +33,7 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 COPY apps/api apps/api
 COPY apps/chat apps/chat
+COPY shared shared
 
 ENV NX_DAEMON=false
 RUN bunx nx run-many --targets=build --projects=api,chat
