@@ -11,7 +11,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: "true"
-      NX_REJECT_UNKNOWN_LOCAL_CACHE: "0"
     steps:
       - uses: actions/checkout@v4
 
@@ -24,7 +23,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-${{ runner.os }}-
 
@@ -32,7 +31,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('bun.lockb', 'nx.json', 'package.json') }}
+          key: nx-${{ runner.os }}-${{ hashFiles('bun.lock', 'nx.json', 'package.json') }}
           restore-keys: |
             nx-${{ runner.os }}-
 

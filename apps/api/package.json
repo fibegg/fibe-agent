@@ -83,7 +83,7 @@
           "command": "bun test --preload ./test-setup.ts --serial",
           "cwd": "apps/api"
         },
-        "dependsOn": []
+        "dependsOn": ["build"]
       },
       "typecheck": {
         "executor": "nx:run-commands",
