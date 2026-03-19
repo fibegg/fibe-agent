@@ -6,6 +6,35 @@ const MAX_PENDING_IMAGES = 5;
 const MAX_PENDING_ATTACHMENTS = 5;
 export const MAX_PENDING_TOTAL = MAX_PENDING_IMAGES + MAX_PENDING_ATTACHMENTS;
 
+/**
+ * Text to insert when pasting into the composer. Uses text/plain first; some apps only expose
+ * HTML (still readable via innerText). Returns null for image-only clipboards so image paste can run.
+ */
+export function getClipboardTextForContentEditablePaste(
+  data: React.ClipboardEvent['clipboardData']
+): string | null {
+  if (!data) return null;
+  const plain = data.getData('text/plain');
+  if (plain.trim().length > 0) return plain;
+  const html = data.getData('text/html');
+  if (!html.trim()) return null;
+  try {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const raw = doc.body.textContent ?? '';
+    const text = raw.replace(/\r\n/g, '\n');
+    if (text.trim().length === 0) return null;
+    return text;
+  } catch {
+    return null;
+  }
+}
+
+export function hasNonEmptyPlainTextOnClipboard(
+  data: React.ClipboardEvent['clipboardData']
+): boolean {
+  return getClipboardTextForContentEditablePaste(data) !== null;
+}
+
 export interface UseChatAttachmentsParams {
   isAuthenticated: boolean;
 }
@@ -136,6 +165,7 @@ export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
+      if (getClipboardTextForContentEditablePaste(e.clipboardData) !== null) return;
       const items = e.clipboardData?.items;
       const item = items ? Array.from(items).find((it) => it.type.startsWith('image/')) : undefined;
       if (!item || pendingImages.length >= MAX_PENDING_IMAGES) return;
