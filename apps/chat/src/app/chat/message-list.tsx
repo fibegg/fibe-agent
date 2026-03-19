@@ -6,6 +6,7 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -25,6 +26,11 @@ import {
   PROSE_MESSAGE,
 } from '../ui-classes';
 import { ASSISTANT_AVATAR_URL, USER_AVATAR_URL } from './chat-avatar';
+import {
+  normalizeBarePreElementsInContainer,
+  stringHash32,
+  wrapBarePreElementsInHtmlString,
+} from './markdown-bare-pre';
 import { renderMarkdown } from './markdown-cache';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
 
@@ -52,19 +58,6 @@ const PRISM_LANG_LABEL: Record<string, string> = {
   sql: 'SQL',
 };
 
-function normalizeBarePreElements(root: HTMLElement): void {
-  root.querySelectorAll('pre').forEach((pre) => {
-    if (pre.querySelector('code')) return;
-    if (!pre.firstChild) return;
-    const code = document.createElement('code');
-    code.className = 'language-none';
-    while (pre.firstChild) {
-      code.appendChild(pre.firstChild);
-    }
-    pre.appendChild(code);
-  });
-}
-
 function annotateChatCodeBlockLabels(root: HTMLElement): void {
   root.querySelectorAll('pre > code[class*="language-"]').forEach((el) => {
     const code = el as HTMLElement;
@@ -83,11 +76,10 @@ function annotateChatCodeBlockLabels(root: HTMLElement): void {
 function schedulePrismHighlightForRoot(root: HTMLElement, shouldAbort: () => boolean): void {
   prismLoaderPromise.then((m) => {
     if (shouldAbort() || !root.isConnected) return;
-    const codes = root.querySelectorAll('pre code');
-    for (let i = 0; i < codes.length; i++) {
+    for (const el of root.querySelectorAll('pre code')) {
       if (shouldAbort() || !root.isConnected) return;
       try {
-        m.highlightCodeElement(codes[i] as HTMLElement);
+        m.highlightCodeElement(el as HTMLElement);
       } catch {
         /* keep plain text */
       }
@@ -171,25 +163,32 @@ const MarkdownWithPrism = memo(
     codeLangBadge?: boolean;
   }) {
     const ref = useRef<HTMLDivElement>(null);
+    const htmlForDom = useMemo(() => wrapBarePreElementsInHtmlString(html), [html]);
     useLayoutEffect(() => {
       if (!ref.current) return;
       const root = ref.current;
       let cancelled = false;
       const shouldAbort = () => cancelled;
-      normalizeBarePreElements(root);
+      normalizeBarePreElementsInContainer(root);
       if (codeLangBadge) annotateChatCodeBlockLabels(root);
       schedulePrismHighlightForRoot(root, shouldAbort);
       return () => {
         cancelled = true;
       };
-    }, [html, codeLangBadge]);
-    return <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+    }, [htmlForDom, codeLangBadge]);
+    return (
+      <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: htmlForDom }} />
+    );
   },
   (prev, next) =>
     prev.html === next.html &&
     prev.className === next.className &&
     prev.codeLangBadge === next.codeLangBadge
 );
+
+function userMessageMarkdownPartKey(index: number, content: string): string {
+  return `umd-${index}-${content.length}-${stringHash32(content)}`;
+}
 
 function MentionChipIcon({ path }: { path: string }) {
   return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
@@ -215,7 +214,7 @@ function MessageBodyWithMentions({ body }: { body: string }) {
         if (!part.content) return null;
         return (
           <MarkdownWithPrism
-            key={i}
+            key={userMessageMarkdownPartKey(i, part.content)}
             html={renderMarkdown(prepareUserMessageMarkdownForRender(part.content))}
             className={USER_MESSAGE_MARKDOWN_CLASS}
             codeLangBadge
