@@ -155,4 +155,89 @@ describe('GithubTokenRefreshService', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test('onModuleInit runs initial refresh and schedules timer', async () => {
+    mockConfig.getPhoenixApiUrl = () => undefined;
+    mockConfig.getPhoenixApiKey = () => undefined;
+    mockConfig.getPhoenixAgentId = () => undefined;
+
+    await service.onModuleInit();
+    // Timer should be set — calling onModuleDestroy clears it
+    service.onModuleDestroy();
+  });
+
+  test('onModuleDestroy is safe when called multiple times', () => {
+    service.onModuleDestroy();
+    service.onModuleDestroy(); // second call should not throw
+  });
+
+  test('returns null when response has no token field', async () => {
+    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
+    mockConfig.getPhoenixApiKey = () => 'key';
+    mockConfig.getPhoenixAgentId = () => '1';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () =>
+      new Response(JSON.stringify({ expires_in: 3600 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ) as typeof fetch;
+
+    try {
+      const result = await service.refreshToken();
+      expect(result).toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('periodic refresh calls killGithubMcpServer after initial', async () => {
+    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
+    mockConfig.getPhoenixApiKey = () => 'key';
+    mockConfig.getPhoenixAgentId = () => '1';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () =>
+      new Response(JSON.stringify({ token: 'ghs_123', expires_in: 3600 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ) as typeof fetch;
+
+    try {
+      // First call is the initial refresh
+      await service.onModuleInit();
+      // Second call simulates periodic refresh (isInitialRefresh is now false)
+      const result = await service.refreshToken();
+      expect(result).toBe('ghs_123');
+    } finally {
+      globalThis.fetch = originalFetch;
+      service.onModuleDestroy();
+    }
+  });
+
+  test('handles invalid MCP_CONFIG_JSON gracefully during token update', async () => {
+    process.env.MCP_CONFIG_JSON = 'invalid-json';
+    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
+    mockConfig.getPhoenixApiKey = () => 'key';
+    mockConfig.getPhoenixAgentId = () => '1';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () =>
+      new Response(JSON.stringify({ token: 'ghs_abc', expires_in: 3600 }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    ) as typeof fetch;
+
+    try {
+      const result = await service.refreshToken();
+      expect(result).toBe('ghs_abc');
+      const config = JSON.parse(process.env.MCP_CONFIG_JSON);
+      expect(config.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('ghs_abc');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

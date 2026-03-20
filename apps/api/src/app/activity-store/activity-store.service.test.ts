@@ -176,4 +176,58 @@ describe('ActivityStoreService', () => {
     service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     expect(service.findByStoryEntryId('other')).toBeUndefined();
   });
+
+  test('loads activities from disk on construction with valid JSON', async () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    // Create a service that writes an activity
+    const service1 = new ActivityStoreService(config as never);
+    service1.createWithEntry({ id: 'e1', type: 'step', message: 'Loaded', timestamp: '2026-01-01T00:00:00Z' });
+    // Wait for json writer to flush
+    await new Promise((r) => setTimeout(r, 50));
+    // Create new service that loads from file
+    const service2 = new ActivityStoreService(config as never);
+    const activities = service2.all();
+    expect(activities.length).toBeGreaterThanOrEqual(1);
+    expect(activities[0].story[0].message).toBe('Loaded');
+  });
+
+  test('loads gracefully when activities file has corrupt JSON', () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    // Write corrupt JSON to the activities file
+    const { writeFileSync } = require('node:fs');
+    writeFileSync(join(dataDir, 'activity.json'), 'invalid-json-content');
+    // Service should load gracefully
+    const service = new ActivityStoreService(config as never);
+    expect(service.all()).toEqual([]);
+  });
+
+  test('loads gracefully when activities file has non-array JSON', () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const { writeFileSync } = require('node:fs');
+    writeFileSync(join(dataDir, 'activity.json'), '{"not":"array"}');
+    const service = new ActivityStoreService(config as never);
+    expect(service.all()).toEqual([]);
+  });
+
+  test('load deduplicates story entries with same id from disk', async () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const { writeFileSync } = require('node:fs');
+    // Write activities with duplicate story entries
+    writeFileSync(join(dataDir, 'activity.json'), JSON.stringify([
+      {
+        id: 'act1',
+        created_at: '2026-01-01',
+        story: [
+          { id: 's1', type: 'step', message: 'First', timestamp: '' },
+          { id: 's1', type: 'step', message: 'Duplicate', timestamp: '' },
+          { id: 's2', type: 'step', message: 'Second', timestamp: '' },
+        ],
+      },
+    ]));
+    const service = new ActivityStoreService(config as never);
+    const activities = service.all();
+    expect(activities).toHaveLength(1);
+    expect(activities[0].story).toHaveLength(2);
+    expect(activities[0].story.map((e: { id: string }) => e.id)).toEqual(['s1', 's2']);
+  });
 });

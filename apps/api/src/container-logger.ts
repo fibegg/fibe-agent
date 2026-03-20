@@ -11,10 +11,19 @@ const LEVEL_ORDER: Record<LogLevel, number> = {
   verbose: 4,
 };
 
+let cachedMinOrder: number | null = null;
+
 function getMinOrder(): number {
+  if (cachedMinOrder !== null) return cachedMinOrder;
   const raw = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
   const level = raw === 'info' ? 'log' : (LOG_LEVELS.includes(raw as LogLevel) ? raw : 'log') as LogLevel;
-  return LEVEL_ORDER[level];
+  cachedMinOrder = LEVEL_ORDER[level];
+  return cachedMinOrder;
+}
+
+/** Reset the cached log level (for testing only). */
+export function resetLogLevelCache(): void {
+  cachedMinOrder = null;
 }
 
 function shouldLog(level: LogLevel): boolean {

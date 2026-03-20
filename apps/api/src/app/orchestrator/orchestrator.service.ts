@@ -10,7 +10,7 @@ import {
   type StoredStoryEntry,
 } from '../message-store/message-store.service';
 import { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
-import { PlaygroundsService } from '../playgrounds/playgrounds.service';
+
 import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -60,13 +60,11 @@ export class OrchestratorService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly strategyRegistry: StrategyRegistryService,
     private readonly uploadsService: UploadsService,
-    private readonly playgroundsService: PlaygroundsService,
     private readonly phoenixSync: PhoenixSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
     private readonly steering: SteeringService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
-    void this.playgroundsService;
   }
 
   async onModuleInit(): Promise<void> {

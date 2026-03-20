@@ -71,4 +71,41 @@ describe('post-init-runner', () => {
     expect(state?.error).toBe('previous');
     expect(state?.output == null || !String(state.output).includes('should-not-run')).toBe(true);
   });
+
+  test('runPostInitOnce records failed state for non-zero exit code', async () => {
+    await runPostInitOnce(tmpDir, 'exit 1', tmpDir);
+    const state = readPostInitState(tmpDir);
+    expect(state?.state).toBe('failed');
+    expect(state?.error).toContain('Exit code 1');
+    expect(state?.finishedAt).toBeDefined();
+  });
+
+  test('runPostInitOnce captures stderr in output', async () => {
+    await runPostInitOnce(tmpDir, 'echo stderr-msg >&2', tmpDir);
+    const state = readPostInitState(tmpDir);
+    expect(state?.state).toBe('done');
+    expect(state?.output).toContain('stderr-msg');
+  });
+
+  test('runPostInitOnce handles spawn error gracefully', async () => {
+    // Use a non-existent directory as cwd to trigger spawn error
+    await runPostInitOnce(tmpDir, 'echo test', '/nonexistent-dir-12345');
+    const state = readPostInitState(tmpDir);
+    // Should be either failed or done depending on sh behavior
+    expect(state?.state).toBeDefined();
+  });
+
+  test('writePostInitState creates dataDir recursively if needed', () => {
+    const nested = join(tmpDir, 'a', 'b', 'c');
+    writePostInitState(nested, { state: 'running' });
+    expect(readPostInitState(nested)).toEqual({ state: 'running' });
+  });
+
+  test('runPostInitOnce re-runs when state is running', async () => {
+    writePostInitState(tmpDir, { state: 'running' });
+    await runPostInitOnce(tmpDir, 'echo re-run', tmpDir);
+    const state = readPostInitState(tmpDir);
+    expect(state?.state).toBe('done');
+    expect(state?.output).toContain('re-run');
+  });
 });

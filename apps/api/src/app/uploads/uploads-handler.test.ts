@@ -44,6 +44,30 @@ describe('extFromMimetype', () => {
     expect(extFromMimetype('image/jpeg')).toBe('jpg');
     expect(extFromMimetype('image/png')).toBe('png');
   });
+
+  test('returns correct ext for audio types', () => {
+    expect(extFromMimetype('audio/webm')).toBe('webm');
+    expect(extFromMimetype('audio/ogg')).toBe('ogg');
+    expect(extFromMimetype('audio/mp4')).toBe('m4a');
+  });
+
+  test('returns webm for unknown audio types', () => {
+    expect(extFromMimetype('audio/x-custom')).toBe('webm');
+  });
+
+  test('handles codec parameters in audio mimetype', () => {
+    expect(extFromMimetype('audio/webm;codecs=opus')).toBe('webm');
+    expect(extFromMimetype('audio/ogg;codecs=opus')).toBe('ogg');
+  });
+
+  test('returns bin for unknown types', () => {
+    expect(extFromMimetype('application/x-custom-binary')).toBe('bin');
+  });
+
+  test('handles image subtypes', () => {
+    expect(extFromMimetype('image/gif')).toBe('gif');
+    expect(extFromMimetype('image/svg+xml')).toBe('svg+xml');
+  });
 });
 
 describe('processUploadFile', () => {

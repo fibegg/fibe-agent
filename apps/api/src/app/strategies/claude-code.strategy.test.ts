@@ -137,5 +137,122 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const result = await strategy.checkAuthStatus();
     expect(result).toBe(true);
   });
-});
 
+  test('executeAuth in api-token mode sends success when env token set', () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-test-123';
+    const strategy = new ClaudeCodeStrategy(true);
+    let authSuccess = false;
+    const noop = () => { return; };
+    const connection = {
+      sendAuthSuccess: () => { authSuccess = true; },
+      sendAuthStatus: noop,
+      sendAuthManualToken: noop,
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendError: noop,
+    };
+    strategy.executeAuth(connection as never);
+    expect(authSuccess).toBe(true);
+  });
+
+  test('executeAuth in api-token mode sends unauthenticated when no token', () => {
+    const strategy = new ClaudeCodeStrategy(true);
+    let status = '';
+    const noop = () => { return; };
+    const connection = {
+      sendAuthSuccess: noop,
+      sendAuthStatus: (s: string) => { status = s; },
+      sendAuthManualToken: noop,
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendError: noop,
+    };
+    strategy.executeAuth(connection as never);
+    expect(status).toBe('unauthenticated');
+  });
+
+  test('executeAuth in default mode sends manual token prompt', () => {
+    const strategy = new ClaudeCodeStrategy(false);
+    let manualTokenSent = false;
+    const noop = () => { return; };
+    const connection = {
+      sendAuthSuccess: noop,
+      sendAuthStatus: noop,
+      sendAuthManualToken: () => { manualTokenSent = true; },
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendError: noop,
+    };
+    strategy.executeAuth(connection as never);
+    expect(manualTokenSent).toBe(true);
+  });
+
+  test('submitAuthCode sends success when code is valid', () => {
+    const strategy = new ClaudeCodeStrategy(false);
+    let authSuccess = false;
+    const noop = () => { return; };
+    const connection = {
+      sendAuthSuccess: () => { authSuccess = true; },
+      sendAuthStatus: noop,
+      sendAuthManualToken: noop,
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendError: noop,
+    };
+    strategy.executeAuth(connection as never);
+    strategy.submitAuthCode('valid-token');
+    expect(authSuccess).toBe(true);
+  });
+
+  test('submitAuthCode sends unauthenticated when code is empty', () => {
+    const strategy = new ClaudeCodeStrategy(false);
+    let status = '';
+    const noop = () => { return; };
+    const connection = {
+      sendAuthSuccess: noop,
+      sendAuthStatus: (s: string) => { status = s; },
+      sendAuthManualToken: noop,
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendError: noop,
+    };
+    strategy.executeAuth(connection as never);
+    strategy.submitAuthCode('');
+    expect(status).toBe('unauthenticated');
+  });
+
+  test('cancelAuth clears connection', () => {
+    const strategy = new ClaudeCodeStrategy();
+    strategy.cancelAuth();
+    // Should not throw
+  });
+
+  test('clearCredentials does not throw when no token file', () => {
+    const strategy = new ClaudeCodeStrategy();
+    strategy.clearCredentials();
+  });
+
+  test('interruptAgent does not throw', () => {
+    const strategy = new ClaudeCodeStrategy();
+    strategy.interruptAgent();
+  });
+
+  test('constructor with conversation data dir', () => {
+    const strategy = new ClaudeCodeStrategy(false, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'conv-data'),
+    });
+    expect(strategy).toBeDefined();
+  });
+
+  test('checkAuthStatus returns true when ANTHROPIC_API_KEY is set', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+    const strategy = new ClaudeCodeStrategy(true);
+    expect(await strategy.checkAuthStatus()).toBe(true);
+  });
+
+  test('checkAuthStatus returns true when CLAUDE_API_KEY is set', async () => {
+    process.env.CLAUDE_API_KEY = 'sk-claude-test';
+    const strategy = new ClaudeCodeStrategy(true);
+    expect(await strategy.checkAuthStatus()).toBe(true);
+  });
+});

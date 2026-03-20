@@ -223,4 +223,37 @@ describe('OpencodeStrategy', () => {
     const strategy = new OpencodeStrategy();
     expect(strategy.getModelArgs('')).toEqual([]);
   });
+
+  test('getModelArgs returns empty for undefined model', () => {
+    const strategy = new OpencodeStrategy();
+    expect(strategy.getModelArgs('undefined')).toEqual([]);
+  });
+
+  test('interruptAgent does not throw', () => {
+    const strategy = new OpencodeStrategy();
+    strategy.interruptAgent();
+  });
+
+  test('constructor with conversationDataDir', () => {
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
+    });
+    expect(strategy).toBeDefined();
+  });
+
+  test('getModelArgs auto-prefixes when stored key is active', () => {
+    // Submit a key to set stored key
+    const strategy = new OpencodeStrategy();
+    const conn = makeConnection();
+    strategy.executeAuth(conn);
+    strategy.submitAuthCode('test-openrouter-key');
+    // Should auto-prefix because stored key is active and no env keys
+    const args = strategy.getModelArgs('openai/gpt-5.4');
+    expect(args).toEqual(['--model', 'openrouter/openai/gpt-5.4']);
+  });
+
+  test('clearCredentials is safe when no auth file exists', () => {
+    const strategy = new OpencodeStrategy();
+    strategy.clearCredentials();
+  });
 });

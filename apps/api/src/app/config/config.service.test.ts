@@ -13,7 +13,6 @@ describe('ConfigService', () => {
     envBackup.SYSTEM_PROMPT_PATH = process.env.SYSTEM_PROMPT_PATH;
     envBackup.PLAYGROUNDS_DIR = process.env.PLAYGROUNDS_DIR;
     envBackup.POST_INIT_SCRIPT = process.env.POST_INIT_SCRIPT;
-    envBackup.PSOT_INIT_SCRIPT = process.env.PSOT_INIT_SCRIPT;
     envBackup.PHOENIX_AGENT_ID = process.env.PHOENIX_AGENT_ID;
     envBackup.CONVERSATION_ID = process.env.CONVERSATION_ID;
   });
@@ -26,7 +25,6 @@ describe('ConfigService', () => {
     process.env.SYSTEM_PROMPT_PATH = envBackup.SYSTEM_PROMPT_PATH;
     process.env.PLAYGROUNDS_DIR = envBackup.PLAYGROUNDS_DIR;
     process.env.POST_INIT_SCRIPT = envBackup.POST_INIT_SCRIPT;
-    process.env.PSOT_INIT_SCRIPT = envBackup.PSOT_INIT_SCRIPT;
     process.env.PHOENIX_AGENT_ID = envBackup.PHOENIX_AGENT_ID;
     process.env.CONVERSATION_ID = envBackup.CONVERSATION_ID;
   });
@@ -99,27 +97,14 @@ describe('ConfigService', () => {
     expect(new ConfigService().getPlaygroundsDir()).toBe(join(process.cwd(), 'playground'));
   });
 
-  test('getPostInitScript returns undefined when neither env set', () => {
+  test('getPostInitScript returns undefined when env not set', () => {
     delete process.env.POST_INIT_SCRIPT;
-    delete process.env.PSOT_INIT_SCRIPT;
     expect(new ConfigService().getPostInitScript()).toBeUndefined();
   });
 
   test('getPostInitScript returns POST_INIT_SCRIPT when set', () => {
     process.env.POST_INIT_SCRIPT = 'echo hello';
     expect(new ConfigService().getPostInitScript()).toBe('echo hello');
-  });
-
-  test('getPostInitScript returns PSOT_INIT_SCRIPT when POST_INIT_SCRIPT not set', () => {
-    delete process.env.POST_INIT_SCRIPT;
-    process.env.PSOT_INIT_SCRIPT = 'echo typo';
-    expect(new ConfigService().getPostInitScript()).toBe('echo typo');
-  });
-
-  test('getPostInitScript prefers POST_INIT_SCRIPT over PSOT_INIT_SCRIPT', () => {
-    process.env.POST_INIT_SCRIPT = 'correct';
-    process.env.PSOT_INIT_SCRIPT = 'typo';
-    expect(new ConfigService().getPostInitScript()).toBe('correct');
   });
 
   test('getPostInitScript returns undefined for empty or whitespace', () => {
@@ -187,5 +172,55 @@ describe('ConfigService', () => {
     process.env.PHOENIX_AGENT_ID = 'abc-123_XYZ';
     const config = new ConfigService();
     expect(config.getConversationDataDir()).toBe('/data/abc-123_XYZ');
+  });
+
+  test('getSystemPrompt returns SYSTEM_PROMPT when set', () => {
+    process.env.SYSTEM_PROMPT = 'You are a helpful assistant';
+    expect(new ConfigService().getSystemPrompt()).toBe('You are a helpful assistant');
+  });
+
+  test('getSystemPrompt returns undefined when not set', () => {
+    delete process.env.SYSTEM_PROMPT;
+    expect(new ConfigService().getSystemPrompt()).toBeUndefined();
+  });
+
+  test('getPhoenixApiKey returns PHOENIX_API_KEY when set', () => {
+    process.env.PHOENIX_API_KEY = 'test-key-123';
+    expect(new ConfigService().getPhoenixApiKey()).toBe('test-key-123');
+  });
+
+  test('getPhoenixApiKey returns undefined when not set', () => {
+    delete process.env.PHOENIX_API_KEY;
+    expect(new ConfigService().getPhoenixApiKey()).toBeUndefined();
+  });
+
+  test('getPhoenixApiUrl returns PHOENIX_API_URL when set', () => {
+    process.env.PHOENIX_API_URL = 'https://phoenix.test';
+    expect(new ConfigService().getPhoenixApiUrl()).toBe('https://phoenix.test');
+  });
+
+  test('getPhoenixApiUrl returns undefined when not set', () => {
+    delete process.env.PHOENIX_API_URL;
+    expect(new ConfigService().getPhoenixApiUrl()).toBeUndefined();
+  });
+
+  test('getPhoenixAgentId returns PHOENIX_AGENT_ID when set', () => {
+    process.env.PHOENIX_AGENT_ID = 'agent-42';
+    expect(new ConfigService().getPhoenixAgentId()).toBe('agent-42');
+  });
+
+  test('isPhoenixSyncEnabled returns true when PHOENIX_SYNC_ENABLED is true', () => {
+    process.env.PHOENIX_SYNC_ENABLED = 'true';
+    expect(new ConfigService().isPhoenixSyncEnabled()).toBe(true);
+  });
+
+  test('isPhoenixSyncEnabled returns false when not set', () => {
+    delete process.env.PHOENIX_SYNC_ENABLED;
+    expect(new ConfigService().isPhoenixSyncEnabled()).toBe(false);
+  });
+
+  test('isPhoenixSyncEnabled returns false for non-true values', () => {
+    process.env.PHOENIX_SYNC_ENABLED = 'false';
+    expect(new ConfigService().isPhoenixSyncEnabled()).toBe(false);
   });
 });

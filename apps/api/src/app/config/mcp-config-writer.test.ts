@@ -290,6 +290,23 @@ describe('writeMcpConfig', () => {
       expect(contentAfterSecond).not.toMatch(/^\s*\]\s*$/m);
       expect(contentAfterSecond).toContain('[mcp_servers."github"]');
     });
+
+    it('writes stdio server with env vars in toml', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          github: {
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-github'],
+            env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_token123' },
+          },
+        },
+      });
+      writeMcpConfig();
+      const content = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
+      expect(content).toContain('[mcp_servers."github"]');
+      expect(content).toContain('type = "stdio"');
+      expect(content).toContain('env = { GITHUB_PERSONAL_ACCESS_TOKEN = "ghp_token123" }');
+    });
   });
 
   describe('legacy format support', () => {
