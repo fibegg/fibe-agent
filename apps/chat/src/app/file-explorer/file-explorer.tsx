@@ -171,7 +171,7 @@ export function FileExplorer({
       let changed = false;
       const nextExpanded = new Set(currentExpanded);
       for (const [p, type] of diff.entries()) {
-        if (type === 'added' || type === 'renamed' || type === 'modified') {
+        if (type === 'added' || type === 'modified') {
           const parts = p.split('/');
           let currentPath = '';
           for (let i = 0; i < parts.length - 1; i++) {
