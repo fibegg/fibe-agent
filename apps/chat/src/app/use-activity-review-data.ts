@@ -4,6 +4,7 @@ import { apiRequest } from './api-url';
 import { API_PATHS } from '@shared/api-paths';
 import { filterVisibleStoryItems, getActivityLabel, type StoryEntry } from './agent-thinking-utils';
 import { getCopyableActivityText } from './activity-review-utils';
+import { usePersistedTypeFilter } from './use-persisted-type-filter';
 
 const ACTIVITY_POLL_INTERVAL_MS = 4000;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -60,7 +61,7 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
   const [copyAnimating, setCopyAnimating] = useState(false);
   const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
@@ -72,8 +73,15 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
 
   const filteredStories = useMemo(() => {
     let list = activityStories;
-    if (typeFilter === 'reasoning') list = list.filter((s) => s.type === 'reasoning_start' || s.type === 'reasoning_end');
-    else if (typeFilter) list = list.filter((s) => s.type === typeFilter);
+    if (typeFilter.length > 0) {
+      const filterSet = new Set(typeFilter);
+      // Expand 'reasoning' shorthand to include both start/end entries
+      const hasReasoning = filterSet.has('reasoning');
+      list = list.filter((s) => {
+        if (hasReasoning && (s.type === 'reasoning_start' || s.type === 'reasoning_end')) return true;
+        return filterSet.has(s.type);
+      });
+    }
     const q = activitySearchQuery.trim().toLowerCase();
     if (!q) return list;
     return list.filter((s) => {

@@ -13,6 +13,8 @@ import {
   MODAL_OVERLAY_DARK,
   SETTINGS_CLOSE_BUTTON,
 } from '../ui-classes';
+import { ActivityTypeFilters } from '../activity-review-panel';
+import { usePersistedTypeFilter } from '../use-persisted-type-filter';
 
 interface InitStatusResponse {
   state: 'disabled' | 'pending' | 'running' | 'done' | 'failed';
@@ -40,6 +42,7 @@ export function ChatSettingsModal({
   onLogout,
 }: ChatSettingsModalProps) {
   const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
+  const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
 
   useEffect(() => {
     if (!open) return;
@@ -99,6 +102,13 @@ export function ChatSettingsModal({
               <ThemeToggle />
             </div>
           )}
+          <div className="space-y-2">
+            <span className="text-sm font-medium text-foreground">Activity Filter</span>
+            <ActivityTypeFilters
+              typeFilter={typeFilter}
+              onTypeFilterChange={setTypeFilter}
+            />
+          </div>
           {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
             <button
               type="button"

@@ -3,6 +3,8 @@ import { Brain, CheckCircle2, ChevronDown, ChevronRight, Loader2, Search, Sparkl
 import { createPortal } from 'react-dom';
 import { memo, useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
+import { usePersistedTypeFilter } from './use-persisted-type-filter';
+import { CountUpNumber } from './count-up-number';
 import {
   PANEL_HEADER_MIN_HEIGHT_PX,
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
@@ -466,6 +468,7 @@ export function AgentThinkingSidebar({
     variant: string;
   } | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
+  const [persistedTypeFilter] = usePersistedTypeFilter();
   const setActivityScrollRef = useCallback((el: HTMLDivElement | null) => {
     (activityScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     setScrollContainerReady((prev) => (el ? true : prev));
@@ -563,10 +566,18 @@ export function AgentThinkingSidebar({
   }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs, transitionToIdleTrigger]);
 
   const filteredStoryItems = useMemo(() => {
-    const forDisplay =
+    let forDisplay =
       isStreaming
         ? fullStoryItems
         : fullStoryItems.filter((e) => !HIDDEN_WHEN_IDLE_TYPES.has(e.type));
+    if (persistedTypeFilter.length > 0) {
+      const filterSet = new Set(persistedTypeFilter);
+      const hasReasoning = filterSet.has('reasoning');
+      forDisplay = forDisplay.filter((s) => {
+        if (hasReasoning && (s.type === 'reasoning_start' || s.type === 'reasoning_end')) return true;
+        return filterSet.has(s.type);
+      });
+    }
     if (!activitySearchQuery.trim()) return forDisplay;
     const q = activitySearchQuery.trim().toLowerCase();
     return forDisplay.filter((entry) => {
@@ -583,7 +594,7 @@ export function AgentThinkingSidebar({
         label.includes(q)
       );
     });
-  }, [fullStoryItems, isStreaming, activitySearchQuery]);
+  }, [fullStoryItems, isStreaming, activitySearchQuery, persistedTypeFilter]);
 
   const { lastStreamStartId, currentRunIds } = useMemo(() => {
     let lastStreamStartIndex = -1;
@@ -808,7 +819,7 @@ export function AgentThinkingSidebar({
                     className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
                     title={STAT_TOOLTIPS.total}
                   >
-                    <span className="text-foreground stat-tick">{sessionStats.totalActions}</span>
+                    <span className="text-foreground stat-tick"><CountUpNumber value={sessionStats.totalActions} format="raw" /></span>
                     <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
                       {STAT_TOOLTIPS.total}
                     </span>
@@ -819,7 +830,7 @@ export function AgentThinkingSidebar({
                     className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
                     title={STAT_TOOLTIPS.completed}
                   >
-                    <span className="text-emerald-400 stat-tick">{sessionStats.completed}</span>
+                    <span className="text-emerald-400 stat-tick"><CountUpNumber value={sessionStats.completed} format="raw" /></span>
                     <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
                       {STAT_TOOLTIPS.completed}
                     </span>
@@ -830,7 +841,7 @@ export function AgentThinkingSidebar({
                     className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
                     title={STAT_TOOLTIPS.processing}
                   >
-                    <span className="text-cyan-400 stat-tick">{sessionStats.processing}</span>
+                    <span className="text-cyan-400 stat-tick"><CountUpNumber value={sessionStats.processing} format="raw" /></span>
                     <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
                       {STAT_TOOLTIPS.processing}
                     </span>
@@ -842,7 +853,7 @@ export function AgentThinkingSidebar({
                         className="text-violet-300/90"
                         title="Token usage (input / output)"
                       >
-                        {formatCompactInteger(sessionTokenUsage.inputTokens)} in / {formatCompactInteger(sessionTokenUsage.outputTokens)} out
+                        <CountUpNumber value={sessionTokenUsage.inputTokens} format="compact" /> in / <CountUpNumber value={sessionTokenUsage.outputTokens} format="compact" /> out
                       </span>
                     </>
                   )}

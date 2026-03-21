@@ -2,13 +2,16 @@ import { X } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { shouldHideThemeSwitch } from './embed-config';
 import { MODAL_CARD, MODAL_OVERLAY_DARK, SETTINGS_CLOSE_BUTTON } from './ui-classes';
+import { ActivityTypeFilters } from './activity-review-panel';
 
 export interface ActivitySettingsModalProps {
   open: boolean;
   onClose: () => void;
+  typeFilter?: string[];
+  onTypeFilterChange?: (filter: string[]) => void;
 }
 
-export function ActivitySettingsModal({ open, onClose }: ActivitySettingsModalProps) {
+export function ActivitySettingsModal({ open, onClose, typeFilter, onTypeFilterChange }: ActivitySettingsModalProps) {
   if (!open) return null;
 
   return (
@@ -35,6 +38,15 @@ export function ActivitySettingsModal({ open, onClose }: ActivitySettingsModalPr
           </button>
         </div>
         <div className="p-4 space-y-3">
+          {onTypeFilterChange && (
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-foreground">Activity Filter</span>
+              <ActivityTypeFilters
+                typeFilter={typeFilter ?? []}
+                onTypeFilterChange={onTypeFilterChange}
+              />
+            </div>
+          )}
           {!shouldHideThemeSwitch() && (
             <div className="flex items-center justify-between py-2">
               <span className="text-sm font-medium text-foreground">Dark mode</span>

@@ -1,12 +1,10 @@
 import { ArrowLeft, Loader2, Search, Settings, X } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
-import { getTypeFilterLabel } from '../activity-review-utils';
 import {
-  ActivityTypeFilters,
   ActivityStoryList,
   ActivityStoryDetailPanel,
 } from '../activity-review-panel';
-import { ActivitySettingsModal } from '../activity-settings-modal';
+import { ChatSettingsModal } from '../chat/chat-settings-modal';
 import { useActivityReviewData, type ActivityReviewData } from '../use-activity-review-data';
 import { RIGHT_SIDEBAR_WIDTH_PX, PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 import {
@@ -19,6 +17,7 @@ import {
 } from '../ui-classes';
 import { ThemeToggle } from '../theme-toggle';
 import { shouldHideThemeSwitch } from '../embed-config';
+import { CHAT_STATES } from '../chat/chat-state';
 
 export type { ActivityReviewData };
 
@@ -139,7 +138,6 @@ export function ActivityReviewPage() {
               ) : null}
             </div>
           </div>
-          <ActivityTypeFilters typeFilter={typeFilter} onTypeFilterChange={setTypeFilter} />
           <ActivityStoryList
             stories={filteredStories}
             selectedIndex={selectedIndexSafe}
@@ -149,7 +147,9 @@ export function ActivityReviewPage() {
                 ? 'No stories yet.'
                 : activitySearchQuery.trim()
                   ? 'No stories match your search.'
-                  : `No ${getTypeFilterLabel(typeFilter)} stories.`
+                  : typeFilter.length > 0
+                    ? 'No matching stories for the selected filters.'
+                    : 'No stories.'
             }
           />
         </aside>
@@ -163,7 +163,14 @@ export function ActivityReviewPage() {
           onCopyClick={() => void runCopyActivityWithAnimation()}
         />
       </div>
-      <ActivitySettingsModal open={settingsOpen} onClose={closeSettings} />
+      <ChatSettingsModal
+        open={settingsOpen}
+        onClose={closeSettings}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={() => {}}
+        onReauthenticate={() => {}}
+        onLogout={() => {}}
+      />
     </div>
   );
 }
