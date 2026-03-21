@@ -81,3 +81,45 @@ export function diffTrees(
   }
   return result;
 }
+
+export function mergeAnimatingRemoved(
+  prev: PlaygroundEntry[],
+  next: PlaygroundEntry[],
+  animating: Map<string, FileAnimationType>
+): PlaygroundEntry[] {
+  let hasRemoved = false;
+  for (const type of animating.values()) {
+    if (type === 'removed') {
+      hasRemoved = true;
+      break;
+    }
+  }
+  if (!hasRemoved) return next;
+
+  const nextKeys = new Set(collectEntryMap(next).keys());
+
+  function mergeLevel(pList: PlaygroundEntry[], nList: PlaygroundEntry[]): PlaygroundEntry[] {
+    const out = [...nList];
+    for (const p of pList) {
+      if (!nextKeys.has(p.path)) {
+        out.push(p);
+      } else if (p.type === 'directory' && p.children) {
+        const nIdx = out.findIndex((n) => n.path === p.path);
+        if (nIdx !== -1) {
+          const nMatch = out[nIdx];
+          if (nMatch.type === 'directory') {
+            out[nIdx] = { ...nMatch, children: mergeLevel(p.children, nMatch.children || []) };
+          }
+        }
+      }
+    }
+    out.sort((a, b) => {
+      if (a.type === 'directory' && b.type !== 'directory') return -1;
+      if (a.type !== 'directory' && b.type === 'directory') return 1;
+      return a.name.localeCompare(b.name);
+    });
+    return out;
+  }
+
+  return mergeLevel(prev, next);
+}
