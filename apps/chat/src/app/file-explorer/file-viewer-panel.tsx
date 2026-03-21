@@ -1,4 +1,4 @@
-import { Copy, Download, FileText, Search, X } from 'lucide-react';
+import { Copy, Download, FileText, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
@@ -6,19 +6,13 @@ import {
   BUTTON_GHOST_ACCENT,
   BUTTON_ICON_MUTED,
   CARD_HEADER,
-  CLEAR_BUTTON_POSITION,
   HEADER_FIRST_ROW,
-  INPUT_SEARCH,
   LOGO_ICON_BOX,
   MODAL_OVERLAY,
-  SEARCH_ICON_POSITION,
-  SEARCH_ROW_WRAPPER,
 } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 import { LANGUAGE_LABEL, getPrismLanguage } from './file-explorer-prism';
 import type { PlaygroundEntry } from './file-explorer-types';
-
-type PrismLoader = { highlightCodeElement: (el: HTMLElement) => void };
 
 export function FileViewerPanel({
   entry,
@@ -32,8 +26,6 @@ export function FileViewerPanel({
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const [searchInFile, setSearchInFile] = useState('');
-  const [prismLoader, setPrismLoader] = useState<PrismLoader | null>(null);
   const codeRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -45,38 +37,32 @@ export function FileViewerPanel({
   }, [onClose]);
 
   useEffect(() => {
-    let cancelled = false;
+    const ac = new AbortController();
     setLoading(true);
     setFetchError(null);
     setContent(null);
+
     const path = `${API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
-    void (async () => {
-      try {
-        const res = await apiRequest(path);
-        if (cancelled) return;
+    
+    apiRequest(path, { signal: ac.signal })
+      .then(async (res) => {
         if (!res.ok) {
-          if (res.status === 404) {
-            setFetchError('File not found');
-            setContent(null);
-            return;
-          }
+          if (res.status === 404) throw new Error('File not found');
           throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to load file');
         }
         const data = (await res.json()) as { content?: string };
-        const text = typeof data.content === 'string' ? data.content : '';
-        if (!cancelled) {
-          setContent(text);
-          setFetchError(null);
+        setContent(typeof data.content === 'string' ? data.content : '');
+      })
+      .catch((e) => {
+        if (e.name !== 'AbortError') {
+          setFetchError(e instanceof Error ? e.message : 'Failed to load file');
         }
-      } catch (e) {
-        if (!cancelled) setFetchError(e instanceof Error ? e.message : 'Failed to load file');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
+      })
+      .finally(() => {
+        if (!ac.signal.aborted) setLoading(false);
+      });
+
+    return () => ac.abort();
   }, [entry.path]);
 
   const language = getPrismLanguage(entry.name);
@@ -85,22 +71,25 @@ export function FileViewerPanel({
   const lineCount = content !== null ? content.split('\n').length : null;
 
   useEffect(() => {
-    if (!content || loading || language === 'plain') return;
-    import('./prism-loader').then((m) => setPrismLoader(m));
-  }, [content, loading, language]);
+    if (!content || loading || fetchError || !codeRef.current || language === 'plain') return;
+    
+    let cancelled = false;
+    import('./prism-loader').then((m) => {
+      if (cancelled || !codeRef.current) return;
+      try {
+        m.highlightCodeElement(codeRef.current);
+      } catch {
+        // Leave existing text content if highlighting fails
+      }
+    });
 
-  useEffect(() => {
-    if (!content || loading || fetchError || !codeRef.current || language === 'plain' || !prismLoader) return;
-    try {
-      prismLoader.highlightCodeElement(codeRef.current);
-    } catch {
-      // Leave existing text content if highlighting fails
-    }
-  }, [content, loading, fetchError, language, prismLoader]);
+    return () => {
+      cancelled = true;
+    };
+  }, [content, loading, fetchError, language]);
 
   const handleCopy = useCallback(() => {
-    if (content === null) return;
-    void navigator.clipboard.writeText(content);
+    if (content !== null) void navigator.clipboard.writeText(content);
   }, [content]);
 
   const handleDownload = useCallback(() => {
@@ -164,30 +153,10 @@ export function FileViewerPanel({
             </button>
           </div>
         </div>
-        <div className={SEARCH_ROW_WRAPPER}>
-          <Search className={SEARCH_ICON_POSITION} />
-          <input
-            type="text"
-            value={searchInFile}
-            onChange={(e) => setSearchInFile(e.target.value)}
-            placeholder="Search in file..."
-            className={INPUT_SEARCH}
-          />
-          {searchInFile && (
-            <button
-              type="button"
-              onClick={() => setSearchInFile('')}
-              className={CLEAR_BUTTON_POSITION}
-              aria-label="Clear search"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="flex-1 overflow-auto min-h-0 bg-[#2d2d2d] dark:bg-[#1e1e1e]">
+        <div className="flex-1 overflow-auto min-h-0 bg-background text-foreground dark:bg-[#1e1e1e] dark:text-[#cccccc]">
           {loading && (
             <div className="p-4 flex items-center justify-center text-sm text-muted-foreground">
               Loading…
