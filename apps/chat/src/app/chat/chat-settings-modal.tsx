@@ -19,6 +19,7 @@ interface InitStatusResponse {
   output?: string;
   error?: string;
   finishedAt?: string;
+  systemPrompt?: string;
 }
 
 export interface ChatSettingsModalProps {
@@ -138,6 +139,21 @@ export function ChatSettingsModal({
                   {initStatus.error}
                   {initStatus.error && initStatus.output?.trim() ? '\n\n' : ''}
                   {initStatus.output?.trim()}
+                </pre>
+              )}
+            </div>
+          )}
+          {initStatus && (
+            <div className="rounded-md border border-border/50 bg-muted/30 px-3 py-2">
+              <div className="flex items-center gap-2 text-sm flex-wrap">
+                <span className="font-medium text-foreground">SYSTEM_PROMPT</span>
+                {!initStatus.systemPrompt && (
+                  <span className="text-muted-foreground">Not configured</span>
+                )}
+              </div>
+              {initStatus.systemPrompt && (
+                <pre className="mt-2 max-h-24 overflow-auto break-words rounded bg-background/50 p-2 text-xs text-muted-foreground whitespace-pre-wrap">
+                  {initStatus.systemPrompt}
                 </pre>
               )}
             </div>
