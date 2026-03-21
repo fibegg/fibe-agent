@@ -24,6 +24,7 @@ import {
   filterTreeByQuery,
   findEntryByPath,
   getDirPathsAtDepth,
+  mergeAnimatingRemoved,
   type FileAnimationType,
 } from './file-explorer-tree-utils';
 import { FileDetailsDialog } from './file-viewer-panel';
@@ -76,6 +77,7 @@ export function FileExplorer({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
   const [animatingPaths, setAnimatingPaths] = useState<Map<string, FileAnimationType>>(new Map());
+  const [animatingPrev, setAnimatingPrev] = useState<PlaygroundEntry[] | null>(null);
   const prevTreeRef = useRef<PlaygroundEntry[]>([]);
 
   const controlled = isControlledTree(treeProp);
@@ -163,7 +165,11 @@ export function FileExplorer({
     const diff = diffTrees(prev, tree);
     if (diff.size === 0) return;
     setAnimatingPaths(diff);
-    const timer = setTimeout(() => setAnimatingPaths(new Map()), 600);
+    setAnimatingPrev(prev);
+    const timer = setTimeout(() => {
+      setAnimatingPaths(new Map());
+      setAnimatingPrev(null);
+    }, 600);
     return () => clearTimeout(timer);
   }, [tree]);
 
@@ -188,7 +194,14 @@ export function FileExplorer({
     [onFileSelect]
   );
 
-  const filteredTree = useMemo(() => filterTreeByQuery(tree, searchQuery), [tree, searchQuery]);
+  const displayTree = useMemo(() => {
+    if (animatingPaths.size > 0 && animatingPrev) {
+      return mergeAnimatingRemoved(animatingPrev, tree, animatingPaths);
+    }
+    return tree;
+  }, [tree, animatingPaths, animatingPrev]);
+
+  const filteredTree = useMemo(() => filterTreeByQuery(displayTree, searchQuery), [displayTree, searchQuery]);
   const openFileEntry =
     !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
 
