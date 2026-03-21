@@ -2,6 +2,7 @@ import { ChevronDown, ChevronRight, Folder, FolderOpen } from 'lucide-react';
 import { memo, useCallback } from 'react';
 import { FileIcon } from '../file-icon';
 import type { PlaygroundEntry } from './file-explorer-types';
+import type { FileAnimationType } from './file-explorer-tree-utils';
 import { TREE_NODE_BASE, TREE_NODE_SELECTED } from '../ui-classes';
 
 export const TreeNode = memo(function TreeNode({
@@ -11,6 +12,7 @@ export const TreeNode = memo(function TreeNode({
   onToggle,
   onFileClick,
   selectedPath,
+  animatingPaths,
 }: {
   entry: PlaygroundEntry;
   depth: number;
@@ -18,6 +20,7 @@ export const TreeNode = memo(function TreeNode({
   onToggle: (path: string) => void;
   onFileClick?: (entry: PlaygroundEntry) => void;
   selectedPath?: string | null;
+  animatingPaths?: Map<string, FileAnimationType>;
 }) {
   const isDir = entry.type === 'directory';
   const isOpen = expanded.has(entry.path);
@@ -32,8 +35,11 @@ export const TreeNode = memo(function TreeNode({
     }
   }, [isDir, entry, onToggle, onFileClick]);
 
+  const animType = animatingPaths?.get(entry.path);
+  const animClass = animType === 'added' ? 'animate-file-added' : animType === 'removed' ? 'animate-file-removed' : animType === 'modified' ? 'animate-file-modified' : '';
+
   return (
-    <div className="select-none group">
+    <div className={`select-none group ${animClass}`}>
       <button
         type="button"
         onClick={handleClick}
@@ -73,6 +79,7 @@ export const TreeNode = memo(function TreeNode({
               onToggle={onToggle}
               onFileClick={onFileClick}
               selectedPath={selectedPath}
+              animatingPaths={animatingPaths}
             />
           ))}
         </div>

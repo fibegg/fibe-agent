@@ -45,3 +45,39 @@ export function filterTreeByQuery(entries: PlaygroundEntry[], query: string): Pl
   }
   return entries.map(build).filter((e): e is PlaygroundEntry => e != null);
 }
+
+export type FileAnimationType = 'added' | 'removed' | 'modified';
+
+function collectEntryMap(entries: PlaygroundEntry[]): Map<string, number | undefined> {
+  const out = new Map<string, number | undefined>();
+  for (const e of entries) {
+    out.set(e.path, e.mtime);
+    if (e.type === 'directory' && e.children?.length) {
+      for (const [p, m] of collectEntryMap(e.children)) out.set(p, m);
+    }
+  }
+  return out;
+}
+
+export function diffTrees(
+  prev: PlaygroundEntry[],
+  next: PlaygroundEntry[]
+): Map<string, FileAnimationType> {
+  const result = new Map<string, FileAnimationType>();
+  const prevMap = collectEntryMap(prev);
+  const nextMap = collectEntryMap(next);
+  for (const [p, mtime] of nextMap) {
+    if (!prevMap.has(p)) {
+      result.set(p, 'added');
+    } else {
+      const prevMtime = prevMap.get(p);
+      if (mtime != null && prevMtime != null && mtime !== prevMtime) {
+        result.set(p, 'modified');
+      }
+    }
+  }
+  for (const p of prevMap.keys()) {
+    if (!nextMap.has(p)) result.set(p, 'removed');
+  }
+  return result;
+}

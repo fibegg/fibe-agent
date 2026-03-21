@@ -20,11 +20,14 @@ import {
 import { TreeNode } from './file-explorer-tree-node';
 import type { PlaygroundEntry } from './file-explorer-types';
 import {
+  diffTrees,
   filterTreeByQuery,
   findEntryByPath,
   getDirPathsAtDepth,
+  type FileAnimationType,
 } from './file-explorer-tree-utils';
 import { FileDetailsDialog } from './file-viewer-panel';
+import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-tabs';
 
 export type { PlaygroundEntry } from './file-explorer-types';
 
@@ -44,6 +47,12 @@ export function FileExplorer({
   selectedPath: selectedPathProp,
   refreshTrigger,
   tree: treeProp,
+  agentTree: agentTreeProp,
+  activeTab,
+  onTabChange,
+  agentFileApiPath,
+  playgroundStats,
+  agentStats,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -53,6 +62,12 @@ export function FileExplorer({
   selectedPath?: string | null;
   refreshTrigger?: number;
   tree?: PlaygroundEntry[] | null;
+  agentTree?: PlaygroundEntry[] | null;
+  activeTab?: FileTab;
+  onTabChange?: (tab: FileTab) => void;
+  agentFileApiPath?: string;
+  playgroundStats?: TabStats;
+  agentStats?: TabStats;
 } = {}) {
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,10 +75,24 @@ export function FileExplorer({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
+  const [animatingPaths, setAnimatingPaths] = useState<Map<string, FileAnimationType>>(new Map());
+  const prevTreeRef = useRef<PlaygroundEntry[]>([]);
 
   const controlled = isControlledTree(treeProp);
-  const tree = controlled ? treeProp : internalTree;
+  const controlledAgent = isControlledTree(agentTreeProp);
+  const playgroundTree = controlled ? treeProp : internalTree;
+  const agentTree = controlledAgent ? agentTreeProp : [];
   const loadingState = controlled ? false : loading;
+
+  const showTabs = playgroundTree.length > 0 && agentTree.length > 0;
+  const effectiveTab: FileTab =
+    showTabs && activeTab ? activeTab
+    : agentTree.length > 0 && playgroundTree.length === 0 ? 'agent'
+    : 'playground';
+  const tree = effectiveTab === 'agent' ? agentTree : playgroundTree;
+  const effectiveFileApiPath = effectiveTab === 'agent' && agentFileApiPath
+    ? agentFileApiPath
+    : undefined;
 
   const selectedFile = selectedPathProp !== undefined
     ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
@@ -129,6 +158,17 @@ export function FileExplorer({
     hasSetInitialExpand.current = true;
     setExpanded(new Set(getDirPathsAtDepth(treeProp, 0)));
   }, [controlled, treeProp]);
+
+  useEffect(() => {
+    const prev = prevTreeRef.current;
+    prevTreeRef.current = tree;
+    if (prev.length === 0 || tree.length === 0) return;
+    const diff = diffTrees(prev, tree);
+    if (diff.size === 0) return;
+    setAnimatingPaths(diff);
+    const timer = setTimeout(() => setAnimatingPaths(new Map()), 600);
+    return () => clearTimeout(timer);
+  }, [tree]);
 
   const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -230,6 +270,14 @@ export function FileExplorer({
         </div>
       </div>
       <div className="flex-1 overflow-auto py-2">
+        {showTabs && onTabChange && (
+          <FileExplorerTabs
+            activeTab={effectiveTab}
+            onTabChange={onTabChange}
+            playgroundStats={playgroundStats}
+            agentStats={agentStats}
+          />
+        )}
         {loadingState && tree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             Loading…
@@ -259,6 +307,7 @@ export function FileExplorer({
                 onToggle={handleToggle}
                 onFileClick={handleFileClick}
                 selectedPath={selectedPathProp ?? openFileEntry?.path ?? null}
+                animatingPaths={animatingPaths}
               />
             ))}
           </div>
@@ -271,7 +320,7 @@ export function FileExplorer({
 
   return (
     <>
-      {onToggleCollapse && collapsed !== undefined && tree.length > 0 ? (
+      {onToggleCollapse && collapsed !== undefined && (playgroundTree.length > 0 || agentTree.length > 0) ? (
         <div className="relative h-full flex flex-col min-h-0 flex-1">
           {content}
           <SidebarToggle

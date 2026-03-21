@@ -18,10 +18,12 @@ export function FileViewerPanel({
   entry,
   onClose,
   inline = false,
+  apiBasePath,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
   inline?: boolean;
+  apiBasePath?: string;
 }) {
   const [content, setContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,7 @@ export function FileViewerPanel({
     setFetchError(null);
     setContent(null);
 
-    const path = `${API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
+    const path = `${apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
     
     apiRequest(path, { signal: ac.signal })
       .then(async (res) => {
