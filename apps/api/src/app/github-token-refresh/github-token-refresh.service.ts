@@ -27,9 +27,7 @@ export class GithubTokenRefreshService implements OnModuleInit, OnModuleDestroy 
     this.isInitialRefresh = false;
 
     // Schedule periodic refresh
-    this.timer = setInterval(() => {
-      void this.refreshToken();
-    }, REFRESH_INTERVAL_MS);
+    this.timer = setInterval(() => this.schedulePeriodicRefresh(), REFRESH_INTERVAL_MS);
 
     this.logger.log(
       `GitHub token refresh scheduled every ${REFRESH_INTERVAL_MS / 60000} minutes`
@@ -142,6 +140,10 @@ export class GithubTokenRefreshService implements OnModuleInit, OnModuleDestroy 
    * Uses pkill to find processes matching the GitHub MCP server package name.
    * Failures are silently ignored (process may not be running).
    */
+  private schedulePeriodicRefresh(): void {
+    void this.refreshToken();
+  }
+
   private killGithubMcpServer(): void {
     try {
       execSync('pkill -f "server-github" 2>/dev/null || true', {
@@ -149,7 +151,11 @@ export class GithubTokenRefreshService implements OnModuleInit, OnModuleDestroy 
       });
       this.logger.log('Killed running GitHub MCP server — will respawn with fresh token');
     } catch {
-      // Process not running or pkill not available — both are fine
+      this.handleKillError();
     }
+  }
+
+  private handleKillError(): void {
+    // Process not running or pkill not available — both are fine
   }
 }

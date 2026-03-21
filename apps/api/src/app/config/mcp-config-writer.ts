@@ -206,9 +206,7 @@ function parseServersFromJson(raw: string): Record<string, McpServerEntry> | nul
       return parsed.mcpServers;
     }
     // Legacy flat format: { serverUrl, authHeader }
-    if (parsed?.serverUrl) {
-      return { 'playgrounds-dev': parsed as McpServerEntry };
-    }
+    if (parsed?.serverUrl) return { 'playgrounds-dev': parsed as McpServerEntry };
     return null;
   } catch {
     return null;

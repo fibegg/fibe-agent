@@ -5,8 +5,7 @@ import { containerLog } from './container-logger';
 
 const POST_INIT_CONTEXT = 'PostInit';
 const STATE_FILENAME = 'post-init-state.json';
-const RUN_TIMEOUT_MS = 600_000;
-const RUN_TIMEOUT_S = RUN_TIMEOUT_MS / 1000;
+export let RUN_TIMEOUT_MS = 600_000;
 
 export interface PostInitStateFile {
   state: 'running' | 'done' | 'failed';
@@ -66,14 +65,14 @@ export function runPostInitOnce(
     const timeout = setTimeout(() => {
       proc.kill('SIGTERM');
       containerLog.warn(
-        `Post-init script timed out after ${RUN_TIMEOUT_S}s`,
+        `Post-init script timed out after ${RUN_TIMEOUT_MS / 1000}s`,
         POST_INIT_CONTEXT
       );
       const output = [stdout, stderr].filter(Boolean).join('\n') || undefined;
       writePostInitState(dataDir, {
         state: 'failed',
         output,
-        error: `Script timed out after ${RUN_TIMEOUT_S} seconds`,
+        error: `Script timed out after ${RUN_TIMEOUT_MS / 1000} seconds`,
         finishedAt: new Date().toISOString(),
       });
       resolve();

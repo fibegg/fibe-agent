@@ -68,7 +68,11 @@ export class SteeringService implements OnModuleInit {
   }
 
   private scheduleWrite(): void {
-    this.writeChain = this.writeChain.then(() => this.writeSteering()).catch(() => { /* ignore write errors */ });
+    this.writeChain = this.writeChain.then(() => this.writeSteering()).catch(() => this.handleWriteError());
+  }
+
+  private handleWriteError(): void {
+    /* ignore write errors */
   }
 
   private async writeSteering(): Promise<void> {

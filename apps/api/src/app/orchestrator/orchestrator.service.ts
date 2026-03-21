@@ -263,10 +263,12 @@ export class OrchestratorService implements OnModuleInit {
     this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
     const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(text, images, undefined, undefined, attachmentFilenames);
-    void this.runAgentResponse(_text, urls, af, att).catch((err) =>
-      this.logger.warn('REST send-message agent run failed', err)
-    );
+    void this.runAgentResponse(_text, urls, af, att).catch((err) => this.handleApiRunFailure(err));
     return { accepted: true, messageId };
+  }
+
+  private handleApiRunFailure(err: unknown): void {
+    this.logger.warn('REST send-message agent run failed', err);
   }
 
   private async addUserMessageAndEmit(

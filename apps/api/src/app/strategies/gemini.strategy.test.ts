@@ -179,3 +179,4 @@ describe('GeminiStrategy API token mode', () => {
     expect(logoutSuccessCalled).toBe(true);
   });
 });
+

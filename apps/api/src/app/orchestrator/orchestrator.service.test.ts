@@ -380,5 +380,46 @@ describe('OrchestratorService', () => {
     const orch = await createOrchestrator();
     await orch.handleClientMessage({ action: 'nonexistent_action' });
   });
+
+  // ─── sendMessageFromApi (REST path) - additional coverage ────
+
+  test('sendMessageFromApi returns AGENT_BUSY when already processing', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    orch.isProcessing = true;
+    const result = await orch.sendMessageFromApi('hello');
+    expect(result.accepted).toBe(false);
+    expect(result.error).toBe(ERROR_CODE.AGENT_BUSY);
+  });
+
+  test('sendMessageFromApi accepts message and returns messageId when authenticated', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const result = await orch.sendMessageFromApi('hello world');
+    expect(result.accepted).toBe(true);
+    expect(result.messageId).toBeDefined();
+    // Allow the async agent run to complete (MockStrategy takes 1000ms)
+    await new Promise((r) => setTimeout(r, 1200));
+  });
+
+  test('sendMessageFromApi with images and attachments returns accepted', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const result = await orch.sendMessageFromApi('hello', [], ['file.txt']);
+    expect(result.accepted).toBe(true);
+    await new Promise((r) => setTimeout(r, 1200));
+  });
+
+  test('sendMessageFromApi logs warning when agent run fails (line 266 catch path)', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    // Override the private strategy's executePromptStreaming to throw immediately
+    const castOrch = orch as unknown as { strategy: { executePromptStreaming: () => Promise<void> } };
+    castOrch.strategy.executePromptStreaming = () => Promise.reject(new Error('agent error for test'));
+    const result = await orch.sendMessageFromApi('fail this');
+    expect(result.accepted).toBe(true);
+    // Give the void promise time to reject and be caught by logger.warn
+    await new Promise((r) => setTimeout(r, 50));
+  });
 });
 

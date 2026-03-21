@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { OpencodeStrategy } from './opencode.strategy';
@@ -257,3 +257,4 @@ describe('OpencodeStrategy', () => {
     strategy.clearCredentials();
   });
 });
+

@@ -7,6 +7,7 @@ import {
   writePostInitState,
   runPostInitOnce,
 } from './post-init-runner';
+import * as postInitRunner from './post-init-runner';
 
 describe('post-init-runner', () => {
   let tmpDir: string;
@@ -108,4 +109,19 @@ describe('post-init-runner', () => {
     expect(state?.state).toBe('done');
     expect(state?.output).toContain('re-run');
   });
+
+  test('runPostInitOnce timeout kills process and writes failed state', async () => {
+    // Override the exported RUN_TIMEOUT_MS to 1ms so the timeout fires immediately
+    const originalDescriptor = Object.getOwnPropertyDescriptor(postInitRunner, 'RUN_TIMEOUT_MS');
+    Object.defineProperty(postInitRunner, 'RUN_TIMEOUT_MS', { value: 1, writable: true, configurable: true });
+    try {
+      // sleep 5 would take 5s but our 1ms timeout kills it first
+      await runPostInitOnce(tmpDir, 'sleep 5', tmpDir);
+      const state = readPostInitState(tmpDir);
+      expect(state?.state).toBe('failed');
+      expect(state?.error).toContain('timed out');
+    } finally {
+      if (originalDescriptor) Object.defineProperty(postInitRunner, 'RUN_TIMEOUT_MS', originalDescriptor);
+    }
+  }, 10_000);
 });

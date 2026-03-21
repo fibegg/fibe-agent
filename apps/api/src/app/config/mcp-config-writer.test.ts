@@ -348,4 +348,17 @@ describe('writeMcpConfig', () => {
     delete process.env.DOCKER_MCP_CONFIG_JSON;
     expect(() => writeMcpConfig()).not.toThrow();
   });
+
+  it('handles legacy flat format { serverUrl, authHeader } for gemini provider', () => {
+    process.env.AGENT_PROVIDER = 'gemini';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      serverUrl: 'https://my.playgrounds.dev',
+      authHeader: 'Bearer legacy-token',
+    });
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+    expect(() => writeMcpConfig()).not.toThrow();
+    const settingsRaw = readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf-8');
+    const settings = JSON.parse(settingsRaw);
+    expect(settings.mcpServers?.['playgrounds-dev']).toBeDefined();
+  });
 });

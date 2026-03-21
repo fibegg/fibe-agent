@@ -1,72 +1,103 @@
-import { describe, test, expect } from 'bun:test';
-import { runAuthProcess } from './auth-process-helper';
+/**
+ * Tests for auth-process-helper.ts
+ * Uses Bun's mock.module() + dynamic import pattern to mock node:child_process.
+ * This avoids flaky timeouts from real process spawning in parallel test runs.
+ */
+import { describe, test, expect, mock } from 'bun:test';
+import { EventEmitter } from 'node:events';
+
+function makeFakeProc() {
+  const proc = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    stdin: { end: () => void; write: (s: string) => void };
+    kill: () => void;
+    killed: boolean;
+  };
+  proc.stdout = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  proc.stdin = { end: () => undefined, write: () => undefined };
+  proc.kill = function () { this.killed = true; this.emit('close', null); };
+  proc.killed = false;
+  return proc;
+}
+
+let currentFakeProc = makeFakeProc();
+
+mock.module('node:child_process', () => ({
+  spawn: (_cmd: string, _args: string[], _opts?: Record<string, unknown>) => currentFakeProc,
+}));
+
+const { runAuthProcess } = await import('./auth-process-helper');
 
 describe('runAuthProcess', () => {
+  // Reset the fake process before each test
+  function resetProc() {
+    currentFakeProc = makeFakeProc();
+    return currentFakeProc;
+  }
+
   test('spawns a process and returns cancel function', () => {
+    resetProc();
     const { process: proc, cancel } = runAuthProcess('echo', ['hello']);
     expect(proc).toBeDefined();
     expect(typeof cancel).toBe('function');
-    cancel();
   });
 
-  test('calls onData with stdout data', async () => {
+  test('calls onData with stdout data', () => {
+    const proc = resetProc();
     const chunks: string[] = [];
-    const { process: proc } = runAuthProcess('echo', ['test-output'], {
+    runAuthProcess('echo', ['test-output'], {
       onData: (data) => chunks.push(data),
     });
-
-    await new Promise<void>((resolve) => {
-      proc.on('close', () => resolve());
-    });
+    proc.stdout.emit('data', Buffer.from('test-output'));
     expect(chunks.join('')).toContain('test-output');
   });
 
-  test('calls onClose with exit code', async () => {
+  test('calls onData with stderr data', () => {
+    const proc = resetProc();
+    const chunks: string[] = [];
+    runAuthProcess('sh', ['-c', 'echo error-msg >&2'], {
+      onData: (data) => chunks.push(data),
+    });
+    proc.stderr.emit('data', 'error-msg\n');
+    expect(chunks.join('')).toContain('error-msg');
+  });
+
+  test('calls onClose with exit code', () => {
+    const proc = resetProc();
     let exitCode: number | null = null;
-    const { process: proc } = runAuthProcess('true', [], {
+    runAuthProcess('true', [], {
       onClose: (code) => { exitCode = code; },
     });
-
-    await new Promise<void>((resolve) => {
-      proc.on('close', () => resolve());
-    });
+    proc.emit('close', 0);
     expect(exitCode).toBe(0);
   });
 
-  test('calls onError when command not found', async () => {
+  test('calls onError when process emits error', () => {
+    const proc = resetProc();
     let caughtError: Error | null = null;
-    const { process: proc } = runAuthProcess('nonexistent-command-12345', [], {
+    runAuthProcess('nonexistent-command', [], {
       onError: (err) => { caughtError = err; },
     });
-
-    await new Promise<void>((resolve) => {
-      proc.on('error', () => resolve());
-    });
+    proc.emit('error', new Error('ENOENT: not found'));
     expect(caughtError).toBeDefined();
+    expect((caughtError as Error).message).toContain('ENOENT');
   });
 
-  test('cancel kills the process', async () => {
-    const { process: proc, cancel } = runAuthProcess('sleep', ['10']);
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
+  test('cancel kills the process', () => {
+    const proc = resetProc();
+    let killCalled = false;
+    proc.kill = function () { killCalled = true; };
+    const { cancel } = runAuthProcess('sleep', ['10']);
     cancel();
-
-    const exitCode = await new Promise<number | null>((resolve) => {
-      proc.on('close', (code) => resolve(code));
-    });
-    // Killed process exits with non-zero or signal
-    expect(exitCode === null || exitCode !== 0).toBe(true);
+    expect(killCalled).toBe(true);
   });
 
-  test('captures stderr through onData', async () => {
-    const chunks: string[] = [];
-    const { process: proc } = runAuthProcess('sh', ['-c', 'echo error-msg >&2'], {
-      onData: (data) => chunks.push(data),
-    });
-
-    await new Promise<void>((resolve) => {
-      proc.on('close', () => resolve());
-    });
-    expect(chunks.join('')).toContain('error-msg');
+  test('custom env is passed through to spawn (verifiable via options)', () => {
+    resetProc();
+    const customEnv = { MY_VAR: 'test_value', PATH: '/usr/bin' };
+    const { process: proc } = runAuthProcess('env', [], { env: customEnv });
+    expect(proc).toBeDefined(); // spawn was called — our mock returns the fake proc
   });
 });

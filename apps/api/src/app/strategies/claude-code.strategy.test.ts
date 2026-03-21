@@ -1,8 +1,25 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { EventEmitter } from 'node:events';
+import * as childProcess from 'node:child_process';
 import { ClaudeCodeStrategy, toolUseToEvent } from './claude-code.strategy';
+
+/** Creates a fake child process that emits events on-demand */
+function makeFakeProcess() {
+  const proc = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    stdin: { end: () => void; write: (s: string) => void };
+    kill: () => void;
+  };
+  proc.stdout = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  proc.stdin = { end: () => undefined, write: () => undefined };
+  proc.kill = () => undefined;
+  return proc;
+}
 
 const CLAUDE_TEST_HOME = join(tmpdir(), `claude-test-home-${process.pid}`);
 
@@ -256,3 +273,4 @@ describe('ClaudeCodeStrategy API token mode', () => {
     expect(await strategy.checkAuthStatus()).toBe(true);
   });
 });
+

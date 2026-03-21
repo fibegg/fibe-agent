@@ -194,8 +194,6 @@ export class ClaudeCodeStrategy implements AgentStrategy {
   }
 
   checkAuthStatus(): Promise<boolean> {
-    const AUTH_STATUS_TIMEOUT_MS = 10_000;
-
     if (this.useApiTokenMode) {
       return Promise.resolve(this.getToken() !== null);
     }
@@ -226,7 +224,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
       const timer = setTimeout(() => {
         checkProcess.kill();
         finish(false);
-      }, AUTH_STATUS_TIMEOUT_MS);
+      }, (ClaudeCodeStrategy as unknown as { AUTH_STATUS_TIMEOUT_MS: number }).AUTH_STATUS_TIMEOUT_MS ?? 10_000);
 
       checkProcess.stdout?.on('data', (data: Buffer | string) => {
         outputStr += data.toString();

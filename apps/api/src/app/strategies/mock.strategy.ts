@@ -68,9 +68,11 @@ export class MockStrategy implements AgentStrategy {
         if (timeoutRef.id !== null) clearTimeout(timeoutRef.id);
         reject(new Error(INTERRUPTED_MESSAGE));
       };
+      callbacks?.onReasoningStart?.();
       callbacks?.onReasoningChunk?.('Considering the request...\n');
       callbacks?.onReasoningChunk?.('Preparing a helpful response.\n');
       callbacks?.onReasoningEnd?.();
+      callbacks?.onUsage?.({ inputTokens: 10, outputTokens: 5 });
       callbacks?.onTool?.({
         kind: 'file_created',
         name: 'example-output.ts',

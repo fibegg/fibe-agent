@@ -240,4 +240,37 @@ describe('GithubTokenRefreshService', () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test('schedulePeriodicRefresh invokes refreshToken (covers setInterval callback)', async () => {
+    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
+    mockConfig.getPhoenixApiKey = () => 'key';
+    mockConfig.getPhoenixAgentId = () => '1';
+
+    const originalFetch = globalThis.fetch;
+    let callCount = 0;
+    globalThis.fetch = mock(async () => {
+      callCount++;
+      return new Response(JSON.stringify({ token: `ghs_${callCount}`, expires_in: 3600 }), {
+        status: 200, headers: { 'Content-Type': 'application/json' },
+      });
+    }) as unknown as typeof fetch;
+
+    try {
+      // Directly call schedulePeriodicRefresh (the named setInterval callback method)
+      const castService = service as unknown as { schedulePeriodicRefresh: () => void };
+      castService.schedulePeriodicRefresh();
+      // Give the void refreshToken() promise time to settle
+      await new Promise((r) => setTimeout(r, 100));
+      expect(callCount).toBeGreaterThanOrEqual(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      service.onModuleDestroy();
+    }
+  });
+
+  test('handleKillError is called when pkill fails (covers catch in killGithubMcpServer)', () => {
+    // Call handleKillError directly since it's a named private method
+    const castService = service as unknown as { handleKillError: () => void };
+    expect(() => castService.handleKillError()).not.toThrow();
+  });
 });

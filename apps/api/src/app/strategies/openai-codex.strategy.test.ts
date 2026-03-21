@@ -183,3 +183,23 @@ describe('OpenaiCodexStrategy', () => {
     expect(result).toBe(false);
   });
 });
+
+// ─── Spawn-based tests (executeAuth non-api-token, executeLogout, executePromptStreaming) ─
+
+import { EventEmitter } from 'node:events';
+import * as childProcess from 'node:child_process';
+
+function makeCodexFakeProcess() {
+  const proc = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    stdin: { end: () => void; write: (s: string) => void };
+    kill: () => void;
+  };
+  proc.stdout = new EventEmitter();
+  proc.stderr = new EventEmitter();
+  proc.stdin = { end: () => undefined, write: () => undefined };
+  proc.kill = () => undefined;
+  return proc;
+}
+
