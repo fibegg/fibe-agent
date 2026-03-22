@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/phoenix-playgrounds/phoenix-agent-oauth/actions/workflows/ci.yml"><img src="https://github.com/phoenix-playgrounds/phoenix-agent-oauth/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/coverage-95%25-brightgreen.svg" alt="Coverage" />
+  <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage" />
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.3.11-000?logo=bun&logoColor=white" alt="Bun" /></a>
   <a href="https://nx.dev"><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></a>
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License MIT" />

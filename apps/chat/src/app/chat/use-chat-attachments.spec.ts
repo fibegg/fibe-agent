@@ -1,7 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
 import {
   getClipboardTextForContentEditablePaste,
   hasNonEmptyPlainTextOnClipboard,
+  useChatAttachments,
+  MAX_PENDING_TOTAL,
 } from './use-chat-attachments';
 
 function mockClipboard(getData: (type: string) => string) {
@@ -68,3 +71,149 @@ describe('hasNonEmptyPlainTextOnClipboard', () => {
     ).toBe(true);
   });
 });
+
+describe('useChatAttachments', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('starts with empty state', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    expect(result.current.pendingImages).toEqual([]);
+    expect(result.current.pendingAttachments).toEqual([]);
+    expect(result.current.pendingVoice).toBeNull();
+    expect(result.current.isDragOver).toBe(false);
+  });
+
+  it('addImage adds a data URL to pendingImages', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    act(() => { result.current.addImage('data:image/png;base64,abc'); });
+    expect(result.current.pendingImages).toEqual(['data:image/png;base64,abc']);
+  });
+
+  it('removePendingImage removes by index', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    act(() => {
+      result.current.addImage('img1');
+      result.current.addImage('img2');
+    });
+    act(() => { result.current.removePendingImage(0); });
+    expect(result.current.pendingImages).toEqual(['img2']);
+  });
+
+  it('addAttachment adds an attachment entry', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    act(() => { result.current.addAttachment('file.txt', 'My File'); });
+    expect(result.current.pendingAttachments).toEqual([{ filename: 'file.txt', name: 'My File' }]);
+  });
+
+  it('removePendingAttachment removes by index', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    act(() => {
+      result.current.addAttachment('a.txt', 'A');
+      result.current.addAttachment('b.txt', 'B');
+    });
+    act(() => { result.current.removePendingAttachment(1); });
+    expect(result.current.pendingAttachments).toEqual([{ filename: 'a.txt', name: 'A' }]);
+  });
+
+  it('clearPending resets all state', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    act(() => {
+      result.current.addImage('img1');
+      result.current.addAttachment('a.txt', 'A');
+    });
+    act(() => { result.current.clearPending(); });
+    expect(result.current.pendingImages).toEqual([]);
+    expect(result.current.pendingAttachments).toEqual([]);
+  });
+
+  it('removePendingVoice clears voice state', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    act(() => {
+      result.current.setPendingVoice('voice_data');
+      result.current.setPendingVoiceFilename('voice.wav');
+    });
+    act(() => { result.current.removePendingVoice(); });
+    expect(result.current.pendingVoice).toBeNull();
+    expect(result.current.pendingVoiceFilename).toBeNull();
+  });
+
+  it('MAX_PENDING_TOTAL is exported correctly', () => {
+    expect(MAX_PENDING_TOTAL).toBe(10);
+  });
+
+  it('handleDragOver sets dropEffect to copy', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const event = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { dropEffect: '' },
+    } as unknown as React.DragEvent;
+    act(() => { result.current.handleDragOver(event); });
+    expect(event.dataTransfer.dropEffect).toBe('copy');
+  });
+
+  it('handleDragEnter sets isDragOver when authenticated and has room', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const event = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { types: ['Files'] },
+    } as unknown as React.DragEvent;
+    act(() => { result.current.handleDragEnter(event); });
+    expect(result.current.isDragOver).toBe(true);
+  });
+
+  it('handleDragEnter does not set isDragOver when not authenticated', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: false }));
+    const event = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { types: ['Files'] },
+    } as unknown as React.DragEvent;
+    act(() => { result.current.handleDragEnter(event); });
+    expect(result.current.isDragOver).toBe(false);
+  });
+
+  it('handleDragLeave hides overlay when counter hits 0', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const enterEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { types: ['Files'] },
+    } as unknown as React.DragEvent;
+    const leaveEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+    } as unknown as React.DragEvent;
+    act(() => { result.current.handleDragEnter(enterEvent); });
+    expect(result.current.isDragOver).toBe(true);
+    act(() => { result.current.handleDragLeave(leaveEvent); });
+    expect(result.current.isDragOver).toBe(false);
+  });
+
+  it('handleDrop resets isDragOver', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const dropEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { files: [] as unknown as FileList },
+    } as unknown as React.DragEvent;
+    act(() => { result.current.handleDrop(dropEvent); });
+    expect(result.current.isDragOver).toBe(false);
+  });
+
+  it('handlePaste ignores event when clipboard has text', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const event = {
+      clipboardData: {
+        getData: (t: string) => (t === 'text/plain' ? 'some text' : ''),
+        items: [],
+      },
+    } as unknown as React.ClipboardEvent;
+    act(() => { result.current.handlePaste(event); });
+    expect(result.current.pendingImages).toEqual([]);
+  });
+});
+

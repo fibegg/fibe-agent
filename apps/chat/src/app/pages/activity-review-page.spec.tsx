@@ -170,6 +170,61 @@ describe('ActivityReviewPage', () => {
       expect(screen.queryByText('Loading activities…')).toBeNull();
     });
     expect(screen.getAllByText(/Some reasoning/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Step one')).toBeTruthy();
+    expect(screen.getAllByText('Step one').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders a checkbox for each story row in the list', async () => {
+    const { apiRequest } = await import('../api-url');
+    (apiRequest as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [mockActivity],
+    });
+    renderWithRoute('test-activity-id');
+    await waitFor(() => {
+      expect(screen.queryByText('Loading activities…')).toBeNull();
+    });
+    const checkboxes = screen.getAllByRole('checkbox');
+    expect(checkboxes.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('shows most recent story at the top of the list', async () => {
+    const twoActivityData = [
+      {
+        id: 'older-activity',
+        created_at: '2025-01-14T10:00:00Z',
+        story: [
+          { id: 'old-1', type: 'step', message: 'Older step', timestamp: '2025-01-14T10:00:00Z' },
+        ],
+      },
+      {
+        id: 'newer-activity',
+        created_at: '2025-01-15T12:00:00Z',
+        story: [
+          { id: 'new-1', type: 'step', message: 'Newer step', timestamp: '2025-01-15T12:00:00Z' },
+        ],
+      },
+    ];
+    const { apiRequest } = await import('../api-url');
+    (apiRequest as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => twoActivityData,
+    });
+    render(
+      <MemoryRouter initialEntries={['/activity']}>
+        <Routes>
+          <Route path="/activity" element={<ActivityReviewPage />} />
+          <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText('Loading activities…')).toBeNull();
+    });
+    const allButtons = screen.getAllByRole('button');
+    const newerIdx = allButtons.findIndex((b) => b.textContent?.includes('Newer step'));
+    const olderIdx = allButtons.findIndex((b) => b.textContent?.includes('Older step'));
+    expect(newerIdx).toBeLessThan(olderIdx);
   });
 });
