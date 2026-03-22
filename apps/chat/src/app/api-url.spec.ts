@@ -1,5 +1,18 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { getApiUrl, getWsUrl, isChatModelLocked } from './api-url';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
+import {
+  getApiUrl,
+  getWsUrl,
+  isChatModelLocked,
+  buildApiUrl,
+  getToken,
+  setToken,
+  clearToken,
+  isAuthenticated,
+  getAuthTokenForRequest,
+  loginWithPassword,
+  NO_PASSWORD_SENTINEL,
+  TOKEN_STORAGE_KEY,
+} from './api-url';
 
 describe('getApiUrl', () => {
   afterEach(() => {
@@ -19,6 +32,32 @@ describe('getApiUrl', () => {
   it('returns URL as-is when no trailing slash', () => {
     vi.stubGlobal('__API_URL__', 'https://api.example.com');
     expect(getApiUrl()).toBe('https://api.example.com');
+  });
+});
+
+describe('buildApiUrl', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('builds URL with base when API_URL is set', () => {
+    vi.stubGlobal('__API_URL__', 'https://api.example.com');
+    expect(buildApiUrl('/health')).toBe('https://api.example.com/health');
+  });
+
+  it('adds leading slash to path when missing', () => {
+    vi.stubGlobal('__API_URL__', 'https://api.example.com');
+    expect(buildApiUrl('health')).toBe('https://api.example.com/health');
+  });
+
+  it('returns relative path when no API base', () => {
+    vi.stubGlobal('__API_URL__', '');
+    expect(buildApiUrl('/health')).toBe('/health');
+  });
+
+  it('adds leading slash to relative path when missing and no base', () => {
+    vi.stubGlobal('__API_URL__', '');
+    expect(buildApiUrl('health')).toBe('/health');
   });
 });
 
@@ -80,3 +119,97 @@ describe('isChatModelLocked', () => {
     expect(isChatModelLocked()).toBe(true);
   });
 });
+
+describe('token management', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+  });
+
+  it('getToken returns empty string when no token stored', () => {
+    expect(getToken()).toBe('');
+  });
+
+  it('setToken stores token in localStorage', () => {
+    setToken('mytoken');
+    expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe('mytoken');
+  });
+
+  it('setToken stores NO_PASSWORD_SENTINEL when value is empty string', () => {
+    setToken('');
+    expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBe(NO_PASSWORD_SENTINEL);
+  });
+
+  it('clearToken removes the key', () => {
+    setToken('tok');
+    clearToken();
+    expect(localStorage.getItem(TOKEN_STORAGE_KEY)).toBeNull();
+  });
+
+  it('isAuthenticated returns false when no token', () => {
+    expect(isAuthenticated()).toBe(false);
+  });
+
+  it('isAuthenticated returns true when token is stored', () => {
+    setToken('tok');
+    expect(isAuthenticated()).toBe(true);
+  });
+
+  it('getAuthTokenForRequest returns empty string for NO_PASSWORD_SENTINEL', () => {
+    localStorage.setItem(TOKEN_STORAGE_KEY, NO_PASSWORD_SENTINEL);
+    expect(getAuthTokenForRequest()).toBe('');
+  });
+
+  it('getAuthTokenForRequest returns token when real token stored', () => {
+    setToken('realtoken');
+    expect(getAuthTokenForRequest()).toBe('realtoken');
+  });
+});
+
+describe('loginWithPassword', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.stubGlobal('__API_URL__', '');
+    vi.stubGlobal('__LOCK_CHAT_MODEL__', '');
+  });
+
+  afterEach(() => {
+    localStorage.clear();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it('returns success: true and stores token on successful login', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, token: 'newtoken' }),
+    }));
+
+    const result = await loginWithPassword('password');
+    expect(result.success).toBe(true);
+    expect(getToken()).toBe('newtoken');
+  });
+
+  it('returns success: false when server returns ok:false', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false,
+      json: async () => ({ error: 'Bad credentials' }),
+    }));
+
+    const result = await loginWithPassword('wrong');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Bad credentials');
+  });
+
+  it('returns success: false on network error', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
+
+    const result = await loginWithPassword('password');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Connection error');
+  });
+});
+

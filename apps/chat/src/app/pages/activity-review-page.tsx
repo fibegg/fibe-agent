@@ -48,6 +48,8 @@ export function ActivityReviewPage() {
     handleSelectStory,
     runCopyActivityWithAnimation,
     closeSettings,
+    isFollowing,
+    setIsFollowing,
   } = useActivityReviewData({
     activityId: routeActivityId,
     storyId: routeStoryId,
@@ -136,6 +138,32 @@ export function ActivityReviewPage() {
                 </button>
               ) : null}
             </div>
+            <label className="flex items-center gap-1.5 cursor-pointer select-none px-1 pb-1 group" htmlFor="follow-activity-toggle">
+              <span
+                id="follow-activity-toggle"
+                role="checkbox"
+                aria-checked={isFollowing}
+                tabIndex={0}
+                onClick={() => setIsFollowing((v) => !v)}
+                onKeyDown={(e) => (e.key === ' ' || e.key === 'Enter') && setIsFollowing((v) => !v)}
+                className={`relative inline-flex h-4 w-7 shrink-0 rounded-full border transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/50 ${
+                  isFollowing
+                    ? 'bg-violet-500 border-violet-400'
+                    : 'bg-muted/60 border-border/50 group-hover:border-violet-500/40'
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 left-0.5 size-2.5 rounded-full bg-white shadow transition-transform ${
+                    isFollowing ? 'translate-x-3' : 'translate-x-0'
+                  }`}
+                />
+              </span>
+              <span className={`text-[11px] font-medium transition-colors ${
+                isFollowing ? 'text-violet-300' : 'text-muted-foreground group-hover:text-foreground'
+              }`}>
+                Follow activity
+              </span>
+            </label>
           </div>
           <ActivityStoryList
             stories={filteredStories}

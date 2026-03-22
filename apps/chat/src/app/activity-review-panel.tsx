@@ -1,5 +1,6 @@
-import { Brain, Search, Sparkles, X } from 'lucide-react';
+import { Brain, ChevronDown, ChevronRight, Search, Sparkles, Terminal, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import {
   getActivityIcon,
   getActivityLabel,
@@ -199,6 +200,103 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
   );
 }
 
+// ─── Command grouping (same as in AgentThinkingSidebar) ──────────────────────
+
+const COMMAND_GROUP_MIN = 3;
+
+type ActivityDisplayItem =
+  | { kind: 'entry'; story: StoryEntry; originalIndex: number }
+  | { kind: 'command_group'; id: string; entries: Array<{ story: StoryEntry; originalIndex: number }> };
+
+function buildActivityDisplayList(stories: StoryEntry[]): ActivityDisplayItem[] {
+  const result: ActivityDisplayItem[] = [];
+  let i = 0;
+  while (i < stories.length) {
+    if (stories[i].type !== 'tool_call') {
+      result.push({ kind: 'entry', story: stories[i], originalIndex: i });
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < stories.length && stories[j].type === 'tool_call') j++;
+    const runLength = j - i;
+    if (runLength >= COMMAND_GROUP_MIN) {
+      const startIndex = i;
+      result.push({
+        kind: 'command_group',
+        id: `cg-${stories[i].id}`,
+        entries: stories.slice(i, j).map((s, k) => ({ story: s, originalIndex: startIndex + k })),
+      });
+    } else {
+      for (let k = i; k < j; k++) {
+        result.push({ kind: 'entry', story: stories[k], originalIndex: k });
+      }
+    }
+    i = j;
+  }
+  return result;
+}
+
+function CommandGroupListRow({
+  entries,
+  isAnySelected,
+  onSelectFirst,
+}: {
+  entries: Array<{ story: StoryEntry; originalIndex: number }>;
+  isAnySelected: boolean;
+  onSelectFirst: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const n = entries.length;
+  const first = entries[0];
+  if (!first) return null;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          onSelectFirst();
+          setExpanded((v) => !v);
+        }}
+        className={`${TREE_NODE_BASE} ${
+          isAnySelected
+            ? 'bg-amber-500/15 text-amber-300'
+            : 'text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300'
+        }`}
+        aria-expanded={expanded}
+      >
+        {expanded
+          ? <ChevronDown className="size-3.5 shrink-0 text-amber-500" />
+          : <ChevronRight className="size-3.5 shrink-0 text-amber-500" />}
+        <Terminal className="size-3.5 shrink-0 text-amber-500" />
+        <span className="flex-1 truncate text-left text-xs">
+          {n} command{n !== 1 ? 's' : ''}
+        </span>
+        <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>
+          {formatRelativeTime(first.story.timestamp)}
+        </span>
+      </button>
+      {expanded && (
+        <div className="flex flex-col mt-0.5 mb-0.5 ml-6 gap-px max-h-40 overflow-y-auto">
+          {entries.map(({ story }) => (
+            <button
+              key={story.id}
+              type="button"
+              onClick={onSelectFirst}
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-amber-500/10 transition-colors"
+            >
+              <span className="text-amber-400/60 shrink-0 text-[10px] font-mono select-none">$</span>
+              <span className="text-[11px] font-mono text-green-300/80 truncate">
+                {commandLabel(story)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export interface ActivityStoryListProps {
   stories: StoryEntry[];
   selectedIndex: number;
@@ -218,16 +316,30 @@ export function ActivityStoryList({
       <p className="text-xs text-muted-foreground px-2 py-4">{emptyMessage}</p>
     );
   }
+  const displayList = buildActivityDisplayList(stories);
   return (
     <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 min-h-0">
-      {stories.map((story, index) => (
-        <StoryListRow
-          key={story.id}
-          story={story}
-          isSelected={index === safeIndex}
-          onSelect={() => onSelectStory(index)}
-        />
-      ))}
+      {displayList.map((item) => {
+        if (item.kind === 'command_group') {
+          const isAnySelected = item.entries.some((e) => e.originalIndex === safeIndex);
+          return (
+            <CommandGroupListRow
+              key={item.id}
+              entries={item.entries}
+              isAnySelected={isAnySelected}
+              onSelectFirst={() => onSelectStory(item.entries[0]?.originalIndex ?? 0)}
+            />
+          );
+        }
+        return (
+          <StoryListRow
+            key={item.story.id}
+            story={item.story}
+            isSelected={item.originalIndex === safeIndex}
+            onSelect={() => onSelectStory(item.originalIndex)}
+          />
+        );
+      })}
     </div>
   );
 }

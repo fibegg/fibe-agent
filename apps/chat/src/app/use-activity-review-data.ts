@@ -32,9 +32,11 @@ type StoryEntryWithActivity = StoryEntry & { _activityId: string; _activityCreat
 function flattenAllStories(activities: ActivityReviewData[]): StoryEntryWithActivity[] {
   const seen = new Set<string>();
   const out: StoryEntryWithActivity[] = [];
-  for (const a of activities) {
+  for (let ai = activities.length - 1; ai >= 0; ai--) {
+    const a = activities[ai];
     if (!Array.isArray(a.story)) continue;
-    for (const s of a.story) {
+    for (let si = a.story.length - 1; si >= 0; si--) {
+      const s = a.story[si];
       if (!s?.id || seen.has(s.id)) continue;
       seen.add(s.id);
       out.push({
@@ -68,6 +70,8 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const prevFilteredLengthRef = useRef(0);
 
   const activityStories = useMemo(() => flattenAllStories(activities), [activities]);
 
@@ -127,6 +131,15 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
   useEffect(() => {
     setSelectedIndex(0);
   }, [typeFilter]);
+
+  // Auto-follow: when new stories arrive and isFollowing is on, jump to newest (index 0)
+  useEffect(() => {
+    if (!isFollowing) return;
+    if (filteredStories.length === 0) return;
+    if (filteredStories.length === prevFilteredLengthRef.current) return;
+    prevFilteredLengthRef.current = filteredStories.length;
+    setSelectedIndex(0);
+  }, [isFollowing, filteredStories]);
 
   const handleSelectStory = useCallback(
     (index: number) => {
@@ -227,5 +240,7 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     handleSelectStory,
     runCopyActivityWithAnimation,
     closeSettings,
+    isFollowing,
+    setIsFollowing,
   };
 }

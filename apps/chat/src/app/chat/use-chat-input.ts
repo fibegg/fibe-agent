@@ -31,6 +31,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
         if (mentionOpen) return;
         e.preventDefault();
         onSendRef.current();
+        chatInputRef.current?.focus();
       }
     },
     [onSendRef, mentionOpen]
