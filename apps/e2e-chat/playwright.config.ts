@@ -16,13 +16,13 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: process.env.CI
     ? {
-        command: 'bunx nx run @playgrounds.dev/chat:preview',
+        command: 'bunx nx run @fibe.gg/chat:preview',
         url: baseURL,
         reuseExistingServer: false,
         timeout: 120_000,
       }
     : {
-        command: 'bunx nx run @playgrounds.dev/chat:serve',
+        command: 'bunx nx run @fibe.gg/chat:serve',
         url: baseURL,
         reuseExistingServer: true,
         timeout: 120_000,

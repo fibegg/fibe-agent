@@ -79,7 +79,7 @@ export default defineConfig(() => ({
     },
   },
   test: {
-    name: '@playgrounds.dev/chat',
+    name: '@fibe.gg/chat',
     watch: false,
     globals: true,
     environment: 'jsdom',

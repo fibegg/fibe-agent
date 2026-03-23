@@ -16,6 +16,6 @@
     "skipLibCheck": true,
     "strict": true,
     "target": "es2022",
-    "customConditions": ["@playgrounds.dev/source"]
+    "customConditions": ["@fibe.gg/source"]
   }
 }

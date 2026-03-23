@@ -1,4 +1,4 @@
-const REPO_URL = 'https://github.com/playgroundsHQ/phoenix-agent-oauth';
+const REPO_URL = 'https://github.com/fibegg/phoenix-agent-oauth';
 const VERSION = `v${__APP_VERSION__}`;
 
 const VIOLET = '#7c3aed';
@@ -15,7 +15,7 @@ const banner = `
   ║   ██║     ██║  ██║╚██████╔╝███████╗██║ ╚████║██║██╔╝ ██║   ║
   ║   ╚═╝     ╚═╝  ╚═╝ ╚═════╝ ╚══════╝╚═╝  ╚═══╝╚═╝╚═╝  ╚═╝   ║
   ╚════════════════════════════════════════════════════════════╝
-%c  ▶ playgroundsHQ  ·  Phoenix
+%c  ▶ fibegg  ·  Phoenix
 %c  ${VERSION}
 %c
   Your future development
