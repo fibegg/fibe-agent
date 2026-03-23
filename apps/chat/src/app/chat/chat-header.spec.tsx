@@ -33,9 +33,9 @@ const DEFAULT_PROPS = {
 };
 
 describe('ChatHeader', () => {
-  it('renders "fibe" heading', () => {
+  it('renders "AI Assistant" heading', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
-    expect(screen.getByLabelText('fibe')).toBeTruthy();
+    expect(screen.getByText('AI Assistant')).toBeTruthy();
   });
 
   it('shows session time when sessionTimeMs > 0', () => {
