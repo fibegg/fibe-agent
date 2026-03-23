@@ -87,7 +87,7 @@ export function ChatHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <FibeLogo className="text-lg text-foreground" variant="wordmark" />
+              <FibeLogo className="text-xl text-foreground" variant="wordmark" />
               {sessionTimeMs > 0 && (
                 <span
                   className="text-[10px] sm:text-xs font-medium tabular-nums text-foreground"

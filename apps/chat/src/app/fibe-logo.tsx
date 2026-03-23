@@ -72,7 +72,7 @@ export function FibeLogo({ className = '', variant = 'wordmark' }: FibeLogoProps
           style={{
             position: 'absolute',
             top: 0,
-            left: 0,
+            right: 0,
             width: '0.22em',
             height: '0.22em',
             borderRadius: '50%',
