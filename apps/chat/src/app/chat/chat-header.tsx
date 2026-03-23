@@ -1,4 +1,5 @@
 import { Brain, Loader2, Menu, Search, Sparkles, X } from 'lucide-react';
+import { FibeLogo } from '../fibe-logo';
 import { ModelSelector } from './model-selector';
 import { CHAT_STATES } from './chat-state';
 import { STATE_LABELS, truncateError } from './chat-state';
@@ -86,7 +87,7 @@ export function ChatHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-display font-semibold text-sm text-foreground truncate">fibe</h2>
+              <FibeLogo className="text-sm text-foreground" variant="wordmark" />
               {sessionTimeMs > 0 && (
                 <span
                   className="text-[10px] sm:text-xs font-medium tabular-nums text-foreground"
