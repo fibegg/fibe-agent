@@ -261,15 +261,15 @@ function CommandGroupListRow({
         }}
         className={`${TREE_NODE_BASE} ${
           isAnySelected
-            ? 'bg-amber-500/15 text-amber-300'
-            : 'text-amber-400/80 hover:bg-amber-500/10 hover:text-amber-300'
+            ? 'bg-violet-400/15 text-violet-300'
+            : 'text-amber-400/80 hover:bg-violet-400/10 hover:text-violet-300'
         }`}
         aria-expanded={expanded}
       >
         {expanded
-          ? <ChevronDown className="size-3.5 shrink-0 text-amber-500" />
-          : <ChevronRight className="size-3.5 shrink-0 text-amber-500" />}
-        <Terminal className="size-3.5 shrink-0 text-amber-500" />
+          ? <ChevronDown className="size-3.5 shrink-0 text-violet-500" />
+          : <ChevronRight className="size-3.5 shrink-0 text-violet-500" />}
+        <Terminal className="size-3.5 shrink-0 text-violet-500" />
         <span className="flex-1 truncate text-left text-xs">
           {n} command{n !== 1 ? 's' : ''}
         </span>
@@ -284,7 +284,7 @@ function CommandGroupListRow({
               key={story.id}
               type="button"
               onClick={onSelectFirst}
-              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-amber-500/10 transition-colors"
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-violet-400/10 transition-colors"
             >
               <span className="text-amber-400/60 shrink-0 text-[10px] font-mono select-none">$</span>
               <span className="text-[11px] font-mono text-green-300/80 truncate">

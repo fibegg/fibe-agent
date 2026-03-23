@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePersistedTypeFilter } from './use-persisted-type-filter';
 
-const STORAGE_KEY = 'phoenix:activityTypeFilter';
-const SYNC_EVENT = 'phoenix:typeFilterSync';
+const STORAGE_KEY = 'fibe:activityTypeFilter';
+const SYNC_EVENT = 'fibe:typeFilterSync';
 
 describe('usePersistedTypeFilter', () => {
   beforeEach(() => {

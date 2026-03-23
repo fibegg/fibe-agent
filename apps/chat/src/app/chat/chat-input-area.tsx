@@ -227,7 +227,7 @@ export function ChatInputArea({
               >
                 <Send className="size-3.5 sm:size-4" />
                 {queuedCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center leading-none">
+                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-violet-400 text-[10px] font-bold text-white flex items-center justify-center leading-none">
                     {queuedCount}
                   </span>
                 )}

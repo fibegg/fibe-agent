@@ -33,9 +33,9 @@ const DEFAULT_PROPS = {
 };
 
 describe('ChatHeader', () => {
-  it('renders "AI Assistant" heading', () => {
+  it('renders "fibe" heading', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
-    expect(screen.getByText('AI Assistant')).toBeTruthy();
+    expect(screen.getByText('fibe')).toBeTruthy();
   });
 
   it('shows session time when sessionTimeMs > 0', () => {
@@ -46,7 +46,7 @@ describe('ChatHeader', () => {
 
   it('shows state label for AUTHENTICATED', () => {
     render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AUTHENTICATED} />);
-    expect(screen.getByText('Ready to help')).toBeTruthy();
+    expect(screen.getByText('Ready')).toBeTruthy();
   });
 
   it('shows Reconnect button when state is AGENT_OFFLINE', () => {

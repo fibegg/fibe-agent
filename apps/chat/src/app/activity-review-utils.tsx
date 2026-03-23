@@ -30,7 +30,7 @@ export const BADGE_ACTIVE_STYLES: Record<string, string> = {
   reasoning: 'bg-violet-500/20 text-violet-300 border-violet-500/40',
   stream_start: 'bg-blue-500/20 text-blue-300 border-blue-500/40',
   step: 'bg-zinc-500/20 text-zinc-300 border-zinc-500/40',
-  tool_call: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+  tool_call: 'bg-violet-400/20 text-violet-300 border-amber-500/40',
   file_created: 'bg-green-500/20 text-green-300 border-green-500/40',
   task_complete: 'bg-green-500/20 text-green-300 border-green-500/40',
 };
@@ -39,7 +39,7 @@ export const BADGE_INACTIVE_STYLES: Record<string, string> = {
   reasoning: 'hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30',
   stream_start: 'hover:bg-blue-500/10 hover:text-blue-400 hover:border-blue-500/30',
   step: 'hover:bg-zinc-500/10 hover:text-zinc-400 hover:border-zinc-500/30',
-  tool_call: 'hover:bg-amber-500/10 hover:text-amber-400 hover:border-amber-500/30',
+  tool_call: 'hover:bg-violet-400/10 hover:text-amber-400 hover:border-amber-500/30',
   file_created: 'hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/30',
   task_complete: 'hover:bg-green-500/10 hover:text-green-400 hover:border-green-500/30',
 };
@@ -71,13 +71,13 @@ export function escapeRegex(s: string): string {
 }
 
 const HIGHLIGHT_MARK_CLASS =
-  'bg-amber-400/40 text-amber-950 dark:bg-amber-400/50 dark:text-amber-100 rounded px-0.5';
+  'bg-amber-400/40 text-amber-950 dark:bg-amber-400/50 dark:text-violet-100 rounded px-0.5';
 const SUSPICIOUS_SEGMENT_CLASS =
-  'bg-amber-500/25 text-amber-200 border-b border-amber-500/50 rounded-sm px-0.5';
+  'bg-violet-400/25 text-violet-200 border-b border-amber-500/50 rounded-sm px-0.5';
 const AGREEMENT_SEGMENT_CLASS =
   'bg-emerald-500/25 text-emerald-200 border-b border-emerald-500/50 rounded-sm px-0.5';
 const UNCERTAINTY_SEGMENT_CLASS =
-  'bg-amber-400/20 text-amber-100 border-b border-amber-400/40 rounded-sm px-0.5';
+  'bg-amber-400/20 text-violet-100 border-b border-amber-400/40 rounded-sm px-0.5';
 const QUESTION_SEGMENT_CLASS =
   'bg-sky-500/25 text-sky-200 border-b border-sky-500/50 rounded-sm px-0.5';
 

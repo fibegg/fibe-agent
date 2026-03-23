@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 
-const STORAGE_KEY = 'phoenix:activityTypeFilter';
-const SYNC_EVENT = 'phoenix:typeFilterSync';
+const STORAGE_KEY = 'fibe:activityTypeFilter';
+const SYNC_EVENT = 'fibe:typeFilterSync';
 
 function readFilter(): string[] {
   try {

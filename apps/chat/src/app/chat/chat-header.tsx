@@ -86,7 +86,7 @@ export function ChatHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold text-sm text-foreground truncate">AI Assistant</h2>
+              <h2 className="font-display font-semibold text-sm text-foreground truncate">fibe</h2>
               {sessionTimeMs > 0 && (
                 <span
                   className="text-[10px] sm:text-xs font-medium tabular-nums text-foreground"

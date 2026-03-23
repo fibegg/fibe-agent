@@ -21,12 +21,12 @@ export const INPUT_SM =
 export const BUTTON_ICON_MUTED =
   'rounded-md flex items-center justify-center text-muted-foreground hover:bg-muted/50 hover:text-foreground';
 export const BUTTON_ICON_ACCENT =
-  'rounded-md flex items-center justify-center text-violet-400 hover:bg-violet-500/10 transition-colors';
+  'rounded-md flex items-center justify-center text-violet-500 hover:bg-violet-500/10 transition-colors';
 export const BUTTON_ICON_ACCENT_SM =
-  'size-8 sm:size-9 flex items-center justify-center rounded-md text-violet-400 hover:bg-violet-500/10 transition-colors';
+  'size-8 sm:size-9 flex items-center justify-center rounded-md text-violet-500 hover:bg-violet-500/10 transition-colors';
 
 export const BUTTON_GHOST_ACCENT =
-  'rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 disabled:opacity-50 flex items-center gap-1.5';
+  'rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-violet-500/10 hover:text-violet-500 disabled:opacity-50 flex items-center gap-1.5';
 
 export const SEARCH_ICON_POSITION = 'absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none';
 export const CLEAR_BUTTON_POSITION = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground';
@@ -64,7 +64,7 @@ export const ACTIVITY_MONO = 'text-xs text-foreground/90 whitespace-pre-wrap fon
 export const BADGE_CARD = 'shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
 
 export const AVATAR_USER =
-  'size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center text-white';
+  'size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center text-white';
 export const AVATAR_ASSISTANT =
   'size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white';
 
@@ -72,13 +72,13 @@ export const BUBBLE_ASSISTANT =
   'rounded-2xl rounded-tl-sm bg-card/60 backdrop-blur-md border border-border/50 shadow-lg text-card-foreground';
 export const BUBBLE_TYPING = 'rounded-2xl rounded-tl-sm bg-card border border-border text-card-foreground';
 export const BUBBLE_USER =
-  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-700 text-white shadow-lg shadow-violet-500/20';
+  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/20';
 
 export const PROSE_MESSAGE =
   'markdown-body prose prose-sm max-w-none min-w-0 dark:prose-invert text-sm sm:text-[14px] break-words';
 
 export const SIDEBAR_PANEL =
-  'relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-purple-950/5 border-l border-violet-500/20 transition-all duration-300';
+  'relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-violet-950/5 border-l border-violet-500/20 transition-all duration-300';
 export const SIDEBAR_HEADER = `border-b ${HEADER_BORDER} shrink-0 ${HEADER_PADDING}`;
 export const CARD_HEADER = `border-b ${HEADER_BORDER} bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`;
 
@@ -95,11 +95,11 @@ export const LOGO_ICON_BOX =
 export const SESSION_STATS_PANEL =
   'rounded-lg border border-violet-500/20 bg-violet-500/5 overflow-hidden shrink-0';
 export const SESSION_STATS_HEADING =
-  'flex items-center gap-1.5 text-xs font-semibold px-3 py-2 text-violet-300 border-b border-violet-500/20';
+  'flex items-center gap-1.5 text-xs font-semibold px-3 py-2 text-violet-500 dark:text-violet-300 border-b border-violet-500/20';
 
 export const MODEL_OPTION_SELECTED = 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow shadow-violet-500/20';
 export const MODEL_OPTION_UNSELECTED =
-  'bg-input-bg border border-border-subtle text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30';
+  'bg-input-bg border border-border-subtle text-muted-foreground hover:bg-violet-500/10 hover:text-violet-500 hover:border-violet-500/30';
 
 export const TREE_NODE_SELECTED = 'bg-violet-500/10 text-violet-400';
 export const TREE_NODE_BASE =
@@ -108,14 +108,14 @@ export const TREE_NODE_BASE =
 export const CLOSE_BUTTON_SIZE = 'size-8';
 
 export const SETTINGS_CLOSE_BUTTON =
-  'size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-violet-400 hover:bg-violet-500/10';
+  'size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-violet-500 hover:bg-violet-500/10';
 export const MODAL_CARD =
-  'rounded-xl bg-gradient-to-br from-card via-card to-violet-950/5 border border-violet-500/20 shadow-[0_0_50px_rgba(139,92,246,0.2)] overflow-hidden';
+  'rounded-xl bg-gradient-to-br from-card via-card to-violet-950/5 border border-violet-500/20 shadow-[0_0_50px_rgba(124,58,237,0.12)] overflow-hidden';
 export const BUTTON_OUTLINE_ACCENT =
-  'rounded-lg border border-violet-500/20 text-sm font-medium text-foreground hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30 transition-colors flex items-center gap-2 w-full px-4 py-2.5';
+  'rounded-lg border border-violet-500/20 text-sm font-medium text-foreground hover:bg-violet-500/10 hover:text-violet-500 hover:border-violet-500/30 transition-colors flex items-center gap-2 w-full px-4 py-2.5';
 export const BUTTON_DESTRUCTIVE_GHOST =
   'rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 text-sm font-medium transition-colors flex items-center gap-2 w-full px-4 py-2.5';
 export const INPUT_ROUNDED =
   'rounded-xl bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 outline-none transition-shadow w-full px-3 py-2.5';
 export const BUTTON_PRIMARY_ROUNDED =
-  'rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white text-sm font-medium shadow-lg shadow-violet-500/30 transition-opacity flex items-center gap-2 px-4 py-2.5';
+  'rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white text-sm font-medium shadow-lg shadow-violet-500/30 transition-opacity flex items-center gap-2 px-4 py-2.5';

@@ -338,7 +338,7 @@ const MessageRow = memo(function MessageRow({
                 <p className="flex flex-wrap items-center gap-1.5 min-w-0">
                   {formatTime(msg.created_at)}
                   {msg.queued && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-medium leading-none">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-400/20 border border-amber-400/30 text-violet-300 text-[10px] font-medium leading-none">
                       <Clock className="size-2.5" aria-hidden />
                       Queued
                     </span>

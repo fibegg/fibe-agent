@@ -85,7 +85,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           {showUrl && (
             <div className="space-y-2">
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Please follow the link below to authorize the AI assistant.
+                Please follow the link below to authorize the fibe agent.
               </p>
               <a
                 href={authModal.authUrl ?? '#'}

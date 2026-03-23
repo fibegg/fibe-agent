@@ -90,7 +90,7 @@ export function ActivityReviewPage() {
     <div className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10">
       <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         <aside
-          className="flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-purple-950/5 border-r border-violet-500/20 transition-all duration-300 overflow-hidden"
+          className="flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-violet-950/5 border-r border-violet-500/20 transition-all duration-300 overflow-hidden"
           style={{ width: RIGHT_SIDEBAR_WIDTH_PX, minWidth: 0 }}
         >
           {/* Header: nav + settings/theme + search */}

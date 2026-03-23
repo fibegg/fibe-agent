@@ -20,7 +20,7 @@ describe('logConsoleBanner', () => {
     logConsoleBanner();
     const firstArg = logSpy.mock.calls[0][0];
     expect(typeof firstArg).toBe('string');
-    expect(firstArg).toContain('Phoenix');
+    expect(firstArg).toContain('fibe');
   });
 
   it('passes multiple CSS style arguments', () => {
