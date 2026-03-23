@@ -199,7 +199,7 @@ describe('mergeAnimatingRemoved', () => {
     const next = [file('a.ts', 'a.ts')];
     const animating = new Map([['gone.ts', 'removed' as const]]);
     const result = mergeAnimatingRemoved(prev, next, animating);
-    expect(result.some(e => e.path === 'gone.ts')).toBe(true);
+    expect(result.some((e: PlaygroundEntry) => e.path === 'gone.ts')).toBe(true);
   });
 
   it('sorts directories before files in merged result', () => {
@@ -217,7 +217,7 @@ describe('mergeAnimatingRemoved', () => {
     const next = [dir('src', 'src', [file('a.ts', 'src/a.ts')])];
     const animating = new Map([['src/old.ts', 'removed' as const]]);
     const result = mergeAnimatingRemoved(prev, next, animating);
-    const srcDir = result.find(e => e.path === 'src');
-    expect(srcDir?.children?.some(c => c.path === 'src/old.ts')).toBe(true);
+    const srcDir = result.find((e: PlaygroundEntry) => e.path === 'src');
+    expect(srcDir?.children?.some((c: PlaygroundEntry) => c.path === 'src/old.ts')).toBe(true);
   });
 });
