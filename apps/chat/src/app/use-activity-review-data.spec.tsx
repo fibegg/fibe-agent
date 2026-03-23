@@ -167,7 +167,7 @@ describe('useActivityReviewData', () => {
 
     act(() => { result.current.setActivitySearchQuery('bash'); });
     const filtered = result.current.filteredStories;
-    expect(filtered.every(s => s.message.toLowerCase().includes('bash'))).toBe(true);
+    expect(filtered.every((s: { message: string }) => s.message.toLowerCase().includes('bash'))).toBe(true);
   });
 
   it('resets selectedIndex when typeFilter changes', async () => {
