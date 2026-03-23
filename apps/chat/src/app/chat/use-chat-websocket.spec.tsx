@@ -237,3 +237,134 @@ describe('useChatWebSocket close codes', () => {
     expect(clearToken).toHaveBeenCalled();
   });
 });
+
+describe('useChatWebSocket actions (startAuth, cancelAuth, submitAuthCode, dismissError, logout, reauthenticate)', () => {
+  let lastWs: {
+    send: ReturnType<typeof vi.fn>;
+    readyState: number;
+    onmessage?: ((e: MessageEvent) => void) | null;
+    onclose?: ((e: CloseEvent) => void) | null;
+  } | null = null;
+
+  beforeEach(() => {
+    lastWs = null;
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWebSocket {
+        readyState = WebSocket.OPEN;
+        send = vi.fn();
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+        onmessage: ((e: MessageEvent) => void) | null = null;
+        onclose: ((e: CloseEvent) => void) | null = null;
+        constructor() {
+          lastWs = this as typeof lastWs;
+        }
+      }
+    );
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  const wrapper = ({ children }: { children: React.ReactNode }) => (
+    <MemoryRouter>{children}</MemoryRouter>
+  );
+
+  it('startAuth sends initiate_auth and sets AUTH_PENDING state', async () => {
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.startAuth(); });
+
+    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'initiate_auth' }));
+    expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
+  });
+
+  it('cancelAuth clears authModal and sends cancel_auth', async () => {
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.cancelAuth(); });
+
+    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'cancel_auth' }));
+    expect(result.current.authModal).toEqual({ authUrl: null, deviceCode: null, isManualToken: false });
+    expect(result.current.state).toBe(CHAT_STATES.UNAUTHENTICATED);
+  });
+
+  it('submitAuthCode sends submit_auth_code with trimmed code', async () => {
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.submitAuthCode('  mycode  '); });
+
+    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'submit_auth_code', code: 'mycode' }));
+  });
+
+  it('dismissError clears errorMessage and sets AUTHENTICATED state', async () => {
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.setErrorMessage('Some error'); });
+    act(() => { result.current.dismissError(); });
+
+    expect(result.current.errorMessage).toBeNull();
+    expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
+  });
+
+  it('interruptAgent sends interrupt_agent', async () => {
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.interruptAgent(); });
+
+    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'interrupt_agent' }));
+  });
+
+  it('reauthenticate sends reauthenticate when user confirms', async () => {
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.reauthenticate(); });
+
+    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'reauthenticate' }));
+    expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
+  });
+
+  it('reauthenticate does nothing when user cancels confirm', async () => {
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    const callCountBefore = (lastWs?.send as ReturnType<typeof vi.fn>).mock.calls.length;
+    act(() => { result.current.reauthenticate(); });
+    const callCountAfter = (lastWs?.send as ReturnType<typeof vi.fn>).mock.calls.length;
+    expect(callCountAfter).toBe(callCountBefore);
+  });
+
+  it('logout sends logout when user confirms', async () => {
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => { result.current.logout(); });
+
+    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'logout' }));
+    expect(result.current.state).toBe(CHAT_STATES.LOGGING_OUT);
+  });
+
+  it('logout does nothing when user cancels confirm', async () => {
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    const initState = result.current.state;
+    act(() => { result.current.logout(); });
+    expect(result.current.state).toBe(initState);
+  });
+});
+

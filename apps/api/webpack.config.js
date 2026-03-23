@@ -28,4 +28,7 @@ module.exports = {
       sourceMap: true,
     }),
   ],
+  watchOptions: {
+    ignored: ['**/node_modules/**', '**/data/**', '**/playground/**'],
+  },
 };

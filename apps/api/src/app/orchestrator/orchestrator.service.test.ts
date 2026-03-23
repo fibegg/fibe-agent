@@ -6,7 +6,6 @@ import { OrchestratorService } from './orchestrator.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { MessageStoreService } from '../message-store/message-store.service';
 import { ModelStoreService } from '../model-store/model-store.service';
-import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { SteeringService } from '../steering/steering.service';
@@ -44,14 +43,6 @@ describe('OrchestratorService', () => {
     const modelStore = new ModelStoreService(config as never);
     const strategyRegistry = new StrategyRegistryService(config as never);
     const uploadsService = new UploadsService(config as never);
-    const playgroundsService = {
-      getFileContent: async () => {
-        throw new Error('not found');
-      },
-      getFolderFileContents: async () => {
-        throw new Error('not found');
-      },
-    } as unknown as PlaygroundsService;
     const phoenixSync = {
       syncMessages: async (payload: string) => {
         void payload;
@@ -78,7 +69,6 @@ describe('OrchestratorService', () => {
       config as never,
       strategyRegistry,
       uploadsService,
-      playgroundsService,
       phoenixSync,
       chatPromptContext,
       steering,
@@ -87,16 +77,18 @@ describe('OrchestratorService', () => {
     return orch;
   }
 
-  test('handleClientConnected sends auth_status and activity_snapshot', async () => {
+  test('handleClientConnected sends auth_status, activity_snapshot, and queue_updated', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
     orch.handleClientConnected();
-    expect(events.length).toBe(2);
+    expect(events.length).toBe(3);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
     expect(events[1].type).toBe(WS_EVENT.ACTIVITY_SNAPSHOT);
     expect(events[1].data.activity).toBeDefined();
+    expect(events[2].type).toBe(WS_EVENT.QUEUE_UPDATED);
+    expect(events[2].data.count).toBeDefined();
   });
 
   test('handleClientMessage get_model sends model_updated', async () => {
@@ -247,9 +239,15 @@ describe('OrchestratorService', () => {
   test('queue resets when a new streaming session starts', async () => {
     const orch = await createOrchestrator();
     orch.isAuthenticated = true;
+    
+    // Enqueue a message to ensure count > 0 before starting a session
+    await orch.handleClientMessage({ action: WS_ACTION.QUEUE_MESSAGE, text: 'go' });
+    
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
+    
     await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'go' });
+    
     // At stream start, queue_updated with count 0 should be emitted
     const queueResetEvent = events.find((e) => e.type === WS_EVENT.QUEUE_UPDATED && e.data.count === 0);
     expect(queueResetEvent).toBeDefined();
@@ -272,4 +270,123 @@ describe('OrchestratorService', () => {
     expect(result.messageId).toBeDefined();
     expect(typeof result.messageId).toBe('string');
   });
+
+  test('sendMessageFromApi calls checkAndSendAuthStatus first', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = false;
+    // Mock strategy checkAuthStatus returns true, so it will authenticate
+    const result = await orch.sendMessageFromApi('hello');
+    // After checkAndSendAuthStatus, isAuthenticated becomes true
+    expect(result.accepted).toBe(true);
+    expect(orch.isAuthenticated).toBe(true);
+  });
+
+  test('handleClientMessage initiate_auth sends auth_success when already authenticated', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = false;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    // Mock strategy returns true for checkAuthStatus
+    await orch.handleClientMessage({ action: WS_ACTION.INITIATE_AUTH });
+    const authSuccess = events.find((e) => e.type === WS_EVENT.AUTH_SUCCESS);
+    expect(authSuccess).toBeDefined();
+    expect(orch.isAuthenticated).toBe(true);
+  });
+
+  test('handleClientMessage cancel_auth sets isAuthenticated to false', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.CANCEL_AUTH });
+    expect(orch.isAuthenticated).toBe(false);
+    const authStatus = events.find((e) => e.type === WS_EVENT.AUTH_STATUS);
+    expect(authStatus).toBeDefined();
+    expect(authStatus?.data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
+  });
+
+  test('handleClientMessage reauthenticate clears credentials and re-initiates auth', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.REAUTHENTICATE });
+    // Mock strategy auto-authenticates via executeAuth callback, but the immediate
+    // effect is that auth_status UNAUTHENTICATED is first emitted
+    const authStatus = events.find((e) => e.type === WS_EVENT.AUTH_STATUS);
+    expect(authStatus).toBeDefined();
+    expect(authStatus?.data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
+  });
+
+  test('handleClientMessage logout sets isAuthenticated and isProcessing to false', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    orch.isProcessing = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.LOGOUT });
+    expect(orch.isAuthenticated).toBe(false);
+    expect(orch.isProcessing).toBe(false);
+    const authStatus = events.find((e) => e.type === WS_EVENT.AUTH_STATUS);
+    expect(authStatus?.data.isProcessing).toBe(false);
+  });
+
+  test('handleClientMessage submit_auth_code passes code to strategy', async () => {
+    const orch = await createOrchestrator();
+    // Should not throw — mock strategy handles it
+    await orch.handleClientMessage({ action: WS_ACTION.SUBMIT_AUTH_CODE, code: 'test-code' });
+  });
+
+  test('handleClientMessage submit_story stores story for last assistant', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    // First send a message to create an activity
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    const story = [
+      { id: 's1', type: 'step', message: 'Did something', timestamp: new Date().toISOString() },
+    ];
+    await orch.handleClientMessage({ action: WS_ACTION.SUBMIT_STORY, story });
+    // Should emit activity_updated or activity_appended
+    const hasActivityEvent = events.some(
+      (e) => e.type === WS_EVENT.ACTIVITY_UPDATED || e.type === WS_EVENT.ACTIVITY_APPENDED
+    );
+    expect(hasActivityEvent).toBe(true);
+  });
+
+  test('handleClientMessage submit_story without prior activity creates new', async () => {
+    const orch = await createOrchestrator();
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    const story = [
+      { id: 's1', type: 'step', message: 'New story', timestamp: new Date().toISOString() },
+    ];
+    await orch.handleClientMessage({ action: WS_ACTION.SUBMIT_STORY, story });
+    const appended = events.find((e) => e.type === WS_EVENT.ACTIVITY_APPENDED);
+    expect(appended).toBeDefined();
+  });
+
+  test('outbound getter returns the Subject', async () => {
+    const orch = await createOrchestrator();
+    expect(orch.outbound).toBeDefined();
+    expect(typeof orch.outbound.subscribe).toBe('function');
+  });
+
+  test('messages getter returns message store', async () => {
+    const orch = await createOrchestrator();
+    expect(orch.messages).toBeDefined();
+    expect(typeof orch.messages.all).toBe('function');
+  });
+
+  test('ensureStrategySettings calls strategy.ensureSettings', async () => {
+    const orch = await createOrchestrator();
+    orch.ensureStrategySettings(); // Should not throw
+  });
+
+  test('handleClientMessage unknown action warns but does not throw', async () => {
+    const orch = await createOrchestrator();
+    await orch.handleClientMessage({ action: 'nonexistent_action' });
+  });
 });
+

@@ -16,7 +16,7 @@ export const STATE_LABELS: Record<ChatState, string> = {
   [CHAT_STATES.AGENT_OFFLINE]: 'Agent offline',
   [CHAT_STATES.UNAUTHENTICATED]: 'Authentication required',
   [CHAT_STATES.AUTH_PENDING]: 'Authentication in progress...',
-  [CHAT_STATES.AUTHENTICATED]: 'Ready to help',
+  [CHAT_STATES.AUTHENTICATED]: 'Ready',
   [CHAT_STATES.AWAITING_RESPONSE]: 'Working...',
   [CHAT_STATES.LOGGING_OUT]: 'Logging out...',
   [CHAT_STATES.ERROR]: 'Error occurred',
@@ -24,7 +24,7 @@ export const STATE_LABELS: Record<ChatState, string> = {
 
 export const CHAT_INPUT_PLACEHOLDER = {
   AUTH_REQUIRED: 'Complete authentication to start chatting...',
-  READY: 'Ask me anything...',
+  READY: 'Talk to fibe...',
   WORKING: 'Queue a message for the agent...',
 } as const;
 

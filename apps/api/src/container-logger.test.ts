@@ -4,6 +4,7 @@ import {
   ContainerLoggerService,
   logRequest,
   logWs,
+  resetLogLevelCache,
 } from './container-logger';
 
 describe('containerLog', () => {
@@ -19,6 +20,7 @@ describe('containerLog', () => {
     realStdout = process.stdout.write.bind(process.stdout);
     realStderr = process.stderr.write.bind(process.stderr);
     logLevelBackup = process.env.LOG_LEVEL;
+    resetLogLevelCache();
     (process.stdout as { write: (chunk: unknown, cb?: () => void) => boolean }).write = (
       chunk: unknown
     ) => {
@@ -134,6 +136,7 @@ describe('ContainerLoggerService', () => {
     stderr = [];
     realStdout = process.stdout.write.bind(process.stdout);
     realStderr = process.stderr.write.bind(process.stderr);
+    resetLogLevelCache();
     process.env.LOG_LEVEL = 'verbose';
     (process.stdout as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
       stdout.push(String(chunk));
@@ -215,6 +218,7 @@ describe('logRequest', () => {
   beforeEach(() => {
     stdout = [];
     realStdout = process.stdout.write.bind(process.stdout);
+    resetLogLevelCache();
     process.env.LOG_LEVEL = 'log';
     (process.stdout as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
       stdout.push(String(chunk));
@@ -279,6 +283,7 @@ describe('logWs', () => {
   beforeEach(() => {
     stdout = [];
     realStdout = process.stdout.write.bind(process.stdout);
+    resetLogLevelCache();
     process.env.LOG_LEVEL = 'log';
     (process.stdout as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
       stdout.push(String(chunk));

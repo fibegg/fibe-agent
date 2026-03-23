@@ -36,6 +36,10 @@ export class GeminiStrategy implements AgentStrategy {
     return join(process.cwd(), 'playground');
   }
 
+  getWorkingDir(): string {
+    return this.getGeminiWorkspaceDir();
+  }
+
   ensureSettings(): void {
     if (!existsSync(GEMINI_CONFIG_DIR)) {
       mkdirSync(GEMINI_CONFIG_DIR, { recursive: true });

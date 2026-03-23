@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from './file-explorer';
+import { FileExplorer, type PlaygroundEntry } from './file-explorer';
+import { FileViewerPanel } from './file-viewer-panel';
 
 vi.mock('../api-url', () => ({
   apiRequest: (path: string, options?: RequestInit) => fetch(path, options),

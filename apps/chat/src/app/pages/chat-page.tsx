@@ -7,6 +7,7 @@ import { MessageList, type MessageListHandle } from '../chat/message-list';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
+import { useAgentFiles } from '../chat/use-agent-files';
 import { useChatLayout } from '../chat/use-chat-layout';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { useChatAttachments, MAX_PENDING_TOTAL } from '../chat/use-chat-attachments';
@@ -16,7 +17,9 @@ import { useChatModel } from '../chat/use-chat-model';
 import { useChatDisplayState } from '../chat/use-chat-display-state';
 import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
-import { FileExplorer, FileViewerPanel, type PlaygroundEntry } from '../file-explorer/file-explorer';
+import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
+import type { FileTab } from '../file-explorer/file-explorer-tabs';
+import { FileViewerPanel } from '../file-explorer/file-viewer-panel';
 import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
@@ -42,10 +45,14 @@ export function ChatPage() {
   const { messages, setMessages, modelOptions, refreshingModels, refreshModelOptions } = useChatInitialData(authenticated);
   const scroll = useScrollToBottom([messages, streamingText]);
 
-  const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, refetch: refetchPlaygrounds } =
+  const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, stats: playgroundStats, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
+  const { tree: agentFileTree, hasFiles: hasAgentFiles, stats: agentStats } =
+    useAgentFiles();
   const hasPlaygroundFiles = playgroundEntries.length > 0;
-  const layout = useChatLayout(hasPlaygroundFiles, playgroundLoading);
+  const hasAnyFiles = hasPlaygroundFiles || hasAgentFiles;
+  const layout = useChatLayout(hasAnyFiles, playgroundLoading);
+  const [activeFileTab, setActiveFileTab] = useState<FileTab>('playground');
   const {
     isMobile,
     sidebarOpen,
@@ -250,6 +257,13 @@ export function ChatPage() {
         ...(pendingAttachments.length ? { attachmentFilenames: pendingAttachments.map((a) => a.filename) } : {}),
       });
     }
+
+    try {
+      window.parent.postMessage({ type: 'player_message_sent' }, '*');
+    } catch (_) {
+      // ignore across cross-origin if parent is unavailable
+    }
+
     if (text) {
       setMessages((prev) => [
         ...prev,
@@ -378,6 +392,12 @@ export function ChatPage() {
           <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20`}>
             <FileExplorer
               tree={playgroundTree}
+              agentTree={agentFileTree as PlaygroundEntry[]}
+              activeTab={activeFileTab}
+              onTabChange={setActiveFileTab}
+              agentFileApiPath="agent-files/file"
+              playgroundStats={playgroundStats}
+              agentStats={agentStats}
               onSettingsClick={() => setSettingsOpen(true)}
               onClose={closeMobileSidebar}
               onFileSelect={(entry) => {
@@ -419,7 +439,7 @@ export function ChatPage() {
           className="flex min-h-0 flex-shrink-0 flex-col overflow-visible transition-[width] duration-300 ease-out"
           style={{
             width:
-              !hasPlaygroundFiles || sidebarCollapsed
+              !hasAnyFiles || sidebarCollapsed
                 ? SIDEBAR_COLLAPSED_WIDTH_PX
                 : SIDEBAR_WIDTH_PX,
           }}
@@ -427,7 +447,13 @@ export function ChatPage() {
           <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
             <FileExplorer
               tree={playgroundTree}
-              collapsed={!hasPlaygroundFiles || sidebarCollapsed}
+              agentTree={agentFileTree as PlaygroundEntry[]}
+              activeTab={activeFileTab}
+              onTabChange={setActiveFileTab}
+              agentFileApiPath="agent-files/file"
+              playgroundStats={playgroundStats}
+              agentStats={agentStats}
+              collapsed={!hasAnyFiles || sidebarCollapsed}
               onSettingsClick={() => setSettingsOpen(true)}
               onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
               onFileSelect={(entry) => setViewingFile(entry)}
@@ -519,6 +545,7 @@ export function ChatPage() {
               entry={viewingFile}
               onClose={() => setViewingFile(null)}
               inline
+              apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
             />
           </div>
         )}

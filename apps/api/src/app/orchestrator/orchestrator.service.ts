@@ -10,7 +10,7 @@ import {
   type StoredStoryEntry,
 } from '../message-store/message-store.service';
 import { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
-import { PlaygroundsService } from '../playgrounds/playgrounds.service';
+
 import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -18,13 +18,11 @@ import type {
   AgentStrategy,
   AuthConnection,
   LogoutConnection,
-  StreamingCallbacks,
   ThinkingStep,
   TokenUsage,
-  ToolEvent,
 } from '../strategies/strategy.types';
 import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
-import { DEFAULT_PROVIDER, StrategyRegistryService } from '../strategies/strategy-registry.service';
+import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
   AUTH_STATUS as AUTH_STATUS_VAL,
   ERROR_CODE,
@@ -35,6 +33,8 @@ import {
 import { writeMcpConfig } from '../config/mcp-config-writer';
 
 import { ChatPromptContextService } from './chat-prompt-context.service';
+import { finishAgentStream, type FinishAgentStreamDeps } from './finish-agent-stream';
+import { createStreamingCallbacks } from './orchestrator-streaming-callbacks';
 
 export interface OutboundEvent {
   type: string;
@@ -60,13 +60,11 @@ export class OrchestratorService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly strategyRegistry: StrategyRegistryService,
     private readonly uploadsService: UploadsService,
-    private readonly playgroundsService: PlaygroundsService,
     private readonly phoenixSync: PhoenixSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
     private readonly steering: SteeringService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
-    void this.playgroundsService;
   }
 
   async onModuleInit(): Promise<void> {
@@ -81,6 +79,11 @@ export class OrchestratorService implements OnModuleInit {
         }
       }
     }
+
+    // Subscribe to queue count variations from steering service
+    this.steering.count$.subscribe((count) => {
+      this._send(WS_EVENT.QUEUE_UPDATED, { count });
+    });
   }
 
   get outbound(): Subject<OutboundEvent> {
@@ -95,33 +98,19 @@ export class OrchestratorService implements OnModuleInit {
     this.outbound$.next({ type, data });
   }
 
-  private finishStream(
-    accumulated: string,
-    stepId: string,
-    step: ThinkingStep,
-    usage?: TokenUsage
-  ): void {
-    const finalText = accumulated || 'The agent produced no visible output.';
-    const storedModel = (this.modelStore.get() || '').trim();
-    const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
-    this.messageStore.add('assistant', finalText, undefined, model);
-    void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
-    this._send(WS_EVENT.THINKING_STEP, {
-      id: stepId,
-      title: step.title,
-      status: 'complete',
-      details: step.details,
-      timestamp: new Date().toISOString(),
-    });
-    this._send(WS_EVENT.STREAM_END, { ...(usage ? { usage } : {}), model });
-    if (this.currentActivityId && usage) {
-      this.activityStore.setUsage(this.currentActivityId, usage);
-      const entry = this.activityStore.getById(this.currentActivityId);
-      if (entry) {
-        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry });
-      }
-    }
-    this.lastStreamUsage = undefined;
+  private finishStreamDeps(): FinishAgentStreamDeps {
+    return {
+      messageStore: this.messageStore,
+      modelStore: this.modelStore,
+      activityStore: this.activityStore,
+      phoenixSync: this.phoenixSync,
+      send: (type: string, data?: Record<string, unknown>) =>
+        this._send(type, data ?? {}),
+      getCurrentActivityId: () => this.currentActivityId,
+      clearLastStreamUsage: () => {
+        this.lastStreamUsage = undefined;
+      },
+    };
   }
 
   ensureStrategySettings(): void {
@@ -163,7 +152,7 @@ export class OrchestratorService implements OnModuleInit {
         break;
       case WS_ACTION.SEND_CHAT_MESSAGE:
         if (this.isProcessing) {
-          this.handleQueueMessage(msg.text ?? '');
+          await this.handleQueueMessage(msg.text ?? '');
         } else {
           await this.handleChatMessage(
             msg.text ?? '',
@@ -175,7 +164,7 @@ export class OrchestratorService implements OnModuleInit {
         }
         break;
       case WS_ACTION.QUEUE_MESSAGE:
-        this.handleQueueMessage(msg.text ?? '');
+        await this.handleQueueMessage(msg.text ?? '');
         break;
       case WS_ACTION.SUBMIT_STORY:
         this.handleSubmitStory(msg.story ?? []);
@@ -204,6 +193,7 @@ export class OrchestratorService implements OnModuleInit {
     this._send(WS_EVENT.ACTIVITY_SNAPSHOT, {
       activity: this.activityStore.all(),
     });
+    this._send(WS_EVENT.QUEUE_UPDATED, { count: this.steering.count });
   }
 
   private async checkAndSendAuthStatus(): Promise<void> {
@@ -275,8 +265,8 @@ export class OrchestratorService implements OnModuleInit {
       return { accepted: false, error: ERROR_CODE.AGENT_BUSY };
     }
     this.isProcessing = true;
-    this.steering.resetQueue();
-    this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
+    await this.steering.resetQueue();
+    // count$ handles QUEUE_UPDATED organically but this helps the API send immediately
     const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(text, images, undefined, undefined, attachmentFilenames);
     void this.runAgentResponse(_text, urls, af, att).catch((err) =>
@@ -380,16 +370,44 @@ export class OrchestratorService implements OnModuleInit {
         timestamp: syntheticStep.timestamp.toISOString(),
       });
       this.lastStreamUsage = undefined;
-      const callbacks = this.buildStreamingCallbacks();
+      const streamDeps = {
+        send: (type: string, data?: Record<string, unknown>) =>
+          this._send(type, data ?? {}),
+        activityStore: this.activityStore,
+        getCurrentActivityId: () => this.currentActivityId,
+        getReasoningText: () => this.reasoningTextAccumulated,
+        appendReasoningText: (t: string) => {
+          this.reasoningTextAccumulated += t;
+        },
+        clearReasoningText: () => {
+          this.reasoningTextAccumulated = '';
+        },
+        setLastStreamUsage: (u: TokenUsage | undefined) => {
+          this.lastStreamUsage = u;
+        },
+      };
+      const callbacks = createStreamingCallbacks(streamDeps);
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
       }, callbacks, systemPrompt || undefined);
-      this.finishStream(accumulated, syntheticStepId, syntheticStep, this.lastStreamUsage);
+      finishAgentStream(
+        this.finishStreamDeps(),
+        accumulated,
+        syntheticStepId,
+        syntheticStep,
+        this.lastStreamUsage
+      );
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       if (raw === INTERRUPTED_MESSAGE) {
-        this.finishStream(accumulated, syntheticStepId, syntheticStep, this.lastStreamUsage);
+        finishAgentStream(
+          this.finishStreamDeps(),
+          accumulated,
+          syntheticStepId,
+          syntheticStep,
+          this.lastStreamUsage
+        );
       } else {
         const message = raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
         this._send(WS_EVENT.ERROR, { message });
@@ -411,8 +429,8 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
     this.isProcessing = true;
-    this.steering.resetQueue();
-    this._send(WS_EVENT.QUEUE_UPDATED, { count: 0 });
+    await this.steering.resetQueue();
+    // the count$ stream will emit QUEUE_UPDATED automatically, but doing it here ensures immediate UI feedback
     const { text: _t, imageUrls, audioFilename, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(
         text,
@@ -424,95 +442,11 @@ export class OrchestratorService implements OnModuleInit {
     await this.runAgentResponse(_t, imageUrls, audioFilename, att);
   }
 
-  private buildStreamingCallbacks(): StreamingCallbacks {
-    return {
-      onReasoningStart: () => this._send(WS_EVENT.REASONING_START, {}),
-      onReasoningChunk: (reasoningText) => {
-        this.reasoningTextAccumulated += reasoningText;
-        this._send(WS_EVENT.REASONING_CHUNK, { text: reasoningText });
-      },
-      onReasoningEnd: () => {
-        this._send(WS_EVENT.REASONING_END, {});
-        if (this.currentActivityId && this.reasoningTextAccumulated.trim()) {
-          this.activityStore.appendEntry(this.currentActivityId, {
-            id: randomUUID(),
-            type: 'reasoning_start',
-            message: 'Reasoning',
-            timestamp: new Date().toISOString(),
-            details: this.reasoningTextAccumulated.trim(),
-          });
-        }
-        this.reasoningTextAccumulated = '';
-      },
-      onStep: (step) => {
-        this._send(WS_EVENT.THINKING_STEP, {
-          id: step.id,
-          title: step.title,
-          status: step.status,
-          details: step.details,
-          timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : step.timestamp,
-        });
-        if (this.currentActivityId) {
-          this.activityStore.appendEntry(this.currentActivityId, {
-            id: step.id,
-            type: 'step',
-            message: step.title,
-            timestamp: step.timestamp instanceof Date ? step.timestamp.toISOString() : String(step.timestamp),
-            details: step.details,
-          });
-        }
-      },
-      onAuthRequired: (url) => {
-        this._send(WS_EVENT.AUTH_URL_GENERATED, { url });
-      },
-      onUsage: (usage) => {
-        this.lastStreamUsage = usage;
-      },
-      onTool: (event: ToolEvent) => {
-        if (event.kind === 'file_created') {
-          this._send(WS_EVENT.FILE_CREATED, {
-            name: event.name,
-            path: event.path,
-            summary: event.summary,
-          });
-          if (this.currentActivityId) {
-            this.activityStore.appendEntry(this.currentActivityId, {
-              id: randomUUID(),
-              type: 'file_created',
-              message: event.summary ?? event.name,
-              timestamp: new Date().toISOString(),
-              path: event.path,
-            });
-          }
-        } else {
-          this._send(WS_EVENT.TOOL_CALL, {
-            name: event.name,
-            path: event.path,
-            summary: event.summary,
-            command: event.command,
-            details: event.details,
-          });
-          if (this.currentActivityId) {
-            this.activityStore.appendEntry(this.currentActivityId, {
-              id: randomUUID(),
-              type: 'tool_call',
-              message: event.summary ?? event.name,
-              timestamp: new Date().toISOString(),
-              command: event.command,
-              details: event.details,
-            });
-          }
-        }
-      },
-    };
-  }
-
-  private handleQueueMessage(text: string): void {
+  private async handleQueueMessage(text: string): Promise<void> {
     if (!text.trim()) return;
-    this.steering.enqueue(text);
+    await this.steering.enqueue(text);
     const userMessage = this.messageStore.add('user', text);
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
-    this._send(WS_EVENT.QUEUE_UPDATED, { count: this.steering.count });
     void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
   }
 

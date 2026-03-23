@@ -102,6 +102,10 @@ export class ClaudeCodeStrategy implements AgentStrategy {
     return PLAYGROUND_DIR;
   }
 
+  getWorkingDir(): string {
+    return this.getClaudeWorkspaceDir();
+  }
+
   private getEnvToken(): string | null {
     for (const key of ENV_TOKEN_VARS) {
       const value = process.env[key];
@@ -279,7 +283,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
         '-p',
         prompt,
         '--dangerously-skip-permissions',
-        ...(systemPrompt ? ['--system-prompt', systemPrompt] : []),
+        ...(systemPrompt ? ['--system-prompt', systemPrompt.trim()] : []),
         ...(useStreamJson
           ? [
               '--output-format',

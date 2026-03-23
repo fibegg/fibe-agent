@@ -53,6 +53,10 @@ export class OpencodeStrategy implements AgentStrategy {
     return PLAYGROUND_DIR;
   }
 
+  getWorkingDir(): string {
+    return this.getOpencodeWorkspaceDir();
+  }
+
   /**
    * Reads a manually stored API key from the auth file (set via auth modal).
    */

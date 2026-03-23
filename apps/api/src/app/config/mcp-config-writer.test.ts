@@ -34,7 +34,7 @@ describe('writeMcpConfig', () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
         'playgrounds-dev': {
-          serverUrl: 'https://my.playgrounds.dev',
+          serverUrl: 'https://my.fibe.gg',
           authHeader: 'Bearer test123',
         },
       },
@@ -53,7 +53,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           'playgrounds-dev': {
-            serverUrl: 'https://my.playgrounds.dev',
+            serverUrl: 'https://my.fibe.gg',
             authHeader: 'Bearer plgr_test_key123',
           },
         },
@@ -68,7 +68,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer plgr_test_key123'],
+        args: ['-y', 'mcp-remote', 'https://my.fibe.gg', '--header', 'Authorization:Bearer plgr_test_key123'],
       });
     });
 
@@ -87,7 +87,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           'playgrounds-dev': {
-            serverUrl: 'https://my.playgrounds.dev',
+            serverUrl: 'https://my.fibe.gg',
             authHeader: 'Bearer plgr_test_key123',
           },
           Sentry: {
@@ -130,7 +130,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           'playgrounds-dev': {
-            serverUrl: 'https://my.playgrounds.dev',
+            serverUrl: 'https://my.fibe.gg',
             authHeader: 'Bearer key',
           },
           docker: {
@@ -173,7 +173,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
-      // Default setup uses https://my.playgrounds.dev
+      // Default setup uses https://my.fibe.gg
       expect(config.mcpServers['playgrounds-dev'].args).not.toContain('--allow-http');
     });
   });
@@ -184,7 +184,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           'playgrounds-dev': {
-            serverUrl: 'https://my.playgrounds.dev',
+            serverUrl: 'https://my.fibe.gg',
             authHeader: 'Bearer plgr_test_key456',
           },
         },
@@ -199,7 +199,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer plgr_test_key456'],
+        args: ['-y', 'mcp-remote', 'https://my.fibe.gg', '--header', 'Authorization:Bearer plgr_test_key456'],
       });
     });
 
@@ -234,7 +234,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           'playgrounds-dev': {
-            serverUrl: 'https://my.playgrounds.dev',
+            serverUrl: 'https://my.fibe.gg',
             authHeader: 'Bearer plgr_test_key789',
           },
         },
@@ -248,7 +248,7 @@ describe('writeMcpConfig', () => {
       expect(existsSync(configPath)).toBe(true);
       const content = readFileSync(configPath, 'utf8');
       expect(content).toContain('[mcp_servers."playgrounds-dev"]');
-      expect(content).toContain('url = "https://my.playgrounds.dev"');
+      expect(content).toContain('url = "https://my.fibe.gg"');
     });
 
     it('preserves existing config.toml content', () => {
@@ -290,13 +290,30 @@ describe('writeMcpConfig', () => {
       expect(contentAfterSecond).not.toMatch(/^\s*\]\s*$/m);
       expect(contentAfterSecond).toContain('[mcp_servers."github"]');
     });
+
+    it('writes stdio server with env vars in toml', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          github: {
+            command: 'npx',
+            args: ['-y', '@modelcontextprotocol/server-github'],
+            env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghp_token123' },
+          },
+        },
+      });
+      writeMcpConfig();
+      const content = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
+      expect(content).toContain('[mcp_servers."github"]');
+      expect(content).toContain('type = "stdio"');
+      expect(content).toContain('env = { GITHUB_PERSONAL_ACCESS_TOKEN = "ghp_token123" }');
+    });
   });
 
   describe('legacy format support', () => {
     it('handles legacy flat { serverUrl, authHeader } format', () => {
       process.env.AGENT_PROVIDER = 'gemini';
       process.env.MCP_CONFIG_JSON = JSON.stringify({
-        serverUrl: 'https://my.playgrounds.dev',
+        serverUrl: 'https://my.fibe.gg',
         authHeader: 'Bearer legacy_key',
       });
       delete process.env.DOCKER_MCP_CONFIG_JSON;
@@ -306,7 +323,7 @@ describe('writeMcpConfig', () => {
       );
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://my.playgrounds.dev', '--header', 'Authorization:Bearer legacy_key'],
+        args: ['-y', 'mcp-remote', 'https://my.fibe.gg', '--header', 'Authorization:Bearer legacy_key'],
       });
     });
   });
@@ -323,7 +340,7 @@ describe('writeMcpConfig', () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
         'playgrounds-dev': {
-          serverUrl: 'https://my.playgrounds.dev',
+          serverUrl: 'https://my.fibe.gg',
           authHeader: 'Bearer test',
         },
       },

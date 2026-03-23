@@ -14,6 +14,10 @@ export class MockStrategy implements AgentStrategy {
     void _config;
   }
 
+  getWorkingDir(): null {
+    return null;
+  }
+
   executeAuth(connection: AuthConnection): void {
     this.logger.log('executeAuth: Mocking auth success in 1s');
     setTimeout(() => {

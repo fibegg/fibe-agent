@@ -11,7 +11,7 @@ function parseList(value: string | undefined): string[] {
 export function getCorsOrigin(env: NodeJS.ProcessEnv): true | string[] {
   const raw = env.CORS_ORIGINS?.trim();
   if (!raw || raw === '*') return true;
-  const list = parseList(env.CORS_ORIGINS ?? '');
+  const list = parseList(raw);
   return list.length > 0 ? list : DEFAULT_CORS_ORIGINS;
 }
 

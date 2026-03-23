@@ -79,7 +79,7 @@ export default defineConfig(() => ({
     },
   },
   test: {
-    name: '@playgrounds.dev/chat',
+    name: '@fibe.gg/chat',
     watch: false,
     globals: true,
     environment: 'jsdom',
@@ -88,6 +88,10 @@ export default defineConfig(() => ({
     coverage: {
       reportsDirectory: './test-output/vitest/coverage',
       provider: 'v8' as const,
+      all: true,
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.{test,spec}.{ts,tsx}', 'src/**/*.d.ts', 'src/main.tsx', 'src/vite-env.d.ts'],
     },
   },
 }));
+

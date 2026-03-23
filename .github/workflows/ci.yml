@@ -24,14 +24,14 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.bun/install/cache
-          key: bun-${{ runner.os }}-${{ hashFiles('bun.lockb') }}
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
           restore-keys: |
             bun-${{ runner.os }}-
       - name: Cache Nx
         uses: actions/cache@v4
         with:
           path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('bun.lockb', 'nx.json', 'package.json') }}
+          key: nx-${{ runner.os }}-${{ hashFiles('bun.lock', 'nx.json', 'package.json') }}
           restore-keys: |
             nx-${{ runner.os }}-
       - name: Install dependencies

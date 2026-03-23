@@ -1,5 +1,7 @@
-import { Brain, Search, Sparkles, X } from 'lucide-react';
+import { Brain, ChevronDown, ChevronRight, Loader2, Search, Sparkles, Terminal, X } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useEffect, useRef, useState } from 'react';
+import { CountUpNumber } from './count-up-number';
 import {
   getActivityIcon,
   getActivityLabel,
@@ -149,18 +151,28 @@ export function StoryDetail({
 }
 
 export interface ActivityTypeFiltersProps {
-  typeFilter: string | null;
-  onTypeFilterChange: (filter: string | null) => void;
+  typeFilter: string[];
+  onTypeFilterChange: (filter: string[]) => void;
 }
 
 export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: ActivityTypeFiltersProps) {
+  const isAllActive = typeFilter.length === 0;
+
+  const toggleFilter = (key: string) => {
+    if (typeFilter.includes(key)) {
+      onTypeFilterChange(typeFilter.filter((f) => f !== key));
+    } else {
+      onTypeFilterChange([...typeFilter, key]);
+    }
+  };
+
   return (
     <div className="px-3 py-3 flex flex-wrap gap-2 shrink-0 border-b border-border/50">
       <button
         type="button"
-        onClick={() => onTypeFilterChange(null)}
+        onClick={() => onTypeFilterChange([])}
         className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors border ${
-          typeFilter === null
+          isAllActive
             ? 'bg-violet-500/20 text-violet-300 border-violet-500/40'
             : 'bg-muted/50 text-muted-foreground border-border/50 hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30'
         }`}
@@ -169,14 +181,14 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
       </button>
       {ACTIVITY_TYPE_FILTERS.map((filterKey) => {
         const label = getTypeFilterLabel(filterKey);
-        const isActive = typeFilter === filterKey;
+        const isActive = typeFilter.includes(filterKey);
         const activeStyle = BADGE_ACTIVE_STYLES[filterKey] ?? 'bg-violet-500/20 text-violet-300 border-violet-500/40';
         const inactiveStyle = BADGE_INACTIVE_STYLES[filterKey] ?? 'hover:bg-violet-500/10 hover:text-violet-400 hover:border-violet-500/30';
         return (
           <button
             key={filterKey}
             type="button"
-            onClick={() => onTypeFilterChange(filterKey)}
+            onClick={() => toggleFilter(filterKey)}
             className={`px-3 py-1.5 rounded-full text-[11px] font-medium transition-colors border ${
               isActive ? activeStyle : `bg-muted/50 text-muted-foreground border-border/50 ${inactiveStyle}`
             }`}
@@ -189,11 +201,109 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
   );
 }
 
+// ─── Command grouping (same as in AgentThinkingSidebar) ──────────────────────
+
+const COMMAND_GROUP_MIN = 3;
+
+type ActivityDisplayItem =
+  | { kind: 'entry'; story: StoryEntry; originalIndex: number }
+  | { kind: 'command_group'; id: string; entries: Array<{ story: StoryEntry; originalIndex: number }> };
+
+function buildActivityDisplayList(stories: StoryEntry[]): ActivityDisplayItem[] {
+  const result: ActivityDisplayItem[] = [];
+  let i = 0;
+  while (i < stories.length) {
+    if (stories[i].type !== 'tool_call') {
+      result.push({ kind: 'entry', story: stories[i], originalIndex: i });
+      i++;
+      continue;
+    }
+    let j = i;
+    while (j < stories.length && stories[j].type === 'tool_call') j++;
+    const runLength = j - i;
+    if (runLength >= COMMAND_GROUP_MIN) {
+      const startIndex = i;
+      result.push({
+        kind: 'command_group',
+        id: `cg-${stories[i].id}`,
+        entries: stories.slice(i, j).map((s, k) => ({ story: s, originalIndex: startIndex + k })),
+      });
+    } else {
+      for (let k = i; k < j; k++) {
+        result.push({ kind: 'entry', story: stories[k], originalIndex: k });
+      }
+    }
+    i = j;
+  }
+  return result;
+}
+
+function CommandGroupListRow({
+  entries,
+  isAnySelected,
+  onSelectFirst,
+}: {
+  entries: Array<{ story: StoryEntry; originalIndex: number }>;
+  isAnySelected: boolean;
+  onSelectFirst: () => void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const n = entries.length;
+  const first = entries[0];
+  if (!first) return null;
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => {
+          onSelectFirst();
+          setExpanded((v) => !v);
+        }}
+        className={`${TREE_NODE_BASE} ${
+          isAnySelected
+            ? 'bg-violet-400/15 text-violet-300'
+            : 'text-amber-400/80 hover:bg-violet-400/10 hover:text-violet-300'
+        }`}
+        aria-expanded={expanded}
+      >
+        {expanded
+          ? <ChevronDown className="size-3.5 shrink-0 text-violet-500" />
+          : <ChevronRight className="size-3.5 shrink-0 text-violet-500" />}
+        <Terminal className="size-3.5 shrink-0 text-violet-500" />
+        <span className="flex-1 truncate text-left text-xs">
+          {n} command{n !== 1 ? 's' : ''}
+        </span>
+        <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>
+          {formatRelativeTime(first.story.timestamp)}
+        </span>
+      </button>
+      {expanded && (
+        <div className="flex flex-col mt-0.5 mb-0.5 ml-6 gap-px max-h-40 overflow-y-auto">
+          {entries.map(({ story }) => (
+            <button
+              key={story.id}
+              type="button"
+              onClick={onSelectFirst}
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-violet-400/10 transition-colors"
+            >
+              <span className="text-amber-400/60 shrink-0 text-[10px] font-mono select-none">$</span>
+              <span className="text-[11px] font-mono text-green-300/80 truncate">
+                {commandLabel(story)}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export interface ActivityStoryListProps {
   stories: StoryEntry[];
   selectedIndex: number;
   onSelectStory: (index: number) => void;
   emptyMessage: string;
+  isFollowing?: boolean;
 }
 
 export function ActivityStoryList({
@@ -201,23 +311,46 @@ export function ActivityStoryList({
   selectedIndex,
   onSelectStory,
   emptyMessage,
+  isFollowing = false,
 }: ActivityStoryListProps) {
   const safeIndex = Math.min(selectedIndex, Math.max(0, stories.length - 1));
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll list to top (newest item) when following and story count changes
+  useEffect(() => {
+    if (!isFollowing || stories.length === 0) return;
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [isFollowing, stories.length]);
+
   if (stories.length === 0) {
     return (
       <p className="text-xs text-muted-foreground px-2 py-4">{emptyMessage}</p>
     );
   }
+  const displayList = buildActivityDisplayList(stories);
   return (
-    <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 min-h-0">
-      {stories.map((story, index) => (
-        <StoryListRow
-          key={story.id}
-          story={story}
-          isSelected={index === safeIndex}
-          onSelect={() => onSelectStory(index)}
-        />
-      ))}
+    <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 min-h-0">
+      {displayList.map((item) => {
+        if (item.kind === 'command_group') {
+          const isAnySelected = item.entries.some((e) => e.originalIndex === safeIndex);
+          return (
+            <CommandGroupListRow
+              key={item.id}
+              entries={item.entries}
+              isAnySelected={isAnySelected}
+              onSelectFirst={() => onSelectStory(item.entries[0]?.originalIndex ?? 0)}
+            />
+          );
+        }
+        return (
+          <StoryListRow
+            key={item.story.id}
+            story={item.story}
+            isSelected={item.originalIndex === safeIndex}
+            onSelect={() => onSelectStory(item.originalIndex)}
+          />
+        );
+      })}
     </div>
   );
 }
@@ -230,6 +363,11 @@ export interface ActivityStoryDetailPanelProps {
   copyTooltipAnchor: { centerX: number; bottom: number } | null;
   brainButtonRef: React.RefObject<HTMLDivElement | null>;
   onCopyClick: () => void;
+  liveResponseText?: string;
+  brainState?: 'idle' | 'working' | 'complete';
+  totalStories?: number;
+  completedStories?: number;
+  isFollowing?: boolean;
 }
 
 export function ActivityStoryDetailPanel({
@@ -240,7 +378,24 @@ export function ActivityStoryDetailPanel({
   copyTooltipAnchor,
   brainButtonRef,
   onCopyClick,
+  liveResponseText = '',
+  brainState = 'idle',
+  totalStories = 0,
+  completedStories = 0,
+  isFollowing = false,
 }: ActivityStoryDetailPanelProps) {
+  const isWorking = brainState === 'working';
+  const isComplete = brainState === 'complete';
+  const brainColor = isWorking ? 'text-blue-400' : isComplete ? 'text-emerald-400' : 'text-violet-400';
+  const accentColor = isWorking ? 'text-blue-300' : isComplete ? 'text-emerald-300' : 'text-violet-300';
+  const statColor = isWorking ? 'text-blue-300' : isComplete ? 'text-emerald-400' : 'text-foreground';
+  const liveResponseRef = useRef<HTMLDivElement>(null);
+
+  // When following, scroll latest-response block into view whenever the text updates
+  useEffect(() => {
+    if (!isFollowing || !liveResponseText) return;
+    liveResponseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [isFollowing, liveResponseText]);
   return (
     <main
       className="flex-1 min-w-0 overflow-y-auto flex flex-col bg-transparent"
@@ -279,11 +434,20 @@ export function ActivityStoryDetailPanel({
                 </span>
               ) : (
                 <>
-                  <Brain className="size-8 text-violet-400 transition-colors" />
-                  <Sparkles
-                    className="size-5 text-violet-300 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"
-                    aria-hidden
-                  />
+                  <Brain className={`size-8 transition-colors ${brainColor}`} />
+                  {isWorking ? (
+                    <Loader2
+                      className={`size-5 ${accentColor} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
+                      aria-hidden
+                    />
+                  ) : (
+                    <Sparkles
+                      className={`size-5 ${accentColor} absolute -top-0.5 -right-0.5 ${
+                        isComplete ? '' : 'animate-pulse'
+                      } transition-colors`}
+                      aria-hidden
+                    />
+                  )}
                 </>
               )}
             </button>
@@ -304,11 +468,32 @@ export function ActivityStoryDetailPanel({
               </span>,
               document.body
             )}
-          <h1 className="font-semibold text-sm text-foreground truncate min-w-0 flex-1 pl-3">
-            {selectedStory
-              ? `${getActivityLabel(selectedStory.type)} · ${formatRelativeTime(selectedStory.timestamp)}`
-              : 'All activities'}
-          </h1>
+          <div className="flex flex-col min-w-0 flex-1 pl-3 gap-0.5">
+            <h1 className="font-semibold text-sm text-foreground truncate min-w-0">
+              {selectedStory
+                ? `${getActivityLabel(selectedStory.type)} · ${formatRelativeTime(selectedStory.timestamp)}`
+                : 'All activities'}
+            </h1>
+            {totalStories > 0 && (
+              <p className="text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
+                <span className={`${statColor} transition-colors`}>
+                  <CountUpNumber value={totalStories} format="raw" />
+                </span>
+                <span className="text-muted-foreground/60 text-[10px]"> total</span>
+                <span className="text-muted-foreground/40 mx-0.5">·</span>
+                <span className="text-emerald-400 transition-colors">
+                  <CountUpNumber value={completedStories} format="raw" />
+                </span>
+                <span className="text-muted-foreground/60 text-[10px]"> done</span>
+                {isWorking && (
+                  <>
+                    <span className="text-muted-foreground/40 mx-0.5">·</span>
+                    <span className="text-cyan-400 text-[10px] animate-pulse">processing</span>
+                  </>
+                )}
+              </p>
+            )}
+          </div>
         </div>
         <div className={SEARCH_ROW_WRAPPER}>
           <Search className={SEARCH_ICON_POSITION} aria-hidden />
@@ -333,12 +518,30 @@ export function ActivityStoryDetailPanel({
         </div>
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+        {liveResponseText && (
+          <div ref={liveResponseRef} className="mb-4 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm shadow-violet-500/10">
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="relative flex size-2 shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
+                <span className="relative inline-flex rounded-full size-2 bg-violet-500" />
+              </span>
+              <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+                Latest Response
+              </p>
+            </div>
+            <div className="max-h-[40vh] overflow-y-auto">
+              <p className={`text-[11px] ${ACTIVITY_MONO} whitespace-pre-wrap`}>
+                {reasoningBodyWithHighlights(liveResponseText, detailSearchQuery)}
+              </p>
+            </div>
+          </div>
+        )}
         {selectedStory ? (
           <div className="w-full min-w-0">
             <StoryDetail story={selectedStory} highlightQuery={detailSearchQuery} />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">Select a story from the list.</p>
+          !liveResponseText && <p className="text-sm text-muted-foreground">Select a story from the list.</p>
         )}
       </div>
     </main>

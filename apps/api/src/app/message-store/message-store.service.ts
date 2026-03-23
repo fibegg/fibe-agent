@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
+import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
 
 export interface StoredStoryEntry {
   id: string;
@@ -29,11 +29,13 @@ export interface StoredMessage {
 @Injectable()
 export class MessageStoreService {
   private readonly messagesPath: string;
+  private readonly jsonWriter: SequentialJsonWriter;
   private messages: StoredMessage[] = [];
 
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.messagesPath = join(dataDir, 'messages.json');
+    this.jsonWriter = new SequentialJsonWriter(this.messagesPath, () => this.messages);
     this.ensureDataDir();
     this.messages = this.load();
   }
@@ -52,7 +54,7 @@ export class MessageStoreService {
       ...(model ? { model } : {}),
     };
     this.messages.push(message);
-    void this.save();
+    this.jsonWriter.schedule();
     return message;
   }
 
@@ -60,7 +62,7 @@ export class MessageStoreService {
     const last = this.messages[this.messages.length - 1];
     if (last?.role === 'assistant' && Array.isArray(story)) {
       last.story = story;
-      void this.save();
+      this.jsonWriter.schedule();
     }
   }
 
@@ -68,13 +70,13 @@ export class MessageStoreService {
     const last = this.messages[this.messages.length - 1];
     if (last?.role === 'assistant') {
       last.activityId = activityId;
-      void this.save();
+      this.jsonWriter.schedule();
     }
   }
 
   clear(): void {
     this.messages = [];
-    void this.save();
+    this.jsonWriter.schedule();
   }
 
   private ensureDataDir(): void {
@@ -93,10 +95,4 @@ export class MessageStoreService {
     }
   }
 
-  private async save(): Promise<void> {
-    await writeFile(
-      this.messagesPath,
-      JSON.stringify(this.messages, null, 2)
-    );
-  }
 }

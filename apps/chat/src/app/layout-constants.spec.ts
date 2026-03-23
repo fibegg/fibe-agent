@@ -29,7 +29,7 @@ describe('layout-constants', () => {
   });
 
   it('exports storage key for sidebar collapse', () => {
-    expect(SIDEBAR_COLLAPSE_STORAGE_KEY).toBe('phoenix-sidebar-collapsed');
+    expect(SIDEBAR_COLLAPSE_STORAGE_KEY).toBe('fibe-sidebar-collapsed');
   });
 
   it('exports expected right sidebar width values', () => {
@@ -39,7 +39,7 @@ describe('layout-constants', () => {
 
   it('exports storage key for right sidebar collapse', () => {
     expect(RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY).toBe(
-      'phoenix-right-sidebar-collapsed'
+      'fibe-right-sidebar-collapsed'
     );
   });
 });

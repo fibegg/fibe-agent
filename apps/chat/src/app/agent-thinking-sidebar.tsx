@@ -3,6 +3,8 @@ import { Brain, CheckCircle2, ChevronDown, ChevronRight, Loader2, Search, Sparkl
 import { createPortal } from 'react-dom';
 import { memo, useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
+import { usePersistedTypeFilter } from './use-persisted-type-filter';
+import { CountUpNumber } from './count-up-number';
 import {
   PANEL_HEADER_MIN_HEIGHT_PX,
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
@@ -14,7 +16,6 @@ import { TypingText } from './chat/typing-text';
 import {
   ensureUniqueStoryIds,
   filterVisibleStoryItems,
-  formatCompactInteger,
   getActivityIcon,
   getActivityLabel,
   getBlockVariant,
@@ -119,7 +120,7 @@ const ACTIVITY_DOT_COLOR: Record<string, string> = {
   stream_start: 'bg-blue-500',
   reasoning: 'bg-violet-500',
   step: 'bg-zinc-500',
-  tool_call: 'bg-amber-500',
+  tool_call: 'bg-violet-400',
   file_created: 'bg-green-500',
   task_complete: 'bg-green-500',
   default: 'bg-violet-500',
@@ -172,11 +173,11 @@ const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
 const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
 
 const SUSPICIOUS_SEGMENT_CLASS =
-  'bg-amber-500/25 text-amber-200 border-b border-amber-500/50 rounded-sm px-0.5';
+  'bg-violet-400/25 text-violet-200 border-b border-amber-500/50 rounded-sm px-0.5';
 const AGREEMENT_SEGMENT_CLASS =
   'bg-emerald-500/25 text-emerald-200 border-b border-emerald-500/50 rounded-sm px-0.5';
 const UNCERTAINTY_SEGMENT_CLASS =
-  'bg-amber-400/20 text-amber-100 border-b border-amber-400/40 rounded-sm px-0.5';
+  'bg-amber-400/20 text-violet-100 border-b border-amber-400/40 rounded-sm px-0.5';
 const QUESTION_SEGMENT_CLASS =
   'bg-sky-500/25 text-sky-200 border-b border-sky-500/50 rounded-sm px-0.5';
 
@@ -341,7 +342,7 @@ const ActivityBlock = memo(function ActivityBlock({
   );
 });
 
-const COMMANDS_GROUP_STYLE = 'rounded-lg border border-amber-500/30 bg-amber-500/10';
+const COMMANDS_GROUP_STYLE = 'rounded-lg border border-amber-500/30 bg-violet-400/10';
 
 const CommandGroupBlock = memo(function CommandGroupBlock({
   entries,
@@ -365,16 +366,16 @@ const CommandGroupBlock = memo(function CommandGroupBlock({
           if (isClickable) e.stopPropagation();
           setExpanded((prev) => !prev);
         }}
-        className={`${FLEX_ROW_CENTER_WRAP} w-full text-left gap-2 min-w-0 -m-1 p-1 rounded-md hover:bg-amber-500/10`}
+        className={`${FLEX_ROW_CENTER_WRAP} w-full text-left gap-2 min-w-0 -m-1 p-1 rounded-md hover:bg-violet-400/10`}
         aria-expanded={expanded}
       >
         <div className={FLEX_ROW_CENTER}>
           {expanded ? (
-            <ChevronDown className="size-4 shrink-0 text-amber-500" />
+            <ChevronDown className="size-4 shrink-0 text-violet-500" />
           ) : (
-            <ChevronRight className="size-4 shrink-0 text-amber-500" />
+            <ChevronRight className="size-4 shrink-0 text-violet-500" />
           )}
-          <Terminal className="size-4 shrink-0 text-amber-500" />
+          <Terminal className="size-4 shrink-0 text-violet-500" />
           <p className={ACTIVITY_LABEL}>
             {n} command{n !== 1 ? 's' : ''}
           </p>
@@ -466,6 +467,7 @@ export function AgentThinkingSidebar({
     variant: string;
   } | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
+  const [persistedTypeFilter] = usePersistedTypeFilter();
   const setActivityScrollRef = useCallback((el: HTMLDivElement | null) => {
     (activityScrollRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     setScrollContainerReady((prev) => (el ? true : prev));
@@ -560,13 +562,21 @@ export function AgentThinkingSidebar({
       fromStreamEnd > 0 && Date.now() - fromStreamEnd < BRAIN_COMPLETE_TO_IDLE_MS;
     if (fromStory || fromStreamEndRecent) return { brain: BRAIN_COMPLETE, accent: BRAIN_COMPLETE_ACCENT };
     return { brain: BRAIN_IDLE, accent: BRAIN_IDLE_ACCENT };
-  }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs, transitionToIdleTrigger]);
+  }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs]);
 
   const filteredStoryItems = useMemo(() => {
-    const forDisplay =
+    let forDisplay =
       isStreaming
         ? fullStoryItems
         : fullStoryItems.filter((e) => !HIDDEN_WHEN_IDLE_TYPES.has(e.type));
+    if (persistedTypeFilter.length > 0) {
+      const filterSet = new Set(persistedTypeFilter);
+      const hasReasoning = filterSet.has('reasoning');
+      forDisplay = forDisplay.filter((s) => {
+        if (hasReasoning && (s.type === 'reasoning_start' || s.type === 'reasoning_end')) return true;
+        return filterSet.has(s.type);
+      });
+    }
     if (!activitySearchQuery.trim()) return forDisplay;
     const q = activitySearchQuery.trim().toLowerCase();
     return forDisplay.filter((entry) => {
@@ -583,7 +593,7 @@ export function AgentThinkingSidebar({
         label.includes(q)
       );
     });
-  }, [fullStoryItems, isStreaming, activitySearchQuery]);
+  }, [fullStoryItems, isStreaming, activitySearchQuery, persistedTypeFilter]);
 
   const { lastStreamStartId, currentRunIds } = useMemo(() => {
     let lastStreamStartIndex = -1;
@@ -808,7 +818,7 @@ export function AgentThinkingSidebar({
                     className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
                     title={STAT_TOOLTIPS.total}
                   >
-                    <span className="text-foreground stat-tick">{sessionStats.totalActions}</span>
+                    <span className="text-foreground stat-tick"><CountUpNumber value={sessionStats.totalActions} format="raw" /></span>
                     <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
                       {STAT_TOOLTIPS.total}
                     </span>
@@ -819,7 +829,7 @@ export function AgentThinkingSidebar({
                     className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
                     title={STAT_TOOLTIPS.completed}
                   >
-                    <span className="text-emerald-400 stat-tick">{sessionStats.completed}</span>
+                    <span className="text-emerald-400 stat-tick"><CountUpNumber value={sessionStats.completed} format="raw" /></span>
                     <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
                       {STAT_TOOLTIPS.completed}
                     </span>
@@ -830,7 +840,7 @@ export function AgentThinkingSidebar({
                     className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
                     title={STAT_TOOLTIPS.processing}
                   >
-                    <span className="text-cyan-400 stat-tick">{sessionStats.processing}</span>
+                    <span className="text-cyan-400 stat-tick"><CountUpNumber value={sessionStats.processing} format="raw" /></span>
                     <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
                       {STAT_TOOLTIPS.processing}
                     </span>
@@ -842,7 +852,7 @@ export function AgentThinkingSidebar({
                         className="text-violet-300/90"
                         title="Token usage (input / output)"
                       >
-                        {formatCompactInteger(sessionTokenUsage.inputTokens)} in / {formatCompactInteger(sessionTokenUsage.outputTokens)} out
+                        <CountUpNumber value={sessionTokenUsage.inputTokens} format="compact" /> in / <CountUpNumber value={sessionTokenUsage.outputTokens} format="compact" /> out
                       </span>
                     </>
                   )}

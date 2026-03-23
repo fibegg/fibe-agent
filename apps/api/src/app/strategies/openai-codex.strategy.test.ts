@@ -153,4 +153,33 @@ describe('OpenaiCodexStrategy', () => {
     strategy.executeAuth(connection);
     expect(successCalled).toBe(true);
   });
+
+  test('cancelAuth clears state safely', () => {
+    const strategy = new OpenaiCodexStrategy();
+    strategy.cancelAuth();
+  });
+
+  test('submitAuthCode does nothing when code is empty', () => {
+    const strategy = new OpenaiCodexStrategy();
+    strategy.submitAuthCode('');
+  });
+
+  test('interruptAgent does not throw', () => {
+    const strategy = new OpenaiCodexStrategy();
+    strategy.interruptAgent();
+  });
+
+  test('constructor with conversationDataDir', () => {
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
+    });
+    expect(strategy).toBeDefined();
+  });
+
+  test('checkAuthStatus returns false in api-token mode when OPENAI_API_KEY is not set', async () => {
+    delete process.env.OPENAI_API_KEY;
+    const strategy = new OpenaiCodexStrategy(true);
+    const result = await strategy.checkAuthStatus();
+    expect(result).toBe(false);
+  });
 });

@@ -109,4 +109,73 @@ describe('GeminiStrategy API token mode', () => {
     const result = await strategy.checkAuthStatus();
     expect(result).toBe(true);
   });
+
+  test('submitAuthCode with empty string sends unauthenticated', () => {
+    const strategy = new GeminiStrategy(true);
+    let status = '';
+    const noop = () => { return; };
+    const connection = {
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendAuthManualToken: noop,
+      sendAuthSuccess: noop,
+      sendAuthStatus: (s: string) => { status = s; },
+      sendError: noop,
+    };
+    strategy.executeAuth(connection);
+    strategy.submitAuthCode('');
+    expect(status).toBe('unauthenticated');
+  });
+
+  test('cancelAuth clears state safely', () => {
+    const strategy = new GeminiStrategy(true);
+    strategy.cancelAuth();
+    // Should not throw
+  });
+
+  test('clearCredentials is safe when no credentials exist', () => {
+    const strategy = new GeminiStrategy(true);
+    strategy.clearCredentials();
+    // Should not throw
+  });
+
+  test('getModelArgs returns flags for valid model', () => {
+    const strategy = new GeminiStrategy(true);
+    expect(strategy.getModelArgs('gemini-2.5-pro')).toEqual(['-m', 'gemini-2.5-pro']);
+  });
+
+  test('getModelArgs returns empty array for empty model', () => {
+    const strategy = new GeminiStrategy(true);
+    expect(strategy.getModelArgs('')).toEqual([]);
+  });
+
+  test('getModelArgs returns empty for undefined model', () => {
+    const strategy = new GeminiStrategy(true);
+    expect(strategy.getModelArgs('undefined')).toEqual([]);
+  });
+
+  test('interruptAgent does not throw', () => {
+    const strategy = new GeminiStrategy(true);
+    strategy.interruptAgent();
+  });
+
+  test('constructor with conversationDataDir', () => {
+    const strategy = new GeminiStrategy(false, {
+      getConversationDataDir: () => '/tmp/test-conv',
+    });
+    expect(strategy).toBeDefined();
+  });
+
+  test('executeLogout in api-token mode clears credentials immediately', () => {
+    const strategy = new GeminiStrategy(true);
+    let logoutSuccessCalled = false;
+    const noop = () => { return; };
+    const connection = {
+      sendLogoutOutput: noop,
+      sendLogoutSuccess: () => { logoutSuccessCalled = true; },
+      sendError: noop,
+    };
+    strategy.executeLogout(connection);
+    expect(logoutSuccessCalled).toBe(true);
+  });
 });

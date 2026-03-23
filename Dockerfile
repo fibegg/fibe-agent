@@ -33,8 +33,11 @@ RUN --mount=type=cache,target=/root/.bun/install/cache \
 
 COPY apps/api apps/api
 COPY apps/chat apps/chat
+COPY shared shared
 
-ENV NX_DAEMON=false
+ENV NX_DAEMON=false \
+    VITE_THEME_SOURCE=frame \
+    VITE_HIDE_THEME_SWITCH=true
 RUN bunx nx run-many --targets=build --projects=api,chat
 
 FROM node:24-slim

@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { Brain, Check, Clock, Copy, RotateCw, Sparkles, User } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
-import { API_PATH_UPLOADS_BY_FILENAME } from '../api-paths';
+import { API_PATH_UPLOADS_BY_FILENAME } from '@shared/api-paths';
 import { FileIcon } from '../file-icon';
 import { formatCompactInteger } from '../agent-thinking-utils';
 import { parseMessageBodyParts, pathDisplayName } from './mention-utils';
@@ -87,7 +87,7 @@ function schedulePrismHighlightForRoot(root: HTMLElement, shouldAbort: () => boo
   });
 }
 
-const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} chat-user-markdown-body [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0 [&_.markdown-body]:min-w-0 [&_pre]:block [&_pre]:w-full [&_pre]:min-w-0 [&_pre]:shrink-0 [&_pre]:basis-full [&_pre]:bg-black/25 [&_pre]:border-white/25 [&_pre]:text-violet-50 [&_pre_code]:text-inherit`;
+const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} chat-user-markdown-body [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0 [&_.markdown-body]:min-w-0 [&_pre]:block [&_pre]:w-full [&_pre]:min-w-0 [&_pre]:shrink-0 [&_pre]:basis-full [&_pre]:bg-background [&_pre]:text-foreground [&_pre]:border-border [&_pre_code]:text-foreground [&_pre]:mt-2`;
 
 const COPY_SUCCESS_LABEL = 'Copied';
 const COPY_SUCCESS_FEEDBACK_MS = 2000;
@@ -264,7 +264,7 @@ function getUploadSrc(filename: string): string {
 }
 
 const ESTIMATED_ROW_HEIGHT = 120;
-const ROW_GAP = 24;
+const ROW_GAP = 28;
 const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
 const FULL_WIDTH = 'max-w-full';
 
@@ -338,7 +338,7 @@ const MessageRow = memo(function MessageRow({
                 <p className="flex flex-wrap items-center gap-1.5 min-w-0">
                   {formatTime(msg.created_at)}
                   {msg.queued && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-400/30 text-amber-300 text-[10px] font-medium leading-none">
+                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-400/20 border border-amber-400/30 text-violet-300 text-[10px] font-medium leading-none">
                       <Clock className="size-2.5" aria-hidden />
                       Queued
                     </span>
@@ -372,7 +372,7 @@ const MessageRow = memo(function MessageRow({
                   </p>
                   <CopyRawMessageButton rawText={msg.body} visualVariant="assistant" />
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none" title={msg.model ? `Processed by ${msg.model}` : undefined}>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70" title={msg.model ? `Processed by ${msg.model}` : undefined}>
                   <Brain className="size-3 shrink-0" aria-hidden />
                   {msg.model ?? '—'}
                 </p>

@@ -28,13 +28,18 @@ describe('usePlaygroundFiles', () => {
   });
 
   it('fetches on mount and sets entries when API returns data', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
-      ok: true,
-      status: 200,
-      json: async () => [
-        { name: 'a', path: 'a', type: 'file' },
-        { name: 'b', path: 'b', type: 'directory', children: [] },
-      ],
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes('stats')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ fileCount: 2, totalLines: 10 }) });
+      }
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => [
+          { name: 'a', path: 'a', type: 'file' },
+          { name: 'b', path: 'b', type: 'directory', children: [] },
+        ],
+      });
     });
     const { result } = renderHook(() => usePlaygroundFiles());
     await waitFor(() => {
@@ -55,17 +60,21 @@ describe('usePlaygroundFiles', () => {
   });
 
   it('refetch updates entries when called', async () => {
-    (fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => [],
-      })
-      .mockResolvedValueOnce({
+    let callCount = 0;
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes('stats')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ fileCount: 0, totalLines: 0 }) });
+      }
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => [] });
+      }
+      return Promise.resolve({
         ok: true,
         status: 200,
         json: async () => [{ name: 'new', path: 'new', type: 'file' }],
       });
+    });
     const { result } = renderHook(() => usePlaygroundFiles());
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
@@ -79,10 +88,11 @@ describe('usePlaygroundFiles', () => {
   });
 
   it('refetches when document becomes visible', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      status: 200,
-      json: async () => [],
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes('stats')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ fileCount: 0, totalLines: 0 }) });
+      }
+      return Promise.resolve({ ok: true, status: 200, json: async () => [] });
     });
     const { result } = renderHook(() => usePlaygroundFiles());
     await waitFor(() => {

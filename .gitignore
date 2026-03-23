@@ -52,3 +52,5 @@ test-output
 designs/
 
 .env
+
+playground

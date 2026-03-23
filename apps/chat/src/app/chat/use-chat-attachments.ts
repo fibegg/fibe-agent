@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { apiRequest } from '../api-url';
-import { API_PATHS } from '../api-paths';
+import { API_PATHS } from '@shared/api-paths';
 
 const MAX_PENDING_IMAGES = 5;
 const MAX_PENDING_ATTACHMENTS = 5;

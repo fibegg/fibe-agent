@@ -1,13 +1,9 @@
 import { join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 
-const CONVERSATION_ID_SAFE_REGEX = /[a-zA-Z0-9_-]/;
-
 function sanitizeConversationId(id: string): string {
   const sanitized = id
-    .split('')
-    .map((c) => (CONVERSATION_ID_SAFE_REGEX.test(c) ? c : '_'))
-    .join('')
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
   return sanitized || 'default';
@@ -79,7 +75,6 @@ export class ConfigService {
   }
 
   getPostInitScript(): string | undefined {
-    const v = process.env.POST_INIT_SCRIPT ?? process.env.PSOT_INIT_SCRIPT;
-    return v?.trim() || undefined;
+    return process.env.POST_INIT_SCRIPT?.trim() || undefined;
   }
 }

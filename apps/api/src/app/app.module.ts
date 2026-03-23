@@ -27,6 +27,9 @@ import { PlaygroundWatcherService } from './playgrounds/playground-watcher.servi
 import { PhoenixSyncService } from './phoenix-sync/phoenix-sync.service';
 import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
 import { SteeringService } from './steering/steering.service';
+import { AgentFilesController } from './agent-files/agent-files.controller';
+import { AgentFilesService } from './agent-files/agent-files.service';
+import { AgentFilesWatcherService } from './agent-files/agent-files-watcher.service';
 
 @Module({
   imports: [
@@ -45,6 +48,7 @@ import { SteeringService } from './steering/steering.service';
     ModelOptionsController,
     UploadsController,
     PlaygroundsController,
+    AgentFilesController,
     InitStatusController,
     AgentController,
   ],
@@ -62,6 +66,8 @@ import { SteeringService } from './steering/steering.service';
     UploadsService,
     PlaygroundsService,
     PlaygroundWatcherService,
+    AgentFilesService,
+    AgentFilesWatcherService,
     PhoenixSyncService,
     GithubTokenRefreshService,
     SteeringService,

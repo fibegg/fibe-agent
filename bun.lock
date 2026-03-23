@@ -9,9 +9,9 @@
         "@nestjs/core": "^11.0.0",
         "@openai/codex": "^0.115.0",
         "@tanstack/react-virtual": "^3.13.0",
-        "axios": "^1.6.0",
         "lucide-react": "^0.468.0",
         "marked": "^15.0.0",
+        "path-to-regexp": "^8.0.0",
         "prismjs": "^1.29.0",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -73,7 +73,7 @@
       },
     },
     "apps/api": {
-      "name": "@playgrounds.dev/api",
+      "name": "@fibe.gg/api",
       "version": "0.0.1",
       "dependencies": {
         "@fastify/helmet": "^13.0.2",
@@ -99,15 +99,15 @@
       },
     },
     "apps/chat": {
-      "name": "@playgrounds.dev/chat",
-      "version": "0.0.3",
+      "name": "@fibe.gg/chat",
+      "version": "0.0.4",
     },
     "apps/e2e-api": {
-      "name": "@playgrounds.dev/e2e-api",
+      "name": "@fibe.gg/e2e-api",
       "version": "0.0.1",
     },
     "apps/e2e-chat": {
-      "name": "@playgrounds.dev/e2e-chat",
+      "name": "@fibe.gg/e2e-chat",
       "version": "0.0.1",
     },
   },
@@ -474,6 +474,14 @@
 
     "@fastify/view": ["@fastify/view@11.1.1", "", { "dependencies": { "fastify-plugin": "^5.0.0", "toad-cache": "^3.7.0" } }, "sha512-GiHqT3R2eKJgWmy0s45eELTC447a4+lTM2o+8fSWeKwBe9VToeePuHJcKtOEXPrKGSddGO0RsNayULiS3aeHeQ=="],
 
+    "@fibe.gg/api": ["@fibe.gg/api@workspace:apps/api"],
+
+    "@fibe.gg/chat": ["@fibe.gg/chat@workspace:apps/chat"],
+
+    "@fibe.gg/e2e-api": ["@fibe.gg/e2e-api@workspace:apps/e2e-api"],
+
+    "@fibe.gg/e2e-chat": ["@fibe.gg/e2e-chat@workspace:apps/e2e-chat"],
+
     "@humanfs/core": ["@humanfs/core@0.19.1", "", {}, "sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA=="],
 
     "@humanfs/node": ["@humanfs/node@0.16.7", "", { "dependencies": { "@humanfs/core": "^0.19.1", "@humanwhocodes/retry": "^0.4.0" } }, "sha512-/zUx+yOsIrG4Y43Eh2peDeKCxlRt/gET6aHfaKpuq267qXdYDFViVHfMaLyygZOnl0kGWxFIgsBy8QFuTLUXEQ=="],
@@ -831,14 +839,6 @@
     "@pkgjs/parseargs": ["@pkgjs/parseargs@0.11.0", "", {}, "sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg=="],
 
     "@pkgr/core": ["@pkgr/core@0.2.9", "", {}, "sha512-QNqXyfVS2wm9hweSYD2O7F0G06uurj9kZ96TRQE5Y9hU7+tgdZwIkbAKc5Ocy1HxEY2kuDQa6cQ1WRs/O5LFKA=="],
-
-    "@playgrounds.dev/api": ["@playgrounds.dev/api@workspace:apps/api"],
-
-    "@playgrounds.dev/chat": ["@playgrounds.dev/chat@workspace:apps/chat"],
-
-    "@playgrounds.dev/e2e-api": ["@playgrounds.dev/e2e-api@workspace:apps/e2e-api"],
-
-    "@playgrounds.dev/e2e-chat": ["@playgrounds.dev/e2e-chat@workspace:apps/e2e-chat"],
 
     "@playwright/test": ["@playwright/test@1.58.2", "", { "dependencies": { "playwright": "1.58.2" }, "bin": { "playwright": "cli.js" } }, "sha512-akea+6bHYBBfA9uQqSYmlJXn61cTa+jbO87xVLCWbTqbWadRVmhxlXATaOjOgcBaWU4ePo0wB41KMFv3o35IXA=="],
 

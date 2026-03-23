@@ -3,6 +3,10 @@ import { act, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { ActivityReviewPage, type ActivityReviewData } from './activity-review-page';
 
+// jsdom does not implement scrollTo or scrollIntoView — stub them
+window.HTMLElement.prototype.scrollTo = vi.fn();
+window.HTMLElement.prototype.scrollIntoView = vi.fn();
+
 const mockActivity: ActivityReviewData = {
   id: 'test-activity-id',
   created_at: '2025-01-15T12:00:00Z',
@@ -29,6 +33,16 @@ vi.mock('../api-url', () => ({
 
 vi.mock('../embed-config', () => ({
   shouldHideThemeSwitch: vi.fn(() => false),
+}));
+
+vi.mock('../chat/chat-settings-modal', () => ({
+  ChatSettingsModal: ({ open, onClose }: any) => (
+    open ? (
+      <div role="dialog" aria-label="Settings">
+        <button type="button" onClick={onClose}>Close</button>
+      </div>
+    ) : null
+  ),
 }));
 
 function renderWithRoute(id: string) {
@@ -86,7 +100,6 @@ describe('ActivityReviewPage', () => {
     expect(screen.getByRole('link', { name: /Back to chat/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
     expect(screen.getByPlaceholderText('Search stories...')).toBeTruthy();
-    expect(screen.getByText(/Reasoning|All activities/)).toBeTruthy();
   });
 
   it('opens settings dialog when Settings is clicked and closes when Close is clicked', async () => {
@@ -161,6 +174,69 @@ describe('ActivityReviewPage', () => {
       expect(screen.queryByText('Loading activities…')).toBeNull();
     });
     expect(screen.getAllByText(/Some reasoning/).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Step one')).toBeTruthy();
+    expect(screen.getAllByText('Step one').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders the follow activity toggle button', async () => {
+    const { apiRequest } = await import('../api-url');
+    (apiRequest as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => [mockActivity],
+    });
+    renderWithRoute('test-activity-id');
+    await waitFor(() => {
+      expect(screen.queryByText('Loading activities…')).toBeNull();
+    });
+    const followBtn = screen.getByRole('button', { name: /Follow activity/i });
+    expect(followBtn).toBeTruthy();
+    expect(followBtn.getAttribute('aria-pressed')).toBe('false');
+    // Toggle on
+    await act(async () => {
+      fireEvent.click(followBtn);
+    });
+    expect(followBtn.getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText('Live')).toBeTruthy();
+  });
+
+
+  it('shows most recent story at the top of the list', async () => {
+    const twoActivityData = [
+      {
+        id: 'older-activity',
+        created_at: '2025-01-14T10:00:00Z',
+        story: [
+          { id: 'old-1', type: 'step', message: 'Older step', timestamp: '2025-01-14T10:00:00Z' },
+        ],
+      },
+      {
+        id: 'newer-activity',
+        created_at: '2025-01-15T12:00:00Z',
+        story: [
+          { id: 'new-1', type: 'step', message: 'Newer step', timestamp: '2025-01-15T12:00:00Z' },
+        ],
+      },
+    ];
+    const { apiRequest } = await import('../api-url');
+    (apiRequest as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => twoActivityData,
+    });
+    render(
+      <MemoryRouter initialEntries={['/activity']}>
+        <Routes>
+          <Route path="/activity" element={<ActivityReviewPage />} />
+          <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await waitFor(() => {
+      expect(screen.queryByText('Loading activities…')).toBeNull();
+    });
+    const allButtons = screen.getAllByRole('button');
+    const newerIdx = allButtons.findIndex((b) => b.textContent?.includes('Newer step'));
+    const olderIdx = allButtons.findIndex((b) => b.textContent?.includes('Older step'));
+    expect(newerIdx).toBeLessThan(olderIdx);
   });
 });

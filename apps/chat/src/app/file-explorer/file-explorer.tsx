@@ -1,537 +1,40 @@
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  Download,
-  FileText,
-  Folder,
-  FolderOpen,
-  Search,
-  Settings,
-  X,
-} from 'lucide-react';
-import { FileIcon } from '../file-icon';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Search, Settings, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
-import { API_PATHS } from '../api-paths';
 import { PANEL_HEADER_MIN_HEIGHT_PX, REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
 import { shouldHideThemeSwitch } from '../embed-config';
 import { SidebarToggle } from '../sidebar-toggle';
 import { ThemeToggle } from '../theme-toggle';
 import {
-  BUTTON_GHOST_ACCENT,
   BUTTON_ICON_ACCENT,
   BUTTON_ICON_ACCENT_SM,
   BUTTON_ICON_MUTED,
-  CARD_HEADER,
   CLEAR_BUTTON_POSITION,
   HEADER_FIRST_ROW,
   HEADER_PADDING,
   INPUT_SEARCH,
-  LOGO_ICON_BOX,
-  MODAL_OVERLAY,
   SEARCH_ICON_POSITION,
   SEARCH_ROW_WRAPPER,
-  TREE_NODE_BASE,
-  TREE_NODE_SELECTED,
 } from '../ui-classes';
+import { TreeNode } from './file-explorer-tree-node';
+import type { PlaygroundEntry } from './file-explorer-types';
+import {
+  diffTrees,
+  filterTreeByQuery,
+  findEntryByPath,
+  getDirPathsAtDepth,
+  mergeAnimatingRemoved,
+  type FileAnimationType,
+} from './file-explorer-tree-utils';
+import { FileDetailsDialog } from './file-viewer-panel';
+import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-tabs';
 
-const PRISM_LANGUAGES: Record<string, string> = {
-  js: 'javascript',
-  jsx: 'jsx',
-  ts: 'typescript',
-  tsx: 'tsx',
-  css: 'css',
-  scss: 'scss',
-  sass: 'sass',
-  html: 'markup',
-  htm: 'markup',
-  json: 'json',
-  json5: 'json5',
-  md: 'markdown',
-  mdx: 'markdown',
-  py: 'python',
-  pyw: 'python',
-  rb: 'ruby',
-  go: 'go',
-  mod: 'go-module',
-  rs: 'rust',
-  java: 'java',
-  kt: 'kotlin',
-  kts: 'kotlin',
-  swift: 'swift',
-  php: 'php',
-  sql: 'sql',
-  yaml: 'yaml',
-  yml: 'yaml',
-  sh: 'bash',
-  bash: 'bash',
-  zsh: 'bash',
-  xml: 'markup',
-  vue: 'markup',
-  svg: 'markup',
-  c: 'c',
-  cpp: 'cpp',
-  cc: 'cpp',
-  cxx: 'cpp',
-  cs: 'csharp',
-  h: 'c',
-  hpp: 'cpp',
-  zig: 'zig',
-  lua: 'lua',
-  dart: 'dart',
-  hs: 'haskell',
-  lhs: 'haskell',
-  scala: 'scala',
-  sc: 'scala',
-  nim: 'nim',
-  nimble: 'nim',
-  ex: 'elixir',
-  exs: 'elixir',
-  erl: 'erlang',
-  hrl: 'erlang',
-  clj: 'clojure',
-  cljs: 'clojure',
-  cljc: 'clojure',
-  edn: 'clojure',
-  groovy: 'groovy',
-  gy: 'groovy',
-  gvy: 'groovy',
-  pl: 'perl',
-  pm: 'perl',
-  ps1: 'powershell',
-  psm1: 'powershell',
-  pssc: 'powershell',
-  fs: 'fsharp',
-  fsi: 'fsharp',
-  fsx: 'fsharp',
-  ml: 'ocaml',
-  mli: 'ocaml',
-  sol: 'solidity',
-  toml: 'toml',
-  makefile: 'makefile',
-  mk: 'makefile',
-  cmake: 'cmake',
-  gradle: 'gradle',
-  ini: 'ini',
-  cfg: 'ini',
-  graphql: 'graphql',
-  gql: 'graphql',
-  pug: 'pug',
-  jade: 'pug',
-  less: 'less',
-  styl: 'stylus',
-  coffee: 'coffeescript',
-  jl: 'julia',
-  r: 'r',
-  R: 'r',
-  vb: 'vbnet',
-  proto: 'protobuf',
-  nginx: 'nginx',
-  diff: 'diff',
-  patch: 'diff',
-  csv: 'csv',
-  rst: 'rest',
-  tex: 'latex',
-  latex: 'latex',
-  m: 'objectivec',
-  mm: 'objectivec',
-  gd: 'gdscript',
-  glsl: 'glsl',
-  vert: 'glsl',
-  frag: 'glsl',
-  v: 'verilog',
-  sv: 'verilog',
-  vhd: 'vhdl',
-  vhdl: 'vhdl',
-  wat: 'wasm',
-  ll: 'llvm',
-  d: 'd',
-  cr: 'crystal',
-  f: 'fortran',
-  f90: 'fortran',
-  f95: 'fortran',
-  nix: 'nix',
-  hcl: 'hcl',
-  tf: 'hcl',
-  tfvars: 'hcl',
-  properties: 'properties',
-  props: 'properties',
-  editorconfig: 'editorconfig',
-  dot: 'dot',
-  mermaid: 'mermaid',
-  mmd: 'mermaid',
-};
-
-function getPrismLanguage(filename: string): string {
-  const baseName = filename.includes('/') ? filename.slice(filename.lastIndexOf('/') + 1) : filename;
-  if (baseName === 'Dockerfile' || baseName.startsWith('Dockerfile.')) {
-    return 'docker';
-  }
-  if (baseName === 'Makefile' || baseName === 'makefile') {
-    return 'makefile';
-  }
-  const ext = baseName.includes('.') ? baseName.slice(baseName.lastIndexOf('.') + 1).toLowerCase() : '';
-  return PRISM_LANGUAGES[ext] ?? 'plain';
-}
-
-export interface PlaygroundEntry {
-  name: string;
-  path: string;
-  type: 'file' | 'directory';
-  children?: PlaygroundEntry[];
-}
+export type { PlaygroundEntry } from './file-explorer-types';
 
 const SIDEBAR_TITLE = 'Standalone';
 const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
 const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
-
-function getDirPathsAtDepth(entries: PlaygroundEntry[], depth: number): string[] {
-  if (depth === 0) {
-    return entries.filter((e) => e.type === 'directory').map((e) => e.path);
-  }
-  const out: string[] = [];
-  for (const e of entries) {
-    if (e.type === 'directory' && e.children?.length) {
-      if (depth === 1) {
-        e.children.filter((c) => c.type === 'directory').forEach((c) => out.push(c.path));
-      } else {
-        out.push(...getDirPathsAtDepth(e.children, depth - 1));
-      }
-    }
-  }
-  return out;
-}
-
-function findEntryByPath(entries: PlaygroundEntry[], path: string): PlaygroundEntry | null {
-  for (const e of entries) {
-    if (e.path === path) return e;
-    if (e.children?.length) {
-      const found = findEntryByPath(e.children, path);
-      if (found) return found;
-    }
-  }
-  return null;
-}
-
-function filterTreeByQuery(entries: PlaygroundEntry[], query: string): PlaygroundEntry[] {
-  if (!query.trim()) return entries;
-  const lower = query.trim().toLowerCase();
-  function build(entry: PlaygroundEntry): PlaygroundEntry | null {
-    if (entry.type === 'file') {
-      return entry.name.toLowerCase().includes(lower) ? entry : null;
-    }
-    const childResults = (entry.children ?? [])
-      .map(build)
-      .filter((c): c is PlaygroundEntry => c != null);
-    if (entry.name.toLowerCase().includes(lower) || childResults.length > 0) {
-      return { ...entry, children: childResults.length ? childResults : entry.children };
-    }
-    return null;
-  }
-  return entries.map(build).filter((e): e is PlaygroundEntry => e != null);
-}
-
-const LANGUAGE_LABEL: Record<string, string> = {
-  plain: 'Plain text',
-  markdown: 'Markdown',
-  javascript: 'JavaScript',
-  typescript: 'TypeScript',
-  json: 'JSON',
-  html: 'HTML',
-  css: 'CSS',
-  python: 'Python',
-  bash: 'Bash',
-};
-
-type PrismLoader = { highlightCodeElement: (el: HTMLElement) => void };
-
-export function FileViewerPanel({
-  entry,
-  onClose,
-  inline = false,
-}: {
-  entry: PlaygroundEntry;
-  onClose: () => void;
-  inline?: boolean;
-}) {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [searchInFile, setSearchInFile] = useState('');
-  const [prismLoader, setPrismLoader] = useState<PrismLoader | null>(null);
-  const codeRef = useRef<HTMLElement>(null);
-
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose]);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setFetchError(null);
-    setContent(null);
-    const path = `${API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
-    void (async () => {
-      try {
-        const res = await apiRequest(path);
-        if (cancelled) return;
-        if (!res.ok) {
-          if (res.status === 404) {
-            setFetchError('File not found');
-            setContent(null);
-            return;
-          }
-          throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to load file');
-        }
-        const data = (await res.json()) as { content?: string };
-        const text = typeof data.content === 'string' ? data.content : '';
-        if (!cancelled) {
-          setContent(text);
-          setFetchError(null);
-        }
-      } catch (e) {
-        if (!cancelled) setFetchError(e instanceof Error ? e.message : 'Failed to load file');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [entry.path]);
-
-  const language = getPrismLanguage(entry.name);
-  const languageClass = language === 'plain' ? '' : `language-${language}`;
-  const languageLabel = LANGUAGE_LABEL[language] ?? (language === 'plain' ? 'Plain text' : language);
-  const lineCount = content !== null ? content.split('\n').length : null;
-
-  useEffect(() => {
-    if (!content || loading || language === 'plain') return;
-    import('./prism-loader').then((m) => setPrismLoader(m));
-  }, [content, loading, language]);
-
-  useEffect(() => {
-    if (!content || loading || fetchError || !codeRef.current || language === 'plain' || !prismLoader) return;
-    try {
-      prismLoader.highlightCodeElement(codeRef.current);
-    } catch {
-      // Leave existing text content if highlighting fails
-    }
-  }, [content, loading, fetchError, language, prismLoader]);
-
-  const handleCopy = useCallback(() => {
-    if (content === null) return;
-    void navigator.clipboard.writeText(content);
-  }, [content]);
-
-  const handleDownload = useCallback(() => {
-    if (content === null) return;
-    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = entry.name;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }, [content, entry.name]);
-
-  return (
-    <div
-      className={`flex flex-col overflow-hidden bg-card ${inline ? 'flex-1 min-h-0 rounded-none border-0' : 'w-full max-w-[95vw] sm:max-w-[90vw] sm:w-[90vw] h-[85vh] sm:h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card'}`}
-      style={inline ? undefined : { backgroundColor: 'var(--card)' }}
-      onClick={inline ? undefined : (e) => e.stopPropagation()}
-    >
-      <div className={CARD_HEADER} style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}>
-        <div className={`flex items-center justify-between gap-2 min-w-0 ${HEADER_FIRST_ROW}`}>
-          <div className="flex items-center gap-3 min-w-0 flex-1">
-            <div className={LOGO_ICON_BOX}>
-              <FileText className="size-5 text-white" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-sm text-foreground truncate" title={entry.name}>
-                {entry.name}
-              </h2>
-              <p className="text-[10px] text-muted-foreground mt-0.5">
-                {languageLabel}
-                {lineCount !== null ? ` - ${lineCount} lines` : ''}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={handleCopy}
-              disabled={content === null || loading}
-              className={BUTTON_GHOST_ACCENT}
-            >
-              <Copy className="size-3" />
-              Copy
-            </button>
-            <button
-              type="button"
-              onClick={handleDownload}
-              disabled={content === null || loading}
-              className={BUTTON_GHOST_ACCENT}
-            >
-              <Download className="size-3" />
-              Download
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className={`${BUTTON_ICON_MUTED} size-8`}
-              aria-label="Close"
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        </div>
-        <div className={SEARCH_ROW_WRAPPER}>
-          <Search className={SEARCH_ICON_POSITION} />
-          <input
-            type="text"
-            value={searchInFile}
-            onChange={(e) => setSearchInFile(e.target.value)}
-            placeholder="Search in file..."
-            className={INPUT_SEARCH}
-          />
-          {searchInFile && (
-            <button
-              type="button"
-              onClick={() => setSearchInFile('')}
-              className={CLEAR_BUTTON_POSITION}
-              aria-label="Clear search"
-            >
-              <X className="size-3.5" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
-        <div className="flex-1 overflow-auto min-h-0 bg-[#2d2d2d] dark:bg-[#1e1e1e]">
-          {loading && (
-            <div className="p-4 flex items-center justify-center text-sm text-muted-foreground">
-              Loading…
-            </div>
-          )}
-          {fetchError && (
-            <div className="p-4 rounded-xl border border-border-subtle bg-muted/20 m-4 text-center">
-              <p className="text-sm text-muted-foreground">{fetchError}</p>
-            </div>
-          )}
-          {!loading && !fetchError && content !== null && content.length > 0 && (
-            <pre className="line-numbers !m-0 !rounded-none !bg-transparent p-4 text-sm font-mono min-h-full" key={entry.path}>
-              <code ref={codeRef} className={languageClass}>
-                {content}
-              </code>
-            </pre>
-          )}
-          {!loading && !fetchError && content !== null && content.length === 0 && (
-            <div className="p-4 text-sm text-muted-foreground">Empty file</div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FileDetailsDialog({
-  entry,
-  onClose,
-}: {
-  entry: PlaygroundEntry;
-  onClose: () => void;
-}) {
-  return (
-    <div className={MODAL_OVERLAY} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()}>
-        <FileViewerPanel entry={entry} onClose={onClose} />
-      </div>
-    </div>
-  );
-}
-
-const TreeNode = memo(function TreeNode({
-  entry,
-  depth,
-  expanded,
-  onToggle,
-  onFileClick,
-  selectedPath,
-}: {
-  entry: PlaygroundEntry;
-  depth: number;
-  expanded: Set<string>;
-  onToggle: (path: string) => void;
-  onFileClick?: (entry: PlaygroundEntry) => void;
-  selectedPath?: string | null;
-}) {
-  const isDir = entry.type === 'directory';
-  const isOpen = expanded.has(entry.path);
-  const hasChildren = isDir && (entry.children?.length ?? 0) > 0;
-  const isSelected = selectedPath === entry.path;
-
-  const handleClick = useCallback(() => {
-    if (isDir) {
-      onToggle(entry.path);
-    } else if (onFileClick) {
-      onFileClick(entry);
-    }
-  }, [isDir, entry, onToggle, onFileClick]);
-
-  return (
-    <div className="select-none group">
-      <button
-        type="button"
-        onClick={handleClick}
-        className={`${TREE_NODE_BASE} ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'}`}
-        style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
-      >
-        <span className="w-3 flex shrink-0 items-center justify-center text-foreground/70 dark:text-muted-foreground" aria-hidden>
-          {isDir && hasChildren ? (
-            isOpen ? (
-              <ChevronDown className="size-3" />
-            ) : (
-              <ChevronRight className="size-3" />
-            )
-          ) : (
-            <span className="w-3" />
-          )}
-        </span>
-        {isDir ? (
-          isOpen ? (
-            <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
-          ) : (
-            <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
-          )
-        ) : (
-          <FileIcon pathOrName={entry.name} />
-        )}
-        <span className={`min-w-0 flex-1 truncate ${isSelected ? 'text-violet-400' : 'text-foreground'}`}>{entry.name}</span>
-      </button>
-      {isDir && hasChildren && isOpen && (
-        <div>
-          {(entry.children ?? []).map((child) => (
-            <TreeNode
-              key={child.path}
-              entry={child}
-              depth={depth + 1}
-              expanded={expanded}
-              onToggle={onToggle}
-              onFileClick={onFileClick}
-              selectedPath={selectedPath}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-});
 
 const isControlledTree = (t: PlaygroundEntry[] | null | undefined): t is PlaygroundEntry[] =>
   Array.isArray(t);
@@ -545,6 +48,12 @@ export function FileExplorer({
   selectedPath: selectedPathProp,
   refreshTrigger,
   tree: treeProp,
+  agentTree: agentTreeProp,
+  activeTab,
+  onTabChange,
+  agentFileApiPath,
+  playgroundStats,
+  agentStats,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -554,6 +63,12 @@ export function FileExplorer({
   selectedPath?: string | null;
   refreshTrigger?: number;
   tree?: PlaygroundEntry[] | null;
+  agentTree?: PlaygroundEntry[] | null;
+  activeTab?: FileTab;
+  onTabChange?: (tab: FileTab) => void;
+  agentFileApiPath?: string;
+  playgroundStats?: TabStats;
+  agentStats?: TabStats;
 } = {}) {
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -561,10 +76,22 @@ export function FileExplorer({
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
+  const [animatingPaths, setAnimatingPaths] = useState<Map<string, FileAnimationType>>(new Map());
+  const [animatingPrev, setAnimatingPrev] = useState<PlaygroundEntry[] | null>(null);
+  const prevTreeRef = useRef<PlaygroundEntry[]>([]);
 
   const controlled = isControlledTree(treeProp);
-  const tree = controlled ? treeProp : internalTree;
+  const controlledAgent = isControlledTree(agentTreeProp);
+  const playgroundTree = controlled ? treeProp : internalTree;
+  const agentTree = controlledAgent ? agentTreeProp : [];
   const loadingState = controlled ? false : loading;
+
+  const showTabs = playgroundTree.length > 0 && agentTree.length > 0;
+  const effectiveTab: FileTab =
+    showTabs && activeTab ? activeTab
+    : agentTree.length > 0 && playgroundTree.length === 0 ? 'agent'
+    : 'playground';
+  const tree = effectiveTab === 'agent' ? agentTree : playgroundTree;
 
   const selectedFile = selectedPathProp !== undefined
     ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
@@ -631,6 +158,41 @@ export function FileExplorer({
     setExpanded(new Set(getDirPathsAtDepth(treeProp, 0)));
   }, [controlled, treeProp]);
 
+  useEffect(() => {
+    const prev = prevTreeRef.current;
+    prevTreeRef.current = tree;
+    if (prev.length === 0 || tree.length === 0) return;
+    const diff = diffTrees(prev, tree);
+    if (diff.size === 0) return;
+    setAnimatingPaths(diff);
+    setAnimatingPrev(prev);
+
+    setExpanded((currentExpanded) => {
+      let changed = false;
+      const nextExpanded = new Set(currentExpanded);
+      for (const [p, type] of diff.entries()) {
+        if (type === 'added' || type === 'modified') {
+          const parts = p.split('/');
+          let currentPath = '';
+          for (let i = 0; i < parts.length - 1; i++) {
+            currentPath = currentPath ? `${currentPath}/${parts[i]}` : parts[i];
+            if (!nextExpanded.has(currentPath)) {
+              nextExpanded.add(currentPath);
+              changed = true;
+            }
+          }
+        }
+      }
+      return changed ? nextExpanded : currentExpanded;
+    });
+
+    const timer = setTimeout(() => {
+      setAnimatingPaths(new Map());
+      setAnimatingPrev(null);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [tree]);
+
   const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
       const next = new Set(prev);
@@ -652,7 +214,14 @@ export function FileExplorer({
     [onFileSelect]
   );
 
-  const filteredTree = useMemo(() => filterTreeByQuery(tree, searchQuery), [tree, searchQuery]);
+  const displayTree = useMemo(() => {
+    if (animatingPaths.size > 0 && animatingPrev) {
+      return mergeAnimatingRemoved(animatingPrev, tree, animatingPaths);
+    }
+    return tree;
+  }, [tree, animatingPaths, animatingPrev]);
+
+  const filteredTree = useMemo(() => filterTreeByQuery(displayTree, searchQuery), [displayTree, searchQuery]);
   const openFileEntry =
     !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
 
@@ -731,6 +300,14 @@ export function FileExplorer({
         </div>
       </div>
       <div className="flex-1 overflow-auto py-2">
+        {showTabs && onTabChange && (
+          <FileExplorerTabs
+            activeTab={effectiveTab}
+            onTabChange={onTabChange}
+            playgroundStats={playgroundStats}
+            agentStats={agentStats}
+          />
+        )}
         {loadingState && tree.length === 0 && (
           <div className="px-3 py-2 text-xs text-muted-foreground">
             Loading…
@@ -760,6 +337,7 @@ export function FileExplorer({
                 onToggle={handleToggle}
                 onFileClick={handleFileClick}
                 selectedPath={selectedPathProp ?? openFileEntry?.path ?? null}
+                animatingPaths={animatingPaths}
               />
             ))}
           </div>
@@ -772,7 +350,7 @@ export function FileExplorer({
 
   return (
     <>
-      {onToggleCollapse && collapsed !== undefined && tree.length > 0 ? (
+      {onToggleCollapse && collapsed !== undefined && (playgroundTree.length > 0 || agentTree.length > 0) ? (
         <div className="relative h-full flex flex-col min-h-0 flex-1">
           {content}
           <SidebarToggle

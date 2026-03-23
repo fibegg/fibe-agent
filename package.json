@@ -1,6 +1,6 @@
 {
-  "name": "phoenix-agent",
-  "version": "1.8.7",
+  "name": "fibe-agent",
+  "version": "1.9.0",
   "license": "MIT",
   "packageManager": "bun@1.3.11",
   "scripts": {
@@ -11,21 +11,21 @@
     "test:integration": "echo 'No integration tests configured'",
     "typecheck": "nx run-many -t typecheck",
     "e2e": "nx run-many -t e2e",
-    "ci": "nx run-many -t lint,build,typecheck --parallel=8",
-    "ci:test": "nx run-many -t lint,build,typecheck,test --parallel=8"
+    "ci": "nx run-many -t lint,build,typecheck,test",
+    "ci:notest": "nx run-many -t lint,build,typecheck"
   },
   "private": true,
   "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
     "@openai/codex": "^0.115.0",
     "@tanstack/react-virtual": "^3.13.0",
     "lucide-react": "^0.468.0",
+    "marked": "^15.0.0",
+    "path-to-regexp": "^8.0.0",
     "prismjs": "^1.29.0",
-    "@nestjs/common": "^11.0.0",
-    "@nestjs/core": "^11.0.0",
-    "axios": "^1.6.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "marked": "^15.0.0",
     "react-router-dom": "6.30.3",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.0"

@@ -2,11 +2,13 @@ import { readdir, readFile, stat } from 'node:fs/promises';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
+import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 
 export interface PlaygroundEntry {
   name: string;
   path: string;
   type: 'file' | 'directory';
+  mtime?: number;
   children?: PlaygroundEntry[];
 }
 
@@ -24,9 +26,41 @@ export class PlaygroundsService {
   constructor(private readonly config: ConfigService) {}
 
   async getTree(): Promise<PlaygroundEntry[]> {
-    return this.readDir(this.config.getPlaygroundsDir(), '');
+    const ig = await loadGitignore(this.config.getPlaygroundsDir());
+    return this.readDir(this.config.getPlaygroundsDir(), '', ig);
   }
 
+  async getStats(): Promise<{ fileCount: number; totalLines: number }> {
+    const ig = await loadGitignore(this.config.getPlaygroundsDir());
+    return this.countStats(this.config.getPlaygroundsDir(), ig);
+  }
+
+  private async countStats(absPath: string, parentIg: GitignoreFilter): Promise<{ fileCount: number; totalLines: number }> {
+    let fileCount = 0;
+    let totalLines = 0;
+    try {
+      const ig = await loadGitignore(absPath, parentIg);
+      const entries = await readdir(absPath, { withFileTypes: true });
+      for (const e of entries) {
+        const name = typeof e.name === 'string' ? e.name : String(e.name);
+        if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
+        if (ig.ignores(name)) continue;
+        const childAbs = join(absPath, name);
+        if (e.isFile()) {
+          fileCount++;
+          try {
+            const content = await readFile(childAbs, 'utf-8');
+            totalLines += content.split('\n').length;
+          } catch { /* skip binary/unreadable */ }
+        } else if (e.isDirectory()) {
+          const sub = await this.countStats(childAbs, ig);
+          fileCount += sub.fileCount;
+          totalLines += sub.totalLines;
+        }
+      }
+    } catch { /* dir not accessible */ }
+    return { fileCount, totalLines };
+  }
   async getFileContent(relativePath: string): Promise<string> {
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
@@ -99,9 +133,10 @@ export class PlaygroundsService {
     return result;
   }
 
-  private async readDir(absPath: string, relativePath: string): Promise<PlaygroundEntry[]> {
+  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter): Promise<PlaygroundEntry[]> {
     if (IGNORED_NAMES.has(basename(absPath))) return [];
     try {
+      const ig = await loadGitignore(absPath, parentIg);
       const entries = await readdir(absPath, { withFileTypes: true });
       const result: PlaygroundEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
@@ -110,6 +145,7 @@ export class PlaygroundsService {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
         const rel = relativePath ? `${relativePath}/${name}` : name;
+        if (ig.ignores(name)) continue;
         if (e.isDirectory()) {
           dirs.push({ name, abs: join(absPath, name), rel });
         } else if (e.isFile()) {
@@ -123,11 +159,16 @@ export class PlaygroundsService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: await this.readDir(d.abs, d.rel),
+          children: await this.readDir(d.abs, d.rel, ig),
         });
       }
       for (const f of files) {
-        result.push({ name: f.name, path: f.rel, type: 'file' });
+        let mtime: number | undefined;
+        try {
+          const st = await stat(join(absPath, f.name));
+          mtime = st.mtimeMs;
+        } catch { /* ignore */ }
+        result.push({ name: f.name, path: f.rel, type: 'file', mtime });
       }
       return result;
     } catch {

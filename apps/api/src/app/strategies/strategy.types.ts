@@ -55,6 +55,7 @@ export interface ConversationDataDirProvider {
 
 export interface AgentStrategy {
   ensureSettings?(): void;
+  getWorkingDir?(): string | null;
   executeAuth(connection: AuthConnection): void;
   submitAuthCode(code: string): void;
   cancelAuth(): void;

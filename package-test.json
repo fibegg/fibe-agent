@@ -1,0 +1,6 @@
+{
+  "name": "test",
+  "scripts": {
+    "hello": "node test-bun.js"
+  }
+}

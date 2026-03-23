@@ -1,4 +1,5 @@
 import { Brain, Loader2, Menu, Search, Sparkles, X } from 'lucide-react';
+import { FibeLogo } from '../fibe-logo';
 import { ModelSelector } from './model-selector';
 import { CHAT_STATES } from './chat-state';
 import { STATE_LABELS, truncateError } from './chat-state';
@@ -59,7 +60,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   return (
     <header
-      className={`border-b border-border/50 bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
+      className={`border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
       style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
     >
       {isMobile && (
@@ -86,10 +87,10 @@ export function ChatHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold text-sm text-foreground truncate">AI Assistant</h2>
+              <FibeLogo className="text-xl text-foreground" variant="wordmark" />
               {sessionTimeMs > 0 && (
                 <span
-                  className="text-[10px] sm:text-xs font-medium tabular-nums text-foreground"
+                  className="text-[10px] sm:text-xs font-medium tabular-nums text-muted-foreground"
                   title="Session time"
                 >
                   {formatSessionDurationMs(sessionTimeMs)}

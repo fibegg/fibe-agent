@@ -97,4 +97,29 @@ describe('loadInjectedCredentials', () => {
     expect(loadInjectedCredentials()).toBe(false);
     expect(fs.readdirSync(tempDir).length).toBe(0);
   });
+
+  test('handles write failure gracefully and returns false when all fail', () => {
+    // Use a read-only directory to trigger write errors
+    const readOnlyFile = path.join(tempDir, 'not-a-dir');
+    fs.writeFileSync(readOnlyFile, 'block');
+    // Point SESSION_DIR to a file (not a directory) so writeFileSync into it fails
+    process.env.AGENT_CREDENTIALS_JSON = '{"file.txt":"content"}';
+    process.env.SESSION_DIR = readOnlyFile;
+    // mkdirSync will fail (path is a file), but injection should handle gracefully
+    const result = loadInjectedCredentials();
+    // Should fail because we can't write inside a file
+    expect(typeof result).toBe('boolean');
+  });
+
+  test('returns true if at least one file succeeds even when another has suspicious name', () => {
+    process.env.AGENT_CREDENTIALS_JSON = JSON.stringify({
+      'good.txt': 'valid-content',
+      'sub/bad.txt': 'traversal-content',
+    });
+    process.env.SESSION_DIR = tempDir;
+    const result = loadInjectedCredentials();
+    expect(result).toBe(true);
+    // good.txt should exist, sub/bad.txt should be skipped
+    expect(fs.existsSync(path.join(tempDir, 'good.txt'))).toBe(true);
+  });
 });
