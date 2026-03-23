@@ -84,7 +84,7 @@ export function ChatInputArea({
     pendingImages.length + pendingAttachments.length < maxPendingTotal;
 
   return (
-    <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm">
+    <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border/30 bg-card/30 backdrop-blur-sm">
       <div className="flex flex-col gap-2">
         {(pendingImages.length > 0 || pendingVoice || pendingAttachments.length > 0) && (
           <div className="flex flex-wrap gap-2 items-center">
@@ -144,7 +144,7 @@ export function ChatInputArea({
             {voiceRecorder.error ?? voiceUploadError ?? attachmentUploadError}
           </p>
         )}
-        <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border p-2 sm:p-3 shadow-xl shadow-violet-500/5">
+        <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border/60 p-2 sm:p-3 shadow-xl shadow-violet-500/[0.04] transition-shadow duration-300 focus-within:shadow-violet-500/[0.08]">
           <input
             ref={fileInputRef}
             type="file"
@@ -246,7 +246,7 @@ export function ChatInputArea({
               type="button"
               onClick={onSend}
               disabled={!isReady}
-              className="size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-opacity"
+              className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
               aria-label="Send"
             >
               <Send className="size-3.5 sm:size-4" />
