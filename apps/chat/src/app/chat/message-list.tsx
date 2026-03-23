@@ -264,7 +264,7 @@ function getUploadSrc(filename: string): string {
 }
 
 const ESTIMATED_ROW_HEIGHT = 120;
-const ROW_GAP = 24;
+const ROW_GAP = 28;
 const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
 const FULL_WIDTH = 'max-w-full';
 
@@ -372,7 +372,7 @@ const MessageRow = memo(function MessageRow({
                   </p>
                   <CopyRawMessageButton rawText={msg.body} visualVariant="assistant" />
                 </div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none" title={msg.model ? `Processed by ${msg.model}` : undefined}>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70" title={msg.model ? `Processed by ${msg.model}` : undefined}>
                   <Brain className="size-3 shrink-0" aria-hidden />
                   {msg.model ?? '—'}
                 </p>

@@ -9,7 +9,7 @@ export const INPUT_BG = 'bg-input-background dark:bg-input/30';
 export const INPUT_FOCUS_BORDER = 'focus:border-violet-500 dark:focus:border-primary';
 
 export const INPUT_SEARCH =
-  'h-8 w-full pl-8 pr-8 text-xs rounded-md ' + INPUT_BG + ' border border-border ' + INPUT_FOCUS_BORDER + ' ' + INPUT;
+  'h-8 w-full pl-8 pr-8 text-xs rounded-xl ' + INPUT_BG + ' border border-border ' + INPUT_FOCUS_BORDER + ' ' + INPUT + ' transition-all duration-200';
 
 export const INPUT_SM =
   'w-28 sm:w-32 h-7 sm:h-8 px-2.5 rounded-md text-[10px] sm:text-xs ' +
@@ -64,15 +64,15 @@ export const ACTIVITY_MONO = 'text-xs text-foreground/90 whitespace-pre-wrap fon
 export const BADGE_CARD = 'shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
 
 export const AVATAR_USER =
-  'size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center text-white';
+  'size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center text-white ring-2 ring-background';
 export const AVATAR_ASSISTANT =
-  'size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white';
+  'size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white ring-2 ring-background';
 
 export const BUBBLE_ASSISTANT =
-  'rounded-2xl rounded-tl-sm bg-card/60 backdrop-blur-md border border-border/50 shadow-lg text-card-foreground';
-export const BUBBLE_TYPING = 'rounded-2xl rounded-tl-sm bg-card border border-border text-card-foreground';
+  'rounded-2xl rounded-tl-md bg-card/60 backdrop-blur-md border border-border/50 shadow-sm text-card-foreground';
+export const BUBBLE_TYPING = 'rounded-2xl rounded-tl-md bg-card border border-border text-card-foreground';
 export const BUBBLE_USER =
-  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-600 text-white shadow-lg shadow-violet-500/20';
+  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-violet-600 to-purple-600 text-white shadow-md shadow-violet-500/15';
 
 export const PROSE_MESSAGE =
   'markdown-body prose prose-sm max-w-none min-w-0 dark:prose-invert text-sm sm:text-[14px] break-words';
@@ -83,11 +83,11 @@ export const SIDEBAR_HEADER = `border-b ${HEADER_BORDER} shrink-0 ${HEADER_PADDI
 export const CARD_HEADER = `border-b ${HEADER_BORDER} bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`;
 
 export const MODAL_OVERLAY = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm';
-export const MODAL_OVERLAY_DARK = 'fixed inset-0 z-50 bg-black/50';
+export const MODAL_OVERLAY_DARK = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm';
 export const MOBILE_SHEET_PANEL =
   'fixed top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col lg:hidden';
 export const MODAL_OVERLAY_CENTER =
-  'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm';
+  'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm';
 
 export const LOGO_ICON_BOX =
   'size-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0';
@@ -110,7 +110,7 @@ export const CLOSE_BUTTON_SIZE = 'size-8';
 export const SETTINGS_CLOSE_BUTTON =
   'size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-violet-500 hover:bg-violet-500/10';
 export const MODAL_CARD =
-  'rounded-xl bg-gradient-to-br from-card via-card to-violet-950/5 border border-violet-500/20 shadow-[0_0_50px_rgba(124,58,237,0.12)] overflow-hidden';
+  'rounded-2xl bg-card backdrop-blur-2xl border border-violet-500/15 shadow-[var(--shadow-elevated)] overflow-hidden animate-modal-enter';
 export const BUTTON_OUTLINE_ACCENT =
   'rounded-lg border border-violet-500/20 text-sm font-medium text-foreground hover:bg-violet-500/10 hover:text-violet-500 hover:border-violet-500/30 transition-colors flex items-center gap-2 w-full px-4 py-2.5';
 export const BUTTON_DESTRUCTIVE_GHOST =

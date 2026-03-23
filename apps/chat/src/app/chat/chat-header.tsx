@@ -60,7 +60,7 @@ export function ChatHeader({
 }: ChatHeaderProps) {
   return (
     <header
-      className={`border-b border-border/50 bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
+      className={`border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
       style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
     >
       {isMobile && (
@@ -90,7 +90,7 @@ export function ChatHeader({
               <FibeLogo className="text-xl text-foreground" variant="wordmark" />
               {sessionTimeMs > 0 && (
                 <span
-                  className="text-[10px] sm:text-xs font-medium tabular-nums text-foreground"
+                  className="text-[10px] sm:text-xs font-medium tabular-nums text-muted-foreground"
                   title="Session time"
                 >
                   {formatSessionDurationMs(sessionTimeMs)}
