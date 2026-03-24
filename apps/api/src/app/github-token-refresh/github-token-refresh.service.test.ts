@@ -33,7 +33,7 @@ describe('GithubTokenRefreshService', () => {
 
   test('fetches token and updates MCP_CONFIG_JSON', async () => {
     mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'plgr_test123';
+    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
     mockConfig.getPhoenixAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
@@ -52,7 +52,7 @@ describe('GithubTokenRefreshService', () => {
         'https://phoenix.test/api/agents/42/github_token',
         {
           method: 'GET',
-          headers: { Authorization: 'Bearer plgr_test123' },
+          headers: { Authorization: 'Bearer fibe_test123' },
         }
       );
 
@@ -68,7 +68,7 @@ describe('GithubTokenRefreshService', () => {
 
   test('returns null on 404 (no GitHub App installed)', async () => {
     mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'plgr_test123';
+    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
     mockConfig.getPhoenixAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
@@ -86,7 +86,7 @@ describe('GithubTokenRefreshService', () => {
 
   test('returns null on server error', async () => {
     mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'plgr_test123';
+    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
     mockConfig.getPhoenixAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
@@ -104,7 +104,7 @@ describe('GithubTokenRefreshService', () => {
 
   test('returns null on network error', async () => {
     mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'plgr_test123';
+    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
     mockConfig.getPhoenixAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
@@ -129,7 +129,7 @@ describe('GithubTokenRefreshService', () => {
     });
 
     mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'plgr_test123';
+    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
     mockConfig.getPhoenixAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
