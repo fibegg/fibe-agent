@@ -24,15 +24,19 @@ ARG BUILDKIT_INLINE_CACHE=1
 
 WORKDIR /app
 
-COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json ./
+COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json tsconfig.json eslint.config.mjs vitest.workspace.ts ./
 COPY apps/api/package.json apps/api/
 COPY apps/chat/package.json apps/chat/
+COPY apps/e2e-api/package.json apps/e2e-api/
+COPY apps/e2e-chat/package.json apps/e2e-chat/
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \
     bun install
 
 COPY apps/api apps/api
 COPY apps/chat apps/chat
+COPY apps/e2e-api apps/e2e-api
+COPY apps/e2e-chat apps/e2e-chat
 COPY shared shared
 
 ENV NX_DAEMON=false \
