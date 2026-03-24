@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { handleSendMessage } from './agent-send-message.handler';
-import { ERROR_CODE } from '../ws.constants';
+import { ERROR_CODE } from '@shared/ws-constants';
 
 describe('handleSendMessage', () => {
   test('returns accepted and messageId when result is accepted', () => {

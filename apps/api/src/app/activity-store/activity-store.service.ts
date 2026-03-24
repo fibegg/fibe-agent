@@ -4,19 +4,9 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
-import type { StoredStoryEntry } from '../message-store/message-store.service';
+import type { StoredStoryEntry, StoredActivityEntry, TokenUsage } from '@shared/types';
 
-export interface TokenUsage {
-  inputTokens: number;
-  outputTokens: number;
-}
-
-export interface StoredActivityEntry {
-  id: string;
-  created_at: string;
-  story: StoredStoryEntry[];
-  usage?: TokenUsage;
-}
+export type { StoredActivityEntry, TokenUsage } from '@shared/types';
 
 function dedupeStoryById(story: StoredStoryEntry[]): StoredStoryEntry[] {
   if (!Array.isArray(story) || story.length === 0) return story;
@@ -33,6 +23,7 @@ export class ActivityStoreService {
   private readonly activityPath: string;
   private readonly jsonWriter: SequentialJsonWriter;
   private activities: StoredActivityEntry[] = [];
+  private readonly indexById = new Map<string, StoredActivityEntry>();
 
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
@@ -40,6 +31,7 @@ export class ActivityStoreService {
     this.jsonWriter = new SequentialJsonWriter(this.activityPath, () => this.activities);
     this.ensureDataDir();
     this.activities = this.load();
+    this.rebuildIndex();
   }
 
   all(): StoredActivityEntry[] {
@@ -47,7 +39,7 @@ export class ActivityStoreService {
   }
 
   getById(id: string): StoredActivityEntry | undefined {
-    return this.activities.find((a) => a.id === id);
+    return this.indexById.get(id);
   }
 
   findByStoryEntryId(entryId: string): StoredActivityEntry | undefined {
@@ -63,6 +55,7 @@ export class ActivityStoreService {
       story: dedupeStoryById(Array.isArray(story) ? story : []),
     };
     this.activities.push(entry);
+    this.indexById.set(entry.id, entry);
     this.jsonWriter.schedule();
     return entry;
   }
@@ -74,12 +67,13 @@ export class ActivityStoreService {
       story: [firstEntry],
     };
     this.activities.push(entry);
+    this.indexById.set(entry.id, entry);
     this.jsonWriter.schedule();
     return entry;
   }
 
   appendEntry(activityId: string, storyEntry: StoredStoryEntry): void {
-    const activity = this.activities.find((a) => a.id === activityId);
+    const activity = this.indexById.get(activityId);
     if (activity && storyEntry?.id && !activity.story.some((e) => e.id === storyEntry.id)) {
       activity.story.push(storyEntry);
       this.jsonWriter.schedule();
@@ -87,7 +81,7 @@ export class ActivityStoreService {
   }
 
   replaceStory(activityId: string, story: StoredStoryEntry[]): void {
-    const activity = this.activities.find((a) => a.id === activityId);
+    const activity = this.indexById.get(activityId);
     if (activity) {
       activity.story = dedupeStoryById(Array.isArray(story) ? story : []);
       this.jsonWriter.schedule();
@@ -95,7 +89,7 @@ export class ActivityStoreService {
   }
 
   setUsage(activityId: string, usage: TokenUsage): void {
-    const activity = this.activities.find((a) => a.id === activityId);
+    const activity = this.indexById.get(activityId);
     if (activity) {
       activity.usage = usage;
       this.jsonWriter.schedule();
@@ -104,6 +98,7 @@ export class ActivityStoreService {
 
   clear(): void {
     this.activities = [];
+    this.indexById.clear();
     this.jsonWriter.schedule();
   }
 
@@ -125,6 +120,13 @@ export class ActivityStoreService {
       }));
     } catch {
       return [];
+    }
+  }
+
+  private rebuildIndex(): void {
+    this.indexById.clear();
+    for (const entry of this.activities) {
+      this.indexById.set(entry.id, entry);
     }
   }
 

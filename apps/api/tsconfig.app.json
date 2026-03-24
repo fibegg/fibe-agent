@@ -6,14 +6,14 @@
     "paths": { "@shared/*": ["../../shared/*"] },
     "module": "nodenext",
     "types": ["node"],
-    "rootDir": "src",
+    "rootDir": "../../",
     "moduleResolution": "nodenext",
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "target": "es2021"
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "../../shared/*.ts"],
   "exclude": [
     "out-tsc",
     "dist",

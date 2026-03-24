@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { finishAgentStream, type FinishAgentStreamDeps } from './finish-agent-stream';
-import { WS_EVENT } from '../ws.constants';
+import { WS_EVENT } from '@shared/ws-constants';
 
 describe('finishAgentStream', () => {
   let sent: Array<{ type: string; data?: Record<string, unknown> }>;

@@ -4,16 +4,9 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
+import type { StoredStoryEntry } from '@shared/types';
 
-export interface StoredStoryEntry {
-  id: string;
-  type: string;
-  message: string;
-  timestamp: string;
-  details?: string;
-  command?: string;
-  path?: string;
-}
+export type { StoredStoryEntry } from '@shared/types';
 
 export interface StoredMessage {
   id: string;
@@ -58,18 +51,11 @@ export class MessageStoreService {
     return message;
   }
 
-  setStoryForLastAssistant(story: StoredStoryEntry[]): void {
-    const last = this.messages[this.messages.length - 1];
-    if (last?.role === 'assistant' && Array.isArray(story)) {
-      last.story = story;
-      this.jsonWriter.schedule();
-    }
-  }
-
-  setActivityIdForLastAssistant(activityId: string): void {
+  finalizeLastAssistant(story: StoredStoryEntry[], activityId?: string): void {
     const last = this.messages[this.messages.length - 1];
     if (last?.role === 'assistant') {
-      last.activityId = activityId;
+      if (Array.isArray(story)) last.story = story;
+      if (activityId) last.activityId = activityId;
       this.jsonWriter.schedule();
     }
   }
