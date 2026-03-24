@@ -24,7 +24,7 @@ ARG BUILDKIT_INLINE_CACHE=1
 
 WORKDIR /app
 
-COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json ./
+COPY package.json bun.lock nx.json tsconfig.base.json ./
 COPY apps/api/package.json apps/api/
 COPY apps/chat/package.json apps/chat/
 
