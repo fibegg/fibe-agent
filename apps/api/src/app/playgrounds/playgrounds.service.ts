@@ -1,4 +1,5 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
@@ -78,6 +79,18 @@ export class PlaygroundsService {
       throw new NotFoundException('File not found');
     }
     return readFile(absPath, 'utf-8');
+  }
+
+  async saveFileContent(relativePath: string, content: string): Promise<void> {
+    const base = resolve(this.config.getPlaygroundsDir());
+    const absPath = resolve(base, relativePath);
+    const rel = relative(base, absPath);
+    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
+      throw new NotFoundException('File not found');
+    }
+    // Ensure parent directory exists
+    await mkdir(dirname(absPath), { recursive: true });
+    await writeFile(absPath, content, 'utf-8');
   }
 
   async getFolderFileContents(

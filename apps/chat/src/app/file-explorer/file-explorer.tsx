@@ -54,6 +54,8 @@ export function FileExplorer({
   agentFileApiPath,
   playgroundStats,
   agentStats,
+  dirtyPaths: dirtyPathsProp,
+  onDirtyChange: onDirtyChangeProp,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -69,6 +71,10 @@ export function FileExplorer({
   agentFileApiPath?: string;
   playgroundStats?: TabStats;
   agentStats?: TabStats;
+  /** Externally-controlled dirty paths (from parent managing the editor inline) */
+  dirtyPaths?: Set<string>;
+  /** Callback for dirty state changes from the internal FileDetailsDialog */
+  onDirtyChange?: (path: string, isDirty: boolean) => void;
 } = {}) {
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,6 +84,7 @@ export function FileExplorer({
   const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
   const [animatingPaths, setAnimatingPaths] = useState<Map<string, FileAnimationType>>(new Map());
   const [animatingPrev, setAnimatingPrev] = useState<PlaygroundEntry[] | null>(null);
+  const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(new Set());
   const prevTreeRef = useRef<PlaygroundEntry[]>([]);
 
   const controlled = isControlledTree(treeProp);
@@ -214,6 +221,21 @@ export function FileExplorer({
     [onFileSelect]
   );
 
+  const handleDirtyChange = useCallback((path: string, isDirty: boolean) => {
+    setDirtyPaths((prev) => {
+      const next = new Set(prev);
+      if (isDirty) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+    onDirtyChangeProp?.(path, isDirty);
+  }, [onDirtyChangeProp]);
+
+  // Merge internal and externally-provided dirty paths
+  const effectiveDirtyPaths = dirtyPathsProp && dirtyPathsProp.size > 0
+    ? new Set([...dirtyPaths, ...dirtyPathsProp])
+    : dirtyPaths;
+
   const displayTree = useMemo(() => {
     if (animatingPaths.size > 0 && animatingPrev) {
       return mergeAnimatingRemoved(animatingPrev, tree, animatingPaths);
@@ -338,6 +360,7 @@ export function FileExplorer({
                 onFileClick={handleFileClick}
                 selectedPath={selectedPathProp ?? openFileEntry?.path ?? null}
                 animatingPaths={animatingPaths}
+                dirtyPaths={effectiveDirtyPaths}
               />
             ))}
           </div>
@@ -366,7 +389,11 @@ export function FileExplorer({
         content
       )}
       {openFileEntry && (
-        <FileDetailsDialog entry={openFileEntry} onClose={() => setSelectedFileLocal(null)} />
+        <FileDetailsDialog
+          entry={openFileEntry}
+          onClose={() => setSelectedFileLocal(null)}
+          onDirtyChange={handleDirtyChange}
+        />
       )}
     </>
   );
