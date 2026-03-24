@@ -18,7 +18,8 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
-FROM oven/bun:1.3.11-slim AS builder
+FROM node:24-slim AS builder
+COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
 
 ARG BUILDKIT_INLINE_CACHE=1
 
@@ -42,7 +43,7 @@ COPY shared shared
 ENV NX_DAEMON=false \
     VITE_THEME_SOURCE=frame \
     VITE_HIDE_THEME_SWITCH=true
-RUN bunx nx run-many --targets=build --projects=api,chat
+RUN npx nx run-many --targets=build --projects=api,chat
 
 FROM node:24-slim
 
