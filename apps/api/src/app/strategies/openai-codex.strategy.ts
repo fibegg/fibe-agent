@@ -2,7 +2,14 @@ import { Logger } from '@nestjs/common';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
+import type {
+  AuthConnection,
+  ConversationDataDirProvider,
+  LogoutConnection,
+  StreamingCallbacks,
+  TokenUsage,
+  ToolEvent,
+} from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 import { runAuthProcess } from './auth-process-helper';
 
@@ -11,6 +18,7 @@ const CODEX_HOME_SUBDIR = 'codex';
 const CODEX_WORKSPACE_SUBDIR = 'codex_workspace';
 const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
+const RESPONSE_PREVIEW_MAX = 200;
 
 function getCodexHome(): string {
   return process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
@@ -34,6 +42,194 @@ function getCodexCommand(): string {
   if (existsSync(localBinUnix)) return localBinUnix;
   return 'codex';
 }
+
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\u001b\[[0-9;]*[a-zA-Z]/g;
+const stripAnsi = (s: string) => s.replace(ANSI_RE, '');
+
+/* ------------------------------------------------------------------ */
+/*  Structured JSONL parser for `codex exec --json`                   */
+/* ------------------------------------------------------------------ */
+
+interface CodexJsonEvent {
+  type?: string;
+  message?: string;
+  thread_id?: string;
+  usage?: { input_tokens?: number; cached_input_tokens?: number; output_tokens?: number };
+  error?: { message?: string };
+  item?: {
+    id?: string;
+    type?: string;
+    text?: string;
+    command?: string;
+    aggregated_output?: string;
+    exit_code?: number | null;
+    status?: string;
+    changes?: Array<{ path?: string; kind?: string }>;
+    name?: string;
+    summary?: string;
+    path?: string;
+  };
+}
+
+export interface CodexExecJsonState {
+  errorResult: string;
+  inReasoning: boolean;
+}
+
+export interface CodexExecJsonHandlers {
+  onChunk: (chunk: string) => void;
+  onReasoningStart?: () => void;
+  onReasoningChunk?: (text: string) => void;
+  onReasoningEnd?: () => void;
+  onTool?: (event: ToolEvent) => void;
+  onUsage?: (usage: TokenUsage) => void;
+}
+
+/**
+ * Parse a single JSONL line from `codex exec --json` and route into callbacks.
+ *
+ * Event flow:
+ *   turn.started        → onReasoningStart  (opens activity entry)
+ *   item: reasoning     → onReasoningChunk
+ *   item: agent_message → onReasoningChunk (preview) + onReasoningEnd + onChunk
+ *   item: command_exec  → onReasoningChunk + onTool
+ *   item: file_change   → onReasoningChunk + onTool
+ *   turn.completed      → onReasoningEnd + onUsage
+ *   error / turn.failed → onChunk (prefixed with ⚠️)
+ *   non-JSON            → onChunk (ANSI stripped)
+ */
+export function handleCodexExecJsonLine(
+  line: string,
+  state: CodexExecJsonState,
+  handlers: CodexExecJsonHandlers
+): void {
+  line = line.trim();
+  if (!line) return;
+
+  const startReasoning = () => {
+    if (state.inReasoning) return;
+    state.inReasoning = true;
+    handlers.onReasoningStart?.();
+  };
+
+  const endReasoning = () => {
+    if (!state.inReasoning) return;
+    handlers.onReasoningEnd?.();
+    state.inReasoning = false;
+  };
+
+  try {
+    const event = JSON.parse(line) as CodexJsonEvent;
+    const type = event.type ?? '';
+
+    if (type === 'turn.started') {
+      startReasoning();
+      return;
+    }
+
+    if (type.startsWith('item.') && event.item) {
+      const item = event.item;
+
+      switch (item.type) {
+        case 'agent_message':
+        case 'message': {
+          if (!item.text) break;
+          const preview = item.text.length > RESPONSE_PREVIEW_MAX
+            ? item.text.slice(0, RESPONSE_PREVIEW_MAX) + '…'
+            : item.text;
+          handlers.onReasoningChunk?.(preview);
+          endReasoning();
+          handlers.onChunk(item.text);
+          break;
+        }
+
+        case 'reasoning': {
+          startReasoning();
+          if (item.text) handlers.onReasoningChunk?.(item.text);
+          break;
+        }
+
+        case 'command_execution': {
+          if (!item.command) break;
+          handlers.onReasoningChunk?.(`$ ${item.command}\n`);
+          handlers.onTool?.({
+            kind: 'tool_call',
+            name: 'command',
+            command: item.command,
+            summary: item.aggregated_output?.slice(0, RESPONSE_PREVIEW_MAX),
+          });
+          break;
+        }
+
+        case 'file_change': {
+          for (const change of item.changes ?? []) {
+            if (!change.path) continue;
+            const fileName = change.path.split(/[/\\]/).pop() ?? 'file';
+            handlers.onReasoningChunk?.(`${change.kind ?? 'changed'}: ${change.path}\n`);
+            handlers.onTool?.({
+              kind: 'file_created',
+              name: fileName,
+              path: change.path,
+              summary: change.kind,
+            });
+          }
+          break;
+        }
+
+        case 'local_shell_call':
+        case 'function_call':
+        case 'tool_call': {
+          handlers.onTool?.({
+            kind: 'tool_call',
+            name: item.name ?? 'tool',
+            command: item.command,
+            path: item.path,
+            summary: item.summary,
+          });
+          break;
+        }
+
+        default:
+          break;
+      }
+      return;
+    }
+
+    if (type === 'turn.completed') {
+      endReasoning();
+      if (event.usage && handlers.onUsage) {
+        handlers.onUsage({
+          inputTokens: event.usage.input_tokens ?? 0,
+          outputTokens: event.usage.output_tokens ?? 0,
+        });
+      }
+      return;
+    }
+
+    if (type === 'turn.failed') {
+      endReasoning();
+      const msg = event.error?.message ?? 'Turn failed';
+      state.errorResult += msg;
+      handlers.onChunk(`⚠️ ${msg}`);
+      return;
+    }
+
+    if (type === 'error') {
+      const msg = event.message ?? event.error?.message ?? 'Unknown codex error';
+      state.errorResult += msg;
+      handlers.onChunk(`⚠️ ${msg}`);
+      return;
+    }
+  } catch {
+    const cleaned = stripAnsi(line).trim();
+    if (cleaned) handlers.onChunk(cleaned);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Strategy class                                                     */
+/* ------------------------------------------------------------------ */
 
 export class OpenaiCodexStrategy implements AgentStrategy {
   private readonly logger = new Logger(OpenaiCodexStrategy.name);
@@ -72,8 +268,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     if (this.useApiTokenMode) {
       const key = process.env[OPENAI_API_KEY_ENV]?.trim();
       if (key) {
-        const authPath = join(codexHome, 'auth.json');
-        writeFileSync(authPath, JSON.stringify({ api_key: key }), { mode: 0o600 });
+        writeFileSync(join(codexHome, 'auth.json'), JSON.stringify({ api_key: key }), { mode: 0o600 });
       }
     }
   }
@@ -98,7 +293,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
       onData: (output) => {
         // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
         const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
-        const urlMatch = clean.match(/https:\/\/[^\s"'>]+/);
+        const urlMatch = clean.match(/https:\/\/[^\s"'> ]+/);
         if (urlMatch && !authUrlExtracted) {
           authUrlExtracted = true;
           this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
@@ -154,22 +349,14 @@ export class OpenaiCodexStrategy implements AgentStrategy {
 
   clearCredentials(): void {
     const authFile = join(this.getCodexHomeForSession(), 'auth.json');
-    if (existsSync(authFile)) {
-      unlinkSync(authFile);
-    }
+    if (existsSync(authFile)) unlinkSync(authFile);
   }
 
   executeLogout(connection: LogoutConnection): void {
     const env = { ...process.env, CODEX_HOME: this.getCodexHomeForSession() };
-    const logoutProcess = spawn(getCodexCommand(), ['logout'], {
-      env,
-      shell: false,
-    });
+    const logoutProcess = spawn(getCodexCommand(), ['logout'], { env, shell: false });
 
-    const handleOutput = (data: Buffer | string) => {
-      connection.sendLogoutOutput(data.toString());
-    };
-
+    const handleOutput = (data: Buffer | string) => connection.sendLogoutOutput(data.toString());
     logoutProcess.stdout?.on('data', handleOutput);
     logoutProcess.stderr?.on('data', handleOutput);
 
@@ -188,16 +375,11 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     if (this.useApiTokenMode && process.env[OPENAI_API_KEY_ENV]?.trim()) {
       return Promise.resolve(true);
     }
-
     return new Promise((resolve) => {
       const authFile = join(this.getCodexHomeForSession(), 'auth.json');
-      if (!existsSync(authFile)) {
-        resolve(false);
-        return;
-      }
+      if (!existsSync(authFile)) { resolve(false); return; }
       try {
-        const content = readFileSync(authFile, 'utf8');
-        const auth = JSON.parse(content) as { access_token?: string; token?: string; api_key?: string };
+        const auth = JSON.parse(readFileSync(authFile, 'utf8')) as Record<string, string>;
         resolve(Boolean(auth?.access_token ?? auth?.token ?? auth?.api_key));
       } catch {
         resolve(false);
@@ -214,53 +396,65 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     prompt: string,
     _model: string,
     onChunk: (chunk: string) => void,
-    callbacks?: import('./strategy.types').StreamingCallbacks,
+    callbacks?: StreamingCallbacks,
     systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
-      if (this.useApiTokenMode) {
-        this.ensureSettings();
-      }
-      const playgroundDir = join(process.cwd(), 'playground');
-      if (!existsSync(playgroundDir)) {
-        mkdirSync(playgroundDir, { recursive: true });
-      }
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
-      const codexCmd = getCodexCommand();
-      const codexArgs = ['exec', '--yolo', effectivePrompt];
-      const env = { ...process.env, CODEX_HOME: this.getCodexHomeForSession() };
+      if (this.useApiTokenMode) this.ensureSettings();
 
-      const codexProcess = spawn(codexCmd, codexArgs, {
-        env,
-        cwd: playgroundDir,
-        shell: false,
-      });
+      const playgroundDir = join(process.cwd(), 'playground');
+      if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
+
+      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
+      const codexProcess = spawn(
+        getCodexCommand(),
+        ['exec', '--json', '--color', 'never', '--dangerously-bypass-approvals-and-sandbox', effectivePrompt],
+        { env: { ...process.env, CODEX_HOME: this.getCodexHomeForSession() }, cwd: playgroundDir, shell: false }
+      );
       this.currentStreamProcess = codexProcess;
 
       let errorResult = '';
+      let lineBuffer = '';
+      let stderrReasoningStarted = false;
+      const jsonState: CodexExecJsonState = { errorResult: '', inReasoning: false };
+
+      const handleJsonLine = (raw: string) => {
+        handleCodexExecJsonLine(raw, jsonState, {
+          onChunk,
+          onReasoningStart: callbacks?.onReasoningStart,
+          onReasoningChunk: callbacks?.onReasoningChunk,
+          onReasoningEnd: callbacks?.onReasoningEnd,
+          onTool: callbacks?.onTool,
+          onUsage: callbacks?.onUsage,
+        });
+        errorResult = jsonState.errorResult;
+      };
 
       codexProcess.stdout?.on('data', (data: Buffer | string) => {
-        onChunk(data.toString());
+        lineBuffer += data.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() ?? '';
+        for (const l of lines) handleJsonLine(l);
       });
 
       codexProcess.stderr?.on('data', (data: Buffer | string) => {
-        const text = data.toString();
+        const text = stripAnsi(data.toString());
         errorResult += text;
         if (callbacks?.onReasoningChunk) {
+          if (!stderrReasoningStarted && !jsonState.inReasoning) {
+            stderrReasoningStarted = true;
+            callbacks.onReasoningStart?.();
+          }
           callbacks.onReasoningChunk(text);
-        } else {
-          onChunk(text);
         }
       });
 
       codexProcess.on('close', (code) => {
         this.currentStreamProcess = null;
-        callbacks?.onReasoningEnd?.();
-        if (this.streamInterrupted) {
-          reject(new Error(INTERRUPTED_MESSAGE));
-          return;
-        }
+        if (lineBuffer.trim()) handleJsonLine(lineBuffer);
+        if (jsonState.inReasoning || stderrReasoningStarted) callbacks?.onReasoningEnd?.();
+        if (this.streamInterrupted) { reject(new Error(INTERRUPTED_MESSAGE)); return; }
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {

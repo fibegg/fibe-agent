@@ -120,7 +120,7 @@ const ACTIVITY_DOT_COLOR: Record<string, string> = {
   stream_start: 'bg-blue-500',
   reasoning: 'bg-violet-500',
   step: 'bg-zinc-500',
-  tool_call: 'bg-violet-400',
+  tool_call: 'bg-amber-500',
   file_created: 'bg-green-500',
   task_complete: 'bg-green-500',
   default: 'bg-violet-500',
@@ -162,8 +162,8 @@ function activityHoverContent(item: DisplayItem): string {
   return e.message || e.details || getActivityLabel(e.type);
 }
 
-const BRAIN_IDLE = 'text-violet-400';
-const BRAIN_IDLE_ACCENT = 'text-violet-300';
+const BRAIN_IDLE = 'text-amber-400';
+const BRAIN_IDLE_ACCENT = 'text-amber-300';
 const BRAIN_WORKING = 'text-blue-400';
 const BRAIN_WORKING_ACCENT = 'text-blue-300';
 const BRAIN_COMPLETE = 'text-emerald-400';
@@ -173,7 +173,7 @@ const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
 const SINGLE_ROW_TYPES = new Set(['stream_start', 'step', 'tool_call', 'file_created']);
 
 const SUSPICIOUS_SEGMENT_CLASS =
-  'bg-violet-400/25 text-violet-200 border-b border-amber-500/50 rounded-sm px-0.5';
+  'bg-amber-500/25 text-amber-200 border-b border-amber-500/50 rounded-sm px-0.5';
 const AGREEMENT_SEGMENT_CLASS =
   'bg-emerald-500/25 text-emerald-200 border-b border-emerald-500/50 rounded-sm px-0.5';
 const UNCERTAINTY_SEGMENT_CLASS =
@@ -265,7 +265,7 @@ const ActivityBlock = memo(function ActivityBlock({
       <button
         type="button"
         onClick={() => onActivityClick({ activityId, storyId: entry.id })}
-        className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+        className="w-full text-left cursor-pointer hover:ring-2 hover:ring-amber-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-amber-500/30"
       >
         {node}
       </button>
@@ -342,7 +342,7 @@ const ActivityBlock = memo(function ActivityBlock({
   );
 });
 
-const COMMANDS_GROUP_STYLE = 'rounded-lg border border-amber-500/30 bg-violet-400/10';
+const COMMANDS_GROUP_STYLE = 'rounded-lg border border-amber-500/30 bg-amber-500/10';
 
 const CommandGroupBlock = memo(function CommandGroupBlock({
   entries,
@@ -366,16 +366,16 @@ const CommandGroupBlock = memo(function CommandGroupBlock({
           if (isClickable) e.stopPropagation();
           setExpanded((prev) => !prev);
         }}
-        className={`${FLEX_ROW_CENTER_WRAP} w-full text-left gap-2 min-w-0 -m-1 p-1 rounded-md hover:bg-violet-400/10`}
+        className={`${FLEX_ROW_CENTER_WRAP} w-full text-left gap-2 min-w-0 -m-1 p-1 rounded-md hover:bg-amber-500/10`}
         aria-expanded={expanded}
       >
         <div className={FLEX_ROW_CENTER}>
           {expanded ? (
-            <ChevronDown className="size-4 shrink-0 text-violet-500" />
+            <ChevronDown className="size-4 shrink-0 text-amber-500" />
           ) : (
-            <ChevronRight className="size-4 shrink-0 text-violet-500" />
+            <ChevronRight className="size-4 shrink-0 text-amber-500" />
           )}
-          <Terminal className="size-4 shrink-0 text-violet-500" />
+          <Terminal className="size-4 shrink-0 text-amber-500" />
           <p className={ACTIVITY_LABEL}>
             {n} command{n !== 1 ? 's' : ''}
           </p>
@@ -403,7 +403,7 @@ const CommandGroupBlock = memo(function CommandGroupBlock({
     <button
       type="button"
       onClick={() => onActivityClick({ activityId, storyId: firstEntryId })}
-      className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+      className="w-full text-left cursor-pointer hover:ring-2 hover:ring-amber-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-amber-500/30"
     >
       {content}
     </button>
@@ -767,7 +767,7 @@ export function AgentThinkingSidebar({
                   disabled={downloadAnimating}
                 >
                   {downloadAnimating ? (
-                    <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
+                    <span className="inline-flex items-center justify-center text-amber-400" aria-hidden>
                       <Brain className="size-8 brain-download-anim" />
                     </span>
                   ) : (
@@ -1062,7 +1062,7 @@ export function AgentThinkingSidebar({
                 <button
                   type="button"
                   onClick={() => onActivityClick({ activityId: latestActivityId })}
-                  className="w-full text-left cursor-pointer hover:ring-2 hover:ring-violet-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+                  className="w-full text-left cursor-pointer hover:ring-2 hover:ring-amber-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-amber-500/30"
                 >
                   <div
                     className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''} min-h-0 flex flex-col shrink-0`}
