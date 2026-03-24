@@ -1,6 +1,5 @@
 import { ChevronDown } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type MessageListHandle } from '../chat/message-list';
@@ -132,6 +131,22 @@ export function ChatPage() {
 
   const voiceRecorder = useVoiceRecorder();
 
+  const streamBufferRef = useRef('');
+  const rafIdRef = useRef<number | null>(null);
+
+  const flushStreamBuffer = useCallback(() => {
+    rafIdRef.current = null;
+    const buffered = streamBufferRef.current;
+    if (buffered) {
+      streamBufferRef.current = '';
+      setStreamingText((prev) => prev + buffered);
+    }
+  }, []);
+
+  useEffect(() => () => {
+    if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+  }, []);
+
   const {
     state,
     errorMessage,
@@ -149,8 +164,19 @@ export function ChatPage() {
     interruptAgent,
   } = useChatWebSocket(
     handleMessage,
-    (chunk) => flushSync(() => setStreamingText((prev) => prev + chunk)),
+    (chunk) => {
+      streamBufferRef.current += chunk;
+      if (rafIdRef.current === null) {
+        rafIdRef.current = requestAnimationFrame(flushStreamBuffer);
+      }
+    },
     (data) => {
+      // Flush any pending buffer before resetting
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+        rafIdRef.current = null;
+      }
+      streamBufferRef.current = '';
       setStreamingText('');
       streamModelRef.current = data?.model ?? null;
       resetForNewStream(data);

@@ -5,7 +5,7 @@ import type {
   TokenUsage,
   ToolEvent,
 } from '../strategies/strategy.types';
-import { WS_EVENT } from '../ws.constants';
+import { WS_EVENT } from '@shared/ws-constants';
 
 export interface StreamingCallbacksDeps {
   send: (type: string, data?: Record<string, unknown>) => void;

@@ -1,6 +1,6 @@
 import { describe, test, expect, beforeEach } from 'bun:test';
 import { createStreamingCallbacks, type StreamingCallbacksDeps } from './orchestrator-streaming-callbacks';
-import { WS_EVENT } from '../ws.constants';
+import { WS_EVENT } from '@shared/ws-constants';
 
 describe('createStreamingCallbacks', () => {
   let sent: Array<{ type: string; data?: Record<string, unknown> }>;

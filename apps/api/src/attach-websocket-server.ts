@@ -4,7 +4,7 @@ import type { RawData } from 'ws';
 import { ConfigService } from './app/config/config.service';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
-import { WS_CLOSE, WS_EVENT } from './app/ws.constants';
+import { WS_CLOSE, WS_EVENT } from '@shared/ws-constants';
 import { logWs } from './container-logger';
 
 type ClientMessage = {
