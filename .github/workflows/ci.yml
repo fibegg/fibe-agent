@@ -99,7 +99,7 @@ jobs:
             AGENT_PROVIDER=${{ matrix.provider.key }}
             GIT_SHA=${{ github.sha }}
           tags: |
-            ghcr.io/${{ steps.repo_owner.outputs.owner }}/phoenix-agent-oauth:${{ matrix.provider.tag }}-${{ steps.tag_suffix.outputs.latest_tag }}
-            ghcr.io/${{ steps.repo_owner.outputs.owner }}/phoenix-agent-oauth:${{ matrix.provider.tag }}-${{ github.sha }}
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/fibe-agent:${{ matrix.provider.tag }}-${{ steps.tag_suffix.outputs.latest_tag }}
+            ghcr.io/${{ steps.repo_owner.outputs.owner }}/fibe-agent:${{ matrix.provider.tag }}-${{ github.sha }}
           cache-from: type=gha,scope=${{ matrix.provider.key }}
           cache-to: type=gha,mode=max,scope=${{ matrix.provider.key }}
