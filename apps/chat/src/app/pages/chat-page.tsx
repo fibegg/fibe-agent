@@ -72,6 +72,16 @@ export function ChatPage() {
 
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
+  const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
+
+  const handlePageDirtyChange = useCallback((path: string, isDirty: boolean) => {
+    setPageDirtyPaths((prev) => {
+      const next = new Set(prev);
+      if (isDirty) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+  }, []);
 
   const { currentModel, setCurrentModel, handleModelSelect, handleModelInputChange } = useChatModel(sendRef);
 
@@ -431,6 +441,7 @@ export function ChatPage() {
                 closeMobileSidebar();
               }}
               selectedPath={viewingFile?.path ?? null}
+              dirtyPaths={pageDirtyPaths}
             />
           </div>
         </>
@@ -484,6 +495,7 @@ export function ChatPage() {
               onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
               onFileSelect={(entry) => setViewingFile(entry)}
               selectedPath={viewingFile?.path ?? null}
+              dirtyPaths={pageDirtyPaths}
             />
           </aside>
         </div>
@@ -572,6 +584,7 @@ export function ChatPage() {
               onClose={() => setViewingFile(null)}
               inline
               apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
+              onDirtyChange={handlePageDirtyChange}
             />
           </div>
         )}

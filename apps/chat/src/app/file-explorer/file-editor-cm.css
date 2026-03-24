@@ -1,0 +1,72 @@
+/* CodeMirror 6 Integration Styles */
+
+/* Container */
+.cm-editor {
+  height: 100%;
+  outline: none !important;
+  font-feature-settings: 'liga' 1, 'calt' 1;
+}
+
+/* Scrollbars — match app style */
+.cm-scroller {
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+.cm-scroller::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.cm-scroller::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cm-scroller::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border) / 0.8);
+  border-radius: 4px;
+}
+.cm-scroller::-webkit-scrollbar-thumb:hover {
+  background-color: hsl(var(--border));
+}
+
+/* Smooth cursor */
+.cm-cursor {
+  border-left-width: 2px !important;
+  transition: top 0.05s ease;
+}
+
+/* Fold marker tweak */
+.cm-foldPlaceholder {
+  background: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  cursor: pointer;
+}
+
+/* Search panel */
+.cm-search {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 8px;
+  margin: 4px;
+}
+
+/* Tooltip / autocomplete */
+.cm-tooltip {
+  background: hsl(var(--card));
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.cm-tooltip-autocomplete > ul > li[aria-selected] {
+  background: hsl(var(--primary) / 0.15);
+  color: hsl(var(--foreground));
+}
+
+/* Selection in non-focused editor */
+.cm-selectionBackground {
+  background: hsl(var(--muted) / 0.5) !important;
+}

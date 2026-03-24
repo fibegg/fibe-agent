@@ -387,7 +387,7 @@ describe('FileExplorer', () => {
     });
     fireEvent.click(screen.getByText('build.zig'));
     await waitFor(() => {
-      expect(screen.getByText('zig')).toBeTruthy();
+      expect(screen.getByText('ZIG')).toBeTruthy();
     });
     await waitFor(() => {
       expect(screen.getByText(/@import/)).toBeTruthy();
@@ -396,7 +396,7 @@ describe('FileExplorer', () => {
 
   it('shows Plain text for unknown file extension in file viewer', async () => {
     const tree: PlaygroundEntry[] = [
-      { name: 'file.xyz', path: 'file.xyz', type: 'file' },
+      { name: 'Makefile', path: 'Makefile', type: 'file' },
     ];
     (fetch as ReturnType<typeof vi.fn>)
       .mockResolvedValueOnce({
@@ -411,9 +411,9 @@ describe('FileExplorer', () => {
       });
     render(<FileExplorer />);
     await waitFor(() => {
-      expect(screen.getByText('file.xyz')).toBeTruthy();
+      expect(screen.getByText('Makefile')).toBeTruthy();
     });
-    fireEvent.click(screen.getByText('file.xyz'));
+    fireEvent.click(screen.getByText('Makefile'));
     await waitFor(() => {
       expect(screen.getByText('Plain text')).toBeTruthy();
     });
