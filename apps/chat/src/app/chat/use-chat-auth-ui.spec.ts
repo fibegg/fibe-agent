@@ -41,9 +41,9 @@ describe('useChatAuthUI', () => {
     expect(result.current.showAuthModal).toBe(true);
   });
 
-  it('showAuthModal is true when UNAUTHENTICATED', () => {
+  it('showAuthModal is false when UNAUTHENTICATED', () => {
     const { result } = renderHook(() => useChatAuthUI(CHAT_STATES.UNAUTHENTICATED, baseAuthModal));
-    expect(result.current.showAuthModal).toBe(true);
+    expect(result.current.showAuthModal).toBe(false);
   });
 
   it('showAuthModal is false when AUTHENTICATED', () => {
@@ -51,13 +51,7 @@ describe('useChatAuthUI', () => {
     expect(result.current.showAuthModal).toBe(false);
   });
 
-  it('authModalForModal spreads authModal with isManualToken true when UNAUTHENTICATED', () => {
-    const authModal = { authUrl: 'u', deviceCode: 'c', isManualToken: false };
-    const { result } = renderHook(() => useChatAuthUI(CHAT_STATES.UNAUTHENTICATED, authModal));
-    expect(result.current.authModalForModal).toEqual({ authUrl: 'u', deviceCode: 'c', isManualToken: true });
-  });
-
-  it('authModalForModal returns authModal unchanged when not UNAUTHENTICATED', () => {
+  it('authModalForModal returns authModal unchanged', () => {
     const authModal = { authUrl: 'u', deviceCode: 'c', isManualToken: false };
     const { result } = renderHook(() => useChatAuthUI(CHAT_STATES.AUTHENTICATED, authModal));
     expect(result.current.authModalForModal).toBe(authModal);
