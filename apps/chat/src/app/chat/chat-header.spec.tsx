@@ -180,4 +180,39 @@ describe('ChatHeader', () => {
     expect(screen.getByTestId('model-selector')).toBeTruthy();
     expect(screen.getByText('gpt-4')).toBeTruthy();
   });
+
+  it('does not render terminal button when onToggleTerminal is not provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} />);
+    expect(screen.queryByRole('button', { name: /terminal/i })).toBeNull();
+  });
+
+  it('renders terminal toggle button when onToggleTerminal is provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} />);
+    expect(screen.getByRole('button', { name: /open terminal/i })).toBeTruthy();
+  });
+
+  it('calls onToggleTerminal when terminal button is clicked', () => {
+    const onToggleTerminal = vi.fn();
+    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={onToggleTerminal} />);
+    fireEvent.click(screen.getByRole('button', { name: /open terminal/i }));
+    expect(onToggleTerminal).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows "Close terminal" label when terminalOpen is true', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={true} />);
+    expect(screen.getByRole('button', { name: /close terminal/i })).toBeTruthy();
+  });
+
+  it('sets aria-pressed=true when terminalOpen is true', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={true} />);
+    const btn = screen.getByRole('button', { name: /close terminal/i });
+    expect(btn.getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('sets aria-pressed=false when terminalOpen is false', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={false} />);
+    const btn = screen.getByRole('button', { name: /open terminal/i });
+    expect(btn.getAttribute('aria-pressed')).toBe('false');
+  });
 });
+
