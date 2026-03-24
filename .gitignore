@@ -54,3 +54,5 @@ designs/
 .env
 
 playground
+
+.docker-test/
