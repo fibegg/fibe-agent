@@ -29,18 +29,19 @@ export class TerminalService implements OnModuleDestroy {
 
   /**
    * Spawn a new PTY shell session.
+   * @param cwd Working directory for the shell. Falls back to PLAYGROUNDS_DIR then cwd().
    * @returns The spawned `IPty` instance, already stored under `id`.
    */
-  create(id: string = randomUUID(), cols = 80, rows = 24): pty.IPty {
+  create(id: string = randomUUID(), cols = 80, rows = 24, cwd?: string): pty.IPty {
     const { cols: c, rows: r } = this.clamp(cols, rows);
     const shell = this.resolveShell();
-    const cwd = process.env.PLAYGROUNDS_DIR ?? process.cwd();
+    const sessionCwd = cwd ?? process.env.PLAYGROUNDS_DIR ?? process.cwd();
 
     const ptyProcess = pty.spawn(shell, [], {
       name: 'xterm-256color',
       cols: c,
       rows: r,
-      cwd,
+      cwd: sessionCwd,
       env: { ...process.env as Record<string, string>, TERM: 'xterm-256color', COLORTERM: 'truecolor' },
     });
 

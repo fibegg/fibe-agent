@@ -107,10 +107,11 @@ export function attachWebSocketServer(
     const sessionId = randomUUID();
     const DEFAULT_COLS = 80;
     const DEFAULT_ROWS = 24;
+    const playgroundDir = config.getPlaygroundsDir();
 
     let ptyProcess: import('node-pty').IPty;
     try {
-      ptyProcess = terminalService.create(sessionId, DEFAULT_COLS, DEFAULT_ROWS);
+      ptyProcess = terminalService.create(sessionId, DEFAULT_COLS, DEFAULT_ROWS, playgroundDir);
     } catch (err) {
       ws.send(`\r\n\x1b[31mFailed to start terminal: ${err instanceof Error ? err.message : String(err)}\x1b[0m\r\n`);
       ws.close();

@@ -90,6 +90,26 @@ describe('TerminalService', () => {
     if (savedShell !== undefined) process.env.SHELL = savedShell;
   });
 
+  it('uses explicit cwd when provided', () => {
+    service.create('s1', 80, 24, '/custom/playground');
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      [],
+      expect.objectContaining({ cwd: '/custom/playground' })
+    );
+  });
+
+  it('falls back to PLAYGROUNDS_DIR when no explicit cwd', () => {
+    process.env.PLAYGROUNDS_DIR = '/env/playground';
+    service.create('s1');
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      [],
+      expect.objectContaining({ cwd: '/env/playground' })
+    );
+    delete process.env.PLAYGROUNDS_DIR;
+  });
+
   // ── write ───────────────────────────────────────────────────────────────────
 
   it('forwards data to the PTY process', () => {
