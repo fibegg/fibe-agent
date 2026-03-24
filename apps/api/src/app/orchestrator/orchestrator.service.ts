@@ -28,7 +28,7 @@ import {
   ERROR_CODE,
   WS_ACTION,
   WS_EVENT,
-} from '../ws.constants';
+} from '@shared/ws-constants';
 
 import { writeMcpConfig } from '../config/mcp-config-writer';
 
@@ -485,15 +485,14 @@ export class OrchestratorService implements OnModuleInit {
       if (useClientStory && entry) {
         this.activityStore.replaceStory(this.currentActivityId, story);
       }
-      this.messageStore.setStoryForLastAssistant(storyToUse);
-      this.messageStore.setActivityIdForLastAssistant(this.currentActivityId);
+      this.messageStore.finalizeLastAssistant(storyToUse, this.currentActivityId);
       const finalEntry = this.activityStore.getById(this.currentActivityId);
       if (finalEntry) {
         this._send(WS_EVENT.ACTIVITY_UPDATED, { entry: finalEntry });
       }
       this.currentActivityId = null;
     } else {
-      this.messageStore.setStoryForLastAssistant(story);
+      this.messageStore.finalizeLastAssistant(story);
       const entry = this.activityStore.append(story);
       this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
     }

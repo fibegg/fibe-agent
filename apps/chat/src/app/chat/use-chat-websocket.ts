@@ -44,12 +44,7 @@ export interface UseChatWebSocketResult {
   setAuthModal: React.Dispatch<React.SetStateAction<AuthModalState>>;
 }
 
-function transition(
-  setState: React.Dispatch<React.SetStateAction<ChatState>>,
-  newState: ChatState
-) {
-  setState(newState);
-}
+
 
 export interface ThinkingCallbacks {
   onStreamStartData?: (data: { model?: string }) => void;
@@ -155,7 +150,7 @@ export function useChatWebSocket(
       if (data.type === 'auth_status') {
         if (data.status === 'authenticated') {
           if (data.isProcessing) {
-            transition(setState, CHAT_STATES.AWAITING_RESPONSE);
+            setState(CHAT_STATES.AWAITING_RESPONSE);
             startResponseTimer();
           } else {
             setState((s) => (s !== CHAT_STATES.AWAITING_RESPONSE ? CHAT_STATES.AUTHENTICATED : s));
@@ -172,7 +167,7 @@ export function useChatWebSocket(
 
       if (data.type === 'auth_url_generated') {
         setAuthModal((a) => ({ ...a, authUrl: data.url ?? null, isManualToken: false }));
-        transition(setState, CHAT_STATES.AUTH_PENDING);
+        setState(CHAT_STATES.AUTH_PENDING);
         return;
       }
 
@@ -183,25 +178,25 @@ export function useChatWebSocket(
 
       if (data.type === 'auth_manual_token') {
         setAuthModal({ authUrl: null, deviceCode: null, isManualToken: true });
-        transition(setState, CHAT_STATES.AUTH_PENDING);
+        setState(CHAT_STATES.AUTH_PENDING);
         return;
       }
 
       if (data.type === 'auth_success') {
         setAuthModal({ authUrl: null, deviceCode: null, isManualToken: false });
-        transition(setState, CHAT_STATES.AUTHENTICATED);
+        setState(CHAT_STATES.AUTHENTICATED);
         return;
       }
 
       if (data.type === 'logout_success') {
-        transition(setState, CHAT_STATES.UNAUTHENTICATED);
+        setState(CHAT_STATES.UNAUTHENTICATED);
         return;
       }
 
       if (data.type === 'error') {
         clearResponseTimer();
         setErrorMessage(data.message ?? 'An unexpected error occurred');
-        transition(setState, CHAT_STATES.ERROR);
+        setState(CHAT_STATES.ERROR);
         onStreamEndRef.current?.('');
         return;
       }
@@ -216,7 +211,7 @@ export function useChatWebSocket(
       }
 
       if (data.type === 'stream_start') {
-        transition(setState, CHAT_STATES.AWAITING_RESPONSE);
+        setState(CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
         streamingAccumulatorRef.current = '';
         onStreamStartRef.current?.({ model: data.model });
@@ -243,7 +238,7 @@ export function useChatWebSocket(
         const model = typeof data.model === 'string' ? data.model : undefined;
         onStreamEndRef.current?.(finalText, usage, model);
         streamingAccumulatorRef.current = '';
-        transition(setState, CHAT_STATES.AUTHENTICATED);
+        setState(CHAT_STATES.AUTHENTICATED);
         return;
       }
 
@@ -343,15 +338,15 @@ export function useChatWebSocket(
       }
       if (event.code === WS_CLOSE.ANOTHER_SESSION_ACTIVE) {
         setErrorMessage('Another session is already active');
-        transition(setState, CHAT_STATES.ERROR);
+        setState(CHAT_STATES.ERROR);
         return;
       }
       if (event.code === WS_CLOSE.SESSION_TAKEN_OVER) {
         setErrorMessage('Your session was taken over by another client');
-        transition(setState, CHAT_STATES.ERROR);
+        setState(CHAT_STATES.ERROR);
         return;
       }
-      transition(setState, CHAT_STATES.AGENT_OFFLINE);
+      setState(CHAT_STATES.AGENT_OFFLINE);
       if (!reconnectTimerRef.current) {
         reconnectTimerRef.current = setTimeout(() => {
           reconnectTimerRef.current = null;

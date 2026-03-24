@@ -1,3 +1,8 @@
+import type { StoredActivityEntry } from '@shared/types';
+
+export type { StoredStoryEntry, StoredActivityEntry } from '@shared/types';
+export { WS_CLOSE } from '@shared/ws-constants';
+
 export const CHAT_STATES = {
   INITIALIZING: 'INITIALIZING',
   AGENT_OFFLINE: 'AGENT_OFFLINE',
@@ -37,11 +42,7 @@ export function getChatInputPlaceholder(state: ChatState): string {
 export const RESPONSE_TIMEOUT_MS = 600_000;
 export const RECONNECT_INTERVAL_MS = 500;
 
-export const WS_CLOSE = {
-  ANOTHER_SESSION_ACTIVE: 4000,
-  UNAUTHORIZED: 4001,
-  SESSION_TAKEN_OVER: 4002,
-} as const;
+
 
 export const ERROR_MESSAGES_NO_RETRY: ReadonlySet<string> = new Set([
   'Another session is already active',
@@ -88,19 +89,4 @@ export interface ServerMessage {
   usage?: { inputTokens: number; outputTokens: number };
 }
 
-export interface StoredStoryEntry {
-  id: string;
-  type: string;
-  message: string;
-  timestamp: string;
-  details?: string;
-  command?: string;
-  path?: string;
-}
 
-export interface StoredActivityEntry {
-  id: string;
-  created_at: string;
-  story: StoredStoryEntry[];
-  usage?: { inputTokens: number; outputTokens: number };
-}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
 
-const BRAIN_WORKING = { brain: 'text-blue-400', accent: 'text-blue-300' };
+const BRAIN_WORKING = { brain: 'text-cyan-400', accent: 'text-cyan-300' };
 const BRAIN_COMPLETE = { brain: 'text-emerald-400', accent: 'text-emerald-300' };
 const BRAIN_IDLE = { brain: 'text-violet-400', accent: 'text-violet-300' };
 

@@ -162,10 +162,10 @@ function activityHoverContent(item: DisplayItem): string {
   return e.message || e.details || getActivityLabel(e.type);
 }
 
-const BRAIN_IDLE = 'text-amber-400';
-const BRAIN_IDLE_ACCENT = 'text-amber-300';
-const BRAIN_WORKING = 'text-blue-400';
-const BRAIN_WORKING_ACCENT = 'text-blue-300';
+const BRAIN_IDLE = 'text-violet-400';
+const BRAIN_IDLE_ACCENT = 'text-violet-300';
+const BRAIN_WORKING = 'text-cyan-400';
+const BRAIN_WORKING_ACCENT = 'text-cyan-300';
 const BRAIN_COMPLETE = 'text-emerald-400';
 const BRAIN_COMPLETE_ACCENT = 'text-emerald-300';
 const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
@@ -767,7 +767,7 @@ export function AgentThinkingSidebar({
                   disabled={downloadAnimating}
                 >
                   {downloadAnimating ? (
-                    <span className="inline-flex items-center justify-center text-amber-400" aria-hidden>
+                    <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
                       <Brain className="size-8 brain-download-anim" />
                     </span>
                   ) : (

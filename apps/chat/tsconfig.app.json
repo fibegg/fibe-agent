@@ -40,6 +40,8 @@
     "src/**/*.jsx",
     "src/**/*.ts",
     "src/**/*.tsx",
-    "../../shared/api-paths.ts"
+    "../../shared/api-paths.ts",
+    "../../shared/ws-constants.ts",
+    "../../shared/types.ts"
   ]
 }

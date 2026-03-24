@@ -4,15 +4,26 @@ import { ConfigService } from '../config/config.service';
 @Injectable()
 export class PhoenixSyncService {
   private readonly logger = new Logger(PhoenixSyncService.name);
+  private messageSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private activitySyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly DEBOUNCE_MS = 500;
 
   constructor(private readonly config: ConfigService) {}
 
   async syncMessages(content: string): Promise<void> {
-    await this.sync('messages', content);
+    if (this.messageSyncTimer) clearTimeout(this.messageSyncTimer);
+    this.messageSyncTimer = setTimeout(() => {
+      this.messageSyncTimer = null;
+      void this.sync('messages', content);
+    }, PhoenixSyncService.DEBOUNCE_MS);
   }
 
   async syncActivity(content: string): Promise<void> {
-    await this.sync('activity', content);
+    if (this.activitySyncTimer) clearTimeout(this.activitySyncTimer);
+    this.activitySyncTimer = setTimeout(() => {
+      this.activitySyncTimer = null;
+      void this.sync('activity', content);
+    }, PhoenixSyncService.DEBOUNCE_MS);
   }
 
   private async sync(

@@ -73,6 +73,9 @@ export default defineConfig(() => ({
           if (id.includes('node_modules/prismjs')) {
             return 'vendor-prism';
           }
+          if (id.includes('node_modules/@tanstack/react-virtual') || id.includes('node_modules/@tanstack/virtual-core')) {
+            return 'vendor-virtual';
+          }
           return undefined;
         },
       },

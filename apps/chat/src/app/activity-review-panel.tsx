@@ -386,9 +386,9 @@ export function ActivityStoryDetailPanel({
 }: ActivityStoryDetailPanelProps) {
   const isWorking = brainState === 'working';
   const isComplete = brainState === 'complete';
-  const brainColor = isWorking ? 'text-blue-400' : isComplete ? 'text-emerald-400' : 'text-violet-400';
-  const accentColor = isWorking ? 'text-blue-300' : isComplete ? 'text-emerald-300' : 'text-violet-300';
-  const statColor = isWorking ? 'text-blue-300' : isComplete ? 'text-emerald-400' : 'text-foreground';
+  const brainColor = isWorking ? 'text-cyan-400' : isComplete ? 'text-emerald-400' : 'text-violet-400';
+  const accentColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-300' : 'text-violet-300';
+  const statColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-400' : 'text-foreground';
   const liveResponseRef = useRef<HTMLDivElement>(null);
 
   // When following, scroll latest-response block into view whenever the text updates

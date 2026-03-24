@@ -3,7 +3,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
-import { ERROR_CODE } from '../ws.constants';
+import { ERROR_CODE } from '@shared/ws-constants';
 
 export type SendMessageOrchestratorResult = {
   accepted: boolean;
