@@ -31,6 +31,8 @@ import { ChatErrorBanner } from '../chat/chat-error-banner';
 import { ChatInputArea } from '../chat/chat-input-area';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
+import { TerminalPanel } from '../terminal/terminal-panel';
+import { useTerminalPanel } from '../terminal/use-terminal-panel';
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
@@ -73,6 +75,7 @@ export function ChatPage() {
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
+  const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
 
   const handlePageDirtyChange = useCallback((path: string, isDirty: boolean) => {
     setPageDirtyPaths((prev) => {
@@ -530,6 +533,8 @@ export function ChatPage() {
           modelLocked={isChatModelLocked()}
           onRefreshModels={refreshModelOptions}
           refreshingModels={refreshingModels}
+          onToggleTerminal={toggleTerminal}
+          terminalOpen={terminalOpen}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
@@ -619,6 +624,14 @@ export function ChatPage() {
           maxPendingTotal={MAX_PENDING_TOTAL}
           queuedCount={queuedCount}
         />
+        {terminalOpen && (
+          <div
+            className="shrink-0 overflow-hidden border-t border-violet-500/20 transition-[height] duration-300 ease-out"
+            style={{ height: '280px' }}
+          >
+            <TerminalPanel onClose={closeTerminal} />
+          </div>
+        )}
         </div>
       </main>
       {!isMobile && (

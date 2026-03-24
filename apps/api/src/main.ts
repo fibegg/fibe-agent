@@ -19,6 +19,7 @@ import { attachWebSocketServer } from './attach-websocket-server';
 import { ContainerLoggerService, logRequest } from './container-logger';
 import { loadInjectedCredentials } from './credential-injector';
 import { runPostInitOnce } from './post-init-runner';
+import { TerminalService } from './app/terminal/terminal.service';
 
 const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
 const DEFAULT_PORT = 3000;
@@ -96,8 +97,9 @@ async function bootstrap() {
     orchestrator.ensureStrategySettings();
   }
   const playgroundWatcher = app.get(PlaygroundWatcherService);
-  attachWebSocketServer(fastify, config, orchestrator, playgroundWatcher);
-  logger.log('WebSocket server listening on path /ws');
+  const terminalService = app.get(TerminalService);
+  attachWebSocketServer(fastify, config, orchestrator, playgroundWatcher, terminalService);
+  logger.log('WebSocket server listening on paths /ws and /ws-terminal');
 
   const postInitScript = config.getPostInitScript();
   if (postInitScript) {
