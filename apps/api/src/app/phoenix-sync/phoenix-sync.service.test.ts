@@ -56,6 +56,8 @@ describe('PhoenixSyncService', () => {
     try {
       const service = new PhoenixSyncService(mockConfig as never);
       await service.syncMessages('{"data":"test"}');
+      // Wait for debounce timer to fire
+      await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://phoenix.test/api/agents/agent-1/messages',
@@ -87,6 +89,8 @@ describe('PhoenixSyncService', () => {
     try {
       const service = new PhoenixSyncService(mockConfig as never);
       await service.syncActivity('[]');
+      // Wait for debounce timer to fire
+      await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://phoenix.test/api/agents/agent-1/activity',

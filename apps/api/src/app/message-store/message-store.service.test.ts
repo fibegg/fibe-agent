@@ -41,7 +41,7 @@ describe('MessageStoreService', () => {
     expect(service.all()).toEqual([]);
   });
 
-  test('setStoryForLastAssistant attaches story to last assistant message', () => {
+  test('finalizeLastAssistant attaches story to last assistant message', () => {
     const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     service.add('user', 'hi');
@@ -49,17 +49,17 @@ describe('MessageStoreService', () => {
     const story = [
       { id: '1', type: 'step', message: 'Thinking', timestamp: new Date().toISOString() },
     ];
-    service.setStoryForLastAssistant(story);
+    service.finalizeLastAssistant(story);
     const all = service.all();
     expect(all).toHaveLength(2);
     expect(all[1].story).toEqual(story);
   });
 
-  test('setStoryForLastAssistant does nothing when last message is not assistant', () => {
+  test('finalizeLastAssistant does nothing when last message is not assistant', () => {
     const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
     service.add('user', 'hi');
-    service.setStoryForLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
+    service.finalizeLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
     expect(service.all()[0].story).toBeUndefined();
   });
 
@@ -71,10 +71,10 @@ describe('MessageStoreService', () => {
     expect(service.all()[0].model).toBe('gpt-4o');
   });
 
-  test('setStoryForLastAssistant does nothing when messages is empty', () => {
+  test('finalizeLastAssistant does nothing when messages is empty', () => {
     const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
     const service = new MessageStoreService(config as never);
-    service.setStoryForLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
+    service.finalizeLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
     expect(service.all()).toHaveLength(0);
   });
 });

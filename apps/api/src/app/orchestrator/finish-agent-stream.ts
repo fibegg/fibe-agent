@@ -4,7 +4,7 @@ import type { ModelStoreService } from '../model-store/model-store.service';
 import type { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
 import { DEFAULT_PROVIDER } from '../strategies/strategy-registry.service';
 import type { ThinkingStep, TokenUsage } from '../strategies/strategy.types';
-import { WS_EVENT } from '../ws.constants';
+import { WS_EVENT } from '@shared/ws-constants';
 
 export interface FinishAgentStreamDeps {
   messageStore: MessageStoreService;

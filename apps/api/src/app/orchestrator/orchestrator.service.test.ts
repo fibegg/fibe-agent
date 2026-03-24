@@ -9,7 +9,7 @@ import { ModelStoreService } from '../model-store/model-store.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { SteeringService } from '../steering/steering.service';
-import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '../ws.constants';
+import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
 
 describe('OrchestratorService', () => {
   let dataDir: string;

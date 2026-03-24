@@ -15,7 +15,7 @@ describe('useMobileBrainClasses', () => {
 
   it('returns working (blue) when streaming', () => {
     const { result } = renderHook(() => useMobileBrainClasses(true, null));
-    expect(result.current).toEqual({ brain: 'text-blue-400', accent: 'text-blue-300' });
+    expect(result.current).toEqual({ brain: 'text-cyan-400', accent: 'text-cyan-300' });
   });
 
   it('returns idle (violet) when not streaming and no complete state', () => {
@@ -28,7 +28,7 @@ describe('useMobileBrainClasses', () => {
       ({ isStreaming }: { isStreaming: boolean }) => useMobileBrainClasses(isStreaming, null),
       { initialProps: { isStreaming: true } }
     );
-    expect(result.current.brain).toBe('text-blue-400');
+    expect(result.current.brain).toBe('text-cyan-400');
     rerender({ isStreaming: false });
     expect(result.current.brain).toBe('text-emerald-400');
     await act(async () => {
@@ -53,6 +53,6 @@ describe('useMobileBrainClasses', () => {
     );
     expect(result.current.brain).toBe('text-emerald-400');
     rerender({ isStreaming: true, last: lastItem });
-    expect(result.current.brain).toBe('text-blue-400');
+    expect(result.current.brain).toBe('text-cyan-400');
   });
 });
