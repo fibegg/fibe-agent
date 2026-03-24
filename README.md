@@ -126,7 +126,7 @@ OpenCode and multi-key setups are documented inline in [`.env.example`](.env.exa
 
 On push to `main` or `dev`, CI builds and pushes provider-specific images to GitHub Container Registry:
 
-`ghcr.io/phoenix-playgrounds/phoenix-agent-oauth:<provider>-<tag>`
+`ghcr.io/<owner>/fibe-agent:<provider>-<tag>`
 
 Providers align with `AGENT_PROVIDER` build args: `gemini`, `claude-code`, `openai-codex`, `opencode`. See the [Dockerfile](Dockerfile) and [CI workflow](.github/workflows/ci.yml) for build arguments and tags.
 

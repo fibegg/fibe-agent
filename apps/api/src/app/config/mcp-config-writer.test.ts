@@ -54,7 +54,7 @@ describe('writeMcpConfig', () => {
         mcpServers: {
           'playgrounds-dev': {
             serverUrl: 'https://fibe.gg',
-            authHeader: 'Bearer plgr_test_key123',
+            authHeader: 'Bearer fibe_test_key123',
           },
         },
       });
@@ -68,7 +68,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer plgr_test_key123'],
+        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key123'],
       });
     });
 
@@ -88,7 +88,7 @@ describe('writeMcpConfig', () => {
         mcpServers: {
           'playgrounds-dev': {
             serverUrl: 'https://fibe.gg',
-            authHeader: 'Bearer plgr_test_key123',
+            authHeader: 'Bearer fibe_test_key123',
           },
           Sentry: {
             serverUrl: 'https://mcp.sentry.dev/mcp',
@@ -185,7 +185,7 @@ describe('writeMcpConfig', () => {
         mcpServers: {
           'playgrounds-dev': {
             serverUrl: 'https://fibe.gg',
-            authHeader: 'Bearer plgr_test_key456',
+            authHeader: 'Bearer fibe_test_key456',
           },
         },
       });
@@ -199,7 +199,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
         command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer plgr_test_key456'],
+        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
       });
     });
 
@@ -235,7 +235,7 @@ describe('writeMcpConfig', () => {
         mcpServers: {
           'playgrounds-dev': {
             serverUrl: 'https://fibe.gg',
-            authHeader: 'Bearer plgr_test_key789',
+            authHeader: 'Bearer fibe_test_key789',
           },
         },
       });
