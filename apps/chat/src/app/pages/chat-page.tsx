@@ -397,7 +397,7 @@ export function ChatPage() {
 
   return (
     <div
-      className={`flex h-screen w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
+      className={`flex h-dvh w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -508,7 +508,7 @@ export function ChatPage() {
         style={{ minWidth: MAIN_CONTENT_MIN_WIDTH_PX }}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden w-full">
-        <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
+        <div className="relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden">
         <ChatHeader
           isMobile={isMobile}
           state={state}
