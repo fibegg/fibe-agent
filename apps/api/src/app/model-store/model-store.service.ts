@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
+import { decryptData } from '../crypto/crypto.util';
 
 @Injectable()
 export class ModelStoreService {
@@ -13,9 +14,11 @@ export class ModelStoreService {
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.modelPath = join(dataDir, 'model.json');
-    this.jsonWriter = new SequentialJsonWriter(this.modelPath, () => ({
-      model: this.cached ?? '',
-    }));
+    this.jsonWriter = new SequentialJsonWriter(
+      this.modelPath, 
+      () => ({ model: this.cached ?? '' }),
+      this.config.getEncryptionKey()
+    );
     this.ensureDataDir();
   }
 
@@ -31,10 +34,13 @@ export class ModelStoreService {
       return '';
     }
     try {
-      const data = JSON.parse(readFileSync(this.modelPath, 'utf8'));
+      const raw = readFileSync(this.modelPath, 'utf8');
+      const decrypted = decryptData(raw, this.config.getEncryptionKey());
+      const data = JSON.parse(decrypted);
       this.cached = (data as { model?: string }).model ?? '';
       return this.cached;
-    } catch {
+    } catch (err) {
+      console.error('Failed to parse model load:', err);
       this.cached = '';
       return '';
     }

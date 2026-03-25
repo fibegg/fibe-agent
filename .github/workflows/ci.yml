@@ -40,6 +40,14 @@ jobs:
       - name: Run CI
         run: bun run ci
 
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          ignore-unfixed: true
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
       - name: Run Integration Tests
         if: hashFiles('tests/bin/gemini') != ''
         run: |

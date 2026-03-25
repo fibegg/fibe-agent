@@ -33,6 +33,7 @@ describe('OrchestratorService', () => {
     const config = {
       getDataDir: () => dataDir,
       getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined,
       getSystemPromptPath: () => join(dataDir, 'nonexistent.md'),
       getSystemPrompt: () => undefined,
       getModelOptions: () => [],
@@ -132,7 +133,8 @@ describe('OrchestratorService', () => {
   test('handleClientMessage send_chat_message with audioFilename streams response', async () => {
     const orch = await createOrchestrator();
     orch.isAuthenticated = true;
-    const uploads = new UploadsService({ getDataDir: () => dataDir, getConversationDataDir: () => dataDir } as never);
+    const uploads = new UploadsService({ getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined } as never);
     const filename = await uploads.saveAudioFromBuffer(Buffer.from('audio'), 'audio/webm');
     const events: Array<{ type: string }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));

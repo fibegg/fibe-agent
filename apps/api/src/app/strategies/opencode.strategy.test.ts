@@ -237,6 +237,7 @@ describe('OpencodeStrategy', () => {
   test('constructor with conversationDataDir', () => {
     const strategy = new OpencodeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
+      getEncryptionKey: () => undefined,
     });
     expect(strategy).toBeDefined();
   });

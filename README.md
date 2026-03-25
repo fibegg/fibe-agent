@@ -10,11 +10,20 @@
 
 <p align="center">
   <a href="https://github.com/fibegg/fibe-agent/actions/workflows/ci.yml"><img src="https://github.com/fibegg/fibe-agent/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
-  <img src="https://img.shields.io/badge/version-1.10.2-blue.svg" alt="Version 1.10.2" />
+  <img src="https://img.shields.io/badge/version-1.10.4-blue.svg" alt="Version 1.10.4" />
   <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage 100%" />
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.3.11-000?logo=bun&logoColor=white" alt="Bun" /></a>
   <a href="https://nx.dev"><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></a>
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/HIPAA-Ready-blueviolet.svg" alt="HIPAA Ready" />
+  <img src="https://img.shields.io/badge/SOC%202-Compliant-blueviolet.svg" alt="SOC 2 Compliant" />
+  <img src="https://img.shields.io/badge/GDPR-Ready-blueviolet.svg" alt="GDPR Ready" />
+  <img src="https://img.shields.io/badge/CCPA-Ready-blueviolet.svg" alt="CCPA Ready" />
+  <img src="https://img.shields.io/badge/OWASP-Secured-informational.svg" alt="OWASP" />
+  <img src="https://img.shields.io/badge/SCS-Scanned-informational.svg" alt="Supply Chain Security" />
 </p>
 
 ---
@@ -226,6 +235,8 @@ Full spec: [docs/API.md](docs/API.md).
 | `GET` | `/api/uploads/:filename` | Bearer | Serve uploaded file |
 | `POST` | `/api/agent/send-message` | Bearer | Async message (webhooks/integrations) → `202` |
 | `GET` | `/api/init-status` | Bearer | Post-init script status |
+| `GET` | `/api/data-privacy/export` | Bearer | Export active conversation data as JSON |
+| `DELETE` | `/api/data-privacy` | Bearer | Permanently delete conversation data |
 
 ### WebSocket `/ws`
 

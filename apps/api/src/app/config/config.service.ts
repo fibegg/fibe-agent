@@ -77,4 +77,8 @@ export class ConfigService {
   getPostInitScript(): string | undefined {
     return process.env.POST_INIT_SCRIPT?.trim() || undefined;
   }
+
+  getEncryptionKey(): string | undefined {
+    return process.env.ENCRYPTION_KEY;
+  }
 }
