@@ -129,28 +129,14 @@ export class OrchestratorService implements OnModuleInit {
     attachmentFilenames?: string[];
     story?: Array<{ id: string; type: string; message: string; timestamp: string; details?: string }>;
   }): Promise<void> {
-    const action = msg.action;
-
-    switch (action) {
-      case WS_ACTION.CHECK_AUTH_STATUS:
-        await this.checkAndSendAuthStatus();
-        break;
-      case WS_ACTION.INITIATE_AUTH:
-        await this.handleInitiateAuth();
-        break;
-      case WS_ACTION.SUBMIT_AUTH_CODE:
-        this.handleSubmitAuthCode(msg.code ?? '');
-        break;
-      case WS_ACTION.CANCEL_AUTH:
-        this.handleCancelAuth();
-        break;
-      case WS_ACTION.REAUTHENTICATE:
-        await this.handleReauthenticate();
-        break;
-      case WS_ACTION.LOGOUT:
-        this.handleLogout();
-        break;
-      case WS_ACTION.SEND_CHAT_MESSAGE:
+    const handlers: Record<string, () => Promise<void> | void> = {
+      [WS_ACTION.CHECK_AUTH_STATUS]: () => this.checkAndSendAuthStatus(),
+      [WS_ACTION.INITIATE_AUTH]: () => this.handleInitiateAuth(),
+      [WS_ACTION.SUBMIT_AUTH_CODE]: () => this.handleSubmitAuthCode(msg.code ?? ''),
+      [WS_ACTION.CANCEL_AUTH]: () => this.handleCancelAuth(),
+      [WS_ACTION.REAUTHENTICATE]: () => this.handleReauthenticate(),
+      [WS_ACTION.LOGOUT]: () => this.handleLogout(),
+      [WS_ACTION.SEND_CHAT_MESSAGE]: async () => {
         if (this.isProcessing) {
           await this.handleQueueMessage(msg.text ?? '');
         } else {
@@ -162,26 +148,21 @@ export class OrchestratorService implements OnModuleInit {
             msg.attachmentFilenames
           );
         }
-        break;
-      case WS_ACTION.QUEUE_MESSAGE:
-        await this.handleQueueMessage(msg.text ?? '');
-        break;
-      case WS_ACTION.SUBMIT_STORY:
-        this.handleSubmitStory(msg.story ?? []);
-        break;
-      case WS_ACTION.GET_MODEL:
-        this.handleGetModel();
-        break;
-      case WS_ACTION.SET_MODEL:
-        this.handleSetModel(msg.model ?? '');
-        break;
-      case WS_ACTION.INTERRUPT_AGENT:
-        if (this.isProcessing) {
-          this.strategy.interruptAgent?.();
-        }
-        break;
-      default:
-        this.logger.warn(`Unknown action: ${action}`);
+      },
+      [WS_ACTION.QUEUE_MESSAGE]: () => this.handleQueueMessage(msg.text ?? ''),
+      [WS_ACTION.SUBMIT_STORY]: () => this.handleSubmitStory(msg.story ?? []),
+      [WS_ACTION.GET_MODEL]: () => this.handleGetModel(),
+      [WS_ACTION.SET_MODEL]: () => this.handleSetModel(msg.model ?? ''),
+      [WS_ACTION.INTERRUPT_AGENT]: () => {
+        if (this.isProcessing) this.strategy.interruptAgent?.();
+      },
+    };
+
+    const handler = handlers[msg.action];
+    if (handler) {
+      await handler();
+    } else {
+      this.logger.warn(`Unknown action: ${msg.action}`);
     }
   }
 

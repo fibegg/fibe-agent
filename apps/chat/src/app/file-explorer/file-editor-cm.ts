@@ -16,84 +16,64 @@ import {
 } from '@codemirror/language';
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 import { oneDark } from '@codemirror/theme-one-dark';
-import { javascript } from '@codemirror/lang-javascript';
-import { markdown } from '@codemirror/lang-markdown';
-import { css } from '@codemirror/lang-css';
-import { html } from '@codemirror/lang-html';
-import { python } from '@codemirror/lang-python';
-import { rust } from '@codemirror/lang-rust';
-import { sql } from '@codemirror/lang-sql';
-import { json } from '@codemirror/lang-json';
-import { java } from '@codemirror/lang-java';
-import { cpp } from '@codemirror/lang-cpp';
-import { go } from '@codemirror/lang-go';
-import { yaml } from '@codemirror/lang-yaml';
-import { xml } from '@codemirror/lang-xml';
-import { sass } from '@codemirror/lang-sass';
-import { vue } from '@codemirror/lang-vue';
-import { php } from '@codemirror/lang-php';
-
-export type EditorHandle = {
-  view: EditorView;
-  setContent: (content: string) => void;
-  setReadOnly: (readOnly: boolean) => void;
-  setTheme: (dark: boolean) => void;
-  getContent: () => string;
-  focus: () => void;
-  destroy: () => void;
-};
-
 // Map of file extensions to CodeMirror language extensions.
 // Exported so it can be tested and extended.
-export const LANG_MAP: Record<string, () => Extension> = {
-  js:   () => javascript(),
-  jsx:  () => javascript({ jsx: true }),
-  ts:   () => javascript({ typescript: true }),
-  tsx:  () => javascript({ jsx: true, typescript: true }),
-  mjs:  () => javascript(),
-  cjs:  () => javascript(),
-  mts:  () => javascript({ typescript: true }),
-  cts:  () => javascript({ typescript: true }),
-  md:   () => markdown(),
-  mdx:  () => markdown(),
-  css:  () => css(),
-  scss: () => sass({ indented: false }),
-  sass: () => sass({ indented: true }),
-  less: () => css(),
-  html: () => html(),
-  htm:  () => html(),
-  vue:  () => vue(),
-  py:   () => python(),
-  pyw:  () => python(),
-  rs:   () => rust(),
-  sql:  () => sql(),
-  json: () => json(),
-  json5:() => json(),
-  java: () => java(),
-  kt:   () => java(),
-  kts:  () => java(),
-  cpp:  () => cpp(),
-  cc:   () => cpp(),
-  cxx:  () => cpp(),
-  c:    () => cpp(),
-  h:    () => cpp(),
-  hpp:  () => cpp(),
-  go:   () => go(),
-  yaml: () => yaml(),
-  yml:  () => yaml(),
-  xml:  () => xml(),
-  svg:  () => xml(),
-  toml: () => xml(),
-  php:  () => php(),
+export const LANG_MAP: Record<string, () => Promise<Extension>> = {
+  js:   async () => (await import('@codemirror/lang-javascript')).javascript(),
+  jsx:  async () => (await import('@codemirror/lang-javascript')).javascript({ jsx: true }),
+  ts:   async () => (await import('@codemirror/lang-javascript')).javascript({ typescript: true }),
+  tsx:  async () => (await import('@codemirror/lang-javascript')).javascript({ jsx: true, typescript: true }),
+  mjs:  async () => (await import('@codemirror/lang-javascript')).javascript(),
+  cjs:  async () => (await import('@codemirror/lang-javascript')).javascript(),
+  mts:  async () => (await import('@codemirror/lang-javascript')).javascript({ typescript: true }),
+  cts:  async () => (await import('@codemirror/lang-javascript')).javascript({ typescript: true }),
+  md:   async () => (await import('@codemirror/lang-markdown')).markdown(),
+  mdx:  async () => (await import('@codemirror/lang-markdown')).markdown(),
+  css:  async () => (await import('@codemirror/lang-css')).css(),
+  scss: async () => (await import('@codemirror/lang-sass')).sass({ indented: false }),
+  sass: async () => (await import('@codemirror/lang-sass')).sass({ indented: true }),
+  less: async () => (await import('@codemirror/lang-css')).css(),
+  html: async () => (await import('@codemirror/lang-html')).html(),
+  htm:  async () => (await import('@codemirror/lang-html')).html(),
+  vue:  async () => (await import('@codemirror/lang-vue')).vue(),
+  py:   async () => (await import('@codemirror/lang-python')).python(),
+  pyw:  async () => (await import('@codemirror/lang-python')).python(),
+  rs:   async () => (await import('@codemirror/lang-rust')).rust(),
+  sql:  async () => (await import('@codemirror/lang-sql')).sql(),
+  json: async () => (await import('@codemirror/lang-json')).json(),
+  json5:async () => (await import('@codemirror/lang-json')).json(),
+  java: async () => (await import('@codemirror/lang-java')).java(),
+  kt:   async () => (await import('@codemirror/lang-java')).java(),
+  kts:  async () => (await import('@codemirror/lang-java')).java(),
+  cpp:  async () => (await import('@codemirror/lang-cpp')).cpp(),
+  cc:   async () => (await import('@codemirror/lang-cpp')).cpp(),
+  cxx:  async () => (await import('@codemirror/lang-cpp')).cpp(),
+  c:    async () => (await import('@codemirror/lang-cpp')).cpp(),
+  h:    async () => (await import('@codemirror/lang-cpp')).cpp(),
+  hpp:  async () => (await import('@codemirror/lang-cpp')).cpp(),
+  go:   async () => (await import('@codemirror/lang-go')).go(),
+  yaml: async () => (await import('@codemirror/lang-yaml')).yaml(),
+  yml:  async () => (await import('@codemirror/lang-yaml')).yaml(),
+  xml:  async () => (await import('@codemirror/lang-xml')).xml(),
+  svg:  async () => (await import('@codemirror/lang-xml')).xml(),
+  toml: async () => (await import('@codemirror/lang-xml')).xml(),
+  php:  async () => (await import('@codemirror/lang-php')).php(),
 };
 
 /** Returns the CodeMirror language extension for a given filename, or null for plain text. */
-export function getLanguageExtension(filename: string): Extension | null {
+export async function getLanguageExtension(filename: string): Promise<Extension | null> {
   const base = filename.includes('/') ? filename.slice(filename.lastIndexOf('/') + 1) : filename;
   // Special filenames with no dedicated CM6 language
   if (base === 'Dockerfile' || base.startsWith('Dockerfile.')) return null;
   const ext = base.includes('.') ? base.slice(base.lastIndexOf('.') + 1).toLowerCase() : '';
-  return LANG_MAP[ext]?.() ?? null;
+  const loader = LANG_MAP[ext];
+  if (!loader) return null;
+  try {
+    return await loader();
+  } catch (error) {
+    console.error(`Failed to load language extension for .${ext}:`, error);
+    return null;
+  }
 }
 
 const LABEL_MAP: Record<string, string> = {
@@ -159,6 +139,16 @@ function buildTheme(dark: boolean): Extension {
 
 // ── Editor factory ────────────────────────────────────────────────────────────
 
+export type EditorHandle = {
+  view: EditorView;
+  setContent: (content: string) => void;
+  setReadOnly: (readOnly: boolean) => void;
+  setTheme: (dark: boolean) => void;
+  getContent: () => string;
+  focus: () => void;
+  destroy: () => void;
+};
+
 export function createEditor({
   parent,
   content,
@@ -178,7 +168,7 @@ export function createEditor({
 }): EditorHandle {
   const themeCompartment = new Compartment();
   const readOnlyCompartment = new Compartment();
-  const langExtension = getLanguageExtension(filename);
+  const langCompartment = new Compartment();
 
   const extensions: Extension[] = [
     highlightSpecialChars(),
@@ -202,19 +192,31 @@ export function createEditor({
     EditorView.lineWrapping,
     themeCompartment.of(isDark ? [oneDark, buildTheme(true)] : [buildTheme(false)]),
     readOnlyCompartment.of(EditorState.readOnly.of(readOnly)),
+    langCompartment.of([]),
   ];
 
-  if (langExtension) extensions.push(langExtension);
-
   const view = new EditorView({ state: EditorState.create({ doc: content, extensions }), parent });
+  
+  let isDestroyed = false;
+
+  getLanguageExtension(filename).then((ext) => {
+    if (ext && !isDestroyed) {
+      view.dispatch({ effects: langCompartment.reconfigure(ext) });
+    }
+  }).catch((err) => {
+    console.error('Failed to load language extension:', err);
+  });
 
   return {
     view,
-    setContent: (c) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: c } }),
-    setReadOnly: (ro) => view.dispatch({ effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(ro)) }),
-    setTheme: (dark) => view.dispatch({ effects: themeCompartment.reconfigure(dark ? [oneDark, buildTheme(true)] : [buildTheme(false)]) }),
+    setContent: (c: string) => view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: c } }),
+    setReadOnly: (ro: boolean) => view.dispatch({ effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(ro)) }),
+    setTheme: (dark: boolean) => view.dispatch({ effects: themeCompartment.reconfigure(dark ? [oneDark, buildTheme(true)] : [buildTheme(false)]) }),
     getContent: () => view.state.doc.toString(),
     focus: () => view.focus(),
-    destroy: () => view.destroy(),
+    destroy: () => {
+      isDestroyed = true;
+      view.destroy();
+    },
   };
 }
