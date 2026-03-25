@@ -23,6 +23,12 @@ COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
 
 ARG BUILDKIT_INLINE_CACHE=1
 
+# node-pty requires native compilation; install build tools + node-gyp
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 make g++ \
+    && rm -rf /var/lib/apt/lists/* \
+    && npm install -g node-gyp
+
 WORKDIR /app
 
 COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json tsconfig.json eslint.config.mjs vitest.workspace.ts ./
