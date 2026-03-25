@@ -6,7 +6,7 @@ import { GeminiStrategy } from './gemini.strategy';
 import { OpenaiCodexStrategy } from './openai-codex.strategy';
 import { OpencodeStrategy } from './opencode.strategy';
 
-const mockConfig = { getConversationDataDir: () => '/tmp/conversation' };
+const mockConfig = { getConversationDataDir: () => '/tmp/conversation', getEncryptionKey: () => undefined };
 
 describe('StrategyRegistryService', () => {
   const envBackup = process.env.AGENT_PROVIDER;

@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
+import { decryptData } from '../crypto/crypto.util';
 import type { StoredStoryEntry, StoredActivityEntry, TokenUsage } from '@shared/types';
 
 export type { StoredActivityEntry, TokenUsage } from '@shared/types';
@@ -28,7 +29,11 @@ export class ActivityStoreService {
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.activityPath = join(dataDir, 'activity.json');
-    this.jsonWriter = new SequentialJsonWriter(this.activityPath, () => this.activities);
+    this.jsonWriter = new SequentialJsonWriter(
+      this.activityPath, 
+      () => this.activities,
+      this.config.getEncryptionKey()
+    );
     this.ensureDataDir();
     this.activities = this.load();
     this.rebuildIndex();
@@ -112,13 +117,16 @@ export class ActivityStoreService {
   private load(): StoredActivityEntry[] {
     if (!existsSync(this.activityPath)) return [];
     try {
-      const data = JSON.parse(readFileSync(this.activityPath, 'utf8'));
+      const raw = readFileSync(this.activityPath, 'utf8');
+      const decrypted = decryptData(raw, this.config.getEncryptionKey());
+      const data = JSON.parse(decrypted);
       const list = Array.isArray(data) ? data : [];
       return list.map((a: StoredActivityEntry) => ({
         ...a,
         story: dedupeStoryById(Array.isArray(a.story) ? a.story : []),
       }));
-    } catch {
+    } catch (err) {
+      console.error('Failed to parse activity load:', err);
       return [];
     }
   }

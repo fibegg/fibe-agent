@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
+import { decryptData } from '../crypto/crypto.util';
 import type { StoredStoryEntry } from '@shared/types';
 
 export type { StoredStoryEntry } from '@shared/types';
@@ -28,7 +29,11 @@ export class MessageStoreService {
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.messagesPath = join(dataDir, 'messages.json');
-    this.jsonWriter = new SequentialJsonWriter(this.messagesPath, () => this.messages);
+    this.jsonWriter = new SequentialJsonWriter(
+      this.messagesPath, 
+      () => this.messages,
+      this.config.getEncryptionKey()
+    );
     this.ensureDataDir();
     this.messages = this.load();
   }
@@ -75,8 +80,11 @@ export class MessageStoreService {
   private load(): StoredMessage[] {
     if (!existsSync(this.messagesPath)) return [];
     try {
-      return JSON.parse(readFileSync(this.messagesPath, 'utf8'));
-    } catch {
+      const raw = readFileSync(this.messagesPath, 'utf8');
+      const decrypted = decryptData(raw, this.config.getEncryptionKey());
+      return JSON.parse(decrypted);
+    } catch (err) {
+      console.error('Failed to parse messages load:', err);
       return [];
     }
   }

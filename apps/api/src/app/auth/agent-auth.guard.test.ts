@@ -29,11 +29,11 @@ describe('AgentAuthGuard', () => {
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
-  test('allows when query token matches', () => {
+  test('rejects when query token matches (deprecated)', () => {
     const config = { getAgentPassword: () => 'secret' };
     const guard = new AgentAuthGuard(config as never);
     const ctx = createMockContext({ query: { token: 'secret' } });
-    expect(guard.canActivate(ctx)).toBe(true);
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
   });
 
   test('throws when password required and token missing', () => {

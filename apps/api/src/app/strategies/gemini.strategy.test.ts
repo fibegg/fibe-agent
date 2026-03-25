@@ -162,6 +162,7 @@ describe('GeminiStrategy API token mode', () => {
   test('constructor with conversationDataDir', () => {
     const strategy = new GeminiStrategy(false, {
       getConversationDataDir: () => '/tmp/test-conv',
+      getEncryptionKey: () => undefined,
     });
     expect(strategy).toBeDefined();
   });

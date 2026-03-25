@@ -240,6 +240,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
   test('constructor with conversation data dir', () => {
     const strategy = new ClaudeCodeStrategy(false, {
       getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'conv-data'),
+      getEncryptionKey: () => undefined,
     });
     expect(strategy).toBeDefined();
   });

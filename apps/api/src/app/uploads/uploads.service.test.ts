@@ -6,7 +6,7 @@ import { UploadsService } from './uploads.service';
 
 describe('UploadsService', () => {
   let dataDir: string;
-  const config = { getDataDir: () => '', getConversationDataDir: () => '' };
+  const config = { getDataDir: () => '', getConversationDataDir: () => '', getEncryptionKey: () => undefined };
 
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'uploads-'));

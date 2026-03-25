@@ -17,13 +17,15 @@ describe('ActivityStoreService', () => {
   });
 
   test('all returns empty array initially', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     expect(service.all()).toEqual([]);
   });
 
   test('append adds entry and returns it', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const story = [
       { id: '1', type: 'step', message: 'Thinking', timestamp: new Date().toISOString() },
@@ -36,7 +38,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('append multiple grows array', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     service.append([{ id: 'a', type: 'x', message: 'm', timestamp: '' }]);
     service.append([{ id: 'b', type: 'y', message: 'n', timestamp: '' }]);
@@ -44,7 +47,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('clear removes all activities', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     service.append([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
     service.clear();
@@ -52,7 +56,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('createWithEntry creates activity with single story entry', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const first = { id: 'e1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() };
     const entry = service.createWithEntry(first);
@@ -63,7 +68,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('appendEntry adds story entry to existing activity', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const first = { id: 'e1', type: 'stream_start', message: 'Started', timestamp: '' };
     const created = service.createWithEntry(first);
@@ -75,7 +81,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('appendEntry does nothing for unknown activity id', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     service.appendEntry('unknown-id', { id: 'e2', type: 'y', message: 'n', timestamp: '' });
@@ -84,7 +91,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('replaceStory overwrites activity story', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     service.appendEntry(created.id, { id: 'e2', type: 'y', message: 'n', timestamp: '' });
@@ -98,7 +106,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('replaceStory does nothing for unknown activity id', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     service.replaceStory('unknown-id', []);
@@ -106,7 +115,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('setUsage stores token usage on activity', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     expect(service.getById(created.id)?.usage).toBeUndefined();
@@ -116,7 +126,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('setUsage does nothing for unknown activity id', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     service.setUsage('unknown-id', { inputTokens: 1, outputTokens: 2 });
@@ -124,7 +135,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('replaceStory deduplicates story by id', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const created = service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     const withDupes = [
@@ -139,7 +151,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('appendEntry does not add duplicate entry id', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const first = { id: 'e1', type: 'stream_start', message: 'Started', timestamp: '' };
     const created = service.createWithEntry(first);
@@ -150,13 +163,15 @@ describe('ActivityStoreService', () => {
   });
 
   test('getById returns undefined for unknown id', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     expect(service.getById('unknown')).toBeUndefined();
   });
 
   test('findByStoryEntryId returns activity containing the story entry', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     const created = service.createWithEntry({
       id: 's1',
@@ -171,14 +186,16 @@ describe('ActivityStoreService', () => {
   });
 
   test('findByStoryEntryId returns undefined when entry not in any activity', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const service = new ActivityStoreService(config as never);
     service.createWithEntry({ id: 'e1', type: 'x', message: 'm', timestamp: '' });
     expect(service.findByStoryEntryId('other')).toBeUndefined();
   });
 
   test('loads activities from disk on construction with valid JSON', async () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     // Create a service that writes an activity
     const service1 = new ActivityStoreService(config as never);
     service1.createWithEntry({ id: 'e1', type: 'step', message: 'Loaded', timestamp: '2026-01-01T00:00:00Z' });
@@ -192,7 +209,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('loads gracefully when activities file has corrupt JSON', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     // Write corrupt JSON to the activities file
     const { writeFileSync } = require('node:fs');
     writeFileSync(join(dataDir, 'activity.json'), 'invalid-json-content');
@@ -202,7 +220,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('loads gracefully when activities file has non-array JSON', () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const { writeFileSync } = require('node:fs');
     writeFileSync(join(dataDir, 'activity.json'), '{"not":"array"}');
     const service = new ActivityStoreService(config as never);
@@ -210,7 +229,8 @@ describe('ActivityStoreService', () => {
   });
 
   test('load deduplicates story entries with same id from disk', async () => {
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir };
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
     const { writeFileSync } = require('node:fs');
     // Write activities with duplicate story entries
     writeFileSync(join(dataDir, 'activity.json'), JSON.stringify([
