@@ -1,65 +1,52 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
 import { TerminalService } from './terminal.service';
 
 // ─── Mock node-pty ────────────────────────────────────────────────────────────
 const mockPty = {
-  write: vi.fn(),
-  resize: vi.fn(),
-  kill: vi.fn(),
-  onData: vi.fn(),
-  onExit: vi.fn(),
+  write:  mock(() => undefined),
+  resize: mock(() => undefined),
+  kill:   mock(() => undefined),
+  onData: mock(() => undefined),
+  onExit: mock(() => undefined),
 };
 
-vi.mock('node-pty', () => ({
-  spawn: vi.fn(() => mockPty),
-}));
-
-// ─── Mock os module ───────────────────────────────────────────────────────────
-vi.mock('node:os', () => ({
-  platform: vi.fn(() => 'linux'),
+mock.module('node-pty', () => ({
+  spawn: mock(() => mockPty),
 }));
 
 import * as nodePty from 'node-pty';
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 describe('TerminalService', () => {
   let service: TerminalService;
 
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockPty.write.mockClear();
+    mockPty.resize.mockClear();
+    mockPty.kill.mockClear();
+    (nodePty.spawn as ReturnType<typeof mock>).mockClear();
     service = new TerminalService();
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    service.onModuleDestroy();
   });
 
-  // ── create ─────────────────────────────────────────────────────────────────
+  // ── create ──────────────────────────────────────────────────────────────────
 
   it('spawns a PTY shell with default dimensions', () => {
-    service.create('session-1');
+    service.create('s1');
     expect(nodePty.spawn).toHaveBeenCalledWith(
       expect.any(String),
       [],
-      expect.objectContaining({ cols: 80, rows: 24 })
+      expect.objectContaining({ cols: 80, rows: 24 }),
     );
   });
 
-  it('clamps cols below minimum to MIN_COLS (10)', () => {
-    service.create('session-1', 2, 24);
-    expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.objectContaining({ cols: 10 })
-    );
-  });
-
-  it('clamps rows below minimum to MIN_ROWS (5)', () => {
-    service.create('session-1', 80, 1);
-    expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.objectContaining({ rows: 5 })
-    );
+  it('returns the spawned IPty instance', () => {
+    const result = service.create('s1');
+    expect(result).toBe(mockPty);
   });
 
   it('stores the session and increments sessionCount', () => {
@@ -70,44 +57,77 @@ describe('TerminalService', () => {
     expect(service.sessionCount).toBe(2);
   });
 
-  it('returns the spawned IPty instance', () => {
-    const result = service.create('s1');
-    expect(result).toBe(mockPty);
+  it('auto-generates a UUID id when none is provided', () => {
+    service.create();
+    expect(service.sessionCount).toBe(1);
+  });
+
+  it('clamps cols below minimum to MIN_COLS (10)', () => {
+    service.create('s1', 2, 24);
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String), [],
+      expect.objectContaining({ cols: 10 }),
+    );
+  });
+
+  it('clamps rows below minimum to MIN_ROWS (5)', () => {
+    service.create('s1', 80, 1);
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String), [],
+      expect.objectContaining({ rows: 5 }),
+    );
   });
 
   it('uses SHELL env var when set', () => {
+    const saved = process.env.SHELL;
     process.env.SHELL = '/bin/zsh';
     service.create('s1');
     expect(nodePty.spawn).toHaveBeenCalledWith('/bin/zsh', [], expect.any(Object));
-    delete process.env.SHELL;
+    if (saved !== undefined) process.env.SHELL = saved; else delete process.env.SHELL;
   });
 
-  it('falls back to bash on non-Windows when SHELL not set', () => {
-    const savedShell = process.env.SHELL;
+  it('falls back to bash on non-Windows when SHELL is unset', () => {
+    const saved = process.env.SHELL;
     delete process.env.SHELL;
+    // process.platform is 'darwin' or 'linux' in CI — neither is 'win32', so bash is expected
     service.create('s1');
-    expect(nodePty.spawn).toHaveBeenCalledWith('bash', [], expect.any(Object));
-    if (savedShell !== undefined) process.env.SHELL = savedShell;
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.stringMatching(/bash|zsh/),
+      [],
+      expect.any(Object),
+    );
+    if (saved !== undefined) process.env.SHELL = saved;
   });
 
   it('uses explicit cwd when provided', () => {
     service.create('s1', 80, 24, '/custom/playground');
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.objectContaining({ cwd: '/custom/playground' })
+      expect.any(String), [],
+      expect.objectContaining({ cwd: '/custom/playground' }),
     );
   });
 
-  it('falls back to PLAYGROUNDS_DIR when no explicit cwd', () => {
+  it('falls back to PLAYGROUNDS_DIR when no explicit cwd given', () => {
+    const saved = process.env.PLAYGROUNDS_DIR;
     process.env.PLAYGROUNDS_DIR = '/env/playground';
     service.create('s1');
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String),
-      [],
-      expect.objectContaining({ cwd: '/env/playground' })
+      expect.any(String), [],
+      expect.objectContaining({ cwd: '/env/playground' }),
     );
+    if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved; else delete process.env.PLAYGROUNDS_DIR;
+  });
+
+  it('falls back to process.cwd() when neither cwd nor PLAYGROUNDS_DIR is set', () => {
+    const saved = process.env.PLAYGROUNDS_DIR;
     delete process.env.PLAYGROUNDS_DIR;
+    const expectedCwd = process.cwd();
+    service.create('s1');
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String), [],
+      expect.objectContaining({ cwd: expectedCwd }),
+    );
+    if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved;
   });
 
   // ── write ───────────────────────────────────────────────────────────────────
@@ -119,7 +139,7 @@ describe('TerminalService', () => {
   });
 
   it('does nothing on write when session does not exist', () => {
-    expect(() => service.write('unknown', 'data')).not.toThrow();
+    expect(() => service.write('ghost', 'data')).not.toThrow();
     expect(mockPty.write).not.toHaveBeenCalled();
   });
 
@@ -138,17 +158,17 @@ describe('TerminalService', () => {
   });
 
   it('does nothing on resize when session does not exist', () => {
-    expect(() => service.resize('unknown', 80, 24)).not.toThrow();
+    expect(() => service.resize('ghost', 80, 24)).not.toThrow();
     expect(mockPty.resize).not.toHaveBeenCalled();
   });
 
-  it('swallows errors from PTY resize', () => {
+  it('swallows errors thrown by PTY resize', () => {
     service.create('s1');
     mockPty.resize.mockImplementationOnce(() => { throw new Error('PTY gone'); });
     expect(() => service.resize('s1', 80, 24)).not.toThrow();
   });
 
-  // ── kill ────────────────────────────────────────────────────────────────────
+  // ── kill ─────────────────────────────────────────────────────────────────────
 
   it('kills the PTY and removes the session', () => {
     service.create('s1');
@@ -159,17 +179,17 @@ describe('TerminalService', () => {
   });
 
   it('does nothing on kill when session does not exist', () => {
-    expect(() => service.kill('unknown')).not.toThrow();
+    expect(() => service.kill('ghost')).not.toThrow();
     expect(mockPty.kill).not.toHaveBeenCalled();
   });
 
-  it('swallows errors from PTY kill', () => {
+  it('swallows errors thrown by PTY kill', () => {
     service.create('s1');
     mockPty.kill.mockImplementationOnce(() => { throw new Error('already dead'); });
     expect(() => service.kill('s1')).not.toThrow();
   });
 
-  // ── onModuleDestroy ─────────────────────────────────────────────────────────
+  // ── onModuleDestroy ──────────────────────────────────────────────────────────
 
   it('kills all sessions on module destroy', () => {
     service.create('s1');

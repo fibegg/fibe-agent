@@ -1,24 +1,24 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { TerminalPanel } from './terminal-panel';
+import { TerminalPanel, buildTerminalWsUrl } from './terminal-panel';
 
-// ─── Shared mock terminal methods ─────────────────────────────────────────────
+// ─── Mock Terminal & addons ────────────────────────────────────────────────────
+
 const mockWrite    = vi.fn();
 const mockDispose  = vi.fn();
 const mockOpen     = vi.fn();
 const mockLoadAddon = vi.fn();
-const mockOnData   = vi.fn();
+const mockOnData   = vi.fn() as ReturnType<typeof vi.fn> & ((cb: (data: string) => void) => void);
 
-// Terminal must be a class constructor; each test shares the same vi.fn() refs.
 vi.mock('@xterm/xterm', () => ({
-  Terminal: class MockTerminal {
+  Terminal: class {
     cols = 80;
     rows = 24;
-    write      = mockWrite;
-    dispose    = mockDispose;
-    open       = mockOpen;
-    loadAddon  = mockLoadAddon;
-    onData     = mockOnData;
+    write     = mockWrite;
+    dispose   = mockDispose;
+    open      = mockOpen;
+    loadAddon = mockLoadAddon;
+    onData    = mockOnData;
   },
 }));
 
@@ -31,24 +31,14 @@ vi.mock('../api-url', () => ({
   getAuthTokenForRequest: vi.fn().mockReturnValue(''),
 }));
 
-// ─── Fake WebSocket class (must be a real class for `new WebSocket()`) ─────────
-// lastWs is updated in the constructor so tests can access the live instance.
-const wsInstances: {
-  send: ReturnType<typeof vi.fn>;
-  close: ReturnType<typeof vi.fn>;
-  readyState: number;
-  binaryType: string;
-  url: string;
-  onopen:    (() => void) | null;
-  onmessage: ((e: MessageEvent) => void) | null;
-  onclose:   (() => void) | null;
-  onerror:   (() => void) | null;
-}[] = [];
+// ─── Fake WebSocket ────────────────────────────────────────────────────────────
+
+const wsInstances: FakeWebSocket[] = [];
 
 class FakeWebSocket {
   static OPEN = 1;
-  readyState = FakeWebSocket.OPEN;
-  binaryType = '';
+  readyState  = FakeWebSocket.OPEN;
+  binaryType  = '';
   url: string;
   onopen:    (() => void)                | null = null;
   onmessage: ((e: MessageEvent) => void) | null = null;
@@ -58,7 +48,7 @@ class FakeWebSocket {
   close = vi.fn();
   constructor(url: string) {
     this.url = url;
-    wsInstances.push(this as never);
+    wsInstances.push(this);
   }
 }
 
@@ -68,21 +58,46 @@ class FakeResizeObserver {
   unobserve  = vi.fn();
 }
 
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+
+const latest = () => wsInstances[wsInstances.length - 1];
+
+// ─── Setup ────────────────────────────────────────────────────────────────────
+
+beforeEach(async () => {
+  vi.clearAllMocks();
+  wsInstances.length = 0;
+  // Reset token mock to empty string so tests don't bleed into each other
+  const { getAuthTokenForRequest } = await import('../api-url');
+  (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('');
+  vi.stubGlobal('WebSocket',             FakeWebSocket);
+  vi.stubGlobal('ResizeObserver',        FakeResizeObserver);
+  vi.stubGlobal('requestAnimationFrame', (cb: () => void) => { cb(); return 0; });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+// ─── buildTerminalWsUrl ───────────────────────────────────────────────────────
+
+describe('buildTerminalWsUrl', () => {
+  it('returns /ws-terminal URL without token when token is empty', async () => {
+    const { getAuthTokenForRequest } = await import('../api-url');
+    (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('');
+    expect(buildTerminalWsUrl()).toBe('ws://localhost:3000/ws-terminal');
+  });
+
+  it('appends token param when token is present', async () => {
+    const { getAuthTokenForRequest } = await import('../api-url');
+    (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('abc123');
+    expect(buildTerminalWsUrl()).toContain('token=abc123');
+  });
+});
+
+// ─── TerminalPanel rendering ──────────────────────────────────────────────────
+
 describe('TerminalPanel', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    wsInstances.length = 0;
-    vi.stubGlobal('WebSocket',             FakeWebSocket);
-    vi.stubGlobal('ResizeObserver',        FakeResizeObserver);
-    vi.stubGlobal('requestAnimationFrame', (cb: () => void) => { cb(); return 0; });
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  const getWs = () => wsInstances[wsInstances.length - 1] as FakeWebSocket;
-
   it('renders the Shell header label', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
     expect(screen.getByText('Shell')).toBeTruthy();
@@ -105,16 +120,31 @@ describe('TerminalPanel', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
+  // ── WebSocket lifecycle ─────────────────────────────────────────────────────
+
   it('opens a WebSocket to /ws-terminal on mount', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    expect(getWs().url).toContain('/ws-terminal');
+    expect(latest().url).toContain('/ws-terminal');
+  });
+
+  it('URL does NOT include token= when token is empty', () => {
+    render(<TerminalPanel onClose={vi.fn()} />);
+    expect(latest().url).not.toContain('token=');
   });
 
   it('includes token in WebSocket URL when a token is present', async () => {
     const { getAuthTokenForRequest } = await import('../api-url');
     (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('secret');
     render(<TerminalPanel onClose={vi.fn()} />);
-    expect(getWs().url).toContain('token=secret');
+    expect(latest().url).toContain('token=secret');
+  });
+
+  it('sends initial resize message on WS open', () => {
+    render(<TerminalPanel onClose={vi.fn()} />);
+    latest().onopen?.();
+    expect(latest().send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'resize', cols: 80, rows: 24 }),
+    );
   });
 
   it('disposes the terminal on unmount', () => {
@@ -126,31 +156,52 @@ describe('TerminalPanel', () => {
   it('closes the WebSocket on unmount', () => {
     const { unmount } = render(<TerminalPanel onClose={vi.fn()} />);
     unmount();
-    expect(getWs().close).toHaveBeenCalled();
+    expect(latest().close).toHaveBeenCalled();
   });
+
+  // ── Incoming messages ───────────────────────────────────────────────────────
 
   it('writes incoming text messages to the terminal', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    getWs().onmessage?.({ data: 'hello world' } as MessageEvent);
+    latest().onmessage?.({ data: 'hello world' } as MessageEvent);
     expect(mockWrite).toHaveBeenCalledWith('hello world');
   });
 
   it('writes incoming ArrayBuffer messages as Uint8Array', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    const buf = new ArrayBuffer(4);
-    getWs().onmessage?.({ data: buf } as MessageEvent);
+    latest().onmessage?.({ data: new ArrayBuffer(4) } as MessageEvent);
     expect(mockWrite).toHaveBeenCalledWith(expect.any(Uint8Array));
   });
 
   it('writes session-closed message when WebSocket closes', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    getWs().onclose?.();
+    latest().onclose?.();
     expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining('Terminal session closed'));
   });
 
   it('writes connection-error message when WebSocket errors', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    getWs().onerror?.();
+    latest().onerror?.();
     expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining('could not connect'));
+  });
+
+  // ── Keyboard input ──────────────────────────────────────────────────────────
+
+  it('sends keyboard input to WebSocket when connection is OPEN', () => {
+    render(<TerminalPanel onClose={vi.fn()} />);
+    // Capture the onData callback registered with the terminal
+    const onDataCb = mockOnData.mock.calls[0]?.[0] as ((d: string) => void) | undefined;
+    expect(onDataCb).toBeDefined();
+    latest().readyState = FakeWebSocket.OPEN;
+    onDataCb?.('ls\r');
+    expect(latest().send).toHaveBeenCalledWith('ls\r');
+  });
+
+  it('does NOT send keyboard input when WebSocket is not OPEN', () => {
+    render(<TerminalPanel onClose={vi.fn()} />);
+    const onDataCb = mockOnData.mock.calls[0]?.[0] as ((d: string) => void) | undefined;
+    latest().readyState = 3; // CLOSED
+    onDataCb?.('ls\r');
+    expect(latest().send).not.toHaveBeenCalled();
   });
 });
