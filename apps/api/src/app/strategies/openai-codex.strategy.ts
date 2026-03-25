@@ -1,5 +1,4 @@
-import { Logger } from '@nestjs/common';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type {
@@ -10,7 +9,8 @@ import type {
   TokenUsage,
   ToolEvent,
 } from './strategy.types';
-import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE } from './strategy.types';
+import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
@@ -231,19 +231,10 @@ export function handleCodexExecJsonLine(
 /*  Strategy class                                                     */
 /* ------------------------------------------------------------------ */
 
-export class OpenaiCodexStrategy implements AgentStrategy {
-  private readonly logger = new Logger(OpenaiCodexStrategy.name);
-  private activeAuthProcess: ReturnType<typeof spawn> | null = null;
-  private currentConnection: AuthConnection | null = null;
-  private authCancel: (() => void) | null = null;
-  private currentStreamProcess: ChildProcess | null = null;
-  private streamInterrupted = false;
-  private readonly useApiTokenMode: boolean;
-  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
+export class OpenaiCodexStrategy extends AbstractCLIStrategy {
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
-    this.useApiTokenMode = useApiTokenMode;
-    this.conversationDataDir = conversationDataDir;
+    super(OpenaiCodexStrategy.name, useApiTokenMode, conversationDataDir);
   }
 
   private getCodexHomeForSession(): string {
@@ -332,12 +323,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     this.authCancel = cancel;
   }
 
-  cancelAuth(): void {
-    this.authCancel?.();
-    this.authCancel = null;
-    this.activeAuthProcess = null;
-    this.currentConnection = null;
-  }
+
 
   submitAuthCode(code: string): void {
     const trimmed = (code ?? '').trim();
@@ -387,10 +373,7 @@ export class OpenaiCodexStrategy implements AgentStrategy {
     });
   }
 
-  interruptAgent(): void {
-    this.streamInterrupted = true;
-    this.currentStreamProcess?.kill();
-  }
+
 
   executePromptStreaming(
     prompt: string,
