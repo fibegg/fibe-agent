@@ -10,7 +10,8 @@ describe('SteeringService', () => {
 
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'steering-'));
-    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir } as never;
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined } as never;
     service = new SteeringService(config);
     service.onModuleInit();
   });

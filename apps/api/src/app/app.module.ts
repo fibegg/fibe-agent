@@ -1,5 +1,5 @@
 import { join } from 'path';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
@@ -7,6 +7,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigService } from './config/config.service';
 import { AgentAuthGuard } from './auth/agent-auth.guard';
+import { AuditService } from './audit/audit.service';
+import { AuditInterceptor } from './audit/audit.interceptor';
+
+import { DataPrivacyController } from './data-privacy/data-privacy.controller';
+import { DataPrivacyService } from './data-privacy/data-privacy.service';
+
 import { AuthController } from './auth/auth.controller';
 import { ActivityController } from './activity/activity.controller';
 import { ActivityStoreService } from './activity-store/activity-store.service';
@@ -52,9 +58,13 @@ import { TerminalService } from './terminal/terminal.service';
     AgentFilesController,
     InitStatusController,
     AgentController,
+    DataPrivacyController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    AuditService,
+    DataPrivacyService,
     AppService,
     ConfigService,
     AgentAuthGuard,

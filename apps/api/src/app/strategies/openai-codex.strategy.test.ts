@@ -631,6 +631,7 @@ describe('OpenaiCodexStrategy', () => {
   test('constructor with conversationDataDir', () => {
     const strategy = new OpenaiCodexStrategy(false, {
       getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
+      getEncryptionKey: () => undefined,
     });
     expect(strategy).toBeDefined();
   });
@@ -645,6 +646,7 @@ describe('OpenaiCodexStrategy', () => {
     const convDir = join(TEST_HOME, 'conv-data');
     const strategy = new OpenaiCodexStrategy(false, {
       getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
     });
     expect(strategy.getWorkingDir()).toBe(join(convDir, 'codex_workspace'));
   });

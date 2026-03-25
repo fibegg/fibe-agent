@@ -1,10 +1,19 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { existsSync, mkdirSync } from 'node:fs';
-import { writeFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
 import { extFromMimetype } from './uploads-handler';
+import sizeOf from 'image-size';
+import Tesseract from 'tesseract.js';
+
+export interface ImageInfo {
+  text: string;
+  width?: number;
+  height?: number;
+  format?: string;
+}
 
 const DATA_URL_REGEX = /^data:([^;]+);base64,(.+)$/;
 
@@ -17,6 +26,8 @@ function audioExtFromMime(mime: string): string {
 
 @Injectable()
 export class UploadsService {
+  private readonly logger = new Logger(UploadsService.name);
+
   constructor(private readonly config: ConfigService) {}
 
   getUploadsDir(): string {
@@ -60,6 +71,42 @@ export class UploadsService {
     if (!this.isSafeFilename(filename)) return null;
     const path = join(this.getUploadsDir(), filename);
     return existsSync(path) ? path : null;
+  }
+
+  async extractImageInfo(filename: string): Promise<ImageInfo | null> {
+    const p = this.getPath(filename);
+    if (!p) return null;
+
+    if (!/\.(jpg|jpeg|png)$/i.test(filename)) {
+      return null;
+    }
+
+    const metaPath = p + '.meta.json';
+    if (existsSync(metaPath)) {
+      try {
+        const cached = await readFile(metaPath, 'utf8');
+        return JSON.parse(cached);
+      } catch (e) {
+        this.logger.warn(`Failed to read cached metadata for ${filename}`, e);
+      }
+    }
+
+    try {
+      const buffer = await readFile(p);
+      const metadata = sizeOf(buffer);
+      const { data } = await Tesseract.recognize(buffer, 'eng', { logger: () => void 0 });
+      const info: ImageInfo = {
+        text: data?.text?.trim() || '',
+        width: metadata?.width,
+        height: metadata?.height,
+        format: metadata?.type,
+      };
+      await writeFile(metaPath, JSON.stringify(info));
+      return info;
+    } catch (e) {
+      this.logger.warn(`Failed to extract image info for ${filename}`, e);
+      return null;
+    }
   }
 
   private ensureUploadsDir(): void {

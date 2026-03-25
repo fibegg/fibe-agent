@@ -23,9 +23,6 @@ export class AgentAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.slice(7);
-    } else {
-      const query = request.query as Record<string, string | undefined>;
-      token = query?.token ?? null;
     }
 
     if (token === requiredPassword) {

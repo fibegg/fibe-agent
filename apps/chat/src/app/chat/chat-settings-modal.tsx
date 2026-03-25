@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Key, Loader2, LogOut, X } from 'lucide-react';
+import { Key, Loader2, LogOut, X, Download, Trash2 } from 'lucide-react';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
 import { ThemeToggle } from '../theme-toggle';
@@ -72,6 +72,33 @@ export function ChatSettingsModal({
     onLogout();
   };
 
+  const handleExportData = () => {
+    apiRequest('/data-privacy/export')
+      .then((r) => r.blob())
+      .then((blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'fibe_agent_data_export.json';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      })
+      .catch((err) => console.error('Export failed', err));
+  };
+
+  const handleDeleteData = () => {
+    if (!window.confirm('Are you absolutely sure you want to permanently delete all your conversation data? This action cannot be undone.')) {
+      return;
+    }
+    apiRequest('/data-privacy', { method: 'DELETE' })
+      .then((r) => {
+        if (r.ok) window.location.reload();
+      })
+      .catch((err) => console.error('Delete failed', err));
+  };
+
   return (
     <>
       <div className={MODAL_OVERLAY_DARK} aria-hidden onClick={onClose} />
@@ -108,6 +135,27 @@ export function ChatSettingsModal({
               typeFilter={typeFilter}
               onTypeFilterChange={setTypeFilter}
             />
+          </div>
+          <div className="space-y-2.5 border-t border-border/30 pt-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data Privacy (GDPR/CCPA)</span>
+            <div className="flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={handleExportData}
+                className={BUTTON_OUTLINE_ACCENT}
+              >
+                <Download className="size-4" />
+                Export My Data
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteData}
+                className={BUTTON_DESTRUCTIVE_GHOST}
+              >
+                <Trash2 className="size-4" />
+                Delete My Data
+              </button>
+            </div>
           </div>
           {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
             <div className="border-t border-border/30 pt-4 space-y-2.5">
