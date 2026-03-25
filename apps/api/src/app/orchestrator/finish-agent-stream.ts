@@ -1,7 +1,7 @@
 import type { ActivityStoreService } from '../activity-store/activity-store.service';
 import type { MessageStoreService } from '../message-store/message-store.service';
 import type { ModelStoreService } from '../model-store/model-store.service';
-import type { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
+import type { FibeSyncService } from '../fibe-sync/fibe-sync.service';
 import { DEFAULT_PROVIDER } from '../strategies/strategy-registry.service';
 import type { ThinkingStep, TokenUsage } from '../strategies/strategy.types';
 import { WS_EVENT } from '@shared/ws-constants';
@@ -10,7 +10,7 @@ export interface FinishAgentStreamDeps {
   messageStore: MessageStoreService;
   modelStore: ModelStoreService;
   activityStore: ActivityStoreService;
-  phoenixSync: PhoenixSyncService;
+  fibeSync: FibeSyncService;
   send: (type: string, data?: Record<string, unknown>) => void;
   getCurrentActivityId: () => string | null;
   clearLastStreamUsage: () => void;
@@ -27,7 +27,7 @@ export function finishAgentStream(
   const storedModel = (deps.modelStore.get() || '').trim();
   const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
   deps.messageStore.add('assistant', finalText, undefined, model);
-  void deps.phoenixSync.syncMessages(JSON.stringify(deps.messageStore.all()));
+  void deps.fibeSync.syncMessages(JSON.stringify(deps.messageStore.all()));
   deps.send(WS_EVENT.THINKING_STEP, {
     id: stepId,
     title: step.title,

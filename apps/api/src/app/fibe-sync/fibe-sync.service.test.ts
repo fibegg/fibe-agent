@@ -1,52 +1,52 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { PhoenixSyncService } from './phoenix-sync.service';
+import { FibeSyncService } from './fibe-sync.service';
 
-describe('PhoenixSyncService', () => {
+describe('FibeSyncService', () => {
   const envBackup: Record<string, string | undefined> = {};
 
   const mockConfig = {
-    isPhoenixSyncEnabled: () => false,
-    getPhoenixApiUrl: () => undefined as string | undefined,
-    getPhoenixApiKey: () => undefined as string | undefined,
-    getPhoenixAgentId: () => undefined as string | undefined,
+    isFibeSyncEnabled: () => false,
+    getFibeApiUrl: () => undefined as string | undefined,
+    getFibeApiKey: () => undefined as string | undefined,
+    getFibeAgentId: () => undefined as string | undefined,
   };
 
   beforeEach(() => {
-    envBackup.PHOENIX_SYNC_ENABLED = process.env.PHOENIX_SYNC_ENABLED;
-    mockConfig.isPhoenixSyncEnabled = () => false;
-    mockConfig.getPhoenixApiUrl = () => undefined;
-    mockConfig.getPhoenixApiKey = () => undefined;
-    mockConfig.getPhoenixAgentId = () => undefined;
+    envBackup.FIBE_SYNC_ENABLED = process.env.FIBE_SYNC_ENABLED;
+    mockConfig.isFibeSyncEnabled = () => false;
+    mockConfig.getFibeApiUrl = () => undefined;
+    mockConfig.getFibeApiKey = () => undefined;
+    mockConfig.getFibeAgentId = () => undefined;
   });
 
   afterEach(() => {
-    process.env.PHOENIX_SYNC_ENABLED = envBackup.PHOENIX_SYNC_ENABLED;
+    process.env.FIBE_SYNC_ENABLED = envBackup.FIBE_SYNC_ENABLED;
   });
 
   test('syncMessages does nothing when sync is disabled', async () => {
-    const service = new PhoenixSyncService(mockConfig as never);
+    const service = new FibeSyncService(mockConfig as never);
     // Should not throw
     await service.syncMessages('{"messages":[]}');
   });
 
   test('syncActivity does nothing when sync is disabled', async () => {
-    const service = new PhoenixSyncService(mockConfig as never);
+    const service = new FibeSyncService(mockConfig as never);
     await service.syncActivity('[]');
   });
 
   test('sync does nothing when apiUrl/apiKey/agentId are missing', async () => {
-    mockConfig.isPhoenixSyncEnabled = () => true;
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
     // Missing apiKey and agentId
-    const service = new PhoenixSyncService(mockConfig as never);
+    const service = new FibeSyncService(mockConfig as never);
     await service.syncMessages('{}');
   });
 
   test('syncMessages makes PUT request when fully configured', async () => {
-    mockConfig.isPhoenixSyncEnabled = () => true;
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key123';
-    mockConfig.getPhoenixAgentId = () => 'agent-1';
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -54,13 +54,13 @@ describe('PhoenixSyncService', () => {
     ) as typeof fetch;
 
     try {
-      const service = new PhoenixSyncService(mockConfig as never);
+      const service = new FibeSyncService(mockConfig as never);
       await service.syncMessages('{"data":"test"}');
       // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'https://phoenix.test/api/agents/agent-1/messages',
+        'https://fibe.test/api/agents/agent-1/messages',
         {
           method: 'PUT',
           headers: {
@@ -76,10 +76,10 @@ describe('PhoenixSyncService', () => {
   });
 
   test('syncActivity makes PUT request with activity endpoint', async () => {
-    mockConfig.isPhoenixSyncEnabled = () => true;
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key123';
-    mockConfig.getPhoenixAgentId = () => 'agent-1';
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -87,13 +87,13 @@ describe('PhoenixSyncService', () => {
     ) as typeof fetch;
 
     try {
-      const service = new PhoenixSyncService(mockConfig as never);
+      const service = new FibeSyncService(mockConfig as never);
       await service.syncActivity('[]');
       // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'https://phoenix.test/api/agents/agent-1/activity',
+        'https://fibe.test/api/agents/agent-1/activity',
         expect.objectContaining({ method: 'PUT' }),
       );
     } finally {
@@ -102,10 +102,10 @@ describe('PhoenixSyncService', () => {
   });
 
   test('handles non-ok response without throwing', async () => {
-    mockConfig.isPhoenixSyncEnabled = () => true;
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key123';
-    mockConfig.getPhoenixAgentId = () => 'agent-1';
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -113,7 +113,7 @@ describe('PhoenixSyncService', () => {
     ) as typeof fetch;
 
     try {
-      const service = new PhoenixSyncService(mockConfig as never);
+      const service = new FibeSyncService(mockConfig as never);
       // Should not throw
       await service.syncMessages('{}');
     } finally {
@@ -122,10 +122,10 @@ describe('PhoenixSyncService', () => {
   });
 
   test('handles network error without throwing', async () => {
-    mockConfig.isPhoenixSyncEnabled = () => true;
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key123';
-    mockConfig.getPhoenixAgentId = () => 'agent-1';
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () => {
@@ -133,7 +133,7 @@ describe('PhoenixSyncService', () => {
     }) as typeof fetch;
 
     try {
-      const service = new PhoenixSyncService(mockConfig as never);
+      const service = new FibeSyncService(mockConfig as never);
       await service.syncMessages('{}');
     } finally {
       globalThis.fetch = originalFetch;

@@ -34,7 +34,7 @@ All API logs are written as **one JSON object per line** to stdout/stderr so con
 
 | Env var             | Description |
 |---------------------|-------------|
-| `DATA_DIR`          | Base directory for persistence (default: `./data`). When `PHOENIX_AGENT_ID` or `CONVERSATION_ID` is set, conversation data is stored under `DATA_DIR/<conversation-id>/` (messages, activities, model, uploads, steering, init-status, and provider session dirs). |
+| `DATA_DIR`          | Base directory for persistence (default: `./data`). When `FIBE_AGENT_ID` or `CONVERSATION_ID` is set, conversation data is stored under `DATA_DIR/<conversation-id>/` (messages, activities, model, uploads, steering, init-status, and provider session dirs). |
 | `POST_INIT_SCRIPT`  | Optional. Shell script run once on first container load (e.g. to install tools). State is stored under the conversation data dir and exposed at `GET /api/init-status`. |
 | `LOG_LEVEL`         | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` (case-insensitive). Minimum level emitted. `info` and `log` are equivalent. |
 
@@ -103,7 +103,7 @@ The client can build a chronological **story** (activity timeline) from `stream_
 
 ## Embedding the chat app (iframe)
 
-When the chat app is loaded inside an iframe (e.g. Phoenix frame), the following apply.
+When the chat app is loaded inside an iframe (e.g. Fibe frame), the following apply.
 
 ### Environment variables (chat app, `VITE_*`)
 
@@ -142,7 +142,7 @@ Persistence (messages, activities, model choice, uploads, steering, init-status,
 
 | Env var | Description |
 |---------|-------------|
-| `PHOENIX_AGENT_ID` | When set (e.g. by Phoenix when attaching a stored agent), used as the conversation id. All data for that agent is stored under `DATA_DIR/<id>/` (id is sanitized for the filesystem). |
-| `CONVERSATION_ID` | Fallback when `PHOENIX_AGENT_ID` is not set. Use for non-Phoenix deployments that want multiple conversations on the same instance. |
+| `FIBE_AGENT_ID` | When set (e.g. by Fibe when attaching a stored agent), used as the conversation id. All data for that agent is stored under `DATA_DIR/<id>/` (id is sanitized for the filesystem). |
+| `CONVERSATION_ID` | Fallback when `FIBE_AGENT_ID` is not set. Use for non-Fibe deployments that want multiple conversations on the same instance. |
 
 When neither is set, the conversation id is `default`, so a single `DATA_DIR` (or `DATA_DIR/default`) is used and behaviour is unchanged. When set, each conversation has its own subdirectory so the same agent id always loads the same history and provider session (e.g. Claude `--continue`, Gemini `--resume`, Codex/Opencode session dirs).

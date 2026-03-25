@@ -43,14 +43,14 @@ describe('OrchestratorService', () => {
     const modelStore = new ModelStoreService(config as never);
     const strategyRegistry = new StrategyRegistryService(config as never);
     const uploadsService = new UploadsService(config as never);
-    const phoenixSync = {
+    const fibeSync = {
       syncMessages: async (payload: string) => {
         void payload;
       },
       syncActivity: async (payload: string) => {
         void payload;
       },
-    } as unknown as import('../phoenix-sync/phoenix-sync.service').PhoenixSyncService;
+    } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
     const chatPromptContext = {
       buildFullPrompt: async (
         text: string,
@@ -69,7 +69,7 @@ describe('OrchestratorService', () => {
       config as never,
       strategyRegistry,
       uploadsService,
-      phoenixSync,
+      fibeSync,
       chatPromptContext,
       steering,
     );

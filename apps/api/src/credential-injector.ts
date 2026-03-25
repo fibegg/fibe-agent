@@ -6,7 +6,7 @@ const CREDENTIALS_CONTEXT = 'Credentials';
 
 /**
  * Loads pre-authenticated credentials from AGENT_CREDENTIALS_JSON.
- * Used when Phoenix attaches a stored Agent to a Playground.
+ * Used when Fibe attaches a stored Agent to a Playground.
  * Writes files into SESSION_DIR (e.g. agent_token.txt, oauth_creds.json).
  * No-op if env vars are unset or empty.
  */

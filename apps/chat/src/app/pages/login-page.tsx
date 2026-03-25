@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginWithPassword, isAuthenticated } from '../api-url';
-import { PhoenixLogo } from '../phoenix-logo';
+import { FibeLogo } from '../fibe-logo';
 import { waitForAutoAuth } from '../postmessage-auth';
 
 export function LoginPage() {
@@ -94,7 +94,7 @@ export function LoginPage() {
       <div className="relative z-10 w-full max-w-md px-4">
         <div className="bg-zinc-800/30 backdrop-blur-3xl border border-violet-400/15 rounded-2xl shadow-[0_0_60px_rgba(124,58,237,0.12)] p-6 sm:p-8">
           <div className="flex justify-center mb-4 sm:mb-6">
-            <PhoenixLogo className="size-16 sm:size-20 object-contain" />
+            <FibeLogo className="size-16 sm:size-20 object-contain" />
           </div>
 
           {error && (
