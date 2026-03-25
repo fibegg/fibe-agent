@@ -86,6 +86,10 @@ async function bootstrap() {
     new ValidationPipe({ whitelist: true, transform: true })
   );
   app.useGlobalFilters(new GlobalHttpExceptionFilter());
+  
+  // Enable graceful shutdown so OnModuleDestroy (which kills node-pty) is triggered
+  app.enableShutdownHooks();
+  
   const port = Number(process.env.PORT) || DEFAULT_PORT;
   await app.listen(port, '0.0.0.0');
   logger.log(`Application is running on: http://localhost:${port}/api`);
