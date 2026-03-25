@@ -9,7 +9,7 @@ import {
   MessageStoreService,
   type StoredStoryEntry,
 } from '../message-store/message-store.service';
-import { PhoenixSyncService } from '../phoenix-sync/phoenix-sync.service';
+import { FibeSyncService } from '../fibe-sync/fibe-sync.service';
 
 import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
@@ -60,7 +60,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly config: ConfigService,
     private readonly strategyRegistry: StrategyRegistryService,
     private readonly uploadsService: UploadsService,
-    private readonly phoenixSync: PhoenixSyncService,
+    private readonly fibeSync: FibeSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
     private readonly steering: SteeringService,
   ) {
@@ -103,7 +103,7 @@ export class OrchestratorService implements OnModuleInit {
       messageStore: this.messageStore,
       modelStore: this.modelStore,
       activityStore: this.activityStore,
-      phoenixSync: this.phoenixSync,
+      fibeSync: this.fibeSync,
       send: (type: string, data?: Record<string, unknown>) =>
         this._send(type, data ?? {}),
       getCurrentActivityId: () => this.currentActivityId,
@@ -447,7 +447,7 @@ export class OrchestratorService implements OnModuleInit {
     await this.steering.enqueue(text);
     const userMessage = this.messageStore.add('user', text);
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
-    void this.phoenixSync.syncMessages(JSON.stringify(this.messageStore.all()));
+    void this.fibeSync.syncMessages(JSON.stringify(this.messageStore.all()));
   }
 
   private createAuthConnection(): AuthConnection {
@@ -496,10 +496,10 @@ export class OrchestratorService implements OnModuleInit {
       const entry = this.activityStore.append(story);
       this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
     }
-    void this.phoenixSync.syncMessages(
+    void this.fibeSync.syncMessages(
       JSON.stringify(this.messageStore.all())
     );
-    void this.phoenixSync.syncActivity(
+    void this.fibeSync.syncActivity(
       JSON.stringify(this.activityStore.all())
     );
   }

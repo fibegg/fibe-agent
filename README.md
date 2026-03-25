@@ -34,8 +34,8 @@
 | **Voice input** | Browser `MediaRecorder` voice recorder that uploads audio and sends it as a message attachment. |
 | **File attachments** | Drag-&-drop or click-to-upload images, audio, PDF, Excel, Word, CSV, JSON, text — up to 20 MB per file. |
 | **`@`-mention files** | Type `@` in the chat input to reference playground files; the API injects their contents into the agent prompt. |
-| **Conversation persistence** | Messages, activities, model choice, uploads, and provider session state scoped by conversation id (`PHOENIX_AGENT_ID` / `CONVERSATION_ID`). |
-| **Phoenix integration** | `PhoenixSyncService`, `postMessage` auto-auth, and iframe embed support with parent-controlled theming. |
+| **Conversation persistence** | Messages, activities, model choice, uploads, and provider session state scoped by conversation id (`FIBE_AGENT_ID` / `CONVERSATION_ID`). |
+| **Fibe integration** | `FibeSyncService`, `postMessage` auto-auth, and iframe embed support with parent-controlled theming. |
 | **Security** | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), JWT-style bearer token auth, multipart validation. |
 | **Structured logging** | One JSON object per line to stdout; request IDs, HTTP and WebSocket context, configurable via `LOG_LEVEL`. |
 | **100% unit coverage** | Every module has co-located spec files; Playwright e2e for API and Chat. |
@@ -150,7 +150,7 @@ fibe-agent/
 | `uploads` | Multipart upload + file serving |
 | `terminal` | `node-pty` shell sessions over `/ws-terminal` |
 | `steering` | Runtime steering/override hints for the orchestrator |
-| `phoenix-sync` | Syncs conversation state back to the Phoenix platform |
+| `fibe-sync` | Syncs conversation state back to the Fibe platform |
 | `github-token-refresh` | Refreshes GitHub OAuth tokens for Codex |
 | `init-status` | Tracks `POST_INIT_SCRIPT` execution state |
 | `persistence` | Base persistence helpers |
@@ -171,17 +171,17 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the model selector (e.g. `flash-lite,flash,pro`) |
 | `DEFAULT_MODEL` | first in `MODEL_OPTIONS` | Pre-selected model |
 | `DATA_DIR` | `./data` | Base data directory |
-| `PHOENIX_AGENT_ID` | — | Conversation id (set by Phoenix); data stored at `DATA_DIR/<id>/` |
-| `CONVERSATION_ID` | — | Fallback conversation id for non-Phoenix multi-conversation setups |
+| `FIBE_AGENT_ID` | — | Conversation id (set by Fibe); data stored at `DATA_DIR/<id>/` |
+| `CONVERSATION_ID` | — | Fallback conversation id for non-Fibe multi-conversation setups |
 | `SYSTEM_PROMPT_PATH` | built-in | Path to custom system prompt file |
 | `SYSTEM_PROMPT` | — | Inline system prompt (overrides file) |
 | `PLAYGROUNDS_DIR` | `./playground` | Root for the file explorer and shell sessions |
 | `POST_INIT_SCRIPT` | — | Shell script run once on first boot; state exposed at `/api/init-status` |
 | `SESSION_DIR` | — | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) for credential injection |
-| `AGENT_CREDENTIALS_JSON` | — | JSON object of credential files injected at startup (set by Phoenix) |
-| `PHOENIX_API_KEY` | — | Phoenix platform API key for sync |
-| `PHOENIX_API_URL` | — | Phoenix platform API URL |
-| `PHOENIX_SYNC_ENABLED` | — | Set to `true` to enable Phoenix sync |
+| `AGENT_CREDENTIALS_JSON` | — | JSON object of credential files injected at startup (set by Fibe) |
+| `FIBE_API_KEY` | — | Fibe platform API key for sync |
+| `FIBE_API_URL` | — | Fibe platform API URL |
+| `FIBE_SYNC_ENABLED` | — | Set to `true` to enable Fibe sync |
 | `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins |
 | `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` (restrict in production) |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
@@ -272,7 +272,7 @@ Providers: `gemini`, `claude-code`, `openai-codex`, `opencode`. Pass `AGENT_PROV
 
 ## Embedding (iframe)
 
-The chat can run inside a `<iframe>` in another app (e.g. Phoenix):
+The chat can run inside a `<iframe>` in another app (e.g. Fibe):
 
 - **Auto-auth:** parent posts `{ action: 'auto_auth', password: '…' }` → chat logs in automatically.
 - **Theme control:** parent posts `{ action: 'set_theme', theme: 'light'|'dark' }` (requires `VITE_THEME_SOURCE=frame`).

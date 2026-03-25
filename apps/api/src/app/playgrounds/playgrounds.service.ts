@@ -1,9 +1,14 @@
 import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execAsync = promisify(exec);
 
 export interface PlaygroundEntry {
   name: string;
@@ -11,6 +16,7 @@ export interface PlaygroundEntry {
   type: 'file' | 'directory';
   mtime?: number;
   children?: PlaygroundEntry[];
+  gitStatus?: 'modified' | 'untracked' | 'deleted' | 'added' | 'renamed';
 }
 
 const HIDDEN_PREFIX = '.';
@@ -28,7 +34,8 @@ export class PlaygroundsService {
 
   async getTree(): Promise<PlaygroundEntry[]> {
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
-    return this.readDir(this.config.getPlaygroundsDir(), '', ig);
+    const statuses = await this.getGitStatuses(this.config.getPlaygroundsDir());
+    return this.readDir(this.config.getPlaygroundsDir(), '', ig, statuses);
   }
 
   async getStats(): Promise<{ fileCount: number; totalLines: number }> {
@@ -114,6 +121,57 @@ export class PlaygroundsService {
     return this.collectFileContents(absPath, rel);
   }
 
+  private async getGitStatuses(dir: string): Promise<Map<string, PlaygroundEntry['gitStatus']>> {
+    const statuses = new Map<string, PlaygroundEntry['gitStatus']>();
+    try {
+      // First, get the git top-level directory to resolve relative paths
+      const { stdout: tlStdout } = await execAsync('git rev-parse --show-toplevel', { cwd: dir });
+      const topLevel = realpathSync(tlStdout.trim());
+      const realDir = realpathSync(dir);
+
+      // Get porcelain status
+      const { stdout } = await execAsync('git status --porcelain -unormal -z', { cwd: dir });
+      // -z uses NUL byte termination
+      const entries = stdout.split('\0');
+      
+      let i = 0;
+      while (i < entries.length) {
+        if (!entries[i]) {
+          i++;
+          continue;
+        }
+        const entry = entries[i];
+        const statusStr = entry.slice(0, 2);
+        const relPath = entry.slice(3);
+        
+        let fileStatus: PlaygroundEntry['gitStatus'] | undefined;
+        if (statusStr.includes('M')) fileStatus = 'modified';
+        else if (statusStr.includes('?')) fileStatus = 'untracked';
+        else if (statusStr.includes('A')) fileStatus = 'added';
+        else if (statusStr.includes('D')) fileStatus = 'deleted';
+        else if (statusStr.includes('R')) fileStatus = 'renamed';
+        
+        if (fileStatus) {
+          // Resolve absolute path using topLevel
+          const absPath = join(topLevel, relPath);
+          // Store it by relative path to the playground dir to avoid symlink issues (e.g. macOS tmpdir)
+          const playgroundRelPath = relative(realDir, absPath);
+          statuses.set(playgroundRelPath, fileStatus);
+        }
+        
+        // If it was renamed, it takes up two entries in the -z output (new path, then old path)
+        if (statusStr.includes('R')) {
+          i += 2; // skip both
+        } else {
+          i += 1;
+        }
+      }
+    } catch {
+      // Git command failed, ignore and return empty map
+    }
+    return statuses;
+  }
+
   private async collectFileContents(
     absPath: string,
     relPath: string
@@ -146,7 +204,7 @@ export class PlaygroundsService {
     return result;
   }
 
-  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter): Promise<PlaygroundEntry[]> {
+  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, statuses: Map<string, PlaygroundEntry['gitStatus']>): Promise<PlaygroundEntry[]> {
     if (IGNORED_NAMES.has(basename(absPath))) return [];
     try {
       const ig = await loadGitignore(absPath, parentIg);
@@ -172,16 +230,19 @@ export class PlaygroundsService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: await this.readDir(d.abs, d.rel, ig),
+          children: await this.readDir(d.abs, d.rel, ig, statuses),
         });
       }
       for (const f of files) {
         let mtime: number | undefined;
+        const absFilePath = join(absPath, f.name);
         try {
-          const st = await stat(join(absPath, f.name));
+          const st = await stat(absFilePath);
           mtime = st.mtimeMs;
         } catch { /* ignore */ }
-        result.push({ name: f.name, path: f.rel, type: 'file', mtime });
+        
+        const gitStatus = statuses.get(f.rel);
+        result.push({ name: f.name, path: f.rel, type: 'file', mtime, gitStatus });
       }
       return result;
     } catch {

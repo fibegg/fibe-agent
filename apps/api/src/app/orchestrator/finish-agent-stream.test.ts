@@ -36,7 +36,7 @@ describe('finishAgentStream', () => {
         setUsage: (id: string, usage: unknown) => usageSet.push({ id, usage }),
         getById: (id: string) => activityById[id] ?? null,
       } as never,
-      phoenixSync: {
+      fibeSync: {
         syncMessages: async (s: string) => { syncedMessages.push(s); },
       } as never,
       send: (type, data) => sent.push({ type, data }),
