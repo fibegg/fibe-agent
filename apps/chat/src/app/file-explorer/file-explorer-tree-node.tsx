@@ -13,6 +13,7 @@ export const TreeNode = memo(function TreeNode({
   onFileClick,
   selectedPath,
   animatingPaths,
+  dirtyPaths,
 }: {
   entry: PlaygroundEntry;
   depth: number;
@@ -21,11 +22,13 @@ export const TreeNode = memo(function TreeNode({
   onFileClick?: (entry: PlaygroundEntry) => void;
   selectedPath?: string | null;
   animatingPaths?: Map<string, FileAnimationType>;
+  dirtyPaths?: Set<string>;
 }) {
   const isDir = entry.type === 'directory';
   const isOpen = expanded.has(entry.path);
   const hasChildren = isDir && (entry.children?.length ?? 0) > 0;
   const isSelected = selectedPath === entry.path;
+  const isDirty = !isDir && dirtyPaths?.has(entry.path);
 
   const handleClick = useCallback(() => {
     if (isDir) {
@@ -67,6 +70,12 @@ export const TreeNode = memo(function TreeNode({
           <FileIcon pathOrName={entry.name} />
         )}
         <span className={`min-w-0 flex-1 truncate ${isSelected ? 'text-violet-400' : 'text-foreground'}`}>{entry.name}</span>
+        {isDirty && (
+          <span
+            className="size-1.5 rounded-full bg-amber-400 shrink-0 mr-1 animate-pulse"
+            title="Unsaved changes"
+          />
+        )}
       </button>
       {isDir && hasChildren && isOpen && (
         <div>
@@ -80,6 +89,7 @@ export const TreeNode = memo(function TreeNode({
               onFileClick={onFileClick}
               selectedPath={selectedPath}
               animatingPaths={animatingPaths}
+              dirtyPaths={dirtyPaths}
             />
           ))}
         </div>

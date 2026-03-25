@@ -1,4 +1,4 @@
-import { Brain, Loader2, Menu, Search, Sparkles, X } from 'lucide-react';
+import { Brain, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
 import { ModelSelector } from './model-selector';
 import { CHAT_STATES } from './chat-state';
 import { STATE_LABELS, truncateError } from './chat-state';
@@ -30,6 +30,8 @@ export interface ChatHeaderProps {
   modelLocked: boolean;
   onRefreshModels?: () => void;
   refreshingModels?: boolean;
+  onToggleTerminal?: () => void;
+  terminalOpen?: boolean;
 }
 
 export function ChatHeader({
@@ -56,6 +58,8 @@ export function ChatHeader({
   modelLocked,
   onRefreshModels,
   refreshingModels,
+  onToggleTerminal,
+  terminalOpen = false,
 }: ChatHeaderProps) {
   return (
     <header
@@ -187,6 +191,22 @@ export function ChatHeader({
             onRefresh={onRefreshModels}
             refreshing={refreshingModels}
           />
+          {onToggleTerminal && (
+            <button
+              type="button"
+              onClick={onToggleTerminal}
+              className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
+                terminalOpen
+                  ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
+                  : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+              }`}
+              title={terminalOpen ? 'Close terminal' : 'Open terminal'}
+              aria-label={terminalOpen ? 'Close terminal' : 'Open terminal'}
+              aria-pressed={terminalOpen}
+            >
+              <TerminalSquare className="size-4" />
+            </button>
+          )}
           {state === CHAT_STATES.UNAUTHENTICATED && (
             <button
               type="button"

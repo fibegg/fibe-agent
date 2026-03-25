@@ -31,6 +31,8 @@ import { ChatErrorBanner } from '../chat/chat-error-banner';
 import { ChatInputArea } from '../chat/chat-input-area';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
+import { TerminalPanel } from '../terminal/terminal-panel';
+import { useTerminalPanel } from '../terminal/use-terminal-panel';
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
@@ -72,6 +74,17 @@ export function ChatPage() {
 
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
+  const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
+  const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
+
+  const handlePageDirtyChange = useCallback((path: string, isDirty: boolean) => {
+    setPageDirtyPaths((prev) => {
+      const next = new Set(prev);
+      if (isDirty) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+  }, []);
 
   const { currentModel, setCurrentModel, handleModelSelect, handleModelInputChange } = useChatModel(sendRef);
 
@@ -384,7 +397,7 @@ export function ChatPage() {
 
   return (
     <div
-      className={`flex h-screen w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
+      className={`flex h-dvh w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -431,6 +444,7 @@ export function ChatPage() {
                 closeMobileSidebar();
               }}
               selectedPath={viewingFile?.path ?? null}
+              dirtyPaths={pageDirtyPaths}
             />
           </div>
         </>
@@ -484,6 +498,7 @@ export function ChatPage() {
               onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
               onFileSelect={(entry) => setViewingFile(entry)}
               selectedPath={viewingFile?.path ?? null}
+              dirtyPaths={pageDirtyPaths}
             />
           </aside>
         </div>
@@ -493,7 +508,7 @@ export function ChatPage() {
         style={{ minWidth: MAIN_CONTENT_MIN_WIDTH_PX }}
       >
         <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden w-full">
-        <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
+        <div className="relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden">
         <ChatHeader
           isMobile={isMobile}
           state={state}
@@ -518,6 +533,8 @@ export function ChatPage() {
           modelLocked={isChatModelLocked()}
           onRefreshModels={refreshModelOptions}
           refreshingModels={refreshingModels}
+          onToggleTerminal={toggleTerminal}
+          terminalOpen={terminalOpen}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
@@ -572,6 +589,7 @@ export function ChatPage() {
               onClose={() => setViewingFile(null)}
               inline
               apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
+              onDirtyChange={handlePageDirtyChange}
             />
           </div>
         )}
@@ -606,6 +624,14 @@ export function ChatPage() {
           maxPendingTotal={MAX_PENDING_TOTAL}
           queuedCount={queuedCount}
         />
+        {terminalOpen && (
+          <div
+            className="shrink-0 overflow-hidden border-t border-violet-500/20 transition-[height] duration-300 ease-out"
+            style={{ height: '280px' }}
+          >
+            <TerminalPanel onClose={closeTerminal} />
+          </div>
+        )}
         </div>
       </main>
       {!isMobile && (

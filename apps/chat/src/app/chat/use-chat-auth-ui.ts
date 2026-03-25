@@ -14,11 +14,8 @@ export function useChatAuthUI(state: string, authModal: AuthModalState) {
       showModelSelector:
         state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE,
       showAuthModal:
-        state === CHAT_STATES.AUTH_PENDING || state === CHAT_STATES.UNAUTHENTICATED,
-      authModalForModal:
-        state === CHAT_STATES.UNAUTHENTICATED
-          ? { ...authModal, isManualToken: true }
-          : authModal,
+        state === CHAT_STATES.AUTH_PENDING,
+      authModalForModal: authModal,
     }),
     [state, authModal]
   );

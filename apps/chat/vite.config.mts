@@ -76,6 +76,9 @@ export default defineConfig(() => ({
           if (id.includes('node_modules/@tanstack/react-virtual') || id.includes('node_modules/@tanstack/virtual-core')) {
             return 'vendor-virtual';
           }
+          if (id.includes('node_modules/@codemirror/') || id.includes('node_modules/@lezer/')) {
+            return 'vendor-codemirror';
+          }
           return undefined;
         },
       },
