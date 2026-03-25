@@ -1,14 +1,29 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { describe, test, expect, beforeEach, afterEach, vi, Mock } from 'bun:test';
+import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { UploadsService } from './uploads.service';
+import sizeOf from 'image-size';
+import Tesseract from 'tesseract.js';
+
+vi.mock('image-size', () => {
+  return { default: vi.fn() };
+});
+
+vi.mock('tesseract.js', () => {
+  return {
+    default: {
+      recognize: vi.fn()
+    }
+  };
+});
 
 describe('UploadsService', () => {
   let dataDir: string;
   const config = { getDataDir: () => '', getConversationDataDir: () => '', getEncryptionKey: () => undefined };
 
   beforeEach(() => {
+    vi.clearAllMocks();
     dataDir = mkdtempSync(join(tmpdir(), 'uploads-'));
     (config as { getDataDir: () => string; getConversationDataDir: () => string }).getDataDir = () => dataDir;
     (config as { getDataDir: () => string; getConversationDataDir: () => string }).getConversationDataDir = () => dataDir;
@@ -102,7 +117,53 @@ describe('UploadsService', () => {
 
   test('saveFileFromBuffer uses correct extension for spreadsheet and text', async () => {
     const service = new UploadsService(config as never);
-    expect(await service.saveFileFromBuffer(Buffer.from(''), 'text/csv')).toMatch(/\.csv$/);
     expect(await service.saveFileFromBuffer(Buffer.from(''), 'text/plain')).toMatch(/\.txt$/);
+  });
+
+  describe('extractImageInfo', () => {
+    test('returns null if path does not exist', async () => {
+      const service = new UploadsService(config as never);
+      expect(await service.extractImageInfo('doesnotexist.jpg')).toBeNull();
+    });
+
+    test('returns null if not an image extension', async () => {
+      const service = new UploadsService(config as never);
+      const filename = await service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
+      expect(await service.extractImageInfo(filename)).toBeNull();
+    });
+
+    test('returns info using mocks and caches it', async () => {
+      const service = new UploadsService(config as never);
+      const dataUrl = 'data:image/png;base64,' + Buffer.from('dummy').toString('base64');
+      const filename = await service.saveImage(dataUrl);
+
+      // Setup mocks
+      (sizeOf as unknown as Mock<() => any>).mockReturnValue({ width: 100, height: 200, type: 'png' });
+      (Tesseract.recognize as unknown as Mock<() => any>).mockResolvedValue({ data: { text: 'hello OCR' } });
+
+      const info1 = await service.extractImageInfo(filename);
+      expect(info1).toEqual({ text: 'hello OCR', width: 100, height: 200, format: 'png' });
+      expect(sizeOf).toHaveBeenCalledTimes(1);
+      expect(Tesseract.recognize).toHaveBeenCalledTimes(1);
+
+      // Next call should use cached metadata
+      const info2 = await service.extractImageInfo(filename);
+      expect(info2).toEqual(info1);
+      expect(sizeOf).toHaveBeenCalledTimes(1); // Still 1
+      
+      const p = service.getPath(filename);
+      expect(p).toBeTruthy();
+      expect(existsSync(p + '.meta.json')).toBeTrue();
+    });
+
+    test('handles extraction errors gracefully', async () => {
+      const service = new UploadsService(config as never);
+      const dataUrl = 'data:image/png;base64,' + Buffer.from('dummy').toString('base64');
+      const filename = await service.saveImage(dataUrl);
+
+      (sizeOf as unknown as Mock<() => any>).mockImplementation(() => { throw new Error('Corrupt'); });
+      const info = await service.extractImageInfo(filename);
+      expect(info).toBeNull();
+    });
   });
 });

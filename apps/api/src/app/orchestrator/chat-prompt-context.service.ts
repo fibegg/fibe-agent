@@ -17,20 +17,37 @@ export class ChatPromptContextService {
     audioFilename: string | null,
     attachmentFilenames: string[] | undefined,
   ): Promise<string> {
-    const imageContext = this.buildImageContext(imageUrls);
+    const imageContext = await this.buildImageContext(imageUrls);
     const voiceContext = this.buildVoiceContext(audioFilename);
     const attachmentContext = this.buildAttachmentContext(attachmentFilenames ?? []);
     const fileContext = await this.buildFileContext(text);
     return `${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
   }
 
-  private buildImageContext(imageUrls: string[]): string {
+  private async buildImageContext(imageUrls: string[]): Promise<string> {
     if (!imageUrls.length) return '';
-    const paths = imageUrls
-      .map((f) => this.uploadsService.getPath(f))
-      .filter((p): p is string => p !== null);
-    return paths.length
-      ? `\n\nThe user attached ${paths.length} image(s). Full paths (for reference):\n${paths.map((p) => `- ${p}`).join('\n')}\n\n`
+    const strings: string[] = [];
+    for (const f of imageUrls) {
+      const p = this.uploadsService.getPath(f);
+      if (!p) continue;
+      
+      let infoStr = `- ${p}\n`;
+      const info = await this.uploadsService.extractImageInfo(f);
+      if (info) {
+        const dimensions = (info.width && info.height) ? `${info.width}x${info.height} pixels` : '';
+        const format = info.format || '';
+        const meta = [dimensions, format].filter(Boolean).join(' ');
+        if (meta) {
+          infoStr += `  Metadata: ${meta}\n`;
+        }
+        if (info.text) {
+          infoStr += `  Extracted Text:\n  ---\n  ${info.text.split('\\n').join('\\n  ')}\n  ---\n`;
+        }
+      }
+      strings.push(infoStr);
+    }
+    return strings.length
+      ? `\\n\\nThe user attached ${strings.length} image(s). Full paths and extracted local data (for reference):\\n${strings.join('\\n')}\\n`
       : '';
   }
 

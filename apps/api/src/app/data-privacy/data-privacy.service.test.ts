@@ -50,7 +50,7 @@ describe('DataPrivacyService', () => {
   });
 
   test('deleteData clears stores and removes directory', () => {
-    const rmSyncSpy = vi.spyOn(fs, 'rmSync').mockImplementation(() => {});
+    const rmSyncSpy = vi.spyOn(fs, 'rmSync').mockImplementation(() => undefined);
     
     service.deleteData();
     // @ts-expect-error mock

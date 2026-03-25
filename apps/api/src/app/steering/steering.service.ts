@@ -73,7 +73,7 @@ export class SteeringService implements OnModuleInit, OnModuleDestroy {
       let content = '';
       try {
         content = await readFile(this.steeringPath, 'utf8');
-      } catch (e) {
+      } catch {
         // File may have been deleted externally — recreate on write
       }
 
@@ -116,7 +116,7 @@ export class SteeringService implements OnModuleInit, OnModuleDestroy {
       try {
         writeFileSync(this.steeringPath, ''); // using sync to ensure it exists before watching
         this.logger.log(`Created STEERING.md at ${this.steeringPath}`);
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -174,7 +174,7 @@ export class SteeringService implements OnModuleInit, OnModuleDestroy {
       const content = readFileSync(this.steeringPath, 'utf8');
       const matches = content.match(this.ENTRY_REGEX);
       this.updateCount(matches ? matches.length : 0);
-    } catch (e) {
+    } catch {
       // Ignore read errors gracefully
     }
   }
@@ -199,8 +199,8 @@ export class SteeringService implements OnModuleInit, OnModuleDestroy {
         mkdirSync(lockPath);
         acquired = true;
         break;
-      } catch (err: any) {
-        if (err.code === 'EEXIST') {
+      } catch (err: unknown) {
+        if (err && typeof err === 'object' && 'code' in err && err.code === 'EEXIST') {
           // On first retry, check if the lock is stale (previous process crashed)
           if (i === 0) {
             this.cleanStaleLock(lockPath);
