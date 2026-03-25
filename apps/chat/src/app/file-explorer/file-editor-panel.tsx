@@ -102,6 +102,10 @@ export function FileEditorPanel({
   const isDirty = liveContent !== null && originalContent !== null && liveContent !== originalContent;
   const lineCount = liveContent !== null ? liveContent.split('\n').length : null;
   const language = getLanguageLabel(entry.name);
+  
+  const isGitModified = entry.gitStatus === 'modified';
+  const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
+  const isGitDeleted = entry.gitStatus === 'deleted';
 
   // Notify parent of dirty state changes
   const onDirtyChangeRef = useRef(onDirtyChange);
@@ -292,12 +296,27 @@ export function FileEditorPanel({
                   >
                     {entry.name}
                   </h2>
-                  {isDirty && (
-                    <span
-                      className="size-2 rounded-full bg-amber-400 shrink-0 animate-pulse"
-                      title="Unsaved changes"
-                    />
-                  )}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {entry.gitStatus && (
+                      <span
+                        className={`text-[10px] font-bold tracking-wider ${
+                          isGitModified ? 'text-amber-500 dark:text-amber-400' :
+                          isGitAddedOrUntracked ? 'text-green-500 dark:text-green-400' :
+                          isGitDeleted ? 'text-red-500 dark:text-red-400' :
+                          'text-muted-foreground'
+                        }`}
+                        title={`Git: ${entry.gitStatus}`}
+                      >
+                        {isGitModified ? 'M' : isGitAddedOrUntracked ? 'U' : isGitDeleted ? 'D' : ''}
+                      </span>
+                    )}
+                    {isDirty && (
+                      <span
+                        className="size-2 rounded-full bg-amber-400 shrink-0 animate-pulse"
+                        title="Unsaved changes"
+                      />
+                    )}
+                  </div>
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={entry.path}>
                   {entry.path}

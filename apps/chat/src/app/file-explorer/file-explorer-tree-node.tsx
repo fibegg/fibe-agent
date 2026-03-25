@@ -41,6 +41,17 @@ export const TreeNode = memo(function TreeNode({
   const animType = animatingPaths?.get(entry.path);
   const animClass = animType === 'added' ? 'animate-file-added' : animType === 'removed' ? 'animate-file-removed' : animType === 'modified' ? 'animate-file-modified' : '';
 
+  const isGitModified = entry.gitStatus === 'modified';
+  const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
+  const isGitDeleted = entry.gitStatus === 'deleted';
+
+  let nameColorClass = isSelected ? 'text-violet-400' : 'text-foreground';
+  if (!isSelected) {
+    if (isGitModified) nameColorClass = 'text-amber-500/90 dark:text-amber-400/90';
+    else if (isGitAddedOrUntracked) nameColorClass = 'text-green-500/90 dark:text-green-400/90';
+    else if (isGitDeleted) nameColorClass = 'text-red-500/90 dark:text-red-400/90 line-through';
+  }
+
   return (
     <div className={`select-none group ${animClass}`}>
       <button
@@ -69,13 +80,30 @@ export const TreeNode = memo(function TreeNode({
         ) : (
           <FileIcon pathOrName={entry.name} />
         )}
-        <span className={`min-w-0 flex-1 truncate ${isSelected ? 'text-violet-400' : 'text-foreground'}`}>{entry.name}</span>
-        {isDirty && (
-          <span
-            className="size-1.5 rounded-full bg-amber-400 shrink-0 mr-1 animate-pulse"
-            title="Unsaved changes"
-          />
-        )}
+        <span className={`min-w-0 flex-1 truncate ${nameColorClass}`}>{entry.name}</span>
+        
+        {/* Badges container */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-1">
+          {entry.gitStatus && (
+            <span
+              className={`text-[9px] font-bold tracking-wider ${
+                isGitModified ? 'text-amber-500 dark:text-amber-400' :
+                isGitAddedOrUntracked ? 'text-green-500 dark:text-green-400' :
+                isGitDeleted ? 'text-red-500 dark:text-red-400' :
+                'text-muted-foreground'
+              }`}
+              title={`Git: ${entry.gitStatus}`}
+            >
+              {isGitModified ? 'M' : isGitAddedOrUntracked ? 'U' : isGitDeleted ? 'D' : ''}
+            </span>
+          )}
+          {isDirty && (
+            <span
+              className="size-1.5 rounded-full bg-amber-400 shrink-0 animate-pulse"
+              title="Unsaved changes"
+            />
+          )}
+        </div>
       </button>
       {isDir && hasChildren && isOpen && (
         <div>

@@ -33,7 +33,7 @@ export class ConfigService {
 
   getConversationId(): string {
     const raw =
-      process.env.PHOENIX_AGENT_ID?.trim() ??
+      process.env.FIBE_AGENT_ID?.trim() ??
       process.env.CONVERSATION_ID?.trim() ??
       'default';
     return raw || 'default';
@@ -58,20 +58,20 @@ export class ConfigService {
     return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
   }
 
-  getPhoenixApiKey(): string | undefined {
-    return process.env.PHOENIX_API_KEY;
+  getFibeApiKey(): string | undefined {
+    return process.env.FIBE_API_KEY;
   }
 
-  getPhoenixApiUrl(): string | undefined {
-    return process.env.PHOENIX_API_URL;
+  getFibeApiUrl(): string | undefined {
+    return process.env.FIBE_API_URL;
   }
 
-  getPhoenixAgentId(): string | undefined {
-    return process.env.PHOENIX_AGENT_ID;
+  getFibeAgentId(): string | undefined {
+    return process.env.FIBE_AGENT_ID;
   }
 
-  isPhoenixSyncEnabled(): boolean {
-    return process.env.PHOENIX_SYNC_ENABLED === 'true';
+  isFibeSyncEnabled(): boolean {
+    return process.env.FIBE_SYNC_ENABLED === 'true';
   }
 
   getPostInitScript(): string | undefined {

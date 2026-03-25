@@ -6,7 +6,7 @@ import { writeMcpConfig } from '../config/mcp-config-writer';
 const REFRESH_INTERVAL_MS = 50 * 60 * 1000; // 50 minutes
 
 /**
- * Periodically fetches a fresh GitHub token from the Phoenix API
+ * Periodically fetches a fresh GitHub token from the Fibe API
  * and updates the MCP config so the GitHub MCP server always has
  * a valid token. Runs every ~50 minutes (installation tokens last 1 hour).
  *
@@ -44,17 +44,17 @@ export class GithubTokenRefreshService implements OnModuleInit, OnModuleDestroy 
   }
 
   /**
-   * Fetches a fresh GitHub installation token from Phoenix API
+   * Fetches a fresh GitHub installation token from Fibe API
    * and rewrites the MCP config with the new token.
    */
   async refreshToken(): Promise<string | null> {
-    const apiUrl = this.config.getPhoenixApiUrl();
-    const apiKey = this.config.getPhoenixApiKey();
-    const agentId = this.config.getPhoenixAgentId();
+    const apiUrl = this.config.getFibeApiUrl();
+    const apiKey = this.config.getFibeApiKey();
+    const agentId = this.config.getFibeAgentId();
 
     if (!apiUrl || !apiKey || !agentId) {
       this.logger.debug(
-        'Phoenix API config missing — skipping GitHub token refresh'
+        'Fibe API config missing — skipping GitHub token refresh'
       );
       return null;
     }

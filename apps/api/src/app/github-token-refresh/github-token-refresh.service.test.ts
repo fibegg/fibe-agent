@@ -2,9 +2,9 @@ import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { GithubTokenRefreshService } from './github-token-refresh.service';
 
 const mockConfig = {
-  getPhoenixApiUrl: () => undefined as string | undefined,
-  getPhoenixApiKey: () => undefined as string | undefined,
-  getPhoenixAgentId: () => undefined as string | undefined,
+  getFibeApiUrl: () => undefined as string | undefined,
+  getFibeApiKey: () => undefined as string | undefined,
+  getFibeAgentId: () => undefined as string | undefined,
 };
 
 describe('GithubTokenRefreshService', () => {
@@ -22,19 +22,19 @@ describe('GithubTokenRefreshService', () => {
     process.env.MCP_CONFIG_JSON = envBackup.MCP_CONFIG_JSON;
   });
 
-  test('skips refresh when Phoenix config is missing', async () => {
-    mockConfig.getPhoenixApiUrl = () => undefined;
-    mockConfig.getPhoenixApiKey = () => undefined;
-    mockConfig.getPhoenixAgentId = () => undefined;
+  test('skips refresh when Fibe config is missing', async () => {
+    mockConfig.getFibeApiUrl = () => undefined;
+    mockConfig.getFibeApiKey = () => undefined;
+    mockConfig.getFibeAgentId = () => undefined;
 
     const result = await service.refreshToken();
     expect(result).toBeNull();
   });
 
   test('fetches token and updates MCP_CONFIG_JSON', async () => {
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
-    mockConfig.getPhoenixAgentId = () => '42';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'fibe_test123';
+    mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -49,7 +49,7 @@ describe('GithubTokenRefreshService', () => {
 
       expect(result).toBe('ghs_fresh_token');
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'https://phoenix.test/api/agents/42/github_token',
+        'https://fibe.test/api/agents/42/github_token',
         {
           method: 'GET',
           headers: { Authorization: 'Bearer fibe_test123' },
@@ -67,9 +67,9 @@ describe('GithubTokenRefreshService', () => {
   });
 
   test('returns null on 404 (no GitHub App installed)', async () => {
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
-    mockConfig.getPhoenixAgentId = () => '42';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'fibe_test123';
+    mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -85,9 +85,9 @@ describe('GithubTokenRefreshService', () => {
   });
 
   test('returns null on server error', async () => {
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
-    mockConfig.getPhoenixAgentId = () => '42';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'fibe_test123';
+    mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -103,9 +103,9 @@ describe('GithubTokenRefreshService', () => {
   });
 
   test('returns null on network error', async () => {
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
-    mockConfig.getPhoenixAgentId = () => '42';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'fibe_test123';
+    mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () => {
@@ -128,9 +128,9 @@ describe('GithubTokenRefreshService', () => {
       },
     });
 
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'fibe_test123';
-    mockConfig.getPhoenixAgentId = () => '42';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'fibe_test123';
+    mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -157,9 +157,9 @@ describe('GithubTokenRefreshService', () => {
   });
 
   test('onModuleInit runs initial refresh and schedules timer', async () => {
-    mockConfig.getPhoenixApiUrl = () => undefined;
-    mockConfig.getPhoenixApiKey = () => undefined;
-    mockConfig.getPhoenixAgentId = () => undefined;
+    mockConfig.getFibeApiUrl = () => undefined;
+    mockConfig.getFibeApiKey = () => undefined;
+    mockConfig.getFibeAgentId = () => undefined;
 
     await service.onModuleInit();
     // Timer should be set — calling onModuleDestroy clears it
@@ -172,9 +172,9 @@ describe('GithubTokenRefreshService', () => {
   });
 
   test('returns null when response has no token field', async () => {
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key';
-    mockConfig.getPhoenixAgentId = () => '1';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key';
+    mockConfig.getFibeAgentId = () => '1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -193,9 +193,9 @@ describe('GithubTokenRefreshService', () => {
   });
 
   test('periodic refresh calls killGithubMcpServer after initial', async () => {
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key';
-    mockConfig.getPhoenixAgentId = () => '1';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key';
+    mockConfig.getFibeAgentId = () => '1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>
@@ -219,9 +219,9 @@ describe('GithubTokenRefreshService', () => {
 
   test('handles invalid MCP_CONFIG_JSON gracefully during token update', async () => {
     process.env.MCP_CONFIG_JSON = 'invalid-json';
-    mockConfig.getPhoenixApiUrl = () => 'https://phoenix.test';
-    mockConfig.getPhoenixApiKey = () => 'key';
-    mockConfig.getPhoenixAgentId = () => '1';
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key';
+    mockConfig.getFibeAgentId = () => '1';
 
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(async () =>

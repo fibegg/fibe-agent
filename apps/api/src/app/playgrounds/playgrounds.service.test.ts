@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { NotFoundException } from '@nestjs/common';
@@ -77,6 +78,40 @@ describe('PlaygroundsService', () => {
     expect(tree[0].children?.length).toBe(1);
     expect(tree[0].children?.[0].path).toBe('sub/file.ts');
     expect(tree[0].children?.[0].name).toBe('file.ts');
+  });
+
+  test('getTree returns git status for files in a git repository', async () => {
+    // 1. Initialize a git repository in the playground directory
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@example.com"', { cwd: playgroundDir, stdio: 'ignore' });
+
+    // 2. Create some files
+    writeFileSync(join(playgroundDir, 'untracked.txt'), 'untracked');
+    writeFileSync(join(playgroundDir, 'tracked.txt'), 'tracked');
+    writeFileSync(join(playgroundDir, 'modified.txt'), 'modified');
+    
+    // 3. Mark tracked and modified as tracked by git
+    execSync('git add tracked.txt modified.txt', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git commit -m "initial commit"', { cwd: playgroundDir, stdio: 'ignore' });
+    
+    // 4. Modify 'modified.txt' so git sees it as changed
+    writeFileSync(join(playgroundDir, 'modified.txt'), 'modified-changed');
+    
+    // 5. Check tree output
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const tree = await service.getTree();
+    
+    expect(tree.length).toBeGreaterThanOrEqual(3);
+    
+    const untrackedNode = tree.find(n => n.name === 'untracked.txt');
+    const modifiedNode = tree.find(n => n.name === 'modified.txt');
+    const trackedNode = tree.find(n => n.name === 'tracked.txt');
+    
+    expect(untrackedNode?.gitStatus).toBe('untracked');
+    expect(modifiedNode?.gitStatus).toBe('modified');
+    expect(trackedNode?.gitStatus).toBeUndefined(); // clean files have no status
   });
 
   test('getTree returns empty array when directory does not exist', async () => {

@@ -2,8 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
-export class PhoenixSyncService {
-  private readonly logger = new Logger(PhoenixSyncService.name);
+export class FibeSyncService {
+  private readonly logger = new Logger(FibeSyncService.name);
   private messageSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private activitySyncTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly DEBOUNCE_MS = 500;
@@ -15,7 +15,7 @@ export class PhoenixSyncService {
     this.messageSyncTimer = setTimeout(() => {
       this.messageSyncTimer = null;
       void this.sync('messages', content);
-    }, PhoenixSyncService.DEBOUNCE_MS);
+    }, FibeSyncService.DEBOUNCE_MS);
   }
 
   async syncActivity(content: string): Promise<void> {
@@ -23,18 +23,18 @@ export class PhoenixSyncService {
     this.activitySyncTimer = setTimeout(() => {
       this.activitySyncTimer = null;
       void this.sync('activity', content);
-    }, PhoenixSyncService.DEBOUNCE_MS);
+    }, FibeSyncService.DEBOUNCE_MS);
   }
 
   private async sync(
     type: 'messages' | 'activity',
     content: string
   ): Promise<void> {
-    if (!this.config.isPhoenixSyncEnabled()) return;
+    if (!this.config.isFibeSyncEnabled()) return;
 
-    const apiUrl = this.config.getPhoenixApiUrl();
-    const apiKey = this.config.getPhoenixApiKey();
-    const agentId = this.config.getPhoenixAgentId();
+    const apiUrl = this.config.getFibeApiUrl();
+    const apiKey = this.config.getFibeApiKey();
+    const agentId = this.config.getFibeAgentId();
 
     if (!apiUrl || !apiKey || !agentId) return;
 
@@ -52,11 +52,11 @@ export class PhoenixSyncService {
 
       if (!res.ok) {
         this.logger.warn(
-          `Phoenix sync ${type} failed: ${res.status} ${res.statusText}`
+          `Fibe sync ${type} failed: ${res.status} ${res.statusText}`
         );
       }
     } catch (err) {
-      this.logger.warn(`Phoenix sync ${type} error: ${err}`);
+      this.logger.warn(`Fibe sync ${type} error: ${err}`);
     }
   }
 }
