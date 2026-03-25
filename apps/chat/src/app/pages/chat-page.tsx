@@ -1,5 +1,5 @@
-import { ChevronDown } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronDown, Loader2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type MessageListHandle } from '../chat/message-list';
@@ -18,7 +18,6 @@ import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
 import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import type { FileTab } from '../file-explorer/file-explorer-tabs';
-import { FileViewerPanel } from '../file-explorer/file-viewer-panel';
 import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
@@ -31,8 +30,10 @@ import { ChatErrorBanner } from '../chat/chat-error-banner';
 import { ChatInputArea } from '../chat/chat-input-area';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
-import { TerminalPanel } from '../terminal/terminal-panel';
 import { useTerminalPanel } from '../terminal/use-terminal-panel';
+
+const LazyFileViewerPanel = lazy(() => import('../file-explorer/file-viewer-panel').then((m) => ({ default: m.FileViewerPanel })));
+const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel })));
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
@@ -140,7 +141,7 @@ export function ChatPage() {
     if (data.type === 'model_updated' && data.model !== undefined) {
       setCurrentModel(data.model);
     }
-  }, [setCurrentModel]);
+  }, [setCurrentModel, setMessages]);
 
   const voiceRecorder = useVoiceRecorder();
 
@@ -299,7 +300,7 @@ export function ChatPage() {
 
     try {
       window.parent.postMessage({ type: 'player_message_sent' }, '*');
-    } catch (_) {
+    } catch {
       // ignore across cross-origin if parent is unavailable
     }
 
@@ -313,7 +314,7 @@ export function ChatPage() {
     setInputState({ value: '', cursor: 0 });
     if (!isQueuing) clearPending();
     scroll.markJustSent();
-  }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll, clearPending]);
+  }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll, clearPending, setInputState, setMessages]);
 
   const handleSendContinue = useCallback(() => {
     send({
@@ -326,7 +327,7 @@ export function ChatPage() {
     ]);
     setLastSentMessage('Continue');
     scroll.markJustSent();
-  }, [send, scroll]);
+  }, [send, scroll, setMessages]);
 
   const handleRetryFromError = useCallback(() => {
     dismissError();
@@ -348,7 +349,7 @@ export function ChatPage() {
         return prev.map((m) => (m.queued ? { ...m, queued: false } : m));
       });
     }
-  }, [queuedCount]);
+  }, [queuedCount, setMessages]);
 
   const uploadVoiceFile = useCallback(
     async (blob: Blob): Promise<string | null> => {
@@ -384,7 +385,7 @@ export function ChatPage() {
     } else {
       await voiceRecorder.startRecording();
     }
-  }, [voiceRecorder, uploadVoiceFile]);
+  }, [voiceRecorder, uploadVoiceFile, setInputState, setPendingVoice, setVoiceUploadError, setPendingVoiceFilename]);
 
   const { statusClass, showModelSelector, showAuthModal, authModalForModal } = useChatAuthUI(
     state,
@@ -578,20 +579,27 @@ export function ChatPage() {
           )}
         </div>
         {viewingFile && (
-          <div
-            className="absolute inset-0 z-10 flex flex-col min-h-0 bg-background"
-            role="dialog"
-            aria-modal="true"
-            aria-label="File viewer"
-          >
-            <FileViewerPanel
-              entry={viewingFile}
-              onClose={() => setViewingFile(null)}
-              inline
-              apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
-              onDirtyChange={handlePageDirtyChange}
-            />
-          </div>
+          <Suspense fallback={
+            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background rounded-xl border border-border">
+              <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
+              <span className="text-sm text-muted-foreground">Loading editor…</span>
+            </div>
+          }>
+            <div
+              className="absolute inset-0 z-10 flex flex-col min-h-0 bg-background"
+              role="dialog"
+              aria-modal="true"
+              aria-label="File viewer"
+            >
+              <LazyFileViewerPanel
+                entry={viewingFile}
+                onClose={() => setViewingFile(null)}
+                inline
+                apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
+                onDirtyChange={handlePageDirtyChange}
+              />
+            </div>
+          </Suspense>
         )}
         </div>
         <ChatInputArea
@@ -625,12 +633,19 @@ export function ChatPage() {
           queuedCount={queuedCount}
         />
         {terminalOpen && (
-          <div
-            className="shrink-0 overflow-hidden border-t border-violet-500/20 transition-[height] duration-300 ease-out"
-            style={{ height: '280px' }}
-          >
-            <TerminalPanel onClose={closeTerminal} />
-          </div>
+          <Suspense fallback={
+            <div className="shrink-0 flex items-center justify-center border-t border-violet-500/20 bg-background" style={{ height: '280px' }}>
+              <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
+              <span className="text-sm text-muted-foreground">Starting terminal…</span>
+            </div>
+          }>
+            <div
+              className="shrink-0 overflow-hidden border-t border-violet-500/20 transition-[height] duration-300 ease-out"
+              style={{ height: '280px' }}
+            >
+              <LazyTerminalPanel onClose={closeTerminal} />
+            </div>
+          </Suspense>
         )}
         </div>
       </main>

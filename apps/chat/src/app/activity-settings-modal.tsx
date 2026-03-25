@@ -2,7 +2,7 @@ import { X } from 'lucide-react';
 import { ThemeToggle } from './theme-toggle';
 import { shouldHideThemeSwitch } from './embed-config';
 import { MODAL_CARD, MODAL_OVERLAY_DARK, SETTINGS_CLOSE_BUTTON } from './ui-classes';
-import { ActivityTypeFilters } from './activity-review-panel';
+import { ActivityTypeFilters } from './activity-type-filters';
 
 export interface ActivitySettingsModalProps {
   open: boolean;
