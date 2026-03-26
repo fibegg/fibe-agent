@@ -25,7 +25,7 @@ import { ChatRightPanel } from './chat-right-panel';
 import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
-import { MAIN_CONTENT_MIN_WIDTH_PX } from '../layout-constants';
+import { ChatLayout } from './chat-layout';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 
 import { getActivityPath } from '../activity-path';
@@ -381,106 +381,127 @@ export function ChatPage() {
   }
 
   return (
-    <div
-      className={`flex h-dvh w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
+    <ChatLayout
+      isDragOver={isDragOver}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      dragOverlay={<DragDropOverlay />}
+      modals={
+        <>
+          <AuthModal
+            open={showAuthModal}
+            authModal={authModalForModal}
+            onClose={cancelAuth}
+            onSubmitCode={(code) => {
+              if (state === CHAT_STATES.UNAUTHENTICATED) send({ action: 'initiate_auth' });
+              submitAuthCode(code);
+            }}
+          />
+          <ChatSettingsModal
+            open={settingsOpen}
+            onClose={closeSettings}
+            state={state}
+            onStartAuth={startAuth}
+            onReauthenticate={reauthenticate}
+            onLogout={logout}
+          />
+        </>
+      }
+      mobileSidebar={
+        isMobile && sidebarOpen ? (
+          <>
+            <div
+              className={`${MODAL_OVERLAY_DARK} lg:hidden`}
+              aria-hidden
+              onClick={closeMobileSidebar}
+            />
+            <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20`}>
+              <FileExplorer
+                tree={playgroundTree}
+                agentTree={agentFileTree as PlaygroundEntry[]}
+                activeTab={activeFileTab}
+                onTabChange={setActiveFileTab}
+                agentFileApiPath="agent-files/file"
+                playgroundStats={playgroundStats}
+                agentStats={agentStats}
+                onSettingsClick={() => setSettingsOpen(true)}
+                onClose={closeMobileSidebar}
+                onFileSelect={(entry) => {
+                  setViewingFile(entry);
+                  closeMobileSidebar();
+                }}
+                selectedPath={viewingFile?.path ?? null}
+                dirtyPaths={pageDirtyPaths}
+              />
+            </div>
+          </>
+        ) : null
+      }
+      mobileActivity={
+        isMobile && rightSidebarOpen ? (
+          <>
+            <div
+              className={`${MODAL_OVERLAY_DARK} lg:hidden`}
+              aria-hidden
+              onClick={() => setRightSidebarOpen(false)}
+            />
+            <div className={`${MOBILE_SHEET_PANEL} right-0 bg-background border-l border-violet-500/20`}>
+              <AgentThinkingSidebar
+                isCollapsed={false}
+                onToggle={() => setRightSidebarOpen(false)}
+                isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+                reasoningText={reasoningText}
+                streamingResponseText={streamingText}
+                thinkingSteps={thinkingSteps}
+                storyItems={displayStory}
+                sessionActivity={sessionActivity}
+                pastActivityFromMessages={pastActivityFromMessages}
+                sessionTokenUsage={sessionTokenUsage}
+                mobileOverlay
+                onActivityClick={(payload) => navigate(getActivityPath(payload))}
+              />
+            </div>
+          </>
+        ) : null
+      }
+      leftPanel={
+        !isMobile ? (
+          <ChatLeftPanel
+            hasAnyFiles={hasAnyFiles}
+            sidebarCollapsed={sidebarCollapsed}
+            playgroundTree={playgroundTree}
+            agentFileTree={agentFileTree as PlaygroundEntry[]}
+            activeFileTab={activeFileTab}
+            onTabChange={setActiveFileTab}
+            playgroundStats={playgroundStats}
+            agentStats={agentStats}
+            onSettingsClick={() => setSettingsOpen(true)}
+            onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+            onFileSelect={(entry) => setViewingFile(entry)}
+            selectedPath={viewingFile?.path ?? null}
+            dirtyPaths={pageDirtyPaths}
+          />
+        ) : null
+      }
+      rightPanel={
+        !isMobile ? (
+          <ChatRightPanel
+            rightSidebarCollapsed={rightSidebarCollapsed}
+            onToggle={() => setRightSidebarCollapsed((v) => !v)}
+            isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+            reasoningText={reasoningText}
+            streamingResponseText={streamingText}
+            thinkingSteps={thinkingSteps}
+            storyItems={displayStory}
+            sessionActivity={sessionActivity}
+            pastActivityFromMessages={pastActivityFromMessages}
+            sessionTokenUsage={sessionTokenUsage}
+          />
+        ) : null
+      }
     >
-      {isDragOver && <DragDropOverlay />}
-      <AuthModal
-        open={showAuthModal}
-        authModal={authModalForModal}
-        onClose={cancelAuth}
-        onSubmitCode={(code) => {
-          if (state === CHAT_STATES.UNAUTHENTICATED) send({ action: 'initiate_auth' });
-          submitAuthCode(code);
-        }}
-      />
-      <ChatSettingsModal
-        open={settingsOpen}
-        onClose={closeSettings}
-        state={state}
-        onStartAuth={startAuth}
-        onReauthenticate={reauthenticate}
-        onLogout={logout}
-      />
-      {isMobile && sidebarOpen && (
-        <>
-          <div
-            className={`${MODAL_OVERLAY_DARK} lg:hidden`}
-            aria-hidden
-            onClick={closeMobileSidebar}
-          />
-          <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20`}>
-            <FileExplorer
-              tree={playgroundTree}
-              agentTree={agentFileTree as PlaygroundEntry[]}
-              activeTab={activeFileTab}
-              onTabChange={setActiveFileTab}
-              agentFileApiPath="agent-files/file"
-              playgroundStats={playgroundStats}
-              agentStats={agentStats}
-              onSettingsClick={() => setSettingsOpen(true)}
-              onClose={closeMobileSidebar}
-              onFileSelect={(entry) => {
-                setViewingFile(entry);
-                closeMobileSidebar();
-              }}
-              selectedPath={viewingFile?.path ?? null}
-              dirtyPaths={pageDirtyPaths}
-            />
-          </div>
-        </>
-      )}
-      {isMobile && rightSidebarOpen && (
-        <>
-          <div
-            className={`${MODAL_OVERLAY_DARK} lg:hidden`}
-            aria-hidden
-            onClick={() => setRightSidebarOpen(false)}
-          />
-          <div className={`${MOBILE_SHEET_PANEL} right-0 bg-background border-l border-violet-500/20`}>
-            <AgentThinkingSidebar
-              isCollapsed={false}
-              onToggle={() => setRightSidebarOpen(false)}
-              isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-              reasoningText={reasoningText}
-              streamingResponseText={streamingText}
-              thinkingSteps={thinkingSteps}
-              storyItems={displayStory}
-              sessionActivity={sessionActivity}
-              pastActivityFromMessages={pastActivityFromMessages}
-              sessionTokenUsage={sessionTokenUsage}
-              mobileOverlay
-              onActivityClick={(payload) => navigate(getActivityPath(payload))}
-            />
-          </div>
-        </>
-      )}
-      {!isMobile && (
-        <ChatLeftPanel
-          hasAnyFiles={hasAnyFiles}
-          sidebarCollapsed={sidebarCollapsed}
-          playgroundTree={playgroundTree}
-          agentFileTree={agentFileTree as PlaygroundEntry[]}
-          activeFileTab={activeFileTab}
-          onTabChange={setActiveFileTab}
-          playgroundStats={playgroundStats}
-          agentStats={agentStats}
-          onSettingsClick={() => setSettingsOpen(true)}
-          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-          onFileSelect={(entry) => setViewingFile(entry)}
-          selectedPath={viewingFile?.path ?? null}
-          dirtyPaths={pageDirtyPaths}
-        />
-      )}
-      <main
-        className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
-        style={{ minWidth: MAIN_CONTENT_MIN_WIDTH_PX }}
-      >
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden w-full">
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden">
         <ChatHeader
           isMobile={isMobile}
@@ -577,7 +598,7 @@ export function ChatPage() {
               aria-label="File viewer"
             >
               <LazyFileViewerPanel
-                entry={viewingFile}
+                entry={viewingFile!}
                 onClose={() => setViewingFile(null)}
                 inline
                 apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
@@ -632,23 +653,7 @@ export function ChatPage() {
             </div>
           </Suspense>
         )}
-        </div>
-      </main>
-      {!isMobile && (
-        <ChatRightPanel
-          rightSidebarCollapsed={rightSidebarCollapsed}
-          onToggle={() => setRightSidebarCollapsed((v) => !v)}
-          isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-          reasoningText={reasoningText}
-          streamingResponseText={streamingText}
-          thinkingSteps={thinkingSteps}
-          storyItems={displayStory}
-          sessionActivity={sessionActivity}
-          pastActivityFromMessages={pastActivityFromMessages}
-          sessionTokenUsage={sessionTokenUsage}
-        />
-      )}
-    </div>
+    </ChatLayout>
   );
 }
 
