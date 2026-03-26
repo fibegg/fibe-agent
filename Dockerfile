@@ -103,6 +103,7 @@ COPY --from=builder /app/apps/chat/dist ./chat/
 COPY apps/api/package.json ./package.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
+    npm rebuild node-pty && \
     npm install -g mcp-remote
 
 # @playwright/mcp – globally install so the agent can use it without npx download.
