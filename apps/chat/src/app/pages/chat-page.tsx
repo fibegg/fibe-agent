@@ -19,11 +19,14 @@ import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
 import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import type { FileTab } from '../file-explorer/file-explorer-tabs';
+import { ChatLeftPanel } from './chat-left-panel';
+import { ChatRightPanel } from './chat-right-panel';
 import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
-import { MAIN_CONTENT_MIN_WIDTH_PX, SIDEBAR_COLLAPSED_WIDTH_PX, SIDEBAR_WIDTH_PX } from '../layout-constants';
+import { MAIN_CONTENT_MIN_WIDTH_PX } from '../layout-constants';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
+
 import { getActivityPath } from '../activity-path';
 import { ChatSettingsModal } from '../chat/chat-settings-modal';
 import { ChatHeader } from '../chat/chat-header';
@@ -478,33 +481,21 @@ export function ChatPage() {
         </>
       )}
       {!isMobile && (
-        <div
-          className="flex min-h-0 flex-shrink-0 flex-col overflow-visible transition-[width] duration-300 ease-out"
-          style={{
-            width:
-              !hasAnyFiles || sidebarCollapsed
-                ? SIDEBAR_COLLAPSED_WIDTH_PX
-                : SIDEBAR_WIDTH_PX,
-          }}
-        >
-          <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
-            <FileExplorer
-              tree={playgroundTree}
-              agentTree={agentFileTree as PlaygroundEntry[]}
-              activeTab={activeFileTab}
-              onTabChange={setActiveFileTab}
-              agentFileApiPath="agent-files/file"
-              playgroundStats={playgroundStats}
-              agentStats={agentStats}
-              collapsed={!hasAnyFiles || sidebarCollapsed}
-              onSettingsClick={() => setSettingsOpen(true)}
-              onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
-              onFileSelect={(entry) => setViewingFile(entry)}
-              selectedPath={viewingFile?.path ?? null}
-              dirtyPaths={pageDirtyPaths}
-            />
-          </aside>
-        </div>
+        <ChatLeftPanel
+          hasAnyFiles={hasAnyFiles}
+          sidebarCollapsed={sidebarCollapsed}
+          playgroundTree={playgroundTree}
+          agentFileTree={agentFileTree as PlaygroundEntry[]}
+          activeFileTab={activeFileTab}
+          onTabChange={setActiveFileTab}
+          playgroundStats={playgroundStats}
+          agentStats={agentStats}
+          onSettingsClick={() => setSettingsOpen(true)}
+          onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+          onFileSelect={(entry) => setViewingFile(entry)}
+          selectedPath={viewingFile?.path ?? null}
+          dirtyPaths={pageDirtyPaths}
+        />
       )}
       <main
         className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
@@ -665,8 +656,8 @@ export function ChatPage() {
         </div>
       </main>
       {!isMobile && (
-        <AgentThinkingSidebar
-          isCollapsed={rightSidebarCollapsed}
+        <ChatRightPanel
+          rightSidebarCollapsed={rightSidebarCollapsed}
           onToggle={() => setRightSidebarCollapsed((v) => !v)}
           isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
           reasoningText={reasoningText}
@@ -676,7 +667,6 @@ export function ChatPage() {
           sessionActivity={sessionActivity}
           pastActivityFromMessages={pastActivityFromMessages}
           sessionTokenUsage={sessionTokenUsage}
-          onActivityClick={(payload) => navigate(getActivityPath(payload))}
         />
       )}
     </div>
