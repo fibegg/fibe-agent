@@ -323,13 +323,20 @@ export const CommandGroupBlock = memo(function CommandGroupBlock({
   );
   const firstEntryId = entries[0]?.id;
   return isClickable && activityId && onActivityClick ? (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={() => onActivityClick({ activityId, storyId: firstEntryId })}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onActivityClick({ activityId, storyId: firstEntryId });
+        }
+      }}
       className="w-full text-left cursor-pointer hover:ring-2 hover:ring-amber-500/30 rounded-lg transition-shadow focus:outline-none focus:ring-2 focus:ring-amber-500/30"
     >
       {content}
-    </button>
+    </div>
   ) : (
     content
   );
