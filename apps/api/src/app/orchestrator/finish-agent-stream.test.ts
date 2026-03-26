@@ -37,7 +37,7 @@ describe('finishAgentStream', () => {
         getById: (id: string) => activityById[id] ?? null,
       } as never,
       fibeSync: {
-        syncMessages: async (s: string) => { syncedMessages.push(s); },
+        syncMessages: (getContent: () => string) => { syncedMessages.push(getContent()); },
       } as never,
       send: (type, data) => sent.push({ type, data }),
       getCurrentActivityId: () => currentActivityId,

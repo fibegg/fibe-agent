@@ -45,11 +45,11 @@ describe('OrchestratorService', () => {
     const strategyRegistry = new StrategyRegistryService(config as never);
     const uploadsService = new UploadsService(config as never);
     const fibeSync = {
-      syncMessages: async (payload: string) => {
-        void payload;
+      syncMessages: (getContent: () => string) => {
+        void getContent();
       },
-      syncActivity: async (payload: string) => {
-        void payload;
+      syncActivity: (getContent: () => string) => {
+        void getContent();
       },
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
     const chatPromptContext = {

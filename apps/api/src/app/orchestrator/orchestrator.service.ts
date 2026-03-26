@@ -428,7 +428,7 @@ export class OrchestratorService implements OnModuleInit {
     await this.steering.enqueue(text);
     const userMessage = this.messageStore.add('user', text);
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
-    void this.fibeSync.syncMessages(JSON.stringify(this.messageStore.all()));
+    void this.fibeSync.syncMessages(() => JSON.stringify(this.messageStore.all()));
   }
 
   private createAuthConnection(): AuthConnection {
@@ -477,10 +477,10 @@ export class OrchestratorService implements OnModuleInit {
       const entry = this.activityStore.append(story);
       this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
     }
-    void this.fibeSync.syncMessages(
+    void this.fibeSync.syncMessages(() =>
       JSON.stringify(this.messageStore.all())
     );
-    void this.fibeSync.syncActivity(
+    void this.fibeSync.syncActivity(() =>
       JSON.stringify(this.activityStore.all())
     );
   }

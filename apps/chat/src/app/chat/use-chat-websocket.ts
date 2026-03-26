@@ -55,7 +55,7 @@ export function useChatWebSocket(
   onMessage?: (data: ServerMessage) => void,
   onStreamChunk?: (text: string) => void,
   onStreamStart?: (data?: { model?: string }) => void,
-  onStreamEnd?: (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
+  onStreamEnd?: (usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void
 ): UseChatWebSocketResult {
@@ -80,7 +80,6 @@ export function useChatWebSocket(
   onStreamStartRef.current = onStreamStart;
   onStreamEndRef.current = onStreamEnd;
   onPlaygroundChangedRef.current = onPlaygroundChanged;
-  const streamingAccumulatorRef = useRef('');
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -173,7 +172,7 @@ export function useChatWebSocket(
         clearResponseTimer();
         setErrorMessage(d.message ?? 'An unexpected error occurred');
         setState(CHAT_STATES.ERROR);
-        onStreamEndRef.current?.('');
+        onStreamEndRef.current?.();
       },
       message: (d) => {
         clearResponseTimer();
@@ -183,13 +182,11 @@ export function useChatWebSocket(
       stream_start: (d) => {
         setState(CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
-        streamingAccumulatorRef.current = '';
         onStreamStartRef.current?.({ model: d.model });
         thinkingRef.current?.onStreamStartData?.({ model: d.model });
       },
       stream_chunk: (d) => {
         const chunk = d.text ?? '';
-        streamingAccumulatorRef.current += chunk;
         onStreamChunkRef.current?.(chunk);
       },
       stream_end: (d) => {
@@ -198,8 +195,7 @@ export function useChatWebSocket(
           d.usage && typeof d.usage.inputTokens === 'number' && typeof d.usage.outputTokens === 'number'
             ? { inputTokens: d.usage.inputTokens, outputTokens: d.usage.outputTokens }
             : undefined;
-        onStreamEndRef.current?.(streamingAccumulatorRef.current, usage, typeof d.model === 'string' ? d.model : undefined);
-        streamingAccumulatorRef.current = '';
+        onStreamEndRef.current?.(usage, typeof d.model === 'string' ? d.model : undefined);
         setState(CHAT_STATES.AUTHENTICATED);
       },
       reasoning_start: () => thinkingRef.current?.onReasoningStart?.(),
