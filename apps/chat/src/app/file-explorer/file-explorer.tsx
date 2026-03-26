@@ -20,6 +20,7 @@ import {
 import { TreeNode } from './file-explorer-tree-node';
 import type { PlaygroundEntry } from './file-explorer-types';
 import {
+  flattenTree,
   diffTrees,
   filterTreeByQuery,
   findEntryByPath,
@@ -27,6 +28,7 @@ import {
   mergeAnimatingRemoved,
   type FileAnimationType,
 } from './file-explorer-tree-utils';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { FileDetailsDialog } from './file-viewer-panel';
 import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-tabs';
 
@@ -244,6 +246,16 @@ export function FileExplorer({
   }, [tree, animatingPaths, animatingPrev]);
 
   const filteredTree = useMemo(() => filterTreeByQuery(displayTree, searchQuery), [displayTree, searchQuery]);
+  const flatTree = useMemo(() => flattenTree(filteredTree, expanded), [filteredTree, expanded]);
+  
+  const parentRef = useRef<HTMLDivElement>(null);
+  const virtualizer = useVirtualizer({
+    count: flatTree.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 28, // 28px height per TreeNode
+    overscan: 10,
+  });
+
   const openFileEntry =
     !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
 
@@ -321,50 +333,76 @@ export function FileExplorer({
           )}
         </div>
       </div>
-      <div className="flex-1 overflow-auto py-2">
+      <div className="flex-1 min-h-0 flex flex-col pt-2">
         {showTabs && onTabChange && (
-          <FileExplorerTabs
-            activeTab={effectiveTab}
-            onTabChange={onTabChange}
-            playgroundStats={playgroundStats}
-            agentStats={agentStats}
-          />
-        )}
-        {loadingState && tree.length === 0 && (
-          <div className="px-3 py-2 text-xs text-muted-foreground">
-            Loading…
+          <div className="shrink-0 mb-2">
+            <FileExplorerTabs
+              activeTab={effectiveTab}
+              onTabChange={onTabChange}
+              playgroundStats={playgroundStats}
+              agentStats={agentStats}
+            />
           </div>
         )}
-        {error && (
-          <div className="px-3 py-2 text-xs text-destructive">{error}</div>
-        )}
-        {!loadingState && !error && tree.length === 0 && (
-          <div className="px-3 py-4 text-sm text-muted-foreground">
-            {EMPTY_PLAYGROUND_MESSAGE}
-          </div>
-        )}
-        {!error && tree.length > 0 && filteredTree.length === 0 && (
-          <div className="px-3 py-2 text-xs text-muted-foreground">
-            No matches for &quot;{searchQuery}&quot;
-          </div>
-        )}
-        {!error && filteredTree.length > 0 && (
-          <div className="p-2 animate-file-explorer-in">
-            {filteredTree.map((entry) => (
-              <TreeNode
-                key={entry.path}
-                entry={entry}
-                depth={0}
-                expanded={expanded}
-                onToggle={handleToggle}
-                onFileClick={handleFileClick}
-                selectedPath={selectedPathProp ?? openFileEntry?.path ?? null}
-                animatingPaths={animatingPaths}
-                dirtyPaths={effectiveDirtyPaths}
-              />
-            ))}
-          </div>
-        )}
+        <div className="flex-1 overflow-auto pb-2" ref={parentRef}>
+          {loadingState && tree.length === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              Loading…
+            </div>
+          )}
+          {error && (
+            <div className="px-3 py-2 text-xs text-destructive">{error}</div>
+          )}
+          {!loadingState && !error && tree.length === 0 && (
+            <div className="px-3 py-4 text-sm text-muted-foreground">
+              {EMPTY_PLAYGROUND_MESSAGE}
+            </div>
+          )}
+          {!error && tree.length > 0 && filteredTree.length === 0 && (
+            <div className="px-3 py-2 text-xs text-muted-foreground">
+              No matches for &quot;{searchQuery}&quot;
+            </div>
+          )}
+          {!error && filteredTree.length > 0 && (
+            <div className="p-2 animate-file-explorer-in">
+              <div
+                style={{
+                  height: `${virtualizer.getTotalSize()}px`,
+                  width: '100%',
+                  position: 'relative',
+                }}
+              >
+                {virtualizer.getVirtualItems().map((virtualItem) => {
+                  const { entry, depth } = flatTree[virtualItem.index];
+                  return (
+                    <div
+                      key={entry.path}
+                      style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: `${virtualItem.size}px`,
+                        transform: `translateY(${virtualItem.start}px)`,
+                      }}
+                    >
+                      <TreeNode
+                        entry={entry}
+                        depth={depth}
+                        isExpanded={expanded.has(entry.path)}
+                        isSelected={selectedPathProp !== undefined ? selectedPathProp === entry.path : openFileEntry?.path === entry.path}
+                        isDirty={effectiveDirtyPaths?.has(entry.path) ?? false}
+                        animType={animatingPaths.get(entry.path)}
+                        onToggle={handleToggle}
+                        onFileClick={handleFileClick}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

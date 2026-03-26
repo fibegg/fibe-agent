@@ -123,3 +123,23 @@ export function mergeAnimatingRemoved(
 
   return mergeLevel(prev, next);
 }
+
+export interface FlatTreeNode {
+  entry: PlaygroundEntry;
+  depth: number;
+}
+
+export function flattenTree(
+  entries: PlaygroundEntry[],
+  expanded: Set<string>,
+  depth = 0
+): FlatTreeNode[] {
+  const result: FlatTreeNode[] = [];
+  for (const entry of entries) {
+    result.push({ entry, depth });
+    if (entry.type === 'directory' && entry.children && expanded.has(entry.path)) {
+      result.push(...flattenTree(entry.children, expanded, depth + 1));
+    }
+  }
+  return result;
+}
