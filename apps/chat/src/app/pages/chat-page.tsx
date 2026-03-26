@@ -151,10 +151,10 @@ export function ChatPage() {
   const voiceRecorder = useVoiceRecorder();
 
   const streamBufferRef = useRef('');
-  const rafIdRef = useRef<number | null>(null);
+  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const flushStreamBuffer = useCallback(() => {
-    rafIdRef.current = null;
+    timeoutIdRef.current = null;
     const buffered = streamBufferRef.current;
     if (buffered) {
       streamBufferRef.current = '';
@@ -163,7 +163,7 @@ export function ChatPage() {
   }, []);
 
   useEffect(() => () => {
-    if (rafIdRef.current !== null) cancelAnimationFrame(rafIdRef.current);
+    if (timeoutIdRef.current !== null) clearTimeout(timeoutIdRef.current);
   }, []);
 
   const {
@@ -185,15 +185,15 @@ export function ChatPage() {
     handleMessage,
     (chunk) => {
       streamBufferRef.current += chunk;
-      if (rafIdRef.current === null) {
-        rafIdRef.current = requestAnimationFrame(flushStreamBuffer);
+      if (timeoutIdRef.current === null) {
+        timeoutIdRef.current = setTimeout(flushStreamBuffer, 60);
       }
     },
     (data) => {
       // Flush any pending buffer before resetting
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-        rafIdRef.current = null;
+      if (timeoutIdRef.current !== null) {
+        clearTimeout(timeoutIdRef.current);
+        timeoutIdRef.current = null;
       }
       streamBufferRef.current = '';
       setStreamingText('');
