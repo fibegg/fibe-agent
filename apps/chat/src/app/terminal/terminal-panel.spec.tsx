@@ -8,7 +8,7 @@ const mockWrite    = vi.fn();
 const mockDispose  = vi.fn();
 const mockOpen     = vi.fn();
 const mockLoadAddon = vi.fn();
-const mockOnData   = vi.fn() as ReturnType<typeof vi.fn> & ((cb: (data: string) => void) => void);
+const mockOnData   = vi.fn().mockReturnValue({ dispose: vi.fn() }) as ReturnType<typeof vi.fn> & ((cb: (data: string) => void) => { dispose: () => void });
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
