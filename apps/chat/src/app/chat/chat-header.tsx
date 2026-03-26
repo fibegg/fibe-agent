@@ -1,5 +1,7 @@
 import { Brain, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
 import { ModelSelector } from './model-selector';
+import { PlaygroundSelector } from './playground-selector';
+import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES } from './chat-state';
 import { STATE_LABELS, truncateError } from './chat-state';
 import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
@@ -32,6 +34,20 @@ export interface ChatHeaderProps {
   refreshingModels?: boolean;
   onToggleTerminal?: () => void;
   terminalOpen?: boolean;
+  // Playground selector
+  playgroundEntries?: BrowseEntry[];
+  playgroundLoading?: boolean;
+  playgroundError?: string | null;
+  playgroundCurrentLink?: string | null;
+  playgroundLinking?: boolean;
+  playgroundCanGoBack?: boolean;
+  playgroundBreadcrumbs?: string[];
+  onPlaygroundOpen?: () => void;
+  onPlaygroundBrowse?: (path: string) => void;
+  onPlaygroundGoBack?: () => void;
+  onPlaygroundGoToRoot?: () => void;
+  onPlaygroundLink?: (path: string) => Promise<boolean>;
+  onPlaygroundLinked?: () => void;
 }
 
 export function ChatHeader({
@@ -60,6 +76,19 @@ export function ChatHeader({
   refreshingModels,
   onToggleTerminal,
   terminalOpen = false,
+  playgroundEntries = [],
+  playgroundLoading = false,
+  playgroundError = null,
+  playgroundCurrentLink = null,
+  playgroundLinking = false,
+  playgroundCanGoBack = false,
+  playgroundBreadcrumbs = [],
+  onPlaygroundOpen,
+  onPlaygroundBrowse,
+  onPlaygroundGoBack,
+  onPlaygroundGoToRoot,
+  onPlaygroundLink,
+  onPlaygroundLinked,
 }: ChatHeaderProps) {
   return (
     <header
@@ -191,6 +220,23 @@ export function ChatHeader({
             onRefresh={onRefreshModels}
             refreshing={refreshingModels}
           />
+          {onPlaygroundOpen && onPlaygroundBrowse && onPlaygroundGoBack && onPlaygroundGoToRoot && onPlaygroundLink && (
+            <PlaygroundSelector
+              entries={playgroundEntries}
+              loading={playgroundLoading}
+              error={playgroundError}
+              currentLink={playgroundCurrentLink}
+              linking={playgroundLinking}
+              canGoBack={playgroundCanGoBack}
+              breadcrumbs={playgroundBreadcrumbs}
+              onOpen={onPlaygroundOpen}
+              onBrowse={onPlaygroundBrowse}
+              onGoBack={onPlaygroundGoBack}
+              onGoToRoot={onPlaygroundGoToRoot}
+              onLink={onPlaygroundLink}
+              onLinked={onPlaygroundLinked}
+            />
+          )}
           {onToggleTerminal && (
             <button
               type="button"
