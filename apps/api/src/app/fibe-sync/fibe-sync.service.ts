@@ -10,7 +10,7 @@ export class FibeSyncService {
 
   constructor(private readonly config: ConfigService) {}
 
-  async syncMessages(content: string): Promise<void> {
+  syncMessages(content: string): void {
     if (this.messageSyncTimer) clearTimeout(this.messageSyncTimer);
     this.messageSyncTimer = setTimeout(() => {
       this.messageSyncTimer = null;
@@ -18,7 +18,7 @@ export class FibeSyncService {
     }, FibeSyncService.DEBOUNCE_MS);
   }
 
-  async syncActivity(content: string): Promise<void> {
+  syncActivity(content: string): void {
     if (this.activitySyncTimer) clearTimeout(this.activitySyncTimer);
     this.activitySyncTimer = setTimeout(() => {
       this.activitySyncTimer = null;
