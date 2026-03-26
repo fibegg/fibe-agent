@@ -80,7 +80,7 @@ describe('useAgentFiles', () => {
     expect(result.current.loading).toBe(false);
   });
 
-  it('sets error and clears tree on network failure', async () => {
+  it('sets error and leaves tree empty on initial network failure', async () => {
     mockApiRequest.mockRejectedValue(new Error('Network error'));
 
     const { result } = renderHook(() => useAgentFiles());
@@ -89,6 +89,24 @@ describe('useAgentFiles', () => {
     expect(result.current.error).toBe('Network error');
     expect(result.current.tree).toEqual([]);
     expect(result.current.loading).toBe(false);
+  });
+
+  it('does not clear existing tree on network failure', async () => {
+    const fakeTree = [{ name: 'file.ts', path: 'file.ts', type: 'file' as const }];
+    mockApiRequest.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fakeTree });
+
+    const { result } = renderHook(() => useAgentFiles());
+    await flushAll();
+
+    expect(result.current.tree).toEqual(fakeTree);
+
+    mockApiRequest.mockRejectedValueOnce(new Error('Network error'));
+    await act(async () => {
+      await result.current.refetch();
+    });
+
+    expect(result.current.error).toBe('Network error');
+    expect(result.current.tree).toEqual(fakeTree);
   });
 
   it('sets error message for non-Error throws', async () => {
