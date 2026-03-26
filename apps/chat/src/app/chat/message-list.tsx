@@ -34,7 +34,14 @@ import {
 import { renderMarkdown } from './markdown-cache';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
 
-const prismLoaderPromise = import('../file-explorer/prism-loader');
+let prismLoaderPromise: Promise<typeof import('../file-explorer/prism-loader')> | null = null;
+
+function getPrismLoader() {
+  if (!prismLoaderPromise) {
+    prismLoaderPromise = import('../file-explorer/prism-loader');
+  }
+  return prismLoaderPromise;
+}
 
 const PRISM_LANG_LABEL: Record<string, string> = {
   none: 'Plain text',
@@ -74,7 +81,7 @@ function annotateChatCodeBlockLabels(root: HTMLElement): void {
 }
 
 function schedulePrismHighlightForRoot(root: HTMLElement, shouldAbort: () => boolean): void {
-  prismLoaderPromise.then((m) => {
+  getPrismLoader().then((m) => {
     if (shouldAbort() || !root.isConnected) return;
     for (const el of root.querySelectorAll('pre code')) {
       if (shouldAbort() || !root.isConnected) return;

@@ -5,9 +5,12 @@ marked.setOptions({ gfm: true, breaks: true });
 const MAX_CACHE_SIZE = 200;
 
 function escapeHtml(str: string): string {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 const cache = new Map<string, string>();
@@ -19,7 +22,7 @@ function evictOldest(): void {
 
 export function renderMarkdown(text: string): string {
   if (cache.has(text)) {
-    return cache.get(text)!;
+    return cache.get(text) ?? '';
   }
   try {
     const out = marked.parse(text);
