@@ -18,11 +18,7 @@ import {
 import type { ThinkingStep } from './thinking-types';
 import type { ToolOrFileEvent } from './thinking-types';
 
-export interface AuthModalState {
-  authUrl: string | null;
-  deviceCode: string | null;
-  isManualToken: boolean;
-}
+import { useChatAuth, type AuthModalState } from './use-chat-auth';
 
 export interface UseChatWebSocketResult {
   state: ChatState;
@@ -66,11 +62,6 @@ export function useChatWebSocket(
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [authModal, setAuthModal] = useState<AuthModalState>({
-    authUrl: null,
-    deviceCode: null,
-    isManualToken: false,
-  });
   const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
   const [queuedCount, setQueuedCount] = useState(0);
 
@@ -105,7 +96,6 @@ export function useChatWebSocket(
       setState(CHAT_STATES.ERROR);
     }, RESPONSE_TIMEOUT_MS);
   }, [clearResponseTimer]);
-
   const send = useCallback(
     (msg: Record<string, unknown>) => {
       const ws = wsRef.current;
@@ -115,6 +105,16 @@ export function useChatWebSocket(
     },
     []
   );
+
+  const {
+    authModal,
+    setAuthModal,
+    startAuth,
+    reauthenticate,
+    logout,
+    cancelAuth,
+    submitAuthCode,
+  } = useChatAuth(send, setState);
 
   const connect = useCallback(() => {
     if (!isAuthenticated()) {
@@ -276,7 +276,7 @@ export function useChatWebSocket(
     ws.onerror = () => {
       /* ignore */
     };
-  }, [navigate, send, clearResponseTimer, startResponseTimer]);
+  }, [navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
 
   useEffect(() => {
     connect();
@@ -289,36 +289,6 @@ export function useChatWebSocket(
       wsRef.current = null;
     };
   }, [connect, clearResponseTimer]);
-
-  const startAuth = useCallback(() => {
-    send({ action: 'initiate_auth' });
-    setState(CHAT_STATES.AUTH_PENDING);
-  }, [send]);
-
-  const reauthenticate = useCallback(() => {
-    if (!window.confirm('This will clear your current authentication. Are you sure?')) return;
-    send({ action: 'reauthenticate' });
-    setState(CHAT_STATES.AUTH_PENDING);
-  }, [send]);
-
-  const logout = useCallback(() => {
-    if (!window.confirm('This will log you out completely. Are you sure?')) return;
-    send({ action: 'logout' });
-    setState(CHAT_STATES.LOGGING_OUT);
-  }, [send]);
-
-  const cancelAuth = useCallback(() => {
-    setAuthModal({ authUrl: null, deviceCode: null, isManualToken: false });
-    send({ action: 'cancel_auth' });
-    setState(CHAT_STATES.UNAUTHENTICATED);
-  }, [send]);
-
-  const submitAuthCode = useCallback(
-    (code: string) => {
-      send({ action: 'submit_auth_code', code: code.trim() });
-    },
-    [send]
-  );
 
   const dismissError = useCallback(() => {
     setErrorMessage(null);
