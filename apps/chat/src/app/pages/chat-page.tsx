@@ -6,6 +6,7 @@ import { MessageList, type MessageListHandle } from '../chat/message-list';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
+import { usePlaygroundSelector } from '../chat/use-playground-selector';
 import { useAgentFiles } from '../chat/use-agent-files';
 import { useChatLayout } from '../chat/use-chat-layout';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
@@ -77,6 +78,7 @@ export function ChatPage() {
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
+  const pgSelector = usePlaygroundSelector();
 
   const handlePageDirtyChange = useCallback((path: string, isDirty: boolean) => {
     setPageDirtyPaths((prev) => {
@@ -536,6 +538,19 @@ export function ChatPage() {
           refreshingModels={refreshingModels}
           onToggleTerminal={toggleTerminal}
           terminalOpen={terminalOpen}
+          playgroundEntries={pgSelector.entries}
+          playgroundLoading={pgSelector.loading}
+          playgroundError={pgSelector.error}
+          playgroundCurrentLink={pgSelector.currentLink}
+          playgroundLinking={pgSelector.linking}
+          playgroundCanGoBack={pgSelector.canGoBack}
+          playgroundBreadcrumbs={pgSelector.breadcrumbs}
+          onPlaygroundOpen={pgSelector.open}
+          onPlaygroundBrowse={pgSelector.browseTo}
+          onPlaygroundGoBack={pgSelector.goBack}
+          onPlaygroundGoToRoot={pgSelector.goToRoot}
+          onPlaygroundLink={pgSelector.linkPlayground}
+          onPlaygroundLinked={refetchPlaygrounds}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
