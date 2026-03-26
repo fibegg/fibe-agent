@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { AuthModalState } from './use-chat-websocket';
+import type { AuthModalState } from './use-chat-auth';
 import {
   BUTTON_ICON_MUTED,
   BUTTON_PRIMARY_ROUNDED,

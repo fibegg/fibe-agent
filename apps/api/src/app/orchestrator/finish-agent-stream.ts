@@ -27,7 +27,7 @@ export function finishAgentStream(
   const storedModel = (deps.modelStore.get() || '').trim();
   const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
   deps.messageStore.add('assistant', finalText, undefined, model);
-  void deps.fibeSync.syncMessages(JSON.stringify(deps.messageStore.all()));
+  void deps.fibeSync.syncMessages(() => JSON.stringify(deps.messageStore.all()));
   deps.send(WS_EVENT.THINKING_STEP, {
     id: stepId,
     title: step.title,

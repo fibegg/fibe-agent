@@ -8,27 +8,24 @@ import { TREE_NODE_BASE, TREE_NODE_SELECTED } from '../ui-classes';
 export const TreeNode = memo(function TreeNode({
   entry,
   depth,
-  expanded,
+  isExpanded,
+  isSelected,
+  isDirty,
+  animType,
   onToggle,
   onFileClick,
-  selectedPath,
-  animatingPaths,
-  dirtyPaths,
 }: {
   entry: PlaygroundEntry;
   depth: number;
-  expanded: Set<string>;
+  isExpanded: boolean;
+  isSelected: boolean;
+  isDirty: boolean;
+  animType: FileAnimationType | undefined;
   onToggle: (path: string) => void;
   onFileClick?: (entry: PlaygroundEntry) => void;
-  selectedPath?: string | null;
-  animatingPaths?: Map<string, FileAnimationType>;
-  dirtyPaths?: Set<string>;
 }) {
   const isDir = entry.type === 'directory';
-  const isOpen = expanded.has(entry.path);
   const hasChildren = isDir && (entry.children?.length ?? 0) > 0;
-  const isSelected = selectedPath === entry.path;
-  const isDirty = !isDir && dirtyPaths?.has(entry.path);
 
   const handleClick = useCallback(() => {
     if (isDir) {
@@ -38,7 +35,6 @@ export const TreeNode = memo(function TreeNode({
     }
   }, [isDir, entry, onToggle, onFileClick]);
 
-  const animType = animatingPaths?.get(entry.path);
   const animClass = animType === 'added' ? 'animate-file-added' : animType === 'removed' ? 'animate-file-removed' : animType === 'modified' ? 'animate-file-modified' : '';
 
   const isGitModified = entry.gitStatus === 'modified';
@@ -62,7 +58,7 @@ export const TreeNode = memo(function TreeNode({
       >
         <span className="w-3 flex shrink-0 items-center justify-center text-foreground/70 dark:text-muted-foreground" aria-hidden>
           {isDir && hasChildren ? (
-            isOpen ? (
+            isExpanded ? (
               <ChevronDown className="size-3" />
             ) : (
               <ChevronRight className="size-3" />
@@ -72,7 +68,7 @@ export const TreeNode = memo(function TreeNode({
           )}
         </span>
         {isDir ? (
-          isOpen ? (
+          isExpanded ? (
             <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
           ) : (
             <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
@@ -105,23 +101,6 @@ export const TreeNode = memo(function TreeNode({
           )}
         </div>
       </button>
-      {isDir && hasChildren && isOpen && (
-        <div>
-          {(entry.children ?? []).map((child) => (
-            <TreeNode
-              key={child.path}
-              entry={child}
-              depth={depth + 1}
-              expanded={expanded}
-              onToggle={onToggle}
-              onFileClick={onFileClick}
-              selectedPath={selectedPath}
-              animatingPaths={animatingPaths}
-              dirtyPaths={dirtyPaths}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 });

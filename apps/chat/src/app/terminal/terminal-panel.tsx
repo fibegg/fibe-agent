@@ -99,23 +99,29 @@ export function TerminalPanel({ onClose }: TerminalPanelProps) {
     };
 
     // ── Input → WebSocket ──────────────────────────────────────────
-    term.onData((data) => {
+    const onDataDisposable = term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
     });
 
     // ── Resize observer ────────────────────────────────────────────
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
     const ro = new ResizeObserver(() => {
-      try {
-        fitAddon.fit();
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
-        }
-      } catch { /* ignore */ }
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        try {
+          fitAddon.fit();
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          }
+        } catch { /* ignore */ }
+      }, 50);
     });
     ro.observe(container);
 
     return () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
       ro.disconnect();
+      onDataDisposable.dispose();
       ws.close();
       term.dispose();
       wsRef.current     = null;

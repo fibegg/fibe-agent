@@ -128,4 +128,32 @@ describe('SidebarToggle', () => {
     );
     expect(screen.getByText('Expand')).toBeTruthy();
   });
+
+  it('applies correct tooltip positioning styles for left side', () => {
+    render(
+      <SidebarToggle
+        isCollapsed={false}
+        onClick={vi.fn()}
+        side="left"
+        ariaLabel="Toggle"
+      />
+    );
+    const tooltip = screen.getByText('Collapse');
+    expect(tooltip.style.left).toBe('100%');
+    expect(tooltip.style.marginLeft).toBe('0.5rem');
+  });
+
+  it('applies correct tooltip positioning styles for right side', () => {
+    render(
+      <SidebarToggle
+        isCollapsed={false}
+        onClick={vi.fn()}
+        side="right"
+        ariaLabel="Toggle"
+      />
+    );
+    const tooltip = screen.getByText('Collapse');
+    expect(tooltip.style.right).toBe('100%');
+    expect(tooltip.style.marginRight).toBe('0.5rem');
+  });
 });

@@ -2,72 +2,72 @@ import { describe, it, expect } from 'vitest';
 import { getLanguageExtension, getLanguageLabel, LANG_MAP } from './file-editor-cm';
 
 describe('getLanguageExtension', () => {
-  it('returns extension for .ts files', () => {
-    expect(getLanguageExtension('index.ts')).not.toBeNull();
+  it('returns extension for .ts files', async () => {
+    expect(await getLanguageExtension('index.ts')).not.toBeNull();
   });
 
-  it('returns extension for .tsx files', () => {
-    expect(getLanguageExtension('app.tsx')).not.toBeNull();
+  it('returns extension for .tsx files', async () => {
+    expect(await getLanguageExtension('app.tsx')).not.toBeNull();
   });
 
-  it('returns extension for .js files', () => {
-    expect(getLanguageExtension('main.js')).not.toBeNull();
+  it('returns extension for .js files', async () => {
+    expect(await getLanguageExtension('main.js')).not.toBeNull();
   });
 
-  it('returns extension for .jsx files', () => {
-    expect(getLanguageExtension('component.jsx')).not.toBeNull();
+  it('returns extension for .jsx files', async () => {
+    expect(await getLanguageExtension('component.jsx')).not.toBeNull();
   });
 
-  it('returns extension for .py files', () => {
-    expect(getLanguageExtension('script.py')).not.toBeNull();
+  it('returns extension for .py files', async () => {
+    expect(await getLanguageExtension('script.py')).not.toBeNull();
   });
 
-  it('returns extension for .rs files', () => {
-    expect(getLanguageExtension('lib.rs')).not.toBeNull();
+  it('returns extension for .rs files', async () => {
+    expect(await getLanguageExtension('lib.rs')).not.toBeNull();
   });
 
-  it('returns extension for .go files', () => {
-    expect(getLanguageExtension('main.go')).not.toBeNull();
+  it('returns extension for .go files', async () => {
+    expect(await getLanguageExtension('main.go')).not.toBeNull();
   });
 
-  it('returns extension for .json files', () => {
-    expect(getLanguageExtension('package.json')).not.toBeNull();
+  it('returns extension for .json files', async () => {
+    expect(await getLanguageExtension('package.json')).not.toBeNull();
   });
 
-  it('returns extension for .md files', () => {
-    expect(getLanguageExtension('README.md')).not.toBeNull();
+  it('returns extension for .md files', async () => {
+    expect(await getLanguageExtension('README.md')).not.toBeNull();
   });
 
-  it('returns extension for .css files', () => {
-    expect(getLanguageExtension('styles.css')).not.toBeNull();
+  it('returns extension for .css files', async () => {
+    expect(await getLanguageExtension('styles.css')).not.toBeNull();
   });
 
-  it('returns extension for .yaml files', () => {
-    expect(getLanguageExtension('.github/ci.yaml')).not.toBeNull();
+  it('returns extension for .yaml files', async () => {
+    expect(await getLanguageExtension('.github/ci.yaml')).not.toBeNull();
   });
 
-  it('returns null for .zig (no CM6 module)', () => {
-    expect(getLanguageExtension('build.zig')).toBeNull();
+  it('returns null for .zig (no CM6 module)', async () => {
+    expect(await getLanguageExtension('build.zig')).toBeNull();
   });
 
-  it('returns null for Dockerfile', () => {
-    expect(getLanguageExtension('Dockerfile')).toBeNull();
+  it('returns null for Dockerfile', async () => {
+    expect(await getLanguageExtension('Dockerfile')).toBeNull();
   });
 
-  it('returns null for Dockerfile.dev', () => {
-    expect(getLanguageExtension('Dockerfile.dev')).toBeNull();
+  it('returns null for Dockerfile.dev', async () => {
+    expect(await getLanguageExtension('Dockerfile.dev')).toBeNull();
   });
 
-  it('returns null for unknown extension', () => {
-    expect(getLanguageExtension('file.foobar')).toBeNull();
+  it('returns null for unknown extension', async () => {
+    expect(await getLanguageExtension('file.foobar')).toBeNull();
   });
 
-  it('returns null for file with no extension', () => {
-    expect(getLanguageExtension('Makefile')).toBeNull();
+  it('returns null for file with no extension', async () => {
+    expect(await getLanguageExtension('Makefile')).toBeNull();
   });
 
-  it('handles nested path correctly', () => {
-    expect(getLanguageExtension('src/utils/helpers.ts')).not.toBeNull();
+  it('handles nested path correctly', async () => {
+    expect(await getLanguageExtension('src/utils/helpers.ts')).not.toBeNull();
   });
 });
 
@@ -153,9 +153,9 @@ describe('LANG_MAP', () => {
     }
   });
 
-  it('each factory returns a truthy extension', () => {
+  it('each factory returns a truthy extension', async () => {
     for (const [ext, factory] of Object.entries(LANG_MAP)) {
-      expect(factory(), `LANG_MAP[${ext}] returned falsy`).toBeTruthy();
+      expect(await factory(), `LANG_MAP[${ext}] returned falsy`).toBeTruthy();
     }
   });
 });

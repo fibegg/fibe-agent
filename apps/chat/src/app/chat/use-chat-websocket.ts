@@ -18,11 +18,7 @@ import {
 import type { ThinkingStep } from './thinking-types';
 import type { ToolOrFileEvent } from './thinking-types';
 
-export interface AuthModalState {
-  authUrl: string | null;
-  deviceCode: string | null;
-  isManualToken: boolean;
-}
+import { useChatAuth, type AuthModalState } from './use-chat-auth';
 
 export interface UseChatWebSocketResult {
   state: ChatState;
@@ -59,18 +55,13 @@ export function useChatWebSocket(
   onMessage?: (data: ServerMessage) => void,
   onStreamChunk?: (text: string) => void,
   onStreamStart?: (data?: { model?: string }) => void,
-  onStreamEnd?: (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
+  onStreamEnd?: (usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [authModal, setAuthModal] = useState<AuthModalState>({
-    authUrl: null,
-    deviceCode: null,
-    isManualToken: false,
-  });
   const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
   const [queuedCount, setQueuedCount] = useState(0);
 
@@ -89,7 +80,6 @@ export function useChatWebSocket(
   onStreamStartRef.current = onStreamStart;
   onStreamEndRef.current = onStreamEnd;
   onPlaygroundChangedRef.current = onPlaygroundChanged;
-  const streamingAccumulatorRef = useRef('');
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -105,7 +95,6 @@ export function useChatWebSocket(
       setState(CHAT_STATES.ERROR);
     }, RESPONSE_TIMEOUT_MS);
   }, [clearResponseTimer]);
-
   const send = useCallback(
     (msg: Record<string, unknown>) => {
       const ws = wsRef.current;
@@ -115,6 +104,16 @@ export function useChatWebSocket(
     },
     []
   );
+
+  const {
+    authModal,
+    setAuthModal,
+    startAuth,
+    reauthenticate,
+    logout,
+    cancelAuth,
+    submitAuthCode,
+  } = useChatAuth(send, setState);
 
   const connect = useCallback(() => {
     if (!isAuthenticated()) {
@@ -139,17 +138,10 @@ export function useChatWebSocket(
       send({ action: 'get_model' });
     };
 
-    ws.onmessage = (event: MessageEvent) => {
-      let data: ServerMessage;
-      try {
-        data = JSON.parse(event.data as string) as ServerMessage;
-      } catch {
-        return;
-      }
-
-      if (data.type === 'auth_status') {
-        if (data.status === 'authenticated') {
-          if (data.isProcessing) {
+    const handlers: Record<string, (d: ServerMessage) => void> = {
+      auth_status: (d) => {
+        if (d.status === 'authenticated') {
+          if (d.isProcessing) {
             setState(CHAT_STATES.AWAITING_RESPONSE);
             startResponseTimer();
           } else {
@@ -157,175 +149,97 @@ export function useChatWebSocket(
           }
         } else {
           setState((s) => (s !== CHAT_STATES.AUTH_PENDING ? CHAT_STATES.UNAUTHENTICATED : s));
-          const ws = wsRef.current;
-          if (ws?.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ action: 'initiate_auth' }));
+          if (wsRef.current?.readyState === WebSocket.OPEN) {
+            wsRef.current.send(JSON.stringify({ action: 'initiate_auth' }));
           }
         }
-        return;
-      }
-
-      if (data.type === 'auth_url_generated') {
-        setAuthModal((a) => ({ ...a, authUrl: data.url ?? null, isManualToken: false }));
+      },
+      auth_url_generated: (d) => {
+        setAuthModal((a) => ({ ...a, authUrl: d.url ?? null, isManualToken: false }));
         setState(CHAT_STATES.AUTH_PENDING);
-        return;
-      }
-
-      if (data.type === 'auth_device_code') {
-        setAuthModal((a) => ({ ...a, deviceCode: data.code ?? null, isManualToken: false }));
-        return;
-      }
-
-      if (data.type === 'auth_manual_token') {
+      },
+      auth_device_code: (d) => setAuthModal((a) => ({ ...a, deviceCode: d.code ?? null, isManualToken: false })),
+      auth_manual_token: () => {
         setAuthModal({ authUrl: null, deviceCode: null, isManualToken: true });
         setState(CHAT_STATES.AUTH_PENDING);
-        return;
-      }
-
-      if (data.type === 'auth_success') {
+      },
+      auth_success: () => {
         setAuthModal({ authUrl: null, deviceCode: null, isManualToken: false });
         setState(CHAT_STATES.AUTHENTICATED);
-        return;
-      }
-
-      if (data.type === 'logout_success') {
-        setState(CHAT_STATES.UNAUTHENTICATED);
-        return;
-      }
-
-      if (data.type === 'error') {
+      },
+      logout_success: () => setState(CHAT_STATES.UNAUTHENTICATED),
+      error: (d) => {
         clearResponseTimer();
-        setErrorMessage(data.message ?? 'An unexpected error occurred');
+        setErrorMessage(d.message ?? 'An unexpected error occurred');
         setState(CHAT_STATES.ERROR);
-        onStreamEndRef.current?.('');
-        return;
-      }
-
-      if (data.type === 'message') {
+        onStreamEndRef.current?.();
+      },
+      message: (d) => {
         clearResponseTimer();
-        if (data.role === 'assistant') {
-          setState(CHAT_STATES.AUTHENTICATED);
-        }
-        onMessageRef.current?.(data);
-        return;
-      }
-
-      if (data.type === 'stream_start') {
+        if (d.role === 'assistant') setState(CHAT_STATES.AUTHENTICATED);
+        onMessageRef.current?.(d);
+      },
+      stream_start: (d) => {
         setState(CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
-        streamingAccumulatorRef.current = '';
-        onStreamStartRef.current?.({ model: data.model });
-        thinkingRef.current?.onStreamStartData?.({ model: data.model });
-        return;
-      }
-
-      if (data.type === 'stream_chunk') {
-        const chunk = data.text ?? '';
-        streamingAccumulatorRef.current += chunk;
+        onStreamStartRef.current?.({ model: d.model });
+        thinkingRef.current?.onStreamStartData?.({ model: d.model });
+      },
+      stream_chunk: (d) => {
+        const chunk = d.text ?? '';
         onStreamChunkRef.current?.(chunk);
-        return;
-      }
-
-      if (data.type === 'stream_end') {
+      },
+      stream_end: (d) => {
         clearResponseTimer();
-        const finalText = streamingAccumulatorRef.current;
         const usage =
-          data.usage &&
-          typeof data.usage.inputTokens === 'number' &&
-          typeof data.usage.outputTokens === 'number'
-            ? { inputTokens: data.usage.inputTokens, outputTokens: data.usage.outputTokens }
+          d.usage && typeof d.usage.inputTokens === 'number' && typeof d.usage.outputTokens === 'number'
+            ? { inputTokens: d.usage.inputTokens, outputTokens: d.usage.outputTokens }
             : undefined;
-        const model = typeof data.model === 'string' ? data.model : undefined;
-        onStreamEndRef.current?.(finalText, usage, model);
-        streamingAccumulatorRef.current = '';
+        onStreamEndRef.current?.(usage, typeof d.model === 'string' ? d.model : undefined);
         setState(CHAT_STATES.AUTHENTICATED);
-        return;
-      }
+      },
+      reasoning_start: () => thinkingRef.current?.onReasoningStart?.(),
+      reasoning_chunk: (d) => thinkingRef.current?.onReasoningChunk?.(d.text ?? ''),
+      reasoning_end: () => thinkingRef.current?.onReasoningEnd?.(),
+      thinking_step: (d) => thinkingRef.current?.onThinkingStep?.({
+        id: d.id ?? '',
+        title: d.title ?? '',
+        status: (d.status as ThinkingStep['status']) ?? 'pending',
+        details: d.details,
+        timestamp: d.timestamp ? new Date(d.timestamp) : new Date(),
+      }),
+      tool_call: (d) => thinkingRef.current?.onToolOrFile?.({
+        kind: 'tool_call',
+        name: d.name ?? '',
+        path: d.path,
+        summary: d.summary,
+        command: d.command,
+        details: d.details,
+      }),
+      file_created: (d) => thinkingRef.current?.onToolOrFile?.({
+        kind: 'file_created',
+        name: d.name ?? '',
+        path: d.path,
+        summary: d.summary,
+      }),
+      activity_snapshot: (d) => setSessionActivity(Array.isArray(d.activity) ? d.activity : []),
+      activity_appended: (d) => { if (d.entry) setSessionActivity((prev) => [...prev, d.entry as StoredActivityEntry]) },
+      activity_updated: (d) => {
+        if (d.entry) {
+          const updated = d.entry as StoredActivityEntry;
+          setSessionActivity((prev) => prev.some((a) => a.id === updated.id) ? prev.map((a) => (a.id === updated.id ? updated : a)) : [...prev, updated]);
+        }
+      },
+      model_updated: (d) => onMessageRef.current?.(d),
+      playground_changed: () => onPlaygroundChangedRef.current?.(),
+      queue_updated: (d) => setQueuedCount(typeof d.count === 'number' ? d.count : 0),
+    };
 
-      if (data.type === 'reasoning_start') {
-        thinkingRef.current?.onReasoningStart?.();
-        return;
-      }
-
-      if (data.type === 'reasoning_chunk') {
-        const text = data.text ?? '';
-        thinkingRef.current?.onReasoningChunk?.(text);
-        return;
-      }
-
-      if (data.type === 'reasoning_end') {
-        thinkingRef.current?.onReasoningEnd?.();
-        return;
-      }
-
-      if (data.type === 'thinking_step') {
-        const step: ThinkingStep = {
-          id: data.id ?? '',
-          title: data.title ?? '',
-          status: (data.status as ThinkingStep['status']) ?? 'pending',
-          details: data.details,
-          timestamp: data.timestamp ? new Date(data.timestamp) : new Date(),
-        };
-        thinkingRef.current?.onThinkingStep?.(step);
-        return;
-      }
-
-      if (data.type === 'tool_call') {
-        const event: ToolOrFileEvent = {
-          kind: 'tool_call',
-          name: data.name ?? '',
-          path: data.path,
-          summary: data.summary,
-          command: data.command,
-          details: data.details,
-        };
-        thinkingRef.current?.onToolOrFile?.(event);
-        return;
-      }
-
-      if (data.type === 'file_created') {
-        const event: ToolOrFileEvent = {
-          kind: 'file_created',
-          name: data.name ?? '',
-          path: data.path,
-          summary: data.summary,
-        };
-        thinkingRef.current?.onToolOrFile?.(event);
-        return;
-      }
-
-      if (data.type === 'activity_snapshot') {
-        setSessionActivity(Array.isArray(data.activity) ? data.activity : []);
-        return;
-      }
-
-      if (data.type === 'activity_appended' && data.entry) {
-        setSessionActivity((prev) => [...prev, data.entry as StoredActivityEntry]);
-        return;
-      }
-
-      if (data.type === 'activity_updated' && data.entry) {
-        const updated = data.entry as StoredActivityEntry;
-        setSessionActivity((prev) =>
-          prev.some((a) => a.id === updated.id)
-            ? prev.map((a) => (a.id === updated.id ? updated : a))
-            : [...prev, updated]
-        );
-        return;
-      }
-
-      if (data.type === 'model_updated') {
-        onMessageRef.current?.(data);
-        return;
-      }
-
-      if (data.type === 'playground_changed') {
-        onPlaygroundChangedRef.current?.();
-        return;
-      }
-
-      if (data.type === 'queue_updated') {
-        setQueuedCount(typeof data.count === 'number' ? data.count : 0);
+    ws.onmessage = (event: MessageEvent) => {
+      try {
+        const data = JSON.parse(event.data as string) as ServerMessage;
+        handlers[data.type]?.(data);
+      } catch {
         return;
       }
     };
@@ -358,7 +272,7 @@ export function useChatWebSocket(
     ws.onerror = () => {
       /* ignore */
     };
-  }, [navigate, send, clearResponseTimer, startResponseTimer]);
+  }, [navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
 
   useEffect(() => {
     connect();
@@ -371,36 +285,6 @@ export function useChatWebSocket(
       wsRef.current = null;
     };
   }, [connect, clearResponseTimer]);
-
-  const startAuth = useCallback(() => {
-    send({ action: 'initiate_auth' });
-    setState(CHAT_STATES.AUTH_PENDING);
-  }, [send]);
-
-  const reauthenticate = useCallback(() => {
-    if (!window.confirm('This will clear your current authentication. Are you sure?')) return;
-    send({ action: 'reauthenticate' });
-    setState(CHAT_STATES.AUTH_PENDING);
-  }, [send]);
-
-  const logout = useCallback(() => {
-    if (!window.confirm('This will log you out completely. Are you sure?')) return;
-    send({ action: 'logout' });
-    setState(CHAT_STATES.LOGGING_OUT);
-  }, [send]);
-
-  const cancelAuth = useCallback(() => {
-    setAuthModal({ authUrl: null, deviceCode: null, isManualToken: false });
-    send({ action: 'cancel_auth' });
-    setState(CHAT_STATES.UNAUTHENTICATED);
-  }, [send]);
-
-  const submitAuthCode = useCallback(
-    (code: string) => {
-      send({ action: 'submit_auth_code', code: code.trim() });
-    },
-    [send]
-  );
 
   const dismissError = useCallback(() => {
     setErrorMessage(null);

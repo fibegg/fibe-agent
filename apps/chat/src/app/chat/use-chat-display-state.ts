@@ -33,15 +33,17 @@ export function useChatDisplayState({
     [messages, searchQuery]
   );
 
-  const lastAssistantMessage = useMemo(
-    () => [...messages].reverse().find((m) => m.role === 'assistant'),
-    [messages]
-  );
-
-  const lastUserMessageFromHistory = useMemo(
-    () => [...messages].reverse().find((m) => m.role === 'user')?.body ?? null,
-    [messages]
-  );
+  const { lastAssistantMessage, lastUserMessageFromHistory } = useMemo(() => {
+    let lastAssistant: ChatMessage | undefined;
+    let lastUserBody: string | null = null;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (!lastAssistant && m.role === 'assistant') lastAssistant = m;
+      if (lastUserBody === null && m.role === 'user') lastUserBody = m.body ?? null;
+      if (lastAssistant && lastUserBody !== null) break;
+    }
+    return { lastAssistantMessage: lastAssistant, lastUserMessageFromHistory: lastUserBody };
+  }, [messages]);
 
   const lastUserMessage = lastSentMessage ?? lastUserMessageFromHistory;
 
