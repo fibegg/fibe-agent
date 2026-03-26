@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { CHAT_STATES } from './chat-state';
-import type { AuthModalState } from './use-chat-websocket';
+import type { AuthModalState } from './use-chat-auth';
 
 export function useChatAuthUI(state: string, authModal: AuthModalState) {
   return useMemo(

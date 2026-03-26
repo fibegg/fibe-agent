@@ -68,8 +68,8 @@ export function SidebarToggle({
       <div
         className="hidden md:block absolute top-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-3 py-1.5 bg-popover border border-border text-foreground text-xs rounded-md shadow-lg z-20"
         style={{
-          [isLeft ? 'right' : 'left']: '100%',
-          [isLeft ? 'marginRight' : 'marginLeft']: '0.5rem',
+          [isLeft ? 'left' : 'right']: '100%',
+          [isLeft ? 'marginLeft' : 'marginRight']: '0.5rem',
         }}
         aria-hidden
       >
@@ -77,7 +77,7 @@ export function SidebarToggle({
         <div
           className="absolute top-1/2 -translate-y-1/2 w-0 h-0 border-4 border-transparent"
           style={{
-            [isLeft ? 'left' : 'right']: '100%',
+            [isLeft ? 'right' : 'left']: '100%',
             borderLeftColor: isLeft ? 'transparent' : 'var(--popover)',
             borderRightColor: isLeft ? 'var(--popover)' : 'transparent',
           }}

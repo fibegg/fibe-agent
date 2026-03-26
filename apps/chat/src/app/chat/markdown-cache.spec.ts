@@ -62,4 +62,18 @@ describe('markdown-cache', () => {
     for (let i = 0; i < 250; i++) renderMarkdown(`text-${i}`);
     expect(getMarkdownCacheSize()).toBeLessThanOrEqual(200);
   });
+
+  it('handles raw HTML tags in markdown input', () => {
+    // marked passes block-level HTML through unchanged; verify it renders
+    const input = '<script>alert("xss")</script>';
+    const result = renderMarkdown(input);
+    expect(typeof result).toBe('string');
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it('handles ampersands and quotes in markdown text', () => {
+    const result = renderMarkdown('Tom & Jerry said "hello"');
+    expect(result).toContain('Tom');
+    expect(result).toContain('Jerry');
+  });
 });

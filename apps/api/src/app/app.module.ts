@@ -4,7 +4,6 @@ import { Module } from '@nestjs/common';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigService } from './config/config.service';
 import { AgentAuthGuard } from './auth/agent-auth.guard';
 import { AuditService } from './audit/audit.service';
@@ -30,6 +29,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
 import { InitStatusController } from './init-status/init-status.controller';
 import { AgentController } from './agent/agent.controller';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
+import { PlayroomBrowserService } from './playgrounds/playroom-browser.service';
 import { FibeSyncService } from './fibe-sync/fibe-sync.service';
 import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
 import { SteeringService } from './steering/steering.service';
@@ -65,7 +65,6 @@ import { TerminalService } from './terminal/terminal.service';
     { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
     AuditService,
     DataPrivacyService,
-    AppService,
     ConfigService,
     AgentAuthGuard,
     ActivityStoreService,
@@ -77,6 +76,7 @@ import { TerminalService } from './terminal/terminal.service';
     UploadsService,
     PlaygroundsService,
     PlaygroundWatcherService,
+    PlayroomBrowserService,
     AgentFilesService,
     AgentFilesWatcherService,
     FibeSyncService,

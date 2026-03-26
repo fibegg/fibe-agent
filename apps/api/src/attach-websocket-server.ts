@@ -108,8 +108,23 @@ function attachTerminalWs(
       return;
     }
 
-    ptyProcess.onData((data) => { if (ws.readyState === ws.OPEN) ws.send(data); });
+    let outputBuffer = '';
+    let flushTimeout: ReturnType<typeof setTimeout> | null = null;
+    
+    ptyProcess.onData((data) => {
+      outputBuffer += data;
+      if (!flushTimeout) {
+        flushTimeout = setTimeout(() => {
+          if (ws.readyState === ws.OPEN) ws.send(outputBuffer);
+          outputBuffer = '';
+          flushTimeout = null;
+        }, 16);
+      }
+    });
+
     ptyProcess.onExit(() => {
+      if (flushTimeout) { clearTimeout(flushTimeout); flushTimeout = null; }
+      if (outputBuffer && ws.readyState === ws.OPEN) ws.send(outputBuffer);
       if (ws.readyState === ws.OPEN) ws.close();
       terminalService.kill(sessionId);
     });
@@ -128,8 +143,14 @@ function attachTerminalWs(
       terminalService.write(sessionId, text);
     });
 
-    ws.on('close', () => terminalService.kill(sessionId));
-    ws.on('error', () => terminalService.kill(sessionId));
+    ws.on('close', () => {
+      if (flushTimeout) { clearTimeout(flushTimeout); flushTimeout = null; }
+      terminalService.kill(sessionId);
+    });
+    ws.on('error', () => {
+      if (flushTimeout) { clearTimeout(flushTimeout); flushTimeout = null; }
+      terminalService.kill(sessionId);
+    });
   });
 }
 

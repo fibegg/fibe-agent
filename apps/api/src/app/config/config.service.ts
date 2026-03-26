@@ -58,6 +58,10 @@ export class ConfigService {
     return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
   }
 
+  getPlayroomsRoot(): string {
+    return process.env.PLAYROOMS_ROOT ?? '/opt/fibe';
+  }
+
   getFibeApiKey(): string | undefined {
     return process.env.FIBE_API_KEY;
   }

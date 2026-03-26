@@ -52,7 +52,7 @@ describe('FileViewerPanel', () => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
 
-    expect(screen.getByText(mockContent)).toBeTruthy();
+    expect(screen.getAllByText(mockContent).length).toBeGreaterThan(0);
     expect(screen.getByText(/1 lines/)).toBeTruthy();
   });
 

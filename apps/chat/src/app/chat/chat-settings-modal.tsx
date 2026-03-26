@@ -13,7 +13,7 @@ import {
   MODAL_OVERLAY_DARK,
   SETTINGS_CLOSE_BUTTON,
 } from '../ui-classes';
-import { ActivityTypeFilters } from '../activity-review-panel';
+import { ActivityTypeFilters } from '../activity-type-filters';
 import { usePersistedTypeFilter } from '../use-persisted-type-filter';
 
 interface InitStatusResponse {

@@ -14,6 +14,9 @@ export const API_PATHS = {
   ACTIVITIES_BY_ENTRY: '/api/activities/by-entry',
   INIT_STATUS: '/api/init-status',
   AGENT_SEND_MESSAGE: '/api/agent/send-message',
+  PLAYROOMS_BROWSE: '/api/playrooms/browse',
+  PLAYROOMS_LINK: '/api/playrooms/link',
+  PLAYROOMS_CURRENT: '/api/playrooms/current',
 } as const;
 
 export const API_PATH_UPLOADS_BY_FILENAME = (filename: string) =>

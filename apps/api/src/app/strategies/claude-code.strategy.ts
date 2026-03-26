@@ -1,8 +1,9 @@
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection, ToolEvent } from './strategy.types';
-import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE } from './strategy.types';
+import { AbstractCLIStrategy } from './abstract-cli.strategy';
 
 const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
 
@@ -82,17 +83,11 @@ export function toolUseToEvent(
   };
 }
 
-export class ClaudeCodeStrategy implements AgentStrategy {
-  private currentConnection: AuthConnection | null = null;
+export class ClaudeCodeStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
-  private currentStreamProcess: ChildProcess | null = null;
-  private streamInterrupted = false;
-  private readonly useApiTokenMode: boolean;
-  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
-    this.useApiTokenMode = useApiTokenMode;
-    this.conversationDataDir = conversationDataDir;
+    super(ClaudeCodeStrategy.name, useApiTokenMode, conversationDataDir);
   }
 
   private getClaudeWorkspaceDir(): string {
@@ -160,9 +155,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
     }
   }
 
-  cancelAuth(): void {
-    this.currentConnection = null;
-  }
+
 
   clearCredentials(): void {
     const tokenPath = getTokenFilePath();
@@ -255,10 +248,7 @@ export class ClaudeCodeStrategy implements AgentStrategy {
     });
   }
 
-  interruptAgent(): void {
-    this.streamInterrupted = true;
-    this.currentStreamProcess?.kill();
-  }
+
 
   executePromptStreaming(
     prompt: string,

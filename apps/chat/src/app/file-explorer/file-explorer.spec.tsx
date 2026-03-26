@@ -7,6 +7,17 @@ vi.mock('../api-url', () => ({
   apiRequest: (path: string, options?: RequestInit) => fetch(path, options),
 }));
 
+vi.mock('@tanstack/react-virtual', () => ({
+  useVirtualizer: (options: { count: number }) => ({
+    getVirtualItems: () => Array.from({ length: options.count }).map((_, i) => ({
+      index: i,
+      size: 28,
+      start: i * 28
+    })),
+    getTotalSize: () => options.count * 28,
+  }),
+}));
+
 describe('FileExplorer', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());

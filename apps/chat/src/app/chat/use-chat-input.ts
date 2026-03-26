@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
 import { getAtMentionState, valueAfterAtMatchesEntry } from './file-mention-dropdown';
 import type { PlaygroundEntryItem } from './use-playground-files';
 
@@ -39,7 +38,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
 
   const handleMentionSelect = useCallback(
     (path: string) => {
-      flushSync(() => setMentionDropdownClosedAfterSelect(true));
+      setMentionDropdownClosedAfterSelect(true);
       const inserted = `@${path} `;
       const newVal =
         inputValue.slice(0, atMention.replaceStart) +

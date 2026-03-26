@@ -1,9 +1,9 @@
-import { Logger } from '@nestjs/common';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
-import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE } from './strategy.types';
+import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 
 const GEMINI_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.gemini');
@@ -12,21 +12,12 @@ const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Goog
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
 const SESSION_MARKER_FILE = '.gemini_session';
 
-export class GeminiStrategy implements AgentStrategy {
-  private readonly logger = new Logger(GeminiStrategy.name);
-  private activeAuthProcess: ReturnType<typeof spawn> | null = null;
-  private currentConnection: AuthConnection | null = null;
-  private authCancel: (() => void) | null = null;
+export class GeminiStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
-  private currentStreamProcess: ChildProcess | null = null;
-  private streamInterrupted = false;
-  private readonly useApiTokenMode: boolean;
   private _apiToken: string | null = null;
-  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
-    this.useApiTokenMode = useApiTokenMode;
-    this.conversationDataDir = conversationDataDir;
+    super(GeminiStrategy.name, useApiTokenMode, conversationDataDir);
   }
 
   private getGeminiWorkspaceDir(): string {
@@ -117,12 +108,7 @@ export class GeminiStrategy implements AgentStrategy {
     this.authCancel = cancel;
   }
 
-  cancelAuth(): void {
-    this.authCancel?.();
-    this.authCancel = null;
-    this.activeAuthProcess = null;
-    this.currentConnection = null;
-  }
+
 
   submitAuthCode(code: string): void {
     const trimmed = (code ?? '').trim();
@@ -259,10 +245,7 @@ export class GeminiStrategy implements AgentStrategy {
     return ['-m', model];
   }
 
-  interruptAgent(): void {
-    this.streamInterrupted = true;
-    this.currentStreamProcess?.kill();
-  }
+
 
   private static readonly GOOGLE_OAUTH_URL_REGEX =
     /https:\/\/accounts\.google\.com\/o\/oauth2\/[^\s"'<>]+/;

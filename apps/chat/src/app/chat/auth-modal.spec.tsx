@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { AuthModal } from './auth-modal';
-import type { AuthModalState } from './use-chat-websocket';
+import type { AuthModalState } from './use-chat-auth';
 
 const DEFAULT_AUTH_MODAL: AuthModalState = {
   authUrl: null,

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { flushSync } from 'react-dom';
 import type { ThinkingStep, ThinkingActivity, ToolOrFileEvent } from './thinking-types';
 
 function nextActivityId(): string {
@@ -39,7 +38,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
       },
       onReasoningChunk: (text: string) => {
         reasoningTextRef.current += text;
-        flushSync(() => setReasoningText(reasoningTextRef.current));
+        setReasoningText(reasoningTextRef.current);
         const entryId = thinkingEntryIdRef.current;
         if (!entryId) return;
         setActivityLog((prev) => {
@@ -62,17 +61,15 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
         });
       },
       onThinkingStep: (step: ThinkingStep) => {
-        flushSync(() =>
-          setThinkingSteps((prev) => {
-            const idx = prev.findIndex((s) => s.id === step.id);
-            if (idx >= 0) {
-              const next = [...prev];
-              next[idx] = step;
-              return next;
-            }
-            return [...prev, step];
-          })
-        );
+        setThinkingSteps((prev) => {
+          const idx = prev.findIndex((s) => s.id === step.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = step;
+            return next;
+          }
+          return [...prev, step];
+        });
         setActivityLog((prev) => [
           ...prev,
           {

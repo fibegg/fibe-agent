@@ -67,7 +67,7 @@ export function usePlaygroundFiles(): {
       const data = (await res.json()) as PlaygroundTreeEntry[];
       setTree(Array.isArray(data) ? data : []);
     } catch (e) {
-      setTree([]);
+      // Don't clear tree on random network errors so the sidebar doesn't collapse
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
       setLoading(false);
