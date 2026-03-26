@@ -17,6 +17,7 @@ import { useChatModel } from '../chat/use-chat-model';
 import { useChatDisplayState } from '../chat/use-chat-display-state';
 import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
+import { useChatStreaming } from '../chat/use-chat-streaming';
 import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import type { FileTab } from '../file-explorer/file-explorer-tabs';
 import { ChatLeftPanel } from './chat-left-panel';
@@ -43,13 +44,11 @@ const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output
 
 export function ChatPage() {
   const navigate = useNavigate();
-  const [streamingText, setStreamingText] = useState('');
   const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => undefined);
   const handleSendRef = useRef<() => void>(() => undefined);
 
   const authenticated = isAuthenticated();
   const { messages, setMessages, modelOptions, refreshingModels, refreshModelOptions } = useChatInitialData(authenticated);
-  const scroll = useScrollToBottom([messages, streamingText]);
 
   const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, stats: playgroundStats, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
@@ -113,7 +112,6 @@ export function ChatPage() {
     handleMentionClose,
   } = useChatInput({ playgroundEntries, onSendRef: handleSendRef });
   const messageListRef = useRef<MessageListHandle | null>(null);
-  const streamModelRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!authenticated) {
@@ -150,21 +148,46 @@ export function ChatPage() {
 
   const voiceRecorder = useVoiceRecorder();
 
-  const streamBufferRef = useRef('');
-  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onStreamEndCallback = useCallback(
+    (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string, streamModel?: string | null) => {
+      const text = finalText?.trim() || NO_OUTPUT_MESSAGE;
+      const log = activityLogRef.current;
+      const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
+        id,
+        type,
+        message,
+        timestamp: timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
+        ...(details !== undefined ? { details } : {}),
+        ...(command !== undefined ? { command } : {}),
+        ...(path !== undefined ? { path } : {}),
+      }));
+      const modelForMessage = model ?? streamModel ?? undefined;
+      setMessages((m) => [
+        ...m,
+        {
+          role: 'assistant',
+          body: text,
+          created_at: new Date().toISOString(),
+          story: storyForApi,
+          ...(usage ? { usage } : {}),
+          ...(modelForMessage ? { model: modelForMessage } : {}),
+        },
+      ]);
+      sendRef.current({ action: 'submit_story', story: storyForApi });
+      setLastSentMessage(null);
+      refetchPlaygrounds();
+    },
+    [setMessages, refetchPlaygrounds, activityLogRef]
+  );
 
-  const flushStreamBuffer = useCallback(() => {
-    timeoutIdRef.current = null;
-    const buffered = streamBufferRef.current;
-    if (buffered) {
-      streamBufferRef.current = '';
-      setStreamingText((prev) => prev + buffered);
-    }
-  }, []);
+  const {
+    streamingText,
+    handleStreamStart,
+    handleStreamChunk,
+    handleStreamEnd,
+  } = useChatStreaming({ onStreamEndCallback, resetForNewStream });
 
-  useEffect(() => () => {
-    if (timeoutIdRef.current !== null) clearTimeout(timeoutIdRef.current);
-  }, []);
+  const scroll = useScrollToBottom([messages, streamingText]);
 
   const {
     state,
@@ -183,53 +206,9 @@ export function ChatPage() {
     interruptAgent,
   } = useChatWebSocket(
     handleMessage,
-    (chunk) => {
-      streamBufferRef.current += chunk;
-      if (timeoutIdRef.current === null) {
-        timeoutIdRef.current = setTimeout(flushStreamBuffer, 60);
-      }
-    },
-    (data) => {
-      // Flush any pending buffer before resetting
-      if (timeoutIdRef.current !== null) {
-        clearTimeout(timeoutIdRef.current);
-        timeoutIdRef.current = null;
-      }
-      streamBufferRef.current = '';
-      setStreamingText('');
-      streamModelRef.current = data?.model ?? null;
-      resetForNewStream(data);
-    },
-    (finalText, usage, model) => {
-      const text = finalText?.trim() || NO_OUTPUT_MESSAGE;
-      const log = activityLogRef.current;
-      const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
-        id,
-        type,
-        message,
-        timestamp: timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
-        ...(details !== undefined ? { details } : {}),
-        ...(command !== undefined ? { command } : {}),
-        ...(path !== undefined ? { path } : {}),
-      }));
-      const modelForMessage = model ?? streamModelRef.current ?? undefined;
-      streamModelRef.current = null;
-      setMessages((m) => [
-        ...m,
-        {
-          role: 'assistant',
-          body: text,
-          created_at: new Date().toISOString(),
-          story: storyForApi,
-          ...(usage ? { usage } : {}),
-          ...(modelForMessage ? { model: modelForMessage } : {}),
-        },
-      ]);
-      sendRef.current({ action: 'submit_story', story: storyForApi });
-      setStreamingText('');
-      setLastSentMessage(null);
-      refetchPlaygrounds();
-    },
+    handleStreamChunk,
+    handleStreamStart,
+    handleStreamEnd,
     thinkingCallbacks,
     refetchPlaygrounds
   );

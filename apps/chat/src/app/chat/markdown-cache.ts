@@ -13,22 +13,31 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
-const cache = new Map<string, string>();
+interface CacheEntry {
+  html: string;
+  sourceText: string;
+}
+
+const cache = new Map<string, CacheEntry>();
 
 function evictOldest(): void {
   const firstKey = cache.keys().next().value;
   if (firstKey !== undefined) cache.delete(firstKey);
 }
 
-export function renderMarkdown(text: string): string {
-  if (cache.has(text)) {
-    return cache.get(text) ?? '';
+export function renderMarkdown(text: string, cacheKey?: string): string {
+  const key = cacheKey ?? text;
+  const existing = cache.get(key);
+  
+  if (existing && existing.sourceText === text) {
+    return existing.html;
   }
+  
   try {
     const out = marked.parse(text);
     const html = typeof out === 'string' ? out : escapeHtml(text);
-    if (cache.size >= MAX_CACHE_SIZE) evictOldest();
-    cache.set(text, html);
+    if (!cache.has(key) && cache.size >= MAX_CACHE_SIZE) evictOldest();
+    cache.set(key, { html, sourceText: text });
     return html;
   } catch {
     return escapeHtml(text);

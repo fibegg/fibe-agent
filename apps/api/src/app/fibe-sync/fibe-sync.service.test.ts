@@ -26,12 +26,12 @@ describe('FibeSyncService', () => {
   test('syncMessages does nothing when sync is disabled', async () => {
     const service = new FibeSyncService(mockConfig as never);
     // Should not throw
-    service.syncMessages('{"messages":[]}');
+    service.syncMessages(() => '{"messages":[]}');
   });
 
   test('syncActivity does nothing when sync is disabled', async () => {
     const service = new FibeSyncService(mockConfig as never);
-    service.syncActivity('[]');
+    service.syncActivity(() => '[]');
   });
 
   test('sync does nothing when apiUrl/apiKey/agentId are missing', async () => {
@@ -39,7 +39,7 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';
     // Missing apiKey and agentId
     const service = new FibeSyncService(mockConfig as never);
-    service.syncMessages('{}');
+    service.syncMessages(() => '{}');
   });
 
   test('syncMessages makes PUT request when fully configured', async () => {
@@ -55,7 +55,7 @@ describe('FibeSyncService', () => {
 
     try {
       const service = new FibeSyncService(mockConfig as never);
-      service.syncMessages('{"data":"test"}');
+      service.syncMessages(() => '{"data":"test"}');
       // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
@@ -88,7 +88,7 @@ describe('FibeSyncService', () => {
 
     try {
       const service = new FibeSyncService(mockConfig as never);
-      service.syncActivity('[]');
+      service.syncActivity(() => '[]');
       // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
@@ -115,7 +115,7 @@ describe('FibeSyncService', () => {
     try {
       const service = new FibeSyncService(mockConfig as never);
       // Should not throw
-      service.syncMessages('{}');
+      service.syncMessages(() => '{}');
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -134,7 +134,7 @@ describe('FibeSyncService', () => {
 
     try {
       const service = new FibeSyncService(mockConfig as never);
-      service.syncMessages('{}');
+      service.syncMessages(() => '{}');
     } finally {
       globalThis.fetch = originalFetch;
     }

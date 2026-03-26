@@ -201,7 +201,7 @@ function MentionChipIcon({ path }: { path: string }) {
   return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
 }
 
-function MessageBodyWithMentions({ body }: { body: string }) {
+function MessageBodyWithMentions({ body, messageId }: { body: string; messageId?: string }) {
   const parts = parseMessageBodyParts(body);
   return (
     <div className="flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1">
@@ -222,7 +222,7 @@ function MessageBodyWithMentions({ body }: { body: string }) {
         return (
           <MarkdownWithPrism
             key={userMessageMarkdownPartKey(i, part.content)}
-            html={renderMarkdown(prepareUserMessageMarkdownForRender(part.content))}
+            html={renderMarkdown(prepareUserMessageMarkdownForRender(part.content), messageId ? `user-${messageId}-${i}` : undefined)}
             className={USER_MESSAGE_MARKDOWN_CLASS}
             codeLangBadge
           />
@@ -339,7 +339,7 @@ const MessageRow = memo(function MessageRow({
                   {msg.body ? <MessageBodyWithMentions body={msg.body} /> : null}
                 </div>
               ) : (
-                <MessageBodyWithMentions body={msg.body} />
+                <MessageBodyWithMentions body={msg.body} messageId={msg.id} />
               )}
               <div className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center justify-between gap-2 min-h-[1.25rem]">
                 <p className="flex flex-wrap items-center gap-1.5 min-w-0">
@@ -356,7 +356,7 @@ const MessageRow = memo(function MessageRow({
             </>
           ) : (
             <>
-              <MarkdownWithPrism html={renderMarkdown(msg.body)} className={PROSE_MESSAGE} />
+              <MarkdownWithPrism html={renderMarkdown(msg.body, msg.id ? `assistant-${msg.id}` : undefined)} className={PROSE_MESSAGE} />
               {isNoOutput && onRetry && (
                 <button
                   type="button"
@@ -524,7 +524,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
             >
               {streamingText ? (
                 <>
-                  <MarkdownWithPrism html={renderMarkdown(streamingText)} className={PROSE_MESSAGE} />
+                  <MarkdownWithPrism html={renderMarkdown(streamingText, 'streaming-message')} className={PROSE_MESSAGE} />
                   <div className="mt-2 flex justify-end">
                     <CopyRawMessageButton rawText={streamingText} visualVariant="assistant" />
                   </div>
