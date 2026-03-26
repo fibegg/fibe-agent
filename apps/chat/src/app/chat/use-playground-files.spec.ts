@@ -49,7 +49,37 @@ describe('usePlaygroundFiles', () => {
     expect(result.current.error).toBeNull();
   });
 
-  it('sets error when fetch fails', async () => {
+  it('does not clear existing entries when fetch fails on subsequent refetch', async () => {
+    let callCount = 0;
+    (fetch as ReturnType<typeof vi.fn>).mockImplementation((url: string) => {
+      if (url.includes('stats')) {
+        return Promise.resolve({ ok: true, status: 200, json: async () => ({ fileCount: 1, totalLines: 5 }) });
+      }
+      callCount++;
+      if (callCount === 1) {
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: async () => [{ name: 'a', path: 'a', type: 'file' }],
+        });
+      }
+      return Promise.reject(new Error('Network error'));
+    });
+    const { result } = renderHook(() => usePlaygroundFiles());
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+    expect(result.current.entries).toHaveLength(1);
+    
+    await act(async () => {
+      await result.current.refetch();
+    });
+    
+    expect(result.current.error).toBe('Network error');
+    expect(result.current.entries).toHaveLength(1);
+  });
+
+  it('sets error when initial fetch fails', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
     const { result } = renderHook(() => usePlaygroundFiles());
     await waitFor(() => {
