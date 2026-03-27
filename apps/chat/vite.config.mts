@@ -13,6 +13,8 @@ const CHAT_ENV_KEYS = [
   'LOCK_CHAT_MODEL',
   'USER_AVATAR_URL',
   'ASSISTANT_AVATAR_URL',
+  'USER_AVATAR_BASE64',
+  'ASSISTANT_AVATAR_BASE64',
 ] as const;
 
 function chatEnvDefine() {
