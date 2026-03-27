@@ -1,82 +1,101 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+import { resolveAvatar, loadAvatarConfig } from './chat-avatar';
 
 describe('chat-avatar', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-    vi.resetModules();
+  // resolveAvatar ————————————————————————————————————————————
+
+  describe('resolveAvatar', () => {
+    it('returns undefined when both base64 and url are null/empty', () => {
+      expect(resolveAvatar(null, null)).toBeUndefined();
+      expect(resolveAvatar('', '')).toBeUndefined();
+      expect(resolveAvatar('  ', '  ')).toBeUndefined();
+    });
+
+    it('wraps base64 as a data URI', () => {
+      expect(resolveAvatar('PHN2ZyAvPg==', null)).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
+    });
+
+    it('trims base64 before wrapping', () => {
+      expect(resolveAvatar('  PHN2ZyAvPg==  ', null)).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
+    });
+
+    it('base64 takes priority over url', () => {
+      expect(resolveAvatar('PHN2ZyAvPg==', 'https://example.com/me.png')).toBe(
+        'data:image/svg+xml;base64,PHN2ZyAvPg=='
+      );
+    });
+
+    it('returns trimmed url when base64 is empty', () => {
+      expect(resolveAvatar('', '  https://example.com/me.png  ')).toBe('https://example.com/me.png');
+    });
+
+    it('returns undefined for whitespace-only url with empty base64', () => {
+      expect(resolveAvatar('', '   ')).toBeUndefined();
+    });
   });
 
-  // USER avatar —————————————————————————————————————————————
+  // loadAvatarConfig —————————————————————————————————————————
 
-  it('USER_AVATAR_URL is undefined when both globals are empty', async () => {
-    vi.stubGlobal('__USER_AVATAR_URL__', '');
-    vi.stubGlobal('__USER_AVATAR_BASE64__', '');
-    const { USER_AVATAR_URL } = await import('./chat-avatar');
-    expect(USER_AVATAR_URL).toBeUndefined();
-  });
+  describe('loadAvatarConfig', () => {
+    it('returns undefined values when fetch fails', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network')));
+      const cfg = await loadAvatarConfig();
+      expect(cfg).toEqual({ userAvatarUrl: undefined, assistantAvatarUrl: undefined });
+      vi.unstubAllGlobals();
+    });
 
-  it('USER_AVATAR_URL is undefined when base64 is whitespace-only', async () => {
-    vi.stubGlobal('__USER_AVATAR_URL__', '');
-    vi.stubGlobal('__USER_AVATAR_BASE64__', '   ');
-    const { USER_AVATAR_URL } = await import('./chat-avatar');
-    expect(USER_AVATAR_URL).toBeUndefined();
-  });
+    it('returns undefined values when response is not ok', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false }));
+      const cfg = await loadAvatarConfig();
+      expect(cfg).toEqual({ userAvatarUrl: undefined, assistantAvatarUrl: undefined });
+      vi.unstubAllGlobals();
+    });
 
-  it('USER_AVATAR_URL returns trimmed plain URL', async () => {
-    vi.stubGlobal('__USER_AVATAR_URL__', '  https://example.com/me.png  ');
-    vi.stubGlobal('__USER_AVATAR_BASE64__', '');
-    const { USER_AVATAR_URL } = await import('./chat-avatar');
-    expect(USER_AVATAR_URL).toBe('https://example.com/me.png');
-  });
+    it('resolves userAvatarUrl from url field', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          userAvatarUrl: 'https://avatars.githubusercontent.com/u/3822576?v=4',
+          userAvatarBase64: null,
+          assistantAvatarUrl: null,
+          assistantAvatarBase64: null,
+        }),
+      }));
+      const cfg = await loadAvatarConfig();
+      expect(cfg.userAvatarUrl).toBe('https://avatars.githubusercontent.com/u/3822576?v=4');
+      expect(cfg.assistantAvatarUrl).toBeUndefined();
+      vi.unstubAllGlobals();
+    });
 
-  it('USER_AVATAR_URL wraps base64 as data URI', async () => {
-    vi.stubGlobal('__USER_AVATAR_URL__', '');
-    vi.stubGlobal('__USER_AVATAR_BASE64__', 'PHN2ZyAvPg==');
-    const { USER_AVATAR_URL } = await import('./chat-avatar');
-    expect(USER_AVATAR_URL).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
-  });
+    it('resolves userAvatarUrl from base64 field (takes priority)', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          userAvatarUrl: 'https://example.com/me.png',
+          userAvatarBase64: 'PHN2ZyAvPg==',
+          assistantAvatarUrl: null,
+          assistantAvatarBase64: null,
+        }),
+      }));
+      const cfg = await loadAvatarConfig();
+      expect(cfg.userAvatarUrl).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
+      vi.unstubAllGlobals();
+    });
 
-  it('USER_AVATAR_BASE64 takes priority over USER_AVATAR_URL', async () => {
-    vi.stubGlobal('__USER_AVATAR_URL__', 'https://example.com/me.png');
-    vi.stubGlobal('__USER_AVATAR_BASE64__', 'PHN2ZyAvPg==');
-    const { USER_AVATAR_URL } = await import('./chat-avatar');
-    expect(USER_AVATAR_URL).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
-  });
-
-  // ASSISTANT avatar —————————————————————————————————————————
-
-  it('ASSISTANT_AVATAR_URL is undefined when both globals are empty', async () => {
-    vi.stubGlobal('__ASSISTANT_AVATAR_URL__', '');
-    vi.stubGlobal('__ASSISTANT_AVATAR_BASE64__', '');
-    const { ASSISTANT_AVATAR_URL } = await import('./chat-avatar');
-    expect(ASSISTANT_AVATAR_URL).toBeUndefined();
-  });
-
-  it('ASSISTANT_AVATAR_URL is undefined when base64 is whitespace-only', async () => {
-    vi.stubGlobal('__ASSISTANT_AVATAR_URL__', '');
-    vi.stubGlobal('__ASSISTANT_AVATAR_BASE64__', '   ');
-    const { ASSISTANT_AVATAR_URL } = await import('./chat-avatar');
-    expect(ASSISTANT_AVATAR_URL).toBeUndefined();
-  });
-
-  it('ASSISTANT_AVATAR_URL returns trimmed plain URL', async () => {
-    vi.stubGlobal('__ASSISTANT_AVATAR_URL__', ' https://example.com/bot.png ');
-    vi.stubGlobal('__ASSISTANT_AVATAR_BASE64__', '');
-    const { ASSISTANT_AVATAR_URL } = await import('./chat-avatar');
-    expect(ASSISTANT_AVATAR_URL).toBe('https://example.com/bot.png');
-  });
-
-  it('ASSISTANT_AVATAR_URL wraps base64 as data URI', async () => {
-    vi.stubGlobal('__ASSISTANT_AVATAR_URL__', '');
-    vi.stubGlobal('__ASSISTANT_AVATAR_BASE64__', 'PHN2ZyAvPg==');
-    const { ASSISTANT_AVATAR_URL } = await import('./chat-avatar');
-    expect(ASSISTANT_AVATAR_URL).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
-  });
-
-  it('ASSISTANT_AVATAR_BASE64 takes priority over ASSISTANT_AVATAR_URL', async () => {
-    vi.stubGlobal('__ASSISTANT_AVATAR_URL__', 'https://example.com/bot.png');
-    vi.stubGlobal('__ASSISTANT_AVATAR_BASE64__', 'PHN2ZyAvPg==');
-    const { ASSISTANT_AVATAR_URL } = await import('./chat-avatar');
-    expect(ASSISTANT_AVATAR_URL).toBe('data:image/svg+xml;base64,PHN2ZyAvPg==');
+    it('resolves both user and assistant avatar', async () => {
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          userAvatarUrl: 'https://user.png',
+          userAvatarBase64: null,
+          assistantAvatarUrl: 'https://bot.png',
+          assistantAvatarBase64: null,
+        }),
+      }));
+      const cfg = await loadAvatarConfig();
+      expect(cfg.userAvatarUrl).toBe('https://user.png');
+      expect(cfg.assistantAvatarUrl).toBe('https://bot.png');
+      vi.unstubAllGlobals();
+    });
   });
 });

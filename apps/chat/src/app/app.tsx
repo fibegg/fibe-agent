@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { AppErrorBoundary } from './error-boundary';
+import { AvatarConfigProvider } from './avatar-config-context';
 
 const LoginPage = lazy(() => import('./pages/login-page').then((m) => ({ default: m.LoginPage })));
 const ChatPage = lazy(() => import('./pages/chat-page').then((m) => ({ default: m.ChatPage })));
@@ -19,16 +20,18 @@ function PageFallback() {
 export function App() {
   return (
     <AppErrorBoundary>
-      <Suspense fallback={<PageFallback />}>
-        <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<ChatPage />} />
-          <Route path="/activity/:activityId/:storyId" element={<ActivityReviewPage />} />
-          <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
-          <Route path="/activity" element={<ActivityReviewPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Suspense>
+      <AvatarConfigProvider>
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/" element={<ChatPage />} />
+            <Route path="/activity/:activityId/:storyId" element={<ActivityReviewPage />} />
+            <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+            <Route path="/activity" element={<ActivityReviewPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
+      </AvatarConfigProvider>
     </AppErrorBoundary>
   );
 }

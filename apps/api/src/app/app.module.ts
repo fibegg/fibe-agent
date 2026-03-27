@@ -36,6 +36,7 @@ import { SteeringService } from './steering/steering.service';
 import { AgentFilesController } from './agent-files/agent-files.controller';
 import { AgentFilesService } from './agent-files/agent-files.service';
 import { AgentFilesWatcherService } from './agent-files/agent-files-watcher.service';
+import { RuntimeConfigController } from './runtime-config/runtime-config.controller';
 import { TerminalService } from './terminal/terminal.service';
 
 @Module({
@@ -59,6 +60,7 @@ import { TerminalService } from './terminal/terminal.service';
     InitStatusController,
     AgentController,
     DataPrivacyController,
+    RuntimeConfigController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
