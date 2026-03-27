@@ -70,6 +70,40 @@ describe('PlayroomBrowserService', () => {
     await expect(service.browse('../../etc')).rejects.toThrow();
   });
 
+  test('browse returns symlink-to-directory as type symlink, sorted with dirs', async () => {
+    const realTarget = mkdtempSync(join(tmpdir(), 'symlink-target-'));
+    try {
+      mkdirSync(join(rootDir, 'normalDir'));
+      symlinkSync(realTarget, join(rootDir, 'linkedDir'), 'dir');
+      writeFileSync(join(rootDir, 'file.txt'), '');
+      const service = new PlayroomBrowserService(makeConfig());
+      const entries = await service.browse('');
+      // Both dirs (normal + symlink) should appear before file
+      expect(entries.length).toBe(3);
+      const linkedEntry = entries.find((e) => e.name === 'linkedDir');
+      expect(linkedEntry).toBeDefined();
+      expect(linkedEntry?.type).toBe('symlink');
+      const fileEntry = entries.find((e) => e.name === 'file.txt');
+      expect(fileEntry?.type).toBe('file');
+      // Dirs come first
+      const types = entries.map((e) => e.type);
+      expect(types.indexOf('file')).toBeGreaterThan(types.indexOf('symlink'));
+    } finally {
+      rmSync(realTarget, { recursive: true, force: true });
+    }
+  });
+
+  test('browse returns symlink-to-file as type file', async () => {
+    const realFile = join(rootDir, 'real.txt');
+    writeFileSync(realFile, 'content');
+    symlinkSync(realFile, join(rootDir, 'link.txt'));
+    const service = new PlayroomBrowserService(makeConfig());
+    const entries = await service.browse('');
+    const link = entries.find((e) => e.name === 'link.txt');
+    expect(link).toBeDefined();
+    expect(link?.type).toBe('file');
+  });
+
   test('browse throws for non-existent path', async () => {
     const service = new PlayroomBrowserService(makeConfig());
     await expect(service.browse('nonexistent')).rejects.toThrow();
