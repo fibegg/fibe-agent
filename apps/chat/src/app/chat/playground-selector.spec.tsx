@@ -37,8 +37,8 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows current link name in trigger', () => {
-    renderSelector({ currentLink: 'playgrounds/zigcss' });
-    expect(screen.getByText('zigcss')).toBeTruthy();
+    renderSelector({ currentLink: 'playgrounds/myproject' });
+    expect(screen.getByText('myproject')).toBeTruthy();
   });
 
   it('opens dropdown and calls onOpen when trigger is clicked', () => {
@@ -89,10 +89,10 @@ describe('PlaygroundSelector', () => {
   });
 
   it('displays breadcrumbs', () => {
-    renderSelector({ breadcrumbs: ['playrooms', 'zigcss'] });
+    renderSelector({ breadcrumbs: ['playrooms', 'myproject'] });
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
     expect(screen.getByText('playrooms')).toBeTruthy();
-    expect(screen.getByText('zigcss')).toBeTruthy();
+    expect(screen.getByText('myproject')).toBeTruthy();
   });
 
   it('shows loading state', () => {
@@ -124,9 +124,44 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows current link footer when a link is set', () => {
-    renderSelector({ currentLink: 'playgrounds/zigcss' });
+    renderSelector({ currentLink: 'playgrounds/myproject' });
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
     expect(screen.getByText(/Linked:/)).toBeTruthy();
-    expect(screen.getByText('playgrounds/zigcss')).toBeTruthy();
+    expect(screen.getByText('playgrounds/myproject')).toBeTruthy();
+  });
+
+  it('renders symlink entry as navigable and calls onBrowse on click', () => {
+    const onBrowse = vi.fn();
+    const entries: BrowseEntry[] = [
+      { name: 'example-backend', path: 'playzones/example-backend', type: 'symlink' },
+    ];
+    renderSelector({ entries, onBrowse });
+    fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
+    const option = screen.getByRole('option', { name: /example-backend/ });
+    expect(option).toBeTruthy();
+    fireEvent.click(option);
+    expect(onBrowse).toHaveBeenCalledWith('playzones/example-backend');
+  });
+
+  it('smart-cut: strips org prefix from trigger label (dash separator)', () => {
+    renderSelector({ currentLink: 'playzones/example-backend' });
+    // Should show 'backend', not 'example-backend'
+    expect(screen.getByText('backend')).toBeTruthy();
+    expect(screen.queryByText('example-backend')).toBeNull();
+  });
+
+  it('smart-cut: shows full name when no dash in segment', () => {
+    renderSelector({ currentLink: 'playzones/myproject' });
+    expect(screen.getByText('myproject')).toBeTruthy();
+  });
+
+  it('marks symlink entry as selected when it matches currentLink', () => {
+    const entries: BrowseEntry[] = [
+      { name: 'example-backend', path: 'playzones/example-backend', type: 'symlink' },
+    ];
+    renderSelector({ entries, currentLink: 'playzones/example-backend' });
+    fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
+    const option = screen.getByRole('option', { name: /example-backend/ });
+    expect(option.getAttribute('aria-selected')).toBe('true');
   });
 });

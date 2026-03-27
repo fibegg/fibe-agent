@@ -13,6 +13,17 @@ const PANEL_DATA_ATTR = 'data-playground-selector-panel';
 const ENTRY_HOVER_CLASS = 'text-foreground hover:bg-violet-500/10 hover:text-violet-400';
 const LINKED_CLASS = 'text-emerald-400 bg-emerald-500/10';
 
+/**
+ * Smart-cut: strips the org prefix (first '-'-delimited segment) from a path segment.
+ * e.g. 'example-backend' → 'backend'. Falls back to the full segment if no dash.
+ */
+export function smartCutLabel(link: string): string {
+  const segment = link.split('/').filter(Boolean).pop() ?? 'Playground';
+  const dashIdx = segment.indexOf('-');
+  return dashIdx !== -1 ? segment.slice(dashIdx + 1) : segment;
+}
+
+
 interface PlaygroundSelectorProps {
   entries: BrowseEntry[];
   loading: boolean;
@@ -50,9 +61,8 @@ export function PlaygroundSelector({
   const [panelRect, setPanelRect] = useState<{ top: number; left: number } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const displayLabel = currentLink
-    ? currentLink.split('/').filter(Boolean).pop() ?? 'Playground'
-    : 'Select Playground';
+  const displayLabel = currentLink ? smartCutLabel(currentLink) : 'Select Playground';
+
 
   useEffect(() => {
     if (!open) {
@@ -95,7 +105,7 @@ export function PlaygroundSelector({
   }, [open, onOpen]);
 
   const handleEntryClick = useCallback((entry: BrowseEntry) => {
-    if (entry.type === 'directory') {
+    if (entry.type === 'directory' || entry.type === 'symlink') {
       onBrowse(entry.path);
     }
   }, [onBrowse]);
@@ -194,6 +204,7 @@ export function PlaygroundSelector({
               )}
               {!loading && !error && entries.map((entry) => {
                 const isLinked = currentLink === entry.path;
+                const isNavigable = entry.type === 'directory' || entry.type === 'symlink';
                 return (
                   <div key={entry.path} className="flex items-center group">
                     <button
@@ -203,17 +214,21 @@ export function PlaygroundSelector({
                       onClick={() => handleEntryClick(entry)}
                       className={`${ENTRY_CLASS_BASE} flex-1 min-w-0 ${isLinked ? LINKED_CLASS : ENTRY_HOVER_CLASS}`}
                     >
-                      {entry.type === 'directory' ? (
+                      {entry.type === 'directory' && (
                         <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
-                      ) : (
+                      )}
+                      {entry.type === 'symlink' && (
+                        <Link2 className="size-3.5 shrink-0 text-fuchsia-400" aria-hidden />
+                      )}
+                      {entry.type === 'file' && (
                         <span className="size-3.5 shrink-0" />
                       )}
                       <span className="truncate">{entry.name}</span>
-                      {entry.type === 'directory' && (
+                      {isNavigable && (
                         <ChevronRight className="size-3 shrink-0 ml-auto text-muted-foreground" aria-hidden />
                       )}
                     </button>
-                    {entry.type === 'directory' && (
+                    {isNavigable && (
                       <button
                         type="button"
                         onClick={() => void handleLink(entry.path)}

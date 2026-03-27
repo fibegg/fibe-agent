@@ -5,7 +5,7 @@ import { API_PATHS } from '@shared/api-paths';
 export interface BrowseEntry {
   name: string;
   path: string;
-  type: 'file' | 'directory';
+  type: 'file' | 'directory' | 'symlink';
 }
 
 export function usePlaygroundSelector() {
