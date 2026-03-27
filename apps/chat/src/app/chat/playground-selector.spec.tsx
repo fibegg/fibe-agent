@@ -37,8 +37,8 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows current link name in trigger', () => {
-    renderSelector({ currentLink: 'playgrounds/test-app' });
-    expect(screen.getByText('test-app')).toBeTruthy();
+    renderSelector({ currentLink: 'playgrounds/myproject' });
+    expect(screen.getByText('myproject')).toBeTruthy();
   });
 
   it('opens dropdown and calls onOpen when trigger is clicked', () => {
@@ -89,10 +89,10 @@ describe('PlaygroundSelector', () => {
   });
 
   it('displays breadcrumbs', () => {
-    renderSelector({ breadcrumbs: ['playrooms', 'test-app'] });
+    renderSelector({ breadcrumbs: ['playrooms', 'myproject'] });
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
     expect(screen.getByText('playrooms')).toBeTruthy();
-    expect(screen.getByText('test-app')).toBeTruthy();
+    expect(screen.getByText('myproject')).toBeTruthy();
   });
 
   it('shows loading state', () => {
@@ -124,10 +124,10 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows current link footer when a link is set', () => {
-    renderSelector({ currentLink: 'playgrounds/test-app' });
+    renderSelector({ currentLink: 'playgrounds/myproject' });
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
     expect(screen.getByText(/Linked:/)).toBeTruthy();
-    expect(screen.getByText('playgrounds/test-app')).toBeTruthy();
+    expect(screen.getByText('playgrounds/myproject')).toBeTruthy();
   });
 
   it('renders symlink entry as navigable and calls onBrowse on click', () => {
@@ -151,8 +151,8 @@ describe('PlaygroundSelector', () => {
   });
 
   it('smart-cut: shows full name when no dash in segment', () => {
-    renderSelector({ currentLink: 'playzones/test-app' });
-    expect(screen.getByText('test-app')).toBeTruthy();
+    renderSelector({ currentLink: 'playzones/myproject' });
+    expect(screen.getByText('myproject')).toBeTruthy();
   });
 
   it('marks symlink entry as selected when it matches currentLink', () => {
