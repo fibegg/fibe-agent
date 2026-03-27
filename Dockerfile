@@ -103,6 +103,7 @@ COPY --from=builder /app/apps/chat/dist ./chat/
 COPY apps/api/package.json ./package.json
 RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
+    npm install node-pty@1.1.0 --omit=dev --ignore-scripts && \
     npm rebuild node-pty && \
     npm install -g mcp-remote
 
