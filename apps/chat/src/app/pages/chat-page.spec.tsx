@@ -1,8 +1,11 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatPage } from './chat-page';
+import { isAuthenticated } from '../api-url';
+import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
+import { useChatLayout } from '../chat/use-chat-layout';
 
 // ─── Mock ALL hooks and heavy dependencies ───────────────────────────────────
 
@@ -14,6 +17,10 @@ vi.mock('../api-url', () => ({
   clearToken: vi.fn(),
   apiRequest: vi.fn().mockResolvedValue({ ok: true, json: async () => [] }),
   buildApiUrl: vi.fn().mockImplementation((p: string) => p),
+}));
+
+const { mockScrollToBottom } = vi.hoisted(() => ({
+  mockScrollToBottom: vi.fn(),
 }));
 
 vi.mock('../chat/use-chat-websocket', () => ({
@@ -197,7 +204,7 @@ vi.mock('../chat/use-scroll-to-bottom', () => ({
     endRef: { current: null },
     isAtBottom: true,
     onScroll: vi.fn(),
-    scrollToBottom: vi.fn(),
+    scrollToBottom: mockScrollToBottom,
     markJustSent: vi.fn(),
   }),
 }));
@@ -277,6 +284,34 @@ describe('ChatPage', () => {
       addEventListener = vi.fn();
       removeEventListener = vi.fn();
     });
+
+    // Re-assert mocks cleared by vi.clearAllMocks()
+    vi.mocked(isAuthenticated).mockReturnValue(true);
+    vi.mocked(useScrollToBottom).mockReturnValue({
+      scrollRef: { current: null },
+      endRef: { current: null },
+      isAtBottom: true,
+      onScroll: vi.fn(),
+      scrollToBottom: mockScrollToBottom,
+      markJustSent: vi.fn(),
+    });
+    vi.mocked(useChatLayout).mockReturnValue({
+      isMobile: false,
+      sidebarOpen: false,
+      setSidebarOpen: vi.fn(),
+      rightSidebarOpen: false,
+      setRightSidebarOpen: vi.fn(),
+      sidebarCollapsed: false,
+      setSidebarCollapsed: vi.fn(),
+      rightSidebarCollapsed: false,
+      setRightSidebarCollapsed: vi.fn(),
+      settingsOpen: false,
+      setSettingsOpen: vi.fn(),
+      searchQuery: '',
+      setSearchQuery: vi.fn(),
+      closeMobileSidebar: vi.fn(),
+      closeSettings: vi.fn(),
+    });
   });
 
   afterEach(() => {
@@ -323,5 +358,96 @@ describe('ChatPage', () => {
 
   it('renders without crashing with no messages', async () => {
     expect(() => render(<ChatPage />, { wrapper })).not.toThrow();
+  });
+
+  it('returns null when not authenticated', () => {
+    vi.mocked(isAuthenticated).mockReturnValue(false);
+    const { container } = render(<ChatPage />, { wrapper });
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('shows scroll-to-bottom button when not at bottom', () => {
+    vi.mocked(useScrollToBottom).mockReturnValue({
+      scrollRef: { current: null },
+      endRef: { current: null },
+      isAtBottom: false,
+      onScroll: vi.fn(),
+      scrollToBottom: mockScrollToBottom,
+      markJustSent: vi.fn(),
+    });
+    render(<ChatPage />, { wrapper });
+    const btn = screen.getByRole('button', { name: /jump to latest messages/i });
+    expect(btn).toBeTruthy();
+    fireEvent.click(btn);
+    expect(mockScrollToBottom).toHaveBeenCalledWith('smooth');
+  });
+
+  it('renders mobile file explorer sidebar when isMobile=true and sidebarOpen=true', () => {
+    vi.mocked(useChatLayout).mockReturnValue({
+      isMobile: true,
+      sidebarOpen: true,
+      setSidebarOpen: vi.fn(),
+      rightSidebarOpen: false,
+      setRightSidebarOpen: vi.fn(),
+      sidebarCollapsed: false,
+      setSidebarCollapsed: vi.fn(),
+      rightSidebarCollapsed: false,
+      setRightSidebarCollapsed: vi.fn(),
+      settingsOpen: false,
+      setSettingsOpen: vi.fn(),
+      searchQuery: '',
+      setSearchQuery: vi.fn(),
+      closeMobileSidebar: vi.fn(),
+      closeSettings: vi.fn(),
+    });
+    render(<ChatPage />, { wrapper });
+    // File explorer is rendered inside the mobile sidebar overlay
+    expect(screen.getAllByTestId('file-explorer').length).toBeGreaterThan(0);
+  });
+
+  it('renders mobile activity sidebar when isMobile=true and rightSidebarOpen=true', () => {
+    vi.mocked(useChatLayout).mockReturnValue({
+      isMobile: true,
+      sidebarOpen: false,
+      setSidebarOpen: vi.fn(),
+      rightSidebarOpen: true,
+      setRightSidebarOpen: vi.fn(),
+      sidebarCollapsed: false,
+      setSidebarCollapsed: vi.fn(),
+      rightSidebarCollapsed: false,
+      setRightSidebarCollapsed: vi.fn(),
+      settingsOpen: false,
+      setSettingsOpen: vi.fn(),
+      searchQuery: '',
+      setSearchQuery: vi.fn(),
+      closeMobileSidebar: vi.fn(),
+      closeSettings: vi.fn(),
+    });
+    render(<ChatPage />, { wrapper });
+    expect(screen.getAllByTestId('agent-thinking-sidebar').length).toBeGreaterThan(0);
+  });
+
+  it('does not render left/right panels for mobile', () => {
+    vi.mocked(useChatLayout).mockReturnValue({
+      isMobile: true,
+      sidebarOpen: false,
+      setSidebarOpen: vi.fn(),
+      rightSidebarOpen: false,
+      setRightSidebarOpen: vi.fn(),
+      sidebarCollapsed: false,
+      setSidebarCollapsed: vi.fn(),
+      rightSidebarCollapsed: false,
+      setRightSidebarCollapsed: vi.fn(),
+      settingsOpen: false,
+      setSettingsOpen: vi.fn(),
+      searchQuery: '',
+      setSearchQuery: vi.fn(),
+      closeMobileSidebar: vi.fn(),
+      closeSettings: vi.fn(),
+    });
+    render(<ChatPage />, { wrapper });
+    // Desktop sidebars not present in mobile mode
+    expect(screen.queryByTestId('file-explorer')).toBeNull();
+    expect(screen.queryByTestId('agent-thinking-sidebar')).toBeNull();
   });
 });

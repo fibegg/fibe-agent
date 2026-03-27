@@ -215,5 +215,77 @@ describe('useChatAttachments', () => {
     act(() => { result.current.handlePaste(event); });
     expect(result.current.pendingImages).toEqual([]);
   });
+
+  it('handleDrop calls addFiles with dropped files', async () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+
+    // Stub FileReader as a class constructor
+    class FakeFileReader {
+      result = 'data:image/png;base64,abc';
+      onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
+      readAsDataURL(_file: File) {
+        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
+      }
+    }
+    vi.stubGlobal('FileReader', FakeFileReader);
+
+    const file = new File(['pixel'], 'photo.png', { type: 'image/png' });
+    const mockFileList = { 0: file, length: 1, item: (i: number) => (i === 0 ? file : null) } as unknown as FileList;
+
+    const dropEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { files: mockFileList },
+    } as unknown as React.DragEvent;
+
+    await act(async () => {
+      result.current.handleDrop(dropEvent);
+      await new Promise((resolve) => queueMicrotask(resolve as () => void));
+    });
+
+    expect(result.current.pendingImages.length).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('handlePaste reads image from clipboard items', async () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+
+    class FakeFileReader {
+      result = 'data:image/png;base64,xyz';
+      onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
+      readAsDataURL(_file: File) {
+        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
+      }
+    }
+    vi.stubGlobal('FileReader', FakeFileReader);
+
+    const fakeFile = new File(['pixel'], 'image.png', { type: 'image/png' });
+    const pasteEvent = {
+      clipboardData: {
+        getData: () => '',
+        items: [{ type: 'image/png', getAsFile: () => fakeFile }],
+      },
+    } as unknown as React.ClipboardEvent;
+
+    await act(async () => {
+      result.current.handlePaste(pasteEvent);
+      await new Promise((resolve) => queueMicrotask(resolve as () => void));
+    });
+
+    expect(result.current.pendingImages.length).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('handlePaste skips when item.getAsFile() returns null', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const pasteEvent = {
+      clipboardData: {
+        getData: () => '',
+        items: [{ type: 'image/jpeg', getAsFile: () => null }],
+      },
+    } as unknown as React.ClipboardEvent;
+    act(() => { result.current.handlePaste(pasteEvent); });
+    expect(result.current.pendingImages).toEqual([]);
+  });
 });
 
