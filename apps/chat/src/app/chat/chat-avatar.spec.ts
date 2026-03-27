@@ -32,6 +32,16 @@ describe('chat-avatar', () => {
     it('returns undefined for whitespace-only url with empty base64', () => {
       expect(resolveAvatar('', '   ')).toBeUndefined();
     });
+
+    it('passes through a base64 value that already has a data: prefix as-is', () => {
+      const full = 'data:image/svg+xml;base64,PHN2ZyAvPg==';
+      expect(resolveAvatar(full, null)).toBe(full);
+    });
+
+    it('passes through a data: URI even when url is also set', () => {
+      const full = 'data:image/svg+xml;base64,PHN2ZyAvPg==';
+      expect(resolveAvatar(full, 'https://example.com/fallback.png')).toBe(full);
+    });
   });
 
   // loadAvatarConfig —————————————————————————————————————————
