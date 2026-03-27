@@ -101,14 +101,20 @@ WORKDIR /app
 COPY --from=builder /app/apps/api/dist ./dist/
 COPY --from=builder /app/apps/chat/dist ./chat/
 COPY apps/api/package.json ./package.json
+
+# node-gyp must be globally available for native addon compilation.
+# It lives only in the builder stage, so we reinstall it here.
+RUN npm install -g node-gyp
+
+# Install production JS deps. --ignore-scripts is safe for pure-JS packages.
 RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
 # Compile node-pty native addon for the target platform.
-# Must run WITHOUT --ignore-scripts so node-gyp builds pty.node.
+# --build-from-source bypasses prebuilt lookup (no prebuilts exist for Node 24).
 # Separate RUN layer prevents BuildKit from cross-caching amd64/arm64 binaries.
-RUN npm install node-pty@1.1.0 --omit=dev
+RUN npm rebuild node-pty --build-from-source
 
 # @playwright/mcp – globally install so the agent can use it without npx download.
 # Pin version to keep browser↔library alignment deterministic.
