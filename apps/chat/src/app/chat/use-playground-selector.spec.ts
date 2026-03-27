@@ -182,4 +182,36 @@ describe('usePlaygroundSelector', () => {
     expect(result.current.breadcrumbs).toEqual([]);
     expect(result.current.canGoBack).toBe(false);
   });
+
+  it('browseTo with a symlink entry updates breadcrumbs like a directory', async () => {
+    const rootEntries = [
+      { name: 'playzones', path: 'playzones', type: 'directory' },
+    ];
+    const symlinkEntries = [
+      { name: 'example-backend', path: 'playzones/example-backend', type: 'symlink' },
+    ];
+
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) })
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) });
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    await act(async () => {
+      result.current.open();
+    });
+
+    mockApiRequest.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(symlinkEntries),
+    });
+
+    await act(async () => {
+      result.current.browseTo('playzones');
+    });
+
+    expect(result.current.entries).toEqual(symlinkEntries);
+    expect(result.current.breadcrumbs).toEqual(['playzones']);
+    expect(result.current.canGoBack).toBe(true);
+  });
 });

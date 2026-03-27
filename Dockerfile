@@ -105,6 +105,11 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
+# Compile node-pty native addon for the target platform.
+# Must run WITHOUT --ignore-scripts so node-gyp builds pty.node.
+# Separate RUN layer prevents BuildKit from cross-caching amd64/arm64 binaries.
+RUN npm install node-pty@1.1.0 --omit=dev
+
 # @playwright/mcp – globally install so the agent can use it without npx download.
 # Pin version to keep browser↔library alignment deterministic.
 RUN --mount=type=cache,target=/root/.npm \

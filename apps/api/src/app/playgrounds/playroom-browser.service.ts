@@ -1,4 +1,4 @@
-import { readdir, lstat, symlink, unlink, readlink } from 'node:fs/promises';
+import { readdir, lstat, stat, symlink, unlink, readlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { resolve, relative } from 'node:path';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
@@ -7,7 +7,7 @@ import { ConfigService } from '../config/config.service';
 export interface BrowseEntry {
   name: string;
   path: string;
-  type: 'file' | 'directory';
+  type: 'file' | 'directory' | 'symlink';
 }
 
 /** Reusable path-traversal guard. */
@@ -44,9 +44,23 @@ export class PlayroomBrowserService {
       const name = typeof e.name === 'string' ? e.name : String(e.name);
       if (name.startsWith('.')) continue;
       const childRel = rel ? `${rel}/${name}` : name;
-      if (e.isDirectory()) {
+      const childAbs = resolve(absPath, name);
+
+      if (e.isSymbolicLink()) {
+        // Follow the symlink to determine the target type
+        try {
+          const targetStat = await stat(childAbs);
+          if (targetStat.isDirectory()) {
+            dirs.push({ name, path: childRel, type: 'symlink' });
+          } else {
+            files.push({ name, path: childRel, type: 'file' });
+          }
+        } catch {
+          // Broken symlink — skip
+        }
+      } else if (e.isDirectory()) {
         dirs.push({ name, path: childRel, type: 'directory' });
-      } else if (e.isFile() || e.isSymbolicLink()) {
+      } else if (e.isFile()) {
         files.push({ name, path: childRel, type: 'file' });
       }
     }
