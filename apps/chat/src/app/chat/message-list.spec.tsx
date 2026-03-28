@@ -5,7 +5,11 @@ import { MessageList, type ChatMessage, type MessageListHandle } from './message
 
 vi.mock('../api-url', () => ({
   buildApiUrl: (path: string) => path,
-  getAuthTokenForRequest: () => '',
+  getAuthTokenForRequest: () => 'tok',
+}));
+
+vi.mock('../avatar-config-context', () => ({
+  useAvatarConfig: vi.fn().mockReturnValue({ userAvatarUrl: undefined, assistantAvatarUrl: undefined }),
 }));
 
 describe('MessageList', () => {
@@ -90,6 +94,77 @@ describe('MessageList', () => {
     );
     expect(screen.getByText('First')).toBeTruthy();
     expect(screen.getByText('Second')).toBeTruthy();
+  });
+
+  it('renders user message with imageUrls', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: 'Look at this',
+        created_at: '2025-03-11T17:00:00.000Z',
+        imageUrls: ['test.png', 'test2.jpg'],
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const images = container.querySelectorAll('img');
+    expect(images.length).toBe(2);
+    expect(images[0]?.getAttribute('src')).toContain('test.png');
+    expect(images[0]?.getAttribute('src')).toContain('token=tok');
+  });
+
+  it('renders queued status for user message', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', body: 'Q', created_at: '2025-03-11T17:00:00.000Z', queued: true },
+    ];
+    render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
+    expect(screen.getByText('Queued')).toBeTruthy();
+  });
+
+  it('renders token usage and model for assistant message', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: 'A',
+        created_at: '2025-03-11T17:00:00.000Z',
+        usage: { inputTokens: 1000, outputTokens: 2500 },
+        model: 'gemini-2.5',
+      },
+    ];
+    render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
+    expect(screen.getByText(/1K in \/ 2\.5K out/)).toBeTruthy();
+    expect(screen.getByText('gemini-2.5')).toBeTruthy();
+  });
+
+  it('renders custom avatar URLs when present in context', async () => {
+    const { useAvatarConfig } = await import('../avatar-config-context');
+    vi.mocked(useAvatarConfig).mockReturnValue({
+      userAvatarUrl: 'https://example.com/user.png',
+      assistantAvatarUrl: 'https://example.com/bot.png',
+    });
+    const messages: ChatMessage[] = [
+      { role: 'user', body: 'U', created_at: '2025-03-11T17:00:00.000Z' },
+      { role: 'assistant', body: 'A', created_at: '2025-03-11T17:01:00.000Z' },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const userImg = container.querySelector('img[src="https://example.com/user.png"]');
+    const botImg = container.querySelector('img[src="https://example.com/bot.png"]');
+    expect(userImg).toBeTruthy();
+    expect(botImg).toBeTruthy();
+
+    // Reset for other tests
+    vi.mocked(useAvatarConfig).mockReturnValue({ userAvatarUrl: undefined, assistantAvatarUrl: undefined });
+  });
+
+  it('uses full width class when bothSidebarsCollapsed is true', () => {
+    const messages: ChatMessage[] = [{ role: 'user', body: 'U', created_at: '2025-03-11T17:00:00.000Z' }];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} bothSidebarsCollapsed={true} />
+    );
+    expect(container.querySelector('.max-w-full')).toBeTruthy();
   });
 
   it('shows thinking state when streaming with empty text', () => {

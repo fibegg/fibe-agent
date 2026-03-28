@@ -64,9 +64,9 @@ export const ACTIVITY_MONO = 'text-xs text-foreground/90 whitespace-pre-wrap fon
 export const BADGE_CARD = 'shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
 
 export const AVATAR_USER =
-  'size-7 sm:size-8 rounded-full bg-gradient-to-br from-violet-600 to-purple-600 flex items-center justify-center text-white ring-2 ring-background';
+  'size-7 sm:size-8 rounded-full flex items-center justify-center text-white ring-2 ring-background';
 export const AVATAR_ASSISTANT =
-  'size-7 sm:size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white ring-2 ring-background';
+  'size-7 sm:size-8 rounded-lg flex items-center justify-center relative text-white ring-2 ring-background';
 
 export const BUBBLE_ASSISTANT =
   'rounded-2xl rounded-tl-md bg-card/60 backdrop-blur-md border border-border/50 shadow-sm text-card-foreground';

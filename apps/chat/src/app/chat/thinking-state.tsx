@@ -52,7 +52,7 @@ export function ThinkingAvatar() {
     );
   }
   return (
-    <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white flex-shrink-0 overflow-hidden">
+    <div className="size-8 rounded-lg flex items-center justify-center relative text-white flex-shrink-0 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-thinking-shine" />
       <Sparkles className="size-4 relative z-10 animate-thinking-pulse" />
     </div>
