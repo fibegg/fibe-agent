@@ -12,6 +12,10 @@ vi.mock('../avatar-config-context', () => ({
   useAvatarConfig: vi.fn().mockReturnValue({ userAvatarUrl: undefined, assistantAvatarUrl: undefined }),
 }));
 
+vi.mock('../file-explorer/prism-loader', () => ({
+  highlightCodeElement: vi.fn(),
+}));
+
 describe('MessageList', () => {
   it('renders without error when messages is empty and not streaming', () => {
     render(
@@ -133,7 +137,7 @@ describe('MessageList', () => {
       },
     ];
     render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
-    expect(screen.getByText(/1K in \/ 2\.5K out/)).toBeTruthy();
+    expect(screen.getByText(/1k in \/ 2\.5k out/i)).toBeTruthy();
     expect(screen.getByText('gemini-2.5')).toBeTruthy();
   });
 
