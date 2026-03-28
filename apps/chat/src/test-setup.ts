@@ -38,7 +38,8 @@ vi.stubGlobal('localStorage', storage);
 // Wrap vi.unstubAllGlobals so it always restores our working localStorage after
 const _unstubAllGlobals = vi.unstubAllGlobals.bind(vi);
 vi.unstubAllGlobals = () => {
-  _unstubAllGlobals();
+  const result = _unstubAllGlobals();
   // Re-apply our working localStorage after Vitest nukes everything
   vi.stubGlobal('localStorage', storage);
+  return result;
 };
