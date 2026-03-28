@@ -5,9 +5,29 @@ const AUTO_AUTH_TIMEOUT_MS = 3000;
 type AuthResolve = () => void;
 let pendingResolve: AuthResolve | null = null;
 
+/**
+ * Tracks whether auto-auth already completed successfully before
+ * waitForAutoAuth() was called. This handles the race where the parent
+ * iframe sends auto_auth before the LoginPage mounts its useEffect.
+ */
+let earlyAuthSuccess = false;
+
+/**
+ * Guard to prevent concurrent login attempts from duplicate postMessages
+ * sent by the parent's _sendAuth() retry loop.
+ */
+let authInFlight = false;
+
 export function waitForAutoAuth(): Promise<boolean> {
   if (window === window.parent) return Promise.resolve(false);
   if (isAuthenticated()) return Promise.resolve(false);
+
+  // The auto_auth message arrived (and succeeded) before this was called.
+  // Resolve immediately so LoginPage navigates to chat.
+  if (earlyAuthSuccess) {
+    earlyAuthSuccess = false;
+    return Promise.resolve(true);
+  }
 
   return new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
@@ -32,13 +52,28 @@ function onMessage(event: MessageEvent): void {
   const password = data?.password;
   if (!data || data.action !== 'auto_auth' || typeof password !== 'string') return;
 
-  window.removeEventListener('message', onMessage);
+  // Already authenticated (e.g. from a previous message in the retry loop)
+  if (isAuthenticated()) return;
+
+  // Prevent concurrent login attempts from the parent's retry loop
+  if (authInFlight) return;
+  authInFlight = true;
 
   void (async () => {
-    const success = await handleAutoAuth(password);
-    if (success && pendingResolve) {
-      pendingResolve();
-      pendingResolve = null;
+    try {
+      const success = await handleAutoAuth(password);
+      if (success) {
+        if (pendingResolve) {
+          // LoginPage is already waiting — resolve its promise
+          pendingResolve();
+          pendingResolve = null;
+        } else {
+          // LoginPage hasn't mounted yet — store for when it calls waitForAutoAuth()
+          earlyAuthSuccess = true;
+        }
+      }
+    } finally {
+      authInFlight = false;
     }
   })();
 }
