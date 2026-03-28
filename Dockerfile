@@ -3,7 +3,11 @@ FROM node:24-slim AS cli
 ARG BUILDKIT_INLINE_CACHE=1
 ARG AGENT_PROVIDER=gemini
 
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,target=/root/.npm \
     if [ "$AGENT_PROVIDER" = "gemini" ]; then \
@@ -23,8 +27,12 @@ COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
 
 ARG BUILDKIT_INLINE_CACHE=1
 
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+
 # node-pty requires native compilation; install build tools + node-gyp
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
         python3 make g++ \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g node-gyp
@@ -49,45 +57,43 @@ COPY shared shared
 ENV NX_DAEMON=false \
     VITE_THEME_SOURCE=frame \
     VITE_HIDE_THEME_SWITCH=true
-RUN npx nx run-many --targets=build --projects=api,chat
+
+RUN --mount=type=cache,target=/app/.nx/cache \
+    npx nx run-many --targets=build --projects=api,chat
 
 FROM node:24-slim
 
 ARG BUILDKIT_INLINE_CACHE=1
-ARG GIT_SHA
-ENV GIT_SHA=$GIT_SHA
+ARG AGENT_PROVIDER=gemini
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
 # Unconditional packages — cached across all provider variants
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
     jq less tree wget zip unzip openssh-client docker.io \
-    # Tier 1 – essential agent tooling
     python3 python3-venv \
     ripgrep fd-find \
     make file patch \
     ca-certificates \
-    # Tier 2 – extended agent tooling
     sqlite3 pandoc htop strace \
     imagemagick ffmpeg ghostscript \
-    # Tier 3 – native compilation support
     build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/fdfind /usr/local/bin/fd
 
-# uv – ultrafast Python package/project manager (single static binary)
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-# uvx wrapper – some uv versions don't handle argv[0]=="uvx" correctly,
-# so we use a shell script that delegates to `uv tool run` instead of a symlink.
 RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
     && chmod +x /usr/local/bin/uvx
 
-# Deno – secure JS/TS runtime for quick scripting
 ENV DENO_INSTALL=/usr/local
 RUN curl -fsSL https://deno.land/install.sh | sh
 
-# Conditional packages — only busts cache for claude_code builds
-ARG AGENT_PROVIDER=gemini
-RUN if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
     apt-get update && apt-get install -y --no-install-recommends \
     dbus gnome-keyring libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*; \
@@ -98,34 +104,32 @@ COPY --from=cli /usr/local/bin /usr/local/bin
 
 WORKDIR /app
 
-COPY --from=builder /app/apps/api/dist ./dist/
-COPY --from=builder /app/apps/chat/dist ./chat/
+# ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
 COPY apps/api/package.json ./package.json
 
 # node-gyp must be globally available for native addon compilation.
-# It lives only in the builder stage, so we reinstall it here.
-RUN npm install -g node-gyp
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g node-gyp
 
-# Install production JS deps. --ignore-scripts is safe for pure-JS packages.
+# Install production JS deps AND mcp-remote
 RUN --mount=type=cache,target=/root/.npm \
     npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
 # Compile node-pty native addon for the target platform.
-# --build-from-source bypasses prebuilt lookup (no prebuilts exist for Node 24).
-# Separate RUN layer prevents BuildKit from cross-caching amd64/arm64 binaries.
-RUN npm rebuild node-pty --build-from-source
+RUN --mount=type=cache,target=/root/.npm \
+    npm rebuild node-pty --build-from-source
 
-# @playwright/mcp – globally install so the agent can use it without npx download.
-# Pin version to keep browser↔library alignment deterministic.
+# @playwright/mcp
 RUN --mount=type=cache,target=/root/.npm \
     npm install -g @playwright/mcp@0.0.68
 
-# System libraries required by Chromium (must run as root).
-RUN npx -y playwright install-deps chromium
+# System libraries required by Chromium.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    npx -y playwright install-deps chromium
 
-EXPOSE 3000
-
+# ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && touch /app/data/STEERING.md \
     && if [ "$AGENT_PROVIDER" = "gemini" ]; then \
@@ -141,9 +145,21 @@ RUN mkdir -p /app/data /app/playground /home/node/.cache \
 
 USER node
 
-# Download Chromium browser binary as node so it lands in /home/node/.cache
-# and is accessible at runtime (container runs as USER node).
+# Download Chromium browser binary as node
 RUN npx -y playwright install chromium
+
+USER root
+
+# ---- FINALLY COPY DIST FILES ----
+# Doing this LAST ensures code changes don't bust the Playwright/native cache
+COPY --from=builder /app/apps/api/dist ./dist/
+COPY --from=builder /app/apps/chat/dist ./chat/
+
+# Inject git SHA at the last possible moment so it doesn't bust previous caches
+ARG GIT_SHA
+ENV GIT_SHA=$GIT_SHA
+
+USER node
 
 ENTRYPOINT ["/usr/bin/dumb-init", "--"]
 

@@ -1,13 +1,35 @@
+# 1. Deny Everything Default
+*
+
+# 2. Whitelist ONLY files explicitly requested by `Dockerfile`
+!package.json
+!bun.lock
+!package-lock.json*
+!nx.json
+!tsconfig.base.json
+!tsconfig.json
+!eslint.config.mjs
+!vitest.workspace.ts
+
+# 3. Whitelist ONLY directories explicitly manipulated by `Dockerfile`
+!apps/api/
+!apps/chat/
+!apps/e2e-api/
+!apps/e2e-chat/
+!shared/
+
+# 4. Re-Blacklist recursive compiler & test caches explicitly nested inside the allowed dirs above
 node_modules
 **/node_modules
 **/dist
-.git
-.env
-.env.*
-!.env.example
-*.log
-.DS_Store
-apps/*-e2e
+**/out-tsc
+**/*.tsbuildinfo
 **/test-results
 **/playwright-report
 **/.nx
+
+# 5. Re-Blacklist specific heavy runtime artifacts (just in case)
+data/
+playground/
+apps/api/data/
+apps/api/playground/

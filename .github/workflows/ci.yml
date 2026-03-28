@@ -31,8 +31,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('bun.lock', 'nx.json', 'package.json') }}
+          key: nx-${{ runner.os }}-${{ github.ref_name }}-${{ github.run_id }}
           restore-keys: |
+            nx-${{ runner.os }}-${{ github.ref_name }}-
             nx-${{ runner.os }}-
       - name: Install dependencies
         run: bun install --frozen-lockfile
