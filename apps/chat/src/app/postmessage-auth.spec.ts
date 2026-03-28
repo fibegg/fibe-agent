@@ -73,10 +73,9 @@ describe('waitForAutoAuth', () => {
       new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
     );
 
-    // Let microtasks run (loginWithPassword is async)
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    // Let microtasks run (loginWithPassword is async: fetch → json() → setToken)
+    await new Promise(process.nextTick);
+    await vi.runAllTimersAsync();
 
     // Now the LoginPage "mounts" and calls waitForAutoAuth — it should
     // resolve true immediately because earlyAuthSuccess was set

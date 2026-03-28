@@ -20,14 +20,14 @@ let authInFlight = false;
 
 export function waitForAutoAuth(): Promise<boolean> {
   if (window === window.parent) return Promise.resolve(false);
-  if (isAuthenticated()) return Promise.resolve(false);
-
   // The auto_auth message arrived (and succeeded) before this was called.
   // Resolve immediately so LoginPage navigates to chat.
   if (earlyAuthSuccess) {
     earlyAuthSuccess = false;
     return Promise.resolve(true);
   }
+
+  if (isAuthenticated()) return Promise.resolve(false);
 
   return new Promise<boolean>((resolve) => {
     const timeout = setTimeout(() => {
@@ -78,6 +78,12 @@ function onMessage(event: MessageEvent): void {
   })();
 }
 
+const LISTENER_KEY = '__auto_auth_listener';
 if (window !== window.parent) {
+  const existing = (window as any)[LISTENER_KEY];
+  if (existing) {
+    window.removeEventListener('message', existing);
+  }
   window.addEventListener('message', onMessage);
+  (window as any)[LISTENER_KEY] = onMessage;
 }
