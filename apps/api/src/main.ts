@@ -71,6 +71,7 @@ async function bootstrap() {
       directives: {
         frameAncestors: ancestors,
         scriptSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:', 'https:'],
         ...(isHttp ? { upgradeInsecureRequests: null } : {}),
       },
     },
