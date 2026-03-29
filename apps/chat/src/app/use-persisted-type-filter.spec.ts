@@ -121,14 +121,8 @@ describe('usePersistedTypeFilter', () => {
   });
 
   it('returns single-string wrapped in array when raw value is a non-JSON string', () => {
-    // Cover the inner-catch branch: raw.startsWith('[') is false → return [raw]
-    vi.spyOn(Storage.prototype, 'getItem').mockReturnValue('tool_call');
-    // Also make JSON.parse throw (simulate old browsers storing bare string)
-    const origParse = JSON.parse;
-    vi.spyOn(JSON, 'parse').mockImplementationOnce(() => { throw new SyntaxError('bad'); });
+    localStorage.setItem(STORAGE_KEY, 'tool_call');
     const { result } = renderHook(() => usePersistedTypeFilter());
     expect(result.current[0]).toEqual(['tool_call']);
-    vi.restoreAllMocks();
-    JSON.parse = origParse;
   });
 });

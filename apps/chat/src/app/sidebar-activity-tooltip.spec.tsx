@@ -1,6 +1,5 @@
-import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { SidebarActivityTooltip } from './sidebar-activity-tooltip';
 
 describe('SidebarActivityTooltip', () => {

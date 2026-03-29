@@ -616,6 +616,7 @@ describe('useChatWebSocket message handlers', () => {
       _onopen?: () => void;
       _onclose?: (e: { code: number }) => void;
       constructor() {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         createdWs = this;
       }
       set onopen(handler: () => void) { this._onopen = handler; }
