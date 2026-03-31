@@ -9,6 +9,7 @@ export function useChatInitialData(authenticated: boolean) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [refreshingModels, setRefreshingModels] = useState(false);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -19,8 +20,10 @@ export function useChatInitialData(authenticated: boolean) {
       }
       const data = (await res.json()) as ChatMessage[];
       setMessages(Array.isArray(data) ? data : []);
+      setMessagesLoaded(true);
     } catch {
       setMessages([]);
+      setMessagesLoaded(true);
     }
   }, [navigate]);
 
@@ -57,5 +60,5 @@ export function useChatInitialData(authenticated: boolean) {
     }
   }, [authenticated, loadMessages, loadModelOptions]);
 
-  return { messages, setMessages, modelOptions, refreshingModels, loadMessages, refreshModelOptions };
+  return { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, loadMessages, refreshModelOptions };
 }
