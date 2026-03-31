@@ -7,6 +7,10 @@ import {
   MAX_PENDING_TOTAL,
 } from './use-chat-attachments';
 
+vi.mock('../api-url', () => ({
+  apiRequest: vi.fn(),
+}));
+
 function mockClipboard(getData: (type: string) => string) {
   return { getData } as unknown as ClipboardEvent['clipboardData'];
 }
@@ -214,6 +218,166 @@ describe('useChatAttachments', () => {
     } as unknown as React.ClipboardEvent;
     act(() => { result.current.handlePaste(event); });
     expect(result.current.pendingImages).toEqual([]);
+  });
+
+  it('handleDrop calls addFiles with dropped files', async () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+
+    // Stub FileReader as a class constructor
+    class FakeFileReader {
+      result = 'data:image/png;base64,abc';
+      onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
+      readAsDataURL(_file: File) {
+        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
+      }
+    }
+    vi.stubGlobal('FileReader', FakeFileReader);
+
+    const file = new File(['pixel'], 'photo.png', { type: 'image/png' });
+    const mockFileList = { 0: file, length: 1, item: (i: number) => (i === 0 ? file : null) } as unknown as FileList;
+
+    const dropEvent = {
+      preventDefault: vi.fn(),
+      stopPropagation: vi.fn(),
+      dataTransfer: { files: mockFileList },
+    } as unknown as React.DragEvent;
+
+    await act(async () => {
+      result.current.handleDrop(dropEvent);
+      await new Promise((resolve) => queueMicrotask(resolve as () => void));
+    });
+
+    expect(result.current.pendingImages.length).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('handlePaste reads image from clipboard items', async () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+
+    class FakeFileReader {
+      result = 'data:image/png;base64,xyz';
+      onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
+      readAsDataURL(_file: File) {
+        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
+      }
+    }
+    vi.stubGlobal('FileReader', FakeFileReader);
+
+    const fakeFile = new File(['pixel'], 'image.png', { type: 'image/png' });
+    const pasteEvent = {
+      clipboardData: {
+        getData: () => '',
+        items: [{ type: 'image/png', getAsFile: () => fakeFile }],
+      },
+    } as unknown as React.ClipboardEvent;
+
+    await act(async () => {
+      result.current.handlePaste(pasteEvent);
+      await new Promise((resolve) => queueMicrotask(resolve as () => void));
+    });
+
+    expect(result.current.pendingImages.length).toBeGreaterThan(0);
+    vi.unstubAllGlobals();
+  });
+
+  it('handlePaste skips when item.getAsFile() returns null', () => {
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const pasteEvent = {
+      clipboardData: {
+        getData: () => '',
+        items: [{ type: 'image/jpeg', getAsFile: () => null }],
+      },
+    } as unknown as React.ClipboardEvent;
+    act(() => { result.current.handlePaste(pasteEvent); });
+    expect(result.current.pendingImages).toEqual([]);
+  });
+
+  describe('file uploads (addFiles / uploadAttachment)', () => {
+    it('handleFileChange early returns if no files', () => {
+      const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+      const event = { target: { files: null, value: 'test' } } as unknown as React.ChangeEvent<HTMLInputElement>;
+      act(() => { result.current.handleFileChange(event); });
+      expect(result.current.pendingAttachments).toEqual([]);
+    });
+
+    it('handleFileChange triggers addFiles and resets input value', async () => {
+      const { apiRequest } = await import('../api-url');
+      vi.mocked(apiRequest).mockResolvedValue({
+        ok: true,
+        json: async () => ({ filename: 'uploaded.txt' }),
+      } as Response);
+
+      const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+      const file = new File(['text'], 'test.txt', { type: 'text/plain' });
+      const mockFileList = { 0: file, length: 1, item: () => file } as unknown as FileList;
+      const event = { target: { files: mockFileList, value: 'C:\\fakepath\\test.txt' } } as unknown as React.ChangeEvent<HTMLInputElement>;
+
+      await act(async () => {
+        result.current.handleFileChange(event);
+        await new Promise((resolve) => queueMicrotask(resolve as () => void));
+      });
+
+      expect(event.target.value).toBe('');
+      expect(result.current.pendingAttachments.length).toBe(1);
+      expect(result.current.pendingAttachments[0].filename).toBe('uploaded.txt');
+    });
+
+    it('uploadAttachment sets error if apiRequest fails', async () => {
+      const { apiRequest } = await import('../api-url');
+      vi.mocked(apiRequest).mockResolvedValue({ ok: false } as Response);
+
+      const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+      const file = new File(['text'], 'fail.txt', { type: 'text/plain' });
+
+      await act(async () => {
+        await result.current.addFiles([file]);
+      });
+
+      expect(result.current.attachmentUploadError).toBe('Could not upload fail.txt');
+      expect(result.current.pendingAttachments.length).toBe(0);
+    });
+
+    it('uploadAttachment handles capacity limits (MAX_PENDING_TOTAL)', async () => {
+      const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+      
+      // Manually saturate pendingImages + attachments up to MAX_PENDING_TOTAL (10)
+      act(() => {
+        for(let i=0; i<5; i++) result.current.addImage(`img${i}`);
+        for(let i=0; i<5; i++) result.current.addAttachment(`att${i}`, 'test');
+      });
+
+      const file = new File(['text'], 'extra.txt', { type: 'text/plain' });
+      await act(async () => {
+        await result.current.addFiles([file]);
+      });
+
+      // Should break immediately and not add the 11th item
+      expect(result.current.pendingAttachments.length).toBe(5);
+    });
+
+    it('handleDrop respects capacity limits', () => {
+      const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+      act(() => {
+        for(let i=0; i<10; i++) result.current.addImage(`img${i}`); // Overload images array directly (ignoring max 5 images logic for capacity test)
+      });
+      
+      const file = new File(['text'], 'test.txt', { type: 'text/plain' });
+      const mockFileList = { 0: file, length: 1, item: () => file } as unknown as FileList;
+      const dropEvent = {
+        preventDefault: vi.fn(),
+        stopPropagation: vi.fn(),
+        dataTransfer: { files: mockFileList },
+      } as unknown as React.DragEvent;
+
+      act(() => { result.current.handleDrop(dropEvent); });
+      expect(result.current.pendingAttachments.length).toBe(0); // Add file skipped
+    });
+    
+    it('setVoiceUploadError updates state', () => {
+      const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+      act(() => { result.current.setVoiceUploadError('failed voice'); });
+      expect(result.current.voiceUploadError).toBe('failed voice');
+    });
   });
 });
 

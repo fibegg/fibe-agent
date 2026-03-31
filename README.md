@@ -139,6 +139,7 @@ fibe-agent/
 ├── shared/           # Shared TS types, WS constants, API path helpers
 ├── docs/
 │   └── API.md        # REST, WebSocket, and logging contract
+├── AGENTS.md         # Agent providers, config, protocol, and architecture reference
 ├── playground/       # Agent working directory (file explorer root)
 └── data/             # Persisted messages, activities, uploads (per conversation)
 ```
@@ -217,7 +218,7 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 
 ## API summary
 
-Full spec: [docs/API.md](docs/API.md).
+Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSocket protocol: [AGENTS.md](AGENTS.md).
 
 ### REST
 
