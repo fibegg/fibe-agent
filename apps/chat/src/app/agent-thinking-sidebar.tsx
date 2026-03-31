@@ -5,7 +5,6 @@ import { SidebarToggle } from './sidebar-toggle';
 import {
   PANEL_HEADER_MIN_HEIGHT_PX,
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
-  RIGHT_SIDEBAR_WIDTH_PX,
 } from './layout-constants';
 import type { ThinkingStep } from './chat/thinking-types';
 import {
@@ -30,6 +29,7 @@ import { useThinkingSidebarData } from './use-thinking-sidebar-data';
 import { SidebarStatsBar } from './sidebar-stats-bar';
 import { SidebarReasoningPanel } from './sidebar-reasoning-panel';
 import { SidebarActivityTooltip } from './sidebar-activity-tooltip';
+import { PanelResizeHandle } from './panel-resize-handle';
 export type { StoryEntry, SessionActivityEntry } from './agent-thinking-blocks';
 
 const ACTIVITY_ESTIMATE_HEIGHT = 32;
@@ -90,6 +90,10 @@ interface AgentThinkingSidebarProps {
   pastActivityFromMessages?: SessionActivityEntry[];
   sessionTokenUsage?: { inputTokens: number; outputTokens: number } | null;
   mobileOverlay?: boolean;
+  width?: number;
+  isDraggingResize?: boolean;
+  panelRef?: React.RefObject<HTMLDivElement | null>;
+  onResizeStart?: (e: React.PointerEvent) => void;
   onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
 }
 
@@ -105,6 +109,10 @@ export function AgentThinkingSidebar({
   pastActivityFromMessages = [],
   sessionTokenUsage = null,
   mobileOverlay = false,
+  width,
+  isDraggingResize = false,
+  panelRef,
+  onResizeStart,
   onActivityClick,
 }: AgentThinkingSidebarProps) {
   const latestActivityId =
@@ -261,13 +269,15 @@ export function AgentThinkingSidebar({
 
   return (
     <div
+      ref={!mobileOverlay ? panelRef : undefined}
       className={`relative min-h-0 flex flex-col ${mobileOverlay ? `${SIDEBAR_PANEL} bg-background` : SIDEBAR_PANEL}`}
       style={{
         width: mobileOverlay
           ? '100%'
           : isCollapsed
             ? RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX
-            : RIGHT_SIDEBAR_WIDTH_PX,
+            : (width ?? 280),
+        ...(isDraggingResize ? { transition: 'none' } : {}),
       }}
     >
       <SidebarToggle
@@ -278,6 +288,13 @@ export function AgentThinkingSidebar({
           isCollapsed ? 'Expand thinking panel' : 'Collapse thinking panel'
         }
       />
+      {!isCollapsed && !mobileOverlay && onResizeStart && (
+        <PanelResizeHandle
+          side="right"
+          isDragging={isDraggingResize}
+          onPointerDown={onResizeStart}
+        />
+      )}
       <div className="min-h-0 overflow-visible flex-1 flex flex-col min-w-0">
       <style>{`
         @keyframes statTick {
