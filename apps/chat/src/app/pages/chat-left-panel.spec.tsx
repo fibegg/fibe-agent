@@ -13,6 +13,7 @@ vi.mock('../file-explorer/file-explorer', () => ({
 const baseProps = {
   hasAnyFiles: true,
   sidebarCollapsed: false,
+  width: 280,
   playgroundTree: [],
   agentFileTree: [],
   activeFileTab: 'playground' as const,
@@ -20,6 +21,8 @@ const baseProps = {
   onSettingsClick: vi.fn(),
   onToggleCollapse: vi.fn(),
   onFileSelect: vi.fn(),
+  onResizeStart: vi.fn(),
+  panelRef: { current: null },
   selectedPath: null,
   dirtyPaths: new Set<string>(),
 };
@@ -52,12 +55,21 @@ describe('ChatLeftPanel', () => {
     expect(getByTestId('file-explorer').getAttribute('data-collapsed')).toBe('true');
   });
 
-  it('passes collapsed=false when sidebar is expanded and has files', () => {
-    const { getByTestId } = render(
+  it('renders resize handle when expanded and has files', () => {
+    const { container } = render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} hasAnyFiles={true} sidebarCollapsed={false} />
       </MemoryRouter>
     );
-    expect(getByTestId('file-explorer').getAttribute('data-collapsed')).toBe('false');
+    expect(container.querySelector('[role="separator"]')).toBeTruthy();
+  });
+
+  it('does not render resize handle when collapsed', () => {
+    const { container } = render(
+      <MemoryRouter>
+        <ChatLeftPanel {...baseProps} sidebarCollapsed={true} />
+      </MemoryRouter>
+    );
+    expect(container.querySelector('[role="separator"]')).toBeNull();
   });
 });

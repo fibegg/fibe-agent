@@ -25,6 +25,9 @@ const baseProps = {
   sessionActivity: [],
   pastActivityFromMessages: [],
   sessionTokenUsage: null,
+  width: 280,
+  onResizeStart: vi.fn(),
+  panelRef: { current: null },
 };
 
 describe('ChatRightPanel', () => {
@@ -60,6 +63,15 @@ describe('ChatRightPanel', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} sessionTokenUsage={usage} />
+      </MemoryRouter>
+    );
+    expect(getByTestId('thinking-sidebar')).toBeTruthy();
+  });
+
+  it('renders without crashing when given a custom width', () => {
+    const { getByTestId } = render(
+      <MemoryRouter>
+        <ChatRightPanel {...baseProps} width={400} />
       </MemoryRouter>
     );
     expect(getByTestId('thinking-sidebar')).toBeTruthy();
