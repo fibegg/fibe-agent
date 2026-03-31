@@ -17,7 +17,7 @@ vi.mock('../theme-toggle', () => ({
   ThemeToggle: () => <button type="button" aria-label="Toggle theme">Theme</button>,
 }));
 
-vi.mock('../activity-review-panel', () => ({
+vi.mock('../activity-type-filters', () => ({
   ActivityTypeFilters: () => <div data-testid="activity-filters" />,
 }));
 
@@ -299,5 +299,123 @@ describe('ChatSettingsModal', () => {
       />
     );
     expect(screen.getByRole('button', { name: /logout/i })).toBeTruthy();
+  });
+
+  it('handleExportData calls apiRequest for export and creates object URL', async () => {
+    const { apiRequest } = await import('../api-url');
+    const fakeBlob = new Blob(['{}'], { type: 'application/json' });
+    vi.mocked(apiRequest).mockResolvedValue({
+      ok: true,
+      blob: async () => fakeBlob,
+      json: async () => ({ state: 'done' }),
+    } as unknown as Response);
+
+    const createObjectURL = vi.fn().mockReturnValue('blob:fake');
+    const revokeObjectURL = vi.fn();
+    Object.defineProperty(globalThis, 'URL', {
+      writable: true,
+      value: { createObjectURL, revokeObjectURL },
+    });
+
+    // Sub document.createElement to avoid real navigation
+    const clickSpy = vi.fn();
+    const originalCreateElement = document.createElement.bind(document);
+    vi.spyOn(document, 'createElement').mockImplementation((tagName) => {
+      if (tagName === 'a') {
+        const a = originalCreateElement('a');
+        a.click = clickSpy;
+        return a;
+      }
+      return originalCreateElement(tagName);
+    });
+
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /export my data/i }));
+    await waitFor(() => expect(createObjectURL).toHaveBeenCalledWith(fakeBlob));
+    expect(clickSpy).toHaveBeenCalled();
+    expect(revokeObjectURL).toHaveBeenCalled();
+
+    vi.restoreAllMocks();
+    Object.defineProperty(globalThis, 'URL', { writable: true, value: window.URL ?? URL });
+  });
+
+  it('handleDeleteData does nothing when user cancels confirm', async () => {
+    const { apiRequest } = await import('../api-url');
+    vi.mocked(apiRequest).mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'done' }),
+    } as Response);
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /delete my data/i }));
+    const calls = vi.mocked(apiRequest).mock.calls;
+    const deleteCalls = calls.filter((c) => (c[1] as RequestInit | undefined)?.method === 'DELETE');
+    expect(deleteCalls.length).toBe(0);
+    vi.unstubAllGlobals();
+    vi.stubGlobal('__APP_VERSION__', '1.0.0');
+  });
+
+  it('handleDeleteData calls DELETE when user confirms', async () => {
+    const { apiRequest } = await import('../api-url');
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+
+    let deleteCallMade = false;
+    vi.mocked(apiRequest).mockImplementation(async (path: string, opts?: RequestInit) => {
+      if ((opts as RequestInit | undefined)?.method === 'DELETE') {
+        deleteCallMade = true;
+        return { ok: true } as Response;
+      }
+      return { ok: true, json: async () => ({ state: 'done' }) } as Response;
+    });
+
+    // Suppress jsdom "not implemented navigation" error for location.reload
+    const reloadSpy = vi.fn();
+    const originalLocation = window.location;
+    // @ts-expect-error jsdom bypass
+    delete window.location;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    window.location = { ...originalLocation, reload: reloadSpy } as any;
+
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /delete my data/i }));
+    await waitFor(() => expect(deleteCallMade).toBe(true));
+    expect(reloadSpy).toHaveBeenCalled();
+
+    // Restore
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    window.location = originalLocation as any;
+    vi.unstubAllGlobals();
+    vi.stubGlobal('__APP_VERSION__', '1.0.0');
   });
 });

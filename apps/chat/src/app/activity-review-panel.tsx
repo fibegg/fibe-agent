@@ -62,7 +62,7 @@ export function StoryListRow({
       className={`${TREE_NODE_BASE} ${isSelected ? TREE_NODE_SELECTED : ''}`}
     >
       <Icon className={`size-4 shrink-0 ${iconColor}`} />
-      <span className="truncate text-left flex-1 min-w-0">{summary || label}</span>
+      <span className="truncate text-left flex-1 min-w-0">{summary}</span>
       <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>{formatRelativeTime(story.timestamp)}</span>
     </button>
   );
@@ -120,7 +120,7 @@ export function StoryDetail({
       {isThinkingBlock ? (
         <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-[70vh] overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO} whitespace-pre-wrap`}>
-            {reasoningBodyWithHighlights(story.details ?? '', q)}
+            {reasoningBodyWithHighlights(story.details as string, q)}
           </p>
         </div>
       ) : (
@@ -135,11 +135,6 @@ export function StoryDetail({
                 {highlightText(story.details, q)}
               </p>
             )}
-          {story.type === 'tool_call' && story.command && (
-            <pre className="mt-1 text-[11px] font-mono text-green-300/95 bg-background/40 rounded px-2 py-1 overflow-x-auto">
-              $ {highlightText(story.command, q)}
-            </pre>
-          )}
         </div>
       )}
     </div>
@@ -197,7 +192,7 @@ function CommandGroupListRow({
   const [expanded, setExpanded] = useState(false);
   const n = entries.length;
   const first = entries[0];
-  if (!first) return null;
+
   return (
     <div>
       <button
@@ -218,7 +213,7 @@ function CommandGroupListRow({
           : <ChevronRight className="size-3.5 shrink-0 text-violet-500" />}
         <Terminal className="size-3.5 shrink-0 text-violet-500" />
         <span className="flex-1 truncate text-left text-xs">
-          {n} command{n !== 1 ? 's' : ''}
+          {n} commands
         </span>
         <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>
           {formatRelativeTime(first.story.timestamp)}
@@ -285,7 +280,7 @@ export function ActivityStoryList({
               key={item.id}
               entries={item.entries}
               isAnySelected={isAnySelected}
-              onSelectFirst={() => onSelectStory(item.entries[0]?.originalIndex ?? 0)}
+              onSelectFirst={() => onSelectStory(item.entries[0].originalIndex)}
             />
           );
         }

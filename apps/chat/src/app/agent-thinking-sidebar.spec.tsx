@@ -1,8 +1,38 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import { AgentThinkingSidebar } from './agent-thinking-sidebar';
 
+vi.mock('@tanstack/react-virtual', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-virtual')>();
+  return {
+    ...actual,
+    useVirtualizer: (options: any) => {
+      return {
+        getVirtualItems: () => {
+          if (options.count > 15) {
+            return Array.from({ length: 5 }).map((_, i) => ({ index: i, start: i * 32, measureElement: vi.fn() }));
+          }
+          return [];
+        },
+        getTotalSize: () => options.count * 32,
+        measureElement: vi.fn(),
+      };
+    },
+  };
+});
+
+vi.mock('./sidebar-activity-tooltip', () => ({
+  SidebarActivityTooltip: ({ tooltip }: any) => {
+    if (!tooltip) return null;
+    return <div role="tooltip">{tooltip.content}</div>;
+  }
+}));
+
 describe('AgentThinkingSidebar', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
   it('renders stats line and activity (brain) button when expanded', () => {
     const sessionActivity = [
       { id: 'e1', created_at: new Date().toISOString(), story: [{ id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() }] },
@@ -452,7 +482,7 @@ describe('AgentThinkingSidebar', () => {
       />
     );
     const lsButton = screen.getByText('ls').closest('button');
-    fireEvent.click(lsButton!);
+    if (lsButton) fireEvent.click(lsButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
     expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'act-uuid-1', storyId: 's2' });
   });
@@ -479,7 +509,7 @@ describe('AgentThinkingSidebar', () => {
     );
     const thinkingButtons = screen.getAllByText('Thinking...');
     const listEntryButton = thinkingButtons[0].closest('button');
-    fireEvent.click(listEntryButton!);
+    if (listEntryButton) fireEvent.click(listEntryButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
     expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'latest-act', storyId: 'e1' });
   });
@@ -505,7 +535,7 @@ describe('AgentThinkingSidebar', () => {
       />
     );
     const reasoningButton = screen.getByText(/Current reasoning content/).closest('button');
-    fireEvent.click(reasoningButton!);
+    if (reasoningButton) fireEvent.click(reasoningButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
     expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'act-1' });
   });
@@ -530,5 +560,111 @@ describe('AgentThinkingSidebar', () => {
     fireEvent.click(outerWrapperButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
     expect(onActivityClick).toHaveBeenCalledWith({ activityId: '1', storyId: '1' });
+  });
+
+  describe('Search and Activity Filtering', () => {
+    it('updates search query and clears it', () => {
+      render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={[]} />);
+      const input = screen.getByPlaceholderText('Search activity...');
+      fireEvent.change(input, { target: { value: 'test search' } });
+      expect(input).toHaveProperty('value', 'test search');
+
+      const clearBtn = screen.getByRole('button', { name: 'Clear search' });
+      fireEvent.click(clearBtn);
+      expect(input).toHaveProperty('value', '');
+    });
+
+    it('shows no activity matches text when search yields no results', () => {
+      const storyItems = [{ id: '1', type: 'tool_call', message: 'xyz123', timestamp: new Date().toISOString() }];
+      render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />);
+      
+      const input = screen.getByPlaceholderText('Search activity...');
+      fireEvent.change(input, { target: { value: 'notfound' } });
+      expect(screen.getByText(/No activity matches "notfound"/)).toBeTruthy();
+    });
+  });
+
+  describe('Collapsed view tooltips', () => {
+    it('sets tooltip on mouse enter and clears on mouse leave', async () => {
+      const storyItems = [{ id: '1', type: 'tool_call', message: 'Command', timestamp: new Date().toISOString(), command: 'Step content' }];
+      const { container } = render(
+        <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} storyItems={storyItems} />
+      );
+      const dot = container.querySelector('span[title="$ Step content"]');
+      expect(dot).toBeTruthy();
+
+      if (dot) fireEvent.mouseEnter(dot);
+      await waitFor(() => {
+        expect(screen.getByText('$ Step content')).toBeTruthy();
+      });
+
+      if (dot) fireEvent.mouseLeave(dot);
+      await waitFor(() => {
+        expect(screen.queryByRole('tooltip')).toBeNull();
+      });
+    });
+  });
+
+  describe('Copy and Animations', () => {
+    let writeTextMock: ReturnType<typeof vi.fn>;
+
+    beforeEach(() => {
+      vi.useFakeTimers();
+      writeTextMock = vi.fn().mockResolvedValue(true);
+      Object.defineProperty(navigator, 'clipboard', { value: { writeText: writeTextMock }, writable: true });
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
+
+    it('copies payload to clipboard and runs animation when completely collapsed', async () => {
+      const sessionActivity = [{ id: 'e1', created_at: '2025', story: [{ id: '1', type: 'step', message: 'Test', timestamp: '2025' }] }];
+      render(<AgentThinkingSidebar isCollapsed onToggle={vi.fn()} sessionActivity={sessionActivity} />);
+      
+      const btn = screen.getByRole('button', { name: 'Copy activity to clipboard' });
+      await act(async () => {
+        fireEvent.click(btn);
+        await Promise.resolve();
+      });
+
+      expect(writeTextMock).toHaveBeenCalled();
+      const payload = JSON.parse(writeTextMock.mock.calls[0][0]);
+      expect(payload.sessionStats.totalActions).toBe(1);
+
+      // Verify button is disabled during animation
+      expect(btn.hasAttribute('disabled')).toBe(true);
+
+      // Fast forward to clear animation
+      act(() => { vi.advanceTimersByTime(2500); });
+      expect(btn.hasAttribute('disabled')).toBe(false);
+    });
+  });
+
+  describe('Virtualized rendering', () => {
+    it('renders natively without virtualization when items are few', () => {
+      const storyItems = Array.from({ length: 5 }).map((_, i) => ({
+        id: `id${i}`, type: 'step', message: `msg${i}`, timestamp: new Date().toISOString()
+      }));
+      const { container } = render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />);
+      // Should not use absolute positioning when not virtualized
+      const rows = container.querySelectorAll('.absolute.left-0.w-full');
+      expect(rows.length).toBe(0);
+    });
+
+    it('uses virtualizer and renders correct window when items exceed threshold of 15', async () => {
+      const storyItems = Array.from({ length: 20 }).map((_, i) => ({
+        id: `id${i}`, type: i % 2 === 0 ? 'tool_call' : 'file_created', message: `msg${i}`, timestamp: new Date().toISOString(), command: `cmd${i}`
+      }));
+
+      // In JSDOM with our mock, components exceeding 15 items will render exactly 5 absolute-positioned rows
+      const { container } = render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />);
+      
+      await waitFor(() => {
+        const virtualRows = container.querySelectorAll('.absolute.left-0.w-full');
+        expect(virtualRows.length).toBe(5);
+      });
+    });
   });
 });

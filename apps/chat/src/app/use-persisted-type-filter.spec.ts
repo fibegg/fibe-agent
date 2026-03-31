@@ -109,4 +109,20 @@ describe('usePersistedTypeFilter', () => {
 
     expect(result.current[0]).toEqual(['step']);
   });
+
+  it('returns empty array when localStorage.getItem throws', () => {
+    // Cover the outer catch in readFilter
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new Error('SecurityError');
+    });
+    const { result } = renderHook(() => usePersistedTypeFilter());
+    expect(result.current[0]).toEqual([]);
+    vi.restoreAllMocks();
+  });
+
+  it('returns single-string wrapped in array when raw value is a non-JSON string', () => {
+    localStorage.setItem(STORAGE_KEY, 'tool_call');
+    const { result } = renderHook(() => usePersistedTypeFilter());
+    expect(result.current[0]).toEqual(['tool_call']);
+  });
 });

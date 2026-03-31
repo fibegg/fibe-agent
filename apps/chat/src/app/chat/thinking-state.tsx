@@ -1,7 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getThinkingLines } from './thinking-copy';
-import { ASSISTANT_AVATAR_URL } from './chat-avatar';
+import { useAvatarConfig } from '../avatar-config-context';
 
 const CYCLE_MS = 2400;
 
@@ -43,15 +43,16 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
 }
 
 export function ThinkingAvatar() {
-  if (ASSISTANT_AVATAR_URL) {
+  const { assistantAvatarUrl } = useAvatarConfig();
+  if (assistantAvatarUrl) {
     return (
       <div className="size-8 rounded-lg flex-shrink-0 overflow-hidden bg-muted">
-        <img src={ASSISTANT_AVATAR_URL} alt="" className="size-full object-cover" />
+        <img src={assistantAvatarUrl} alt="" className="size-full object-cover" />
       </div>
     );
   }
   return (
-    <div className="size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center relative text-white flex-shrink-0 overflow-hidden">
+    <div className="size-8 rounded-lg flex items-center justify-center relative text-white flex-shrink-0 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-thinking-shine" />
       <Sparkles className="size-4 relative z-10 animate-thinking-pulse" />
     </div>

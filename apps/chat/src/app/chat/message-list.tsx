@@ -25,7 +25,8 @@ import {
   BUBBLE_USER,
   PROSE_MESSAGE,
 } from '../ui-classes';
-import { ASSISTANT_AVATAR_URL, USER_AVATAR_URL } from './chat-avatar';
+import { useAvatarConfig } from '../avatar-config-context';
+
 import {
   normalizeBarePreElementsInContainer,
   stringHash32,
@@ -290,24 +291,25 @@ const MessageRow = memo(function MessageRow({
   onRetry?: () => void;
   isNoOutput?: boolean;
 }) {
+  const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
   return (
     <div
       className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
     >
       <div className="flex-shrink-0">
         {msg.role === 'user' ? (
-          USER_AVATAR_URL ? (
+          userAvatarUrl ? (
             <div className={`${AVATAR_USER} overflow-hidden`}>
-              <img src={USER_AVATAR_URL} alt="" className="size-full object-cover" />
+              <img src={userAvatarUrl} alt="" className="size-full object-cover" />
             </div>
           ) : (
             <div className={AVATAR_USER}>
               <User className="size-3.5 sm:size-4" />
             </div>
           )
-        ) : ASSISTANT_AVATAR_URL ? (
+        ) : assistantAvatarUrl ? (
           <div className={`${AVATAR_ASSISTANT} overflow-hidden`}>
-            <img src={ASSISTANT_AVATAR_URL} alt="" className="size-full object-cover" />
+            <img src={assistantAvatarUrl} alt="" className="size-full object-cover" />
           </div>
         ) : (
           <div className={AVATAR_ASSISTANT}>

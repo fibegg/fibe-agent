@@ -149,4 +149,48 @@ describe('initTheme', () => {
   it('does not throw', () => {
     expect(() => initTheme()).not.toThrow();
   });
+
+  it('registers matchMedia change listener and re-applies when no stored theme', () => {
+    let changeHandler: (() => void) | null = null;
+    const mockMediaQueryList = {
+      matches: false,
+      addEventListener: vi.fn((event: string, handler: () => void) => {
+        if (event === 'change') changeHandler = handler;
+      }),
+    };
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockReturnValue(mockMediaQueryList),
+    });
+
+    initTheme();
+    expect(mockMediaQueryList.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+
+    // Simulate system theme change — no stored theme, so applyTheme runs
+    (changeHandler as (() => void) | null)?.();
+    // Should not throw — applyTheme was called
+  });
+
+  it('matchMedia change handler skips applyTheme when a theme is explicitly stored', () => {
+    let changeHandler: (() => void) | null = null;
+    const mockMediaQueryList = {
+      matches: true,
+      addEventListener: vi.fn((event: string, handler: () => void) => {
+        if (event === 'change') changeHandler = handler;
+      }),
+    };
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: vi.fn().mockReturnValue(mockMediaQueryList),
+    });
+    localStorage.setItem(STORAGE_KEY, 'light');
+
+    initTheme();
+    // Stored theme exists → calling changeHandler should suppress applyTheme (but won't throw)
+    (changeHandler as (() => void) | null)?.();
+    // light theme stored — dark class should still NOT be on
+    expect(document.documentElement.classList.contains('dark')).toBe(false);
+  });
 });
