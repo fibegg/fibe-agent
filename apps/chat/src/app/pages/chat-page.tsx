@@ -27,6 +27,17 @@ import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
 import { ChatLayout } from './chat-layout';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
+import { usePanelResize } from '../use-panel-resize';
+import {
+  SIDEBAR_MIN_WIDTH_PX,
+  SIDEBAR_MAX_WIDTH_PX,
+  SIDEBAR_WIDTH_PX,
+  SIDEBAR_WIDTH_STORAGE_KEY,
+  RIGHT_SIDEBAR_MIN_WIDTH_PX,
+  RIGHT_SIDEBAR_MAX_WIDTH_PX,
+  RIGHT_SIDEBAR_WIDTH_PX,
+  RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
+} from '../layout-constants';
 
 import { getActivityPath } from '../activity-path';
 import { ChatSettingsModal } from '../chat/chat-settings-modal';
@@ -81,6 +92,24 @@ export function ChatPage() {
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const pgSelector = usePlaygroundSelector();
+
+  const leftResize = usePanelResize({
+    initialWidth: SIDEBAR_WIDTH_PX,
+    minWidth: SIDEBAR_MIN_WIDTH_PX,
+    maxWidth: SIDEBAR_MAX_WIDTH_PX,
+    storageKey: SIDEBAR_WIDTH_STORAGE_KEY,
+    side: 'left',
+  });
+
+  const rightResize = usePanelResize({
+    initialWidth: RIGHT_SIDEBAR_WIDTH_PX,
+    minWidth: RIGHT_SIDEBAR_MIN_WIDTH_PX,
+    maxWidth: RIGHT_SIDEBAR_MAX_WIDTH_PX,
+    storageKey: RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
+    side: 'right',
+  });
+
+  const isPanelResizing = leftResize.isDragging || rightResize.isDragging;
 
   const handlePageDirtyChange = useCallback((path: string, isDirty: boolean) => {
     setPageDirtyPaths((prev) => {
@@ -387,6 +416,7 @@ export function ChatPage() {
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
+      isPanelResizing={isPanelResizing}
       dragOverlay={<DragDropOverlay />}
       modals={
         <>
@@ -471,6 +501,9 @@ export function ChatPage() {
           <ChatLeftPanel
             hasAnyFiles={hasAnyFiles}
             sidebarCollapsed={sidebarCollapsed}
+            width={leftResize.width}
+            isDraggingResize={leftResize.isDragging}
+            panelRef={leftResize.panelRef}
             playgroundTree={playgroundTree}
             agentFileTree={agentFileTree as PlaygroundEntry[]}
             activeFileTab={activeFileTab}
@@ -480,6 +513,7 @@ export function ChatPage() {
             onSettingsClick={() => setSettingsOpen(true)}
             onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
             onFileSelect={(entry) => setViewingFile(entry)}
+            onResizeStart={leftResize.startResize}
             selectedPath={viewingFile?.path ?? null}
             dirtyPaths={pageDirtyPaths}
           />
@@ -498,6 +532,10 @@ export function ChatPage() {
             sessionActivity={sessionActivity}
             pastActivityFromMessages={pastActivityFromMessages}
             sessionTokenUsage={sessionTokenUsage}
+            width={rightResize.width}
+            isDraggingResize={rightResize.isDragging}
+            panelRef={rightResize.panelRef}
+            onResizeStart={rightResize.startResize}
           />
         ) : null
       }

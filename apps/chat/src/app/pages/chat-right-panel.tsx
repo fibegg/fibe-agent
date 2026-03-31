@@ -16,6 +16,10 @@ interface ChatRightPanelProps {
   sessionActivity: SessionActivityEntry[];
   pastActivityFromMessages: SessionActivityEntry[];
   sessionTokenUsage: { inputTokens: number; outputTokens: number } | null;
+  width: number;
+  isDraggingResize?: boolean;
+  panelRef: React.RefObject<HTMLDivElement | null>;
+  onResizeStart: (e: React.PointerEvent) => void;
 }
 
 export const ChatRightPanel = memo(function ChatRightPanel({
@@ -29,6 +33,10 @@ export const ChatRightPanel = memo(function ChatRightPanel({
   sessionActivity,
   pastActivityFromMessages,
   sessionTokenUsage,
+  width,
+  isDraggingResize = false,
+  panelRef,
+  onResizeStart,
 }: ChatRightPanelProps) {
   const navigate = useNavigate();
 
@@ -44,6 +52,10 @@ export const ChatRightPanel = memo(function ChatRightPanel({
       sessionActivity={sessionActivity}
       pastActivityFromMessages={pastActivityFromMessages}
       sessionTokenUsage={sessionTokenUsage}
+      width={width}
+      isDraggingResize={isDraggingResize}
+      panelRef={panelRef}
+      onResizeStart={onResizeStart}
       onActivityClick={(payload) => navigate(getActivityPath(payload))}
     />
   );
