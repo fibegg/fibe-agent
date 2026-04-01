@@ -1,0 +1,32 @@
+# fibe-agent — docker-compose for running from pre-built GHCR image
+# Usage: docker compose up
+#
+# The image already contains the compiled app (/app/dist/main.js + /app/chat/).
+# Mount ONLY data directories — never mount the entire project root into /app,
+# as that would overwrite the built artifacts inside the image.
+#
+# Copy .env.example → .env and fill in your keys before starting.
+
+services:
+  agent:
+    image: ghcr.io/fibegg/fibe-agent:${AGENT_PROVIDER:-gemini}-latest
+    restart: unless-stopped
+    ports:
+      - "${PORT:-3000}:3000"
+    env_file:
+      - .env
+    environment:
+      PORT: "3000"
+    volumes:
+      # Persistent conversation data (messages, activities, uploads)
+      - ./data:/app/data
+      # Agent working directory — files the agent reads/writes
+      - ./playground:/app/playground
+    # Optional: mount your own system prompt
+    # - ./my-system-prompt.md:/app/system-prompt.md
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
