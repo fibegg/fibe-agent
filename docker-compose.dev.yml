@@ -1,0 +1,61 @@
+# fibe-agent — docker-compose for LOCAL DEVELOPMENT from source
+# Runs API + Chat via `nx serve` inside the container with hot-reload.
+#
+# Usage:
+#   docker compose -f docker-compose.dev.yml up
+#
+# The source code is mounted into /app so changes are picked up immediately.
+# node_modules are kept in a named volume so they don't conflict with your
+# local host node_modules (which may be compiled for a different platform).
+
+services:
+  agent-dev:
+    image: node:24-slim
+    working_dir: /app
+    restart: unless-stopped
+
+    # NX needs a TTY — without it nx run-many crashes with "addRunningTask" errors
+    tty: true
+    stdin_open: true
+
+    ports:
+      - "${PORT:-3000}:3000"   # API + static chat UI
+      - "3100:3100"             # Vite dev server (hot-reload)
+
+    env_file:
+      - .env
+    environment:
+      PORT: "3000"
+      NODE_ENV: "development"
+      # Disable NX daemon — it crashes in containers without a persistent process manager
+      NX_DAEMON: "false"
+      # Disable native file watcher — NX native binaries compiled on macOS won't
+      # load on Linux; this falls back to the JS watcher and avoids the null crash
+      NX_NATIVE_FILE_WATCHER: "false"
+
+    volumes:
+      # Mount source code for hot-reload
+      - .:/app
+      # Isolate node_modules from host — prevents macOS ↔ Linux binary conflicts
+      - node_modules_dev:/app/node_modules
+      # Persistent data & playground between restarts
+      - ./data:/app/data
+      - ./playground:/app/playground
+
+    # Install deps first (bun is not in node:24-slim, use npm/npx)
+    # then start API + Chat in parallel
+    command: >
+      sh -c "
+        npm install --prefer-offline --no-audit --no-fund &&
+        npx nx run-many --targets=serve,dev --parallel=2
+      "
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+volumes:
+  node_modules_dev:
