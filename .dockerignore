@@ -6,6 +6,7 @@
 !bun.lock
 !package-lock.json*
 !nx.json
+!docker-entrypoint.sh
 !tsconfig.base.json
 !tsconfig.json
 !eslint.config.mjs

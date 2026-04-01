@@ -150,6 +150,13 @@ RUN npx -y playwright install chromium
 
 USER root
 
+# ---- SMART ENTRYPOINT ----
+# Detects prod (dist/ present) vs dev (source code mounted, no dist/) at runtime.
+# In dev mode it runs `npm install` then `nx serve` so the container works
+# when the entire project root is volume-mounted (e.g. local Rails orchestration).
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 # ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
 COPY --from=builder /app/apps/api/dist ./dist/
@@ -161,6 +168,4 @@ ENV GIT_SHA=$GIT_SHA
 
 USER node
 
-ENTRYPOINT ["/usr/bin/dumb-init", "--"]
-
-CMD ["node", "dist/main.js"]
+ENTRYPOINT ["/usr/bin/dumb-init", "--", "/usr/local/bin/docker-entrypoint.sh"]
