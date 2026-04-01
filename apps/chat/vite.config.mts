@@ -30,8 +30,8 @@ export default defineConfig(() => ({
   cacheDir: '../../node_modules/.vite/apps/chat',
   server: {
     port: 3100,
-    host: 'localhost',
-    allowedHosts: ['.ngrok-free.dev'],
+    host: process.env.VITE_HOST || true,
+    allowedHosts: ['.ngrok-free.dev', '.phoenix.test'],
     proxy: {
       '/api': 'http://localhost:3000',
       '/ws': { target: 'http://localhost:3000', ws: true },
@@ -39,7 +39,7 @@ export default defineConfig(() => ({
   },
   preview: {
     port: 4300,
-    host: 'localhost',
+    host: process.env.VITE_HOST || true,
   },
   resolve: {
     alias: { '@shared': join(import.meta.dirname, '../../shared') },
