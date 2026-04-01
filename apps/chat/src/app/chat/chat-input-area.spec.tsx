@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ChatInputArea } from './chat-input-area';
 import { CHAT_STATES } from './chat-state';
 
@@ -243,5 +243,51 @@ describe('ChatInputArea', () => {
     render(<ChatInputArea {...BASE_PROPS} state={CHAT_STATES.UNAUTHENTICATED} />);
     const input = screen.getByTestId('mention-input');
     expect(input.getAttribute('disabled')).not.toBeNull();
+  });
+
+  // ── Deferred focus after Send (iframe postMessage fix) ───────────────────
+  // Clicking a button blurs the input. We restore focus via setTimeout(fn, 0)
+  // so the call happens *after* the parent frame's sortable-tabs DOM mutation
+  // triggered by window.parent.postMessage({ type: 'player_message_sent' }).
+
+  it('Send button restores focus to chatInputRef asynchronously, not synchronously', () => {
+    vi.useFakeTimers();
+    const focusMock = vi.fn();
+    const chatInputRef = { current: { focus: focusMock } } as unknown as React.RefObject<HTMLDivElement>;
+
+    render(<ChatInputArea {...BASE_PROPS} chatInputRef={chatInputRef} />);
+    fireEvent.click(screen.getByRole('button', { name: /send/i }));
+
+    // Must NOT have been called synchronously during the click handler
+    expect(focusMock).not.toHaveBeenCalled();
+
+    // Flush the deferred setTimeout(fn, 0)
+    act(() => vi.runAllTimers());
+    expect(focusMock).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
+  });
+
+  it('Queue-message button restores focus asynchronously when AWAITING_RESPONSE', () => {
+    vi.useFakeTimers();
+    const focusMock = vi.fn();
+    const chatInputRef = { current: { focus: focusMock } } as unknown as React.RefObject<HTMLDivElement>;
+
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+        inputValue="hello"
+        chatInputRef={chatInputRef}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /queue message/i }));
+
+    expect(focusMock).not.toHaveBeenCalled();
+
+    act(() => vi.runAllTimers());
+    expect(focusMock).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
   });
 });

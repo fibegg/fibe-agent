@@ -30,7 +30,10 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
         if (mentionOpen) return;
         e.preventDefault();
         onSendRef.current();
-        chatInputRef.current?.focus();
+        // Defer focus so it fires after window.parent.postMessage triggers
+        // DOM mutations in the parent frame (e.g. tab re-sorting), which
+        // can otherwise steal focus away from the iframe input.
+        setTimeout(() => chatInputRef.current?.focus(), 0);
       }
     },
     [onSendRef, mentionOpen]
@@ -45,7 +48,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
         inserted +
         inputValue.slice(cursorOffset);
       setInputState({ value: newVal, cursor: newVal.length });
-      chatInputRef.current?.focus();
+      setTimeout(() => chatInputRef.current?.focus(), 0);
     },
     [inputValue, cursorOffset, atMention.replaceStart]
   );
@@ -54,7 +57,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
     const newVal =
       inputValue.slice(0, atMention.replaceStart) + inputValue.slice(cursorOffset);
     setInputState({ value: newVal, cursor: atMention.replaceStart });
-    chatInputRef.current?.focus();
+    setTimeout(() => chatInputRef.current?.focus(), 0);
   }, [inputValue, cursorOffset, atMention.replaceStart]);
 
   return {

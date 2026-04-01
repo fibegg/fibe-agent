@@ -12,7 +12,7 @@ describe('useChatInput', () => {
     expect(result.current.cursorOffset).toBe(0);
   });
 
-  it('setInputState updates input value', () => {
+  it('setInputState updates input value and cursor', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
       useChatInput({ playgroundEntries: [], onSendRef })
@@ -24,20 +24,28 @@ describe('useChatInput', () => {
     expect(result.current.cursorOffset).toBe(5);
   });
 
-  it('handleKeyDown calls onSendRef when Enter without shift and mention not open', () => {
+  it('returns chatInputRef initialised to null', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
       useChatInput({ playgroundEntries: [], onSendRef })
     );
-    act(() => {
-      result.current.setInputState({ value: 'hi', cursor: 2 });
-    });
+    expect(result.current.chatInputRef).toEqual({ current: null });
+  });
+
+  // ── handleKeyDown ────────────────────────────────────────────────────────
+
+  it('handleKeyDown calls onSendRef on Enter without shift', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    act(() => result.current.setInputState({ value: 'hi', cursor: 2 }));
+
     const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
-    act(() => {
-      result.current.handleKeyDown(e as unknown as React.KeyboardEvent);
-    });
-    expect(onSendRef.current).toHaveBeenCalled();
-    expect(e.preventDefault).toHaveBeenCalled();
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+
+    expect(onSendRef.current).toHaveBeenCalledOnce();
+    expect(e.preventDefault).toHaveBeenCalledOnce();
   });
 
   it('handleKeyDown does not call onSendRef when shiftKey is true', () => {
@@ -46,32 +54,121 @@ describe('useChatInput', () => {
       useChatInput({ playgroundEntries: [], onSendRef })
     );
     const e = { key: 'Enter', shiftKey: true, preventDefault: vi.fn() };
-    act(() => {
-      result.current.handleKeyDown(e as unknown as React.KeyboardEvent);
-    });
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
     expect(onSendRef.current).not.toHaveBeenCalled();
   });
 
-  it('handleMentionSelect inserts path and updates input', () => {
+  it('handleKeyDown does not call onSendRef for non-Enter keys', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
       useChatInput({ playgroundEntries: [], onSendRef })
     );
-    act(() => {
-      result.current.setInputState({ value: '@', cursor: 1 });
-    });
-    act(() => {
-      result.current.handleMentionSelect('src/index.ts');
-    });
+    const e = { key: 'a', shiftKey: false, preventDefault: vi.fn() };
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    expect(onSendRef.current).not.toHaveBeenCalled();
+    expect(e.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('handleKeyDown defers focus via setTimeout so parent postMessage mutations settle first', () => {
+    vi.useFakeTimers();
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+
+    const focusMock = vi.fn();
+    // Attach a fake DOM node so the focus call has something to call
+    (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+      focus: focusMock,
+    };
+
+    const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+
+    // focus must NOT have been called synchronously
+    expect(focusMock).not.toHaveBeenCalled();
+
+    // Flush the deferred setTimeout(fn, 0)
+    act(() => vi.runAllTimers());
+    expect(focusMock).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
+  });
+
+  // ── handleMentionSelect ──────────────────────────────────────────────────
+
+  it('handleMentionSelect inserts path and moves cursor to end', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    act(() => result.current.setInputState({ value: '@', cursor: 1 }));
+    act(() => result.current.handleMentionSelect('src/index.ts'));
+
     expect(result.current.inputValue).toContain('@src/index.ts');
     expect(result.current.cursorOffset).toBe(result.current.inputValue.length);
   });
 
-  it('returns chatInputRef', () => {
+  it('handleMentionSelect defers focus via setTimeout', () => {
+    vi.useFakeTimers();
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
       useChatInput({ playgroundEntries: [], onSendRef })
     );
-    expect(result.current.chatInputRef).toEqual({ current: null });
+
+    const focusMock = vi.fn();
+    (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+      focus: focusMock,
+    };
+
+    act(() => {
+      result.current.setInputState({ value: '@', cursor: 1 });
+      result.current.handleMentionSelect('lib/foo.ts');
+    });
+
+    expect(focusMock).not.toHaveBeenCalled();
+    act(() => vi.runAllTimers());
+    expect(focusMock).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
+  });
+
+  // ── handleMentionClose ───────────────────────────────────────────────────
+
+  it('handleMentionClose removes the in-progress @-query from the value', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    // Simulate user having typed "@foo" at position 4
+    act(() => result.current.setInputState({ value: '@foo', cursor: 4 }));
+    act(() => result.current.handleMentionClose());
+
+    // The @-query should be stripped; value becomes ''
+    expect(result.current.inputValue).toBe('');
+  });
+
+  it('handleMentionClose defers focus via setTimeout', () => {
+    vi.useFakeTimers();
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+
+    const focusMock = vi.fn();
+    (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+      focus: focusMock,
+    };
+
+    act(() => {
+      result.current.setInputState({ value: '@partial', cursor: 8 });
+      result.current.handleMentionClose();
+    });
+
+    expect(focusMock).not.toHaveBeenCalled();
+    act(() => vi.runAllTimers());
+    expect(focusMock).toHaveBeenCalledOnce();
+
+    vi.useRealTimers();
   });
 });
