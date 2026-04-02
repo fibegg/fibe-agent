@@ -238,9 +238,6 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
   }
 
   private getCodexHomeForSession(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CODEX_HOME_SUBDIR);
-    }
     return getCodexHome();
   }
 
