@@ -5,9 +5,10 @@ import type { PlaygroundEntryItem } from './use-playground-files';
 export interface UseChatInputParams {
   playgroundEntries: PlaygroundEntryItem[];
   onSendRef: React.MutableRefObject<() => void>;
+  isMobile?: boolean; // Mobile allows raw Enter for newlines
 }
 
-export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParams) {
+export function useChatInput({ playgroundEntries, onSendRef, isMobile }: UseChatInputParams) {
   const [inputState, setInputState] = useState({ value: '', cursor: 0 });
   const [mentionDropdownClosedAfterSelect, setMentionDropdownClosedAfterSelect] = useState(false);
   const chatInputRef = useRef<HTMLDivElement>(null);
@@ -24,41 +25,42 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
     if (!atMention.show) setMentionDropdownClosedAfterSelect(false);
   }, [atMention.show]);
 
+  const focusInput = useCallback(() => {
+    setTimeout(() => chatInputRef.current?.focus(), 50);
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
-        if (mentionOpen) return;
+        if (mentionOpen || isMobile) return;
         e.preventDefault();
         onSendRef.current();
-        // Defer focus so it fires after window.parent.postMessage triggers
-        // DOM mutations in the parent frame (e.g. tab re-sorting), which
-        // can otherwise steal focus away from the iframe input.
-        setTimeout(() => chatInputRef.current?.focus(), 0);
+        focusInput();
       }
     },
-    [onSendRef, mentionOpen]
+    [onSendRef, mentionOpen, isMobile, focusInput]
   );
 
   const handleMentionSelect = useCallback(
     (path: string) => {
       setMentionDropdownClosedAfterSelect(true);
       const inserted = `@${path} `;
-      const newVal =
-        inputValue.slice(0, atMention.replaceStart) +
-        inserted +
-        inputValue.slice(cursorOffset);
-      setInputState({ value: newVal, cursor: newVal.length });
-      setTimeout(() => chatInputRef.current?.focus(), 0);
+      setInputState((prev) => {
+        const newVal = prev.value.slice(0, atMention.replaceStart) + inserted + prev.value.slice(prev.cursor);
+        return { value: newVal, cursor: atMention.replaceStart + inserted.length };
+      });
+      focusInput();
     },
-    [inputValue, cursorOffset, atMention.replaceStart]
+    [atMention.replaceStart, focusInput]
   );
 
   const handleMentionClose = useCallback(() => {
-    const newVal =
-      inputValue.slice(0, atMention.replaceStart) + inputValue.slice(cursorOffset);
-    setInputState({ value: newVal, cursor: atMention.replaceStart });
-    setTimeout(() => chatInputRef.current?.focus(), 0);
-  }, [inputValue, cursorOffset, atMention.replaceStart]);
+    setInputState((prev) => {
+      const newVal = prev.value.slice(0, atMention.replaceStart) + prev.value.slice(prev.cursor);
+      return { value: newVal, cursor: atMention.replaceStart };
+    });
+    focusInput();
+  }, [atMention.replaceStart, focusInput]);
 
   return {
     inputValue,

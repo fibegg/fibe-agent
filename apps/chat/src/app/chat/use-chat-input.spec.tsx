@@ -58,6 +58,17 @@ describe('useChatInput', () => {
     expect(onSendRef.current).not.toHaveBeenCalled();
   });
 
+  it('handleKeyDown does not call onSendRef when isMobile is true', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef, isMobile: true })
+    );
+    const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    expect(onSendRef.current).not.toHaveBeenCalled();
+    expect(e.preventDefault).not.toHaveBeenCalled();
+  });
+
   it('handleKeyDown does not call onSendRef for non-Enter keys', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
@@ -107,6 +118,19 @@ describe('useChatInput', () => {
 
     expect(result.current.inputValue).toContain('@src/index.ts');
     expect(result.current.cursorOffset).toBe(result.current.inputValue.length);
+  });
+
+  it('handleMentionSelect inserts path correctly in the middle of text', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    // "prefix @ suffix" -> user typing @ at cursor 8
+    act(() => result.current.setInputState({ value: 'prefix @ suffix', cursor: 8 }));
+    act(() => result.current.handleMentionSelect('lib/util.ts'));
+
+    expect(result.current.inputValue).toBe('prefix @lib/util.ts  suffix');
+    expect(result.current.cursorOffset).toBe('prefix @lib/util.ts '.length);
   });
 
   it('handleMentionSelect defers focus via setTimeout', () => {

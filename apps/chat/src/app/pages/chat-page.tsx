@@ -140,7 +140,7 @@ export function ChatPage() {
     handleKeyDown,
     handleMentionSelect,
     handleMentionClose,
-  } = useChatInput({ playgroundEntries, onSendRef: handleSendRef });
+  } = useChatInput({ playgroundEntries, onSendRef: handleSendRef, isMobile });
   const messageListRef = useRef<MessageListHandle | null>(null);
 
   useEffect(() => {

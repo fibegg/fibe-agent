@@ -222,7 +222,7 @@ export function ChatInputArea({
                 onClick={() => {
                   onSend();
                   // Restore focus after parent postMessage DOM mutation settles
-                  setTimeout(() => chatInputRef.current?.focus(), 0);
+                  setTimeout(() => chatInputRef.current?.focus(), 50);
                 }}
                 disabled={!inputValue.trim()}
                 className="relative size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-30 transition-opacity"
@@ -251,7 +251,7 @@ export function ChatInputArea({
               onClick={() => {
                 onSend();
                 // Restore focus after parent postMessage DOM mutation settles
-                setTimeout(() => chatInputRef.current?.focus(), 0);
+                setTimeout(() => chatInputRef.current?.focus(), 50);
               }}
               disabled={!isReady}
               className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
