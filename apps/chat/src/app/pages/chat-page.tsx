@@ -601,6 +601,7 @@ export function ChatPage() {
           onPlaygroundGoToRoot={pgSelector.goToRoot}
           onPlaygroundLink={pgSelector.linkPlayground}
           onPlaygroundLinked={refetchPlaygrounds}
+          onPlaygroundSmartMount={pgSelector.smartMount}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}

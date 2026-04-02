@@ -1,10 +1,10 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, Folder, FolderOpen, ArrowLeft, Home, Link2, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Folder, FolderOpen, ArrowLeft, Home, Link2, Loader2, Sparkles } from 'lucide-react';
 import type { BrowseEntry } from './use-playground-selector';
 
 const TRIGGER_CLASS =
-  'hidden md:flex items-center gap-1.5 min-w-0 max-w-[200px] h-8 px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
+  'flex items-center gap-1.5 min-w-0 max-w-[200px] h-8 px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
 const PANEL_CLASS =
   'min-w-[280px] max-w-[420px] max-h-[420px] overflow-hidden rounded-lg border border-border bg-card shadow-lg z-[100] flex flex-col';
 const ENTRY_CLASS_BASE =
@@ -38,6 +38,7 @@ interface PlaygroundSelectorProps {
   onGoToRoot: () => void;
   onLink: (path: string) => Promise<boolean>;
   onLinked?: () => void;
+  onSmartMount?: () => void;
   visible?: boolean;
 }
 
@@ -55,6 +56,7 @@ export function PlaygroundSelector({
   onGoToRoot,
   onLink,
   onLinked,
+  onSmartMount,
   visible = true,
 }: PlaygroundSelectorProps) {
   const [open, setOpen] = useState(false);
@@ -121,7 +123,7 @@ export function PlaygroundSelector({
   if (!visible) return null;
 
   return (
-    <div ref={containerRef} className="relative hidden md:block">
+    <div ref={containerRef} className="relative block">
       <button
         type="button"
         onClick={handleToggle}
@@ -173,6 +175,18 @@ export function PlaygroundSelector({
               >
                 <Home className="size-3.5 text-muted-foreground" aria-hidden />
               </button>
+              {onSmartMount && (
+                <button
+                  type="button"
+                  onClick={onSmartMount}
+                  disabled={linking || loading}
+                  className="size-7 shrink-0 flex items-center justify-center rounded-md hover:bg-violet-500/10 transition-colors ml-1"
+                  title="Smart Mount"
+                  aria-label="Smart mount first available playground"
+                >
+                  <Sparkles className="size-3.5 text-fuchsia-400" aria-hidden />
+                </button>
+              )}
               <div className="flex-1 min-w-0 flex items-center gap-0.5 text-[10px] text-muted-foreground truncate px-1">
                 <span className="shrink-0 font-medium text-violet-400">/</span>
                 {breadcrumbs.map((crumb, i) => (

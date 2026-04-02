@@ -143,7 +143,9 @@ describe('usePlaygroundSelector', () => {
   });
 
   it('sets error when browse request fails', async () => {
-    mockApiRequest.mockResolvedValueOnce({ ok: false, status: 404 });
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: false, status: 404 }) // fetchEntries -> browse
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: 'existing' }) }); // fetchCurrentLink
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -152,6 +154,73 @@ describe('usePlaygroundSelector', () => {
     });
 
     expect(result.current.error).toBe('Path not found');
+  });
+
+  it('smartMount fetches root and links the first directory', async () => {
+    const rootEntries = [
+      { name: 'file.ts', path: 'file.ts', type: 'file' },
+      { name: 'dir', path: 'dir', type: 'directory' },
+    ];
+
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }) // browse
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // link
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }); // fetchEntries
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.smartMount();
+    });
+
+    expect(success).toBe(true);
+    expect(result.current.currentLink).toBe('dir');
+    expect(mockApiRequest).toHaveBeenCalledWith(
+      '/api/playrooms/link',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ path: 'dir' }),
+      }),
+    );
+  });
+
+  it('smartMount returns false if no directories found', async () => {
+    const rootEntries = [
+      { name: 'file.ts', path: 'file.ts', type: 'file' },
+    ];
+
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) });
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.smartMount();
+    });
+
+    expect(success).toBe(false);
+    expect(result.current.error).toBe('No available playgrounds found');
+  });
+
+  it('open() calls smartMount if currentLink is null on first open', async () => {
+    const rootEntries = [{ name: 'dir', path: 'dir', type: 'directory' }];
+
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // open -> fetchEntries
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) }) // fetchCurrentLink
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }) // smartMount -> browse
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // smartMount -> link
+      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }); // smartMount -> fetchEntries
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    await act(async () => {
+      await result.current.open();
+    });
+
+    expect(result.current.currentLink).toBe('dir');
   });
 
   it('goToRoot resets path history and fetches root', async () => {
