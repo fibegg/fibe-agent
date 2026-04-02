@@ -12,9 +12,13 @@ export type ThemeSource = 'localStorage' | 'frame';
 
 export function getThemeSource(e?: ImportMetaEnv): ThemeSource {
   const v = e?.VITE_THEME_SOURCE ?? env().VITE_THEME_SOURCE;
-  return v === 'frame' ? 'frame' : 'localStorage';
+  if (v === 'frame' || v === 'localStorage') return v;
+  if (typeof window !== 'undefined' && window !== window.parent) return 'frame';
+  return 'localStorage';
 }
 
 export function shouldHideThemeSwitch(e?: ImportMetaEnv): boolean {
-  return truthy(e?.VITE_HIDE_THEME_SWITCH ?? env().VITE_HIDE_THEME_SWITCH);
+  const v = e?.VITE_HIDE_THEME_SWITCH ?? env().VITE_HIDE_THEME_SWITCH;
+  if (v !== undefined) return truthy(v);
+  return typeof window !== 'undefined' && window !== window.parent;
 }
