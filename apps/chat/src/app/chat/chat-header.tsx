@@ -48,6 +48,7 @@ export interface ChatHeaderProps {
   onPlaygroundGoToRoot?: () => void;
   onPlaygroundLink?: (path: string) => Promise<boolean>;
   onPlaygroundLinked?: () => void;
+  onPlaygroundSmartMount?: () => void;
 }
 
 export function ChatHeader({
@@ -89,6 +90,7 @@ export function ChatHeader({
   onPlaygroundGoToRoot,
   onPlaygroundLink,
   onPlaygroundLinked,
+  onPlaygroundSmartMount,
 }: ChatHeaderProps) {
   return (
     <header
@@ -235,6 +237,7 @@ export function ChatHeader({
               onGoToRoot={onPlaygroundGoToRoot}
               onLink={onPlaygroundLink}
               onLinked={onPlaygroundLinked}
+              onSmartMount={onPlaygroundSmartMount}
             />
           )}
           {onToggleTerminal && (

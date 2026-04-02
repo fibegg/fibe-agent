@@ -88,6 +88,16 @@ describe('PlaygroundSelector', () => {
     expect(onGoToRoot).toHaveBeenCalledOnce();
   });
 
+  it('renders smart mount button and calls onSmartMount', () => {
+    const onSmartMount = vi.fn();
+    renderSelector({ onSmartMount });
+    fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
+    const smartBtn = screen.getByRole('button', { name: /smart mount/i });
+    expect(smartBtn).toBeTruthy();
+    fireEvent.click(smartBtn);
+    expect(onSmartMount).toHaveBeenCalledOnce();
+  });
+
   it('displays breadcrumbs', () => {
     renderSelector({ breadcrumbs: ['playrooms', 'myproject'] });
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
