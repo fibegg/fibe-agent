@@ -34,6 +34,7 @@ import {
 } from './markdown-bare-pre';
 import { renderMarkdown } from './markdown-cache';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
+import { estimateMessageHeight, estimateStreamingHeight, computeTightBubbleWidth } from './pretext-height';
 
 let prismLoaderPromise: Promise<typeof import('../file-explorer/prism-loader')> | null = null;
 
@@ -271,28 +272,48 @@ function getUploadSrc(filename: string): string {
   return token ? `${path}?token=${encodeURIComponent(token)}` : path;
 }
 
-const ESTIMATED_ROW_HEIGHT = 120;
 const ROW_GAP = 28;
 const DEFAULT_MAX_WIDTH = 'max-w-[90%] sm:max-w-[85%] md:max-w-[80%]';
 const FULL_WIDTH = 'max-w-full';
+/**
+ * Fraction of the scroll-container width used as the bubble width for
+ * estimating text-wrap line count via Pretext.js.
+ */
+const BUBBLE_WIDTH_FRACTION = 0.8;
 
 function isNoOutputMessage(msg: ChatMessage, noOutputBody?: string): boolean {
   return msg.role === 'assistant' && !!noOutputBody && msg.body === noOutputBody;
 }
 
-const MessageRow = memo(function MessageRow({
-  msg,
-  maxWidthClass = DEFAULT_MAX_WIDTH,
-  onRetry,
-  isNoOutput,
-}: {
-  msg: ChatMessage;
-  maxWidthClass?: string;
-  onRetry?: () => void;
-  isNoOutput?: boolean;
-}) {
-  const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
-  return (
+const MessageRow = memo(
+  function MessageRow({
+    msg,
+    maxWidthClass = DEFAULT_MAX_WIDTH,
+    onRetry,
+    isNoOutput,
+    containerWidthPx,
+  }: {
+    msg: ChatMessage;
+    maxWidthClass?: string;
+    onRetry?: () => void;
+    isNoOutput?: boolean;
+    /** Scroll-container pixel width — used to compute tight bubble widths. */
+    containerWidthPx?: number;
+  }) {
+    const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
+
+    // Compute tight bubble width for plain short user messages.
+    // Skip when: role is assistant, message has images, message has code blocks,
+    // or we have no container measurement yet.
+    const tightMaxWidth =
+      msg.role === 'user' &&
+      !(msg.imageUrls?.length) &&
+      !msg.body.includes('```') &&
+      containerWidthPx
+        ? computeTightBubbleWidth(msg.body, containerWidthPx * BUBBLE_WIDTH_FRACTION)
+        : undefined;
+
+    return (
     <div
       className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
     >
@@ -322,6 +343,7 @@ const MessageRow = memo(function MessageRow({
           className={`${maxWidthClass} min-w-0 px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
             msg.role === 'user' ? `rounded-tr-sm ${BUBBLE_USER}` : BUBBLE_ASSISTANT
           }`}
+          style={tightMaxWidth !== undefined ? { maxWidth: tightMaxWidth } : undefined}
         >
           {msg.role === 'user' ? (
             <>
@@ -392,7 +414,16 @@ const MessageRow = memo(function MessageRow({
       </div>
     </div>
   );
-});
+  },
+  // Custom memo comparator: include containerWidthPx in the shallow check
+  // so resize events correctly invalidate tight-width calculations.
+  (prev, next) =>
+    prev.msg === next.msg &&
+    prev.maxWidthClass === next.maxWidthClass &&
+    prev.onRetry === next.onRetry &&
+    prev.isNoOutput === next.isNoOutput &&
+    prev.containerWidthPx === next.containerWidthPx
+);
 
 export interface MessageListHandle {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
@@ -423,10 +454,23 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
   ref
 ) {
   const maxWidthClass = bothSidebarsCollapsed ? FULL_WIDTH : DEFAULT_MAX_WIDTH;
+
+  // Read the scroll-container pixel width for tight-bubble computation.
+  // TanStack Virtual already uses a ResizeObserver internally — when the
+  // container resizes, the virtualizer re-renders, which re-reads this value.
+  const containerWidthPx = scrollRef?.current?.clientWidth ?? 640;
+
   const virtualizer = useVirtualizer({
     count: messages.length,
     getScrollElement: () => scrollRef?.current ?? null,
-    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    estimateSize: (index) => {
+      const msg = messages[index];
+      const containerWidth = scrollRef?.current?.clientWidth ?? 640;
+      const bubbleWidth = containerWidth * BUBBLE_WIDTH_FRACTION;
+      return estimateMessageHeight(msg.body, bubbleWidth, {
+        hasCode: msg.body.includes('```'),
+      });
+    },
     gap: ROW_GAP,
     overscan: 5,
   });
@@ -493,6 +537,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               maxWidthClass={maxWidthClass}
               isNoOutput={isNoOutputMessage(msg, noOutputBody)}
               onRetry={onRetry}
+              containerWidthPx={containerWidthPx}
             />
           </div>
         );
@@ -507,10 +552,20 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
           maxWidthClass={maxWidthClass}
           isNoOutput={isNoOutputMessage(msg, noOutputBody)}
           onRetry={onRetry}
+          containerWidthPx={containerWidthPx}
         />
       ))}
     </div>
   );
+
+  // Reserve vertical space for the streaming bubble proportional to the
+  // current text flow, preventing abrupt container-height jumps on each flush.
+  const streamingBubbleMinHeight = useMemo(() => {
+    if (!isStreaming || !streamingText) return undefined;
+    const containerWidth = scrollRef?.current?.clientWidth ?? 640;
+    const bubbleWidth = containerWidth * BUBBLE_WIDTH_FRACTION;
+    return estimateStreamingHeight(streamingText, bubbleWidth);
+  }, [isStreaming, streamingText, scrollRef]);
 
   return (
     <>
@@ -520,9 +575,10 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
           <ThinkingAvatar />
           <div className="flex-1 min-w-0">
             <div
-              className={`${maxWidthClass} min-w-0 px-4 py-3 ${
+              className={`${maxWidthClass} min-w-0 px-4 py-3 transition-[min-height] duration-100 ${
                 streamingText ? BUBBLE_ASSISTANT : BUBBLE_TYPING
               }`}
+              style={streamingBubbleMinHeight !== undefined ? { minHeight: streamingBubbleMinHeight } : undefined}
             >
               {streamingText ? (
                 <>

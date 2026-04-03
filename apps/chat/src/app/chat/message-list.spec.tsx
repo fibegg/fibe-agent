@@ -16,6 +16,17 @@ vi.mock('../file-explorer/prism-loader', () => ({
   highlightCodeElement: vi.fn(),
 }));
 
+// Pretext.js measures canvas glyphs — JSDOM has no canvas implementation.
+// Return deterministic fixed heights so virtualizer and streaming-bubble tests
+// are stable and do not depend on the real layout engine.
+vi.mock('./pretext-height', () => ({
+  estimateMessageHeight: vi.fn().mockReturnValue(120),
+  estimateStreamingHeight: vi.fn().mockReturnValue(160),
+  computeTightBubbleWidth: vi.fn().mockReturnValue(200),
+  clearPretextCache: vi.fn(),
+  getPretextCacheSize: vi.fn().mockReturnValue(0),
+}));
+
 describe('MessageList', () => {
   it('renders without error when messages is empty and not streaming', () => {
     render(
@@ -189,6 +200,82 @@ describe('MessageList', () => {
     );
     expect(screen.getByText(/Bold/)).toBeTruthy();
     expect(screen.getByText(/text/)).toBeTruthy();
+  });
+
+  it('applies min-height style to streaming bubble when streamingText is non-empty', () => {
+    const { container } = render(
+      <MessageList
+        messages={[]}
+        streamingText="Streaming response tokens accumulating here"
+        isStreaming={true}
+      />
+    );
+    // The streaming bubble wrapper should have an inline min-height style.
+    const bubbles = container.querySelectorAll('[style*="min-height"]');
+    expect(bubbles.length).toBeGreaterThan(0);
+  });
+
+  it('does not apply min-height style to streaming bubble when streamingText is empty', () => {
+    const { container } = render(
+      <MessageList messages={[]} streamingText="" isStreaming={true} />
+    );
+    const bubbles = container.querySelectorAll('[style*="min-height"]');
+    expect(bubbles.length).toBe(0);
+  });
+
+  it('applies tight max-width inline style to short plain user message bubble', () => {
+    const messages: ChatMessage[] = [
+      { role: 'user', body: 'Yes', created_at: '2025-03-11T17:00:00.000Z' },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    // computeTightBubbleWidth mock returns 200 — the bubble div should have maxWidth:200px
+    const bubble = container.querySelector('[style*="max-width"]');
+    expect(bubble).toBeTruthy();
+  });
+
+  it('does not apply tight max-width to user message containing a code block', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: '```ts\nconst x = 1\n```',
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    // Code-block messages bypass tight bubble — no inline max-width style expected
+    const styledBubble = container.querySelector('[style*="max-width"]');
+    expect(styledBubble).toBeNull();
+  });
+
+  it('does not apply tight max-width to user message with images', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: 'Look at this',
+        created_at: '2025-03-11T17:00:00.000Z',
+        imageUrls: ['photo.png'],
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const styledBubble = container.querySelector('[style*="max-width"]');
+    expect(styledBubble).toBeNull();
+  });
+
+  it('does not apply tight max-width to assistant messages', () => {
+    const messages: ChatMessage[] = [
+      { role: 'assistant', body: 'Sure!', created_at: '2025-03-11T17:01:00.000Z' },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />
+    );
+    const styledBubble = container.querySelector('[style*="max-width"]');
+    expect(styledBubble).toBeNull();
   });
 
   it('renders user message body as markdown', () => {
