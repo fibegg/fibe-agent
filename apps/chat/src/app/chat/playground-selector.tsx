@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight, Folder, FolderOpen, ArrowLeft, Home, Link2, Loader2, Sparkles } from 'lucide-react';
 import type { BrowseEntry } from './use-playground-selector';
 
+// On small screens only the folder icon is shown; text/chevron appear from sm breakpoint.
 const TRIGGER_CLASS =
-  'flex items-center gap-1.5 min-w-0 max-w-[200px] h-8 px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
+  'flex items-center gap-1.5 min-w-0 h-8 px-2 sm:px-3 sm:max-w-[200px] rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
 const PANEL_CLASS =
   'min-w-[280px] max-w-[420px] max-h-[420px] overflow-hidden rounded-lg border border-border bg-card shadow-lg z-[100] flex flex-col';
 const ENTRY_CLASS_BASE =
@@ -22,7 +23,6 @@ export function smartCutLabel(link: string): string {
   const dashIdx = segment.indexOf('-');
   return dashIdx !== -1 ? segment.slice(dashIdx + 1) : segment;
 }
-
 
 interface PlaygroundSelectorProps {
   entries: BrowseEntry[];
@@ -65,35 +65,31 @@ export function PlaygroundSelector({
 
   const displayLabel = currentLink ? smartCutLabel(currentLink) : 'Select Playground';
 
-
   useEffect(() => {
     if (!open) {
       setPanelRect(null);
       return;
     }
     const el = containerRef.current;
-    if (el) {
-      const updateRect = () => {
-        const r = el.getBoundingClientRect();
-        setPanelRect({ top: r.bottom + 6, left: r.left });
-      };
-      updateRect();
-      window.addEventListener('scroll', updateRect, true);
-      window.addEventListener('resize', updateRect);
-      return () => {
-        window.removeEventListener('scroll', updateRect, true);
-        window.removeEventListener('resize', updateRect);
-      };
-    }
-    return;
+    if (!el) return;
+    const updateRect = () => {
+      const r = el.getBoundingClientRect();
+      setPanelRect({ top: r.bottom + 6, left: r.left });
+    };
+    updateRect();
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+    };
   }, [open]);
 
   useEffect(() => {
     if (!open) return;
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current?.contains(e.target as Node)) return;
-      const target = e.target as HTMLElement;
-      if (target.closest(`[${PANEL_DATA_ATTR}]`)) return;
+      if ((e.target as HTMLElement).closest(`[${PANEL_DATA_ATTR}]`)) return;
       setOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -106,19 +102,23 @@ export function PlaygroundSelector({
     if (next) onOpen();
   }, [open, onOpen]);
 
-  const handleEntryClick = useCallback((entry: BrowseEntry) => {
-    if (entry.type === 'directory' || entry.type === 'symlink') {
-      onBrowse(entry.path);
-    }
-  }, [onBrowse]);
+  const handleEntryClick = useCallback(
+    (entry: BrowseEntry) => {
+      if (entry.type === 'directory' || entry.type === 'symlink') onBrowse(entry.path);
+    },
+    [onBrowse],
+  );
 
-  const handleLink = useCallback(async (path: string) => {
-    const ok = await onLink(path);
-    if (ok) {
-      setOpen(false);
-      onLinked?.();
-    }
-  }, [onLink, onLinked]);
+  const handleLink = useCallback(
+    async (path: string) => {
+      const ok = await onLink(path);
+      if (ok) {
+        setOpen(false);
+        onLinked?.();
+      }
+    },
+    [onLink, onLinked],
+  );
 
   if (!visible) return null;
 
@@ -133,9 +133,9 @@ export function PlaygroundSelector({
         aria-label="Select playground"
       >
         <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
-        <span className="truncate flex-1 text-left">{displayLabel}</span>
+        <span className="hidden sm:inline truncate flex-1 text-left">{displayLabel}</span>
         <ChevronDown
-          className={`size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
+          className={`hidden sm:inline size-3.5 shrink-0 text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`}
           aria-hidden
         />
       </button>
@@ -147,13 +147,9 @@ export function PlaygroundSelector({
             className={PANEL_CLASS}
             role="listbox"
             aria-label="Playground browser"
-            style={{
-              position: 'fixed',
-              top: panelRect.top,
-              left: panelRect.left,
-            }}
+            style={{ position: 'fixed', top: panelRect.top, left: panelRect.left }}
           >
-            {/* Toolbar: back + breadcrumbs + link button */}
+            {/* Toolbar: back + breadcrumbs + smart mount */}
             <div className="flex items-center gap-1 p-2 border-b border-border/50 shrink-0 min-w-0">
               {canGoBack && (
                 <button
@@ -216,55 +212,55 @@ export function PlaygroundSelector({
                   Empty directory
                 </div>
               )}
-              {!loading && !error && entries.map((entry) => {
-                const isLinked = currentLink === entry.path;
-                const isNavigable = entry.type === 'directory' || entry.type === 'symlink';
-                return (
-                  <div key={entry.path} className="flex items-center group">
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={isLinked}
-                      onClick={() => handleEntryClick(entry)}
-                      className={`${ENTRY_CLASS_BASE} flex-1 min-w-0 ${isLinked ? LINKED_CLASS : ENTRY_HOVER_CLASS}`}
-                    >
-                      {entry.type === 'directory' && (
-                        <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
-                      )}
-                      {entry.type === 'symlink' && (
-                        <Link2 className="size-3.5 shrink-0 text-fuchsia-400" aria-hidden />
-                      )}
-                      {entry.type === 'file' && (
-                        <span className="size-3.5 shrink-0" />
-                      )}
-                      <span className="truncate">{entry.name}</span>
-                      {isNavigable && (
-                        <ChevronRight className="size-3 shrink-0 ml-auto text-muted-foreground" aria-hidden />
-                      )}
-                    </button>
-                    {isNavigable && (
+              {!loading &&
+                !error &&
+                entries.map((entry) => {
+                  const isLinked = currentLink === entry.path;
+                  const isNavigable = entry.type === 'directory' || entry.type === 'symlink';
+                  return (
+                    <div key={entry.path} className="flex items-center group">
                       <button
                         type="button"
-                        onClick={() => void handleLink(entry.path)}
-                        disabled={linking || isLinked}
-                        className={`size-7 shrink-0 flex items-center justify-center rounded-md transition-colors mr-1 ${
-                          isLinked
-                            ? 'text-emerald-400 cursor-default'
-                            : 'opacity-0 group-hover:opacity-100 hover:bg-violet-500/10 text-muted-foreground hover:text-violet-400'
-                        } disabled:opacity-50`}
-                        title={isLinked ? 'Currently linked' : 'Link this playground'}
-                        aria-label={isLinked ? 'Currently linked' : `Link ${entry.name}`}
+                        role="option"
+                        aria-selected={isLinked}
+                        onClick={() => handleEntryClick(entry)}
+                        className={`${ENTRY_CLASS_BASE} flex-1 min-w-0 ${isLinked ? LINKED_CLASS : ENTRY_HOVER_CLASS}`}
                       >
-                        {linking ? (
-                          <Loader2 className="size-3 animate-spin" aria-hidden />
-                        ) : (
-                          <Link2 className="size-3" aria-hidden />
+                        {entry.type === 'directory' && (
+                          <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+                        )}
+                        {entry.type === 'symlink' && (
+                          <Link2 className="size-3.5 shrink-0 text-fuchsia-400" aria-hidden />
+                        )}
+                        {entry.type === 'file' && <span className="size-3.5 shrink-0" />}
+                        <span className="truncate">{entry.name}</span>
+                        {isNavigable && (
+                          <ChevronRight className="size-3 shrink-0 ml-auto text-muted-foreground" aria-hidden />
                         )}
                       </button>
-                    )}
-                  </div>
-                );
-              })}
+                      {isNavigable && (
+                        <button
+                          type="button"
+                          onClick={() => void handleLink(entry.path)}
+                          disabled={linking || isLinked}
+                          className={`size-7 shrink-0 flex items-center justify-center rounded-md transition-colors mr-1 ${
+                            isLinked
+                              ? 'text-emerald-400 cursor-default'
+                              : 'opacity-0 group-hover:opacity-100 hover:bg-violet-500/10 text-muted-foreground hover:text-violet-400'
+                          } disabled:opacity-50`}
+                          title={isLinked ? 'Currently linked' : 'Link this playground'}
+                          aria-label={isLinked ? 'Currently linked' : `Link ${entry.name}`}
+                        >
+                          {linking ? (
+                            <Loader2 className="size-3 animate-spin" aria-hidden />
+                          ) : (
+                            <Link2 className="size-3" aria-hidden />
+                          )}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
 
             {/* Current link footer */}
@@ -275,7 +271,7 @@ export function PlaygroundSelector({
               </div>
             )}
           </div>,
-          document.body
+          document.body,
         )}
     </div>
   );

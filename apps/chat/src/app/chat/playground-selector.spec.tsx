@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { PlaygroundSelector } from './playground-selector';
+import { PlaygroundSelector, smartCutLabel } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
 
 const asyncNoop = async () => true;
@@ -24,21 +24,72 @@ function renderSelector(overrides: Partial<Parameters<typeof PlaygroundSelector>
   return render(<PlaygroundSelector {...defaults} {...overrides} />);
 }
 
+// ─── smartCutLabel unit tests ────────────────────────────────────────────────
+
+describe('smartCutLabel', () => {
+  it('strips the org prefix before the first dash', () => {
+    expect(smartCutLabel('orgs/example-backend')).toBe('backend');
+  });
+
+  it('returns the full segment when there is no dash', () => {
+    expect(smartCutLabel('playzones/myproject')).toBe('myproject');
+  });
+
+  it('handles a path with no slashes (bare segment)', () => {
+    expect(smartCutLabel('example-frontend')).toBe('frontend');
+  });
+
+  it('falls back to "Playground" for an empty string', () => {
+    expect(smartCutLabel('')).toBe('Playground');
+  });
+
+  it('handles trailing slash gracefully', () => {
+    // last non-empty segment picked via filter(Boolean)
+    expect(smartCutLabel('orgs/example-backend/')).toBe('backend');
+  });
+});
+
+// ─── PlaygroundSelector component tests ─────────────────────────────────────
+
 describe('PlaygroundSelector', () => {
   it('returns null when visible is false', () => {
     const { container } = renderSelector({ visible: false });
     expect(container.firstChild).toBeNull();
   });
 
-  it('renders trigger with "Select Playground" when no link is set', () => {
+  it('renders trigger button with accessible label', () => {
     renderSelector();
     expect(screen.getByRole('button', { name: 'Select playground' })).toBeTruthy();
+  });
+
+  it('renders "Select Playground" text in the trigger (sm+ label)', () => {
+    renderSelector();
     expect(screen.getByText('Select Playground')).toBeTruthy();
   });
 
-  it('shows current link name in trigger', () => {
+  it('shows smart-cut label from currentLink in trigger', () => {
     renderSelector({ currentLink: 'playgrounds/myproject' });
     expect(screen.getByText('myproject')).toBeTruthy();
+  });
+
+  // Icon-only: the text span is hidden via CSS class but still in the DOM.
+  it('trigger text span has hidden-on-mobile class so only icon shows on mobile', () => {
+    renderSelector();
+    const span = screen.getByText('Select Playground');
+    expect(span.className).toContain('hidden');
+    expect(span.className).toContain('sm:inline');
+  });
+
+  // Chevron is also hidden on mobile.
+  it('chevron element has hidden-on-mobile class', () => {
+    const { container } = renderSelector();
+    // Chevron is the svg sibling after the folder icon inside the trigger button
+    const trigger = screen.getByRole('button', { name: 'Select playground' });
+    const svgs = trigger.querySelectorAll('svg');
+    // folder icon (0), chevron (1)
+    const chevron = svgs[1];
+    expect(chevron.className.baseVal).toContain('hidden');
+    expect(chevron.className.baseVal).toContain('sm:inline');
   });
 
   it('opens dropdown and calls onOpen when trigger is clicked', () => {
@@ -47,6 +98,15 @@ describe('PlaygroundSelector', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
     expect(onOpen).toHaveBeenCalledOnce();
     expect(screen.getByRole('listbox', { name: 'Playground browser' })).toBeTruthy();
+  });
+
+  it('closes dropdown when trigger is clicked a second time', () => {
+    renderSelector();
+    const btn = screen.getByRole('button', { name: 'Select playground' });
+    fireEvent.click(btn);
+    expect(screen.getByRole('listbox', { name: 'Playground browser' })).toBeTruthy();
+    fireEvent.click(btn);
+    expect(screen.queryByRole('listbox')).toBeNull();
   });
 
   it('renders directory entries with browse navigation', () => {
@@ -61,6 +121,15 @@ describe('PlaygroundSelector', () => {
     expect(dirButton).toBeTruthy();
     fireEvent.click(dirButton);
     expect(onBrowse).toHaveBeenCalledWith('project-a');
+  });
+
+  it('does NOT call onBrowse when a file entry is clicked', () => {
+    const onBrowse = vi.fn();
+    const entries: BrowseEntry[] = [{ name: 'readme.md', path: 'readme.md', type: 'file' }];
+    renderSelector({ entries, onBrowse });
+    fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
+    fireEvent.click(screen.getByRole('option', { name: /readme.md/ }));
+    expect(onBrowse).not.toHaveBeenCalled();
   });
 
   it('renders back button when canGoBack is true', () => {
@@ -124,9 +193,7 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows linked indicator for currently linked entry', () => {
-    const entries: BrowseEntry[] = [
-      { name: 'my-project', path: 'my-project', type: 'directory' },
-    ];
+    const entries: BrowseEntry[] = [{ name: 'my-project', path: 'my-project', type: 'directory' }];
     renderSelector({ entries, currentLink: 'my-project' });
     fireEvent.click(screen.getByRole('button', { name: 'Select playground' }));
     const option = screen.getByRole('option', { name: /my-project/ });
@@ -155,7 +222,6 @@ describe('PlaygroundSelector', () => {
 
   it('smart-cut: strips org prefix from trigger label (dash separator)', () => {
     renderSelector({ currentLink: 'playzones/example-backend' });
-    // Should show 'backend', not 'example-backend'
     expect(screen.getByText('backend')).toBeTruthy();
     expect(screen.queryByText('example-backend')).toBeNull();
   });

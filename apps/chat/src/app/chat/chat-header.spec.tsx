@@ -8,6 +8,21 @@ vi.mock('./model-selector', () => ({
     visible ? <div data-testid="model-selector">{currentModel}</div> : null,
 }));
 
+// Lightweight stub so PlaygroundSelector renders a recognisable element.
+vi.mock('./playground-selector', () => ({
+  PlaygroundSelector: ({ currentLink }: { currentLink: string | null }) => (
+    <div data-testid="playground-selector">{currentLink ?? 'no-link'}</div>
+  ),
+}));
+
+const PLAYGROUND_PROPS = {
+  onPlaygroundOpen: vi.fn(),
+  onPlaygroundBrowse: vi.fn(),
+  onPlaygroundGoBack: vi.fn(),
+  onPlaygroundGoToRoot: vi.fn(),
+  onPlaygroundLink: vi.fn(async () => true),
+};
+
 const DEFAULT_PROPS = {
   isMobile: false,
   state: CHAT_STATES.AUTHENTICATED,
@@ -32,6 +47,8 @@ const DEFAULT_PROPS = {
   modelLocked: false,
 };
 
+// ─── Core rendering ───────────────────────────────────────────────────────────
+
 describe('ChatHeader', () => {
   it('renders "AI Assistant" heading', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
@@ -40,7 +57,6 @@ describe('ChatHeader', () => {
 
   it('shows session time when sessionTimeMs > 0', () => {
     render(<ChatHeader {...DEFAULT_PROPS} sessionTimeMs={65000} />);
-    // formatSessionDurationMs(65000) → "1:05"
     expect(screen.getByTitle('Session time')).toBeTruthy();
   });
 
@@ -48,6 +64,8 @@ describe('ChatHeader', () => {
     render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AUTHENTICATED} />);
     expect(screen.getByText('Ready')).toBeTruthy();
   });
+
+  // ─── Reconnect / Auth buttons ──────────────────────────────────────────────
 
   it('shows Reconnect button when state is AGENT_OFFLINE', () => {
     render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} />);
@@ -77,6 +95,8 @@ describe('ChatHeader', () => {
     fireEvent.click(screen.getByRole('button', { name: /start auth/i }));
     expect(onStartAuth).toHaveBeenCalled();
   });
+
+  // ─── Search ────────────────────────────────────────────────────────────────
 
   it('renders search input', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
@@ -112,6 +132,8 @@ describe('ChatHeader', () => {
     expect(onSearchChange).toHaveBeenCalledWith('');
   });
 
+  // ─── Mobile-specific ──────────────────────────────────────────────────────
+
   it('shows Mobile menu button when isMobile is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} />);
     expect(screen.getByRole('button', { name: /open menu/i })).toBeTruthy();
@@ -125,11 +147,13 @@ describe('ChatHeader', () => {
   });
 
   it('shows mobile stats when isMobile is true', () => {
-    render(<ChatHeader
-      {...DEFAULT_PROPS}
-      isMobile={true}
-      mobileSessionStats={{ totalActions: 5, completed: 3, processing: 2 }}
-    />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        isMobile={true}
+        mobileSessionStats={{ totalActions: 5, completed: 3, processing: 2 }}
+      />,
+    );
     expect(screen.getByTitle('Total actions')).toBeTruthy();
     expect(screen.getByTitle('Completed')).toBeTruthy();
     expect(screen.getByTitle('Processing')).toBeTruthy();
@@ -148,32 +172,31 @@ describe('ChatHeader', () => {
   });
 
   it('shows token usage when sessionTokenUsage is provided and isMobile', () => {
-    render(<ChatHeader
-      {...DEFAULT_PROPS}
-      isMobile={true}
-      sessionTokenUsage={{ inputTokens: 100, outputTokens: 50 }}
-    />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        isMobile={true}
+        sessionTokenUsage={{ inputTokens: 100, outputTokens: 50 }}
+      />,
+    );
     expect(screen.getByTitle(/token usage/i)).toBeTruthy();
   });
 
   it('shows error message for AGENT_OFFLINE state', () => {
-    render(<ChatHeader
-      {...DEFAULT_PROPS}
-      state={CHAT_STATES.AGENT_OFFLINE}
-      errorMessage="Agent down"
-    />);
+    render(
+      <ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} errorMessage="Agent down" />,
+    );
     expect(screen.getByText(/agent down/i)).toBeTruthy();
   });
 
   it('shows Loader2 during AWAITING_RESPONSE on mobile', () => {
-    const { container } = render(<ChatHeader
-      {...DEFAULT_PROPS}
-      isMobile={true}
-      state={CHAT_STATES.AWAITING_RESPONSE}
-    />);
-    // Loader2 applies animate-spin class
+    const { container } = render(
+      <ChatHeader {...DEFAULT_PROPS} isMobile={true} state={CHAT_STATES.AWAITING_RESPONSE} />,
+    );
     expect(container.querySelector('.animate-spin')).toBeTruthy();
   });
+
+  // ─── ModelSelector ────────────────────────────────────────────────────────
 
   it('shows ModelSelector when showModelSelector is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} showModelSelector={true} currentModel="gpt-4" />);
@@ -181,38 +204,86 @@ describe('ChatHeader', () => {
     expect(screen.getByText('gpt-4')).toBeTruthy();
   });
 
+  // ─── Terminal button ──────────────────────────────────────────────────────
+
   it('does not render terminal button when onToggleTerminal is not provided', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
     expect(screen.queryByRole('button', { name: /terminal/i })).toBeNull();
   });
 
-  it('renders terminal toggle button when onToggleTerminal is provided', () => {
+  it('renders terminal toggle buttons when onToggleTerminal is provided', () => {
     render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /open terminal/i })).toBeTruthy();
+    // Both desktop (hidden sm:flex) and mobile (sm:hidden) buttons are in DOM.
+    const btns = screen.getAllByRole('button', { name: /open terminal/i });
+    expect(btns.length).toBeGreaterThanOrEqual(1);
   });
 
   it('calls onToggleTerminal when terminal button is clicked', () => {
     const onToggleTerminal = vi.fn();
     render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={onToggleTerminal} />);
-    fireEvent.click(screen.getByRole('button', { name: /open terminal/i }));
+    fireEvent.click(screen.getAllByRole('button', { name: /open terminal/i })[0]);
     expect(onToggleTerminal).toHaveBeenCalledTimes(1);
   });
 
-  it('shows "Close terminal" label when terminalOpen is true', () => {
+  it('shows "Close terminal" label on both buttons when terminalOpen is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={true} />);
-    expect(screen.getByRole('button', { name: /close terminal/i })).toBeTruthy();
+    const btns = screen.getAllByRole('button', { name: /close terminal/i });
+    expect(btns.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('sets aria-pressed=true when terminalOpen is true', () => {
+  it('sets aria-pressed=true on terminal buttons when terminalOpen is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={true} />);
-    const btn = screen.getByRole('button', { name: /close terminal/i });
-    expect(btn.getAttribute('aria-pressed')).toBe('true');
+    const btns = screen.getAllByRole('button', { name: /close terminal/i });
+    btns.forEach((btn) => expect(btn.getAttribute('aria-pressed')).toBe('true'));
   });
 
-  it('sets aria-pressed=false when terminalOpen is false', () => {
+  it('sets aria-pressed=false on terminal buttons when terminalOpen is false', () => {
     render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={false} />);
-    const btn = screen.getByRole('button', { name: /open terminal/i });
-    expect(btn.getAttribute('aria-pressed')).toBe('false');
+    const btns = screen.getAllByRole('button', { name: /open terminal/i });
+    btns.forEach((btn) => expect(btn.getAttribute('aria-pressed')).toBe('false'));
+  });
+
+  // ─── Playground selector layout (desktop vs mobile) ───────────────────────
+
+  it('renders playground selector when all playground props supplied', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
+    // Both the desktop (hidden sm:block) and mobile (sm:hidden) slots are in the DOM.
+    const slots = screen.getAllByTestId('playground-selector');
+    expect(slots.length).toBe(2);
+  });
+
+  it('desktop playground slot has hidden-on-mobile class', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
+    const slots = screen.getAllByTestId('playground-selector');
+    // The desktop wrapper has "hidden sm:block"; the mobile wrapper has "sm:hidden".
+    const wrappers = slots.map((s) => s.parentElement!);
+    const hasDesktopWrapper = wrappers.some((w) => w.className.includes('hidden') && w.className.includes('sm:block'));
+    expect(hasDesktopWrapper).toBe(true);
+  });
+
+  it('mobile playground slot has sm:hidden class', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
+    const slots = screen.getAllByTestId('playground-selector');
+    const wrappers = slots.map((s) => s.parentElement!);
+    const hasMobileWrapper = wrappers.some((w) => w.className.includes('sm:hidden'));
+    expect(hasMobileWrapper).toBe(true);
+  });
+
+  it('does not render playground selector when playground props are missing', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} />);
+    expect(screen.queryByTestId('playground-selector')).toBeNull();
+  });
+
+  it('passes currentLink to playground selector', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        {...PLAYGROUND_PROPS}
+        playgroundCurrentLink="my/project"
+      />,
+    );
+    // Both slots should show the same link value.
+    const slots = screen.getAllByTestId('playground-selector');
+    slots.forEach((s) => expect(s.textContent).toBe('my/project'));
   });
 });
-
