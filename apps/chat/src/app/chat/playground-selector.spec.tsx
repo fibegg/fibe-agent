@@ -82,7 +82,7 @@ describe('PlaygroundSelector', () => {
 
   // Chevron is also hidden on mobile.
   it('chevron element has hidden-on-mobile class', () => {
-    const { container } = renderSelector();
+    renderSelector();
     // Chevron is the svg sibling after the folder icon inside the trigger button
     const trigger = screen.getByRole('button', { name: 'Select playground' });
     const svgs = trigger.querySelectorAll('svg');
