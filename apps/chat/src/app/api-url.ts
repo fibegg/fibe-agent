@@ -12,12 +12,17 @@ export function buildApiUrl(path: string): string {
   return path.startsWith('/') ? path : `/${path}`;
 }
 
-export function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
+export async function apiRequest(path: string, options: RequestInit = {}): Promise<Response> {
   const url = buildApiUrl(path);
   const token = getAuthTokenForRequest();
   const headers = new Headers(options.headers);
   if (token) headers.set('Authorization', `Bearer ${token}`);
-  return fetch(url, { ...options, headers });
+  const res = await fetch(url, { ...options, headers });
+  if (res.status === 401 && path !== API_PATHS.AUTH_LOGIN) {
+    clearToken();
+    window.location.reload();
+  }
+  return res;
 }
 
 export function isChatModelLocked(): boolean {

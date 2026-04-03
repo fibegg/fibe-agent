@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useRef } from 'react';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
 
@@ -16,6 +16,7 @@ export function usePlaygroundSelector() {
   const [currentLink, setCurrentLink] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [pathHistory, setPathHistory] = useState<string[]>([]);
+  const autoMountedRef = useRef(false);
 
   const fetchEntries = useCallback(async (path: string) => {
     setLoading(true);
@@ -43,8 +44,10 @@ export function usePlaygroundSelector() {
       if (res.ok) {
         const data = (await res.json()) as { current: string | null };
         setCurrentLink(data.current);
+        return data.current;
       }
     } catch { /* ignore */ }
+    return null;
   }, []);
 
   const browseTo = useCallback((path: string) => {
@@ -88,10 +91,51 @@ export function usePlaygroundSelector() {
     }
   }, []);
 
-  const open = useCallback(() => {
+  const smartMount = useCallback(async (): Promise<boolean> => {
+    if (linking) return false;
+    setLinking(true);
+    setError(null);
+    try {
+      const res = await apiRequest(API_PATHS.PLAYROOMS_BROWSE);
+      if (!res.ok) throw new Error('Failed to fetch playgrounds for smart mount');
+      const rootEntries = (await res.json()) as BrowseEntry[];
+      
+      const firstDir = rootEntries.find(e => e.type === 'directory' || e.type === 'symlink');
+      if (!firstDir) {
+        setError('No available playgrounds found');
+        return false;
+      }
+
+      const linkRes = await apiRequest(API_PATHS.PLAYROOMS_LINK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: firstDir.path }),
+      });
+
+      if (!linkRes.ok) {
+        throw new Error('Failed to smart mount target');
+      }
+
+      setCurrentLink(firstDir.path);
+      // Ensure we fetch entries to refresh view if open
+      void fetchEntries('');
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Smart mount failed');
+      return false;
+    } finally {
+      setLinking(false);
+    }
+  }, [linking, fetchEntries]);
+
+  const open = useCallback(async () => {
     void fetchEntries('');
-    void fetchCurrentLink();
-  }, [fetchEntries, fetchCurrentLink]);
+    const link = await fetchCurrentLink();
+    if (!link && !autoMountedRef.current) {
+      autoMountedRef.current = true;
+      void smartMount();
+    }
+  }, [fetchEntries, fetchCurrentLink, smartMount]);
 
   const canGoBack = pathHistory.length > 0;
   const breadcrumbs = useMemo(
@@ -112,6 +156,7 @@ export function usePlaygroundSelector() {
     goBack,
     goToRoot,
     linkPlayground,
+    smartMount,
     open,
   };
 }

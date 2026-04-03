@@ -25,6 +25,7 @@ import { ChatRightPanel } from './chat-right-panel';
 import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { isAuthenticated, isChatModelLocked } from '../api-url';
+import { consumeGreeting } from '../postmessage-greeting';
 import { ChatLayout } from './chat-layout';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 import { usePanelResize } from '../use-panel-resize';
@@ -59,7 +60,7 @@ export function ChatPage() {
   const handleSendRef = useRef<() => void>(() => undefined);
 
   const authenticated = isAuthenticated();
-  const { messages, setMessages, modelOptions, refreshingModels, refreshModelOptions } = useChatInitialData(authenticated);
+  const { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, refreshModelOptions } = useChatInitialData(authenticated);
 
   const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, stats: playgroundStats, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
@@ -139,7 +140,7 @@ export function ChatPage() {
     handleKeyDown,
     handleMentionSelect,
     handleMentionClose,
-  } = useChatInput({ playgroundEntries, onSendRef: handleSendRef });
+  } = useChatInput({ playgroundEntries, onSendRef: handleSendRef, isMobile });
   const messageListRef = useRef<MessageListHandle | null>(null);
 
   useEffect(() => {
@@ -245,6 +246,26 @@ export function ChatPage() {
   useEffect(() => {
     sendRef.current = send;
   }, [send]);
+
+  // Auto-send initial greeting when chat is authenticated with empty history
+  const greetingSentRef = useRef(false);
+  useEffect(() => {
+    if (greetingSentRef.current) return;
+    if (state !== CHAT_STATES.AUTHENTICATED) return;
+    if (!messagesLoaded) return; // Wait for history fetch to complete
+    if (messages.length > 0) return; // Has existing conversation
+
+    const greeting = consumeGreeting();
+    if (!greeting) return;
+
+    greetingSentRef.current = true;
+    send({ action: 'send_chat_message', text: greeting });
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', body: greeting, created_at: new Date().toISOString(), optimistic: true },
+    ]);
+    scroll.markJustSent();
+  }, [state, messagesLoaded, messages, send, setMessages, scroll]);
 
   const {
     pendingImages,
@@ -580,6 +601,7 @@ export function ChatPage() {
           onPlaygroundGoToRoot={pgSelector.goToRoot}
           onPlaygroundLink={pgSelector.linkPlayground}
           onPlaygroundLinked={refetchPlaygrounds}
+          onPlaygroundSmartMount={pgSelector.smartMount}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}

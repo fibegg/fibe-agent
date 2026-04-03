@@ -2,10 +2,9 @@ import { Brain, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucid
 import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
-import { CHAT_STATES } from './chat-state';
-import { STATE_LABELS, truncateError } from './chat-state';
+import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
 import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
-import { HEADER_FIRST_ROW, HEADER_PADDING, INPUT_SEARCH, SEARCH_ICON_POSITION, SEARCH_ROW_WRAPPER, CLEAR_BUTTON_POSITION } from '../ui-classes';
+import { HEADER_FIRST_ROW, HEADER_PADDING, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 
 export interface ChatHeaderProps {
@@ -48,6 +47,77 @@ export interface ChatHeaderProps {
   onPlaygroundGoToRoot?: () => void;
   onPlaygroundLink?: (path: string) => Promise<boolean>;
   onPlaygroundLinked?: () => void;
+  onPlaygroundSmartMount?: () => void;
+}
+
+/** Shared prop-forwarding helper — avoids repeating the 13-prop spread twice. */
+function PlaygroundSelectorSlot({
+  props,
+  className,
+}: {
+  props: ChatHeaderProps;
+  className?: string;
+}) {
+  const {
+    onPlaygroundOpen,
+    onPlaygroundBrowse,
+    onPlaygroundGoBack,
+    onPlaygroundGoToRoot,
+    onPlaygroundLink,
+  } = props;
+
+  if (!onPlaygroundOpen || !onPlaygroundBrowse || !onPlaygroundGoBack || !onPlaygroundGoToRoot || !onPlaygroundLink) {
+    return null;
+  }
+
+  return (
+    <div className={className}>
+      <PlaygroundSelector
+        entries={props.playgroundEntries ?? []}
+        loading={props.playgroundLoading ?? false}
+        error={props.playgroundError ?? null}
+        currentLink={props.playgroundCurrentLink ?? null}
+        linking={props.playgroundLinking ?? false}
+        canGoBack={props.playgroundCanGoBack ?? false}
+        breadcrumbs={props.playgroundBreadcrumbs ?? []}
+        onOpen={onPlaygroundOpen}
+        onBrowse={onPlaygroundBrowse}
+        onGoBack={onPlaygroundGoBack}
+        onGoToRoot={onPlaygroundGoToRoot}
+        onLink={onPlaygroundLink}
+        onLinked={props.onPlaygroundLinked}
+        onSmartMount={props.onPlaygroundSmartMount}
+      />
+    </div>
+  );
+}
+
+/** Terminal toggle button, shared between the desktop top-row and the mobile search-row. */
+function TerminalButton({
+  open,
+  onToggle,
+  className,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  className: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`${className} rounded-md flex items-center justify-center transition-colors shrink-0 ${
+        open
+          ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
+          : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+      }`}
+      title={open ? 'Close terminal' : 'Open terminal'}
+      aria-label={open ? 'Close terminal' : 'Open terminal'}
+      aria-pressed={open}
+    >
+      <TerminalSquare className="size-4" />
+    </button>
+  );
 }
 
 export function ChatHeader({
@@ -76,20 +146,38 @@ export function ChatHeader({
   refreshingModels,
   onToggleTerminal,
   terminalOpen = false,
-  playgroundEntries = [],
-  playgroundLoading = false,
-  playgroundError = null,
-  playgroundCurrentLink = null,
-  playgroundLinking = false,
-  playgroundCanGoBack = false,
-  playgroundBreadcrumbs = [],
-  onPlaygroundOpen,
-  onPlaygroundBrowse,
-  onPlaygroundGoBack,
-  onPlaygroundGoToRoot,
-  onPlaygroundLink,
-  onPlaygroundLinked,
+  ...rest
 }: ChatHeaderProps) {
+  // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
+  const playgroundProps: ChatHeaderProps = {
+    isMobile,
+    state,
+    errorMessage,
+    sessionTimeMs,
+    mobileSessionStats,
+    sessionTokenUsage,
+    mobileBrainClasses,
+    statusClass,
+    showModelSelector,
+    currentModel,
+    modelOptions,
+    searchQuery,
+    filteredMessagesCount,
+    onSearchChange,
+    onModelSelect,
+    onModelInputChange,
+    onReconnect,
+    onStartAuth,
+    onOpenMenu,
+    onOpenActivity,
+    modelLocked,
+    onRefreshModels,
+    refreshingModels,
+    onToggleTerminal,
+    terminalOpen,
+    ...rest,
+  };
+
   return (
     <header
       className={`border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
@@ -105,7 +193,10 @@ export function ChatHeader({
           .mobile-stat-tick { animation: statTick 0.32s cubic-bezier(0.34, 1.2, 0.64, 1) 1; }
         `}</style>
       )}
+
+      {/* Top row */}
       <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
+        {/* Left: menu + title */}
         <div className="flex items-center gap-2 min-w-0 flex-1">
           <div className="flex items-center gap-1.5 shrink-0 lg:hidden">
             <button
@@ -130,9 +221,7 @@ export function ChatHeader({
               )}
             </div>
             <div className="min-h-[14px] mt-0.5 flex items-center">
-              <p
-                className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}
-              >
+              <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
                 {state === CHAT_STATES.AGENT_OFFLINE && errorMessage
                   ? truncateError(errorMessage)
                   : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state}
@@ -140,33 +229,23 @@ export function ChatHeader({
             </div>
           </div>
         </div>
+
+        {/* Right: actions */}
         <div className="flex items-center gap-1 sm:gap-2 min-w-0">
           {isMobile && (
             <p
               className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"
               aria-label={`${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} in / ${sessionTokenUsage.outputTokens} out` : ''}`}
             >
-              <span
-                key={`m-total-${mobileSessionStats.totalActions}`}
-                className="text-foreground mobile-stat-tick"
-                title="Total actions"
-              >
+              <span key={`m-total-${mobileSessionStats.totalActions}`} className="text-foreground mobile-stat-tick" title="Total actions">
                 {mobileSessionStats.totalActions}
               </span>
               <span className="text-muted-foreground/70">/</span>
-              <span
-                key={`m-done-${mobileSessionStats.completed}`}
-                className="text-emerald-400 mobile-stat-tick"
-                title="Completed"
-              >
+              <span key={`m-done-${mobileSessionStats.completed}`} className="text-emerald-400 mobile-stat-tick" title="Completed">
                 {mobileSessionStats.completed}
               </span>
               <span className="text-muted-foreground/70">/</span>
-              <span
-                key={`m-proc-${mobileSessionStats.processing}`}
-                className="text-cyan-400 mobile-stat-tick"
-                title="Processing"
-              >
+              <span key={`m-proc-${mobileSessionStats.processing}`} className="text-cyan-400 mobile-stat-tick" title="Processing">
                 {mobileSessionStats.processing}
               </span>
               {sessionTokenUsage && (
@@ -189,15 +268,9 @@ export function ChatHeader({
             >
               <Brain className={`size-8 ${mobileBrainClasses.brain} transition-colors`} />
               {state === CHAT_STATES.AWAITING_RESPONSE ? (
-                <Loader2
-                  className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
-                  aria-hidden
-                />
+                <Loader2 className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`} aria-hidden />
               ) : (
-                <Sparkles
-                  className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
-                  aria-hidden
-                />
+                <Sparkles className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`} aria-hidden />
               )}
             </button>
           )}
@@ -220,38 +293,11 @@ export function ChatHeader({
             onRefresh={onRefreshModels}
             refreshing={refreshingModels}
           />
-          {onPlaygroundOpen && onPlaygroundBrowse && onPlaygroundGoBack && onPlaygroundGoToRoot && onPlaygroundLink && (
-            <PlaygroundSelector
-              entries={playgroundEntries}
-              loading={playgroundLoading}
-              error={playgroundError}
-              currentLink={playgroundCurrentLink}
-              linking={playgroundLinking}
-              canGoBack={playgroundCanGoBack}
-              breadcrumbs={playgroundBreadcrumbs}
-              onOpen={onPlaygroundOpen}
-              onBrowse={onPlaygroundBrowse}
-              onGoBack={onPlaygroundGoBack}
-              onGoToRoot={onPlaygroundGoToRoot}
-              onLink={onPlaygroundLink}
-              onLinked={onPlaygroundLinked}
-            />
-          )}
+          {/* Desktop-only: playground selector in top row */}
+          <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
+          {/* Desktop-only: terminal button in top row */}
           {onToggleTerminal && (
-            <button
-              type="button"
-              onClick={onToggleTerminal}
-              className={`size-8 sm:size-9 rounded-md flex items-center justify-center transition-colors shrink-0 ${
-                terminalOpen
-                  ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
-                  : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
-              }`}
-              title={terminalOpen ? 'Close terminal' : 'Open terminal'}
-              aria-label={terminalOpen ? 'Close terminal' : 'Open terminal'}
-              aria-pressed={terminalOpen}
-            >
-              <TerminalSquare className="size-4" />
-            </button>
+            <TerminalButton open={terminalOpen} onToggle={onToggleTerminal} className="hidden sm:flex size-9" />
           )}
           {state === CHAT_STATES.UNAUTHENTICATED && (
             <button
@@ -264,26 +310,40 @@ export function ChatHeader({
           )}
         </div>
       </div>
-      <div className={SEARCH_ROW_WRAPPER}>
-        <Search className={SEARCH_ICON_POSITION} aria-hidden />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Search in conversation..."
-          className={INPUT_SEARCH}
-        />
-        {searchQuery && (
-          <button
-            type="button"
-            onClick={() => onSearchChange('')}
-            className={CLEAR_BUTTON_POSITION}
-            aria-label="Clear search"
-          >
-            <X className="size-3.5" />
-          </button>
+
+      {/* Search row — on mobile: [playground icon] [search input] [terminal icon] */}
+      <div className="flex items-center gap-1.5 mt-2">
+        {/* Mobile-only: playground selector left of search */}
+        <PlaygroundSelectorSlot props={playgroundProps} className="sm:hidden shrink-0" />
+
+        {/* Search field */}
+        <div className="relative flex-1 h-8">
+          <Search className={SEARCH_ICON_POSITION} aria-hidden />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            placeholder="Search in conversation..."
+            className={INPUT_SEARCH}
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => onSearchChange('')}
+              className={CLEAR_BUTTON_POSITION}
+              aria-label="Clear search"
+            >
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* Mobile-only: terminal button right of search */}
+        {onToggleTerminal && (
+          <TerminalButton open={terminalOpen} onToggle={onToggleTerminal} className="sm:hidden size-8" />
         )}
       </div>
+
       {searchQuery && (
         <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
           Found {filteredMessagesCount} message{filteredMessagesCount !== 1 ? 's' : ''}

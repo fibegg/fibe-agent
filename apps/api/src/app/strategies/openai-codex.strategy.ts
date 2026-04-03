@@ -14,7 +14,7 @@ import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
-const CODEX_HOME_SUBDIR = 'codex';
+
 const CODEX_WORKSPACE_SUBDIR = 'codex_workspace';
 const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
@@ -238,9 +238,6 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
   }
 
   private getCodexHomeForSession(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CODEX_HOME_SUBDIR);
-    }
     return getCodexHome();
   }
 

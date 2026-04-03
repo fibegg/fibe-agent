@@ -266,6 +266,9 @@
 html {
   font-size: var(--font-size);
   height: 100%;
+  width: 100%;
+  position: fixed;
+  overflow: hidden;
   border-color: var(--border);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -278,12 +281,19 @@ body {
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   height: 100%;
+  width: 100%;
+  position: fixed;
+  overflow: hidden;
   min-height: 0;
+  margin: 0;
   background-color: var(--background);
 }
 
 #root {
   height: 100%;
+  width: 100%;
+  position: fixed;
+  overflow: hidden;
   min-height: 0;
 }
 
