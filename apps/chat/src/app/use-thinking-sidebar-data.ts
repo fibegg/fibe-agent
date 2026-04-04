@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
-import { usePersistedTypeFilter } from './use-persisted-type-filter';
 import {
   ensureUniqueStoryIds,
   filterVisibleStoryItems,
@@ -33,7 +32,6 @@ export function useThinkingSidebarData({
   sessionActivity,
   pastActivityFromMessages,
 }: UseThinkingSidebarDataProps) {
-  const [persistedTypeFilter] = usePersistedTypeFilter();
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   
   const prevStreamingRef = useRef(isStreaming);
@@ -112,18 +110,9 @@ export function useThinkingSidebarData({
   }, [isStreaming, fullStoryItems.length, lastStoryTimestampMs]);
 
   const filteredStoryItems = useMemo(() => {
-    let forDisplay =
-      isStreaming
-        ? fullStoryItems
-        : fullStoryItems.filter((e) => !HIDDEN_WHEN_IDLE_TYPES.has(e.type));
-    if (persistedTypeFilter.length > 0) {
-      const filterSet = new Set(persistedTypeFilter);
-      const hasReasoning = filterSet.has('reasoning');
-      forDisplay = forDisplay.filter((s) => {
-        if (hasReasoning && (s.type === 'reasoning_start' || s.type === 'reasoning_end')) return true;
-        return filterSet.has(s.type);
-      });
-    }
+    const forDisplay = isStreaming
+      ? fullStoryItems
+      : fullStoryItems.filter((e) => !HIDDEN_WHEN_IDLE_TYPES.has(e.type));
     if (!activitySearchQuery.trim()) return forDisplay;
     const q = activitySearchQuery.trim().toLowerCase();
     return forDisplay.filter((entry) => {
@@ -140,7 +129,7 @@ export function useThinkingSidebarData({
         label.includes(q)
       );
     });
-  }, [fullStoryItems, isStreaming, activitySearchQuery, persistedTypeFilter]);
+  }, [fullStoryItems, isStreaming, activitySearchQuery]);
 
   const { lastStreamStartId, currentRunIds } = useMemo(() => {
     let lastStreamStartIndex = -1;

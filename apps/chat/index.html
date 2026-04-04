@@ -4,6 +4,21 @@
     <meta charset="utf-8" />
     <title>fibe — AI Agent</title>
     <base href="/" />
+    <script>
+      // Make external links open in the parent window when inside an iframe,
+      // and in a new tab when in standalone mode.
+      document.addEventListener('click', function(e) {
+        var link = e.target.closest('a');
+        // Only modify target for links inside chat messages (.prose)
+        if (link && link.closest('.prose') && link.href && link.origin !== window.location.origin) {
+          if (window !== window.parent) {
+             link.target = '_parent';
+          } else if (!link.target) {
+             link.target = '_blank';
+          }
+        }
+      });
+    </script>
 
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, interactive-widget=resizes-content" />
     <meta name="description" content="fibe — AI-powered agent interface. Elegant, fast, and intuitive." />
