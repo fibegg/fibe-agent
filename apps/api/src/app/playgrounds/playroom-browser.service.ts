@@ -1,6 +1,5 @@
-import { readdir, lstat, stat, symlink, unlink, readlink } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
-import { resolve, relative } from 'node:path';
+import { readdir, lstat, stat, symlink, unlink, readlink, mkdir, access } from 'node:fs/promises';
+import { resolve, relative, dirname } from 'node:path';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 
@@ -10,13 +9,23 @@ export interface BrowseEntry {
   type: 'file' | 'directory' | 'symlink';
 }
 
-/** Reusable path-traversal guard. */
+/** Path-traversal guard — throws BadRequestException when abs escapes root. */
 function assertSafePath(root: string, abs: string): string {
   const rel = relative(root, abs);
   if (rel.startsWith('..') || rel.startsWith('/')) {
     throw new BadRequestException('Invalid path');
   }
   return rel;
+}
+
+/** Returns true when the path exists (any type). */
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await access(p);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 @Injectable()
@@ -29,7 +38,7 @@ export class PlayroomBrowserService {
     const absPath = relPath ? resolve(root, relPath) : root;
     const rel = assertSafePath(root, absPath);
 
-    if (!existsSync(absPath)) {
+    if (!(await pathExists(absPath))) {
       throw new NotFoundException(`Path not found: ${relPath || '/'}`);
     }
 
@@ -41,13 +50,13 @@ export class PlayroomBrowserService {
     const files: BrowseEntry[] = [];
 
     for (const e of raw) {
-      const name = typeof e.name === 'string' ? e.name : String(e.name);
+      const name = String(e.name);
       if (name.startsWith('.')) continue;
+
       const childRel = rel ? `${rel}/${name}` : name;
       const childAbs = resolve(absPath, name);
 
       if (e.isSymbolicLink()) {
-        // Follow the symlink to determine the target type
         try {
           const targetStat = await stat(childAbs);
           if (targetStat.isDirectory()) {
@@ -70,7 +79,14 @@ export class PlayroomBrowserService {
     return [...dirs, ...files];
   }
 
-  /** Create symlink: PLAYGROUNDS_DIR → <PLAYROOMS_ROOT>/<relPath>. Replaces existing symlink. */
+  /**
+   * Create (or replace) the PLAYGROUNDS_DIR symlink pointing at
+   * <PLAYROOMS_ROOT>/<relPath>.
+   *
+   * Throws:
+   *  - BadRequestException  if relPath is empty / invalid / PLAYGROUNDS_DIR is a real dir
+   *  - NotFoundException    if the target path does not exist
+   */
   async linkPlayground(relPath: string): Promise<{ linkedPath: string }> {
     if (!relPath?.trim()) {
       throw new BadRequestException('Path is required');
@@ -80,20 +96,38 @@ export class PlayroomBrowserService {
     const target = resolve(root, relPath);
     assertSafePath(root, target);
 
-    if (!existsSync(target)) {
+    if (!(await pathExists(target))) {
       throw new NotFoundException(`Target not found: ${relPath}`);
     }
 
     const playgroundDir = resolve(this.config.getPlaygroundsDir());
 
-    // Remove existing symlink if present
-    try {
-      if ((await lstat(playgroundDir)).isSymbolicLink()) {
-        await unlink(playgroundDir);
-      }
-    } catch { /* doesn't exist — fine */ }
+    // Ensure parent directory exists
+    await mkdir(dirname(playgroundDir), { recursive: true });
 
-    await symlink(target, playgroundDir, 'dir');
+    // Clean up whatever is at playgroundDir
+    try {
+      const st = await lstat(playgroundDir);
+      if (st.isDirectory() && !st.isSymbolicLink()) {
+        throw new BadRequestException(
+          `Cannot replace '${playgroundDir}': it is a real directory. Remove it manually first.`,
+        );
+      }
+      await unlink(playgroundDir);
+    } catch (err: unknown) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT') throw err; // re-throw BadRequestException or unexpected OS errors
+    }
+
+    try {
+      await symlink(target, playgroundDir, 'dir');
+    } catch (err: unknown) {
+      const e = err as NodeJS.ErrnoException;
+      throw new BadRequestException(
+        `Failed to create symlink: ${e.message} (code: ${e.code ?? 'unknown'})`,
+      );
+    }
+
     return { linkedPath: target };
   }
 
@@ -103,7 +137,7 @@ export class PlayroomBrowserService {
     try {
       if (!(await lstat(playgroundDir)).isSymbolicLink()) return null;
       const target = await readlink(playgroundDir);
-      const absTarget = resolve(playgroundDir, '..', target);
+      const absTarget = resolve(dirname(playgroundDir), target);
       const root = resolve(this.config.getPlayroomsRoot());
       const rel = relative(root, absTarget);
       return rel.startsWith('..') ? target : rel;
