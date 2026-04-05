@@ -416,13 +416,19 @@ const MessageRow = memo(
   );
   },
   // Custom memo comparator: include containerWidthPx in the shallow check
-  // so resize events correctly invalidate tight-width calculations.
-  (prev, next) =>
-    prev.msg === next.msg &&
-    prev.maxWidthClass === next.maxWidthClass &&
-    prev.onRetry === next.onRetry &&
-    prev.isNoOutput === next.isNoOutput &&
-    prev.containerWidthPx === next.containerWidthPx
+  // only when it affects tight-width calculations (simple user messages).
+  (prev, next) => {
+    if (
+      prev.msg !== next.msg ||
+      prev.maxWidthClass !== next.maxWidthClass ||
+      prev.onRetry !== next.onRetry ||
+      prev.isNoOutput !== next.isNoOutput
+    ) {
+      return false;
+    }
+    const needsTightWidth = prev.msg.role === 'user' && !prev.msg.imageUrls?.length && !prev.msg.body.includes('```');
+    return needsTightWidth ? prev.containerWidthPx === next.containerWidthPx : true;
+  }
 );
 
 export interface MessageListHandle {
@@ -465,8 +471,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     getScrollElement: () => scrollRef?.current ?? null,
     estimateSize: (index) => {
       const msg = messages[index];
-      const containerWidth = scrollRef?.current?.clientWidth ?? 640;
-      const bubbleWidth = containerWidth * BUBBLE_WIDTH_FRACTION;
+      const bubbleWidth = containerWidthPx * BUBBLE_WIDTH_FRACTION;
       return estimateMessageHeight(msg.body, bubbleWidth, {
         hasCode: msg.body.includes('```'),
       });
@@ -562,10 +567,9 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
   // current text flow, preventing abrupt container-height jumps on each flush.
   const streamingBubbleMinHeight = useMemo(() => {
     if (!isStreaming || !streamingText) return undefined;
-    const containerWidth = scrollRef?.current?.clientWidth ?? 640;
-    const bubbleWidth = containerWidth * BUBBLE_WIDTH_FRACTION;
+    const bubbleWidth = containerWidthPx * BUBBLE_WIDTH_FRACTION;
     return estimateStreamingHeight(streamingText, bubbleWidth);
-  }, [isStreaming, streamingText, scrollRef]);
+  }, [isStreaming, streamingText, containerWidthPx]);
 
   return (
     <>
