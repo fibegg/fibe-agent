@@ -43,10 +43,10 @@ export function peekGreeting(): string | null {
 // Attach the listener only when running inside an iframe
 const LISTENER_KEY = '__initial_greeting_listener';
 if (typeof window !== 'undefined' && window !== window.parent) {
-  const existing = (window as any)[LISTENER_KEY];
+  const existing = window[LISTENER_KEY];
   if (existing) {
     window.removeEventListener('message', existing);
   }
   window.addEventListener('message', onMessage);
-  (window as any)[LISTENER_KEY] = onMessage;
+  window[LISTENER_KEY] = onMessage;
 }

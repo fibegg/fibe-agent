@@ -22,13 +22,18 @@ Path constants are defined in `shared/api-paths.ts` (`API_PATHS.*`, `API_PATH_UP
 | POST   | /api/uploads           | Bearer | Upload a file (multipart form field `file`). Returns `{ filename }`. Allowed: images, audio, PDF, Excel, Word, text, CSV, JSON, etc. Blocked: executables and scripts. Max 20MB. |
 | GET    | /api/model-options | Bearer | Returns string array of model names from `MODEL_OPTIONS` env                |
 | GET    | /api/playgrounds   | Bearer | Returns file tree of `./playground` (or `PLAYGROUNDS_DIR`) as JSON array   |
+| GET    | /api/playgrounds/stats | Bearer | Returns size/count stats for the linked playground directory. |
 | GET    | /api/playgrounds/file | Bearer | Query `path` = relative path. Returns `{ content: string }`; 404 if not found or not a file. |
-| GET    | /api/init-status      | Bearer | Post-init script status. Returns `{ state: 'disabled'|'pending'|'running'|'done'|'failed', output?, error?, finishedAt? }`. |
+| PUT    | /api/playgrounds/file | Bearer | Body `{ path, content }`. Writes (creates or overwrites) a file in the playground. Returns `{ ok: true }`. 404 on invalid path. |
+| GET    | /api/playrooms/browse | Bearer | Query `?path=` (optional). Returns `BrowseEntry[]` listing directories, symlinks, and files under `PLAYROOMS_ROOT`. Hidden entries (`.`-prefixed) are skipped. 404 if path not found. |
+| POST   | /api/playrooms/link | Bearer | Body `{ path }`. Creates a symlink from `PLAYGROUNDS_DIR` to `<PLAYROOMS_ROOT>/<path>` so the agent workspace points at that directory. Returns `{ ok: true, linkedPath }`. Errors: 400 if path empty/invalid/already a real dir; 404 if target not found. |
+| GET    | /api/playrooms/current | Bearer | Returns `{ current: string \| null }` — the relative path (under `PLAYROOMS_ROOT`) that `PLAYGROUNDS_DIR` currently points to, or `null` if not linked. |
+| GET    | /api/init-status      | Bearer | Post-init script status. Returns `{ state: 'disabled'\|'pending'\|'running'\|'done'\|'failed', output?, error?, finishedAt? }`. |
 | POST   | /api/agent/send-message | Bearer | Send a message to the agent asynchronously. Body: `{ text, images?, attachmentFilenames? }`. Returns `202` with `{ accepted: true, messageId }` when the message is accepted for processing. Rejects with `400` (empty text), `403` (NEED_AUTH), or `409` (AGENT_BUSY). Intended for webhooks and integrations (e.g. Sentry). |
 | GET    | /api/data-privacy/export | Bearer | Export active conversation core data (`messages.json`, `activity.json`, `model.json`) as a standardized JSON structure. |
 | DELETE | /api/data-privacy     | Bearer | Permanently delete the isolated conversation data directory and clear associated in-memory cache stores. |
 
-When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, `GET /api/playgrounds/file`, `GET /api/init-status`, and `POST /api/agent/send-message` require `Authorization: Bearer <password>` or `?token=<password>`.
+When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, `GET /api/playgrounds/stats`, `GET /api/playgrounds/file`, `PUT /api/playgrounds/file`, `GET /api/playrooms/browse`, `POST /api/playrooms/link`, `GET /api/playrooms/current`, `GET /api/init-status`, and `POST /api/agent/send-message` require `Authorization: Bearer <password>` or `?token=<password>`.
 
 ## Container logging
 
@@ -39,6 +44,8 @@ All API logs are written as **one JSON object per line** to stdout/stderr so con
 | `DATA_DIR`          | Base directory for persistence (default: `./data`). When `FIBE_AGENT_ID` or `CONVERSATION_ID` is set, conversation data is stored under `DATA_DIR/<conversation-id>/` (messages, activities, model, uploads, steering, init-status, and provider session dirs). |
 | `POST_INIT_SCRIPT`  | Optional. Shell script run once on first container load (e.g. to install tools). State is stored under the conversation data dir and exposed at `GET /api/init-status`. |
 | `LOG_LEVEL`         | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` (case-insensitive). Minimum level emitted. `info` and `log` are equivalent. |
+| `PLAYROOMS_ROOT`    | Root directory the Playroom Browser serves (default: `/opt/fibe`). The UI's Playground Selector browses this tree and links a subdirectory as the active workspace via `PLAYGROUNDS_DIR`. |
+| `PLAYGROUNDS_DIR`   | Path the agent uses as its active playground/workspace (default: `./playground`). Managed as a symlink by `POST /api/playrooms/link`; the target must be inside `PLAYROOMS_ROOT`. |
 
 **Log shape:** `{ "timestamp": "<ISO8601>", "level": "log", "context": "<optional>", "message": "<string>", ... }`
 

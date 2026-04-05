@@ -80,10 +80,10 @@ function onMessage(event: MessageEvent): void {
 
 const LISTENER_KEY = '__auto_auth_listener';
 if (window !== window.parent) {
-  const existing = (window as any)[LISTENER_KEY];
+  const existing = window[LISTENER_KEY];
   if (existing) {
     window.removeEventListener('message', existing);
   }
   window.addEventListener('message', onMessage);
-  (window as any)[LISTENER_KEY] = onMessage;
+  window[LISTENER_KEY] = onMessage;
 }
