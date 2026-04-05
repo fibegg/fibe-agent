@@ -1,5 +1,5 @@
 import { Controller, Get, Req, Res, Next } from '@nestjs/common';
-import type { NextFunction, Request, Response } from 'express';
+import type { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from 'fastify';
 import { serveIndexLogic } from './serve-index.util';
 
 @Controller()
@@ -10,7 +10,7 @@ export class AppController {
   }
 
   @Get('*')
-  serveIndex(@Req() req: Request, @Res() res: Response, @Next() next: NextFunction) {
+  serveIndex(@Req() req: FastifyRequest, @Res() res: FastifyReply, @Next() next: HookHandlerDoneFunction) {
     return serveIndexLogic(req, res, next);
   }
 }

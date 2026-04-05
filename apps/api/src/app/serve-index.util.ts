@@ -1,16 +1,17 @@
 import { join } from 'path';
 import { readFileSync, existsSync } from 'fs';
-import type { NextFunction, Request, Response } from 'express';
+import type { FastifyRequest, FastifyReply, HookHandlerDoneFunction } from 'fastify';
 
 // Store html cache locally
 let cachedHtml: string | null = null;
 
-export function serveIndexLogic(req: Request, res: Response, next: NextFunction, publicDir = join(__dirname, '..', 'chat')) {
+export function serveIndexLogic(req: FastifyRequest, res: FastifyReply, next: HookHandlerDoneFunction, publicDir = join(__dirname, '..', 'chat')) {
+  const path = req.url.split('?')[0];
   if (
-    req.path.startsWith('/api/') ||
-    req.path.startsWith('/ws') ||
-    req.path.startsWith('/assets/') ||
-    req.path.includes('.')
+    path.startsWith('/api/') ||
+    path.startsWith('/ws') ||
+    path.startsWith('/assets/') ||
+    path.includes('.')
   ) {
     return next();
   }
@@ -27,7 +28,7 @@ export function serveIndexLogic(req: Request, res: Response, next: NextFunction,
 
     let html = cachedHtml;
     
-    const prefix = process.env.AGENT_BASE_PATH || req.header('x-forwarded-prefix') || '';
+    const prefix = process.env.AGENT_BASE_PATH || (req.headers['x-forwarded-prefix'] as string) || '';
     
     if (prefix) {
       const baseHref = prefix.endsWith('/') ? prefix : `${prefix}/`;
@@ -38,10 +39,10 @@ export function serveIndexLogic(req: Request, res: Response, next: NextFunction,
       html = html.replace('<head>', `<head>\n    <base href="/" />\n    <script>window.__BASENAME__ = "";</script>`);
     }
 
-    res.type('text/html').send(html);
+    res.type('text/html').send(html);  // FastifyReply.send returns the reply itself
   } catch (error) {
     console.error('Error serving index.html', error);
-    res.status(500).send('Internal Server Error');
+    res.code(500).send('Internal Server Error');
   }
 }
 
