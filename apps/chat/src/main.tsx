@@ -13,13 +13,21 @@ if (typeof window !== 'undefined' && window !== window.parent) {
   window.parent.postMessage({ type: 'iframe_ready' }, '*');
 }
 
+declare global {
+  interface Window {
+    __BASENAME__?: string;
+  }
+}
+
 const root = ReactDOM.createRoot(
   document.getElementById('root') as HTMLElement,
 );
 
+const basename = typeof window !== 'undefined' && window.__BASENAME__ ? window.__BASENAME__ : '/';
+
 root.render(
   <StrictMode>
-    <BrowserRouter>
+    <BrowserRouter basename={basename}>
       <App />
     </BrowserRouter>
   </StrictMode>,
