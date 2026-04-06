@@ -1,4 +1,5 @@
 /** @vitest-environment jsdom */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useLocalLlm } from './use-local-llm';
@@ -56,7 +57,7 @@ describe('useLocalLlm', () => {
       expect(result.current.isReady).toBe(true);
     });
 
-    let output: string = '';
+    let output = '';
     await act(async () => {
       output = await result.current.generate([{ role: 'user', content: 'hello' }]);
     });
@@ -73,7 +74,7 @@ describe('useLocalLlm', () => {
           if (opts?.initProgressCallback) {
               capturedCallback = opts.initProgressCallback;
           }
-          return { unload: vi.fn() } as any;
+          return { unload: vi.fn().mockResolvedValue(undefined) } as any;
       });
 
       const { result } = renderHook(() => useLocalLlm());
