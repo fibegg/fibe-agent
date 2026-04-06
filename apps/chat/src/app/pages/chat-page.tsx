@@ -250,11 +250,16 @@ export function ChatPage() {
   }, [send]);
 
   useEffect(() => {
-    try {
-      window.parent.postMessage({ type: 'agent_status_update', isWorking: state === CHAT_STATES.AWAITING_RESPONSE }, '*');
-    } catch {
-      // ignore across cross-origin if parent is unavailable
-    }
+    const notifyParent = () => {
+      try {
+        window.parent.postMessage({ type: 'agent_status_update', isWorking: state === CHAT_STATES.AWAITING_RESPONSE }, '*');
+      } catch {
+        // ignore across cross-origin if parent is unavailable
+      }
+    };
+    notifyParent();
+    const interval = setInterval(notifyParent, 1000);
+    return () => clearInterval(interval);
   }, [state]);
 
   // Auto-send initial greeting when chat is authenticated with empty history
