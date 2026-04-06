@@ -8,6 +8,23 @@ import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
 const SESSION_MARKER_FILE = '.opencode_session';
+const OPENCODE_CONFIG_FILE = 'opencode.json';
+
+/**
+ * Full-yolo opencode.json config that auto-approves everything.
+ * Without this, `external_directory` defaults to "ask" which auto-rejects
+ * in non-interactive CLI `run` mode — blocking access to /app/data, /app/skills, etc.
+ */
+const YOLO_CONFIG = JSON.stringify(
+  {
+    $schema: 'https://opencode.ai/config.json',
+    permission: 'allow',
+    autoupdate: false,
+    share: 'disabled',
+  },
+  null,
+  2,
+);
 
 /**
  * Well-known API key env vars that OpenCode CLI can read.
@@ -159,9 +176,24 @@ export class OpencodeStrategy implements AgentStrategy {
 
   private static readonly LIST_MODELS_TIMEOUT_MS = 15_000;
 
+  /**
+   * Env vars injected into every opencode subprocess to ensure fully
+   * non-interactive, yolo-mode execution.
+   */
+  private static readonly YOLO_ENV: Record<string, string> = {
+    OPENCODE_PERMISSION: 'allow',
+    OPENCODE_DISABLE_AUTOUPDATE: '1',
+    OPENCODE_DISABLE_MODELS_FETCH: '1',
+    OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
+    OPENCODE_DISABLE_PRUNE: '1',
+  };
+
   listModels(): Promise<string[]> {
     return new Promise((resolve) => {
-      const env: NodeJS.ProcessEnv = { ...process.env };
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        ...OpencodeStrategy.YOLO_ENV,
+      };
       const storedKey = this.getStoredApiKey();
       if (storedKey) {
         for (const varName of API_KEY_ENV_VARS) {
@@ -209,6 +241,22 @@ export class OpencodeStrategy implements AgentStrategy {
     this.currentStreamProcess?.kill();
   }
 
+  /**
+   * Ensure the workspace has a permissive opencode.json so the CLI
+   * never prompts for permission (external_directory, bash, edit, etc.).
+   */
+  private ensureYoloConfig(workspaceDir: string): void {
+    const configPath = join(workspaceDir, OPENCODE_CONFIG_FILE);
+    try {
+      if (!existsSync(configPath)) {
+        writeFileSync(configPath, YOLO_CONFIG, { mode: 0o644 });
+        this.logger.log('Wrote yolo opencode.json config');
+      }
+    } catch (err) {
+      this.logger.warn('Failed to write opencode.json config', (err as Error).message);
+    }
+  }
+
   executePromptStreaming(
     prompt: string,
     model: string,
@@ -222,6 +270,11 @@ export class OpencodeStrategy implements AgentStrategy {
       if (!existsSync(workspaceDir)) {
         mkdirSync(workspaceDir, { recursive: true });
       }
+
+      // Write permissive opencode.json so external_directory, bash, edit
+      // etc. are all auto-approved (yolo mode)
+      this.ensureYoloConfig(workspaceDir);
+
       const hasSession = this.conversationDataDir
         ? existsSync(join(workspaceDir, SESSION_MARKER_FILE))
         : false;
@@ -238,9 +291,13 @@ export class OpencodeStrategy implements AgentStrategy {
 
       // Build env: start with process.env (inherits pre-set keys like
       // ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, etc.).
+      // Merge in YOLO_ENV to ensure non-interactive execution.
       // If a manual key was stored via the auth modal, inject it into
       // all common env vars so opencode can use any provider.
-      const env: NodeJS.ProcessEnv = { ...process.env };
+      const env: NodeJS.ProcessEnv = {
+        ...process.env,
+        ...OpencodeStrategy.YOLO_ENV,
+      };
       const storedKey = this.getStoredApiKey();
 
       if (storedKey) {
