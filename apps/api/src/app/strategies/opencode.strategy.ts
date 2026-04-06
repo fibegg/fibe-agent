@@ -181,7 +181,15 @@ export class OpencodeStrategy implements AgentStrategy {
    * non-interactive, yolo-mode execution.
    */
   private static readonly YOLO_ENV: Record<string, string> = {
-    OPENCODE_PERMISSION: 'allow',
+    // OPENCODE_CONFIG_CONTENT is the highest-precedence config source.
+    // It takes full inline JSON and overrides project/global/remote configs.
+    // We use this instead of OPENCODE_PERMISSION because the latter expects
+    // a JSON-parseable value (bare `allow` causes a parse error).
+    OPENCODE_CONFIG_CONTENT: JSON.stringify({
+      permission: 'allow',
+      autoupdate: false,
+      share: 'disabled',
+    }),
     OPENCODE_DISABLE_AUTOUPDATE: '1',
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
