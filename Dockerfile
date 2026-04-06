@@ -13,9 +13,9 @@ RUN --mount=type=cache,target=/root/.npm \
     if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     npm install -g @google/gemini-cli; \
     elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    npm install -g @anthropic-ai/claude-code@2.1.50; \
+    npm install -g @anthropic-ai/claude-code; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
-    npm install -g @openai/codex@0.104.0; \
+    npm install -g @openai/codex; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     npm install -g opencode-ai; \
     fi
