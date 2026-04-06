@@ -34,3 +34,13 @@ data/
 playground/
 apps/api/data/
 apps/api/playground/
+apps/api/node_modules
+apps/api/node_modules/**
+apps/chat/node_modules
+apps/chat/node_modules/**
+apps/e2e-api/node_modules
+apps/e2e-api/node_modules/**
+apps/e2e-chat/node_modules
+apps/e2e-chat/node_modules/**
+shared/node_modules
+shared/node_modules/**

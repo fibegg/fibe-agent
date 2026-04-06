@@ -13,9 +13,9 @@ RUN --mount=type=cache,target=/root/.npm \
     if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     npm install -g @google/gemini-cli; \
     elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    npm install -g @anthropic-ai/claude-code@2.1.50; \
+    npm install -g @anthropic-ai/claude-code; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
-    npm install -g @openai/codex@0.104.0; \
+    npm install -g @openai/codex; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     npm install -g opencode-ai; \
     fi
@@ -73,7 +73,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
-    jq less tree wget zip unzip openssh-client docker.io \
+    jq less tree wget zip unzip openssh-client \
     python3 python3-venv python-is-python3 \
     ripgrep fd-find \
     make file patch \
@@ -83,6 +83,16 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/fdfind /usr/local/bin/fd
+
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then DOCKER_ARCH="x86_64"; \
+    elif [ "$ARCH" = "aarch64" ]; then DOCKER_ARCH="aarch64"; \
+    else DOCKER_ARCH="x86_64"; fi && \
+    curl -fsSL -o docker.tgz "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-27.4.1.tgz" && \
+    tar -xzf docker.tgz docker/docker && \
+    mv docker/docker /usr/local/bin/docker && \
+    chmod +x /usr/local/bin/docker && \
+    rm -rf docker docker.tgz
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
