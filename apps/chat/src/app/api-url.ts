@@ -7,7 +7,10 @@ export function getApiUrl(): string {
 }
 
 export function buildApiUrl(path: string): string {
-  const base = getApiUrl();
+  const env = getApiUrl();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const basePrefix = typeof window !== 'undefined' ? ((window as any).__BASENAME__ || '') : '';
+  const base = env || basePrefix || '';
   if (base) return `${base}${path.startsWith('/') ? path : `/${path}`}`;
   return path.startsWith('/') ? path : `/${path}`;
 }
@@ -36,14 +39,18 @@ export function isChatModelLocked(): boolean {
 }
 
 export function getWsUrl(): string {
-  const base = getApiUrl();
-  if (base) {
-    const wsProtocol = base.startsWith('https') ? 'wss' : 'ws';
-    const host = base.replace(/^https?:\/\//, '');
+  const env = getApiUrl();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const basePrefix = typeof window !== 'undefined' ? ((window as any).__BASENAME__ || '') : '';
+  
+  if (env) {
+    const wsProtocol = env.startsWith('https') ? 'wss' : 'ws';
+    const host = env.replace(/^https?:\/\//, '');
     return `${wsProtocol}://${host}`;
   }
+  
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${protocol}//${window.location.host}`;
+  return `${protocol}//${window.location.host}${basePrefix}`;
 }
 
 export const TOKEN_STORAGE_KEY = 'agent_password';

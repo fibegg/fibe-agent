@@ -74,7 +74,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
     jq less tree wget zip unzip openssh-client docker.io \
-    python3 python3-venv \
+    python3 python3-venv python-is-python3 \
     ripgrep fd-find \
     make file patch \
     ca-certificates \

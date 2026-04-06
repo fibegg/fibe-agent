@@ -36,8 +36,16 @@ describe('getApiUrl', () => {
 });
 
 describe('buildApiUrl', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalWindow: any;
+
+  beforeEach(() => {
+    originalWindow = global.window;
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
+    global.window = originalWindow;
   });
 
   it('builds URL with base when API_URL is set', () => {
@@ -59,11 +67,25 @@ describe('buildApiUrl', () => {
     vi.stubGlobal('__API_URL__', '');
     expect(buildApiUrl('health')).toBe('/health');
   });
+
+  it('prepends __BASENAME__ when available and API_URL is empty', () => {
+    vi.stubGlobal('__API_URL__', '');
+    global.window = Object.assign({}, originalWindow, { __BASENAME__: '/tab1' });
+    expect(buildApiUrl('/health')).toBe('/tab1/health');
+  });
 });
 
 describe('getWsUrl', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let originalWindow: any;
+
+  beforeEach(() => {
+    originalWindow = global.window;
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
+    global.window = originalWindow;
   });
 
   it('uses wss when API base is https', () => {
@@ -78,9 +100,22 @@ describe('getWsUrl', () => {
 
   it('uses current host when API_URL is empty', () => {
     vi.stubGlobal('__API_URL__', '');
+    global.window = Object.assign({}, originalWindow, {
+      location: { protocol: 'https:', host: 'localhost:4200' },
+      __BASENAME__: undefined,
+    });
     const url = getWsUrl();
-    expect(url).toMatch(/^wss?:\/\//);
-    expect(url).toContain(window.location.host);
+    expect(url).toBe('wss://localhost:4200');
+  });
+
+  it('appends __BASENAME__ when returning local ws URL', () => {
+    vi.stubGlobal('__API_URL__', '');
+    global.window = Object.assign({}, originalWindow, {
+      location: { protocol: 'http:', host: 'localhost:4200' },
+      __BASENAME__: '/tab1',
+    });
+    const url = getWsUrl();
+    expect(url).toBe('ws://localhost:4200/tab1');
   });
 });
 

@@ -1,6 +1,6 @@
 {
   "name": "@fibe.gg/api",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "nx": {
     "name": "api",
@@ -116,6 +116,7 @@
   },
   "devDependencies": {
     "@nestjs/testing": "^11.0.0",
+    "@types/express": "^5.0.0",
     "@types/ws": "^8.5.0"
   }
 }
