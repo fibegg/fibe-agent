@@ -10,6 +10,7 @@ import { usePlaygroundSelector } from '../chat/use-playground-selector';
 import { useAgentFiles } from '../chat/use-agent-files';
 import { useChatLayout } from '../chat/use-chat-layout';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
+import { useLocalStt } from '../chat/use-local-stt';
 import { useChatAttachments, MAX_PENDING_TOTAL } from '../chat/use-chat-attachments';
 import { useChatActivityLog } from '../chat/use-chat-activity-log';
 import { useChatInitialData } from '../chat/use-chat-initial-data';
@@ -177,6 +178,7 @@ export function ChatPage() {
   }, [setCurrentModel, setMessages]);
 
   const voiceRecorder = useVoiceRecorder();
+  const localStt = useLocalStt();
 
   const onStreamEndCallback = useCallback(
     (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string, streamModel?: string | null) => {
@@ -394,32 +396,44 @@ export function ChatPage() {
   );
 
   const handleVoiceToggle = useCallback(async () => {
-    if (voiceRecorder.isRecording) {
-      const result = await voiceRecorder.stopRecording();
-      if (result) {
-        if (result.transcript) {
-          setInputState((prev) => {
-            const next = prev.value.trim() ? `${prev.value.trim()} ${result.transcript}` : (result.transcript ?? '');
-            return { value: next, cursor: next.length };
-          });
-        }
-        if (result.blob.size > 0) {
-          const reader = new FileReader();
-          reader.onloadend = () => setPendingVoice(reader.result as string);
-          reader.readAsDataURL(result.blob);
-          setVoiceUploadError(null);
-          const filename = await uploadVoiceFile(result.blob);
-          if (filename) {
-            setPendingVoiceFilename(filename);
-          } else {
-            setVoiceUploadError('Upload failed; voice will be sent with message.');
+    if (voiceRecorder.isRecording || localStt.isTranscribing) {
+      // If native is recording, stop it.
+      if (voiceRecorder.isRecording) {
+        const result = await voiceRecorder.stopRecording();
+        if (result) {
+          let finalTranscript = result.transcript;
+          
+          if (result.blob.size > 0 && !finalTranscript) {
+             try {
+               finalTranscript = await localStt.transcribe(result.blob);
+             } catch (err) {
+               console.error("Local STT Error:", err);
+             }
+          }
+
+          if (finalTranscript) {
+            setInputState((prev) => {
+              const next = prev.value.trim() ? `${prev.value.trim()} ${finalTranscript}` : (finalTranscript ?? '');
+              return { value: next, cursor: next.length };
+            });
+          } else if (result.blob.size > 0) {
+            const reader = new FileReader();
+            reader.onloadend = () => setPendingVoice(reader.result as string);
+            reader.readAsDataURL(result.blob);
+            setVoiceUploadError(null);
+            const filename = await uploadVoiceFile(result.blob);
+            if (filename) {
+              setPendingVoiceFilename(filename);
+            } else {
+              setVoiceUploadError('Upload failed; voice will be sent with message.');
+            }
           }
         }
       }
     } else {
       await voiceRecorder.startRecording();
     }
-  }, [voiceRecorder, uploadVoiceFile, setInputState, setPendingVoice, setVoiceUploadError, setPendingVoiceFilename]);
+  }, [voiceRecorder, localStt, uploadVoiceFile, setInputState, setPendingVoice, setVoiceUploadError, setPendingVoiceFilename]);
 
   const { statusClass, showModelSelector, showAuthModal, authModalForModal } = useChatAuthUI(
     state,

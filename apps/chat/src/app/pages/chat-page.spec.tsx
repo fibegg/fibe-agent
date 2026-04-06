@@ -7,6 +7,14 @@ import { isAuthenticated } from '../api-url';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { useChatLayout } from '../chat/use-chat-layout';
 
+
+vi.mock('../chat/use-local-stt', () => ({
+  useLocalStt: vi.fn().mockReturnValue({
+    isTranscribing: false,
+    transcribe: vi.fn().mockResolvedValue('test'),
+  }),
+}));
+
 // ─── Mock ALL hooks and heavy dependencies ───────────────────────────────────
 
 vi.mock('../api-url', () => ({
@@ -99,6 +107,7 @@ vi.mock('../chat/use-voice-recorder', () => ({
   useVoiceRecorder: vi.fn().mockReturnValue({
     isRecording: false,
     recordingTimeSec: 0,
+    liveText: '',
     error: null,
     isSupported: false,
     startRecording: vi.fn(),

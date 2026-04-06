@@ -27,6 +27,10 @@ vi.mock('./pretext-height', () => ({
   getPretextCacheSize: vi.fn().mockReturnValue(0),
 }));
 
+vi.mock('./use-local-tts', () => ({
+  useLocalTts: vi.fn().mockReturnValue({ stop: vi.fn(), speak: vi.fn().mockResolvedValue(undefined) }),
+}));
+
 describe('MessageList', () => {
   it('renders without error when messages is empty and not streaming', () => {
     render(
