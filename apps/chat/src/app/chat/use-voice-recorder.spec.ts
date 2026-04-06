@@ -205,4 +205,48 @@ describe('useVoiceRecorder', () => {
       language: 'en-US',
     });
   });
+
+  it('updates liveText for interim results and clears on stop', async () => {
+    let capturedOnResult: ((e: unknown) => void) | null = null;
+    class FakeSpeechRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = '';
+      onresult: ((e: unknown) => void) | null = null;
+      start = vi.fn(() => { capturedOnResult = this.onresult; });
+      stop = vi.fn();
+    }
+    vi.stubGlobal('SpeechRecognition', FakeSpeechRecognition);
+
+    const { result } = renderHook(() => useVoiceRecorder());
+    await act(async () => { await result.current.startRecording(); });
+    expect(result.current.isRecording).toBe(true);
+
+    act(() => {
+      capturedOnResult?.({
+        resultIndex: 0,
+        results: {
+          length: 1,
+          0: { isFinal: false, length: 1, 0: { transcript: 'live test', confidence: 0.8 } },
+        },
+      });
+    });
+
+    expect(result.current.liveText).toBe('live test');
+
+    await act(async () => {
+      const stopPromise = result.current.stopRecording();
+      await Promise.resolve();
+      await stopPromise;
+    });
+
+    expect(result.current.liveText).toBe('');
+
+    vi.unstubAllGlobals();
+    vi.stubGlobal('MediaRecorder', MockMediaRecorder);
+    vi.stubGlobal('navigator', {
+      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()) },
+      language: 'en-US',
+    });
+  });
 });

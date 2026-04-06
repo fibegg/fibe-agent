@@ -41,5 +41,19 @@ vi.unstubAllGlobals = () => {
   const result = _unstubAllGlobals();
   // Re-apply our working localStorage after Vitest nukes everything
   vi.stubGlobal('localStorage', storage);
+  vi.stubGlobal('Worker', class MockWorker {
+    addEventListener = vi.fn();
+    removeEventListener = vi.fn();
+    postMessage = vi.fn();
+    terminate = vi.fn();
+  });
   return result;
 };
+
+// Initial stub for Worker
+vi.stubGlobal('Worker', class MockWorker {
+  addEventListener = vi.fn();
+  removeEventListener = vi.fn();
+  postMessage = vi.fn();
+  terminate = vi.fn();
+});

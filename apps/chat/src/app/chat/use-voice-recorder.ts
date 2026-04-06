@@ -18,6 +18,7 @@ interface SpeechRecognitionInstance extends EventTarget {
 
 interface SpeechRecognitionResultEvent {
   results: SpeechRecognitionResultList;
+  resultIndex: number;
 }
 
 interface SpeechRecognitionResultList {
@@ -38,7 +39,7 @@ interface SpeechRecognitionAlternative {
   confidence: number;
 }
 
-const SpeechRecognitionCtor =
+const getSpeechRecognitionCtor = () =>
   typeof window !== 'undefined' &&
   (window.SpeechRecognition || window.webkitSpeechRecognition);
 
@@ -50,6 +51,7 @@ export interface VoiceRecorderResult {
 export interface UseVoiceRecorderReturn {
   isRecording: boolean;
   recordingTimeSec: number;
+  liveText: string;
   error: string | null;
   isSupported: boolean;
   startRecording: () => Promise<void>;
@@ -67,6 +69,7 @@ function getSupportedMimeType(): string {
 export function useVoiceRecorder(): UseVoiceRecorderReturn {
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTimeSec, setRecordingTimeSec] = useState(0);
+  const [liveText, setLiveText] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
@@ -84,6 +87,7 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
   const startRecording = useCallback(async () => {
     setError(null);
     setRecordingTimeSec(0);
+    setLiveText('');
     transcriptRef.current = [];
 
     try {
@@ -102,17 +106,26 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
 
       mediaRecorder.start(100);
 
+      const SpeechRecognitionCtor = getSpeechRecognitionCtor();
       if (SpeechRecognitionCtor) {
         const recognition = new SpeechRecognitionCtor() as SpeechRecognitionInstance;
         recognition.continuous = true;
         recognition.interimResults = true;
         recognition.lang = navigator.language || 'en-US';
         recognition.onresult = (e: SpeechRecognitionResultEvent) => {
-          const last = e.results.length - 1;
-          const result = e.results[last];
-          if (result.isFinal && result.length > 0) {
-            transcriptRef.current.push(result[0].transcript.trim());
+          let interim = '';
+          for (let i = e.resultIndex; i < e.results.length; ++i) {
+            if (e.results[i].isFinal) {
+              const finalPiece = e.results[i][0].transcript.trim();
+              if (finalPiece.length > 0) {
+                transcriptRef.current.push(finalPiece);
+              }
+            } else {
+              interim += e.results[i][0].transcript;
+            }
           }
+          const currentFinal = transcriptRef.current.filter(Boolean).join(' ');
+          setLiveText((currentFinal + ' ' + interim).trim());
         };
         recognition.start();
         recognitionRef.current = recognition;
@@ -165,6 +178,7 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
         mediaRecorderRef.current = null;
         setIsRecording(false);
         setRecordingTimeSec(0);
+        setLiveText('');
 
         const transcript = transcriptRef.current.filter(Boolean).join(' ').trim();
         const blob =
@@ -182,6 +196,7 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
   return {
     isRecording,
     recordingTimeSec,
+    liveText,
     error,
     isSupported: !!isSupported,
     startRecording,

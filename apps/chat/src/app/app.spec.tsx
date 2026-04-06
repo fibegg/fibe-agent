@@ -11,6 +11,13 @@ vi.mock('./file-explorer/prism-loader', () => ({
   highlightCodeElement: vi.fn(),
 }));
 
+vi.stubGlobal('Worker', class MockWorker {
+  addEventListener = vi.fn();
+  removeEventListener = vi.fn();
+  postMessage = vi.fn();
+  terminate = vi.fn();
+});
+
 describe('App', () => {
   it('should render successfully', () => {
     const { baseElement } = render(

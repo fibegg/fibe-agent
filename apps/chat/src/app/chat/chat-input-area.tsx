@@ -30,6 +30,7 @@ export interface ChatInputAreaProps {
     isSupported: boolean;
     isRecording: boolean;
     recordingTimeSec: number;
+    liveText: string;
     error: string | null;
   };
   voiceUploadError: string | null;
@@ -178,8 +179,15 @@ export function ChatInputArea({
               disabled={!canType}
               onKeyDown={onKeyDown}
               onPaste={onPaste}
-              className="w-full bg-transparent"
+              className={`w-full bg-transparent ${voiceRecorder.isRecording ? 'opacity-0' : ''}`}
             />
+            {voiceRecorder.isRecording && (
+              <div className="absolute inset-0 z-10 flex items-center px-3 overflow-hidden pointer-events-none">
+                <span className="text-sm text-foreground/80 break-words line-clamp-1 italic">
+                  {voiceRecorder.liveText || "Listening..."}
+                </span>
+              </div>
+            )}
             <FileMentionDropdown
               open={mentionOpen}
               query={atMentionQuery}

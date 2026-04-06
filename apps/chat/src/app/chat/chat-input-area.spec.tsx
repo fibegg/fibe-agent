@@ -49,7 +49,7 @@ const BASE_PROPS = {
   pendingImages: [],
   pendingAttachments: [],
   pendingVoice: null,
-  voiceRecorder: { isSupported: false, isRecording: false, recordingTimeSec: 0, error: null },
+  voiceRecorder: { isSupported: false, isRecording: false, recordingTimeSec: 0, liveText: '', error: null },
   voiceUploadError: null,
   attachmentUploadError: null,
   onRemovePendingImage: vi.fn(),
@@ -177,7 +177,7 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'Mic denied' }}
+        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'Mic denied', liveText: '' }}
       />
     );
     expect(screen.getByText('Mic denied')).toBeTruthy();
@@ -187,7 +187,7 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: null }}
+        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: null, liveText: '' }}
       />
     );
     expect(screen.getByRole('button', { name: /voice input/i })).toBeTruthy();
@@ -197,7 +197,7 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: true, recordingTimeSec: 5, error: null }}
+        voiceRecorder={{ isSupported: true, isRecording: true, recordingTimeSec: 5, error: null, liveText: '' }}
       />
     );
     expect(screen.getByRole('button', { name: /stop recording/i })).toBeTruthy();
@@ -207,7 +207,7 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: true, recordingTimeSec: 75, error: null }}
+        voiceRecorder={{ isSupported: true, isRecording: true, recordingTimeSec: 75, error: null, liveText: '' }}
       />
     );
     // 75 seconds = 1:15
@@ -219,7 +219,7 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: null }}
+        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: null, liveText: '' }}
         onVoiceToggle={onVoiceToggle}
       />
     );

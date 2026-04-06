@@ -10,8 +10,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Brain, Check, Clock, Copy, RotateCw, Sparkles, User } from 'lucide-react';
+import { Brain, Check, Clock, Copy, RotateCw, Sparkles, User, Play, Square } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
+import { useLocalTts } from './use-local-tts';
 import { API_PATH_UPLOADS_BY_FILENAME } from '@shared/api-paths';
 import { FileIcon } from '../file-icon';
 import { formatCompactInteger } from '../agent-thinking-utils';
@@ -292,6 +293,8 @@ const MessageRow = memo(
     onRetry,
     isNoOutput,
     containerWidthPx,
+    onPlay,
+    playingId,
   }: {
     msg: ChatMessage;
     maxWidthClass?: string;
@@ -299,6 +302,8 @@ const MessageRow = memo(
     isNoOutput?: boolean;
     /** Scroll-container pixel width — used to compute tight bubble widths. */
     containerWidthPx?: number;
+    onPlay?: (id: string, text: string) => void;
+    playingId?: string | null;
   }) {
     const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
 
@@ -402,6 +407,17 @@ const MessageRow = memo(
                     )}
                   </p>
                   <CopyRawMessageButton rawText={msg.body} visualVariant="assistant" />
+                  {msg.id && onPlay && (
+                    <button
+                      type="button"
+                      onClick={() => msg.id && onPlay(msg.id, msg.body)}
+                      className={COPY_BUTTON_CLASS_ASSISTANT}
+                      title={playingId === msg.id ? "Stop voice" : "Read aloud"}
+                      aria-label={playingId === msg.id ? "Stop voice" : "Read aloud"}
+                    >
+                      {playingId === msg.id ? <Square className="size-3.5" aria-hidden /> : <Play className="size-3.5" aria-hidden />}
+                    </button>
+                  )}
                 </div>
                   <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70" title={msg.model ? `Processed by ${msg.model}` : undefined}>
                   <Brain className="size-3 shrink-0" aria-hidden />
@@ -422,7 +438,8 @@ const MessageRow = memo(
       prev.msg !== next.msg ||
       prev.maxWidthClass !== next.maxWidthClass ||
       prev.onRetry !== next.onRetry ||
-      prev.isNoOutput !== next.isNoOutput
+      prev.isNoOutput !== next.isNoOutput ||
+      prev.playingId !== next.playingId
     ) {
       return false;
     }
@@ -465,6 +482,22 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
   // TanStack Virtual already uses a ResizeObserver internally — when the
   // container resizes, the virtualizer re-renders, which re-reads this value.
   const containerWidthPx = scrollRef?.current?.clientWidth ?? 640;
+
+  const localTts = useLocalTts();
+  const [playingId, setPlayingId] = useState<string | null>(null);
+
+  const handlePlay = useCallback((id: string, text: string) => {
+     if (playingId === id) {
+        localTts.stop();
+        setPlayingId(null);
+     } else {
+        localTts.stop();
+        setPlayingId(id);
+        localTts.speak(text).finally(() => {
+          setPlayingId((curr) => curr === id ? null : curr);
+        });
+     }
+  }, [localTts, playingId]);
 
   const virtualizer = useVirtualizer({
     count: messages.length,
@@ -543,6 +576,8 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               isNoOutput={isNoOutputMessage(msg, noOutputBody)}
               onRetry={onRetry}
               containerWidthPx={containerWidthPx}
+              onPlay={handlePlay}
+              playingId={playingId}
             />
           </div>
         );
@@ -558,6 +593,8 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
           isNoOutput={isNoOutputMessage(msg, noOutputBody)}
           onRetry={onRetry}
           containerWidthPx={containerWidthPx}
+          onPlay={handlePlay}
+          playingId={playingId}
         />
       ))}
     </div>
