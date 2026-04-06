@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom';
 import * as ReactDOM from 'react-dom/client';
 import { initTheme } from './app/theme';
 import './app/postmessage-auth';
+import './app/keybind-forwarder';
 import { logConsoleBanner } from './app/console-banner';
 import App from './app/app';
 
