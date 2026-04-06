@@ -29,6 +29,9 @@ export default defineConfig(() => ({
   },
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/chat',
+  optimizeDeps: {
+    include: ['@huggingface/transformers'],
+  },
   server: {
     port: 3100,
     host: process.env.VITE_HOST || true,
