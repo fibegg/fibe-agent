@@ -179,6 +179,10 @@ export function ChatPage() {
 
   const voiceRecorder = useVoiceRecorder();
   const localStt = useLocalStt();
+  const voiceRecorderRef = useRef(voiceRecorder);
+  useEffect(() => { voiceRecorderRef.current = voiceRecorder; });
+  const localSttRef = useRef(localStt);
+  useEffect(() => { localSttRef.current = localStt; });
 
   const onStreamEndCallback = useCallback(
     (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string, streamModel?: string | null) => {
@@ -289,15 +293,11 @@ export function ChatPage() {
     pendingVoiceFilename,
     voiceUploadError,
     attachmentUploadError,
-    setVoiceUploadError,
-    setPendingVoice,
-    setPendingVoiceFilename,
     removePendingImage,
     removePendingVoice,
     removePendingAttachment,
     handleFileChange,
     clearPending,
-    uploadAttachment,
     isDragOver,
     handleDragOver,
     handleDragEnter,
@@ -324,26 +324,51 @@ export function ChatPage() {
     lastSentMessage,
   });
 
-  const handleSend = useCallback(() => {
-    const text = inputValue.trim();
+
+  const handleSend = useCallback(async () => {
+    let currentInput = inputValue.trim();
     const isQueuing = state === CHAT_STATES.AWAITING_RESPONSE;
-    const hasVoice = !!pendingVoiceFilename || !!pendingVoice;
-    const hasContent =
-      text || pendingImages.length > 0 || hasVoice || pendingAttachments.length > 0;
+    const currentPendingImages = [...pendingImages];
+    const currentPendingVoiceFilename = pendingVoiceFilename;
+    const currentPendingVoice = pendingVoice;
+    const currentPendingAttachments = [...pendingAttachments];
+    
+    if (voiceRecorderRef.current.isRecording) {
+      // Capture liveText BEFORE stopping — final Web Speech onresult may arrive after onstop resolves
+      const liveTextSnapshot = voiceRecorderRef.current.liveText;
+      const result = await voiceRecorderRef.current.stopRecording();
+      if (result) {
+        let finalTranscript = result.transcript || liveTextSnapshot || '';
+        if (!finalTranscript && result.blob.size > 0) {
+          try {
+            finalTranscript = await localSttRef.current.transcribe(result.blob);
+          } catch (err) {
+            console.error("Local STT Error:", err);
+          }
+        }
+        if (finalTranscript) {
+          currentInput = currentInput ? `${currentInput} ${finalTranscript}` : finalTranscript;
+        }
+      }
+    }
+
+    const hasVoice = !!currentPendingVoiceFilename || !!currentPendingVoice;
+    const hasContent = currentInput || currentPendingImages.length > 0 || hasVoice || currentPendingAttachments.length > 0;
+    
     if (!hasContent) return;
     if (!isQueuing && state !== CHAT_STATES.AUTHENTICATED) return;
 
     if (isQueuing) {
       // Queue mode — text only
-      if (!text) return;
-      send({ action: 'queue_message', text });
+      if (!currentInput) return;
+      send({ action: 'queue_message', text: currentInput });
     } else {
       send({
         action: 'send_chat_message',
-        text: text || '',
-        ...(pendingImages.length ? { images: pendingImages } : {}),
-        ...(pendingVoiceFilename ? { audioFilename: pendingVoiceFilename } : pendingVoice ? { audio: pendingVoice } : {}),
-        ...(pendingAttachments.length ? { attachmentFilenames: pendingAttachments.map((a) => a.filename) } : {}),
+        text: currentInput || '',
+        ...(currentPendingImages.length ? { images: currentPendingImages } : {}),
+        ...(currentPendingVoiceFilename ? { audioFilename: currentPendingVoiceFilename } : currentPendingVoice ? { audio: currentPendingVoice } : {}),
+        ...(currentPendingAttachments.length ? { attachmentFilenames: currentPendingAttachments.map((a) => a.filename) } : {}),
       });
     }
 
@@ -353,17 +378,20 @@ export function ChatPage() {
       // ignore across cross-origin if parent is unavailable
     }
 
-    if (text) {
+    if (currentInput) {
       setMessages((prev) => [
         ...prev,
-        { role: 'user', body: text, created_at: new Date().toISOString(), optimistic: true, ...(isQueuing ? { queued: true } : {}) },
+        { role: 'user', body: currentInput, created_at: new Date().toISOString(), optimistic: true, ...(isQueuing ? { queued: true } : {}) },
       ]);
     }
-    setLastSentMessage(text || null);
+    setLastSentMessage(currentInput || null);
     setInputState({ value: '', cursor: 0 });
     if (!isQueuing) clearPending();
     scroll.markJustSent();
-  }, [send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll, clearPending, setInputState, setMessages]);
+  }, [
+    send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll,
+    clearPending, setInputState, setMessages
+  ]);
 
   const handleSendContinue = useCallback(() => {
     send({
@@ -400,53 +428,33 @@ export function ChatPage() {
     }
   }, [queuedCount, setMessages]);
 
-  const uploadVoiceFile = useCallback(
-    async (blob: Blob): Promise<string | null> => {
-      const file = new File([blob], 'recording.webm');
-      return uploadAttachment(file);
-    },
-    [uploadAttachment]
-  );
-
   const handleVoiceToggle = useCallback(async () => {
-    if (voiceRecorder.isRecording || localStt.isTranscribing) {
-      // If native is recording, stop it.
-      if (voiceRecorder.isRecording) {
-        const result = await voiceRecorder.stopRecording();
+    if (voiceRecorderRef.current.isRecording || localSttRef.current.isTranscribing) {
+      if (voiceRecorderRef.current.isRecording) {
+        // Capture liveText BEFORE stopping — final Web Speech onresult may arrive after onstop resolves
+        const liveTextSnapshot = voiceRecorderRef.current.liveText;
+        const result = await voiceRecorderRef.current.stopRecording();
         if (result) {
-          let finalTranscript = result.transcript;
-          
-          if (result.blob.size > 0 && !finalTranscript) {
-             try {
-               finalTranscript = await localStt.transcribe(result.blob);
-             } catch (err) {
-               console.error("Local STT Error:", err);
-             }
-          }
-
-          if (finalTranscript) {
-            setInputState((prev) => {
-              const next = prev.value.trim() ? `${prev.value.trim()} ${finalTranscript}` : (finalTranscript ?? '');
-              return { value: next, cursor: next.length };
-            });
-          } else if (result.blob.size > 0) {
-            const reader = new FileReader();
-            reader.onloadend = () => setPendingVoice(reader.result as string);
-            reader.readAsDataURL(result.blob);
-            setVoiceUploadError(null);
-            const filename = await uploadVoiceFile(result.blob);
-            if (filename) {
-              setPendingVoiceFilename(filename);
-            } else {
-              setVoiceUploadError('Upload failed; voice will be sent with message.');
+          let finalTranscript = result.transcript || liveTextSnapshot || '';
+          if (!finalTranscript && result.blob.size > 0) {
+            try {
+              finalTranscript = await localSttRef.current.transcribe(result.blob);
+            } catch (err) {
+              console.error("Local STT Error:", err);
             }
+          }
+          if (finalTranscript) {
+            setInputState((prev) => ({
+              ...prev,
+              value: prev.value ? `${prev.value} ${finalTranscript}` : finalTranscript,
+            }));
           }
         }
       }
     } else {
-      await voiceRecorder.startRecording();
+      await voiceRecorderRef.current.startRecording();
     }
-  }, [voiceRecorder, localStt, uploadVoiceFile, setInputState, setPendingVoice, setVoiceUploadError, setPendingVoiceFilename]);
+  }, [setInputState]);
 
   const { statusClass, showModelSelector, showAuthModal, authModalForModal } = useChatAuthUI(
     state,
