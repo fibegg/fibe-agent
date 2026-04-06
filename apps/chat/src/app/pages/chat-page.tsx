@@ -249,6 +249,14 @@ export function ChatPage() {
     sendRef.current = send;
   }, [send]);
 
+  useEffect(() => {
+    try {
+      window.parent.postMessage({ type: 'agent_status_update', isWorking: state === CHAT_STATES.AWAITING_RESPONSE }, '*');
+    } catch {
+      // ignore across cross-origin if parent is unavailable
+    }
+  }, [state]);
+
   // Auto-send initial greeting when chat is authenticated with empty history
   const greetingSentRef = useRef(false);
   useEffect(() => {
