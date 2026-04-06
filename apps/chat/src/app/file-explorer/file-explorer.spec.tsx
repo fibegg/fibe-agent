@@ -21,6 +21,10 @@ vi.mock('@tanstack/react-virtual', () => ({
 describe('FileExplorer', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    if (typeof Range !== 'undefined') {
+      Range.prototype.getClientRects = () => ([] as unknown as DOMRectList);
+      Range.prototype.getBoundingClientRect = () => ({ width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => undefined } as DOMRect);
+    }
   });
 
   afterEach(() => {
@@ -600,6 +604,10 @@ describe('FileExplorer', () => {
 describe('FileViewerPanel', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    if (typeof Range !== 'undefined') {
+      Range.prototype.getClientRects = () => ([] as unknown as DOMRectList);
+      Range.prototype.getBoundingClientRect = () => ({ width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => undefined } as DOMRect);
+    }
   });
 
   afterEach(() => {

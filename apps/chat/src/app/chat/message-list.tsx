@@ -612,7 +612,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     <>
       {listContent}
       {isStreaming && (
-        <div className="flex gap-2 sm:gap-3 md:gap-4">
+        <div className={`flex gap-2 sm:gap-3 md:gap-4 ${messages.length > 0 ? "mt-7" : ""}`}>
           <ThinkingAvatar />
           <div className="flex-1 min-w-0">
             <div
