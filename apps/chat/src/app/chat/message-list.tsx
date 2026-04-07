@@ -439,6 +439,7 @@ const MessageRow = memo(
       prev.maxWidthClass !== next.maxWidthClass ||
       prev.onRetry !== next.onRetry ||
       prev.isNoOutput !== next.isNoOutput ||
+      prev.onPlay !== next.onPlay ||
       prev.playingId !== next.playingId
     ) {
       return false;
@@ -486,18 +487,27 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
   const localTts = useLocalTts();
   const [playingId, setPlayingId] = useState<string | null>(null);
 
+  // Keep a ref so the stable wrapper below never captures a stale closure.
+  const playingIdRef = useRef(playingId);
+  playingIdRef.current = playingId;
+  const localTtsRef = useRef(localTts);
+  localTtsRef.current = localTts;
+
+  // Stable identity — never changes, so MessageRow memo is not invalidated
+  // when playingId changes on an unrelated row.
   const handlePlay = useCallback((id: string, text: string) => {
-     if (playingId === id) {
-        localTts.stop();
-        setPlayingId(null);
-     } else {
-        localTts.stop();
-        setPlayingId(id);
-        localTts.speak(text).finally(() => {
-          setPlayingId((curr) => curr === id ? null : curr);
-        });
-     }
-  }, [localTts, playingId]);
+    const tts = localTtsRef.current;
+    if (playingIdRef.current === id) {
+      tts.stop();
+      setPlayingId(null);
+    } else {
+      tts.stop();
+      setPlayingId(id);
+      tts.speak(text).finally(() => {
+        setPlayingId((curr) => curr === id ? null : curr);
+      });
+    }
+  }, []);
 
   const virtualizer = useVirtualizer({
     count: messages.length,
