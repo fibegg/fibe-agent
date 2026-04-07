@@ -324,11 +324,20 @@ export class OrchestratorService implements OnModuleInit {
       } else if (this.cachedSystemPromptFromFile !== null) {
         systemPrompt = this.cachedSystemPromptFromFile;
       }
+      // Always inject conversation history into the prompt so the agent has
+      // context about prior messages. CLI flags like --continue/--resume are
+      // unreliable across providers, so prompt-level history is the primary
+      // mechanism for long-running conversation support.
+      const allMessages = this.messageStore.all();
+      const historyMessages = allMessages.length > 1
+        ? allMessages.slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
+        : undefined;
       const fullPrompt = await this.chatPromptContext.buildFullPrompt(
         text,
         imageUrls,
         audioFilename,
-        attachmentFilenames
+        attachmentFilenames,
+        historyMessages,
       );
       const model = this.modelStore.get();
       this._send(WS_EVENT.STREAM_START, { model });
