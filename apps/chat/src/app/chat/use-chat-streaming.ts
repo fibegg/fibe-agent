@@ -16,7 +16,7 @@ export function useChatStreaming({
 }: UseChatStreamingProps) {
   const [streamingText, setStreamingText] = useState('');
   const streamBufferRef = useRef('');
-  const timeoutIdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const timeoutIdRef = useRef<number | null>(null);
   const streamModelRef = useRef<string | null>(null);
 
   const flushStreamBuffer = useCallback(() => {
@@ -31,7 +31,7 @@ export function useChatStreaming({
   useEffect(() => {
     return () => {
       if (timeoutIdRef.current !== null) {
-        clearTimeout(timeoutIdRef.current);
+        cancelAnimationFrame(timeoutIdRef.current);
       }
     };
   }, []);
@@ -41,7 +41,7 @@ export function useChatStreaming({
   const handleStreamStart = useCallback(
     (data?: { model?: string }) => {
       if (timeoutIdRef.current !== null) {
-        clearTimeout(timeoutIdRef.current);
+        cancelAnimationFrame(timeoutIdRef.current);
         timeoutIdRef.current = null;
       }
       streamBufferRef.current = '';
@@ -58,7 +58,9 @@ export function useChatStreaming({
       streamBufferRef.current += chunk;
       finalTextRef.current += chunk;
       if (timeoutIdRef.current === null) {
-        timeoutIdRef.current = setTimeout(flushStreamBuffer, 60);
+        // Align flushes to the display refresh cycle. rAF pauses automatically
+        // when the tab is hidden, saving wasted renders and timer drift.
+        timeoutIdRef.current = requestAnimationFrame(flushStreamBuffer);
       }
     },
     [flushStreamBuffer]
