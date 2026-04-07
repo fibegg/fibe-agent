@@ -6,7 +6,7 @@ import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 
-const GEMINI_CONFIG_DIR = join(process.env.HOME ?? '/home/node', '.gemini');
+const GEMINI_CONFIG_DIR = process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.gemini');
 const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';

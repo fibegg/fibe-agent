@@ -3,6 +3,9 @@ import { resolve, relative, dirname } from 'node:path';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 
+/** Hidden (dot-prefixed) entries that should still appear when browsing. */
+const VISIBLE_HIDDEN = new Set<string>(['.claude']);
+
 export interface BrowseEntry {
   name: string;
   path: string;
@@ -51,7 +54,7 @@ export class PlayroomBrowserService {
 
     for (const e of raw) {
       const name = String(e.name);
-      if (name.startsWith('.')) continue;
+      if (name.startsWith('.') && !VISIBLE_HIDDEN.has(name)) continue;
 
       const childRel = rel ? `${rel}/${name}` : name;
       const childAbs = resolve(absPath, name);

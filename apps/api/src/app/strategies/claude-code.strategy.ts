@@ -8,7 +8,7 @@ import { AbstractCLIStrategy } from './abstract-cli.strategy';
 const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
 
 function getClaudeConfigDir(): string {
-  return join(process.env.HOME ?? '/home/node', '.claude');
+  return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude');
 }
 
 function getTokenFilePath(): string {

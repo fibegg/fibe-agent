@@ -139,6 +139,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     npx -y playwright install-deps chromium
 
+# ---- FIX FILE DESCRIPTOR LIMITS ----
+# Ensures su/sudo sessions inherit high nofile — prevents EMFILE in dev mode
+RUN mkdir -p /etc/security/limits.d \
+    && printf "*  soft  nofile  1048576\n*  hard  nofile  1048576\n" > /etc/security/limits.d/99-nofile.conf
+
 # ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && touch /app/data/STEERING.md \
