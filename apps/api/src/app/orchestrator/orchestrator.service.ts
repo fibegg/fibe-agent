@@ -324,11 +324,19 @@ export class OrchestratorService implements OnModuleInit {
       } else if (this.cachedSystemPromptFromFile !== null) {
         systemPrompt = this.cachedSystemPromptFromFile;
       }
+      // Inject conversation history into the prompt for strategies without native
+      // session continuation (e.g. codex exec). This ensures the agent has context
+      // about prior messages in the conversation.
+      const injectHistory = this.strategy.needsHistoryInPrompt?.() ?? false;
+      const historyMessages = injectHistory
+        ? this.messageStore.all().slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
+        : undefined;
       const fullPrompt = await this.chatPromptContext.buildFullPrompt(
         text,
         imageUrls,
         audioFilename,
-        attachmentFilenames
+        attachmentFilenames,
+        historyMessages
       );
       const model = this.modelStore.get();
       this._send(WS_EVENT.STREAM_START, { model });
