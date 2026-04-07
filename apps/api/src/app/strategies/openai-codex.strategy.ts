@@ -383,7 +383,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       this.streamInterrupted = false;
       if (this.useApiTokenMode) this.ensureSettings();
 
-      const playgroundDir = join(process.cwd(), 'playground');
+      const playgroundDir = this.getWorkingDir();
       if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
