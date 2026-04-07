@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ThinkingStep, ThinkingActivity, ToolOrFileEvent } from './thinking-types';
 
 function nextActivityId(): string {
@@ -13,9 +13,18 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
   const reasoningTextRef = useRef('');
   const thinkingEntryIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    activityLogRef.current = activityLog;
-  }, [activityLog]);
+  // Sync the ref inside the setter so it is always up-to-date, even when
+  // stream_end arrives before the useEffect commit of the previous render.
+  const setActivityLogSync = useCallback(
+    (updater: React.SetStateAction<ThinkingActivity[]>) => {
+      setActivityLog((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        activityLogRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
 
   const thinkingCallbacks = useMemo(
     () => ({
@@ -25,7 +34,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
       onReasoningStart: () => {
         const id = nextActivityId();
         thinkingEntryIdRef.current = id;
-        setActivityLog((prev) => [
+        setActivityLogSync((prev) => [
           ...prev,
           {
             id,
@@ -41,7 +50,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
         setReasoningText(reasoningTextRef.current);
         const entryId = thinkingEntryIdRef.current;
         if (!entryId) return;
-        setActivityLog((prev) => {
+        setActivityLogSync((prev) => {
           const idx = prev.findIndex((e) => e.id === entryId);
           if (idx < 0) return prev;
           const next = [...prev];
@@ -50,7 +59,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
         });
       },
       onReasoningEnd: () => {
-        setActivityLog((prev) => {
+        setActivityLogSync((prev) => {
           const entryId = thinkingEntryIdRef.current;
           if (!entryId) return prev;
           const idx = prev.findIndex((e) => e.id === entryId);
@@ -70,7 +79,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
           }
           return [...prev, step];
         });
-        setActivityLog((prev) => [
+        setActivityLogSync((prev) => [
           ...prev,
           {
             id: nextActivityId(),
@@ -90,7 +99,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
             : event.command
               ? event.command
               : `Ran ${event.name}`;
-        setActivityLog((prev) => [
+        setActivityLogSync((prev) => [
           ...prev,
           {
             id: nextActivityId(),
@@ -108,7 +117,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
         ]);
       },
     }),
-    [refetchPlaygrounds]
+    [refetchPlaygrounds, setActivityLogSync]
   );
 
   const resetForNewStream = useCallback((data?: { model?: string }) => {
@@ -116,7 +125,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
     setThinkingSteps([]);
     reasoningTextRef.current = '';
     thinkingEntryIdRef.current = null;
-    setActivityLog([
+    setActivityLogSync([
       {
         id: nextActivityId(),
         type: 'stream_start',
@@ -125,14 +134,14 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
         details: data?.model ? `Model: ${data.model}` : undefined,
       },
     ]);
-  }, []);
+  }, [setActivityLogSync]);
 
   return {
     activityLog,
     activityLogRef,
     thinkingSteps,
     reasoningText,
-    setActivityLog,
+    setActivityLog: setActivityLogSync,
     setReasoningText,
     setThinkingSteps,
     thinkingCallbacks,
