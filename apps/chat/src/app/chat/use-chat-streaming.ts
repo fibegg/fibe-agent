@@ -78,7 +78,6 @@ export function useChatStreaming({
 
   return {
     streamingText,
-    setStreamingText,
     handleStreamStart,
     handleStreamChunk,
     handleStreamEnd,
