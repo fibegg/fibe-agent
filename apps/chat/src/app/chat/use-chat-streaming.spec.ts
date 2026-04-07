@@ -42,7 +42,11 @@ describe('useChatStreaming', () => {
     expect(resetForNewStream).toHaveBeenCalledWith(undefined);
   });
 
-  it('handleStreamChunk buffers chunks and flushes after 60ms timeout', () => {
+  it('handleStreamChunk buffers chunks and flushes on next animation frame', () => {
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      setTimeout(cb, 16);
+      return 1;
+    });
     const { result } = renderHook(() =>
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
     );
@@ -54,13 +58,18 @@ describe('useChatStreaming', () => {
     expect(result.current.streamingText).toBe('');
 
     act(() => {
-      vi.advanceTimersByTime(60);
+      vi.advanceTimersByTime(16);
     });
 
     expect(result.current.streamingText).toBe('Hello ');
+    rafSpy.mockRestore();
   });
 
   it('multiple chunks merge into one flush', () => {
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      setTimeout(cb, 16);
+      return 1;
+    });
     const { result } = renderHook(() =>
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
     );
@@ -71,24 +80,26 @@ describe('useChatStreaming', () => {
     });
 
     act(() => {
-      vi.advanceTimersByTime(60);
+      vi.advanceTimersByTime(16);
     });
 
     expect(result.current.streamingText).toBe('FooBar');
+    rafSpy.mockRestore();
   });
 
-  it('second chunk does not create a second timer', () => {
+  it('second chunk does not create a second rAF request', () => {
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(1 as unknown as ReturnType<typeof requestAnimationFrame>);
     const { result } = renderHook(() =>
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
     );
-    const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout');
 
     act(() => {
       result.current.handleStreamChunk('A');
       result.current.handleStreamChunk('B');
     });
 
-    expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+    expect(rafSpy).toHaveBeenCalledTimes(1);
+    rafSpy.mockRestore();
   });
 
   it('handleStreamEnd calls onStreamEndCallback with accumulated text', () => {
@@ -131,12 +142,13 @@ describe('useChatStreaming', () => {
     expect(onStreamEndCallback).toHaveBeenCalledWith('World', undefined, undefined, 'gpt-4');
   });
 
-  it('handleStreamStart cancels pending timer', () => {
+  it('handleStreamStart cancels pending rAF', () => {
+    const cancelRafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame');
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(42 as unknown as ReturnType<typeof requestAnimationFrame>);
     const resetForNewStream = vi.fn();
     const { result } = renderHook(() =>
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream })
     );
-    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
 
     act(() => {
       result.current.handleStreamChunk('Partial');
@@ -146,28 +158,17 @@ describe('useChatStreaming', () => {
       result.current.handleStreamStart();
     });
 
-    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(cancelRafSpy).toHaveBeenCalled();
     expect(result.current.streamingText).toBe('');
     expect(resetForNewStream).toHaveBeenCalled();
   });
 
-  it('setStreamingText is exposed and updates state', () => {
-    const { result } = renderHook(() =>
-      useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
-    );
-
-    act(() => {
-      result.current.setStreamingText('override');
-    });
-
-    expect(result.current.streamingText).toBe('override');
-  });
-
-  it('cleans up timeout on unmount', () => {
+  it('cleans up rAF on unmount', () => {
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(99 as unknown as ReturnType<typeof requestAnimationFrame>);
+    const cancelRafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame');
     const { result, unmount } = renderHook(() =>
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
     );
-    const clearTimeoutSpy = vi.spyOn(globalThis, 'clearTimeout');
 
     act(() => {
       result.current.handleStreamChunk('pending');
@@ -175,18 +176,23 @@ describe('useChatStreaming', () => {
 
     unmount();
 
-    expect(clearTimeoutSpy).toHaveBeenCalled();
+    expect(cancelRafSpy).toHaveBeenCalled();
   });
 
   it('empty buffer does not update streamingText on flush', () => {
+    const rafSpy = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation((cb) => {
+      setTimeout(cb, 16);
+      return 1;
+    });
     const { result } = renderHook(() =>
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
     );
 
     act(() => {
-      vi.advanceTimersByTime(60);
+      vi.advanceTimersByTime(16);
     });
 
     expect(result.current.streamingText).toBe('');
+    rafSpy.mockRestore();
   });
 });

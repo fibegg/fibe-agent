@@ -2,7 +2,8 @@
 
 This document is the single reference for everything agent-related in this repository: supported providers, configuration, authentication modes, conversation scoping, the WebSocket protocol, REST API surface, Docker images, and local development.
 
-For full REST and WebSocket specs see [`docs/API.md`](docs/API.md).
+For full REST and WebSocket specs see [`docs/API.md`](docs/API.md).  
+For the system prompt library see [`prompts/README.md`](prompts/README.md).
 
 ---
 
@@ -14,6 +15,7 @@ For full REST and WebSocket specs see [`docs/API.md`](docs/API.md).
 - [Authentication modes](#authentication-modes)
 - [Conversation context & persistence](#conversation-context--persistence)
 - [Steering](#steering)
+- [Prompts](#prompts)
 - [WebSocket protocol (`/ws`)](#websocket-protocol-ws)
 - [WebSocket terminal (`/ws-terminal`)](#websocket-terminal-ws-terminal)
 - [REST API](#rest-api)
@@ -227,6 +229,60 @@ The **SteeringService** exposes a `STEERING.md` file in `DATA_DIR` that the agen
 - **File watching:** `SteeringService` watches the file (with a 100ms debounce) and emits `queue_updated` over WebSocket whenever the entry count changes.
 - **Health check:** every 5 seconds, the service verifies the watcher is alive and the file exists (the agent may delete it). It recreates both if needed.
 - **Lock:** writes use a directory-based lock (`STEERING.md.lock`) with a 30-second staleness timeout for crash recovery.
+
+---
+
+## Prompts
+
+All system prompts are stored under the [`prompts/`](prompts/) directory — the single source of truth for what the AI agent is told at the start of every session.
+
+### Directory layout
+
+```
+prompts/
+├── README.md                   ← full usage guide and naming conventions
+├── base/
+│   └── code-playground.md      ← canonical prompt for code-generation sessions
+└── providers/
+    ├── gemini.md               ← Gemini CLI-specific prompt
+    ├── claude-code.md          ← Claude Code-specific prompt
+    ├── openai-codex.md         ← OpenAI Codex-specific prompt
+    └── opencode.md             ← OpenCode-specific prompt
+```
+
+### How prompts are loaded
+
+The `OrchestratorService` resolves the active system prompt in this priority order:
+
+1. **`SYSTEM_PROMPT` env var** — inline string; highest priority, overrides everything.
+2. **`SYSTEM_PROMPT_PATH` env var** — path to a `.md` file; loaded once at startup.
+3. **Built-in fallback** — `dist/assets/SYSTEM_PROMPT.md` bundled into the Docker image.
+
+### Wiring a prompt
+
+```sh
+# Use the provider-agnostic base prompt (recommended default)
+SYSTEM_PROMPT_PATH=./prompts/base/code-playground.md
+
+# Use a provider-tuned prompt
+SYSTEM_PROMPT_PATH=./prompts/providers/gemini.md
+
+# Inline override (takes precedence over SYSTEM_PROMPT_PATH)
+SYSTEM_PROMPT="You are a TypeScript expert. Work only in src/."
+```
+
+### Provider-specific prompts
+
+Each file in `prompts/providers/` extends the base code-playground behaviour with notes specific to that CLI tool's flags, session semantics, and known quirks. Use them when you know which `AGENT_PROVIDER` will run, or as reference material when tuning a base prompt.
+
+| File | Provider | Notable additions |
+|------|----------|------------------|
+| `providers/gemini.md` | `gemini` | `--yolo` mode, `--resume` sessions, output-length advice |
+| `providers/claude-code.md` | `claude-code` | Native file-edit tools, `--continue` sessions, extended thinking |
+| `providers/openai-codex.md` | `openai-codex` | Sandbox approval policy, full-file writes, o-series reasoning |
+| `providers/opencode.md` | `opencode` | API auto-detection, MCP tool usage, monorepo commands |
+
+See [`prompts/README.md`](prompts/README.md) for full authoring guidelines.
 
 ---
 
