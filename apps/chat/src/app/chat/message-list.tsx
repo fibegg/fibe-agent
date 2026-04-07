@@ -281,6 +281,11 @@ const FULL_WIDTH = 'max-w-full';
  * estimating text-wrap line count via Pretext.js.
  */
 const BUBBLE_WIDTH_FRACTION = 0.8;
+/**
+ * Minimum character growth before the streaming bubble height is recalculated.
+ * Avoids a full layout() pass on every 16 ms animation frame during streaming.
+ */
+const STREAMING_HEIGHT_THROTTLE_CHARS = 80;
 
 function isNoOutputMessage(msg: ChatMessage, noOutputBody?: string): boolean {
   return msg.role === 'assistant' && !!noOutputBody && msg.body === noOutputBody;
@@ -439,6 +444,7 @@ const MessageRow = memo(
       prev.maxWidthClass !== next.maxWidthClass ||
       prev.onRetry !== next.onRetry ||
       prev.isNoOutput !== next.isNoOutput ||
+      prev.onPlay !== next.onPlay ||
       prev.playingId !== next.playingId
     ) {
       return false;
@@ -486,18 +492,27 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
   const localTts = useLocalTts();
   const [playingId, setPlayingId] = useState<string | null>(null);
 
+  // Keep a ref so the stable wrapper below never captures a stale closure.
+  const playingIdRef = useRef(playingId);
+  playingIdRef.current = playingId;
+  const localTtsRef = useRef(localTts);
+  localTtsRef.current = localTts;
+
+  // Stable identity — never changes, so MessageRow memo is not invalidated
+  // when playingId changes on an unrelated row.
   const handlePlay = useCallback((id: string, text: string) => {
-     if (playingId === id) {
-        localTts.stop();
-        setPlayingId(null);
-     } else {
-        localTts.stop();
-        setPlayingId(id);
-        localTts.speak(text).finally(() => {
-          setPlayingId((curr) => curr === id ? null : curr);
-        });
-     }
-  }, [localTts, playingId]);
+    const tts = localTtsRef.current;
+    if (playingIdRef.current === id) {
+      tts.stop();
+      setPlayingId(null);
+    } else {
+      tts.stop();
+      setPlayingId(id);
+      tts.speak(text).finally(() => {
+        setPlayingId((curr) => curr === id ? null : curr);
+      });
+    }
+  }, []);
 
   const virtualizer = useVirtualizer({
     count: messages.length,
@@ -602,10 +617,28 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
 
   // Reserve vertical space for the streaming bubble proportional to the
   // current text flow, preventing abrupt container-height jumps on each flush.
+  // Throttled: recompute only when text grows by ≥ STREAMING_HEIGHT_THROTTLE_CHARS
+  // since the last computation, cutting layout() calls by ~5× during streaming.
+  const streamingHeightLenRef = useRef<number | null>(null);
+  const streamingHeightCacheRef = useRef<number | undefined>(undefined);
+
   const streamingBubbleMinHeight = useMemo(() => {
-    if (!isStreaming || !streamingText) return undefined;
+    if (!isStreaming || !streamingText) {
+      streamingHeightLenRef.current = null;
+      streamingHeightCacheRef.current = undefined;
+      return undefined;
+    }
+    const len = streamingText.length;
+    const lastLen = streamingHeightLenRef.current;
+    if (lastLen !== null && Math.abs(len - lastLen) < STREAMING_HEIGHT_THROTTLE_CHARS) {
+      // Not enough new text to justify a full layout pass — reuse cached value.
+      return streamingHeightCacheRef.current;
+    }
+    streamingHeightLenRef.current = len;
     const bubbleWidth = containerWidthPx * BUBBLE_WIDTH_FRACTION;
-    return estimateStreamingHeight(streamingText, bubbleWidth);
+    const h = estimateStreamingHeight(streamingText, bubbleWidth);
+    streamingHeightCacheRef.current = h;
+    return h;
   }, [isStreaming, streamingText, containerWidthPx]);
 
   return (
