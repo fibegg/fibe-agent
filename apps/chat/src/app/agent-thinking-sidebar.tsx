@@ -35,7 +35,6 @@ export type { StoryEntry, SessionActivityEntry } from './agent-thinking-blocks';
 const ACTIVITY_ESTIMATE_HEIGHT = 32;
 const ACTIVITY_GAP = 8;
 const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
-const ACTIVITY_SCROLL_AT_BOTTOM_PX = 2;
 const REASONING_MAX_HEIGHT_RATIO = 0.75;
 
 const STAT_TOOLTIPS = {
@@ -127,6 +126,7 @@ export function AgentThinkingSidebar({
     streaming: false,
   });
   const scrolledActivityOnOpenRef = useRef(false);
+  const scrolledReasoningOnOpenRef = useRef(false);
   const [scrollContainerReady, setScrollContainerReady] = useState(false);
   const [downloadAnimating, setDownloadAnimating] = useState(false);
   const [reasoningMaxHeightPx, setReasoningMaxHeightPx] = useState<number | null>(null);
@@ -143,6 +143,7 @@ export function AgentThinkingSidebar({
     if (isCollapsed) {
       setScrollContainerReady(false);
       scrolledActivityOnOpenRef.current = false;
+      scrolledReasoningOnOpenRef.current = false;
     }
   }, [isCollapsed]);
 
@@ -190,8 +191,15 @@ export function AgentThinkingSidebar({
   const virtualTotalHeight = virtualItems ? virtualizer.getTotalSize() : 0;
 
   useEffect(() => {
-    if (isStreaming && displayThinkingText && typeof thinkingScrollRef.current?.scrollIntoView === 'function') {
-      thinkingScrollRef.current.scrollIntoView({ behavior: 'smooth' });
+    if (!displayThinkingText) {
+      scrolledReasoningOnOpenRef.current = false;
+      return;
+    }
+    if (typeof thinkingScrollRef.current?.scrollIntoView === 'function') {
+      if (isStreaming || !scrolledReasoningOnOpenRef.current) {
+        thinkingScrollRef.current.scrollIntoView({ behavior: isStreaming ? 'smooth' : 'auto' });
+        scrolledReasoningOnOpenRef.current = true;
+      }
     }
   }, [isStreaming, displayThinkingText]);
 
@@ -204,6 +212,9 @@ export function AgentThinkingSidebar({
       fullLength > prev.storyLength ||
       (hasThinking && !prev.hasThinking) ||
       (streaming && !prev.streaming);
+    
+    const isInitialLoad = prev.storyLength === 0 && !prev.hasThinking && !prev.streaming;
+
     prevActivityDepsRef.current = {
       storyLength: fullLength,
       sessionLength: sessionActivity.length,
@@ -211,33 +222,40 @@ export function AgentThinkingSidebar({
       streaming,
     };
     if (activityGrew && typeof activityEndRef.current?.scrollIntoView === 'function') {
-      activityEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      activityEndRef.current.scrollIntoView({ behavior: isInitialLoad ? 'auto' : 'smooth' });
     }
   }, [fullStoryItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
 
   useEffect(() => {
-    if (isCollapsed || !scrollContainerReady || displayList.length === 0 || scrolledActivityOnOpenRef.current) return;
+    if (isCollapsed || !scrollContainerReady || (displayList.length === 0 && !displayThinkingText) || scrolledActivityOnOpenRef.current) return;
     scrolledActivityOnOpenRef.current = true;
     let cancelled = false;
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+    let frames = 0;
+    let lastScrollHeight = 0;
+    
+    const s = activityScrollRef.current;
+
+    const enforceBottomOnMount = () => {
+      if (cancelled) return;
+      if (s && s.scrollHeight !== lastScrollHeight) {
+        lastScrollHeight = s.scrollHeight;
         const endEl = activityEndRef.current;
-        if (cancelled || !endEl || typeof endEl.scrollIntoView !== 'function') return;
-        endEl.scrollIntoView({ behavior: 'auto' });
-        requestAnimationFrame(() => {
-          const s = activityScrollRef.current;
-          const atBottom = s ? s.scrollHeight - s.scrollTop - s.clientHeight <= ACTIVITY_SCROLL_AT_BOTTOM_PX : false;
-          if (!atBottom && activityEndRef.current) {
-            activityEndRef.current.scrollIntoView({ behavior: 'auto' });
-          }
-        });
-      });
-    });
+        if (endEl && typeof endEl.scrollIntoView === 'function') {
+          endEl.scrollIntoView({ behavior: 'auto' });
+        }
+      }
+      frames++;
+      if (frames < 30) {
+        requestAnimationFrame(enforceBottomOnMount);
+      }
+    };
+    
+    requestAnimationFrame(enforceBottomOnMount);
+    
     return () => {
       cancelled = true;
-      cancelAnimationFrame(id);
     };
-  }, [isCollapsed, scrollContainerReady, displayList.length]);
+  }, [isCollapsed, scrollContainerReady, displayList.length, displayThinkingText]);
 
   const runCopyWithAnimation = useCallback(async () => {
     if (downloadAnimating) return;
