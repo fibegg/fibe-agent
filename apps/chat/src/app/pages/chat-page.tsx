@@ -325,6 +325,27 @@ export function ChatPage() {
   });
 
 
+  /**
+   * Stops the active voice recording and resolves the final transcript.
+   * Falls back to the local STT worker when Web Speech returns no text.
+   * Extracted to avoid duplicating the stop→transcribe→fallback flow in
+   * both handleSend and handleVoiceToggle.
+   */
+  const stopAndTranscribe = useCallback(async (): Promise<string> => {
+    // Capture liveText BEFORE stopping — final Web Speech onresult may arrive after onstop resolves
+    const liveTextSnapshot = voiceRecorderRef.current.liveText;
+    const result = await voiceRecorderRef.current.stopRecording();
+    if (!result) return '';
+    let transcript = result.transcript || liveTextSnapshot || '';
+    if (!transcript && result.blob.size > 0) {
+      transcript = await localSttRef.current.transcribe(result.blob).catch((err: unknown) => {
+        console.error('Local STT Error:', err);
+        return '';
+      });
+    }
+    return transcript;
+  }, []);
+
   const handleSend = useCallback(async () => {
     let currentInput = inputValue.trim();
     const isQueuing = state === CHAT_STATES.AWAITING_RESPONSE;
@@ -332,29 +353,17 @@ export function ChatPage() {
     const currentPendingVoiceFilename = pendingVoiceFilename;
     const currentPendingVoice = pendingVoice;
     const currentPendingAttachments = [...pendingAttachments];
-    
+
     if (voiceRecorderRef.current.isRecording) {
-      // Capture liveText BEFORE stopping — final Web Speech onresult may arrive after onstop resolves
-      const liveTextSnapshot = voiceRecorderRef.current.liveText;
-      const result = await voiceRecorderRef.current.stopRecording();
-      if (result) {
-        let finalTranscript = result.transcript || liveTextSnapshot || '';
-        if (!finalTranscript && result.blob.size > 0) {
-          try {
-            finalTranscript = await localSttRef.current.transcribe(result.blob);
-          } catch (err) {
-            console.error("Local STT Error:", err);
-          }
-        }
-        if (finalTranscript) {
-          currentInput = currentInput ? `${currentInput} ${finalTranscript}` : finalTranscript;
-        }
+      const transcript = await stopAndTranscribe();
+      if (transcript) {
+        currentInput = currentInput ? `${currentInput} ${transcript}` : transcript;
       }
     }
 
     const hasVoice = !!currentPendingVoiceFilename || !!currentPendingVoice;
     const hasContent = currentInput || currentPendingImages.length > 0 || hasVoice || currentPendingAttachments.length > 0;
-    
+
     if (!hasContent) return;
     if (!isQueuing && state !== CHAT_STATES.AUTHENTICATED) return;
 
@@ -390,7 +399,7 @@ export function ChatPage() {
     scroll.markJustSent();
   }, [
     send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll,
-    clearPending, setInputState, setMessages
+    clearPending, setInputState, setMessages, stopAndTranscribe,
   ]);
 
   const handleSendContinue = useCallback(() => {
@@ -431,30 +440,18 @@ export function ChatPage() {
   const handleVoiceToggle = useCallback(async () => {
     if (voiceRecorderRef.current.isRecording || localSttRef.current.isTranscribing) {
       if (voiceRecorderRef.current.isRecording) {
-        // Capture liveText BEFORE stopping — final Web Speech onresult may arrive after onstop resolves
-        const liveTextSnapshot = voiceRecorderRef.current.liveText;
-        const result = await voiceRecorderRef.current.stopRecording();
-        if (result) {
-          let finalTranscript = result.transcript || liveTextSnapshot || '';
-          if (!finalTranscript && result.blob.size > 0) {
-            try {
-              finalTranscript = await localSttRef.current.transcribe(result.blob);
-            } catch (err) {
-              console.error("Local STT Error:", err);
-            }
-          }
-          if (finalTranscript) {
-            setInputState((prev) => ({
-              ...prev,
-              value: prev.value ? `${prev.value} ${finalTranscript}` : finalTranscript,
-            }));
-          }
+        const transcript = await stopAndTranscribe();
+        if (transcript) {
+          setInputState((prev) => ({
+            ...prev,
+            value: prev.value ? `${prev.value} ${transcript}` : transcript,
+          }));
         }
       }
     } else {
       await voiceRecorderRef.current.startRecording();
     }
-  }, [setInputState]);
+  }, [setInputState, stopAndTranscribe]);
 
   const { statusClass, showModelSelector, showAuthModal, authModalForModal } = useChatAuthUI(
     state,
