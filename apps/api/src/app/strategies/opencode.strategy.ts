@@ -38,7 +38,7 @@ const API_KEY_ENV_VARS = [
 ] as const;
 
 function opencodeDataDir(): string {
-  return join(process.env.HOME ?? '/home/node', '.local', 'share', 'opencode');
+  return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.local', 'share', 'opencode');
 }
 
 function opencodeAuthFile(): string {

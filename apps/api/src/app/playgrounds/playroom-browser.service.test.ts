@@ -71,14 +71,17 @@ describe('PlayroomBrowserService', () => {
       expect(entries[3]).toEqual({ name: 'b.txt', path: 'b.txt', type: 'file' });
     });
 
-    test('skips hidden entries (dot-prefixed files and dirs)', async () => {
+    test('skips hidden entries (dot-prefixed files and dirs) but shows .claude', async () => {
       writeFileSync(join(rootDir, '.hidden'), '');
       mkdirSync(join(rootDir, '.dotdir'));
+      mkdirSync(join(rootDir, '.claude'));
       writeFileSync(join(rootDir, 'visible.txt'), '');
 
       const entries = await service.browse('');
-      expect(entries).toHaveLength(1);
-      expect(entries[0].name).toBe('visible.txt');
+      expect(entries).toHaveLength(2);
+      expect(entries[0].name).toBe('.claude');
+      expect(entries[0].type).toBe('directory');
+      expect(entries[1].name).toBe('visible.txt');
     });
 
     test('navigates into subdirectories with correct relative paths', async () => {
