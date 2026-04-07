@@ -40,15 +40,20 @@ describe('PlaygroundsService', () => {
     expect(tree[2].type).toBe('file');
   });
 
-  test('getTree skips dotfiles and dotdirs', async () => {
+  test('getTree skips dotfiles and dotdirs but shows .claude', async () => {
     writeFileSync(join(playgroundDir, '.hidden'), '');
     writeFileSync(join(playgroundDir, 'visible'), '');
     mkdirSync(join(playgroundDir, '.dotdir'));
+    mkdirSync(join(playgroundDir, '.claude'));
+    writeFileSync(join(playgroundDir, '.claude', 'settings.json'), '{}');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
     const tree = await service.getTree();
-    expect(tree.length).toBe(1);
-    expect(tree[0].name).toBe('visible');
+    expect(tree.length).toBe(2);
+    expect(tree[0].name).toBe('.claude');
+    expect(tree[0].type).toBe('directory');
+    expect(tree[0].children?.length).toBe(1);
+    expect(tree[1].name).toBe('visible');
   });
 
   test('getTree skips node_modules and .git', async () => {

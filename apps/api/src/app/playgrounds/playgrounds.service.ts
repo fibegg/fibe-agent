@@ -23,6 +23,9 @@ const HIDDEN_PREFIX = '.';
 
 const IGNORED_NAMES = new Set<string>(['node_modules', '.git']);
 
+/** Hidden (dot-prefixed) directories that should still appear in the file tree. */
+const VISIBLE_HIDDEN = new Set<string>(['.claude']);
+
 function pathInIgnoredDir(relPath: string): boolean {
   const segments = relPath.replace(/\\/g, '/').split('/');
   return segments.some((seg) => IGNORED_NAMES.has(seg));
@@ -51,7 +54,7 @@ export class PlaygroundsService {
       const entries = await readdir(absPath, { withFileTypes: true });
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
+        if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
         if (ig.ignores(name)) continue;
         const childAbs = join(absPath, name);
         if (e.isFile()) {
@@ -186,7 +189,7 @@ export class PlaygroundsService {
     }
     for (const e of entries) {
       const name = typeof e.name === 'string' ? e.name : String(e.name);
-      if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
+      if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
       const childRel = relPath ? `${relPath}/${name}` : name;
       const childAbs = join(absPath, name);
       if (e.isFile()) {
@@ -214,7 +217,7 @@ export class PlaygroundsService {
       const files: { name: string; rel: string }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if (name.startsWith(HIDDEN_PREFIX) || IGNORED_NAMES.has(name)) continue;
+        if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
         const rel = relativePath ? `${relativePath}/${name}` : name;
         if (ig.ignores(name)) continue;
         if (e.isDirectory()) {

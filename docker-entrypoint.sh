@@ -11,6 +11,28 @@ export NX_DAEMON=false
 # Use JS file-watcher instead of native binaries (macOS binaries won't load on Linux)
 export NX_NATIVE_FILE_WATCHER=false
 
+fix_file_limits() {
+  mkdir -p /etc/security/limits.d
+  printf '*  soft  nofile  1048576\n*  hard  nofile  1048576\n' > /etc/security/limits.d/99-nofile.conf
+}
+
+setup_docker_group() {
+  if [ -n "$DOCKER_HOST_GID" ]; then
+    groupadd -g "$DOCKER_HOST_GID" docker_host 2>/dev/null || true
+    usermod -aG docker_host node 2>/dev/null || true
+  fi
+}
+
+install_dev_deps() {
+  if [ ! -f node_modules/.npm_dev_installed ]; then
+    echo "[entrypoint] Installing dev dependencies..."
+    rm -rf node_modules/*
+    npm install --prefer-offline --no-audit --no-fund
+    chown -R node:node /app/node_modules
+    touch node_modules/.npm_dev_installed
+  fi
+}
+
 if [ -f /app/dist/main.js ]; then
   # ── PRODUCTION: pre-built image, just run the compiled bundle ──────────────
   echo "[entrypoint] dist/main.js found — starting production server"
@@ -20,12 +42,11 @@ else
   echo "[entrypoint] No dist/main.js — running in dev mode (source mounted)"
 
   cd /app
-
-  # Install / sync dependencies for the Linux platform inside the container.
-  # Uses npm because bun may not be present in the base image at runtime.
-  echo "[entrypoint] Installing dependencies..."
-  npm install --prefer-offline --no-audit --no-fund
+  fix_file_limits
+  setup_docker_group
+  install_dev_deps
+  chown -R node:node /tmp/.nx-cache 2>/dev/null || true
 
   echo "[entrypoint] Starting API + Chat dev servers..."
-  exec npx nx run-many --targets=serve,dev --parallel=2
+  exec su node -c "export HOME=/home/node; cd /app && npx nx reset && npx nx run-many --targets=serve,dev --parallel=2"
 fi
