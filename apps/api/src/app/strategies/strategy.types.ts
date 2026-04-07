@@ -65,6 +65,13 @@ export interface AgentStrategy {
   getModelArgs?(model: string): string[];
   listModels?(): Promise<string[]>;
   interruptAgent?(): void;
+  /**
+   * Whether conversation history should be injected into the prompt.
+   * Strategies that support native conversation continuation (e.g. --continue, --resume)
+   * return false; strategies without native continuation (e.g. codex exec) return true.
+   * When not implemented, defaults to false (history not injected).
+   */
+  needsHistoryInPrompt?(): boolean;
   executePromptStreaming(
     prompt: string,
     model: string,
