@@ -5,17 +5,27 @@ import { apiRequest } from '../api-url';
 
 vi.mock('../api-url', () => ({ apiRequest: vi.fn() }));
 
-// CodeMirror can't really run in jsdom — mock the loader so it never mounts
+// CodeMirror can't really run in jsdom — mock the loader so it renders content
+// into a child element (simulating what CM does) while exposing a handle.
 vi.mock('./file-editor-cm', () => ({
-  createEditor: vi.fn(() => ({
-    view: {},
-    setContent: vi.fn(),
-    setReadOnly: vi.fn(),
-    setTheme: vi.fn(),
-    getContent: vi.fn(() => 'test content'),
-    focus: vi.fn(),
-    destroy: vi.fn(),
-  })),
+  createEditor: vi.fn(({ parent, content }: { parent: HTMLElement; content: string }) => {
+    // Mimic CodeMirror rendering content into a child span (not textContent,
+    // which would wipe out React-managed children like the empty-file placeholder).
+    let currentContent = content;
+    const span = document.createElement('span');
+    span.setAttribute('data-testid', 'cm-mock');
+    span.textContent = content;
+    if (parent) parent.appendChild(span);
+    return {
+      view: {},
+      setContent: vi.fn((c: string) => { currentContent = c; span.textContent = c; }),
+      setReadOnly: vi.fn(),
+      setTheme: vi.fn(),
+      getContent: vi.fn(() => currentContent),
+      focus: vi.fn(),
+      destroy: vi.fn(() => { span.remove(); }),
+    };
+  }),
   getLanguageExtension: vi.fn(() => null),
   getLanguageLabel: vi.fn((filename: string) => {
     const ext = filename.split('.').pop()?.toLowerCase() ?? '';
@@ -65,8 +75,8 @@ describe('FileEditorPanel', () => {
     (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'const x = 1;' }) });
     render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
-    // Content is shown in the fallback pre (CM not mounted in jsdom)
-    expect(screen.getByText(/const x = 1;/)).toBeTruthy();
+    // Content may appear in both the editor container and the fallback pre
+    expect(screen.getAllByText(/const x = 1;/).length).toBeGreaterThanOrEqual(1);
   });
 
   it('shows Empty file text for empty content', async () => {
