@@ -357,6 +357,9 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           return;
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
+          if (this.conversationDataDir) {
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch {}
+          }
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }

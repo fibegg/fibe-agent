@@ -387,6 +387,7 @@ export class OpencodeStrategy implements AgentStrategy {
                 }
                 break;
               case 'step_start':
+                hasEmittedOutput = true;
                 callbacks?.onReasoningChunk?.('Thinking…\n');
                 break;
               case 'thinking':
@@ -396,6 +397,7 @@ export class OpencodeStrategy implements AgentStrategy {
                 }
                 break;
               case 'step_finish':
+                hasEmittedOutput = true;
                 callbacks?.onReasoningEnd?.();
                 break;
               case 'error': {
@@ -435,9 +437,11 @@ export class OpencodeStrategy implements AgentStrategy {
               part?: { text?: string };
             };
             if (event.type === 'text' && event.part?.text) {
+              if (event.part.text.trim()) hasEmittedOutput = true;
               onChunk(event.part.text);
-            }
+             }
           } catch {
+            if (lineBuffer.trim()) hasEmittedOutput = true;
             onChunk(lineBuffer.trim());
           }
         }
@@ -448,6 +452,9 @@ export class OpencodeStrategy implements AgentStrategy {
           return;
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
+          if (this.conversationDataDir) {
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch {}
+          }
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }

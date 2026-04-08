@@ -35,59 +35,40 @@ async function pathExists(p: string): Promise<boolean> {
 export class PlayroomBrowserService {
   constructor(private readonly config: ConfigService) {}
 
-  /** List entries under PLAYROOMS_ROOT at the given relative path. */
+  /** List entries explicitly via playgrounds-explorer. */
   async browse(relPath = ''): Promise<BrowseEntry[]> {
-    const root = resolve(this.config.getPlayroomsRoot());
-    const absPath = relPath ? resolve(root, relPath) : root;
-    const rel = assertSafePath(root, absPath);
+    if (relPath) return []; // Flattened UI workflow doesn't browse subdirectories
 
-    if (!(await pathExists(absPath))) {
-      throw new NotFoundException(`Path not found: ${relPath || '/'}`);
-    }
-
-    const raw = await readdir(absPath, { withFileTypes: true }).catch(() => {
-      throw new NotFoundException(`Cannot read: ${relPath || '/'}`);
-    });
-
-    const dirs: BrowseEntry[] = [];
-    const files: BrowseEntry[] = [];
-
-    for (const e of raw) {
-      const name = String(e.name);
-      if (name.startsWith('.') && !VISIBLE_HIDDEN.has(name)) continue;
-
-      const childRel = rel ? `${rel}/${name}` : name;
-      const childAbs = resolve(absPath, name);
-
-      if (e.isSymbolicLink()) {
-        try {
-          const targetStat = await stat(childAbs);
-          if (targetStat.isDirectory()) {
-            dirs.push({ name, path: childRel, type: 'symlink' });
-          } else {
-            files.push({ name, path: childRel, type: 'file' });
-          }
-        } catch {
-          // Broken symlink — skip
-        }
-      } else if (e.isDirectory()) {
-        dirs.push({ name, path: childRel, type: 'directory' });
-      } else if (e.isFile()) {
-        files.push({ name, path: childRel, type: 'file' });
+    try {
+      const { execFile } = require('child_process');
+      const util = require('util');
+      const execFileAsync = util.promisify(execFile);
+      const scriptPath = resolve(process.cwd(), 'playgrounds-explorer');
+      const targetBase = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
+      
+      const { stdout } = await execFileAsync('node', [scriptPath], {
+        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
+      });
+      const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
+      
+      const entries: BrowseEntry[] = [];
+      for (const line of lines) {
+         const [path, name] = line.split('|');
+         if (path) {
+             entries.push({ name: name || path, path, type: 'directory' });
+         }
       }
+      return entries;
+    } catch (e) {
+      throw new NotFoundException(`Cannot execute Playgrounds Explorer.`);
     }
-
-    dirs.sort((a, b) => a.name.localeCompare(b.name));
-    files.sort((a, b) => a.name.localeCompare(b.name));
-    return [...dirs, ...files];
   }
 
   /**
-   * Create (or replace) the PLAYGROUNDS_DIR symlink pointing at
-   * <PLAYROOMS_ROOT>/<relPath>.
+   * Run playgrounds-explorer --link to map the target services to /app/playground.
    *
    * Throws:
-   *  - BadRequestException  if relPath is empty / invalid / PLAYGROUNDS_DIR is a real dir
+   *  - BadRequestException  if relPath is empty / invalid
    *  - NotFoundException    if the target path does not exist
    */
   async linkPlayground(relPath: string): Promise<{ linkedPath: string }> {
@@ -95,7 +76,7 @@ export class PlayroomBrowserService {
       throw new BadRequestException('Path is required');
     }
 
-    const root = resolve(this.config.getPlayroomsRoot());
+    const root = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
     const target = resolve(root, relPath);
     assertSafePath(root, target);
 
@@ -103,47 +84,36 @@ export class PlayroomBrowserService {
       throw new NotFoundException(`Target not found: ${relPath}`);
     }
 
-    const playgroundDir = resolve(this.config.getPlaygroundsDir());
-
-    // Ensure parent directory exists
-    await mkdir(dirname(playgroundDir), { recursive: true });
-
-    // Clean up whatever is at playgroundDir
     try {
-      const st = await lstat(playgroundDir);
-      if (st.isDirectory() && !st.isSymbolicLink()) {
-        throw new BadRequestException(
-          `Cannot replace '${playgroundDir}': it is a real directory. Remove it manually first.`,
-        );
-      }
-      await unlink(playgroundDir);
+      const { execFile } = require('child_process');
+      const util = require('util');
+      const execFileAsync = util.promisify(execFile);
+      
+      const scriptPath = resolve(process.cwd(), 'playgrounds-explorer');
+      const linkDir = resolve(this.config.getPlaygroundsDir());
+      const targetBase = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
+      
+      await execFileAsync('node', [scriptPath, relPath, '--link', '--link-dir', linkDir], {
+        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
+      });
+      
     } catch (err: unknown) {
-      const code = (err as NodeJS.ErrnoException).code;
-      if (code !== 'ENOENT') throw err; // re-throw BadRequestException or unexpected OS errors
-    }
-
-    try {
-      await symlink(target, playgroundDir, 'dir');
-    } catch (err: unknown) {
-      const e = err as NodeJS.ErrnoException;
+      const e = err as Error;
       throw new BadRequestException(
-        `Failed to create symlink: ${e.message} (code: ${e.code ?? 'unknown'})`,
+        `Failed to link playground via explorer: ${e.message}`,
       );
     }
 
     return { linkedPath: target };
   }
 
-  /** Returns the symlink target of PLAYGROUNDS_DIR relative to PLAYROOMS_ROOT, or null. */
+  /** Returns the name of the playground currently active in /app/playground, or null. */
   async getCurrentLink(): Promise<string | null> {
     const playgroundDir = resolve(this.config.getPlaygroundsDir());
+    const stateFile = resolve(playgroundDir, '.current_playground');
     try {
-      if (!(await lstat(playgroundDir)).isSymbolicLink()) return null;
-      const target = await readlink(playgroundDir);
-      const absTarget = resolve(dirname(playgroundDir), target);
-      const root = resolve(this.config.getPlayroomsRoot());
-      const rel = relative(root, absTarget);
-      return rel.startsWith('..') ? target : rel;
+      const content = await require('fs/promises').readFile(stateFile, 'utf8');
+      return content ? content.trim() : null;
     } catch {
       return null;
     }

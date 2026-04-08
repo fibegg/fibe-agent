@@ -56,7 +56,10 @@ export class PlaygroundsService {
       const projectName = currentLink || '';
       
       const scriptPath = join(process.cwd(), 'playgrounds-explorer');
-      const { stdout } = await execAsync(`node ${scriptPath} ${projectName} --urls`);
+      const targetBase = join(this.config.getPlayroomsRoot(), 'playgrounds');
+      const { stdout } = await execAsync(`node ${scriptPath} ${projectName} --urls`, {
+        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
+      });
       return stdout.split('\n')
         .map(l => l.trim())
         .filter(l => l.length > 0 && !l.includes('Network: Internal only'));

@@ -374,11 +374,12 @@ export function FileExplorer({
         )}
         {effectiveTab === 'playground' && playgroundUrls?.length > 0 && (
           <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
-            {playgroundUrls.map((url) => {
-              const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+            {playgroundUrls.map((urlStr) => {
+              const [name, rawUrl] = urlStr.includes('|') ? urlStr.split('|') : [urlStr, urlStr];
+              const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
               return (
                 <a
-                  key={url}
+                  key={urlStr}
                   href={fullUrl}
                   target="_blank"
                   rel="noreferrer"
@@ -388,7 +389,7 @@ export function FileExplorer({
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
                     <span className="relative inline-flex size-1.5 rounded-full bg-blue-500"></span>
                   </div>
-                  {url}
+                  {name}
                 </a>
               );
             })}

@@ -90,15 +90,7 @@ function PlaygroundSelectorSlot({
   props: ChatHeaderProps;
   className?: string;
 }) {
-  const {
-    onPlaygroundOpen,
-    onPlaygroundBrowse,
-    onPlaygroundGoBack,
-    onPlaygroundGoToRoot,
-    onPlaygroundLink,
-  } = props;
-
-  if (!onPlaygroundOpen || !onPlaygroundBrowse || !onPlaygroundGoBack || !onPlaygroundGoToRoot || !onPlaygroundLink) {
+  if (!props.onPlaygroundOpen || !props.onPlaygroundLink) {
     return null;
   }
 
@@ -110,15 +102,10 @@ function PlaygroundSelectorSlot({
         error={props.playgroundError ?? null}
         currentLink={props.playgroundCurrentLink ?? null}
         linking={props.playgroundLinking ?? false}
-        canGoBack={props.playgroundCanGoBack ?? false}
-        breadcrumbs={props.playgroundBreadcrumbs ?? []}
-        onOpen={onPlaygroundOpen}
-        onBrowse={onPlaygroundBrowse}
-        onGoBack={onPlaygroundGoBack}
-        onGoToRoot={onPlaygroundGoToRoot}
-        onLink={onPlaygroundLink}
+        onOpen={props.onPlaygroundOpen}
+        onLink={props.onPlaygroundLink}
         onLinked={props.onPlaygroundLinked}
-        onSmartMount={props.onPlaygroundSmartMount}
+        visible={true}
       />
     </div>
   );
