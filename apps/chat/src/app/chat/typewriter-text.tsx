@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export function TypewriterText({ text, speed = 40 }: { text: string; speed?: number }) {
+export function TypewriterText({ text, speed = 40, pulseDelay = 3000 }: { text: string; speed?: number; pulseDelay?: number }) {
   const [index, setIndex] = useState(0);
 
   useEffect(() => {
@@ -13,8 +13,13 @@ export function TypewriterText({ text, speed = 40 }: { text: string; speed?: num
         setIndex((prev) => prev + 1);
       }, speed);
       return () => clearTimeout(timeoutId);
+    } else {
+      const pulseTimeoutId = setTimeout(() => {
+        setIndex(0);
+      }, pulseDelay);
+      return () => clearTimeout(pulseTimeoutId);
     }
-  }, [index, text.length, speed]);
+  }, [index, text.length, speed, pulseDelay]);
 
   return <>{text.substring(0, index)}</>;
 }
