@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { ChatHeader } from './chat-header';
 import { CHAT_STATES } from './chat-state';
 
@@ -290,7 +291,11 @@ describe('ChatHeader', () => {
   // ─── Tony Stark Mode ──────────────────────────────────────────────────────
 
   it('renders Tony Stark mode link when onToggleTonyStarkMode is provided', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} onToggleTonyStarkMode={vi.fn()} tonyStarkMode={false} />);
+    render(
+      <MemoryRouter>
+        <ChatHeader {...DEFAULT_PROPS} onToggleTonyStarkMode={vi.fn()} tonyStarkMode={false} />
+      </MemoryRouter>,
+    );
     const link = screen.getByTitle('Enter Tony Stark Mode');
     expect(link).toBeTruthy();
     expect(link.tagName).toBe('A'); // Because we use react-router-dom Link, in tests it renders as an anchor

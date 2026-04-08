@@ -158,6 +158,7 @@ export function handleCodexExecJsonLine(
             name: 'command',
             command: item.command,
             summary: item.aggregated_output?.slice(0, RESPONSE_PREVIEW_MAX),
+            details: JSON.stringify({ command: item.command, output: item.aggregated_output }),
           });
           break;
         }
@@ -172,6 +173,7 @@ export function handleCodexExecJsonLine(
               name: fileName,
               path: change.path,
               summary: change.kind,
+              details: JSON.stringify(change),
             });
           }
           break;
@@ -186,6 +188,7 @@ export function handleCodexExecJsonLine(
             command: item.command,
             path: item.path,
             summary: item.summary,
+            details: JSON.stringify(item),
           });
           break;
         }

@@ -379,6 +379,7 @@ export class OpencodeStrategy implements AgentStrategy {
                     name: event.part.name ?? 'tool',
                     path: event.part.path,
                     summary: event.part.summary,
+                    details: JSON.stringify(event.part),
                   });
                 }
                 break;
@@ -461,5 +462,9 @@ export class OpencodeStrategy implements AgentStrategy {
         reject(err);
       });
     });
+  }
+
+  hasNativeSessionSupport(): boolean {
+    return true;
   }
 }

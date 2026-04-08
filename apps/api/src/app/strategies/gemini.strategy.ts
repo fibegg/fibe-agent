@@ -381,4 +381,8 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       });
     });
   }
+
+  hasNativeSessionSupport(): boolean {
+    return true;
+  }
 }

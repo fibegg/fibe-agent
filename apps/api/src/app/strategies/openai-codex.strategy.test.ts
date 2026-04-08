@@ -213,6 +213,7 @@ describe('handleCodexExecJsonLine', () => {
       name: 'command',
       command: 'npm test',
       summary: 'tests passed',
+      details: JSON.stringify({ command: 'npm test', output: 'tests passed' }),
     }]);
     expect(spy.reasoning).toEqual(['$ npm test\n']);
   });
@@ -261,8 +262,8 @@ describe('handleCodexExecJsonLine', () => {
       spy.handlers
     );
     expect(spy.tools).toEqual([
-      { kind: 'file_created', name: 'a.ts', path: 'src/a.ts', summary: 'add' },
-      { kind: 'file_created', name: 'b.ts', path: 'src/b.ts', summary: 'modify' },
+      { kind: 'file_created', name: 'a.ts', path: 'src/a.ts', summary: 'add', details: JSON.stringify({ path: 'src/a.ts', kind: 'add' }) },
+      { kind: 'file_created', name: 'b.ts', path: 'src/b.ts', summary: 'modify', details: JSON.stringify({ path: 'src/b.ts', kind: 'modify' }) },
     ]);
     expect(spy.reasoning).toEqual(['add: src/a.ts\n', 'modify: src/b.ts\n']);
   });
@@ -309,6 +310,7 @@ describe('handleCodexExecJsonLine', () => {
       command: 'echo hi',
       path: undefined,
       summary: 'greeting',
+      details: JSON.stringify({ type: 'local_shell_call', name: 'bash', command: 'echo hi', summary: 'greeting' }),
     }]);
   });
 

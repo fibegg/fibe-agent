@@ -324,14 +324,16 @@ export class OrchestratorService implements OnModuleInit {
       } else if (this.cachedSystemPromptFromFile !== null) {
         systemPrompt = this.cachedSystemPromptFromFile;
       }
-      // Always inject conversation history into the prompt so the agent has
-      // context about prior messages. CLI flags like --continue/--resume are
-      // unreliable across providers, so prompt-level history is the primary
-      // mechanism for long-running conversation support.
-      const allMessages = this.messageStore.all();
-      const historyMessages = allMessages.length > 1
-        ? allMessages.slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
-        : undefined;
+      // Only inject prompt-level history for strategies without native session support.
+      // Strategies like Claude Code use --resume which restores full context natively.
+      const historyMessages = this.strategy.hasNativeSessionSupport?.()
+        ? undefined
+        : (() => {
+            const allMessages = this.messageStore.all();
+            return allMessages.length > 1
+              ? allMessages.slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
+              : undefined;
+          })();
       const fullPrompt = await this.chatPromptContext.buildFullPrompt(
         text,
         imageUrls,
