@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Logger } from '@nestjs/common';
 
 const getHome = () => process.env.HOME ?? '/home/node';
+const getSessionDir = () => process.env.SESSION_DIR;
 const logger = new Logger('McpConfigWriter');
 
 /**
@@ -91,7 +92,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
   gemini: (servers) => {
-    const dir = join(getHome(), '.gemini');
+    const dir = getSessionDir() || join(getHome(), '.gemini');
     const configPath = join(dir, 'settings.json');
     let existing: Record<string, unknown> = {};
 
@@ -122,36 +123,64 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   },
 
   /**
-   * Claude Code: ~/.claude.json
-   * User-scoped MCP servers live in ~/.claude.json (not ~/.claude/settings.json).
-   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } }, ...otherKeys }
+   * Claude Code: writes MCP servers to BOTH config locations:
+   *   1. ~/.claude/settings.json  — canonical location for Claude Code MCP servers
+   *   2. ~/.claude.json           — legacy/fallback location
+   *
+   * Writing to both ensures tools are discovered regardless of Claude Code version.
+   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
   'claude-code': (servers) => {
-    const configPath = join(getHome(), '.claude.json');
-    let existing: Record<string, unknown> = {};
-
-    try {
-      if (existsSync(configPath)) {
-        existing = JSON.parse(readFileSync(configPath, 'utf8'));
-      }
-    } catch {
-      /* start fresh */
-    }
-
     const nativeServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
       nativeServers[name] = toNativeJsonEntry(entry);
     }
 
-    const config = {
-      ...existing,
+    // Write to ~/.claude/settings.json (canonical location)
+    // Respect SESSION_DIR if set — strategies read config from there
+    const settingsDir = getSessionDir() || join(getHome(), '.claude');
+    const settingsPath = join(settingsDir, 'settings.json');
+    if (!existsSync(settingsDir)) mkdirSync(settingsDir, { recursive: true });
+
+    let settingsExisting: Record<string, unknown> = {};
+    try {
+      if (existsSync(settingsPath)) {
+        settingsExisting = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      }
+    } catch {
+      /* start fresh */
+    }
+
+    const settingsConfig = {
+      ...settingsExisting,
       mcpServers: {
-        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
+        ...((settingsExisting.mcpServers as Record<string, unknown>) ?? {}),
         ...nativeServers,
       },
     };
-    writeFileSync(configPath, JSON.stringify(config, null, 2));
-    logger.log(`Wrote Claude MCP config to ${configPath}`);
+    writeFileSync(settingsPath, JSON.stringify(settingsConfig, null, 2));
+    logger.log(`Wrote Claude MCP config to ${settingsPath}`);
+
+    // Also write to ~/.claude.json (legacy/fallback)
+    const legacyPath = join(getHome(), '.claude.json');
+    let legacyExisting: Record<string, unknown> = {};
+    try {
+      if (existsSync(legacyPath)) {
+        legacyExisting = JSON.parse(readFileSync(legacyPath, 'utf8'));
+      }
+    } catch {
+      /* start fresh */
+    }
+
+    const legacyConfig = {
+      ...legacyExisting,
+      mcpServers: {
+        ...((legacyExisting.mcpServers as Record<string, unknown>) ?? {}),
+        ...nativeServers,
+      },
+    };
+    writeFileSync(legacyPath, JSON.stringify(legacyConfig, null, 2));
+    logger.log(`Wrote Claude MCP config to ${legacyPath}`);
   },
 
   /**
@@ -159,7 +188,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
    * Format: [mcp_servers."<name>"] with url/command and env keys (TOML)
    */
   'openai-codex': (servers) => {
-    const dir = join(getHome(), '.codex');
+    const dir = getSessionDir() || join(getHome(), '.codex');
     const configPath = join(dir, 'config.toml');
     let existingContent = '';
 
@@ -194,6 +223,44 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     writeFileSync(configPath, finalContent);
     logger.log(`Wrote Codex MCP config (TOML) to ${configPath}`);
   },
+
+  /**
+   * OpenCode: injects MCP servers into the OPENCODE_CONFIG_CONTENT env var.
+   * OpenCode reads config exclusively from this env var (highest precedence).
+   * The strategy's YOLO_ENV already sets base config; we merge mcpServers into it.
+   */
+  opencode: (servers) => {
+    const existingRaw = process.env.OPENCODE_CONFIG_CONTENT;
+    let existing: Record<string, unknown> = {};
+    try {
+      if (existingRaw) existing = JSON.parse(existingRaw);
+    } catch {
+      /* start fresh */
+    }
+
+    const nativeServers: Record<string, unknown> = {};
+    for (const [name, entry] of Object.entries(servers)) {
+      if (entry.command) {
+        nativeServers[name] = {
+          command: entry.command,
+          args: entry.args ?? [],
+          ...(entry.env ? { env: entry.env } : {}),
+        };
+      } else if (entry.serverUrl) {
+        nativeServers[name] = { url: entry.serverUrl };
+      }
+    }
+
+    const config = {
+      ...existing,
+      mcpServers: {
+        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
+        ...nativeServers,
+      },
+    };
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
+    logger.log('Injected MCP servers into OPENCODE_CONFIG_CONTENT env var');
+  },
 };
 
 // ─── Main Entry Point ──────────────────────────────────────────────
@@ -224,16 +291,19 @@ function parseServersFromJson(raw: string): Record<string, McpServerEntry> | nul
  * can connect to all configured MCP servers on startup.
  */
 export function writeMcpConfig(): void {
-  const provider = process.env.AGENT_PROVIDER;
-  if (!provider) {
+  const rawProvider = process.env.AGENT_PROVIDER;
+  if (!rawProvider) {
     const hasMcp = process.env.MCP_CONFIG_JSON || process.env.DOCKER_MCP_CONFIG_JSON;
     if (hasMcp) logger.warn('MCP config env vars are set but AGENT_PROVIDER is missing');
     return;
   }
 
+  // Normalize: Dockerfile uses underscores (claude_code), registry uses hyphens (claude-code)
+  const provider = rawProvider.replace(/_/g, '-');
+
   const writer = PROVIDER_WRITERS[provider];
   if (!writer) {
-    logger.warn(`No MCP config writer for provider: ${provider}`);
+    logger.warn(`No MCP config writer for provider: ${provider} (raw: ${rawProvider})`);
     return;
   }
 

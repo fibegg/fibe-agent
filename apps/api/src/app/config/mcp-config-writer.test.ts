@@ -203,6 +203,17 @@ describe('writeMcpConfig', () => {
       });
     });
 
+    it('writes ~/.claude/settings.json with mcpServers block', () => {
+      writeMcpConfig();
+      const settingsPath = join(testHome, '.claude', 'settings.json');
+      expect(existsSync(settingsPath)).toBe(true);
+      const config = JSON.parse(readFileSync(settingsPath, 'utf8'));
+      expect(config.mcpServers['playgrounds-dev']).toEqual({
+        command: 'mcp-remote-wrapper',
+        args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
+      });
+    });
+
     it('merges docker and playgrounds servers', () => {
       process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
