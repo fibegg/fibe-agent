@@ -150,7 +150,13 @@ for (const pgName of pgDirs) {
                       const parts = relative.split('/');
                       if (parts.length >= 2) {
                           services[currentService].hostMount = hostPath;
-                          services[currentService].prop = parts[0];
+                          let rawProp = parts[0];
+                          const propParts = rawProp.split('--');
+                          if (propParts.length >= 3) {
+                              services[currentService].prop = propParts.slice(1, -1).join('--');
+                          } else {
+                              services[currentService].prop = rawProp;
+                          }
                           services[currentService].branch = parts[1];
                       }
                   }
