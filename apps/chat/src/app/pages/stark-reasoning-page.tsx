@@ -176,53 +176,55 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
             </span>
           </div>
         ) : (
-          <div 
-            ref={scrollContainerRef}
-            className="flex-1 overflow-y-auto p-4 md:p-8 relative"
-            style={{ scrollBehavior: 'smooth' }}
-          >
-            {/* Top decorative corners */}
-            <div className="fixed top-20 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
-            <div className="fixed top-20 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
-            
-            {/* Grid layout for chronological LTR reading order */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12 w-full auto-rows-max items-start">
-              {filteredStories.map((story, i) => (
-                <div 
-                  key={story.id} 
-                  className="w-full opacity-0" 
-                  style={{ animation: `thinking-fade 0.4s ease-out ${(i % 10) * 0.05}s forwards` }}
-                >
-                  <StarkWindow story={story} searchQuery={detailSearchQuery} index={i} />
-                </div>
-              ))}
-
-              {liveResponseText && (
-                <div className="mt-4 animate-pulse-glow col-span-1 md:col-span-2 xl:col-span-3 2xl:col-span-4 w-full">
-                  <div className="border border-emerald-500/50 bg-emerald-950/20 p-4 rounded-sm backdrop-blur-md relative overflow-hidden ring-1 ring-inset ring-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
-                    <div className="flex items-center gap-2 mb-3 border-b border-emerald-500/30 pb-2">
-                      <span className="relative flex size-2 shrink-0">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
-                      </span>
-                      <p className="text-emerald-400 text-xs font-mono font-bold tracking-[0.2em] uppercase">
-                        ACTIVE PROCESSING WINDOW
-                      </p>
-                    </div>
-                    <div className="bg-emerald-950/30 p-3 border-l-2 border-emerald-500 max-h-[60vh] overflow-y-auto custom-scrollbar">
-                      <p className="text-emerald-300 text-[11px] font-mono whitespace-pre-wrap leading-relaxed">
-                        {reasoningBodyWithHighlights(liveResponseText, detailSearchQuery)}
-                        <span className="inline-block w-2 h-3 ml-1 bg-emerald-400 animate-pulse"></span>
-                      </p>
-                    </div>
+          <div className="flex-1 flex flex-col min-h-0 relative">
+            {liveResponseText && (
+              <div className="shrink-0 p-4 md:p-8 pb-0 md:pb-0 z-30 animate-pulse-glow w-full relative">
+                <div className="border border-emerald-500/50 bg-emerald-950/20 p-4 rounded-sm backdrop-blur-md relative overflow-hidden ring-1 ring-inset ring-emerald-500/20 shadow-[0_0_15px_rgba(16,185,129,0.15)]">
+                  <div className="flex items-center gap-2 mb-3 border-b border-emerald-500/30 pb-2">
+                    <span className="relative flex size-2 shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
+                    </span>
+                    <p className="text-emerald-400 text-xs font-mono font-bold tracking-[0.2em] uppercase">
+                      ACTIVE PROCESSING WINDOW
+                    </p>
+                  </div>
+                  <div className="bg-emerald-950/30 p-3 border-l-2 border-emerald-500 max-h-[30vh] overflow-y-auto custom-scrollbar">
+                    <p className="text-emerald-300 text-[11px] font-mono whitespace-pre-wrap leading-relaxed">
+                      {reasoningBodyWithHighlights(liveResponseText, detailSearchQuery)}
+                      <span className="inline-block w-2 h-3 ml-1 bg-emerald-400 animate-pulse"></span>
+                    </p>
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
 
-            {/* Bottom decorative corners */}
-            <div className="fixed bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
-            <div className="fixed bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
+            <div 
+              ref={scrollContainerRef}
+              className="flex-1 overflow-y-auto p-4 md:p-8 relative"
+              style={{ scrollBehavior: 'smooth' }}
+            >
+              {/* Top decorative corners */}
+              <div className="fixed top-20 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              <div className="fixed top-20 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              
+              {/* Grid layout for chronological LTR reading order */}
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12 w-full auto-rows-max items-start">
+                {filteredStories.map((story, i) => (
+                  <div 
+                    key={story.id} 
+                    className="w-full opacity-0" 
+                    style={{ animation: `thinking-fade 0.4s ease-out ${(i % 10) * 0.05}s forwards` }}
+                  >
+                    <StarkWindow story={story} searchQuery={detailSearchQuery} index={i} />
+                  </div>
+                ))}
+              </div>
+
+              {/* Bottom decorative corners */}
+              <div className="fixed bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              <div className="fixed bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
+            </div>
           </div>
         )}
       </div>
