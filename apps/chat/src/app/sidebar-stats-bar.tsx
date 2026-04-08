@@ -67,7 +67,7 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
 
   return (
     <div className="flex items-center gap-2 overflow-visible">
-      <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
+      <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center" style={{ display: 'none' }}>
         <button
           type="button"
           onClick={handleCopy}

@@ -375,7 +375,7 @@ export function AgentThinkingSidebar({
             className="flex flex-col items-center gap-1.5 w-full rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
             aria-label="Copy activity to clipboard"
           >
-            <div className="relative shrink-0">
+            <div className="relative shrink-0" style={{ display: 'none' }}>
               <Brain className={`size-5 ${brainClasses.brain} transition-colors`} />
               {isStreaming ? (
                 <Loader2

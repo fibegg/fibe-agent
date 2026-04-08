@@ -288,6 +288,7 @@ export function ChatHeader({
           {isMobile && (
             <button
               type="button"
+              style={{ display: 'none' }}
               onClick={onOpenActivity}
               className="size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"
               title="Agent activity"
