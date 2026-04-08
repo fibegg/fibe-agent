@@ -236,6 +236,7 @@ export function ChatPage() {
 
   const {
     state,
+    agentMode,
     errorMessage,
     authModal,
     sessionActivity,
@@ -606,6 +607,7 @@ export function ChatPage() {
         <ChatHeader
           isMobile={isMobile}
           state={state}
+          agentMode={agentMode}
           errorMessage={errorMessage}
           sessionTimeMs={sessionTimeMs}
           mobileSessionStats={mobileSessionStats}

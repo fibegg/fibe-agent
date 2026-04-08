@@ -4,6 +4,7 @@ import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
+import { TypewriterText } from './typewriter-text';
 import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
 import { HEADER_FIRST_ROW, HEADER_PADDING, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
@@ -11,6 +12,7 @@ import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 export interface ChatHeaderProps {
   isMobile: boolean;
   state: string;
+  agentMode?: string;
   errorMessage: string | null;
   sessionTimeMs: number;
   mobileSessionStats: { totalActions: number; completed: number; processing: number };
@@ -153,6 +155,7 @@ function TerminalButton({
 export function ChatHeader({
   isMobile,
   state,
+  agentMode,
   errorMessage,
   sessionTimeMs,
   mobileSessionStats,
@@ -184,6 +187,7 @@ export function ChatHeader({
   const playgroundProps: ChatHeaderProps = {
     isMobile,
     state,
+    agentMode,
     errorMessage,
     sessionTimeMs,
     mobileSessionStats,
@@ -256,7 +260,9 @@ export function ChatHeader({
             </div>
             <div className="min-h-[14px] mt-0.5 flex items-center">
               <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
-                {state === CHAT_STATES.AGENT_OFFLINE && errorMessage
+                {state === CHAT_STATES.AWAITING_RESPONSE && agentMode
+                  ? <TypewriterText text={agentMode} speed={40} />
+                  : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
                   ? truncateError(errorMessage)
                   : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state}
               </p>
