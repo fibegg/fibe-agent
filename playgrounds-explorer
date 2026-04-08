@@ -189,9 +189,7 @@ for (const pgName of pgDirs) {
               }
               const symlinkPath = path.join(targetDir, symlinkName);
               
-              if (fs.existsSync(symlinkPath)) {
-                  try { fs.rmSync(symlinkPath, { recursive: true, force: true }); } catch (e) {}
-              }
+              try { fs.rmSync(symlinkPath, { recursive: true, force: true }); } catch (e) {}
               
               fs.symlinkSync(svc.hostMount, symlinkPath, 'dir');
               console.log(`Created symlink: ${symlinkPath} -> ${svc.hostMount}`);
