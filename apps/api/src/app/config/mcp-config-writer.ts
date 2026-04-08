@@ -35,7 +35,10 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
     };
   }
 
-  // Streamable-HTTP server — use mcp-remote proxy
+  // Streamable-HTTP server — use mcp-remote proxy via auto-restart wrapper.
+  // mcp-remote (v0.1.x) has no reconnection logic; if the upstream server
+  // restarts the process exits and tools become permanently unavailable.
+  // The wrapper script catches exits and relaunches mcp-remote automatically.
   const url = entry.serverUrl ?? '';
   const args = [url];
   if (entry.serverUrl && !entry.serverUrl.startsWith('https://')) {
@@ -44,7 +47,7 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   if (entry.authHeader) {
     args.push('--header', `Authorization:${entry.authHeader}`);
   }
-  return { command: 'mcp-remote', args };
+  return { command: 'mcp-remote-wrapper', args };
 }
 
 /**

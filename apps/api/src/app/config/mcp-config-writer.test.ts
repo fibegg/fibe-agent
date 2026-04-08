@@ -67,8 +67,8 @@ describe('writeMcpConfig', () => {
       expect(existsSync(configPath)).toBe(true);
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
-        command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key123'],
+        command: 'mcp-remote-wrapper',
+        args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key123'],
       });
     });
 
@@ -101,8 +101,8 @@ describe('writeMcpConfig', () => {
       );
       expect(config.mcpServers['playgrounds-dev']).toBeDefined();
       expect(config.mcpServers['Sentry']).toEqual({
-        command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://mcp.sentry.dev/mcp'],
+        command: 'mcp-remote-wrapper',
+        args: ['https://mcp.sentry.dev/mcp'],
       });
     });
 
@@ -163,8 +163,8 @@ describe('writeMcpConfig', () => {
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
       expect(config.mcpServers['local-dev']).toEqual({
-        command: 'npx',
-        args: ['-y', 'mcp-remote', 'http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer dev_key'],
+        command: 'mcp-remote-wrapper',
+        args: ['http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer dev_key'],
       });
     });
 
@@ -198,8 +198,8 @@ describe('writeMcpConfig', () => {
       expect(existsSync(configPath)).toBe(true);
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['playgrounds-dev']).toEqual({
-        command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
+        command: 'mcp-remote-wrapper',
+        args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
       });
     });
 
@@ -322,8 +322,8 @@ describe('writeMcpConfig', () => {
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
       expect(config.mcpServers['playgrounds-dev']).toEqual({
-        command: 'npx',
-        args: ['-y', 'mcp-remote', 'https://fibe.gg', '--header', 'Authorization:Bearer legacy_key'],
+        command: 'mcp-remote-wrapper',
+        args: ['https://fibe.gg', '--header', 'Authorization:Bearer legacy_key'],
       });
     });
   });
