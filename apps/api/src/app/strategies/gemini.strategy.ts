@@ -297,6 +297,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       let errorResult = '';
       let stdoutBuffer = '';
       let authUrlEmitted = false;
+      let hasEmittedOutput = false;
 
       const detectAndEmitAuthUrl = (output: string): boolean => {
         if (authUrlEmitted) return true;
@@ -317,6 +318,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           reject(new Error(AUTH_REQUIRED_MESSAGE));
           return;
         }
+        if (text.trim()) hasEmittedOutput = true;
         onChunk(text);
       });
 
@@ -352,6 +354,10 @@ export class GeminiStrategy extends AbstractCLIStrategy {
               'Model is currently overloaded (rate limited). Please try again in a few minutes or switch to a different model.'
             )
           );
+          return;
+        }
+        if ((code === 0 || code === null) && !hasEmittedOutput) {
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code === 0 || code === null) {

@@ -338,6 +338,7 @@ export class OpencodeStrategy implements AgentStrategy {
 
       let errorResult = '';
       let lineBuffer = '';
+      let hasEmittedOutput = false;
 
       /** Strip ANSI escape sequences so sidebar output is clean. */
       // eslint-disable-next-line no-control-regex
@@ -369,11 +370,13 @@ export class OpencodeStrategy implements AgentStrategy {
             switch (event.type) {
               case 'text':
                 if (event.part?.text) {
+                  if (event.part.text.trim()) hasEmittedOutput = true;
                   onChunk(event.part.text);
                 }
                 break;
               case 'tool_call':
                 if (callbacks?.onTool && event.part) {
+                  hasEmittedOutput = true;
                   callbacks.onTool({
                     kind: 'tool_call',
                     name: event.part.name ?? 'tool',
@@ -388,6 +391,7 @@ export class OpencodeStrategy implements AgentStrategy {
                 break;
               case 'thinking':
                 if (event.part?.text && callbacks?.onReasoningChunk) {
+                  hasEmittedOutput = true;
                   callbacks.onReasoningChunk(event.part.text);
                 }
                 break;
@@ -408,6 +412,7 @@ export class OpencodeStrategy implements AgentStrategy {
             }
           } catch {
             // Non-JSON line — pass through as raw text
+            if (trimmed) hasEmittedOutput = true;
             onChunk(trimmed);
           }
         }
@@ -440,6 +445,10 @@ export class OpencodeStrategy implements AgentStrategy {
         callbacks?.onReasoningEnd?.();
         if (this.streamInterrupted) {
           reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
+        if ((code === 0 || code === null) && !hasEmittedOutput) {
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code !== 0 && code !== null) {

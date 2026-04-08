@@ -106,10 +106,25 @@ export function FileExplorer({
     ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
     : selectedFileLocal;
 
+  const [playgroundUrls, setPlaygroundUrls] = useState<string[]>([]);
+
+  const fetchUrls = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const urlsRes = await apiRequest('/api/playgrounds/urls', { signal }).catch(() => null);
+      if (urlsRes?.ok) {
+        const urlData = await urlsRes.json();
+        setPlaygroundUrls(Array.isArray(urlData.urls) ? urlData.urls : []);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
   const refetch = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
       const res = await apiRequest(API_PATHS.PLAYGROUNDS, { signal });
+
       if (res.status === 401) {
         setInternalTree([]);
         return;
@@ -139,22 +154,35 @@ export function FileExplorer({
   }, [controlled, refetch]);
 
   useEffect(() => {
+    void fetchUrls();
+  }, [fetchUrls, playgroundTree]);
+
+  useEffect(() => {
     if (controlled || refreshTrigger === undefined) return;
     void refetch();
-  }, [controlled, refreshTrigger, refetch]);
+    void fetchUrls();
+  }, [controlled, refreshTrigger, refetch, fetchUrls]);
 
   useEffect(() => {
     if (controlled || internalTree.length > 0 || loading) return;
-    const id = setInterval(() => void refetch(), REFETCH_WHEN_EMPTY_MS);
+    const id = setInterval(() => {
+      void refetch();
+      void fetchUrls();
+    }, REFETCH_WHEN_EMPTY_MS);
     return () => clearInterval(id);
-  }, [controlled, internalTree.length, loading, refetch]);
+  }, [controlled, internalTree.length, loading, refetch, fetchUrls]);
 
   const refetchRef = useRef(refetch);
+  const fetchUrlsRef = useRef(fetchUrls);
   refetchRef.current = refetch;
+  fetchUrlsRef.current = fetchUrls;
   useEffect(() => {
     if (controlled) return;
     const onVisibility = () => {
-      if (document.visibilityState === 'visible') refetchRef.current();
+      if (document.visibilityState === 'visible') {
+        refetchRef.current();
+        fetchUrlsRef.current();
+      }
     };
     document.addEventListener('visibilitychange', onVisibility);
     return () => document.removeEventListener('visibilitychange', onVisibility);
@@ -342,6 +370,28 @@ export function FileExplorer({
               playgroundStats={playgroundStats}
               agentStats={agentStats}
             />
+          </div>
+        )}
+        {effectiveTab === 'playground' && playgroundUrls?.length > 0 && (
+          <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
+            {playgroundUrls.map((url) => {
+              const fullUrl = url.startsWith('http') ? url : `https://${url}`;
+              return (
+                <a
+                  key={url}
+                  href={fullUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20 shadow-sm"
+                >
+                  <div className="relative flex size-1.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
+                    <span className="relative inline-flex size-1.5 rounded-full bg-blue-500"></span>
+                  </div>
+                  {url}
+                </a>
+              );
+            })}
           </div>
         )}
         <div className="flex-1 overflow-auto pb-2" ref={parentRef}>

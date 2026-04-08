@@ -21,6 +21,12 @@ export class PlaygroundsController {
     return this.playgrounds.getStats();
   }
 
+  @Get('playgrounds/urls')
+  async getUrls() {
+    const urls = await this.playgrounds.getUrls();
+    return { urls };
+  }
+
   @Get('playgrounds/file')
   async getFileContent(@Query('path') path: string) {
     if (!path || typeof path !== 'string') {

@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
+import { PlayroomBrowserService } from './playroom-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -33,7 +34,10 @@ function pathInIgnoredDir(relPath: string): boolean {
 
 @Injectable()
 export class PlaygroundsService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly playroomBrowser: PlayroomBrowserService,
+  ) {}
 
   async getTree(): Promise<PlaygroundEntry[]> {
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
@@ -44,6 +48,25 @@ export class PlaygroundsService {
   async getStats(): Promise<{ fileCount: number; totalLines: number }> {
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
     return this.countStats(this.config.getPlaygroundsDir(), ig);
+  }
+
+  async getUrls(): Promise<string[]> {
+    try {
+      const currentLink = await this.playroomBrowser.getCurrentLink();
+      const projectName = currentLink || '';
+      
+      const scriptPath = join(process.cwd(), 'playgrounds-explorer');
+      const { stdout } = await execAsync(`node ${scriptPath} ${projectName} --urls`);
+      return stdout.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0 && !l.includes('Network: Internal only'));
+    } catch (err: unknown) {
+      console.error('ERROR IN GETURLS:', err);
+      if (err instanceof Error && err.stack) {
+        console.error(err.stack);
+      }
+      return [];
+    }
   }
 
   private async countStats(absPath: string, parentIg: GitignoreFilter): Promise<{ fileCount: number; totalLines: number }> {

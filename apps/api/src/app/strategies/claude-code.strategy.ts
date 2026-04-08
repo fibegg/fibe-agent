@@ -317,6 +317,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       let streamUsage: { inputTokens: number; outputTokens: number } | null = null;
       let capturedSessionId: string | null = null;
       let currentToolBlock: { name?: string; inputStr: string } | null = null;
+      let hasEmittedOutput = false;
 
       const applyUsage = (u: { input_tokens?: number; output_tokens?: number } | undefined) => {
         if (!u) return;
@@ -372,6 +373,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
                 callbacks?.onReasoningEnd?.();
                 inThinking = false;
               }
+              hasEmittedOutput = true;
               onChunk(ev.delta.text);
             }
             if (ev.delta.type === 'thinking_delta') {
@@ -381,6 +383,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
                   inThinking = true;
                   callbacks?.onReasoningStart?.();
                 }
+                hasEmittedOutput = true;
                 callbacks?.onReasoningChunk?.(thinkingChunk);
               }
             }
@@ -402,6 +405,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
               } catch {
                 /* ignore */
               }
+              hasEmittedOutput = true;
               callbacks?.onTool?.(toolUseToEvent(cb, input));
               currentToolBlock = null;
             }
@@ -422,6 +426,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           stdoutBuffer = lines.pop() ?? '';
           for (const line of lines) handleStreamJsonLine(line);
         } else {
+          if (str.trim()) hasEmittedOutput = true;
           onChunk(str);
         }
       });
@@ -439,6 +444,8 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         }
         if (code !== 0 && errorResult.trim()) {
           reject(new Error(errorResult || `Process exited with code ${code}`));
+        } else if (!hasEmittedOutput) {
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
         } else {
           this._hasSession = true;
           if (capturedSessionId) {

@@ -1,0 +1,187 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+function showHelp() {
+  console.log(`Usage: ./playgrounds-explorer [{PLAYGROUND_NAME}] [OPTIONS]
+
+A CLI utility to explore local Playgrounds.
+
+Options:
+  --urls        Output only the service URLs for the specified playground
+  --help, -h    Show this help message
+
+Environment Variables:
+  PLAYROOMS_ROOT  Directory containing the playgrounds (default: /opt/fibe/playgrounds)
+  MARQUEE_ROOT_DOMAIN Base domain for URLs
+
+Examples:
+  ./playgrounds-explorer                    # List all playgrounds
+  ./playgrounds-explorer {PLAYGROUND_NAME}          # Show extended info for '{PLAYGROUND_NAME}'
+  ./playgrounds-explorer {PLAYGROUND_NAME} --urls   # Output service URLs (e.g. web-123.\${MARQUEE_ROOT_DOMAIN:-phoenix.test})
+`);
+}
+
+const args = process.argv.slice(2);
+
+if (args.includes('--help') || args.includes('-h')) {
+  showHelp();
+  process.exit(0);
+}
+
+let action = 'LIST';
+let target = '';
+let showUrls = false;
+
+if (args.includes('--urls')) {
+  showUrls = true;
+}
+
+const cleanArgs = args.filter(a => a !== '--urls' && a !== '--help' && a !== '-h');
+
+if (cleanArgs.length > 0) {
+  action = 'INFO';
+  target = cleanArgs[0];
+} else if (showUrls) {
+  action = 'INFO';
+  target = '';
+}
+
+const baseDir = process.env.PLAYROOMS_ROOT || '/opt/fibe/playgrounds';
+const rootDomain = process.env.MARQUEE_ROOT_DOMAIN || 'phoenix.test';
+
+if (!fs.existsSync(baseDir)) {
+  console.error(`Error: Directory '${baseDir}' does not exist.`);
+  console.error(`You can set the PLAYROOMS_ROOT environment variable (default: /opt/fibe/playgrounds).`);
+  process.exit(1);
+}
+
+const pgDirs = fs.readdirSync(baseDir, { withFileTypes: true })
+  .filter(dirent => dirent.isDirectory())
+  .map(dirent => dirent.name);
+
+let foundCount = 0;
+
+for (const pgName of pgDirs) {
+  const ymlPath = path.join(baseDir, pgName, 'compose.yml');
+  if (!fs.existsSync(ymlPath)) continue;
+
+  const ymlContent = fs.readFileSync(ymlPath, 'utf8');
+
+  // Basic playspec
+  const playspecMatch = ymlContent.match(/fibe\.gg\/playspec:\s*['"]?([^\s'"]+)['"]?/);
+  const playspec = playspecMatch ? playspecMatch[1] : pgName;
+
+  // Mount path
+  let mountPath = 'unknown';
+  let branch = 'unknown';
+  let propNameRaw = 'unknown';
+  let propFormatted = 'unknown';
+
+  const propsMatch = ymlContent.match(/-\s*["']?(.*?\/props\/([^\/]+)\/([^\/:]+))[:"']/);
+  if (propsMatch) {
+    mountPath = propsMatch[1];
+    propNameRaw = propsMatch[2];
+    branch = propsMatch[3];
+    
+    // Parse user and id from prop
+    const propParts = propNameRaw.split('--');
+    if (propParts.length >= 3) {
+       const pUser = propParts[0];
+       const pId = propParts[propParts.length - 1];
+       propFormatted = `${pUser} (id=${pId})`;
+    } else {
+       propFormatted = propNameRaw;
+    }
+  }
+
+  if (action === 'LIST') {
+      console.log(`- ${playspec} (branch: ${branch})`);
+      continue;
+  }
+
+  if (action === 'INFO') {
+    if (pgName === target || playspec === target || playspec.startsWith(target)) {
+      foundCount++;
+      
+      const lines = ymlContent.split('\n');
+      let currentService = null;
+      let inServices = false;
+      const services = {};
+      
+      for (const line of lines) {
+        if (/^services:/.test(line)) {
+            inServices = true;
+            continue;
+        }
+        if (inServices && /^[a-zA-Z]/.test(line)) {
+            inServices = false;
+        }
+        
+        if (inServices) {
+            const svcMatch = line.match(/^  ([a-zA-Z0-9_-]+):/);
+            if (svcMatch) {
+              currentService = svcMatch[1];
+              services[currentService] = { name: currentService };
+            } else if (currentService) {
+              const imageMatch = line.match(/^\s+image:\s+['"]?([^'"]+)['"]?/);
+              if (imageMatch) services[currentService].image = imageMatch[1];
+
+              if (line.match(/traefik\.enable:\s+['"]?true['"]?/)) services[currentService].traefik = true;
+              if (line.match(/fibe\.gg\/expose:/)) services[currentService].expose = true;
+              
+              const subMatch = line.match(/fibe\.gg\/subdomain:\s+['"]?([^'"]+)['"]?/);
+              if (subMatch) services[currentService].subdomain = subMatch[1];
+
+              const cmdMatch = line.match(/fibe\.gg\/start_command:\s+(.+)$/);
+              if (cmdMatch) {
+                  let cmd = cmdMatch[1].trim();
+                  // Strip wrapping quotes if any
+                  cmd = cmd.replace(/^["']/, '').replace(/["']$/, '');
+                  services[currentService].startCmd = cmd;
+              }
+            }
+        }
+      }
+
+      if (showUrls) {
+          for (const svcName in services) {
+              const svc = services[svcName];
+              if (svc.traefik && svc.subdomain) {
+                  console.log(`${svc.subdomain}.${rootDomain}`);
+              }
+          }
+      } else {
+          console.log(`==========================================================`);
+          console.log(`Playground:  ${playspec}`);
+          console.log(`Branch:      ${branch}`);
+          console.log(`Prop:        ${propFormatted}`);
+          console.log(`Mount:       ${mountPath}`);
+          console.log(``);
+          console.log(`Services:`);
+          
+          for (const svcName in services) {
+              const svc = services[svcName];
+              console.log(`  - ${svcName}:`);
+              if (svc.image) console.log(`      Image:      ${svc.image}`);
+              if (svc.traefik && svc.subdomain) {
+                  console.log(`      URL:        https://${svc.subdomain}.${rootDomain}`);
+              } else {
+                  console.log(`      Network:    Internal only`);
+              }
+              if (svc.startCmd) {
+                  console.log(`      Command:    ${svc.startCmd}`);
+              }
+              console.log(``);
+          }
+          console.log(`==========================================================`);
+      }
+    }
+  }
+}
+
+if (action === 'INFO' && foundCount === 0) {
+    console.error(`No playground found matching '${target}'`);
+    process.exit(1);
+}
