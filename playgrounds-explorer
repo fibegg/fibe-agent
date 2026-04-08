@@ -150,6 +150,7 @@ for (const pgName of pgDirs) {
                       const parts = relative.split('/');
                       if (parts.length >= 2) {
                           services[currentService].hostMount = hostPath;
+                          services[currentService].prop = parts[0];
                           services[currentService].branch = parts[1];
                       }
                   }
@@ -183,7 +184,7 @@ for (const pgName of pgDirs) {
               if (createdMounts.has(svc.hostMount)) continue;
               createdMounts.add(svc.hostMount);
               
-              let symlinkName = svc.name;
+              let symlinkName = svc.prop || 'default';
               if (appendBranch && svc.branch) {
                   symlinkName = `${symlinkName}-${svc.branch}`;
               }
