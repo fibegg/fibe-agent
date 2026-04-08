@@ -38,6 +38,7 @@ export const WS_EVENT = {
   ACTIVITY_UPDATED: 'activity_updated',
   PLAYGROUND_CHANGED: 'playground_changed',
   QUEUE_UPDATED: 'queue_updated',
+  AGENT_MODE_UPDATED: 'agent_mode_updated',
 } as const;
 
 export const AUTH_STATUS = {
