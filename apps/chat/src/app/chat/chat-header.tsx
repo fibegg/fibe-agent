@@ -1,4 +1,5 @@
 import { Brain, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
@@ -33,6 +34,8 @@ export interface ChatHeaderProps {
   refreshingModels?: boolean;
   onToggleTerminal?: () => void;
   terminalOpen?: boolean;
+  tonyStarkMode?: boolean;
+  onToggleTonyStarkMode?: () => void;
   // Playground selector
   playgroundEntries?: BrowseEntry[];
   playgroundLoading?: boolean;
@@ -49,6 +52,33 @@ export interface ChatHeaderProps {
   onPlaygroundLinked?: () => void;
   onPlaygroundSmartMount?: () => void;
 }
+
+const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    {/* Bridge */}
+    <path d="M10 11h4" fill="none" strokeWidth="2" />
+    {/* Left lens (angular aviator style) */}
+    <path d="M10 11l-1.5 4.5H3.5L2 11h8z" />
+    {/* Right lens (angular aviator style) */}
+    <path d="M14 11l1.5 4.5h5l1.5-4.5h-8z" />
+    {/* Left arm */}
+    <path d="M2 11V9c0-1 .5-2 1.5-2h1" fill="none" strokeWidth="1.5" />
+    {/* Right arm */}
+    <path d="M22 11V9c0-1-.5-2-1.5-2h-1" fill="none" strokeWidth="1.5" />
+    {/* Gradient or glass reflection lines */}
+    <path d="M5 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
+    <path d="M16 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
+  </svg>
+);
 
 /** Shared prop-forwarding helper — avoids repeating the 13-prop spread twice. */
 function PlaygroundSelectorSlot({
@@ -146,6 +176,8 @@ export function ChatHeader({
   refreshingModels,
   onToggleTerminal,
   terminalOpen = false,
+  tonyStarkMode = false,
+  onToggleTonyStarkMode,
   ...rest
 }: ChatHeaderProps) {
   // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
@@ -175,6 +207,8 @@ export function ChatHeader({
     refreshingModels,
     onToggleTerminal,
     terminalOpen,
+    tonyStarkMode,
+    onToggleTonyStarkMode,
     ...rest,
   };
 
@@ -283,6 +317,17 @@ export function ChatHeader({
               Reconnect
             </button>
           )}
+
+          {onToggleTonyStarkMode && (
+            <Link
+              to="/stark"
+              className="p-1 md:p-1.5 rounded-full transition-all text-cyan-500/80 hover:text-cyan-300 hover:bg-cyan-500/10 group flex items-center justify-center transform hover:scale-105 active:scale-95"
+              title="Enter Tony Stark Mode"
+            >
+              <StarkGlassesIcon className="w-5 h-5 md:w-6 md:h-6 group-hover:drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] transition-all" />
+            </Link>
+          )}
+
           <ModelSelector
             currentModel={currentModel}
             options={modelOptions}

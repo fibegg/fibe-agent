@@ -8,6 +8,7 @@ const ChatPage = lazy(() => import('./pages/chat-page').then((m) => ({ default: 
 const ActivityReviewPage = lazy(() =>
   import('./pages/activity-review-page').then((m) => ({ default: m.ActivityReviewPage }))
 );
+const StarkReasoningPage = lazy(() => import('./pages/stark-reasoning-page').then((m) => ({ default: m.StarkReasoningPage })));
 
 function PageFallback() {
   return (
@@ -25,6 +26,9 @@ export function App() {
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/" element={<ChatPage />} />
+            <Route path="/stark" element={<StarkReasoningPage />} />
+            <Route path="/stark/:activityId/:storyId" element={<StarkReasoningPage />} />
+            <Route path="/stark/:activityStoryId" element={<StarkReasoningPage />} />
             <Route path="/activity/:activityId/:storyId" element={<ActivityReviewPage />} />
             <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
             <Route path="/activity" element={<ActivityReviewPage />} />

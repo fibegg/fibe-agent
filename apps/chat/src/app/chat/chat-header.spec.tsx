@@ -256,7 +256,7 @@ describe('ChatHeader', () => {
     render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
     const slots = screen.getAllByTestId('playground-selector');
     // The desktop wrapper has "hidden sm:block"; the mobile wrapper has "sm:hidden".
-    const wrappers = slots.map((s) => s.parentElement!);
+    const wrappers = slots.map((s) => s.parentElement as HTMLElement);
     const hasDesktopWrapper = wrappers.some((w) => w.className.includes('hidden') && w.className.includes('sm:block'));
     expect(hasDesktopWrapper).toBe(true);
   });
@@ -264,7 +264,7 @@ describe('ChatHeader', () => {
   it('mobile playground slot has sm:hidden class', () => {
     render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
     const slots = screen.getAllByTestId('playground-selector');
-    const wrappers = slots.map((s) => s.parentElement!);
+    const wrappers = slots.map((s) => s.parentElement as HTMLElement);
     const hasMobileWrapper = wrappers.some((w) => w.className.includes('sm:hidden'));
     expect(hasMobileWrapper).toBe(true);
   });
@@ -285,5 +285,20 @@ describe('ChatHeader', () => {
     // Both slots should show the same link value.
     const slots = screen.getAllByTestId('playground-selector');
     slots.forEach((s) => expect(s.textContent).toBe('my/project'));
+  });
+
+  // ─── Tony Stark Mode ──────────────────────────────────────────────────────
+
+  it('renders Tony Stark mode link when onToggleTonyStarkMode is provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} onToggleTonyStarkMode={vi.fn()} tonyStarkMode={false} />);
+    const link = screen.getByTitle('Enter Tony Stark Mode');
+    expect(link).toBeTruthy();
+    expect(link.tagName).toBe('A'); // Because we use react-router-dom Link, in tests it renders as an anchor
+    expect(link.getAttribute('href')).toBe('/stark');
+  });
+
+  it('does not render Tony Stark mode link when onToggleTonyStarkMode is not provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} />);
+    expect(screen.queryByTitle('Enter Tony Stark Mode')).toBeNull();
   });
 });
