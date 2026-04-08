@@ -1,3 +1,18 @@
+# syntax=docker/dockerfile:1
+# ─────────────────────────────────────────────────────────────────────────────
+# Dockerfile.dev — Development-only build for fibe-agent.
+#
+# Mirrors the main Dockerfile's runtime stage exactly (same system deps, same
+# tools, same MCP servers, same entrypoint) but SKIPS the builder stage.
+#
+# In dev mode the source tree is volume-mounted at /app and the entrypoint
+# detects this (no dist/main.js) and runs `npm install` + `nx serve`.
+# There is no need to compile dist/ during the Docker build.
+#
+# Keep this file in sync with the runtime stage of the main Dockerfile.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Stage 1: CLI — provider-specific agent CLI binary ──────────────────────
 FROM node:24-slim AS cli
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -22,45 +37,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
-FROM node:24-slim AS builder
-COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
-
-ARG BUILDKIT_INLINE_CACHE=1
-
-RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
-
-# node-pty requires native compilation; install build tools + node-gyp
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
-        python3 make g++ \
-    && rm -rf /var/lib/apt/lists/* \
-    && npm install -g node-gyp
-
-WORKDIR /app
-
-COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json tsconfig.json eslint.config.mjs vitest.workspace.ts ./
-COPY apps/api/package.json apps/api/
-COPY apps/chat/package.json apps/chat/
-COPY apps/e2e-api/package.json apps/e2e-api/
-COPY apps/e2e-chat/package.json apps/e2e-chat/
-
-RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install
-
-COPY apps/api apps/api
-COPY apps/chat apps/chat
-COPY apps/e2e-api apps/e2e-api
-COPY apps/e2e-chat apps/e2e-chat
-COPY shared shared
-
-ENV NX_DAEMON=false \
-    VITE_THEME_SOURCE=frame \
-    VITE_HIDE_THEME_SWITCH=true
-
-RUN --mount=type=cache,target=/app/.nx/cache \
-    npx nx run-many --targets=build --projects=api,chat
-
+# ── Stage 2: Runtime — identical to production, minus dist/ ────────────────
 FROM node:24-slim
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -80,6 +57,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ca-certificates \
     sqlite3 pandoc htop strace \
     imagemagick ffmpeg ghostscript \
+    chromium \
     build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/fdfind /usr/local/bin/fd
@@ -115,6 +93,9 @@ COPY --from=cli /usr/local/bin /usr/local/bin
 WORKDIR /app
 
 # ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
+# In dev mode, package.json is volume-mounted. We still install production
+# deps in the image as a warm cache layer — the entrypoint's npm install
+# will be a fast no-op when deps haven't changed.
 COPY apps/api/package.json ./package.json
 
 # node-gyp must be globally available for native addon compilation.
@@ -130,9 +111,16 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN --mount=type=cache,target=/root/.npm \
     npm rebuild node-pty --build-from-source
 
-# @playwright/mcp
+# @playwright/mcp and other common MCP servers
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g @playwright/mcp@0.0.68
+    npm install -g @playwright/mcp@0.0.68 @modelcontextprotocol/server-github
+
+# Official Gitea MCP server Binary
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then GITEA_ARCH="x86_64"; \
+    elif [ "$ARCH" = "aarch64" ]; then GITEA_ARCH="arm64"; \
+    else GITEA_ARCH="x86_64"; fi && \
+    curl -sL "https://gitea.com/gitea/gitea-mcp/releases/download/v1.1.0/gitea-mcp_Linux_${GITEA_ARCH}.tar.gz" | tar -xz -C /usr/local/bin gitea-mcp
 
 # System libraries required by Chromium.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -160,6 +148,8 @@ RUN mkdir -p /app/data /app/playground /home/node/.cache \
 
 USER node
 
+RUN git config --global --add safe.directory "*"
+
 # Download Chromium browser binary as node
 RUN npx -y playwright install chromium
 
@@ -176,10 +166,7 @@ RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# ---- FINALLY COPY DIST FILES ----
-# Doing this LAST ensures code changes don't bust the Playwright/native cache
-COPY --from=builder /app/apps/api/dist ./dist/
-COPY --from=builder /app/apps/chat/dist ./chat/
+# ── NO builder stage dist/ copy — dev mode runs from source ──
 
 # Inject git SHA at the last possible moment so it doesn't bust previous caches
 ARG GIT_SHA
