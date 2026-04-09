@@ -76,7 +76,6 @@ x-common-build: &common-build
   working_dir: /app
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
-    - docker-buildx-cache:/root/.docker/buildx-cache
   environment: *env-build
 
 services:
@@ -231,7 +230,6 @@ volumes:
   nx-cache:
   apt-cache:
   trivy-cache:
-  docker-buildx-cache:
 
 configs:
   script_setup:
@@ -281,25 +279,20 @@ configs:
       fi
 
       echo "--> Logging into ghcr.io"
-      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin
+      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin 2>/dev/null
 
-      # Setup buildx for cache support
-      docker buildx create --name ci-builder --driver docker-container --use 2>/dev/null || docker buildx use ci-builder 2>/dev/null || true
-
-      CACHE_DIR="/root/.docker/buildx-cache"
-      CACHE_KEY="$$TAG_NAME"
+      IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
 
       echo "========================================="
       echo "--> Building $$PROVIDER"
       echo "========================================="
 
-      docker buildx build . \
-        -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$LATEST_TAG \
-        -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$GIT_SHA \
+      docker build . \
+        -t $$IMAGE:$$TAG_NAME-$$LATEST_TAG \
+        -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
         --build-arg AGENT_PROVIDER=$$PROVIDER \
-        --build-arg GIT_SHA=$$GIT_SHA \
-        --cache-from type=local,src=$$CACHE_DIR/$$CACHE_KEY \
-        --cache-to type=local,dest=$$CACHE_DIR/$$CACHE_KEY,mode=max \
-        --push
+        --build-arg GIT_SHA=$$GIT_SHA
 
-      echo "--> Built and pushed $$PROVIDER"
+      echo "--> Pushing $$PROVIDER"
+      docker push $$IMAGE:$$TAG_NAME-$$LATEST_TAG
+      docker push $$IMAGE:$$TAG_NAME-$$GIT_SHA
