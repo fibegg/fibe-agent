@@ -59,9 +59,10 @@ x-common-bun: &common-bun
   image: oven/bun:1.3.11-slim
   working_dir: /app
   volumes:
-    # - ./:/app # WIP: commented out in order to run on local when needed until verified Fibe can ignore it
     - bun-cache:/root/.bun/install/cache
     - nx-cache:/app/.nx/cache
+    - apt-cache:/var/cache/apt
+    - node-modules:/app/node_modules
   environment:
     CI: "true"
 
@@ -75,8 +76,8 @@ x-common-build: &common-build
   image: docker:27.4.1-cli
   working_dir: /app
   volumes:
-    # - ./:/app # WIP: commented out in order to run on local when needed until verified Fibe can ignore it
     - /var/run/docker.sock:/var/run/docker.sock
+    - docker-buildx-cache:/root/.docker/buildx-cache
   environment: *env-build
 
 services:
@@ -125,12 +126,14 @@ services:
     depends_on:
       ci-setup:
         condition: service_completed_successfully
+    volumes:
+      - trivy-cache:/root/.cache/trivy
     labels:
       fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
       fibe.gg/branch: "${BRANCH:-main}"
       fibe.gg/source_mount: "/app"
       fibe.gg/job_watch: "true"
-    command: ["fs", "--ignore-unfixed", "--format", "table", "--severity", "CRITICAL,HIGH", "."]
+    command: ["fs", "--cache-dir", "/root/.cache/trivy", "--ignore-unfixed", "--format", "table", "--severity", "CRITICAL,HIGH", "."]
 
   ci-build-gemini:
     <<: *common-build
@@ -227,16 +230,32 @@ services:
 volumes:
   bun-cache:
   nx-cache:
+  apt-cache:
+  node-modules:
+  trivy-cache:
+  docker-buildx-cache:
 
 configs:
   script_setup:
     content: |
       set -e
-      echo "--> Installing OS dependencies"
-      apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates nodejs npm node-gyp
-      
-      echo "--> Installing project dependencies"
-      bun install --frozen-lockfile
+
+      # Skip OS deps if already installed (persistent volume)
+      if ! command -v node-gyp >/dev/null 2>&1; then
+        echo "--> Installing OS dependencies"
+        apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates nodejs npm node-gyp
+      else
+        echo "--> OS dependencies already installed (cached)"
+      fi
+
+      # Skip bun install if node_modules matches lockfile
+      if [ -f /app/node_modules/.bun-lock-hash ] && [ "$$(sha256sum /app/bun.lock | cut -d' ' -f1)" = "$$(cat /app/node_modules/.bun-lock-hash)" ]; then
+        echo "--> Dependencies unchanged (cached node_modules)"
+      else
+        echo "--> Installing project dependencies"
+        bun install --frozen-lockfile
+        sha256sum /app/bun.lock | cut -d' ' -f1 > /app/node_modules/.bun-lock-hash
+      fi
 
   script_test:
     content: |
@@ -249,7 +268,7 @@ configs:
       else
         echo "--> No Integration tests found!"
       fi
-      
+
   script_build:
     content: |
       set -e
@@ -257,30 +276,38 @@ configs:
       apk add --no-cache git
       git config --global --add safe.directory /app
       GIT_SHA=$$(git rev-parse HEAD || echo "unknown")
-      
+
       LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
       LATEST_TAG="latest"
       if [ "$$BRANCH" != "main" ] && [ "$$BRANCH" != "master" ]; then
         LATEST_TAG="latest-$$BRANCH"
       fi
-      
+
       if [ -z "$$GH_TOKEN" ] || [ "$$GH_TOKEN" = '""' ] || [ "$$GH_TOKEN" = "''" ]; then
         echo "--> Missing GH_TOKEN, skipping build/push"
         exit 0
       fi
-      
+
       echo "--> Logging into ghcr.io"
       echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin
-      
+
+      # Setup buildx for cache support
+      docker buildx create --name ci-builder --driver docker-container --use 2>/dev/null || docker buildx use ci-builder 2>/dev/null || true
+
+      CACHE_DIR="/root/.docker/buildx-cache"
+      CACHE_KEY="$$TAG_NAME"
+
       echo "========================================="
       echo "--> Building $$PROVIDER"
       echo "========================================="
-      
-      docker build . -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$LATEST_TAG \
-                     -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$GIT_SHA \
-                     --build-arg AGENT_PROVIDER=$$PROVIDER \
-                     --build-arg GIT_SHA=$$GIT_SHA
-                     
-      echo "--> Pushing $$PROVIDER"
-      docker push ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$LATEST_TAG
-      docker push ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$GIT_SHA
+
+      docker buildx build . \
+        -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$LATEST_TAG \
+        -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG_NAME-$$GIT_SHA \
+        --build-arg AGENT_PROVIDER=$$PROVIDER \
+        --build-arg GIT_SHA=$$GIT_SHA \
+        --cache-from type=local,src=$$CACHE_DIR/$$CACHE_KEY \
+        --cache-to type=local,dest=$$CACHE_DIR/$$CACHE_KEY,mode=max \
+        --push
+
+      echo "--> Built and pushed $$PROVIDER"
