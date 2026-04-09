@@ -73,7 +73,7 @@ x-env-build: &env-build
   BRANCH: "${BRANCH:-main}"
 
 x-common-build: &common-build
-  image: docker:27.4.1-cli
+  image: docker:29.3.1-cli
   working_dir: /app
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
@@ -121,7 +121,7 @@ services:
     command: ["/bin/sh", "/run.sh"]
 
   ci-scan:
-    image: aquasec/trivy:0.48.0
+    image: aquasec/trivy:0.69.3
     working_dir: /app
     depends_on:
       ci-setup:
