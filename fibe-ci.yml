@@ -22,7 +22,9 @@ x-fibe.gg:
       name: Source Repository URL
       required: true
       default: "https://github.com/fibegg/fibe-agent"
-      path: services.ci-runner.labels.fibe.gg/repo_url
+      path:
+        - services.ci-runner.labels.fibe.gg/repo_url
+        - x-fibe.gg.metadata.trigger_config.repo_url
     branch:
       name: Target Branch
       required: true
