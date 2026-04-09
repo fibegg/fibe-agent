@@ -62,7 +62,6 @@ x-common-bun: &common-bun
     - bun-cache:/root/.bun/install/cache
     - nx-cache:/app/.nx/cache
     - apt-cache:/var/cache/apt
-    - node-modules:/app/node_modules
   environment:
     CI: "true"
 
@@ -231,7 +230,6 @@ volumes:
   bun-cache:
   nx-cache:
   apt-cache:
-  node-modules:
   trivy-cache:
   docker-buildx-cache:
 
@@ -240,7 +238,7 @@ configs:
     content: |
       set -e
 
-      # Skip OS deps if already installed (persistent volume)
+      # Skip OS deps if already installed (persistent apt-cache volume)
       if ! command -v node-gyp >/dev/null 2>&1; then
         echo "--> Installing OS dependencies"
         apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates nodejs npm node-gyp
@@ -248,14 +246,8 @@ configs:
         echo "--> OS dependencies already installed (cached)"
       fi
 
-      # Skip bun install if node_modules matches lockfile
-      if [ -f /app/node_modules/.bun-lock-hash ] && [ "$$(sha256sum /app/bun.lock | cut -d' ' -f1)" = "$$(cat /app/node_modules/.bun-lock-hash)" ]; then
-        echo "--> Dependencies unchanged (cached node_modules)"
-      else
-        echo "--> Installing project dependencies"
-        bun install --frozen-lockfile
-        sha256sum /app/bun.lock | cut -d' ' -f1 > /app/node_modules/.bun-lock-hash
-      fi
+      echo "--> Installing project dependencies"
+      bun install --frozen-lockfile
 
   script_test:
     content: |
