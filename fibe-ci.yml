@@ -39,7 +39,7 @@ services:
     image: oven/bun:1.3.11-alpine
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./:/app
+      # - ./:/app
       - bun-cache:/root/.bun/install/cache
       - nx-cache:/app/.nx/cache
     labels:
