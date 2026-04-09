@@ -390,5 +390,30 @@ describe('OrchestratorService', () => {
     const orch = await createOrchestrator();
     await orch.handleClientMessage({ action: 'nonexistent_action' });
   });
+
+  test('setAgentMode emits AGENT_MODE_UPDATED event', async () => {
+    const orch = await createOrchestrator();
+    const events: { event: string; data: unknown }[] = [];
+    orch.outbound.subscribe((e) => events.push(e));
+
+    orch.setAgentMode('Exploring');
+
+    const modeEvent = events.find((e) => e.event === WS_EVENT.AGENT_MODE_UPDATED);
+    expect(modeEvent).toBeDefined();
+    expect((modeEvent!.data as { mode: string }).mode).toBe('Exploring');
+  });
+
+  test('handleClientConnected sends agent_mode_updated with current mode', async () => {
+    const orch = await createOrchestrator();
+    orch.setAgentMode('Casting');
+
+    const events: { event: string; data: unknown }[] = [];
+    orch.outbound.subscribe((e) => events.push(e));
+    await orch.handleClientConnected();
+
+    const modeEvent = events.find((e) => e.event === WS_EVENT.AGENT_MODE_UPDATED);
+    expect(modeEvent).toBeDefined();
+    expect((modeEvent!.data as { mode: string }).mode).toBe('Casting');
+  });
 });
 

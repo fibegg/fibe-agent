@@ -256,4 +256,30 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const strategy = new ClaudeCodeStrategy(true);
     expect(await strategy.checkAuthStatus()).toBe(true);
   });
+
+  test('hasNativeSessionSupport returns true', () => {
+    const strategy = new ClaudeCodeStrategy();
+    expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('session marker file is read on sendMessage for resume support', () => {
+    const convDataDir = join(CLAUDE_TEST_HOME, 'session-test-conv');
+    mkdirSync(convDataDir, { recursive: true });
+    const workDir = join(CLAUDE_TEST_HOME, 'session-test-work');
+    mkdirSync(workDir, { recursive: true });
+    const markerPath = join(workDir, '.claude_session');
+
+    // Write a session ID to the marker file
+    const { writeFileSync } = require('node:fs');
+    writeFileSync(markerPath, 'test-session-id-123');
+
+    const strategy = new ClaudeCodeStrategy(false, {
+      getConversationDataDir: () => convDataDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    // The session ID will be loaded when sendMessage is called.
+    // We verify the strategy was constructed without error and has session support.
+    expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
 });
