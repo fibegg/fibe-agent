@@ -1,10 +1,11 @@
-import { readdir, lstat, stat, symlink, unlink, readlink, mkdir, access } from 'node:fs/promises';
-import { resolve, relative, dirname } from 'node:path';
+import { access, readFile } from 'node:fs/promises';
+import { resolve, relative } from 'node:path';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 
-/** Hidden (dot-prefixed) entries that should still appear when browsing. */
-const VISIBLE_HIDDEN = new Set<string>(['.claude']);
+const execFileAsync = promisify(execFile);
 
 export interface BrowseEntry {
   name: string;
@@ -40,17 +41,14 @@ export class PlayroomBrowserService {
     if (relPath) return []; // Flattened UI workflow doesn't browse subdirectories
 
     try {
-      const { execFile } = require('child_process');
-      const util = require('util');
-      const execFileAsync = util.promisify(execFile);
-      const scriptPath = resolve(process.cwd(), 'playgrounds-explorer');
+      const scriptPath = process.env.PLAYGROUNDS_EXPLORER_PATH || resolve(process.cwd(), 'playgrounds-explorer');
       const targetBase = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
-      
+
       const { stdout } = await execFileAsync('node', [scriptPath], {
         env: { ...process.env, PLAYROOMS_ROOT: targetBase }
       });
       const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
-      
+
       const entries: BrowseEntry[] = [];
       for (const line of lines) {
          const [path, name] = line.split('|');
@@ -59,7 +57,7 @@ export class PlayroomBrowserService {
          }
       }
       return entries;
-    } catch (e) {
+    } catch {
       throw new NotFoundException(`Cannot execute Playgrounds Explorer.`);
     }
   }
@@ -85,18 +83,14 @@ export class PlayroomBrowserService {
     }
 
     try {
-      const { execFile } = require('child_process');
-      const util = require('util');
-      const execFileAsync = util.promisify(execFile);
-      
-      const scriptPath = resolve(process.cwd(), 'playgrounds-explorer');
+      const scriptPath = process.env.PLAYGROUNDS_EXPLORER_PATH || resolve(process.cwd(), 'playgrounds-explorer');
       const linkDir = resolve(this.config.getPlaygroundsDir());
       const targetBase = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
-      
+
       await execFileAsync('node', [scriptPath, relPath, '--link', '--link-dir', linkDir], {
         env: { ...process.env, PLAYROOMS_ROOT: targetBase }
       });
-      
+
     } catch (err: unknown) {
       const e = err as Error;
       throw new BadRequestException(
@@ -112,7 +106,7 @@ export class PlayroomBrowserService {
     const playgroundDir = resolve(this.config.getPlaygroundsDir());
     const stateFile = resolve(playgroundDir, '.current_playground');
     try {
-      const content = await require('fs/promises').readFile(stateFile, 'utf8');
+      const content = await readFile(stateFile, 'utf8');
       return content ? content.trim() : null;
     } catch {
       return null;

@@ -78,18 +78,20 @@ describe('OrchestratorService', () => {
     return orch;
   }
 
-  test('handleClientConnected sends auth_status, activity_snapshot, and queue_updated', async () => {
+  test('handleClientConnected sends auth_status, activity_snapshot, queue_updated, and agent_mode_updated', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
     orch.handleClientConnected();
-    expect(events.length).toBe(3);
+    expect(events.length).toBe(4);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
     expect(events[1].type).toBe(WS_EVENT.ACTIVITY_SNAPSHOT);
     expect(events[1].data.activity).toBeDefined();
     expect(events[2].type).toBe(WS_EVENT.QUEUE_UPDATED);
     expect(events[2].data.count).toBeDefined();
+    expect(events[3].type).toBe(WS_EVENT.AGENT_MODE_UPDATED);
+    expect(events[3].data.mode).toBeDefined();
   });
 
   test('handleClientMessage get_model sends model_updated', async () => {
@@ -393,12 +395,12 @@ describe('OrchestratorService', () => {
 
   test('setAgentMode emits AGENT_MODE_UPDATED event', async () => {
     const orch = await createOrchestrator();
-    const events: { event: string; data: unknown }[] = [];
-    orch.outbound.subscribe((e) => events.push(e));
+    const events: { type: string; data: unknown }[] = [];
+    orch.outbound.subscribe((e: { type: string; data: unknown }) => events.push(e));
 
     orch.setAgentMode('Exploring');
 
-    const modeEvent = events.find((e) => e.event === WS_EVENT.AGENT_MODE_UPDATED);
+    const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
     expect((modeEvent!.data as { mode: string }).mode).toBe('Exploring');
   });
@@ -407,11 +409,11 @@ describe('OrchestratorService', () => {
     const orch = await createOrchestrator();
     orch.setAgentMode('Casting');
 
-    const events: { event: string; data: unknown }[] = [];
-    orch.outbound.subscribe((e) => events.push(e));
+    const events: { type: string; data: unknown }[] = [];
+    orch.outbound.subscribe((e: { type: string; data: unknown }) => events.push(e));
     await orch.handleClientConnected();
 
-    const modeEvent = events.find((e) => e.event === WS_EVENT.AGENT_MODE_UPDATED);
+    const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
     expect((modeEvent!.data as { mode: string }).mode).toBe('Casting');
   });

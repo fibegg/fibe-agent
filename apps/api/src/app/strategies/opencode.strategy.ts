@@ -453,7 +453,7 @@ export class OpencodeStrategy implements AgentStrategy {
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
           if (this.conversationDataDir) {
-            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch {}
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
           }
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
