@@ -446,7 +446,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           reject(new Error(errorResult || `Process exited with code ${code}`));
         } else if (!hasEmittedOutput) {
           if (this.conversationDataDir) {
-            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch {}
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
           }
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
         } else {
