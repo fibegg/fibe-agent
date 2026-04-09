@@ -4,7 +4,12 @@ import { FileExplorer, type PlaygroundEntry } from './file-explorer';
 import { FileViewerPanel } from './file-viewer-panel';
 
 vi.mock('../api-url', () => ({
-  apiRequest: (path: string, options?: RequestInit) => fetch(path, options),
+  apiRequest: (path: string, options?: RequestInit) => {
+    if (path.includes('/urls')) {
+      return Promise.resolve({ ok: true, status: 200, json: async () => ({ urls: [] }) });
+    }
+    return fetch(path, options);
+  }
 }));
 
 vi.mock('@tanstack/react-virtual', () => ({

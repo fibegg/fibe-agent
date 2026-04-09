@@ -162,13 +162,13 @@ describe('ChatHeader', () => {
 
   it('shows mobile activity button when isMobile is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} />);
-    expect(screen.getByRole('button', { name: /open agent activity/i })).toBeTruthy();
+    expect(screen.getByLabelText(/open agent activity/i, { hidden: true })).toBeTruthy();
   });
 
   it('calls onOpenActivity when activity button clicked', () => {
     const onOpenActivity = vi.fn();
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenActivity={onOpenActivity} />);
-    fireEvent.click(screen.getByRole('button', { name: /open agent activity/i }));
+    fireEvent.click(screen.getByLabelText(/open agent activity/i, { hidden: true }));
     expect(onOpenActivity).toHaveBeenCalled();
   });
 

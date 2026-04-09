@@ -1,0 +1,2209 @@
+
+> nx run @fibe.gg/chat:test
+
+> vitest
+
+
+[1m[46m RUN [49m[22m [36mv4.1.0 [39m[90m/Users/vyakymenko/Documents/git/fibe/fibe-agent/apps/chat[39m
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mrenders Settings dialog when open is true
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mshows version number
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mcalls onClose when Close button clicked
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mcalls onClose when overlay is clicked
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mshows "Re-authenticate" button when state is AUTHENTICATED
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mshows "Start Auth" button when state is UNAUTHENTICATED
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/pages/activity-review-page.spec.tsx[2m > [22m[2mActivityReviewPage[2m > [22m[2mshows loading state when activities are being fetched
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mcalls onStartAuth and onClose when Start Auth clicked from UNAUTHENTICATED
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mcalls onReauthenticate and onClose when Re-authenticate clicked
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mshows Logout button when state is AUTHENTICATED
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mcalls onLogout and onClose when Logout clicked
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [31m❯[39m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-stats-bar.spec.tsx [2m([22m[2m13 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[33m 499[2mms[22m[39m
+[31m     [31m×[31m renders the activity button[39m[32m 155[2mms[22m[39m
+     [32m✓[39m shows empty state message when all stats are zero[32m 19[2mms[22m[39m
+     [32m✓[39m does not show empty message when stats are non-zero[32m 4[2mms[22m[39m
+     [32m✓[39m shows stat counts when non-zero stats provided[32m 4[2mms[22m[39m
+     [32m✓[39m shows token usage when sessionTokenUsage is provided[32m 29[2mms[22m[39m
+     [32m✓[39m does not show token usage when null[32m 2[2mms[22m[39m
+     [32m✓[39m shows Brain icon when not animating[32m 19[2mms[22m[39m
+     [32m✓[39m shows animated brain icon when downloadAnimating[32m 22[2mms[22m[39m
+[31m     [31m×[31m disables the copy button when downloadAnimating[39m[32m 22[2mms[22m[39m
+     [32m✓[39m shows Loader2 when streaming[32m 5[2mms[22m[39m
+     [32m✓[39m shows Sparkles when not streaming[32m 4[2mms[22m[39m
+[31m     [31m×[31m calls onRunCopy and shows "Copied to clipboard" after click[39m[32m 64[2mms[22m[39m
+[31m     [31m×[31m hides "Copied to clipboard" after 2500ms[39m[32m 148[2mms[22m[39m
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at navigateFetch (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+    at exports.navigate (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+    at Timeout._onTimeout (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/living/nodes/HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at processTimers (node:internal/timers:541:7) [90mundefined[39m
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mdoes not render auth buttons when state is ERROR
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mshows Logout button when state is AWAITING_RESPONSE
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/chat/chat-settings-modal.spec.tsx[2m > [22m[2mChatSettingsModal[2m > [22m[2mhandleDeleteData does nothing when user cancels confirm
+[22m[39mAn update to ChatSettingsModal inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-editor-panel.spec.tsx [2m([22m[2m22 tests[22m[2m)[22m[33m 735[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-settings-modal.spec.tsx [2m([22m[2m19 tests[22m[2m)[22m[33m 692[2mms[22m[39m
+Error: Not implemented: navigation (except hash changes)
+    at module.exports (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/browser/not-implemented.js:9:17)
+    at navigateFetch (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/living/window/navigation.js:77:3)
+    at exports.navigate (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/living/window/navigation.js:55:3)
+    at Timeout._onTimeout (/Users/vyakymenko/Documents/git/fibe/fibe-agent/node_modules/jsdom/lib/jsdom/living/nodes/HTMLHyperlinkElementUtils-impl.js:81:7)
+    at listOnTimeout (node:internal/timers:605:17)
+    at processTimers (node:internal/timers:541:7) [90mundefined[39m
+[90mstderr[2m | src/app/chat/chat-header.spec.tsx[2m > [22m[2mChatHeader[2m > [22m[2mrenders Tony Stark mode link when onToggleTonyStarkMode is provided
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-viewer-panel.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[33m 626[2mms[22m[39m
+ [31m❯[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-header.spec.tsx [2m([22m[2m36 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[33m 750[2mms[22m[39m
+     [32m✓[39m renders "AI Assistant" heading[32m 28[2mms[22m[39m
+     [32m✓[39m shows session time when sessionTimeMs > 0[32m 25[2mms[22m[39m
+     [32m✓[39m shows state label for AUTHENTICATED[32m 2[2mms[22m[39m
+     [32m✓[39m shows Reconnect button when state is AGENT_OFFLINE[32m 103[2mms[22m[39m
+     [32m✓[39m calls onReconnect when Reconnect button clicked[32m 31[2mms[22m[39m
+     [32m✓[39m shows Reconnect button when state is ERROR[32m 6[2mms[22m[39m
+     [32m✓[39m shows Start Auth button when state is UNAUTHENTICATED[32m 3[2mms[22m[39m
+     [32m✓[39m calls onStartAuth when Start Auth clicked[32m 53[2mms[22m[39m
+     [32m✓[39m renders search input[32m 7[2mms[22m[39m
+     [32m✓[39m calls onSearchChange when typing in search[32m 8[2mms[22m[39m
+     [32m✓[39m shows result count when searchQuery is set[32m 3[2mms[22m[39m
+     [32m✓[39m shows singular "message" for 1 result[32m 2[2mms[22m[39m
+     [32m✓[39m shows clear search button when searchQuery is set[32m 9[2mms[22m[39m
+     [32m✓[39m calls onSearchChange with empty string when clear button clicked[32m 21[2mms[22m[39m
+     [32m✓[39m shows Mobile menu button when isMobile is true[32m 19[2mms[22m[39m
+     [32m✓[39m calls onOpenMenu when menu button clicked[32m 5[2mms[22m[39m
+     [32m✓[39m shows mobile stats when isMobile is true[32m 3[2mms[22m[39m
+[31m     [31m×[31m shows mobile activity button when isMobile is true[39m[32m 115[2mms[22m[39m
+[31m     [31m×[31m calls onOpenActivity when activity button clicked[39m[32m 109[2mms[22m[39m
+     [32m✓[39m shows token usage when sessionTokenUsage is provided and isMobile[32m 13[2mms[22m[39m
+     [32m✓[39m shows error message for AGENT_OFFLINE state[32m 2[2mms[22m[39m
+     [32m✓[39m shows Loader2 during AWAITING_RESPONSE on mobile[32m 3[2mms[22m[39m
+     [32m✓[39m shows ModelSelector when showModelSelector is true[32m 2[2mms[22m[39m
+     [32m✓[39m does not render terminal button when onToggleTerminal is not provided[32m 2[2mms[22m[39m
+     [32m✓[39m renders terminal toggle buttons when onToggleTerminal is provided[32m 61[2mms[22m[39m
+     [32m✓[39m calls onToggleTerminal when terminal button is clicked[32m 4[2mms[22m[39m
+     [32m✓[39m shows "Close terminal" label on both buttons when terminalOpen is true[32m 16[2mms[22m[39m
+     [32m✓[39m sets aria-pressed=true on terminal buttons when terminalOpen is true[32m 56[2mms[22m[39m
+     [32m✓[39m sets aria-pressed=false on terminal buttons when terminalOpen is false[32m 14[2mms[22m[39m
+     [32m✓[39m renders playground selector when all playground props supplied[32m 2[2mms[22m[39m
+     [32m✓[39m desktop playground slot has hidden-on-mobile class[32m 1[2mms[22m[39m
+     [32m✓[39m mobile playground slot has sm:hidden class[32m 1[2mms[22m[39m
+     [32m✓[39m does not render playground selector when playground props are missing[32m 1[2mms[22m[39m
+     [32m✓[39m passes currentLink to playground selector[32m 1[2mms[22m[39m
+     [32m✓[39m renders Tony Stark mode link when onToggleTonyStarkMode is provided[32m 14[2mms[22m[39m
+     [32m✓[39m does not render Tony Stark mode link when onToggleTonyStarkMode is not provided[32m 1[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/pages/activity-review-page.spec.tsx [2m([22m[2m9 tests[22m[2m)[22m[33m 613[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/message-list.spec.tsx [2m([22m[2m39 tests[22m[2m)[22m[33m 537[2mms[22m[39m
+ [31m❯[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx [2m([22m[2m30 tests[22m[2m | [22m[31m11 failed[39m[2m)[22m[33m 883[2mms[22m[39m
+     [32m✓[39m shows empty playground message when tree is loaded with no files[32m 78[2mms[22m[39m
+     [32m✓[39m shows loading state initially[32m 23[2mms[22m[39m
+     [32m✓[39m shows empty playground message when API returns empty array[32m 25[2mms[22m[39m
+     [32m✓[39m does not render expand/collapse button when tree is empty[32m 51[2mms[22m[39m
+     [32m✓[39m shows error when fetch fails[32m 54[2mms[22m[39m
+     [32m✓[39m shows error when response is not ok[32m 41[2mms[22m[39m
+     [32m✓[39m shows tree with single top-level directory when tree has one dir[32m 75[2mms[22m[39m
+     [32m✓[39m shows file tree when refetching and tree already has files[32m 41[2mms[22m[39m
+     [32m✓[39m shows version in sidebar[32m 8[2mms[22m[39m
+     [32m✓[39m renders file and directory entries from API[32m 12[2mms[22m[39m
+     [32m✓[39m expands and collapses directory when folder is clicked[32m 52[2mms[22m[39m
+[31m     [31m×[31m opens file viewer dialog when file is clicked[39m[32m 24[2mms[22m[39m
+     [32m✓[39m calls onSettingsClick when Settings button is clicked[32m 16[2mms[22m[39m
+     [32m✓[39m does not throw when Settings is clicked without onSettingsClick[32m 20[2mms[22m[39m
+     [32m✓[39m renders Close button when onClose is provided and calls it when clicked[32m 38[2mms[22m[39m
+     [32m✓[39m does not render Close button when onClose is not provided[32m 43[2mms[22m[39m
+     [32m✓[39m renders collapsed rail when collapsed is true[32m 12[2mms[22m[39m
+     [32m✓[39m renders full explorer when collapsed is false[32m 30[2mms[22m[39m
+     [32m✓[39m shows Settings in collapsed rail and calls onSettingsClick when clicked[32m 6[2mms[22m[39m
+[31m     [31m×[31m shows file content in viewer after file is loaded[39m[32m 17[2mms[22m[39m
+[31m     [31m×[31m shows language label for known file extension in file viewer[39m[32m 30[2mms[22m[39m
+[31m     [31m×[31m shows zig language label for .zig file in file viewer[39m[32m 15[2mms[22m[39m
+[31m     [31m×[31m shows Plain text for unknown file extension in file viewer[39m[32m 24[2mms[22m[39m
+[31m     [31m×[31m shows Empty file when file content is empty[39m[32m 14[2mms[22m[39m
+[31m     [31m×[31m shows error message in file viewer when file fetch fails[39m[32m 20[2mms[22m[39m
+[31m     [31m×[31m shows File not found when file content returns 404[39m[32m 16[2mms[22m[39m
+[31m     [31m×[31m closes file viewer when Close button is clicked[39m[32m 18[2mms[22m[39m
+[31m     [31m×[31m closes file viewer when Escape is pressed[39m[32m 12[2mms[22m[39m
+[31m     [31m×[31m disables Copy and Download while file is loading[39m[32m 7[2mms[22m[39m
+     [32m✓[39m renders inline with file content and calls onClose when Close is clicked[32m 54[2mms[22m[39m
+ [31m❯[39m [30m[45m @fibe.gg/chat [49m[39m src/app/agent-thinking-sidebar.spec.tsx [2m([22m[2m39 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 938[2mms[22m[39m
+[31m     [31m×[31m renders stats line and activity (brain) button when expanded[39m[32m 182[2mms[22m[39m
+     [32m✓[39m does not show stats row when collapsed[32m 14[2mms[22m[39m
+     [32m✓[39m calls onToggle when sidebar toggle is clicked[32m 34[2mms[22m[39m
+     [32m✓[39m shows expand label when collapsed[32m 54[2mms[22m[39m
+     [32m✓[39m shows reasoning text in scrollable area[32m 26[2mms[22m[39m
+     [32m✓[39m shows streaming response when reasoningText is empty[32m 12[2mms[22m[39m
+     [32m✓[39m prefers reasoningText over streamingResponseText when both set[32m 32[2mms[22m[39m
+     [32m✓[39m renders story items when storyItems provided and streaming[32m 23[2mms[22m[39m
+     [32m✓[39m renders tool_call activity block with command text in one row[32m 73[2mms[22m[39m
+     [32m✓[39m highlights suspicious failure phrases in reasoning activity block[32m 63[2mms[22m[39m
+     [32m✓[39m strips leading "Ran " from tool_call when only message is set[32m 17[2mms[22m[39m
+     [32m✓[39m shows empty state message when no activity[32m 3[2mms[22m[39m
+     [32m✓[39m shows stat tooltips when expanded[32m 5[2mms[22m[39m
+     [32m✓[39m shows Task complete block when not streaming and story items exist[32m 6[2mms[22m[39m
+     [32m✓[39m shows task complete indicator in collapsed chain when not streaming and story items exist[32m 9[2mms[22m[39m
+     [32m✓[39m does not show Task complete block when streaming[32m 6[2mms[22m[39m
+     [32m✓[39m shows totals from sessionActivity in stats line when expanded[32m 58[2mms[22m[39m
+     [32m✓[39m does not apply animate-pulse to reasoning block when task is complete[32m 13[2mms[22m[39m
+     [32m✓[39m applies animate-pulse to reasoning block when streaming[32m 5[2mms[22m[39m
+     [32m✓[39m applies full width and solid background when mobileOverlay is true[32m 3[2mms[22m[39m
+     [32m✓[39m uses fixed width when mobileOverlay is false[32m 3[2mms[22m[39m
+     [32m✓[39m does not show AskUserQuestion entries in activity list[32m 6[2mms[22m[39m
+     [32m✓[39m hides Started and step (GENERATING RESPONSE) when not streaming[32m 33[2mms[22m[39m
+     [32m✓[39m shows stream_start and step when streaming[32m 5[2mms[22m[39m
+     [32m✓[39m groups 3+ consecutive tool_calls into one collapsible commands block[32m 27[2mms[22m[39m
+     [32m✓[39m shows 2 tool_calls as separate blocks (no group)[32m 15[2mms[22m[39m
+     [32m✓[39m expanded commands group shows list of commands[32m 50[2mms[22m[39m
+     [32m✓[39m expanded panel has scrollable activity area[32m 6[2mms[22m[39m
+     [32m✓[39m collapsed panel with activity has scrollable summary container[32m 16[2mms[22m[39m
+     [32m✓[39m calls onActivityClick with activityId and storyId when clicking a session activity entry[32m 20[2mms[22m[39m
+     [32m✓[39m calls onActivityClick with activityId and storyId when clicking stream_start entry in list[32m 15[2mms[22m[39m
+     [32m✓[39m calls onActivityClick with activityId only when clicking bottom reasoning block[32m 7[2mms[22m[39m
+     [32m✓[39m calls onActivityClick with activityId and storyId when clicking command group wrapper[32m 11[2mms[22m[39m
+       [32m✓[39m updates search query and clears it[32m 7[2mms[22m[39m
+       [32m✓[39m shows no activity matches text when search yields no results[32m 7[2mms[22m[39m
+       [32m✓[39m sets tooltip on mouse enter and clears on mouse leave[32m 22[2mms[22m[39m
+       [32m✓[39m copies payload to clipboard and runs animation when completely collapsed[32m 24[2mms[22m[39m
+       [32m✓[39m renders natively without virtualization when items are few[32m 5[2mms[22m[39m
+       [32m✓[39m uses virtualizer and renders correct window when items exceed threshold of 15[32m 16[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/activity-settings-modal.spec.tsx [2m([22m[2m12 tests[22m[2m)[22m[32m 159[2mms[22m[39m
+[90mstderr[2m | src/app/app.spec.tsx[2m > [22m[2mApp[2m > [22m[2mshould render successfully
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+[90mstderr[2m | src/app/app.spec.tsx[2m > [22m[2mApp[2m > [22m[2mshould render successfully
+[22m[39mAn update to AvatarConfigProvider inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-reasoning-panel.spec.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 157[2mms[22m[39m
+[90mstderr[2m | src/app/chat/use-chat-websocket.spec.tsx[2m > [22m[2museChatWebSocket[2m > [22m[2mreturns state, send, reconnect, interruptAgent, and other expected fields
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/playground-selector.spec.tsx [2m([22m[2m15 tests[22m[2m)[22m[33m 328[2mms[22m[39m
+[90mstderr[2m | src/app/use-activity-review-data.spec.tsx[2m > [22m[2museActivityReviewData[2m > [22m[2mstarts with loading=true
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+[90mstderr[2m | src/app/use-activity-review-data.spec.tsx[2m > [22m[2museActivityReviewData[2m > [22m[2mstarts with loading=true
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/use-activity-review-data.spec.tsx[2m > [22m[2museActivityReviewData[2m > [22m[2mstarts with loading=true
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/app.spec.tsx [2m([22m[2m2 tests[22m[2m)[22m[33m 444[2mms[22m[39m
+     [33m[2m✓[22m[39m should show login form when not authenticated [33m 424[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-websocket.spec.tsx [2m([22m[2m33 tests[22m[2m)[22m[32m 287[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/use-activity-review-data.spec.tsx [2m([22m[2m22 tests[22m[2m)[22m[32m 91[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-playground-files.spec.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 350[2mms[22m[39m
+[90mstderr[2m | src/app/pages/login-page.spec.tsx[2m > [22m[2mLoginPage[2m > [22m[2mrenders the login form
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/pages/login-page.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 95[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/model-selector.spec.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 129[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/file-mention-dropdown-component.spec.tsx [2m([22m[2m18 tests[22m[2m)[22m[32m 111[2mms[22m[39m
+[90mstderr[2m | src/app/chat/use-chat-initial-data.spec.tsx[2m > [22m[2museChatInitialData[2m > [22m[2mreturns messages and modelOptions and loadMessages
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+[90mstderr[2m | src/app/chat/use-chat-initial-data.spec.tsx[2m > [22m[2museChatInitialData[2m > [22m[2msetMessages updates messages
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-initial-data.spec.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 269[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/fibe-logo.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+[90mstderr[2m | src/app/chat/use-chat-attachments.spec.ts[2m > [22m[2museChatAttachments[2m > [22m[2mfile uploads (addFiles / uploadAttachment)[2m > [22m[2mhandleDrop respects capacity limits
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-attachments.spec.ts [2m([22m[2m31 tests[22m[2m)[22m[32m 65[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-input-area.spec.tsx [2m([22m[2m24 tests[22m[2m)[22m[33m 319[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-local-llm.spec.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 161[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-editor-cm.spec.ts [2m([22m[2m37 tests[22m[2m)[22m[32m 124[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer-tree-node.spec.tsx [2m([22m[2m21 tests[22m[2m)[22m[32m 89[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-error-banner.spec.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 150[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/terminal/terminal-panel.spec.tsx [2m([22m[2m18 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-toggle.spec.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 96[2mms[22m[39m
+[90mstderr[2m | src/app/chat/use-agent-files.spec.ts[2m > [22m[2museAgentFiles[2m > [22m[2mstarts with loading=true and empty tree
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+[90mstderr[2m | src/app/pages/chat-left-panel.spec.tsx[2m > [22m[2mChatLeftPanel[2m > [22m[2mrenders the FileExplorer
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/pages/chat-left-panel.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 82[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-agent-files.spec.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 108[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-streaming.spec.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/mention-input.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 184[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-display-state.spec.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/activity-review-panel.spec.tsx [2m([22m[2m7 tests[22m[2m)[22m[32m 219[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/activity-type-filters.spec.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 215[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/use-panel-resize.spec.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 67[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/auth-modal.spec.tsx [2m([22m[2m15 tests[22m[2m)[22m[32m 198[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-playground-selector.spec.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 173[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/count-up-number.spec.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 170[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/markdown-bare-pre.spec.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/activity-review-utils.spec.tsx [2m([22m[2m30 tests[22m[2m)[22m[32m 99[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/thinking-state.spec.tsx [2m([22m[2m9 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/panel-resize-handle.spec.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 75[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer-tabs.spec.tsx [2m([22m[2m6 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/postmessage-auth.spec.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 68[2mms[22m[39m
+[90mstderr[2m | src/app/pages/chat-page.spec.tsx[2m > [22m[2mChatPage[2m > [22m[2mrenders the chat page when authenticated
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/pages/chat-page.spec.tsx [2m([22m[2m11 tests[22m[2m)[22m[32m 152[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-auth-ui.spec.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 59[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/error-boundary.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 238[2mms[22m[39m
+[90mstderr[2m | src/app/theme-toggle.spec.tsx[2m > [22m[2mThemeToggle[2m > [22m[2mupdates dark state when matchMedia change fires and no stored theme
+[22m[39mAn update to ThemeToggle inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/theme-toggle.spec.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 221[2mms[22m[39m
+[90mstderr[2m | src/app/pages/chat-right-panel.spec.tsx[2m > [22m[2mChatRightPanel[2m > [22m[2mrenders the AgentThinkingSidebar
+[22m[39m⚠️ React Router Future Flag Warning: React Router will begin wrapping state updates in `React.startTransition` in v7. You can use the `v7_startTransition` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_starttransition.
+⚠️ React Router Future Flag Warning: Relative route resolution within Splat routes is changing in v7. You can use the `v7_relativeSplatPath` future flag to opt-in early. For more information, see https://reactrouter.com/v6/upgrading/future#v7_relativesplatpath.
+
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/pages/chat-right-panel.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-input.spec.tsx [2m([22m[2m13 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/agent-thinking-utils.test.ts [2m([22m[2m35 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/mention-input-interactions.spec.tsx [2m([22m[2m10 tests[22m[2m)[22m[32m 70[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-mobile-brain-classes.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/use-thinking-sidebar-data.spec.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 42[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-icon.spec.tsx [2m([22m[2m8 tests[22m[2m)[22m[32m 30[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-voice-recorder.spec.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 152[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/markdown-cache.spec.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 43[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/drag-drop-overlay.spec.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 40[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-activity-log.spec.ts [2m([22m[2m18 tests[22m[2m)[22m[32m 50[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/prism-loader.spec.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 132[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/use-persisted-type-filter.spec.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/terminal/use-terminal-panel.spec.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-activity-tooltip.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 206[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-scroll-to-bottom.spec.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 26[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/typing-text.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 58[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-model.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer-tree-utils.spec.ts [2m([22m[2m27 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/contenteditable-serialize.spec.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/avatar-config-context.spec.tsx [2m([22m[2m5 tests[22m[2m)[22m[32m 56[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/format-relative-time.spec.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 76[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/use-chat-layout.spec.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 93[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/layout-constants.spec.ts [2m([22m[2m30 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/api-url.spec.ts [2m([22m[2m29 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/pretext-height.spec.ts [2m([22m[2m33 tests[22m[2m)[22m[32m 7[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/postmessage-greeting.spec.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/theme.spec.ts [2m([22m[2m20 tests[22m[2m)[22m[32m 31[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/thinking-failure-patterns.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-state.spec.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/mention-utils.spec.ts [2m([22m[2m15 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-avatar.spec.ts [2m([22m[2m13 tests[22m[2m)[22m[32m 11[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/agent-thinking-utils.spec.ts [2m([22m[2m9 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/embed-config.spec.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/user-markdown-prep.spec.ts [2m([22m[2m10 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer-prism.spec.ts [2m([22m[2m40 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/thinking-copy.spec.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/file-mention-dropdown.spec.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/activity-path.spec.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 2[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/file-extension-icons.spec.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 5[2mms[22m[39m
+ [32m✓[39m [30m[45m @fibe.gg/chat [49m[39m src/app/console-banner.spec.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 3[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 18 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/agent-thinking-sidebar.spec.tsx[2m > [22mAgentThinkingSidebar[2m > [22mrenders stats line and activity (brain) button when expanded
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name "Activity"
+
+Here are the accessible roles:
+
+  button:
+
+  Name "Collapse thinking panel":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Collapse thinking panel"[39m
+    [33mclass[39m=[32m"sidebar-toggle absolute top-1/2 -translate-y-1/2 z-50
+          -left-4
+          size-8 md:size-9 lg:size-8
+          rounded-full
+          bg-card/90 backdrop-blur-md
+          hover:bg-card
+          active:scale-95
+          flex items-center justify-center
+          transition-all duration-300 ease-out
+          hover:scale-105
+          group
+          touch-manipulation
+          animate-pulse
+        "[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tooltip:
+
+  Name "Total actions":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Completed":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Processing":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  textbox:
+
+  Name "Search activity":
+  [36m<input[39m
+    [33maria-label[39m=[32m"Search activity"[39m
+    [33mclass[39m=[32m"h-8 w-full pl-8 pr-8 text-xs rounded-xl bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 transition-all duration-200"[39m
+    [33mplaceholder[39m=[32m"Search activity..."[39m
+    [33mtype[39m=[32m"text"[39m
+    [33mvalue[39m=[32m""[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"relative min-h-0 flex flex-col relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-violet-950/5 border-l border-violet-500/20 transition-all duration-300"[39m
+      [33mstyle[39m=[32m"width: 280px;"[39m
+    [36m>[39m
+      [36m<button[39m
+        [33maria-label[39m=[32m"Collapse thinking panel"[39m
+        [33mclass[39m=[32m"sidebar-toggle absolute top-1/2 -translate-y-1/2 z-50
+        -left-4
+        size-8 md:size-9 lg:size-8
+        rounded-full
+        bg-card/90 backdrop-blur-md
+        hover:bg-card
+        active:scale-95
+        flex items-center justify-center
+        transition-all duration-300 ease-out
+        hover:scale-105
+        group
+        touch-manipulation
+        animate-pulse
+      "[39m
+        [33mtype[39m=[32m"button"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"absolute inset-0 rounded-full bg-violet-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300"[39m
+        [36m/>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"relative z-10"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mclass[39m=[32m"lucide lucide-chevron-right size-4 text-muted-foreground group-hover:text-violet-500 transition-all group-hover:translate-x-0.5"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"m9 18 6-6-6-6"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33maria-hidden[39m=[32m"true"[39m
+          [33mclass[39m=[32m"hidden md:block absolute top-1/2 -translate-y-1/2 whitespace-nowrap pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 px-3 py-1.5 bg-popover border border-border text-foreground text-xs rounded-md shadow-lg z-20"[39m
+          [33mstyle[39m=[32m"right: 100%; margin-right: 0.5rem;"[39m
+        [36m>[39m
+          [0mCollapse[0m
+          [36m<div[39m
+            [33mclass[39m=[32m"absolute top-1/2 -translate-y-1/2 w-0 h-0 border-4 border-transparent"[39m
+            [33mstyle[39m=[32m"left: 100%; border-right-color: transparent;"[39m
+          [36m/>[39m
+        [36m</div>[39m
+      [36m</button>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"min-h-0 overflow-visible flex-1 flex flex-col min-w-0"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"border-b border-border/50 shrink-0 px-4 py-3"[39m
+          [33mstyle[39m=[32m"min-height: 128px;"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-center gap-2 overflow-visible"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"relative shrink-0 flex items-center justify-center"[39m
+              [33mstyle[39m=[32m"display: none;"[39m
+            [36m>[39m
+              [36m<button[39m
+                [33maria-label[39m=[32m"Activity"[39m
+                [33mclass[39m=[32m"relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"[39m
+                [33mtype[39m=[32m"button"[39m
+              [36m>[39m
+                [36m<svg[39m
+                  [33mclass[39m=[32m"lucide lucide-brain size-8 text-emerald-400 transition-colors"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mheight[39m=[32m"24"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-linecap[39m=[32m"round"[39m
+                  [33mstroke-linejoin[39m=[32m"round"[39m
+                  [33mstroke-width[39m=[32m"2"[39m
+                  [33mviewBox[39m=[32m"0 0 24 24"[39m
+                  [33mwidth[39m=[32m"24"[39m
+                  [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+                  [36m/>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+                  [36m/>[39m
+                [36m</svg>[39m
+                [36m<svg[39m
+                  [33maria-hidden[39m=[32m"true"[39m
+                  [33mclass[39m=[32m"lucide lucide-sparkles size-5 text-emerald-300 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"[39m
+                  [33mfill[39m=[32m"none"[39m
+                  [33mheight[39m=[32m"24"[39m
+                  [33mstroke[39m=[32m"currentColor"[39m
+                  [33mstroke-linecap[39m=[32m"round"[39m
+                  [33mstroke-linejoin[39m=[32m"round"[39m
+                  [33mstroke-width[39m=[32m"2"[39m
+                  [33mviewBox[39m=[32m"0 0 24 24"[39m
+                  [33mwidth[39m=[32m"24"[39m
+                  [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+                [36m>[39m
+                  [36m<path[39m
+                    [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1...
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/agent-thinking-sidebar.spec.tsx:[2m43:19[22m[39m
+    [90m 41|[39m       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} ses…
+    [90m 42|[39m     )[33m;[39m
+    [90m 43|[39m     expect(screen.getByRole('button', { name: 'Activity' })).toBeTruth…
+    [90m   |[39m                   [31m^[39m
+    [90m 44|[39m     [34mexpect[39m(screen[33m.[39m[34mgetByTitle[39m([32m'Total actions'[39m))[33m.[39m[34mtoBeTruthy[39m()[33m;[39m
+    [90m 45|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-stats-bar.spec.tsx[2m > [22mSidebarStatsBar[2m > [22mrenders the activity button
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name `/activity/i`
+
+Here are the accessible roles:
+
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tooltip:
+
+  Name "Total actions":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Completed":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Processing":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex items-center gap-2 overflow-visible"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"relative shrink-0 flex items-center justify-center"[39m
+        [33mstyle[39m=[32m"display: none;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"Activity"[39m
+          [33mclass[39m=[32m"relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mclass[39m=[32m"lucide lucide-brain size-8 text-violet-400 transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-sparkles size-5 text-violet-300 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 3v4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M22 5h-4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M4 17v2"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 18H3"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+      [36m>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Total actions"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-foreground stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m10[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mTotal actions[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Completed"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-emerald-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m8[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mCompleted[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Processing"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-cyan-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m1[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mProcessing[0m
+          [36m</span>[39m
+        [36m</span>[39m
+      [36m</p>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/sidebar-stats-bar.spec.tsx:[2m38:19[22m[39m
+    [90m 36|[39m   [34mit[39m([32m'renders the activity button'[39m[33m,[39m () [33m=>[39m {
+    [90m 37|[39m     [34mrenderBar[39m()[33m;[39m
+    [90m 38|[39m     expect(screen.getByRole('button', { name: /activity/i })).toBeTrut…
+    [90m   |[39m                   [31m^[39m
+    [90m 39|[39m   })[33m;[39m
+    [90m 40|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-stats-bar.spec.tsx[2m > [22mSidebarStatsBar[2m > [22mdisables the copy button when downloadAnimating
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name `/activity/i`
+
+Here are the accessible roles:
+
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tooltip:
+
+  Name "Total actions":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Completed":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Processing":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex items-center gap-2 overflow-visible"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"relative shrink-0 flex items-center justify-center"[39m
+        [33mstyle[39m=[32m"display: none;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"Activity"[39m
+          [33mclass[39m=[32m"relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"[39m
+          [33mdisabled[39m=[32m""[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"inline-flex items-center justify-center text-violet-400"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"lucide lucide-brain size-8 brain-download-anim"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</span>[39m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+      [36m>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Total actions"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-foreground stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m10[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mTotal actions[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Completed"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-emerald-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m8[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mCompleted[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Processing"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-cyan-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m1[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mProcessing[0m
+          [36m</span>[39m
+        [36m</span>[39m
+      [36m</p>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/sidebar-stats-bar.spec.tsx:[2m80:24[22m[39m
+    [90m 78|[39m   [34mit[39m([32m'disables the copy button when downloadAnimating'[39m[33m,[39m () [33m=>[39m {
+    [90m 79|[39m     [34mrenderBar[39m({ downloadAnimating[33m:[39m [35mtrue[39m })[33m;[39m
+    [90m 80|[39m     [35mconst[39m btn [33m=[39m screen[33m.[39m[34mgetByRole[39m([32m'button'[39m[33m,[39m { name[33m:[39m [36m/activity/i[39m })[33m;[39m
+    [90m   |[39m                        [31m^[39m
+    [90m 81|[39m     [34mexpect[39m((btn [35mas[39m [33mHTMLButtonElement[39m)[33m.[39mdisabled)[33m.[39m[34mtoBe[39m([35mtrue[39m)[33m;[39m
+    [90m 82|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-stats-bar.spec.tsx[2m > [22mSidebarStatsBar[2m > [22mcalls onRunCopy and shows "Copied to clipboard" after click
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name `/activity/i`
+
+Here are the accessible roles:
+
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tooltip:
+
+  Name "Total actions":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Completed":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Processing":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex items-center gap-2 overflow-visible"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"relative shrink-0 flex items-center justify-center"[39m
+        [33mstyle[39m=[32m"display: none;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"Activity"[39m
+          [33mclass[39m=[32m"relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mclass[39m=[32m"lucide lucide-brain size-8 text-violet-400 transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-sparkles size-5 text-violet-300 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 3v4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M22 5h-4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M4 17v2"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 18H3"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+      [36m>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Total actions"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-foreground stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m10[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mTotal actions[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Completed"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-emerald-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m8[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mCompleted[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Processing"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-cyan-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m1[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mProcessing[0m
+          [36m</span>[39m
+        [36m</span>[39m
+      [36m</p>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/sidebar-stats-bar.spec.tsx:[2m105:24[22m[39m
+    [90m103|[39m     })[33m;[39m
+    [90m104|[39m
+    [90m105|[39m     [35mconst[39m btn [33m=[39m screen[33m.[39m[34mgetByRole[39m([32m'button'[39m[33m,[39m { name[33m:[39m [36m/activity/i[39m })[33m;[39m
+    [90m   |[39m                        [31m^[39m
+    [90m106|[39m     fireEvent[33m.[39m[34mclick[39m(btn)[33m;[39m
+    [90m107|[39m     [34mexpect[39m(onRunCopy)[33m.[39m[34mtoHaveBeenCalledTimes[39m([34m1[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/sidebar-stats-bar.spec.tsx[2m > [22mSidebarStatsBar[2m > [22mhides "Copied to clipboard" after 2500ms
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name `/activity/i`
+
+Here are the accessible roles:
+
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  tooltip:
+
+  Name "Total actions":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Completed":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  Name "Processing":
+  [36m<span[39m
+    [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+    [33mrole[39m=[32m"tooltip"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<div[39m
+      [33mclass[39m=[32m"flex items-center gap-2 overflow-visible"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"relative shrink-0 flex items-center justify-center"[39m
+        [33mstyle[39m=[32m"display: none;"[39m
+      [36m>[39m
+        [36m<button[39m
+          [33maria-label[39m=[32m"Activity"[39m
+          [33mclass[39m=[32m"relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"[39m
+          [33mtype[39m=[32m"button"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mclass[39m=[32m"lucide lucide-brain size-8 text-violet-400 transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-sparkles size-5 text-violet-300 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M20 3v4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M22 5h-4"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M4 17v2"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M5 18H3"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+        [36m</button>[39m
+      [36m</div>[39m
+      [36m<p[39m
+        [33mclass[39m=[32m"px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap"[39m
+      [36m>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Total actions"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-foreground stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m10[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mTotal actions[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Completed"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-emerald-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m8[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mCompleted[0m
+          [36m</span>[39m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"text-muted-foreground/70"[39m
+        [36m>[39m
+          [0m/[0m
+        [36m</span>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"[39m
+          [33mtitle[39m=[32m"Processing"[39m
+        [36m>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"text-cyan-400 stat-tick"[39m
+          [36m>[39m
+            [36m<span>[39m
+              [0m1[0m
+            [36m</span>[39m
+          [36m</span>[39m
+          [36m<span[39m
+            [33mclass[39m=[32m"pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100"[39m
+            [33mrole[39m=[32m"tooltip"[39m
+          [36m>[39m
+            [0mProcessing[0m
+          [36m</span>[39m
+        [36m</span>[39m
+      [36m</p>[39m
+    [36m</div>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/sidebar-stats-bar.spec.tsx:[2m120:24[22m[39m
+    [90m118|[39m     })[33m;[39m
+    [90m119|[39m
+    [90m120|[39m     [35mconst[39m btn [33m=[39m screen[33m.[39m[34mgetByRole[39m([32m'button'[39m[33m,[39m { name[33m:[39m [36m/activity/i[39m })[33m;[39m
+    [90m   |[39m                        [31m^[39m
+    [90m121|[39m     fireEvent[33m.[39m[34mclick[39m(btn)[33m;[39m
+    [90m122|[39m     [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'Copied to clipboard'[39m))[33m.[39m[34mtoBeTruthy[39m()[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mopens file viewer dialog when file is clicked
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows file content in viewer after file is loaded
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows language label for known file extension in file viewer
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows zig language label for .zig file in file viewer
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows Plain text for unknown file extension in file viewer
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows Empty file when file content is empty
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows error message in file viewer when file fetch fails
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mshows File not found when file content returns 404
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mcloses file viewer when Close button is clicked
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mcloses file viewer when Escape is pressed
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/file-explorer/file-explorer.spec.tsx[2m > [22mFileExplorer[2m > [22mdisables Copy and Download while file is loading
+[31m[1mTypeError[22m: Cannot read properties of undefined (reading 'then')[39m
+[36m [2m❯[22m src/app/file-explorer/file-editor-panel.tsx:[2m128:43[22m[39m
+    [90m126|[39m     const path = `${apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE}?path=${…
+    [90m127|[39m
+    [90m128|[39m     [34mapiRequest[39m(path[33m,[39m { signal[33m:[39m ac[33m.[39msignal })
+    [90m   |[39m                                           [31m^[39m
+    [90m129|[39m       [33m.[39m[34mthen[39m([35masync[39m (res) [33m=>[39m {
+    [90m130|[39m         [35mif[39m ([33m![39mres[33m.[39mok) {
+[90m [2m❯[22m Object.react_stack_bottom_frame ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m25989:20[22m[39m
+[90m [2m❯[22m runWithFiberInDEV ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m874:13[22m[39m
+[90m [2m❯[22m commitHookEffectListMount ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m13249:29[22m[39m
+[90m [2m❯[22m commitHookPassiveMountEffects ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m13336:11[22m[39m
+[90m [2m❯[22m commitPassiveMountOnFiber ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m15484:13[22m[39m
+[90m [2m❯[22m recursivelyTraversePassiveMountEffects ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m15439:11[22m[39m
+[90m [2m❯[22m commitPassiveMountOnFiber ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m15718:11[22m[39m
+[90m [2m❯[22m recursivelyTraversePassiveMountEffects ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m15439:11[22m[39m
+[90m [2m❯[22m commitPassiveMountOnFiber ../../node_modules/react-dom/cjs/react-dom-client.development.js:[2m15718:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-header.spec.tsx[2m > [22mChatHeader[2m > [22mshows mobile activity button when isMobile is true
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name `/open agent activity/i`
+
+Here are the accessible roles:
+
+  banner:
+
+  Name "":
+  [36m<header[39m
+    [33mclass[39m=[32m"border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 px-4 py-3"[39m
+    [33mstyle[39m=[32m"min-height: 128px;"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Open menu":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Open menu"[39m
+    [33mclass[39m=[32m"flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "AI Assistant":
+  [36m<h2[39m
+    [33mclass[39m=[32m"font-semibold text-sm text-foreground truncate"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-[10px] sm:text-xs text-green-500"[39m
+  [36m/>[39m
+
+  Name "0 total / 0 completed / 0 processing":
+  [36m<p[39m
+    [33maria-label[39m=[32m"0 total / 0 completed / 0 processing"[39m
+    [33mclass[39m=[32m"text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  textbox:
+
+  Name "":
+  [36m<input[39m
+    [33mclass[39m=[32m"h-8 w-full pl-8 pr-8 text-xs rounded-xl bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 transition-all duration-200"[39m
+    [33mplaceholder[39m=[32m"Search in conversation..."[39m
+    [33mtype[39m=[32m"text"[39m
+    [33mvalue[39m=[32m""[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<header[39m
+      [33mclass[39m=[32m"border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 px-4 py-3"[39m
+      [33mstyle[39m=[32m"min-height: 128px;"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center justify-between h-[3.25rem] mb-2 overflow-hidden flex-shrink-0"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-2 min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-center gap-1.5 shrink-0 lg:hidden"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Open menu"[39m
+              [33mclass[39m=[32m"flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33mclass[39m=[32m"lucide lucide-menu size-4 sm:size-5 shrink-0"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<line[39m
+                  [33mx1[39m=[32m"4"[39m
+                  [33mx2[39m=[32m"20"[39m
+                  [33my1[39m=[32m"12"[39m
+                  [33my2[39m=[32m"12"[39m
+                [36m/>[39m
+                [36m<line[39m
+                  [33mx1[39m=[32m"4"[39m
+                  [33mx2[39m=[32m"20"[39m
+                  [33my1[39m=[32m"6"[39m
+                  [33my2[39m=[32m"6"[39m
+                [36m/>[39m
+                [36m<line[39m
+                  [33mx1[39m=[32m"4"[39m
+                  [33mx2[39m=[32m"20"[39m
+                  [33my1[39m=[32m"18"[39m
+                  [33my2[39m=[32m"18"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"min-w-0 flex-1"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex items-center gap-2 flex-wrap"[39m
+            [36m>[39m
+              [36m<h2[39m
+                [33mclass[39m=[32m"font-semibold text-sm text-foreground truncate"[39m
+              [36m>[39m
+                [0mAI Assistant[0m
+              [36m</h2>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"min-h-[14px] mt-0.5 flex items-center"[39m
+            [36m>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"text-[10px] sm:text-xs text-green-500"[39m
+              [36m>[39m
+                [0mReady[0m
+              [36m</p>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-1 sm:gap-2 min-w-0"[39m
+        [36m>[39m
+          [36m<p[39m
+            [33maria-label[39m=[32m"0 total / 0 completed / 0 processing"[39m
+            [33mclass[39m=[32m"text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-foreground mobile-stat-tick"[39m
+              [33mtitle[39m=[32m"Total actions"[39m
+            [36m>[39m
+              [0m0[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-muted-foreground/70"[39m
+            [36m>[39m
+              [0m/[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-emerald-400 mobile-stat-tick"[39m
+              [33mtitle[39m=[32m"Completed"[39m
+            [36m>[39m
+              [0m0[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-muted-foreground/70"[39m
+            [36m>[39m
+              [0m/[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-cyan-400 mobile-stat-tick"[39m
+              [33mtitle[39m=[32m"Processing"[39m
+            [36m>[39m
+              [0m0[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<button[39m
+            [33maria-label[39m=[32m"Open agent activity"[39m
+            [33mclass[39m=[32m"size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"[39m
+            [33mstyle[39m=[32m"display: none;"[39m
+            [33mtitle[39m=[32m"Agent activity"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"lucide lucide-brain size-8 text-violet-500 transition-colors"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-sparkles size-5 text-violet-400 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M20 3v4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M22 5h-4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M4 17v2"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M5 18H3"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</button>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center gap-1.5 mt-2"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"relative flex-1 h-8"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-search absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<circle[39m
+              [33mcx[39m=[32m"11"[39m
+              [33mcy[39m=[32m"11"[39m
+              [33mr[39m=[32m"8"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"m21 21-4.3-4.3"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [36m<input[39m
+            [33mclass[39m=[32m"h-8 w-full pl-8 pr-8 text-xs rounded-xl bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 transition-all duration-200"[39m
+            [33mplaceholder[39m=[32m"Search in conversation..."[39m
+            [33mtype[39m=[32m"text"[39m
+            [33mvalue[39m=[32m""[39m
+          [36m/>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</header>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/chat/chat-header.spec.tsx:[2m165:19[22m[39m
+    [90m163|[39m   [34mit[39m([32m'shows mobile activity button when isMobile is true'[39m[33m,[39m () [33m=>[39m {
+    [90m164|[39m     [34mrender[39m([33m<[39m[33mChatHeader[39m [33m{[39m[33m...[39m[33mDEFAULT_PROPS[39m[33m}[39m [33misMobile[39m[33m=[39m[33m{[39m[35mtrue[39m[33m}[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m165|[39m     expect(screen.getByRole('button', { name: /open agent activity/i }…
+    [90m   |[39m                   [31m^[39m
+    [90m166|[39m   })[33m;[39m
+    [90m167|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/18]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[45m @fibe.gg/chat [49m[39m src/app/chat/chat-header.spec.tsx[2m > [22mChatHeader[2m > [22mcalls onOpenActivity when activity button clicked
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an accessible element with the role "button" and name `/open agent activity/i`
+
+Here are the accessible roles:
+
+  banner:
+
+  Name "":
+  [36m<header[39m
+    [33mclass[39m=[32m"border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 px-4 py-3"[39m
+    [33mstyle[39m=[32m"min-height: 128px;"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  button:
+
+  Name "Open menu":
+  [36m<button[39m
+    [33maria-label[39m=[32m"Open menu"[39m
+    [33mclass[39m=[32m"flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"[39m
+    [33mtype[39m=[32m"button"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  heading:
+
+  Name "AI Assistant":
+  [36m<h2[39m
+    [33mclass[39m=[32m"font-semibold text-sm text-foreground truncate"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  paragraph:
+
+  Name "":
+  [36m<p[39m
+    [33mclass[39m=[32m"text-[10px] sm:text-xs text-green-500"[39m
+  [36m/>[39m
+
+  Name "0 total / 0 completed / 0 processing":
+  [36m<p[39m
+    [33maria-label[39m=[32m"0 total / 0 completed / 0 processing"[39m
+    [33mclass[39m=[32m"text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+  textbox:
+
+  Name "":
+  [36m<input[39m
+    [33mclass[39m=[32m"h-8 w-full pl-8 pr-8 text-xs rounded-xl bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 transition-all duration-200"[39m
+    [33mplaceholder[39m=[32m"Search in conversation..."[39m
+    [33mtype[39m=[32m"text"[39m
+    [33mvalue[39m=[32m""[39m
+  [36m/>[39m
+
+  --------------------------------------------------
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<header[39m
+      [33mclass[39m=[32m"border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 px-4 py-3"[39m
+      [33mstyle[39m=[32m"min-height: 128px;"[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center justify-between h-[3.25rem] mb-2 overflow-hidden flex-shrink-0"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-2 min-w-0 flex-1"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-center gap-1.5 shrink-0 lg:hidden"[39m
+          [36m>[39m
+            [36m<button[39m
+              [33maria-label[39m=[32m"Open menu"[39m
+              [33mclass[39m=[32m"flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"[39m
+              [33mtype[39m=[32m"button"[39m
+            [36m>[39m
+              [36m<svg[39m
+                [33mclass[39m=[32m"lucide lucide-menu size-4 sm:size-5 shrink-0"[39m
+                [33mfill[39m=[32m"none"[39m
+                [33mheight[39m=[32m"24"[39m
+                [33mstroke[39m=[32m"currentColor"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+                [33mviewBox[39m=[32m"0 0 24 24"[39m
+                [33mwidth[39m=[32m"24"[39m
+                [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+              [36m>[39m
+                [36m<line[39m
+                  [33mx1[39m=[32m"4"[39m
+                  [33mx2[39m=[32m"20"[39m
+                  [33my1[39m=[32m"12"[39m
+                  [33my2[39m=[32m"12"[39m
+                [36m/>[39m
+                [36m<line[39m
+                  [33mx1[39m=[32m"4"[39m
+                  [33mx2[39m=[32m"20"[39m
+                  [33my1[39m=[32m"6"[39m
+                  [33my2[39m=[32m"6"[39m
+                [36m/>[39m
+                [36m<line[39m
+                  [33mx1[39m=[32m"4"[39m
+                  [33mx2[39m=[32m"20"[39m
+                  [33my1[39m=[32m"18"[39m
+                  [33my2[39m=[32m"18"[39m
+                [36m/>[39m
+              [36m</svg>[39m
+            [36m</button>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"min-w-0 flex-1"[39m
+          [36m>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"flex items-center gap-2 flex-wrap"[39m
+            [36m>[39m
+              [36m<h2[39m
+                [33mclass[39m=[32m"font-semibold text-sm text-foreground truncate"[39m
+              [36m>[39m
+                [0mAI Assistant[0m
+              [36m</h2>[39m
+            [36m</div>[39m
+            [36m<div[39m
+              [33mclass[39m=[32m"min-h-[14px] mt-0.5 flex items-center"[39m
+            [36m>[39m
+              [36m<p[39m
+                [33mclass[39m=[32m"text-[10px] sm:text-xs text-green-500"[39m
+              [36m>[39m
+                [0mReady[0m
+              [36m</p>[39m
+            [36m</div>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-1 sm:gap-2 min-w-0"[39m
+        [36m>[39m
+          [36m<p[39m
+            [33maria-label[39m=[32m"0 total / 0 completed / 0 processing"[39m
+            [33mclass[39m=[32m"text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"[39m
+          [36m>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-foreground mobile-stat-tick"[39m
+              [33mtitle[39m=[32m"Total actions"[39m
+            [36m>[39m
+              [0m0[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-muted-foreground/70"[39m
+            [36m>[39m
+              [0m/[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-emerald-400 mobile-stat-tick"[39m
+              [33mtitle[39m=[32m"Completed"[39m
+            [36m>[39m
+              [0m0[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-muted-foreground/70"[39m
+            [36m>[39m
+              [0m/[0m
+            [36m</span>[39m
+            [36m<span[39m
+              [33mclass[39m=[32m"text-cyan-400 mobile-stat-tick"[39m
+              [33mtitle[39m=[32m"Processing"[39m
+            [36m>[39m
+              [0m0[0m
+            [36m</span>[39m
+          [36m</p>[39m
+          [36m<button[39m
+            [33maria-label[39m=[32m"Open agent activity"[39m
+            [33mclass[39m=[32m"size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"[39m
+            [33mstyle[39m=[32m"display: none;"[39m
+            [33mtitle[39m=[32m"Agent activity"[39m
+            [33mtype[39m=[32m"button"[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"lucide lucide-brain size-8 text-violet-500 transition-colors"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M17.599 6.5a3 3 0 0 0 .399-1.375"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6.003 5.125A3 3 0 0 0 6.401 6.5"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M3.477 10.896a4 4 0 0 1 .585-.396"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.938 10.5a4 4 0 0 1 .585.396"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M6 18a4 4 0 0 1-1.967-.516"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M19.967 17.484A4 4 0 0 1 18 18"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+            [36m<svg[39m
+              [33maria-hidden[39m=[32m"true"[39m
+              [33mclass[39m=[32m"lucide lucide-sparkles size-5 text-violet-400 absolute -top-0.5 -right-0.5 animate-pulse transition-colors"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mheight[39m=[32m"24"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+              [33mwidth[39m=[32m"24"[39m
+              [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M9.937 15.5A2 2 0 0 0 8.5 14.063l-6.135-1.582a.5.5 0 0 1 0-.962L8.5 9.936A2 2 0 0 0 9.937 8.5l1.582-6.135a.5.5 0 0 1 .963 0L14.063 8.5A2 2 0 0 0 15.5 9.937l6.135 1.581a.5.5 0 0 1 0 .964L15.5 14.063a2 2 0 0 0-1.437 1.437l-1.582 6.135a.5.5 0 0 1-.963 0z"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M20 3v4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M22 5h-4"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M4 17v2"[39m
+              [36m/>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M5 18H3"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</button>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-center gap-1.5 mt-2"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"relative flex-1 h-8"[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33maria-hidden[39m=[32m"true"[39m
+            [33mclass[39m=[32m"lucide lucide-search absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mheight[39m=[32m"24"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mstroke-linecap[39m=[32m"round"[39m
+            [33mstroke-linejoin[39m=[32m"round"[39m
+            [33mstroke-width[39m=[32m"2"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [33mwidth[39m=[32m"24"[39m
+            [33mxmlns[39m=[32m"http://www.w3.org/2000/svg"[39m
+          [36m>[39m
+            [36m<circle[39m
+              [33mcx[39m=[32m"11"[39m
+              [33mcy[39m=[32m"11"[39m
+              [33mr[39m=[32m"8"[39m
+            [36m/>[39m
+            [36m<path[39m
+              [33md[39m=[32m"m21 21-4.3-4.3"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [36m<input[39m
+            [33mclass[39m=[32m"h-8 w-full pl-8 pr-8 text-xs rounded-xl bg-input-background dark:bg-input/30 border border-border focus:border-violet-500 dark:focus:border-primary rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 transition-all duration-200"[39m
+            [33mplaceholder[39m=[32m"Search in conversation..."[39m
+            [33mtype[39m=[32m"text"[39m
+            [33mvalue[39m=[32m""[39m
+          [36m/>[39m
+        [36m</div>[39m
+      [36m</div>[39m
+    [36m</header>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError ../../node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m ../../node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/app/chat/chat-header.spec.tsx:[2m171:28[22m[39m
+    [90m169|[39m     [35mconst[39m onOpenActivity [33m=[39m vi[33m.[39m[34mfn[39m()[33m;[39m
+    [90m170|[39m     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenActivi…
+    [90m171|[39m     fireEvent.click(screen.getByRole('button', { name: /open agent act…
+    [90m   |[39m                            [31m^[39m
+    [90m172|[39m     [34mexpect[39m(onOpenActivity)[33m.[39m[34mtoHaveBeenCalled[39m()[33m;[39m
+    [90m173|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/18]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m4 failed[39m[22m[2m | [22m[1m[32m87 passed[39m[22m[90m (91)[39m
+[2m      Tests [22m [1m[31m18 failed[39m[22m[2m | [22m[1m[32m1254 passed[39m[22m[90m (1272)[39m
+[2m   Start at [22m 09:19:24
+[2m   Duration [22m 28.91s[2m (transform 7.51s, setup 2.20s, import 21.58s, tests 13.92s, environment 49.86s)[22m
+
+Warning: command "vitest" exited with non-zero status code
+
+
+ NX   Running target test for project @fibe.gg/chat failed
+
+Failed tasks:
+
+- @fibe.gg/chat:test
+
+Hint: run the command with --verbose for more details.
+
