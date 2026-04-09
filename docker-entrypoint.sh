@@ -13,7 +13,7 @@ export NX_NATIVE_FILE_WATCHER=false
 
 fix_file_limits() {
   mkdir -p /etc/security/limits.d
-  printf '*  soft  nofile  1048576\n*  hard  nofile  1048576\n' > /etc/security/limits.d/99-nofile.conf
+  # printf '*  soft  nofile  1048576\n*  hard  nofile  1048576\n' > /etc/security/limits.d/99-nofile.conf
 }
 
 setup_docker_group() {
