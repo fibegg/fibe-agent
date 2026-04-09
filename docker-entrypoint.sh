@@ -42,7 +42,7 @@ else
   echo "[entrypoint] No dist/main.js — running in dev mode (source mounted)"
 
   cd /app
-  fix_file_limits
+  fix_file_limits || true # WIP
   setup_docker_group
   install_dev_deps
   chown -R node:node /tmp/.nx-cache 2>/dev/null || true

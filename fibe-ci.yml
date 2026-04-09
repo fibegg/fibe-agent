@@ -1,0 +1,135 @@
+---
+x-fibe.gg:
+  metadata:
+    description: "CI/CD Pipeline for Fibe Agent"
+    category: "Development"
+    job_mode: true
+    trigger_config:
+      enabled: true
+      event_type: "push"
+      branch: "main"
+  variables:
+    gh_username:
+      name: GitHub Username (Repo Owner)
+      required: true
+      default: "fibegg"
+      path: services.ci-runner.environment.GH_USERNAME
+    gh_token:
+      name: GitHub Personal Access Token (for GHCR)
+      required: true
+      path: services.ci-runner.environment.GH_TOKEN
+    repo_url:
+      name: Source Repository URL
+      required: true
+      default: "https://github.com/fibegg/fibe-agent"
+      path:
+        - services.ci-runner.labels.fibe.gg/repo_url
+        - x-fibe.gg.metadata.trigger_config.repo_url
+    branch:
+      name: Target Branch
+      required: true
+      default: "main"
+      paths:
+        - services.ci-runner.labels.fibe.gg/branch
+        - x-fibe.gg.metadata.trigger_config.branch
+        - services.ci-runner.environment.BRANCH
+
+services:
+  ci-runner:
+    image: oven/bun:1.3.11-slim
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # - ./:/app
+      - bun-cache:/root/.bun/install/cache
+      - nx-cache:/app/.nx/cache
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    working_dir: /app
+    environment:
+      CI: "true"
+      GH_USERNAME: "${GH_USERNAME:-fibe-phoenix}"
+      GH_TOKEN: "${GH_TOKEN:-}"
+      BRANCH: "${BRANCH:-main}"
+    configs:
+      - source: ci_pipeline_script
+        target: /ci-pipeline.sh
+    command: ["/bin/sh", "/ci-pipeline.sh"]
+
+volumes:
+  bun-cache:
+  nx-cache:
+
+configs:
+  ci_pipeline_script:
+    content: |
+      set -e
+      echo "--> Installing OS dependencies"
+      apt-get update && apt-get install -y --no-install-recommends git curl jq python3 make g++ ca-certificates nodejs npm node-gyp
+      npm install -g node-gyp
+      export PATH="$$PATH:$$(npm bin -g)"
+      ln -sf $$(npm bin -g)/node-gyp /usr/local/bin/node-gyp || true
+      
+      echo "--> Installing Docker CLI"
+      ARCH=$$(uname -m)
+      if [ "$$ARCH" = "x86_64" ]; then DOCKER_ARCH="x86_64"; elif [ "$$ARCH" = "aarch64" ]; then DOCKER_ARCH="aarch64"; else DOCKER_ARCH="x86_64"; fi
+      curl -fsSL -o docker.tgz "https://download.docker.com/linux/static/stable/$${DOCKER_ARCH}/docker-27.4.1.tgz"
+      tar -xzf docker.tgz docker/docker
+      mv docker/docker /usr/local/bin/docker
+      chmod +x /usr/local/bin/docker
+      rm -rf docker docker.tgz
+
+      echo "--> Installing Trivy scanner"
+      curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
+      
+      echo "--> Installing project dependencies"
+      bun install --frozen-lockfile
+      
+      echo "--> Running CI checks"
+      bun run ci
+      
+      echo "--> Running Trivy scanner"
+      trivy fs --ignore-unfixed --format table --severity CRITICAL,HIGH .
+      
+      echo "--> Running Integration tests"
+      if [ -f tests/bin/gemini ]; then
+        sed -i "s/\r$$//" tests/bin/gemini
+        chmod +x tests/bin/gemini
+        bun run test:integration
+      fi
+      
+      echo "--> Preparing for Docker Build & Push"
+      git config --global --add safe.directory /app
+      GIT_SHA=$$(git rev-parse HEAD || echo "unknown")
+      
+      LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
+      LATEST_TAG="latest"
+      if [ "$$BRANCH" != "main" ] && [ "$$BRANCH" != "master" ]; then
+        LATEST_TAG="latest-$$BRANCH"
+      fi
+      
+      echo "--> Logging into ghcr.io with user: $$GH_USERNAME"
+      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin
+      
+      for PROVIDER in gemini claude_code openai_codex opencode; do
+        echo "========================================="
+        echo "--> Building $$PROVIDER"
+        echo "========================================="
+        
+        if [ "$$PROVIDER" = "claude_code" ]; then TAG="claude-code";
+        elif [ "$$PROVIDER" = "openai_codex" ]; then TAG="openai-codex";
+        else TAG="$$PROVIDER"; fi
+        
+        docker build . -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG-$$LATEST_TAG \
+                       -t ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG-$$GIT_SHA \
+                       --build-arg AGENT_PROVIDER=$$PROVIDER \
+                       --build-arg GIT_SHA=$$GIT_SHA
+                       
+        echo "--> Pushing $$PROVIDER"
+        docker push ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG-$$LATEST_TAG
+        docker push ghcr.io/$$LOWER_OWNER/fibe-agent:$$TAG-$$GIT_SHA
+      done
+      
+      echo "--> CI/CD Pipeline Completed Successfully 🎉"
