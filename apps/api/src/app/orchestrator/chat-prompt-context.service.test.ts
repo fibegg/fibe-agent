@@ -71,6 +71,39 @@ describe('ChatPromptContextService', () => {
     expect(result).toBe('see @missing');
   });
 
+  test('buildFullPrompt with @../../../etc/passwd path traversal attempt is handled safely', async () => {
+    const uploads = { getPath: () => null, extractImageInfo: async () => null };
+    let requestedPath: string | null = null;
+    const playgrounds = {
+      getFileContent: async (path: string) => { requestedPath = path; throw new Error('not found'); },
+      getFolderFileContents: async () => { throw new Error(); },
+    };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    const result = await service.buildFullPrompt('see @../../../etc/passwd', [], null, undefined);
+    expect(requestedPath).toBe('../../../etc/passwd');
+    expect(result).not.toContain('root:');
+  });
+
+  test('buildFullPrompt handles empty imageUrls gracefully', async () => {
+    const uploads = { getPath: () => null, extractImageInfo: async () => null };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    const result = await service.buildFullPrompt('hello', [], null, []);
+    expect(result).toBe('hello');
+  });
+
+  test('buildFullPrompt with multiple @paths only fetches unique paths', async () => {
+    const fetchedPaths: string[] = [];
+    const uploads = { getPath: () => null, extractImageInfo: async () => null };
+    const playgrounds = {
+      getFileContent: async (path: string) => { fetchedPaths.push(path); return 'content'; },
+      getFolderFileContents: async () => { throw new Error(); },
+    };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    await service.buildFullPrompt('see @src/a.ts and also @src/a.ts again', [], null, undefined);
+    expect(fetchedPaths.length).toBe(1);
+  });
+
   describe('buildHistoryContext', () => {
     const uploads = { getPath: () => null, extractImageInfo: async () => null };
     const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };

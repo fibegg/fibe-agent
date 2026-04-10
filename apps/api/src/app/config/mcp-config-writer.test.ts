@@ -359,4 +359,129 @@ describe('writeMcpConfig', () => {
     delete process.env.DOCKER_MCP_CONFIG_JSON;
     expect(() => writeMcpConfig()).not.toThrow();
   });
+
+  it('opencode writer mutates process.env.OPENCODE_CONFIG_CONTENT globally', () => {
+    process.env.AGENT_PROVIDER = 'opencode';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: {
+        'test-server': { serverUrl: 'https://example.com/mcp' },
+      },
+    });
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+
+    writeMcpConfig();
+
+    expect(process.env.OPENCODE_CONFIG_CONTENT).toBeDefined();
+    const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!);
+    expect(config.mcpServers['test-server']).toBeDefined();
+    expect(config.mcpServers['test-server'].url).toBe('https://example.com/mcp');
+  });
+
+  it('normalizes provider name with underscores to hyphens', () => {
+    process.env.AGENT_PROVIDER = 'claude_code';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: {
+        'test-server': { serverUrl: 'https://example.com/mcp', authHeader: 'Bearer tok' },
+      },
+    });
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+    delete process.env.SESSION_DIR;
+
+    writeMcpConfig();
+
+    const settingsPath = join(testHome, '.claude', 'settings.json');
+    expect(existsSync(settingsPath)).toBe(true);
+  });
+
+  it('merges DOCKER_MCP_CONFIG_JSON with MCP_CONFIG_JSON', () => {
+    process.env.AGENT_PROVIDER = 'gemini';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: { 'server-a': { serverUrl: 'https://a.com' } },
+    });
+    process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: { 'server-b': { serverUrl: 'https://b.com' } },
+    });
+    delete process.env.SESSION_DIR;
+
+    writeMcpConfig();
+
+    const config = JSON.parse(readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'));
+    expect(config.mcpServers['server-a']).toBeDefined();
+    expect(config.mcpServers['server-b']).toBeDefined();
+  });
+
+  it('handles malformed MCP_CONFIG_JSON gracefully', () => {
+    process.env.AGENT_PROVIDER = 'gemini';
+    process.env.MCP_CONFIG_JSON = 'not-valid-json{{{';
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+    delete process.env.SESSION_DIR;
+
+    expect(() => writeMcpConfig()).not.toThrow();
+  });
+
+  it('handles server args containing double quotes in TOML output (BUG: TOML injection)', () => {
+    process.env.AGENT_PROVIDER = 'openai-codex';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: {
+        'test-server': {
+          command: 'node',
+          args: ['script.js', 'arg with "quotes"'],
+        },
+      },
+    });
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+    delete process.env.SESSION_DIR;
+
+    writeMcpConfig();
+
+    const configPath = join(testHome, '.codex', 'config.toml');
+    expect(existsSync(configPath)).toBe(true);
+    const content = readFileSync(configPath, 'utf8');
+    expect(content).toContain('test-server');
+  });
+
+  it('TOML writer preserves existing non-MCP sections (BUG: regex eats them)', () => {
+    process.env.AGENT_PROVIDER = 'openai-codex';
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+    delete process.env.SESSION_DIR;
+
+    const codexDir = join(testHome, '.codex');
+    mkdirSync(codexDir, { recursive: true });
+    writeFileSync(join(codexDir, 'config.toml'), [
+      '[mcp_servers."old-server"]',
+      'url = "https://old.com"',
+      '',
+      '[general]',
+      'model = "gpt-4"',
+      '',
+    ].join('\n'));
+
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: {
+        'old-server': { serverUrl: 'https://new.com' },
+      },
+    });
+
+    writeMcpConfig();
+
+    const content = readFileSync(join(codexDir, 'config.toml'), 'utf8');
+    expect(content).toContain('[general]');
+    expect(content).toContain('model = "gpt-4"');
+  });
+
+  it('claude-code writer writes to both settings.json and legacy .claude.json', () => {
+    process.env.AGENT_PROVIDER = 'claude-code';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: { 'test': { serverUrl: 'https://test.com' } },
+    });
+    delete process.env.DOCKER_MCP_CONFIG_JSON;
+    delete process.env.SESSION_DIR;
+
+    writeMcpConfig();
+
+    const settingsPath = join(testHome, '.claude', 'settings.json');
+    const legacyPath = join(testHome, '.claude.json');
+    expect(existsSync(settingsPath)).toBe(true);
+    expect(existsSync(legacyPath)).toBe(true);
+  });
 });

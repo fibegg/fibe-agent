@@ -223,4 +223,97 @@ describe('PlaygroundsService', () => {
     const service = new PlaygroundsService(config as never);
     await expect(service.getFolderFileContents('file.txt')).rejects.toThrow(NotFoundException);
   });
+
+  test('getTree handles symlink to file correctly', async () => {
+    const { symlinkSync } = require('node:fs');
+    writeFileSync(join(playgroundDir, 'real.txt'), 'content');
+    symlinkSync(join(playgroundDir, 'real.txt'), join(playgroundDir, 'link.txt'));
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const tree = await service.getTree();
+
+    const names = tree.map((e: { name: string }) => e.name);
+    expect(names).toContain('real.txt');
+    expect(names).toContain('link.txt');
+  });
+
+  test('countStats follows symlinks to files', async () => {
+    const { symlinkSync } = require('node:fs');
+    writeFileSync(join(playgroundDir, 'real.txt'), 'line1\nline2\n');
+    symlinkSync(join(playgroundDir, 'real.txt'), join(playgroundDir, 'link.txt'));
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const stats = await service.getStats();
+
+    expect(stats.fileCount).toBe(2);
+  });
+
+  test('getTree does not crash on broken symlinks', async () => {
+    const { symlinkSync } = require('node:fs');
+    symlinkSync(join(playgroundDir, 'nonexistent'), join(playgroundDir, 'broken-link'));
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const tree = await service.getTree();
+
+    expect(tree).toEqual([]);
+  });
+
+  test('getTree with symlink cycle does not hang or crash (BUG: no cycle detection)', async () => {
+    const { symlinkSync } = require('node:fs');
+    mkdirSync(join(playgroundDir, 'dir-a'));
+    symlinkSync(join(playgroundDir, 'dir-a'), join(playgroundDir, 'dir-a', 'self-loop'));
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+
+    const timeout = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 3000));
+    const result = await Promise.race([
+      service.getTree().then(() => 'done' as const).catch(() => 'error' as const),
+      timeout,
+    ]);
+
+    expect(result).not.toBe('timeout');
+  });
+
+  test('getFileContent rejects paths with null bytes', async () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    await expect(service.getFileContent('file\x00.txt')).rejects.toThrow();
+  });
+
+  test('saveFileContent rejects path traversal', async () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    await expect(service.saveFileContent('../../etc/evil', 'pwned')).rejects.toThrow(NotFoundException);
+  });
+
+  test('saveFileContent creates parent directories', async () => {
+    writeFileSync(join(playgroundDir, 'placeholder'), '');
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+
+    await service.saveFileContent('new-dir/sub/file.txt', 'content');
+
+    const { readFileSync: rfs } = require('node:fs');
+    expect(rfs(join(playgroundDir, 'new-dir', 'sub', 'file.txt'), 'utf8')).toBe('content');
+  });
+
+  test('collectFileContents handles deeply nested directories without stack overflow', async () => {
+    let current = playgroundDir;
+    for (let i = 0; i < 20; i++) {
+      current = join(current, `d${i}`);
+      mkdirSync(current);
+    }
+    writeFileSync(join(current, 'deep.txt'), 'deep content');
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const files = await service.getFolderFileContents('d0');
+
+    expect(files.length).toBeGreaterThan(0);
+    expect(files[0].path).toContain('deep.txt');
+  });
 });
