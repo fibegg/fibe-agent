@@ -120,6 +120,7 @@ x-common-build: &common-build
   working_dir: /app
   volumes:
     - /var/run/docker.sock:/var/run/docker.sock
+    - buildx-state:/root/.docker/buildx
   environment: *env-build
 
 services:
@@ -274,6 +275,7 @@ volumes:
   nx-cache:
   apt-cache:
   trivy-cache:
+  buildx-state:
 
 configs:
   script_setup:
@@ -326,21 +328,33 @@ configs:
       echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin 2>/dev/null
 
       IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
+      CACHE_REF="$$IMAGE:buildcache-$$TAG_NAME"
 
       echo "========================================="
-      echo "--> Building $$PROVIDER"
+      echo "--> Building $$PROVIDER (linux/amd64 + linux/arm64)"
       echo "========================================="
 
       JOBS="$${BUILD_PARALLEL_JOBS:-4}"
       echo "--> Using $$JOBS parallel build jobs"
 
-      docker build . \
+      # Reuse persistent docker-container builder (state survives via buildx-state volume).
+      # docker-container driver is required for multi-platform builds.
+      docker buildx use fibe-builder 2>/dev/null \
+        || docker buildx create \
+             --name fibe-builder \
+             --driver docker-container \
+             --driver-opt network=host \
+             --use
+      docker buildx inspect --bootstrap
+
+      docker buildx build . \
+        --platform linux/amd64,linux/arm64 \
         -t $$IMAGE:$$TAG_NAME-$$LATEST_TAG \
         -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
         --build-arg AGENT_PROVIDER=$$PROVIDER \
         --build-arg GIT_SHA=$$GIT_SHA \
-        --build-arg PARALLEL_JOBS=$$JOBS
-
-      echo "--> Pushing $$PROVIDER"
-      docker push $$IMAGE:$$TAG_NAME-$$LATEST_TAG
-      docker push $$IMAGE:$$TAG_NAME-$$GIT_SHA
+        --build-arg PARALLEL_JOBS=$$JOBS \
+        --cache-from type=registry,ref=$$CACHE_REF \
+        --cache-from type=registry,ref=$$IMAGE:$$TAG_NAME-$$LATEST_TAG \
+        --cache-to type=registry,ref=$$CACHE_REF,mode=max \
+        --push
