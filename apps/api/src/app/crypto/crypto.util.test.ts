@@ -81,5 +81,32 @@ describe('crypto.util', () => {
       const decrypted = decryptData(encrypted, longKey);
       expect(decrypted).toBe('data');
     });
+
+    test('encrypted output does not contain the plaintext', () => {
+      const sensitive = 'my-super-secret-api-key-12345';
+      const encrypted = encryptData(sensitive, testKey);
+      expect(encrypted).not.toContain(sensitive);
+    });
+
+    test('encrypted output does not contain the key material', () => {
+      const encrypted = encryptData('hello', testKey);
+      expect(encrypted).not.toContain(testKey);
+    });
+
+    test('decryption with tampered ciphertext fails', () => {
+      const encrypted = encryptData('hello', testKey);
+      const parts = encrypted.split(':');
+      parts[3] = Buffer.from('tampered').toString('base64');
+      const tampered = parts.join(':');
+      expect(() => decryptData(tampered, testKey)).toThrow();
+    });
+
+    test('decryption with tampered auth tag fails', () => {
+      const encrypted = encryptData('hello', testKey);
+      const parts = encrypted.split(':');
+      parts[2] = Buffer.from('0'.repeat(16)).toString('base64');
+      const tampered = parts.join(':');
+      expect(() => decryptData(tampered, testKey)).toThrow();
+    });
   });
 });

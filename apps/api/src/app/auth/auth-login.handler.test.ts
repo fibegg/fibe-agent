@@ -22,4 +22,17 @@ describe('handleLogin', () => {
       UnauthorizedException
     );
   });
+
+  test('OWASP A02: token returned on login IS the plaintext password (CWE-256)', () => {
+    const result = handleLogin({ password: 'my-secret-password' }, () => 'my-secret-password');
+
+    expect(result.token).toBe('my-secret-password');
+  });
+
+  test('OWASP A02: token equals the exact AGENT_PASSWORD value', () => {
+    const agentPassword = 'super-secret-agent-pwd-123';
+    const result = handleLogin({ password: agentPassword }, () => agentPassword);
+
+    expect(result.token).toBe(agentPassword);
+  });
 });

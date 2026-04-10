@@ -49,4 +49,23 @@ describe('AgentAuthGuard', () => {
     const ctx = createMockContext({ headers: { authorization: 'Bearer wrong' } });
     expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedException);
   });
+
+  test('OWASP A07: uses non-timing-safe comparison (CWE-208)', () => {
+    const config = { getAgentPassword: () => 'a'.repeat(100) };
+    const guard = new AgentAuthGuard(config as never);
+
+    const shortMismatch = createMockContext({ headers: { authorization: 'Bearer b' + 'a'.repeat(99) } });
+    const longMismatch = createMockContext({ headers: { authorization: 'Bearer ' + 'a'.repeat(99) + 'b' } });
+
+    expect(() => guard.canActivate(shortMismatch)).toThrow(UnauthorizedException);
+    expect(() => guard.canActivate(longMismatch)).toThrow(UnauthorizedException);
+  });
+
+  test('OWASP A01: token in query string exposes credential in URL (CWE-598)', () => {
+    const config = { getAgentPassword: () => 'secret' };
+    const guard = new AgentAuthGuard(config as never);
+    const ctx = createMockContext({ query: { token: 'secret' } });
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
 });
