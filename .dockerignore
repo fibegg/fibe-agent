@@ -11,6 +11,7 @@
 !tsconfig.json
 !eslint.config.mjs
 !vitest.workspace.ts
+!playgrounds-explorer
 
 # 3. Whitelist ONLY directories explicitly manipulated by `Dockerfile`
 !apps/api/
