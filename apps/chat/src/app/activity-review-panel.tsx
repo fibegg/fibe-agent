@@ -361,7 +361,7 @@ export function ActivityStoryDetailPanel({
           .brain-download-anim { animation: brainDownloadPulse 2.2s ease-in-out forwards; }
         `}</style>
         <div className="flex items-center justify-between min-w-0 mb-2">
-          <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center">
+          <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center" style={{ display: 'none' }}>
             <button
               type="button"
               onClick={onCopyClick}

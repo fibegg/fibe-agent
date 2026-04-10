@@ -297,6 +297,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       let errorResult = '';
       let stdoutBuffer = '';
       let authUrlEmitted = false;
+      let hasEmittedOutput = false;
 
       const detectAndEmitAuthUrl = (output: string): boolean => {
         if (authUrlEmitted) return true;
@@ -317,6 +318,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           reject(new Error(AUTH_REQUIRED_MESSAGE));
           return;
         }
+        if (text.trim()) hasEmittedOutput = true;
         onChunk(text);
       });
 
@@ -354,6 +356,13 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           );
           return;
         }
+        if ((code === 0 || code === null) && !hasEmittedOutput) {
+          if (this.conversationDataDir) {
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
+          }
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+          return;
+        }
         if (code === 0 || code === null) {
           this._hasSession = true;
           if (this.conversationDataDir) {
@@ -380,5 +389,9 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         reject(err);
       });
     });
+  }
+
+  hasNativeSessionSupport(): boolean {
+    return true;
   }
 }

@@ -19,7 +19,8 @@ Your job is to read, understand, and modify code repositories that exist in the 
 ## Scope rules — CRITICAL
 
 - **Work only inside the current directory tree.** No access outside it.
-- Do not attempt path traversal (`../`, absolute paths to system locations).
+  - **Exception:** Your conversation history is at `../messages.json`. You may read this file to recall past context.
+- Do not attempt path traversal (`../`, absolute paths to system locations) except to read `../messages.json`.
 - Treat every subdirectory as a potentially independent repository.
 
 ---

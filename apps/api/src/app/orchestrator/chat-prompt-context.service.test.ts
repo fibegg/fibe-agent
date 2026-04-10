@@ -70,4 +70,56 @@ describe('ChatPromptContextService', () => {
     const result = await service.buildFullPrompt('see @missing', [], null, undefined);
     expect(result).toBe('see @missing');
   });
+
+  describe('buildHistoryContext', () => {
+    const uploads = { getPath: () => null, extractImageInfo: async () => null };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+
+    test('returns empty string for undefined messages', () => {
+      expect(service.buildHistoryContext(undefined)).toBe('');
+    });
+
+    test('returns empty string for empty array', () => {
+      expect(service.buildHistoryContext([])).toBe('');
+    });
+
+    test('formats user and assistant messages with role labels', () => {
+      const messages = [
+        { role: 'user', body: 'Hello' },
+        { role: 'assistant', body: 'Hi there!' },
+      ];
+      const result = service.buildHistoryContext(messages);
+      expect(result).toContain('User: Hello');
+      expect(result).toContain('Assistant: Hi there!');
+      expect(result).toContain('[Conversation History');
+      expect(result).toContain('2 prior messages');
+    });
+
+    test('truncates individual messages longer than 2000 chars', () => {
+      const longBody = 'a'.repeat(3000);
+      const messages = [{ role: 'user', body: longBody }];
+      const result = service.buildHistoryContext(messages);
+      expect(result).not.toContain('a'.repeat(2001));
+    });
+
+    test('limits to last 50 messages', () => {
+      const messages = Array.from({ length: 60 }, (_, i) => ({
+        role: 'user',
+        body: `Message ${i}`,
+      }));
+      const result = service.buildHistoryContext(messages);
+      expect(result).not.toContain('Message 0');
+      expect(result).toContain('Message 59');
+    });
+
+    test('stops accumulating when total chars exceed 30000', () => {
+      const messages = Array.from({ length: 30 }, (_, i) => ({
+        role: 'user',
+        body: 'x'.repeat(1500) + ` msg-${i}`,
+      }));
+      const result = service.buildHistoryContext(messages);
+      expect(result.length).toBeLessThan(35000);
+    });
+  });
 });

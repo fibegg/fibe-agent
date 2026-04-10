@@ -40,7 +40,7 @@ describe('AgentThinkingSidebar', () => {
     render(
       <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} sessionActivity={sessionActivity} />
     );
-    expect(screen.getByRole('button', { name: 'Activity' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Activity', hidden: true })).toBeTruthy();
     expect(screen.getByTitle('Total actions')).toBeTruthy();
   });
 
@@ -48,7 +48,7 @@ describe('AgentThinkingSidebar', () => {
     render(
       <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />
     );
-    expect(screen.queryByRole('button', { name: 'Activity' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Activity', hidden: true })).toBeNull();
   });
 
   it('calls onToggle when sidebar toggle is clicked', () => {

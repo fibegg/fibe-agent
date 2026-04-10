@@ -4,6 +4,7 @@ import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
+import { PlayroomBrowserService } from './playroom-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -33,7 +34,10 @@ function pathInIgnoredDir(relPath: string): boolean {
 
 @Injectable()
 export class PlaygroundsService {
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    private readonly playroomBrowser: PlayroomBrowserService,
+  ) {}
 
   async getTree(): Promise<PlaygroundEntry[]> {
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
@@ -44,6 +48,28 @@ export class PlaygroundsService {
   async getStats(): Promise<{ fileCount: number; totalLines: number }> {
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
     return this.countStats(this.config.getPlaygroundsDir(), ig);
+  }
+
+  async getUrls(): Promise<string[]> {
+    try {
+      const currentLink = await this.playroomBrowser.getCurrentLink();
+      const projectName = currentLink || '';
+      
+      const scriptPath = join(process.cwd(), 'playgrounds-explorer');
+      const targetBase = join(this.config.getPlayroomsRoot(), 'playgrounds');
+      const { stdout } = await execAsync(`node ${scriptPath} ${projectName} --urls`, {
+        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
+      });
+      return stdout.split('\n')
+        .map(l => l.trim())
+        .filter(l => l.length > 0 && !l.includes('Network: Internal only'));
+    } catch (err: unknown) {
+      console.error('ERROR IN GETURLS:', err);
+      if (err instanceof Error && err.stack) {
+        console.error(err.stack);
+      }
+      return [];
+    }
   }
 
   private async countStats(absPath: string, parentIg: GitignoreFilter): Promise<{ fileCount: number; totalLines: number }> {
@@ -57,13 +83,26 @@ export class PlaygroundsService {
         if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
         if (ig.ignores(name)) continue;
         const childAbs = join(absPath, name);
-        if (e.isFile()) {
+        let isDir = e.isDirectory();
+        let isFile = e.isFile();
+
+        if (e.isSymbolicLink()) {
+          try {
+            const st = await stat(childAbs);
+            isDir = st.isDirectory();
+            isFile = st.isFile();
+          } catch {
+            continue;
+          }
+        }
+
+        if (isFile) {
           fileCount++;
           try {
             const content = await readFile(childAbs, 'utf-8');
             totalLines += content.split('\n').length;
           } catch { /* skip binary/unreadable */ }
-        } else if (e.isDirectory()) {
+        } else if (isDir) {
           const sub = await this.countStats(childAbs, ig);
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
@@ -181,7 +220,7 @@ export class PlaygroundsService {
   ): Promise<{ path: string; content: string }[]> {
     if (IGNORED_NAMES.has(basename(absPath))) return [];
     const result: { path: string; content: string }[] = [];
-    let entries: { name: string | Buffer; isFile: () => boolean; isDirectory: () => boolean }[];
+    let entries;
     try {
       entries = await readdir(absPath, { withFileTypes: true });
     } catch {
@@ -192,14 +231,27 @@ export class PlaygroundsService {
       if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
       const childRel = relPath ? `${relPath}/${name}` : name;
       const childAbs = join(absPath, name);
-      if (e.isFile()) {
+      let isDir = e.isDirectory();
+      let isFile = e.isFile();
+
+      if (e.isSymbolicLink?.()) {
+        try {
+          const st = await stat(childAbs);
+          isDir = st.isDirectory();
+          isFile = st.isFile();
+        } catch {
+          continue;
+        }
+      }
+
+      if (isFile) {
         try {
           const content = await readFile(childAbs, 'utf-8');
           result.push({ path: childRel, content });
         } catch {
           /* skip unreadable files */
         }
-      } else if (e.isDirectory()) {
+      } else if (isDir) {
         const sub = await this.collectFileContents(childAbs, childRel);
         result.push(...sub);
       }
@@ -220,9 +272,22 @@ export class PlaygroundsService {
         if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
         const rel = relativePath ? `${relativePath}/${name}` : name;
         if (ig.ignores(name)) continue;
-        if (e.isDirectory()) {
+        let isDir = e.isDirectory();
+        let isFile = e.isFile();
+
+        if (e.isSymbolicLink()) {
+          try {
+            const st = await stat(join(absPath, name));
+            isDir = st.isDirectory();
+            isFile = st.isFile();
+          } catch {
+            continue;
+          }
+        }
+
+        if (isDir) {
           dirs.push({ name, abs: join(absPath, name), rel });
-        } else if (e.isFile()) {
+        } else if (isFile) {
           files.push({ name, rel });
         }
       }

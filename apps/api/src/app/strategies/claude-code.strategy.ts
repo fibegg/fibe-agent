@@ -85,6 +85,7 @@ export function toolUseToEvent(
 
 export class ClaudeCodeStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
+  private _sessionId: string | null = null;
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     super(ClaudeCodeStrategy.name, useApiTokenMode, conversationDataDir);
@@ -264,12 +265,21 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         mkdirSync(workspaceDir, { recursive: true });
       }
       if (this.conversationDataDir) {
-        this._hasSession = existsSync(join(workspaceDir, SESSION_MARKER_FILE));
+        const markerPath = join(workspaceDir, SESSION_MARKER_FILE);
+        if (existsSync(markerPath)) {
+          const stored = readFileSync(markerPath, 'utf8').trim();
+          this._sessionId = stored || null;
+          this._hasSession = true;
+        }
       }
 
       const useStreamJson = !!callbacks;
       const args = [
-        ...(this._hasSession ? ['--continue'] : []),
+        ...(this._sessionId
+          ? ['--resume', this._sessionId]
+          : this._hasSession
+            ? ['--continue']
+            : []),
         '-p',
         prompt,
         '--dangerously-skip-permissions',
@@ -305,6 +315,9 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       let stdoutBuffer = '';
       let inThinking = false;
       let streamUsage: { inputTokens: number; outputTokens: number } | null = null;
+      let capturedSessionId: string | null = null;
+      let currentToolBlock: { name?: string; inputStr: string } | null = null;
+      let hasEmittedOutput = false;
 
       const applyUsage = (u: { input_tokens?: number; output_tokens?: number } | undefined) => {
         if (!u) return;
@@ -319,15 +332,19 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         try {
           const obj = JSON.parse(line) as {
             type?: string;
+            session_id?: string;
             event?: {
               type?: string;
               index?: number;
-              delta?: { type?: string; text?: string; thinking?: string };
+              delta?: { type?: string; text?: string; thinking?: string; partial_json?: string };
               content_block?: { type?: string; name?: string; input?: unknown };
               message?: { usage?: { input_tokens?: number; output_tokens?: number } };
               usage?: { input_tokens?: number; output_tokens?: number };
             };
           };
+          if (!capturedSessionId && obj.session_id) {
+            capturedSessionId = obj.session_id;
+          }
           if (obj.type === 'message_start') {
             const msg = (obj as { message?: { usage?: { input_tokens?: number; output_tokens?: number } } }).message;
             if (msg?.usage) applyUsage(msg.usage);
@@ -356,6 +373,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
                 callbacks?.onReasoningEnd?.();
                 inThinking = false;
               }
+              hasEmittedOutput = true;
               onChunk(ev.delta.text);
             }
             if (ev.delta.type === 'thinking_delta') {
@@ -365,18 +383,35 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
                   inThinking = true;
                   callbacks?.onReasoningStart?.();
                 }
+                hasEmittedOutput = true;
                 callbacks?.onReasoningChunk?.(thinkingChunk);
               }
             }
+            if (ev.delta.type === 'input_json_delta' && currentToolBlock) {
+              currentToolBlock.inputStr += ev.delta.partial_json || '';
+            }
           }
-          if (ev.type === 'content_block_stop' && inThinking) {
-            callbacks?.onReasoningEnd?.();
-            inThinking = false;
+          if (ev.type === 'content_block_stop') {
+            if (inThinking) {
+              callbacks?.onReasoningEnd?.();
+              inThinking = false;
+            } else if (currentToolBlock) {
+              const cb = { name: currentToolBlock.name };
+              let input: Record<string, unknown> | undefined;
+              try {
+                if (currentToolBlock.inputStr.trim()) {
+                  input = JSON.parse(currentToolBlock.inputStr) as Record<string, unknown>;
+                }
+              } catch {
+                /* ignore */
+              }
+              hasEmittedOutput = true;
+              callbacks?.onTool?.(toolUseToEvent(cb, input));
+              currentToolBlock = null;
+            }
           }
           if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
-            const cb = ev.content_block;
-            const input = cb.input && typeof cb.input === 'object' ? (cb.input as Record<string, unknown>) : undefined;
-            callbacks?.onTool?.(toolUseToEvent(cb, input));
+            currentToolBlock = { name: ev.content_block.name, inputStr: '' };
           }
         } catch {
           /* ignore malformed lines */
@@ -391,6 +426,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           stdoutBuffer = lines.pop() ?? '';
           for (const line of lines) handleStreamJsonLine(line);
         } else {
+          if (str.trim()) hasEmittedOutput = true;
           onChunk(str);
         }
       });
@@ -408,11 +444,19 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         }
         if (code !== 0 && errorResult.trim()) {
           reject(new Error(errorResult || `Process exited with code ${code}`));
+        } else if (!hasEmittedOutput) {
+          if (this.conversationDataDir) {
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
+          }
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
         } else {
           this._hasSession = true;
+          if (capturedSessionId) {
+            this._sessionId = capturedSessionId;
+          }
           if (this.conversationDataDir) {
             try {
-              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), '');
+              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), this._sessionId ?? '');
             } catch {
               /* ignore */
             }
@@ -437,5 +481,9 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
     } catch {
       return [];
     }
+  }
+
+  hasNativeSessionSupport(): boolean {
+    return true;
   }
 }

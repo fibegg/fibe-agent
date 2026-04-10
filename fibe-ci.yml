@@ -1,0 +1,346 @@
+---
+x-fibe.gg:
+  metadata:
+    description: "CI/CD Pipeline for Fibe Agent"
+    category: "Development"
+    job_mode: true
+    trigger_config:
+      enabled: true
+      event_type: "push"
+      branch: "main"
+  variables:
+    gh_username:
+      name: GitHub Username (Repo Owner)
+      required: true
+      default: "fibegg"
+      paths:
+        - services.ci-build-gemini.environment.GH_USERNAME
+        - services.ci-build-claude.environment.GH_USERNAME
+        - services.ci-build-codex.environment.GH_USERNAME
+        - services.ci-build-opencode.environment.GH_USERNAME
+    gh_token:
+      name: GitHub Personal Access Token (for GHCR)
+      required: true
+      paths:
+        - services.ci-build-gemini.environment.GH_TOKEN
+        - services.ci-build-claude.environment.GH_TOKEN
+        - services.ci-build-codex.environment.GH_TOKEN
+        - services.ci-build-opencode.environment.GH_TOKEN
+    repo_url:
+      name: Source Repository URL
+      required: true
+      default: "https://github.com/fibegg/fibe-agent"
+      paths:
+        - services.ci-setup.labels.fibe.gg/repo_url
+        - services.ci-lint.labels.fibe.gg/repo_url
+        - services.ci-test.labels.fibe.gg/repo_url
+        - services.ci-scan.labels.fibe.gg/repo_url
+        - services.ci-build-gemini.labels.fibe.gg/repo_url
+        - services.ci-build-claude.labels.fibe.gg/repo_url
+        - services.ci-build-codex.labels.fibe.gg/repo_url
+        - services.ci-build-opencode.labels.fibe.gg/repo_url
+        - x-fibe.gg.metadata.trigger_config.repo_url
+    branch:
+      name: Target Branch
+      required: true
+      default: "main"
+      paths:
+        - services.ci-setup.labels.fibe.gg/branch
+        - services.ci-lint.labels.fibe.gg/branch
+        - services.ci-test.labels.fibe.gg/branch
+        - services.ci-scan.labels.fibe.gg/branch
+        - services.ci-build-gemini.labels.fibe.gg/branch
+        - services.ci-build-claude.labels.fibe.gg/branch
+        - services.ci-build-codex.labels.fibe.gg/branch
+        - services.ci-build-opencode.labels.fibe.gg/branch
+        - services.ci-build-gemini.environment.BRANCH
+        - services.ci-build-claude.environment.BRANCH
+        - services.ci-build-codex.environment.BRANCH
+        - services.ci-build-opencode.environment.BRANCH
+        - x-fibe.gg.metadata.trigger_config.branch
+    build_cpus:
+      name: Build CPU Cores
+      required: false
+      default: "2"
+      paths:
+        - services.ci-build-gemini.cpus
+        - services.ci-build-claude.cpus
+        - services.ci-build-codex.cpus
+        - services.ci-build-opencode.cpus
+        - services.ci-build-gemini.labels.fibe.gg/build_cpus
+        - services.ci-build-claude.labels.fibe.gg/build_cpus
+        - services.ci-build-codex.labels.fibe.gg/build_cpus
+        - services.ci-build-opencode.labels.fibe.gg/build_cpus
+    build_memory:
+      name: Build Memory Limit
+      required: false
+      default: "4g"
+      paths:
+        - services.ci-build-gemini.mem_limit
+        - services.ci-build-claude.mem_limit
+        - services.ci-build-codex.mem_limit
+        - services.ci-build-opencode.mem_limit
+        - services.ci-build-gemini.labels.fibe.gg/build_memory
+        - services.ci-build-claude.labels.fibe.gg/build_memory
+        - services.ci-build-codex.labels.fibe.gg/build_memory
+        - services.ci-build-opencode.labels.fibe.gg/build_memory
+    build_parallel_jobs:
+      name: Build Parallel Jobs (threads)
+      required: false
+      default: "4"
+      paths:
+        - services.ci-build-gemini.environment.BUILD_PARALLEL_JOBS
+        - services.ci-build-claude.environment.BUILD_PARALLEL_JOBS
+        - services.ci-build-codex.environment.BUILD_PARALLEL_JOBS
+        - services.ci-build-opencode.environment.BUILD_PARALLEL_JOBS
+        - services.ci-build-gemini.labels.fibe.gg/build_parallel_jobs
+        - services.ci-build-claude.labels.fibe.gg/build_parallel_jobs
+        - services.ci-build-codex.labels.fibe.gg/build_parallel_jobs
+        - services.ci-build-opencode.labels.fibe.gg/build_parallel_jobs
+
+x-common-bun: &common-bun
+  image: oven/bun:1.3.11-slim
+  working_dir: /app
+  volumes:
+    - bun-cache:/root/.bun/install/cache
+    - nx-cache:/app/.nx/cache
+    - apt-cache:/var/cache/apt
+  environment:
+    CI: "true"
+
+x-env-build: &env-build
+  CI: "true"
+  GH_USERNAME: "${GH_USERNAME:-fibe-phoenix}"
+  GH_TOKEN: "${GH_TOKEN:-}"
+  BRANCH: "${BRANCH:-main}"
+  BUILD_PARALLEL_JOBS: "${BUILD_PARALLEL_JOBS:-4}"
+
+x-common-build: &common-build
+  image: docker:29.3.1-cli
+  working_dir: /app
+  volumes:
+    - /var/run/docker.sock:/var/run/docker.sock
+  environment: *env-build
+
+services:
+  ci-setup:
+    <<: *common-bun
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    configs:
+      - source: script_setup
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+  ci-lint:
+    <<: *common-bun
+    depends_on:
+      ci-setup:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    command: ["bun", "run", "ci:notest"]
+
+  ci-test:
+    <<: *common-bun
+    depends_on:
+      ci-setup:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    configs:
+      - source: script_test
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+  ci-scan:
+    image: aquasec/trivy:0.69.3
+    working_dir: /app
+    depends_on:
+      ci-setup:
+        condition: service_completed_successfully
+    volumes:
+      - trivy-cache:/root/.cache/trivy
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    command: ["fs", "--cache-dir", "/root/.cache/trivy", "--ignore-unfixed", "--format", "table", "--severity", "CRITICAL,HIGH", "."]
+
+  ci-build-gemini:
+    <<: *common-build
+    depends_on:
+      ci-lint:
+        condition: service_completed_successfully
+      ci-test:
+        condition: service_completed_successfully
+      ci-scan:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    environment:
+      <<: *env-build
+      PROVIDER: gemini
+      TAG_NAME: gemini
+    configs:
+      - source: script_build
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+  ci-build-claude:
+    <<: *common-build
+    depends_on:
+      ci-lint:
+        condition: service_completed_successfully
+      ci-test:
+        condition: service_completed_successfully
+      ci-scan:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    environment:
+      <<: *env-build
+      PROVIDER: claude_code
+      TAG_NAME: claude-code
+    configs:
+      - source: script_build
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+  ci-build-codex:
+    <<: *common-build
+    depends_on:
+      ci-lint:
+        condition: service_completed_successfully
+      ci-test:
+        condition: service_completed_successfully
+      ci-scan:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    environment:
+      <<: *env-build
+      PROVIDER: openai_codex
+      TAG_NAME: openai-codex
+    configs:
+      - source: script_build
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+  ci-build-opencode:
+    <<: *common-build
+    depends_on:
+      ci-lint:
+        condition: service_completed_successfully
+      ci-test:
+        condition: service_completed_successfully
+      ci-scan:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/repo_url: "https://github.com/fibegg/fibe-agent"
+      fibe.gg/branch: "${BRANCH:-main}"
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    environment:
+      <<: *env-build
+      PROVIDER: opencode
+      TAG_NAME: opencode
+    configs:
+      - source: script_build
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+volumes:
+  bun-cache:
+  nx-cache:
+  apt-cache:
+  trivy-cache:
+
+configs:
+  script_setup:
+    content: |
+      set -e
+
+      # Skip OS deps if already installed (persistent apt-cache volume)
+      if ! command -v node-gyp >/dev/null 2>&1; then
+        echo "--> Installing OS dependencies"
+        apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates nodejs npm node-gyp
+      else
+        echo "--> OS dependencies already installed (cached)"
+      fi
+
+      echo "--> Installing project dependencies"
+      bun install --frozen-lockfile
+
+  script_test:
+    content: |
+      set -e
+      echo "--> Running Integration tests"
+      if [ -f tests/bin/gemini ]; then
+        sed -i "s/\r$$//" tests/bin/gemini
+        chmod +x tests/bin/gemini
+        bun run test:integration
+      else
+        echo "--> No Integration tests found!"
+      fi
+
+  script_build:
+    content: |
+      set -e
+      echo "--> Preparing for Docker Build & Push"
+      apk add --no-cache git
+      git config --global --add safe.directory /app
+      GIT_SHA=$$(git rev-parse HEAD || echo "unknown")
+
+      LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
+      LATEST_TAG="latest"
+      if [ "$$BRANCH" != "main" ] && [ "$$BRANCH" != "master" ]; then
+        LATEST_TAG="latest-$$BRANCH"
+      fi
+
+      if [ -z "$$GH_TOKEN" ] || [ "$$GH_TOKEN" = '""' ] || [ "$$GH_TOKEN" = "''" ]; then
+        echo "--> Missing GH_TOKEN, skipping build/push"
+        exit 0
+      fi
+
+      echo "--> Logging into ghcr.io"
+      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin 2>/dev/null
+
+      IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
+
+      echo "========================================="
+      echo "--> Building $$PROVIDER"
+      echo "========================================="
+
+      JOBS="$${BUILD_PARALLEL_JOBS:-4}"
+      echo "--> Using $$JOBS parallel build jobs"
+
+      docker build . \
+        -t $$IMAGE:$$TAG_NAME-$$LATEST_TAG \
+        -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
+        --build-arg AGENT_PROVIDER=$$PROVIDER \
+        --build-arg GIT_SHA=$$GIT_SHA \
+        --build-arg PARALLEL_JOBS=$$JOBS
+
+      echo "--> Pushing $$PROVIDER"
+      docker push $$IMAGE:$$TAG_NAME-$$LATEST_TAG
+      docker push $$IMAGE:$$TAG_NAME-$$GIT_SHA

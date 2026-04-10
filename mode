@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+MODE="$1"
+
+if [ -z "$MODE" ]; then
+  echo "Usage: ./mode <exploring|casting|overseeing|greenfielding|brownfielding>"
+  exit 1
+fi
+
+case "$MODE" in
+  exploring) MODE_STR="Exploring..." ;;
+  casting) MODE_STR="Casting..." ;;
+  overseeing) MODE_STR="Overseeing..." ;;
+  greenfielding) MODE_STR="Greenfielding..." ;;
+  brownfielding) MODE_STR="Brownfielding..." ;;
+  *) MODE_STR="$MODE" ;; # Custom fallback
+esac
+
+curl -s -X POST -H "Content-Type: application/json" -d "{\"mode\":\"$MODE_STR\"}" http://localhost:3000/api/agent-mode > /dev/null
+echo "Mode updated to $MODE_STR"

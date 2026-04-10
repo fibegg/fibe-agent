@@ -76,6 +76,7 @@ export interface ServerMessage {
   imageUrls?: string[];
   id?: string;
   title?: string;
+  mode?: string;
   details?: string;
   timestamp?: string;
   name?: string;

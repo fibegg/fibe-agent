@@ -18,6 +18,7 @@
 !apps/e2e-api/
 !apps/e2e-chat/
 !shared/
+!scripts/
 
 # 4. Re-Blacklist recursive compiler & test caches explicitly nested inside the allowed dirs above
 node_modules

@@ -1,8 +1,10 @@
 import { Brain, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
+import { TypewriterText } from './typewriter-text';
 import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
 import { HEADER_FIRST_ROW, HEADER_PADDING, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
@@ -10,6 +12,7 @@ import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 export interface ChatHeaderProps {
   isMobile: boolean;
   state: string;
+  agentMode?: string;
   errorMessage: string | null;
   sessionTimeMs: number;
   mobileSessionStats: { totalActions: number; completed: number; processing: number };
@@ -33,6 +36,8 @@ export interface ChatHeaderProps {
   refreshingModels?: boolean;
   onToggleTerminal?: () => void;
   terminalOpen?: boolean;
+  tonyStarkMode?: boolean;
+  onToggleTonyStarkMode?: () => void;
   // Playground selector
   playgroundEntries?: BrowseEntry[];
   playgroundLoading?: boolean;
@@ -50,6 +55,33 @@ export interface ChatHeaderProps {
   onPlaygroundSmartMount?: () => void;
 }
 
+const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="currentColor"
+    stroke="currentColor"
+    strokeWidth="1.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    {/* Bridge */}
+    <path d="M10 11h4" fill="none" strokeWidth="2" />
+    {/* Left lens (angular aviator style) */}
+    <path d="M10 11l-1.5 4.5H3.5L2 11h8z" />
+    {/* Right lens (angular aviator style) */}
+    <path d="M14 11l1.5 4.5h5l1.5-4.5h-8z" />
+    {/* Left arm */}
+    <path d="M2 11V9c0-1 .5-2 1.5-2h1" fill="none" strokeWidth="1.5" />
+    {/* Right arm */}
+    <path d="M22 11V9c0-1-.5-2-1.5-2h-1" fill="none" strokeWidth="1.5" />
+    {/* Gradient or glass reflection lines */}
+    <path d="M5 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
+    <path d="M16 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
+  </svg>
+);
+
 /** Shared prop-forwarding helper — avoids repeating the 13-prop spread twice. */
 function PlaygroundSelectorSlot({
   props,
@@ -58,15 +90,7 @@ function PlaygroundSelectorSlot({
   props: ChatHeaderProps;
   className?: string;
 }) {
-  const {
-    onPlaygroundOpen,
-    onPlaygroundBrowse,
-    onPlaygroundGoBack,
-    onPlaygroundGoToRoot,
-    onPlaygroundLink,
-  } = props;
-
-  if (!onPlaygroundOpen || !onPlaygroundBrowse || !onPlaygroundGoBack || !onPlaygroundGoToRoot || !onPlaygroundLink) {
+  if (!props.onPlaygroundOpen || !props.onPlaygroundLink) {
     return null;
   }
 
@@ -78,15 +102,10 @@ function PlaygroundSelectorSlot({
         error={props.playgroundError ?? null}
         currentLink={props.playgroundCurrentLink ?? null}
         linking={props.playgroundLinking ?? false}
-        canGoBack={props.playgroundCanGoBack ?? false}
-        breadcrumbs={props.playgroundBreadcrumbs ?? []}
-        onOpen={onPlaygroundOpen}
-        onBrowse={onPlaygroundBrowse}
-        onGoBack={onPlaygroundGoBack}
-        onGoToRoot={onPlaygroundGoToRoot}
-        onLink={onPlaygroundLink}
+        onOpen={props.onPlaygroundOpen}
+        onLink={props.onPlaygroundLink}
         onLinked={props.onPlaygroundLinked}
-        onSmartMount={props.onPlaygroundSmartMount}
+        visible={true}
       />
     </div>
   );
@@ -123,6 +142,7 @@ function TerminalButton({
 export function ChatHeader({
   isMobile,
   state,
+  agentMode,
   errorMessage,
   sessionTimeMs,
   mobileSessionStats,
@@ -146,12 +166,15 @@ export function ChatHeader({
   refreshingModels,
   onToggleTerminal,
   terminalOpen = false,
+  tonyStarkMode = false,
+  onToggleTonyStarkMode,
   ...rest
 }: ChatHeaderProps) {
   // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
   const playgroundProps: ChatHeaderProps = {
     isMobile,
     state,
+    agentMode,
     errorMessage,
     sessionTimeMs,
     mobileSessionStats,
@@ -175,6 +198,8 @@ export function ChatHeader({
     refreshingModels,
     onToggleTerminal,
     terminalOpen,
+    tonyStarkMode,
+    onToggleTonyStarkMode,
     ...rest,
   };
 
@@ -222,7 +247,9 @@ export function ChatHeader({
             </div>
             <div className="min-h-[14px] mt-0.5 flex items-center">
               <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
-                {state === CHAT_STATES.AGENT_OFFLINE && errorMessage
+                {state === CHAT_STATES.AWAITING_RESPONSE && agentMode
+                  ? <TypewriterText text={agentMode} speed={40} />
+                  : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
                   ? truncateError(errorMessage)
                   : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state}
               </p>
@@ -261,6 +288,7 @@ export function ChatHeader({
           {isMobile && (
             <button
               type="button"
+              style={{ display: 'none' }}
               onClick={onOpenActivity}
               className="size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"
               title="Agent activity"
@@ -283,6 +311,17 @@ export function ChatHeader({
               Reconnect
             </button>
           )}
+
+          {onToggleTonyStarkMode && (
+            <Link
+              to="/stark"
+              className="p-1 md:p-1.5 rounded-full transition-all text-cyan-500/80 hover:text-cyan-300 hover:bg-cyan-500/10 group flex items-center justify-center transform hover:scale-105 active:scale-95"
+              title="Enter Tony Stark Mode"
+            >
+              <StarkGlassesIcon className="w-5 h-5 md:w-6 md:h-6 group-hover:drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] transition-all" />
+            </Link>
+          )}
+
           <ModelSelector
             currentModel={currentModel}
             options={modelOptions}

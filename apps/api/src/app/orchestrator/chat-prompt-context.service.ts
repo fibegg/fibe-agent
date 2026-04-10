@@ -2,6 +2,16 @@ import { Injectable, Logger } from '@nestjs/common';
 import { UploadsService } from '../uploads/uploads.service';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 
+/** Max number of prior messages to inject into the prompt for history context. */
+const MAX_HISTORY_MESSAGES = 50;
+/** Max total characters for history block to avoid blowing up the context window. */
+const MAX_HISTORY_CHARS = 30_000;
+
+export interface HistoryMessage {
+  role: string;
+  body: string;
+}
+
 @Injectable()
 export class ChatPromptContextService {
   private readonly logger = new Logger(ChatPromptContextService.name);
@@ -16,12 +26,31 @@ export class ChatPromptContextService {
     imageUrls: string[],
     audioFilename: string | null,
     attachmentFilenames: string[] | undefined,
+    historyMessages?: HistoryMessage[],
   ): Promise<string> {
+    const historyContext = this.buildHistoryContext(historyMessages);
     const imageContext = await this.buildImageContext(imageUrls);
     const voiceContext = this.buildVoiceContext(audioFilename);
     const attachmentContext = this.buildAttachmentContext(attachmentFilenames ?? []);
     const fileContext = await this.buildFileContext(text);
-    return `${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
+    return `${historyContext}${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
+  }
+
+  buildHistoryContext(messages?: HistoryMessage[]): string {
+    if (!messages?.length) return '';
+    const recent = messages.slice(-MAX_HISTORY_MESSAGES);
+    const lines: string[] = [];
+    let totalChars = 0;
+    for (const msg of recent) {
+      const role = msg.role === 'user' ? 'User' : 'Assistant';
+      const body = msg.body.length > 2000 ? msg.body.slice(0, 2000) + '…' : msg.body;
+      const line = `${role}: ${body}`;
+      if (totalChars + line.length > MAX_HISTORY_CHARS) break;
+      lines.push(line);
+      totalChars += line.length;
+    }
+    if (!lines.length) return '';
+    return `\n\n[Conversation History — ${lines.length} prior messages]\n${lines.join('\n')}\n[End of Conversation History]\n\n`;
   }
 
   private async buildImageContext(imageUrls: string[]): Promise<string> {

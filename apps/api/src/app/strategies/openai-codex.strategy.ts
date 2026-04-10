@@ -75,6 +75,7 @@ interface CodexJsonEvent {
 export interface CodexExecJsonState {
   errorResult: string;
   inReasoning: boolean;
+  hasEmittedOutput: boolean;
 }
 
 export interface CodexExecJsonHandlers {
@@ -138,6 +139,7 @@ export function handleCodexExecJsonLine(
           const preview = item.text.length > RESPONSE_PREVIEW_MAX
             ? item.text.slice(0, RESPONSE_PREVIEW_MAX) + '…'
             : item.text;
+          state.hasEmittedOutput = true;
           handlers.onReasoningChunk?.(preview);
           endReasoning();
           handlers.onChunk(item.text);
@@ -146,18 +148,23 @@ export function handleCodexExecJsonLine(
 
         case 'reasoning': {
           startReasoning();
-          if (item.text) handlers.onReasoningChunk?.(item.text);
+          if (item.text) {
+            state.hasEmittedOutput = true;
+            handlers.onReasoningChunk?.(item.text);
+          }
           break;
         }
 
         case 'command_execution': {
           if (!item.command) break;
+          state.hasEmittedOutput = true;
           handlers.onReasoningChunk?.(`$ ${item.command}\n`);
           handlers.onTool?.({
             kind: 'tool_call',
             name: 'command',
             command: item.command,
             summary: item.aggregated_output?.slice(0, RESPONSE_PREVIEW_MAX),
+            details: JSON.stringify({ command: item.command, output: item.aggregated_output }),
           });
           break;
         }
@@ -165,6 +172,7 @@ export function handleCodexExecJsonLine(
         case 'file_change': {
           for (const change of item.changes ?? []) {
             if (!change.path) continue;
+            state.hasEmittedOutput = true;
             const fileName = change.path.split(/[/\\]/).pop() ?? 'file';
             handlers.onReasoningChunk?.(`${change.kind ?? 'changed'}: ${change.path}\n`);
             handlers.onTool?.({
@@ -172,6 +180,7 @@ export function handleCodexExecJsonLine(
               name: fileName,
               path: change.path,
               summary: change.kind,
+              details: JSON.stringify(change),
             });
           }
           break;
@@ -180,12 +189,14 @@ export function handleCodexExecJsonLine(
         case 'local_shell_call':
         case 'function_call':
         case 'tool_call': {
+          state.hasEmittedOutput = true;
           handlers.onTool?.({
             kind: 'tool_call',
             name: item.name ?? 'tool',
             command: item.command,
             path: item.path,
             summary: item.summary,
+            details: JSON.stringify(item),
           });
           break;
         }
@@ -223,7 +234,10 @@ export function handleCodexExecJsonLine(
     }
   } catch {
     const cleaned = stripAnsi(line).trim();
-    if (cleaned) handlers.onChunk(cleaned);
+    if (cleaned) {
+      state.hasEmittedOutput = true;
+      handlers.onChunk(cleaned);
+    }
   }
 }
 
@@ -383,7 +397,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       this.streamInterrupted = false;
       if (this.useApiTokenMode) this.ensureSettings();
 
-      const playgroundDir = join(process.cwd(), 'playground');
+      const playgroundDir = this.getWorkingDir();
       if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
@@ -397,7 +411,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       let errorResult = '';
       let lineBuffer = '';
       let stderrReasoningStarted = false;
-      const jsonState: CodexExecJsonState = { errorResult: '', inReasoning: false };
+      const jsonState: CodexExecJsonState = { errorResult: '', inReasoning: false, hasEmittedOutput: false };
 
       const handleJsonLine = (raw: string) => {
         handleCodexExecJsonLine(raw, jsonState, {
@@ -426,6 +440,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
             stderrReasoningStarted = true;
             callbacks.onReasoningStart?.();
           }
+          if (text.trim()) jsonState.hasEmittedOutput = true;
           callbacks.onReasoningChunk(text);
         }
       });
@@ -435,6 +450,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         if (lineBuffer.trim()) handleJsonLine(lineBuffer);
         if (jsonState.inReasoning || stderrReasoningStarted) callbacks?.onReasoningEnd?.();
         if (this.streamInterrupted) { reject(new Error(INTERRUPTED_MESSAGE)); return; }
+        if ((code === 0 || code === null) && !jsonState.hasEmittedOutput) {
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved.'));
+          return;
+        }
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {

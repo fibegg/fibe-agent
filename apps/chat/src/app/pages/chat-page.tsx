@@ -95,6 +95,15 @@ export function ChatPage() {
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const pgSelector = usePlaygroundSelector();
 
+  const [tonyStarkMode, setTonyStarkMode] = useState(() => localStorage.getItem('tony-stark-mode') === 'true');
+  const handleToggleTonyStarkMode = useCallback(() => {
+    setTonyStarkMode((prev) => {
+      const next = !prev;
+      localStorage.setItem('tony-stark-mode', String(next));
+      return next;
+    });
+  }, []);
+
   const leftResize = usePanelResize({
     initialWidth: SIDEBAR_WIDTH_PX,
     minWidth: SIDEBAR_MIN_WIDTH_PX,
@@ -227,6 +236,7 @@ export function ChatPage() {
 
   const {
     state,
+    agentMode,
     errorMessage,
     authModal,
     sessionActivity,
@@ -597,6 +607,7 @@ export function ChatPage() {
         <ChatHeader
           isMobile={isMobile}
           state={state}
+          agentMode={agentMode}
           errorMessage={errorMessage}
           sessionTimeMs={sessionTimeMs}
           mobileSessionStats={mobileSessionStats}
@@ -634,6 +645,8 @@ export function ChatPage() {
           onPlaygroundLink={pgSelector.linkPlayground}
           onPlaygroundLinked={refetchPlaygrounds}
           onPlaygroundSmartMount={pgSelector.smartMount}
+          tonyStarkMode={tonyStarkMode}
+          onToggleTonyStarkMode={handleToggleTonyStarkMode}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}

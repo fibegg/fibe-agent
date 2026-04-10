@@ -96,29 +96,32 @@ export function usePlaygroundSelector() {
     setLinking(true);
     setError(null);
     try {
-      const res = await apiRequest(API_PATHS.PLAYROOMS_BROWSE);
-      if (!res.ok) throw new Error('Failed to fetch playgrounds for smart mount');
-      const rootEntries = (await res.json()) as BrowseEntry[];
-      
-      const firstDir = rootEntries.find(e => e.type === 'directory' || e.type === 'symlink');
-      if (!firstDir) {
-        setError('No available playgrounds found');
-        return false;
+      let targetPath = browsePath;
+
+      if (!targetPath) {
+        const res = await apiRequest(API_PATHS.PLAYROOMS_BROWSE);
+        if (!res.ok) throw new Error('Failed to fetch playgrounds for smart mount');
+        const rootEntries = (await res.json()) as BrowseEntry[];
+        const firstDir = rootEntries.find(e => e.type === 'directory' || e.type === 'symlink');
+        if (!firstDir) {
+          setError('No available playgrounds found');
+          return false;
+        }
+        targetPath = firstDir.path;
       }
 
       const linkRes = await apiRequest(API_PATHS.PLAYROOMS_LINK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: firstDir.path }),
+        body: JSON.stringify({ path: targetPath }),
       });
 
       if (!linkRes.ok) {
         throw new Error('Failed to smart mount target');
       }
 
-      setCurrentLink(firstDir.path);
-      // Ensure we fetch entries to refresh view if open
-      void fetchEntries('');
+      setCurrentLink(targetPath);
+      void fetchEntries(browsePath);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Smart mount failed');
@@ -126,7 +129,7 @@ export function usePlaygroundSelector() {
     } finally {
       setLinking(false);
     }
-  }, [linking, fetchEntries]);
+  }, [linking, browsePath, fetchEntries]);
 
   const open = useCallback(async () => {
     void fetchEntries('');

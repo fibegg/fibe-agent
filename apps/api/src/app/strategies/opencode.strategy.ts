@@ -338,6 +338,7 @@ export class OpencodeStrategy implements AgentStrategy {
 
       let errorResult = '';
       let lineBuffer = '';
+      let hasEmittedOutput = false;
 
       /** Strip ANSI escape sequences so sidebar output is clean. */
       // eslint-disable-next-line no-control-regex
@@ -369,28 +370,34 @@ export class OpencodeStrategy implements AgentStrategy {
             switch (event.type) {
               case 'text':
                 if (event.part?.text) {
+                  if (event.part.text.trim()) hasEmittedOutput = true;
                   onChunk(event.part.text);
                 }
                 break;
               case 'tool_call':
                 if (callbacks?.onTool && event.part) {
+                  hasEmittedOutput = true;
                   callbacks.onTool({
                     kind: 'tool_call',
                     name: event.part.name ?? 'tool',
                     path: event.part.path,
                     summary: event.part.summary,
+                    details: JSON.stringify(event.part),
                   });
                 }
                 break;
               case 'step_start':
+                hasEmittedOutput = true;
                 callbacks?.onReasoningChunk?.('Thinking…\n');
                 break;
               case 'thinking':
                 if (event.part?.text && callbacks?.onReasoningChunk) {
+                  hasEmittedOutput = true;
                   callbacks.onReasoningChunk(event.part.text);
                 }
                 break;
               case 'step_finish':
+                hasEmittedOutput = true;
                 callbacks?.onReasoningEnd?.();
                 break;
               case 'error': {
@@ -407,6 +414,7 @@ export class OpencodeStrategy implements AgentStrategy {
             }
           } catch {
             // Non-JSON line — pass through as raw text
+            if (trimmed) hasEmittedOutput = true;
             onChunk(trimmed);
           }
         }
@@ -429,9 +437,11 @@ export class OpencodeStrategy implements AgentStrategy {
               part?: { text?: string };
             };
             if (event.type === 'text' && event.part?.text) {
+              if (event.part.text.trim()) hasEmittedOutput = true;
               onChunk(event.part.text);
-            }
+             }
           } catch {
+            if (lineBuffer.trim()) hasEmittedOutput = true;
             onChunk(lineBuffer.trim());
           }
         }
@@ -439,6 +449,13 @@ export class OpencodeStrategy implements AgentStrategy {
         callbacks?.onReasoningEnd?.();
         if (this.streamInterrupted) {
           reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
+        if ((code === 0 || code === null) && !hasEmittedOutput) {
+          if (this.conversationDataDir) {
+            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
+          }
+          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code !== 0 && code !== null) {
@@ -461,5 +478,9 @@ export class OpencodeStrategy implements AgentStrategy {
         reject(err);
       });
     });
+  }
+
+  hasNativeSessionSupport(): boolean {
+    return true;
   }
 }

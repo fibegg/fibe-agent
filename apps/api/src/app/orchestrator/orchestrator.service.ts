@@ -52,6 +52,7 @@ export class OrchestratorService implements OnModuleInit {
   private currentActivityId: string | null = null;
   private reasoningTextAccumulated = '';
   private lastStreamUsage: TokenUsage | undefined = undefined;
+  private agentMode = 'Exploring...';
 
   constructor(
     private readonly activityStore: ActivityStoreService,
@@ -117,6 +118,11 @@ export class OrchestratorService implements OnModuleInit {
     this.strategy.ensureSettings?.();
   }
 
+  setAgentMode(mode: string): void {
+    this.agentMode = mode;
+    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode });
+  }
+
 
   async handleClientMessage(msg: {
     action: string;
@@ -175,6 +181,7 @@ export class OrchestratorService implements OnModuleInit {
       activity: this.activityStore.all(),
     });
     this._send(WS_EVENT.QUEUE_UPDATED, { count: this.steering.count });
+    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentMode });
   }
 
   private async checkAndSendAuthStatus(): Promise<void> {
@@ -324,11 +331,22 @@ export class OrchestratorService implements OnModuleInit {
       } else if (this.cachedSystemPromptFromFile !== null) {
         systemPrompt = this.cachedSystemPromptFromFile;
       }
+      // Only inject prompt-level history for strategies without native session support.
+      // Strategies like Claude Code use --resume which restores full context natively.
+      const historyMessages = this.strategy.hasNativeSessionSupport?.()
+        ? undefined
+        : (() => {
+            const allMessages = this.messageStore.all();
+            return allMessages.length > 1
+              ? allMessages.slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
+              : undefined;
+          })();
       const fullPrompt = await this.chatPromptContext.buildFullPrompt(
         text,
         imageUrls,
         audioFilename,
-        attachmentFilenames
+        attachmentFilenames,
+        historyMessages,
       );
       const model = this.modelStore.get();
       this._send(WS_EVENT.STREAM_START, { model });

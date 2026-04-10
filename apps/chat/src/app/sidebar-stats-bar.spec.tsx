@@ -35,7 +35,7 @@ describe('SidebarStatsBar', () => {
 
   it('renders the activity button', () => {
     renderBar();
-    expect(screen.getByRole('button', { name: /activity/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /activity/i, hidden: true })).toBeTruthy();
   });
 
   it('shows empty state message when all stats are zero', () => {
@@ -77,7 +77,7 @@ describe('SidebarStatsBar', () => {
 
   it('disables the copy button when downloadAnimating', () => {
     renderBar({ downloadAnimating: true });
-    const btn = screen.getByRole('button', { name: /activity/i });
+    const btn = screen.getByRole('button', { name: /activity/i, hidden: true });
     expect((btn as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -102,7 +102,7 @@ describe('SidebarStatsBar', () => {
       left: 100, right: 200, top: 50, bottom: 80, width: 100, height: 30, x: 100, y: 50, toJSON: () => ({}),
     });
 
-    const btn = screen.getByRole('button', { name: /activity/i });
+    const btn = screen.getByRole('button', { name: /activity/i, hidden: true });
     fireEvent.click(btn);
     expect(onRunCopy).toHaveBeenCalledTimes(1);
     expect(screen.getByRole('status')).toBeTruthy();
@@ -117,7 +117,7 @@ describe('SidebarStatsBar', () => {
       left: 0, right: 100, top: 0, bottom: 30, width: 100, height: 30, x: 0, y: 0, toJSON: () => ({}),
     });
 
-    const btn = screen.getByRole('button', { name: /activity/i });
+    const btn = screen.getByRole('button', { name: /activity/i, hidden: true });
     fireEvent.click(btn);
     expect(screen.getByText('Copied to clipboard')).toBeTruthy();
 
