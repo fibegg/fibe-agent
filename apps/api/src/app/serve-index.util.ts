@@ -27,12 +27,12 @@ export function serveIndexLogic(req: Request, res: Response, next: NextFunction,
 
     let html = cachedHtml;
 
-    const prefix = process.env.AGENT_BASE_PATH || req.header('x-forwarded-prefix') || '';
+    const rawPrefix = process.env.AGENT_BASE_PATH || req.header('x-forwarded-prefix') || '';
+    const prefix = rawPrefix.replace(/[^a-zA-Z0-9/_-]/g, '');
 
     if (prefix) {
       const baseHref = prefix.endsWith('/') ? prefix : `${prefix}/`;
       const basename = prefix.endsWith('/') ? prefix.slice(0, -1) : prefix;
-      // Inject base tag right after <head>
       html = html.replace('<head>', `<head>\n    <base href="${baseHref}" />\n    <script>window.__BASENAME__ = "${basename}";</script>`);
     } else {
       html = html.replace('<head>', `<head>\n    <base href="/" />\n    <script>window.__BASENAME__ = "";</script>`);

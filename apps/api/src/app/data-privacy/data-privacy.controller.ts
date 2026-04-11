@@ -1,7 +1,9 @@
-import { Controller, Get, Delete, Header } from '@nestjs/common';
+import { Controller, Get, Delete, Header, UseGuards } from '@nestjs/common';
 import { DataPrivacyService } from './data-privacy.service';
+import { AgentAuthGuard } from '../auth/agent-auth.guard';
 
 @Controller('data-privacy')
+@UseGuards(AgentAuthGuard)
 export class DataPrivacyController {
   constructor(private readonly dataPrivacyService: DataPrivacyService) {}
 

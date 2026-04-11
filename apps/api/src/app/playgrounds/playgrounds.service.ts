@@ -27,6 +27,9 @@ const IGNORED_NAMES = new Set<string>(['node_modules', '.git']);
 /** Hidden (dot-prefixed) directories that should still appear in the file tree. */
 const VISIBLE_HIDDEN = new Set<string>(['.claude']);
 
+/** Maximum recursion depth for directory traversal (prevents symlink cycle crashes). */
+const MAX_DEPTH = 50;
+
 function pathInIgnoredDir(relPath: string): boolean {
   const segments = relPath.replace(/\\/g, '/').split('/');
   return segments.some((seg) => IGNORED_NAMES.has(seg));
@@ -54,15 +57,19 @@ export class PlaygroundsService {
     try {
       const currentLink = await this.playroomBrowser.getCurrentLink();
       const projectName = currentLink || '';
-      
+
       const scriptPath = join(process.cwd(), 'playgrounds-explorer');
       const targetBase = join(this.config.getPlayroomsRoot(), 'playgrounds');
-      const { stdout } = await execAsync(`node ${scriptPath} ${projectName} --urls`, {
+      const { execFile: execFileCb } = require('child_process');
+      const { promisify } = require('util');
+      const execFileAsync = promisify(execFileCb);
+      const args = [scriptPath, ...(projectName ? [projectName] : []), '--urls'];
+      const { stdout } = await execFileAsync('node', args, {
         env: { ...process.env, PLAYROOMS_ROOT: targetBase }
       });
       return stdout.split('\n')
-        .map(l => l.trim())
-        .filter(l => l.length > 0 && !l.includes('Network: Internal only'));
+        .map((l: string) => l.trim())
+        .filter((l: string) => l.length > 0 && !l.includes('Network: Internal only'));
     } catch (err: unknown) {
       console.error('ERROR IN GETURLS:', err);
       if (err instanceof Error && err.stack) {
@@ -72,7 +79,8 @@ export class PlaygroundsService {
     }
   }
 
-  private async countStats(absPath: string, parentIg: GitignoreFilter): Promise<{ fileCount: number; totalLines: number }> {
+  private async countStats(absPath: string, parentIg: GitignoreFilter, depth = 0): Promise<{ fileCount: number; totalLines: number }> {
+    if (depth > MAX_DEPTH) return { fileCount: 0, totalLines: 0 };
     let fileCount = 0;
     let totalLines = 0;
     try {
@@ -103,7 +111,7 @@ export class PlaygroundsService {
             totalLines += content.split('\n').length;
           } catch { /* skip binary/unreadable */ }
         } else if (isDir) {
-          const sub = await this.countStats(childAbs, ig);
+          const sub = await this.countStats(childAbs, ig, depth + 1);
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
         }
@@ -259,8 +267,8 @@ export class PlaygroundsService {
     return result;
   }
 
-  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, statuses: Map<string, PlaygroundEntry['gitStatus']>): Promise<PlaygroundEntry[]> {
-    if (IGNORED_NAMES.has(basename(absPath))) return [];
+  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, statuses: Map<string, PlaygroundEntry['gitStatus']>, depth = 0): Promise<PlaygroundEntry[]> {
+    if (depth > MAX_DEPTH || IGNORED_NAMES.has(basename(absPath))) return [];
     try {
       const ig = await loadGitignore(absPath, parentIg);
       const entries = await readdir(absPath, { withFileTypes: true });
@@ -298,7 +306,7 @@ export class PlaygroundsService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: await this.readDir(d.abs, d.rel, ig, statuses),
+          children: await this.readDir(d.abs, d.rel, ig, statuses, depth + 1),
         });
       }
       for (const f of files) {
