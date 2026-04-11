@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { FastifyRequest } from 'fastify';
+import { timingSafeEqual } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
 
 @Injectable()
@@ -27,10 +28,19 @@ export class AgentAuthGuard implements CanActivate {
       token = (request.query as { token?: string }).token ?? null;
     }
 
-    if (token === requiredPassword) {
+    if (token && this.safeCompare(token, requiredPassword)) {
       return true;
     }
 
     throw new UnauthorizedException('Unauthorized');
+  }
+
+  private safeCompare(a: string, b: string): boolean {
+    if (a.length !== b.length) return false;
+    try {
+      return timingSafeEqual(Buffer.from(a), Buffer.from(b));
+    } catch {
+      return false;
+    }
   }
 }

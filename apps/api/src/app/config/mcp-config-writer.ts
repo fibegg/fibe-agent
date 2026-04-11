@@ -208,7 +208,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     for (const name of Object.keys(servers)) {
       const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const pattern = new RegExp(
-        `(\\[mcp_servers\\."${escaped}"\\][\\s\\S]*?)(?=\\n\\[mcp_servers\\.|$)`,
+        `(\\[mcp_servers\\."${escaped}"\\][\\s\\S]*?)(?=\\n\\[|$)`,
         'gs',
       );
       cleaned = cleaned.replace(pattern, '');

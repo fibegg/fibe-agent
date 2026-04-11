@@ -1,18 +1,22 @@
-import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
+import { randomBytes, createCipheriv, createDecipheriv, createHash } from 'node:crypto';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
 
+function deriveKey(keyString: string): Buffer {
+  return createHash('sha256').update(keyString).digest();
+}
+
 /**
  * Encrypts a string using AES-256-GCM.
  * @param text The plain text string.
- * @param keyString The encryption key (will be padded or truncated to 32 bytes).
+ * @param keyString The encryption key (hashed to 32 bytes via SHA-256).
  * @returns The encrypted string with format `ENC:<base64-iv>:<base64-tag>:<base64-encrypted>` or plain text if no key provided.
  */
 export function encryptData(text: string, keyString?: string): string {
   if (!keyString) return text;
-  
-  const key = Buffer.from(keyString.padEnd(32, '0').slice(0, 32), 'utf-8');
+
+  const key = deriveKey(keyString);
   const iv = randomBytes(IV_LENGTH);
   const cipher = createCipheriv(ALGORITHM, key, iv);
   
@@ -40,7 +44,7 @@ export function decryptData(cipherText: string, keyString?: string): string {
     throw new Error('Invalid encrypted format.');
   }
   
-  const key = Buffer.from(keyString.padEnd(32, '0').slice(0, 32), 'utf-8');
+  const key = deriveKey(keyString);
   const iv = Buffer.from(parts[1], 'base64');
   const tag = Buffer.from(parts[2], 'base64');
   const encrypted = Buffer.from(parts[3], 'base64');

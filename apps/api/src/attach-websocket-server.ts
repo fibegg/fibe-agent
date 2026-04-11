@@ -67,7 +67,16 @@ function attachChatWs(
     orchestrator.handleClientConnected();
     logWs({ event: 'connect' });
 
+    let messageCount = 0;
+    const MESSAGE_LIMIT = 60;
+    const resetInterval = setInterval(() => { messageCount = 0; }, 60_000);
+
     ws.on('message', (raw: RawData) => {
+      messageCount++;
+      if (messageCount > MESSAGE_LIMIT) {
+        logWs({ event: 'rate_limited', count: messageCount });
+        return;
+      }
       try {
         const msg = JSON.parse(raw.toString()) as ClientMessage;
         logWs({ event: 'action', action: msg.action });
@@ -78,6 +87,7 @@ function attachChatWs(
     });
 
     ws.on('close', (code?: number) => {
+      clearInterval(resetInterval);
       logWs({ event: 'disconnect', closeCode: code });
       if (activeClient === ws) activeClient = null;
     });

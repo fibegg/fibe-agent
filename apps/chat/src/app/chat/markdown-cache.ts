@@ -13,6 +13,15 @@ function escapeHtml(str: string): string {
     .replace(/'/g, '&#39;');
 }
 
+const DANGEROUS_TAG_RE = /<\s*\/?\s*(script|iframe|object|embed|form|input|textarea|button|select|style|link|meta|base)\b[^>]*>/gi;
+const EVENT_HANDLER_RE = /\s+on\w+\s*=\s*["'][^"']*["']/gi;
+
+function sanitizeHtml(html: string): string {
+  return html
+    .replace(DANGEROUS_TAG_RE, '')
+    .replace(EVENT_HANDLER_RE, '');
+}
+
 interface CacheEntry {
   html: string;
   sourceText: string;
@@ -35,7 +44,7 @@ export function renderMarkdown(text: string, cacheKey?: string): string {
   
   try {
     const out = marked.parse(text);
-    const html = typeof out === 'string' ? out : escapeHtml(text);
+    const html = typeof out === 'string' ? sanitizeHtml(out) : escapeHtml(text);
     if (!cache.has(key) && cache.size >= MAX_CACHE_SIZE) evictOldest();
     cache.set(key, { html, sourceText: text });
     return html;

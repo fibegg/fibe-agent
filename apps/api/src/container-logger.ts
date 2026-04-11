@@ -96,9 +96,10 @@ export function logRequest(payload: {
 }
 
 export function logWs(payload: {
-  event: 'connect' | 'disconnect' | 'action';
+  event: 'connect' | 'disconnect' | 'action' | 'rate_limited';
   action?: string;
   closeCode?: number;
+  count?: number;
   error?: string;
 }): void {
   if (!shouldLog('log')) return;
