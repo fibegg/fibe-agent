@@ -38,6 +38,8 @@ import { AgentFilesService } from './agent-files/agent-files.service';
 import { AgentFilesWatcherService } from './agent-files/agent-files-watcher.service';
 import { RuntimeConfigController } from './runtime-config/runtime-config.controller';
 import { TerminalService } from './terminal/terminal.service';
+import { ProxyService } from './provider-traffic/proxy.service';
+import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic-store.service';
 
 @Module({
   imports: [
@@ -85,6 +87,8 @@ import { TerminalService } from './terminal/terminal.service';
     GithubTokenRefreshService,
     SteeringService,
     TerminalService,
+    ProviderTrafficStoreService,
+    ProxyService,
   ],
 })
 export class AppModule {}

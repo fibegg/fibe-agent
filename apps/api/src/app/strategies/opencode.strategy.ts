@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import { join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
+import { getProxyEnv } from '../provider-traffic/types';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
@@ -200,6 +201,7 @@ export class OpencodeStrategy implements AgentStrategy {
     return new Promise((resolve) => {
       const env: NodeJS.ProcessEnv = {
         ...process.env,
+        ...getProxyEnv(),
         ...OpencodeStrategy.YOLO_ENV,
       };
       const storedKey = this.getStoredApiKey();
@@ -304,6 +306,7 @@ export class OpencodeStrategy implements AgentStrategy {
       // all common env vars so opencode can use any provider.
       const env: NodeJS.ProcessEnv = {
         ...process.env,
+        ...getProxyEnv(),
         ...OpencodeStrategy.YOLO_ENV,
       };
       const storedKey = this.getStoredApiKey();

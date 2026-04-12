@@ -404,7 +404,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       const codexProcess = spawn(
         getCodexCommand(),
         ['exec', '--json', '--color', 'never', '--dangerously-bypass-approvals-and-sandbox', effectivePrompt],
-        { env: { ...process.env, CODEX_HOME: this.getCodexHomeForSession() }, cwd: playgroundDir, shell: false }
+        { env: { ...process.env, ...this.getProxyEnv(), CODEX_HOME: this.getCodexHomeForSession() }, cwd: playgroundDir, shell: false }
       );
       this.currentStreamProcess = codexProcess;
 
