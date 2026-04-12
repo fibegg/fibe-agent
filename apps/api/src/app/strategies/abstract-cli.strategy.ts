@@ -7,6 +7,7 @@ import type {
   LogoutConnection,
   StreamingCallbacks,
 } from './strategy.types';
+import { getProxyEnv } from '../provider-traffic/types';
 
 export abstract class AbstractCLIStrategy implements AgentStrategy {
   protected readonly logger: Logger;
@@ -58,5 +59,13 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
   interruptAgent(): void {
     this.streamInterrupted = true;
     this.currentStreamProcess?.kill();
+  }
+
+  /**
+   * Returns env vars that route the spawned CLI through the MITM proxy.
+   * Returns an empty object when the proxy is not active.
+   */
+  protected getProxyEnv(): Record<string, string> {
+    return getProxyEnv();
   }
 }
