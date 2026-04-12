@@ -206,7 +206,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       }
 
       const checkProcess = spawn('claude', ['auth', 'status'], {
-        env: { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: token },
+        env: { ...process.env, ...this.getProxyEnv(), CLAUDE_CODE_OAUTH_TOKEN: token },
         shell: false,
       });
       checkProcess.stdin?.end();
@@ -301,6 +301,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       const claudeProcess = spawn('claude', args, {
         env: {
           ...process.env,
+          ...this.getProxyEnv(),
           CLAUDE_CODE_OAUTH_TOKEN: token ?? '',
           BROWSER: '/bin/true',
           DISPLAY: '',

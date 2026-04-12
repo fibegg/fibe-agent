@@ -6,6 +6,7 @@ export class FibeSyncService {
   private readonly logger = new Logger(FibeSyncService.name);
   private messageSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private activitySyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private rawProvidersSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly DEBOUNCE_MS = 500;
 
   constructor(private readonly config: ConfigService) {}
@@ -34,8 +35,20 @@ export class FibeSyncService {
     }, FibeSyncService.DEBOUNCE_MS);
   }
 
+  syncRawProviders(getContent: () => string): void {
+    if (this.rawProvidersSyncTimer) clearTimeout(this.rawProvidersSyncTimer);
+    this.rawProvidersSyncTimer = setTimeout(() => {
+      this.rawProvidersSyncTimer = null;
+      try {
+        void this.sync('raw_providers', getContent());
+      } catch (err) {
+        this.logger.error(`Error resolving raw_providers content for sync: ${err}`);
+      }
+    }, FibeSyncService.DEBOUNCE_MS);
+  }
+
   private async sync(
-    type: 'messages' | 'activity',
+    type: 'messages' | 'activity' | 'raw_providers',
     content: string
   ): Promise<void> {
     if (!this.config.isFibeSyncEnabled()) return;
