@@ -166,6 +166,20 @@ RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# ---- FIBE CLI (downloaded from GitHub Releases) ----
+ARG FIBE_VERSION=v0.1.0
+RUN if [ -n "$FIBE_VERSION" ]; then \
+      ARCH=$(uname -m) && \
+      if [ "$ARCH" = "x86_64" ]; then FIBE_ARCH="amd64"; \
+      elif [ "$ARCH" = "aarch64" ]; then FIBE_ARCH="arm64"; \
+      else FIBE_ARCH="amd64"; fi && \
+      curl -fsSL "https://github.com/fibegg/fibe-api/releases/download/${FIBE_VERSION}/fibe_${FIBE_VERSION#v}_linux_${FIBE_ARCH}.tar.gz" \
+        -o /tmp/fibe.tar.gz && \
+      tar -xzf /tmp/fibe.tar.gz -C /usr/local/bin fibe && \
+      chmod +x /usr/local/bin/fibe && \
+      rm -f /tmp/fibe.tar.gz; \
+    fi
+
 # ── NO builder stage dist/ copy — dev mode runs from source ──
 
 # Inject git SHA at the last possible moment so it doesn't bust previous caches
