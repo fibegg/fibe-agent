@@ -97,6 +97,15 @@ x-fibe.gg:
         - services.ci-build-claude.labels.fibe.gg/build_parallel_jobs
         - services.ci-build-codex.labels.fibe.gg/build_parallel_jobs
         - services.ci-build-opencode.labels.fibe.gg/build_parallel_jobs
+    fibe_version:
+      name: Fibe CLI Version (from .fibe-version)
+      required: false
+      default: "v0.1.0"
+      paths:
+        - services.ci-build-gemini.environment.FIBE_VERSION
+        - services.ci-build-claude.environment.FIBE_VERSION
+        - services.ci-build-codex.environment.FIBE_VERSION
+        - services.ci-build-opencode.environment.FIBE_VERSION
 
 x-common-bun: &common-bun
   image: oven/bun:1.3.11-slim
@@ -313,6 +322,14 @@ configs:
       git config --global --add safe.directory /app
       GIT_SHA=$$(git rev-parse HEAD || echo "unknown")
 
+      # Read fibe CLI version from .fibe-version if not set via env
+      if [ -z "$$FIBE_VERSION" ] && [ -f .fibe-version ]; then
+        FIBE_VERSION=$$(cat .fibe-version | tr -d '[:space:]')
+      fi
+      if [ -z "$$FIBE_VERSION" ]; then
+        echo "WARNING: FIBE_VERSION not set and .fibe-version not found"
+      fi
+
       LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
       LATEST_TAG="latest"
       if [ "$$BRANCH" != "main" ] && [ "$$BRANCH" != "master" ]; then
@@ -353,6 +370,7 @@ configs:
         -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
         --build-arg AGENT_PROVIDER=$$PROVIDER \
         --build-arg GIT_SHA=$$GIT_SHA \
+        --build-arg FIBE_VERSION=$$FIBE_VERSION \
         --build-arg PARALLEL_JOBS=$$JOBS \
         --cache-from type=registry,ref=$$CACHE_REF \
         --cache-from type=registry,ref=$$IMAGE:$$TAG_NAME-$$LATEST_TAG \
