@@ -56,3 +56,6 @@ designs/
 playground
 
 .docker-test/
+
+# fibe binaries (downloaded from GitHub Releases at build time)
+bin/fibe-*
