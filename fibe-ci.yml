@@ -352,17 +352,41 @@ configs:
       echo "========================================="
 
       JOBS="$${BUILD_PARALLEL_JOBS:-4}"
+      BUILDER_NAME="fibe-builder-$$TAG_NAME"
       echo "--> Using $$JOBS parallel build jobs"
 
-      # Reuse persistent docker-container builder (state survives via buildx-state volume).
-      # docker-container driver is required for multi-platform builds.
-      docker buildx use fibe-builder 2>/dev/null \
+      echo "--> Installing binfmt emulators for amd64/arm64"
+      docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
+
+      # Use a provider-scoped builder so parallel image jobs do not race over the
+      # same buildx instance/state. docker-container driver is required for
+      # multi-platform builds.
+      docker buildx use "$$BUILDER_NAME" 2>/dev/null \
         || docker buildx create \
-             --name fibe-builder \
+             --name "$$BUILDER_NAME" \
              --driver docker-container \
              --driver-opt network=host \
              --use
-      docker buildx inspect --bootstrap
+      BUILDER_INFO=$$(docker buildx inspect --bootstrap)
+      echo "$$BUILDER_INFO"
+
+      for platform in linux/amd64 linux/arm64; do
+        if ! echo "$$BUILDER_INFO" | grep -q "$$platform"; then
+          echo "--> Recreating $$BUILDER_NAME to restore $$platform support"
+          docker buildx rm "$$BUILDER_NAME" >/dev/null 2>&1 || true
+          docker buildx create \
+            --name "$$BUILDER_NAME" \
+            --driver docker-container \
+            --driver-opt network=host \
+            --use
+          BUILDER_INFO=$$(docker buildx inspect --bootstrap)
+          echo "$$BUILDER_INFO"
+          echo "$$BUILDER_INFO" | grep -q "$$platform" || {
+            echo "ERROR: buildx builder $$BUILDER_NAME is missing $$platform support"
+            exit 1
+          }
+        fi
+      done
 
       docker buildx build . \
         --platform linux/amd64,linux/arm64 \
@@ -376,3 +400,17 @@ configs:
         --cache-from type=registry,ref=$$IMAGE:$$TAG_NAME-$$LATEST_TAG \
         --cache-to type=registry,ref=$$CACHE_REF,mode=max \
         --push
+
+      echo "--> Verifying multi-arch manifests"
+      for tag in "$$TAG_NAME-$$LATEST_TAG" "$$TAG_NAME-$$GIT_SHA"; do
+        MANIFEST_INFO=$$(docker buildx imagetools inspect "$$IMAGE:$$tag")
+        echo "$$MANIFEST_INFO"
+        echo "$$MANIFEST_INFO" | grep -q "linux/amd64" || {
+          echo "ERROR: $$IMAGE:$$tag is missing linux/amd64"
+          exit 1
+        }
+        echo "$$MANIFEST_INFO" | grep -q "linux/arm64" || {
+          echo "ERROR: $$IMAGE:$$tag is missing linux/arm64"
+          exit 1
+        }
+      done
