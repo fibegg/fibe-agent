@@ -120,6 +120,8 @@ API_URL=http://localhost:3000 bunx nx serve chat
 
 **Password-protected?** Set `AGENT_PASSWORD` and sign in from the chat UI before sending messages.
 
+When the container is launched by Fibe, it receives a mandatory SDK MCP definition through `MCP_CONFIG_JSON`. That built-in entry runs `fibe mcp serve --yolo` and is parameterized with `FIBE_API_KEY` and `FIBE_DOMAIN`, so the local `fibe` binary inside the container and the MCP surface stay aligned.
+
 ### Run services separately
 
 | App | Command | Port |
