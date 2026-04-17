@@ -179,6 +179,27 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY playgrounds-explorer /app/playgrounds-explorer
 RUN chmod +x /app/playgrounds-explorer
 
+# ---- FIBE CLI (downloaded from GitHub Releases) ----
+COPY .fibe-version /tmp/.fibe-version
+ARG FIBE_VERSION
+RUN VERSION="$FIBE_VERSION"; \
+    if [ -z "$VERSION" ] && [ -f /tmp/.fibe-version ]; then \
+      VERSION=$(tr -d '[:space:]' < /tmp/.fibe-version); \
+    fi; \
+    if [ -n "$VERSION" ]; then \
+      TAG="$VERSION"; \
+      case "$TAG" in v*) FILE_VERSION="${TAG#v}" ;; *) FILE_VERSION="$TAG"; TAG="v$TAG" ;; esac; \
+      ARCH=$(uname -m) && \
+      if [ "$ARCH" = "x86_64" ]; then FIBE_ARCH="amd64"; \
+      elif [ "$ARCH" = "aarch64" ]; then FIBE_ARCH="arm64"; \
+      else FIBE_ARCH="amd64"; fi && \
+      curl -fsSL "https://github.com/fibegg/fibe-api/releases/download/${TAG}/fibe_${FILE_VERSION}_linux_${FIBE_ARCH}.tar.gz" \
+        -o /tmp/fibe.tar.gz && \
+      tar -xzf /tmp/fibe.tar.gz -C /usr/local/bin fibe && \
+      chmod +x /usr/local/bin/fibe && \
+      rm -f /tmp/fibe.tar.gz; \
+    fi
+
 # ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
 COPY --from=builder /app/apps/api/dist ./dist/

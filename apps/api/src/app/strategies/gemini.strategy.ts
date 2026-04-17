@@ -279,7 +279,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         effectivePrompt,
       ];
 
-      const env: NodeJS.ProcessEnv = { ...process.env, NO_BROWSER: 'true' };
+      const env: NodeJS.ProcessEnv = { ...process.env, ...this.getProxyEnv(), NO_BROWSER: 'true' };
       if (this.useApiTokenMode) {
         const token = this.getApiToken();
         if (token) {

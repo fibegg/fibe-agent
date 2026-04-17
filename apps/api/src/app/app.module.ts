@@ -41,7 +41,8 @@ import { TerminalService } from './terminal/terminal.service';
 import { AgentConfigStoreService } from './group-chat/agent-config-store.service';
 import { GroupOrchestratorService } from './group-chat/group-orchestrator.service';
 import { GroupChatController } from './group-chat/group-chat.controller';
-
+import { ProxyService } from './provider-traffic/proxy.service';
+import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic-store.service';
 
 @Module({
   imports: [
@@ -93,6 +94,8 @@ import { GroupChatController } from './group-chat/group-chat.controller';
     TerminalService,
     AgentConfigStoreService,
     GroupOrchestratorService,
+    ProviderTrafficStoreService,
+    ProxyService,
   ],
 
 })
