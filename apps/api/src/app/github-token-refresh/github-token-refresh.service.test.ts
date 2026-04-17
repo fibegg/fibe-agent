@@ -123,7 +123,7 @@ describe('GithubTokenRefreshService', () => {
   test('preserves existing MCP config when updating token', async () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
-        'playgrounds-dev': { serverUrl: 'https://test/mcp' },
+        'fibe': { serverUrl: 'https://test/mcp' },
         Sentry: { serverUrl: 'https://sentry/mcp' },
       },
     });
@@ -144,7 +144,7 @@ describe('GithubTokenRefreshService', () => {
       await service.refreshToken();
 
       const config = JSON.parse(process.env.MCP_CONFIG_JSON as string);
-      expect(config.mcpServers['playgrounds-dev'].serverUrl).toBe(
+      expect(config.mcpServers['fibe'].serverUrl).toBe(
         'https://test/mcp'
       );
       expect(config.mcpServers.Sentry.serverUrl).toBe('https://sentry/mcp');

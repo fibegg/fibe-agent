@@ -33,7 +33,7 @@ describe('writeMcpConfig', () => {
   it('does nothing when AGENT_PROVIDER is not set', () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
-        'playgrounds-dev': {
+        'fibe': {
           serverUrl: 'https://fibe.gg',
           authHeader: 'Bearer test123',
         },
@@ -52,7 +52,7 @@ describe('writeMcpConfig', () => {
       process.env.AGENT_PROVIDER = 'gemini';
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
-          'playgrounds-dev': {
+          'fibe': {
             serverUrl: 'https://fibe.gg',
             authHeader: 'Bearer fibe_test_key123',
           },
@@ -66,7 +66,7 @@ describe('writeMcpConfig', () => {
       const configPath = join(testHome, '.gemini', 'settings.json');
       expect(existsSync(configPath)).toBe(true);
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      expect(config.mcpServers['playgrounds-dev']).toEqual({
+      expect(config.mcpServers['fibe']).toEqual({
         command: 'mcp-remote-wrapper',
         args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key123'],
       });
@@ -80,13 +80,13 @@ describe('writeMcpConfig', () => {
       writeMcpConfig();
       const config = JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8'));
       expect(config.theme).toBe('dark');
-      expect(config.mcpServers['playgrounds-dev']).toBeDefined();
+      expect(config.mcpServers['fibe']).toBeDefined();
     });
 
     it('writes multiple servers from MCP_CONFIG_JSON', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
-          'playgrounds-dev': {
+          'fibe': {
             serverUrl: 'https://fibe.gg',
             authHeader: 'Bearer fibe_test_key123',
           },
@@ -99,7 +99,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
-      expect(config.mcpServers['playgrounds-dev']).toBeDefined();
+      expect(config.mcpServers['fibe']).toBeDefined();
       expect(config.mcpServers['Sentry']).toEqual({
         command: 'mcp-remote-wrapper',
         args: ['https://mcp.sentry.dev/mcp'],
@@ -119,7 +119,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
-      expect(config.mcpServers['playgrounds-dev']).toBeDefined();
+      expect(config.mcpServers['fibe']).toBeDefined();
       expect(config.mcpServers['docker']).toEqual({
         command: 'uvx',
         args: ['mcp-server-docker'],
@@ -129,7 +129,7 @@ describe('writeMcpConfig', () => {
     it('writes stdio server entries as-is', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
-          'playgrounds-dev': {
+          'fibe': {
             serverUrl: 'https://fibe.gg',
             authHeader: 'Bearer key',
           },
@@ -174,7 +174,7 @@ describe('writeMcpConfig', () => {
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
       // Default setup uses https://fibe.gg
-      expect(config.mcpServers['playgrounds-dev'].args).not.toContain('--allow-http');
+      expect(config.mcpServers['fibe'].args).not.toContain('--allow-http');
     });
   });
 
@@ -183,7 +183,7 @@ describe('writeMcpConfig', () => {
       process.env.AGENT_PROVIDER = 'claude-code';
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
-          'playgrounds-dev': {
+          'fibe': {
             serverUrl: 'https://fibe.gg',
             authHeader: 'Bearer fibe_test_key456',
           },
@@ -197,7 +197,7 @@ describe('writeMcpConfig', () => {
       const configPath = join(testHome, '.claude.json');
       expect(existsSync(configPath)).toBe(true);
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      expect(config.mcpServers['playgrounds-dev']).toEqual({
+      expect(config.mcpServers['fibe']).toEqual({
         command: 'mcp-remote-wrapper',
         args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
       });
@@ -208,7 +208,7 @@ describe('writeMcpConfig', () => {
       const settingsPath = join(testHome, '.claude', 'settings.json');
       expect(existsSync(settingsPath)).toBe(true);
       const config = JSON.parse(readFileSync(settingsPath, 'utf8'));
-      expect(config.mcpServers['playgrounds-dev']).toEqual({
+      expect(config.mcpServers['fibe']).toEqual({
         command: 'mcp-remote-wrapper',
         args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
       });
@@ -224,7 +224,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(
         readFileSync(join(testHome, '.claude.json'), 'utf8'),
       );
-      expect(Object.keys(config.mcpServers)).toContain('playgrounds-dev');
+      expect(Object.keys(config.mcpServers)).toContain('fibe');
       expect(Object.keys(config.mcpServers)).toContain('docker');
     });
 
@@ -235,7 +235,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(join(testHome, '.claude.json'), 'utf8'));
       expect(config.userID).toBe('abc123');
       expect(config.firstStartTime).toBe('2026-01-01');
-      expect(config.mcpServers['playgrounds-dev']).toBeDefined();
+      expect(config.mcpServers['fibe']).toBeDefined();
     });
   });
 
@@ -244,7 +244,7 @@ describe('writeMcpConfig', () => {
       process.env.AGENT_PROVIDER = 'openai-codex';
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
-          'playgrounds-dev': {
+          'fibe': {
             serverUrl: 'https://fibe.gg',
             authHeader: 'Bearer fibe_test_key789',
           },
@@ -258,8 +258,40 @@ describe('writeMcpConfig', () => {
       const configPath = join(testHome, '.codex', 'config.toml');
       expect(existsSync(configPath)).toBe(true);
       const content = readFileSync(configPath, 'utf8');
-      expect(content).toContain('[mcp_servers."playgrounds-dev"]');
+      expect(content).toContain('[mcp_servers."fibe"]');
       expect(content).toContain('url = "https://fibe.gg"');
+    });
+
+    it('writes bearer_token_env_var for remote servers when configured explicitly', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          'fibe': {
+            serverUrl: 'https://fibe.gg',
+            bearerTokenEnvVar: 'FIBE_API_KEY',
+          },
+        },
+      });
+
+      writeMcpConfig();
+
+      const content = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
+      expect(content).toContain('bearer_token_env_var = "FIBE_API_KEY"');
+    });
+
+    it('derives bearer_token_env_var from authHeader env placeholders', () => {
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          'fibe': {
+            serverUrl: 'https://fibe.gg',
+            authHeader: 'Bearer ${env:FIBE_API_KEY}',
+          },
+        },
+      });
+
+      writeMcpConfig();
+
+      const content = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
+      expect(content).toContain('bearer_token_env_var = "FIBE_API_KEY"');
     });
 
     it('preserves existing config.toml content', () => {
@@ -270,7 +302,7 @@ describe('writeMcpConfig', () => {
       writeMcpConfig();
       const content = readFileSync(join(dir, 'config.toml'), 'utf8');
       expect(content).toContain('model = "gpt-4"');
-      expect(content).toContain('[mcp_servers."playgrounds-dev"]');
+      expect(content).toContain('[mcp_servers."fibe"]');
     });
 
     it('writes stdio servers as type = stdio in toml', () => {
@@ -332,7 +364,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
-      expect(config.mcpServers['playgrounds-dev']).toEqual({
+      expect(config.mcpServers['fibe']).toEqual({
         command: 'mcp-remote-wrapper',
         args: ['https://fibe.gg', '--header', 'Authorization:Bearer legacy_key'],
       });
@@ -350,7 +382,7 @@ describe('writeMcpConfig', () => {
     process.env.AGENT_PROVIDER = 'unknown-provider';
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
-        'playgrounds-dev': {
+        'fibe': {
           serverUrl: 'https://fibe.gg',
           authHeader: 'Bearer test',
         },
@@ -419,7 +451,7 @@ describe('writeMcpConfig', () => {
     expect(() => writeMcpConfig()).not.toThrow();
   });
 
-  it('handles server args containing double quotes in TOML output (BUG: TOML injection)', () => {
+  it('escapes server args containing double quotes in TOML output', () => {
     process.env.AGENT_PROVIDER = 'openai-codex';
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
@@ -438,9 +470,10 @@ describe('writeMcpConfig', () => {
     expect(existsSync(configPath)).toBe(true);
     const content = readFileSync(configPath, 'utf8');
     expect(content).toContain('test-server');
+    expect(content).toContain('args = ["script.js", "arg with \\"quotes\\""]');
   });
 
-  it('TOML writer preserves existing non-MCP sections (BUG: regex eats them)', () => {
+  it('TOML writer preserves existing non-MCP sections', () => {
     process.env.AGENT_PROVIDER = 'openai-codex';
     delete process.env.DOCKER_MCP_CONFIG_JSON;
     delete process.env.SESSION_DIR;

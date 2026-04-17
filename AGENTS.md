@@ -123,7 +123,7 @@ Copy `.env.example` to `.env` before starting.
 | `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins (use `*` for open/iframe use) |
 | `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` — restrict in production |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
-| `MCP_CONFIG_JSON` | — | JSON object `{ mcpServers: { "<name>": { serverUrl?, authHeader?, command?, args?, env? } } }` — stdio/HTTP MCP servers injected into provider config at startup. In Fibe deployments this always includes the mandatory SDK MCP entry `fibe mcp serve --yolo` with `FIBE_API_KEY` and `FIBE_DOMAIN`. |
+| `MCP_CONFIG_JSON` | — | JSON object `{ mcpServers: { "<name>": { serverUrl?, authHeader?, bearerTokenEnvVar?, command?, args?, env? } } }` — stdio/HTTP MCP servers injected into provider config at startup. In Fibe deployments this always includes the canonical built-in Fibe MCP entry `fibe mcp serve --yolo` with `FIBE_API_KEY` and `FIBE_DOMAIN`. Keep that built-in Fibe server unique per environment; avoid exposing duplicate Fibe MCPs over multiple transports to the same agent. |
 | `DOCKER_MCP_CONFIG_JSON` | — | Same format as `MCP_CONFIG_JSON`; merged with it. Typically carries Docker-specific MCP servers (e.g. docker MCP toolkit) |
 
 ### Provider API keys (`AGENT_AUTH_MODE=api-token`)
