@@ -15,6 +15,7 @@ const logger = new Logger('McpConfigWriter');
 interface McpServerEntry {
   serverUrl?: string;
   authHeader?: string;
+  bearerTokenEnvVar?: string;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -51,33 +52,100 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   return { command: 'mcp-remote-wrapper', args };
 }
 
+function escapeTomlString(value: string): string {
+  return value
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')
+    .replace(/\t/g, '\\t');
+}
+
+function quotedTomlString(value: string): string {
+  return `"${escapeTomlString(value)}"`;
+}
+
+function codexBearerTokenEnvVar(entry: McpServerEntry): string | null {
+  if (entry.bearerTokenEnvVar) {
+    return entry.bearerTokenEnvVar;
+  }
+  if (!entry.authHeader) {
+    return null;
+  }
+
+  const envPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  if (envPlaceholder) {
+    return envPlaceholder[1];
+  }
+
+  const rawPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  if (rawPlaceholder) {
+    return rawPlaceholder[1];
+  }
+
+  return null;
+}
+
+function stripManagedCodexBlocks(content: string, serverNames: string[]): string {
+  if (!content.trim()) {
+    return '';
+  }
+
+  const names = new Set(serverNames);
+  const lines = content.split('\n');
+  const kept: string[] = [];
+  let skipping = false;
+
+  for (const line of lines) {
+    const header = line.match(/^\[mcp_servers\."((?:[^"\\]|\\.)+)"\]\s*$/);
+    if (header) {
+      skipping = names.has(header[1]);
+      if (skipping) {
+        continue;
+      }
+    } else if (skipping && /^\[/.test(line)) {
+      skipping = false;
+    }
+
+    if (!skipping) {
+      kept.push(line);
+    }
+  }
+
+  return kept.join('\n').trim();
+}
+
 /**
  * Converts a McpServerEntry into a TOML block for OpenAI Codex config.
  */
 function toTomlBlock(name: string, entry: McpServerEntry): string {
   if (entry.command) {
     // Stdio — Codex uses "type", "command" and "args" keys
-    const argsQuoted = (entry.args ?? []).map((a) => `"${a}"`).join(', ');
+    const argsQuoted = (entry.args ?? []).map((a) => quotedTomlString(a)).join(', ');
     const lines = [
-      `[mcp_servers."${name}"]`,
+      `[mcp_servers.${quotedTomlString(name)}]`,
       `type = "stdio"`,
-      `command = "${entry.command}"`,
+      `command = ${quotedTomlString(entry.command)}`,
       `args = [${argsQuoted}]`,
     ];
     if (entry.env && Object.keys(entry.env).length > 0) {
       const envParts = Object.entries(entry.env)
-        .map(([k, v]) => `${k} = "${v}"`)
+        .map(([k, v]) => `${k} = ${quotedTomlString(v)}`)
         .join(', ');
       lines.push(`env = { ${envParts} }`);
     }
     return lines.join('\n');
   }
 
-  // Streamable-HTTP — Codex does not support env for url-based servers; use bearer_token_env_var if needed
-  return [
-    `[mcp_servers."${name}"]`,
-    `url = "${entry.serverUrl}"`,
-  ].join('\n');
+  const lines = [
+    `[mcp_servers.${quotedTomlString(name)}]`,
+    `url = ${quotedTomlString(entry.serverUrl ?? '')}`,
+  ];
+  const bearerTokenEnvVar = codexBearerTokenEnvVar(entry);
+  if (bearerTokenEnvVar) {
+    lines.push(`bearer_token_env_var = ${quotedTomlString(bearerTokenEnvVar)}`);
+  }
+  return lines.join('\n');
 }
 
 // ─── Provider Writers ──────────────────────────────────────────────
@@ -202,18 +270,15 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
 
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
-    // Remove any existing [mcp_servers."..."] blocks that we're about to write.
-    // Match through to the next table header or EOF so we don't cut inside args = [...].
-    let cleaned = existingContent;
-    for (const name of Object.keys(servers)) {
-      const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const pattern = new RegExp(
-        `(\\[mcp_servers\\."${escaped}"\\][\\s\\S]*?)(?=\\n\\[|$)`,
-        'gs',
-      );
-      cleaned = cleaned.replace(pattern, '');
+    for (const [name, entry] of Object.entries(servers)) {
+      if (entry.serverUrl && entry.authHeader && !codexBearerTokenEnvVar(entry)) {
+        logger.warn(
+          `Codex MCP server "${name}" uses authHeader, but Codex only supports bearer_token_env_var for remote servers; skipping auth header`,
+        );
+      }
     }
-    cleaned = cleaned.trim();
+
+    const cleaned = stripManagedCodexBlocks(existingContent, Object.keys(servers));
 
     const tomlBlocks = Object.entries(servers)
       .map(([name, entry]) => toTomlBlock(name, entry))
@@ -275,9 +340,9 @@ function parseServersFromJson(raw: string): Record<string, McpServerEntry> | nul
     if (parsed?.mcpServers && typeof parsed.mcpServers === 'object') {
       return parsed.mcpServers;
     }
-    // Legacy flat format: { serverUrl, authHeader }
+    // Legacy single-server format: treat it as the built-in Fibe MCP.
     if (parsed?.serverUrl) {
-      return { 'playgrounds-dev': parsed as McpServerEntry };
+      return { fibe: parsed as McpServerEntry };
     }
     return null;
   } catch {
