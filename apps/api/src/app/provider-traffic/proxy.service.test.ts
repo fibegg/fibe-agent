@@ -18,6 +18,7 @@ function makeConfig(dataDir: string) {
 }
 
 function makeFibeSync() {
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
   return { syncRawProviders: () => {} } as never;
 }
 
