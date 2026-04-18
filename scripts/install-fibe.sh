@@ -5,6 +5,7 @@ set -eu
 REPO_OWNER="${FIBE_REPO_OWNER:-fibegg}"
 REPO_NAME="${FIBE_REPO_NAME:-sdk}"
 VERSION="${FIBE_VERSION:-}"
+INSTALL_DIR="${FIBE_INSTALL_DIR:-/usr/local/bin}"
 TOKEN=""
 
 if [ -n "${GH_TOKEN:-}" ]; then
@@ -40,8 +41,9 @@ else
 fi
 
 RELEASE_JSON=$(mktemp)
+ARCHIVE_PATH=$(mktemp)
 cleanup() {
-  rm -f "$RELEASE_JSON" /tmp/fibe.tar.gz
+  rm -f "$RELEASE_JSON" "$ARCHIVE_PATH"
 }
 trap cleanup EXIT
 
@@ -82,10 +84,11 @@ if [ -n "$TOKEN" ] && [ -n "$ASSET_API_URL" ] && [ "$ASSET_API_URL" != "null" ];
     -H "Authorization: Bearer ${TOKEN}" \
     -H "Accept: application/octet-stream" \
     "$ASSET_API_URL" \
-    -o /tmp/fibe.tar.gz
+    -o "$ARCHIVE_PATH"
 else
-  curl -fsSL "$ASSET_BROWSER_URL" -o /tmp/fibe.tar.gz
+  curl -fsSL "$ASSET_BROWSER_URL" -o "$ARCHIVE_PATH"
 fi
 
-tar -xzf /tmp/fibe.tar.gz -C /usr/local/bin fibe
-chmod +x /usr/local/bin/fibe
+mkdir -p "$INSTALL_DIR"
+tar -xzf "$ARCHIVE_PATH" -C "$INSTALL_DIR" fibe
+chmod +x "$INSTALL_DIR/fibe"
