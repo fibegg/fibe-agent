@@ -10,6 +10,8 @@ set -e
 export NX_DAEMON=false
 # Use JS file-watcher instead of native binaries (macOS binaries won't load on Linux)
 export NX_NATIVE_FILE_WATCHER=false
+RUNTIME_FIBE_BIN_DIR="${DATA_DIR:-/app/data}/.fibe/bin"
+export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
 
 fix_file_limits() {
   mkdir -p /etc/security/limits.d
@@ -33,6 +35,40 @@ install_dev_deps() {
   fi
 }
 
+ensure_runtime_fibe() {
+  mkdir -p "$RUNTIME_FIBE_BIN_DIR"
+
+  if [ -z "${FIBE_VERSION:-}" ] && [ -x "${RUNTIME_FIBE_BIN_DIR}/fibe" ]; then
+    echo "[entrypoint] Using existing runtime fibe from ${RUNTIME_FIBE_BIN_DIR}/fibe"
+    return
+  fi
+
+  current_version=""
+  if [ -x "${RUNTIME_FIBE_BIN_DIR}/fibe" ]; then
+    current_version=$("${RUNTIME_FIBE_BIN_DIR}/fibe" version 2>/dev/null | awk 'NR==1 { print $2 }')
+  fi
+
+  desired_version="${FIBE_VERSION:-}"
+  normalized_desired="${desired_version#v}"
+
+  if [ -n "$normalized_desired" ] && [ "$current_version" = "$normalized_desired" ]; then
+    echo "[entrypoint] Using cached runtime fibe ${current_version}"
+    return
+  fi
+
+  if [ -n "$normalized_desired" ]; then
+    echo "[entrypoint] Installing runtime fibe ${normalized_desired}"
+  else
+    echo "[entrypoint] Installing runtime fibe latest"
+  fi
+
+  FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" /usr/local/bin/install-fibe.sh
+  installed_version=$("${RUNTIME_FIBE_BIN_DIR}/fibe" version 2>/dev/null | awk 'NR==1 { print $2 }')
+  echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
+}
+
+ensure_runtime_fibe
+
 if [ -f /app/dist/main.js ]; then
   # ── PRODUCTION: pre-built image, just run the compiled bundle ──────────────
   echo "[entrypoint] dist/main.js found — starting production server"
@@ -48,5 +84,5 @@ else
   chown -R node:node /tmp/.nx-cache 2>/dev/null || true
 
   echo "[entrypoint] Starting API + Chat dev servers..."
-  exec su node -c "export HOME=/home/node; cd /app && npx nx reset && npx nx run-many --targets=serve,dev --parallel=2"
+  exec su node -c "export HOME=/home/node PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && npx nx reset && npx nx run-many --targets=serve,dev --parallel=2"
 fi
