@@ -97,15 +97,6 @@ x-fibe.gg:
         - services.ci-build-claude.labels.fibe.gg/build_parallel_jobs
         - services.ci-build-codex.labels.fibe.gg/build_parallel_jobs
         - services.ci-build-opencode.labels.fibe.gg/build_parallel_jobs
-    fibe_version:
-      name: Fibe CLI Version (optional; latest sdk release if blank)
-      required: false
-      default: ""
-      paths:
-        - services.ci-build-gemini.environment.FIBE_VERSION
-        - services.ci-build-claude.environment.FIBE_VERSION
-        - services.ci-build-codex.environment.FIBE_VERSION
-        - services.ci-build-opencode.environment.FIBE_VERSION
     slack_workflow_url:
       name: Slack Workflow URL
       required: false
@@ -393,14 +384,6 @@ configs:
       BUILDER_NAME="fibe-builder-$$TAG_NAME-$$RUN_ID"
       echo "--> Using $$JOBS parallel build jobs"
 
-      FIBE_BUILD_ARG=""
-      if [ -n "$$FIBE_VERSION" ]; then
-        echo "--> Pinning Fibe CLI to $$FIBE_VERSION"
-        FIBE_BUILD_ARG="--build-arg FIBE_VERSION=$$FIBE_VERSION"
-      else
-        echo "--> Fibe CLI version not pinned; Dockerfile will resolve the latest fibegg/sdk release"
-      fi
-
       echo "--> Installing binfmt emulators for amd64/arm64"
       docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
 
@@ -444,12 +427,10 @@ configs:
         -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
         --build-arg AGENT_PROVIDER=$$PROVIDER \
         --build-arg GIT_SHA=$$GIT_SHA \
-        $$FIBE_BUILD_ARG \
         --build-arg PARALLEL_JOBS=$$JOBS \
         --cache-from type=registry,ref=$$CACHE_REF \
         --cache-from type=registry,ref=$$IMAGE:$$TAG_NAME-$$LATEST_TAG \
         --cache-to type=registry,ref=$$CACHE_REF,mode=max \
-        --secret id=gh_token,env=GH_TOKEN \
         --push
 
       echo "--> Verifying multi-arch manifests"

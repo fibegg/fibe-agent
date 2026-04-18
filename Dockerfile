@@ -182,9 +182,6 @@ RUN chmod +x /app/playgrounds-explorer
 # ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh
-ARG FIBE_VERSION
-RUN --mount=type=secret,id=gh_token,required=false \
-    FIBE_VERSION="$FIBE_VERSION" /usr/local/bin/install-fibe.sh
 
 # ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
