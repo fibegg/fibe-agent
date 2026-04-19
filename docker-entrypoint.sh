@@ -11,6 +11,7 @@ export NX_DAEMON=false
 # Use JS file-watcher instead of native binaries (macOS binaries won't load on Linux)
 export NX_NATIVE_FILE_WATCHER=false
 RUNTIME_FIBE_BIN_DIR="${DATA_DIR:-/app/data}/.fibe/bin"
+RUNTIME_FIBE_BIN="${RUNTIME_FIBE_BIN_DIR}/fibe"
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
 
 fix_file_limits() {
@@ -54,14 +55,9 @@ run_dev_command() {
 ensure_runtime_fibe() {
   mkdir -p "$RUNTIME_FIBE_BIN_DIR"
 
-  if [ -z "${FIBE_VERSION:-}" ] && [ -x "${RUNTIME_FIBE_BIN_DIR}/fibe" ]; then
-    echo "[entrypoint] Using existing runtime fibe from ${RUNTIME_FIBE_BIN_DIR}/fibe"
-    return
-  fi
-
   current_version=""
-  if [ -x "${RUNTIME_FIBE_BIN_DIR}/fibe" ]; then
-    current_version=$("${RUNTIME_FIBE_BIN_DIR}/fibe" version 2>/dev/null | awk 'NR==1 { print $2 }')
+  if [ -x "$RUNTIME_FIBE_BIN" ]; then
+    current_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
   fi
 
   desired_version="${FIBE_VERSION:-}"
@@ -78,13 +74,35 @@ ensure_runtime_fibe() {
     echo "[entrypoint] Installing runtime fibe latest"
   fi
 
-  if [ ! -x /usr/local/bin/install-fibe.sh ]; then
-    echo "[entrypoint] install-fibe.sh not found; skipping runtime fibe install"
-    return
+  installer=""
+  for candidate in /usr/local/bin/install-fibe.sh /app/scripts/install-fibe.sh; do
+    if [ -f "$candidate" ]; then
+      installer="$candidate"
+      break
+    fi
+  done
+
+  rm -f "$RUNTIME_FIBE_BIN"
+
+  if [ -z "$installer" ]; then
+    if [ -x /usr/local/bin/fibe ]; then
+      echo "[entrypoint] install-fibe.sh not found; copying baked fibe from /usr/local/bin/fibe"
+      cp /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"
+      chmod +x "$RUNTIME_FIBE_BIN"
+    else
+      echo "[entrypoint] ERROR: no fibe installer or baked fibe binary found" >&2
+      exit 1
+    fi
+  else
+    echo "[entrypoint] Using fibe installer at ${installer}"
+    FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" sh "$installer"
   fi
 
-  FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" /usr/local/bin/install-fibe.sh
-  installed_version=$("${RUNTIME_FIBE_BIN_DIR}/fibe" version 2>/dev/null | awk 'NR==1 { print $2 }')
+  if [ "$(id -u)" = "0" ]; then
+    chown -R node:node "${DATA_DIR:-/app/data}/.fibe" 2>/dev/null || true
+  fi
+
+  installed_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
   echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
 }
 

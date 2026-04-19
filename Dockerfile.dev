@@ -168,7 +168,9 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
-RUN chmod +x /usr/local/bin/install-fibe.sh
+RUN chmod +x /usr/local/bin/install-fibe.sh \
+    && /usr/local/bin/install-fibe.sh \
+    && /usr/local/bin/fibe version
 
 # ── NO builder stage dist/ copy — dev mode runs from source ──
 
