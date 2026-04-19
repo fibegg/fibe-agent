@@ -29,10 +29,26 @@ install_dev_deps() {
   if [ ! -f node_modules/.npm_dev_installed ]; then
     echo "[entrypoint] Installing dev dependencies..."
     rm -rf node_modules/*
-    npm install --prefer-offline --no-audit --no-fund
-    chown -R node:node /app/node_modules
+    npm install --prefer-offline --no-audit --no-fund --package-lock=false
     touch node_modules/.npm_dev_installed
+    chown_dev_paths
   fi
+}
+
+chown_dev_paths() {
+  if [ "$(id -u)" = "0" ]; then
+    chown -R node:node /app/node_modules /app/.nx /app/data 2>/dev/null || true
+  fi
+}
+
+run_dev_command() {
+  command="$1"
+
+  if [ "$(id -u)" = "0" ]; then
+    exec su node -c "export HOME=/home/node PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
+  fi
+
+  exec sh -c "export HOME=/home/node PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
 }
 
 ensure_runtime_fibe() {
@@ -62,6 +78,11 @@ ensure_runtime_fibe() {
     echo "[entrypoint] Installing runtime fibe latest"
   fi
 
+  if [ ! -x /usr/local/bin/install-fibe.sh ]; then
+    echo "[entrypoint] install-fibe.sh not found; skipping runtime fibe install"
+    return
+  fi
+
   FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" /usr/local/bin/install-fibe.sh
   installed_version=$("${RUNTIME_FIBE_BIN_DIR}/fibe" version 2>/dev/null | awk 'NR==1 { print $2 }')
   echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
@@ -81,8 +102,11 @@ else
   fix_file_limits || true # WIP
   setup_docker_group
   install_dev_deps
+  chown_dev_paths
   chown -R node:node /tmp/.nx-cache 2>/dev/null || true
 
+  dev_command="${FIBE_AGENT_DEV_COMMAND:-npx nx reset && npx nx run-many --targets=serve,dev --parallel=2}"
+
   echo "[entrypoint] Starting API + Chat dev servers..."
-  exec su node -c "export HOME=/home/node PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && npx nx reset && npx nx run-many --targets=serve,dev --parallel=2"
+  run_dev_command "$dev_command"
 fi
