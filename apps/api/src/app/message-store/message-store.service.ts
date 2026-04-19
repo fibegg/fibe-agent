@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -21,7 +21,7 @@ export interface StoredMessage {
 }
 
 @Injectable()
-export class MessageStoreService {
+export class MessageStoreService implements OnModuleDestroy {
   private readonly messagesPath: string;
   private readonly jsonWriter: SequentialJsonWriter;
   private messages: StoredMessage[] = [];
@@ -68,6 +68,14 @@ export class MessageStoreService {
   clear(): void {
     this.messages = [];
     this.jsonWriter.schedule();
+  }
+
+  flush(): Promise<void> {
+    return this.jsonWriter.flush();
+  }
+
+  onModuleDestroy(): Promise<void> {
+    return this.flush();
   }
 
   private ensureDataDir(): void {

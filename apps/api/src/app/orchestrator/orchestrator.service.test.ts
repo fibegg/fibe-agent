@@ -78,6 +78,14 @@ describe('OrchestratorService', () => {
     return orch;
   }
 
+  async function waitForIdle(orch: OrchestratorService): Promise<void> {
+    for (let i = 0; i < 40; i += 1) {
+      if (!orch.isProcessing) return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    expect(orch.isProcessing).toBe(false);
+  }
+
   test('handleClientConnected sends auth_status, activity_snapshot, queue_updated, and agent_mode_updated', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
@@ -108,7 +116,7 @@ describe('OrchestratorService', () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
-    orch.handleClientMessage({ action: WS_ACTION.SET_MODEL, model: 'gemini-2' });
+    await orch.handleClientMessage({ action: WS_ACTION.SET_MODEL, model: 'gemini-2' });
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.MODEL_UPDATED);
     expect(events[0].data.model).toBe('gemini-2');
@@ -273,6 +281,7 @@ describe('OrchestratorService', () => {
     expect(result.accepted).toBe(true);
     expect(result.messageId).toBeDefined();
     expect(typeof result.messageId).toBe('string');
+    await waitForIdle(orch);
   });
 
   test('sendMessageFromApi calls checkAndSendAuthStatus first', async () => {
@@ -283,6 +292,7 @@ describe('OrchestratorService', () => {
     // After checkAndSendAuthStatus, isAuthenticated becomes true
     expect(result.accepted).toBe(true);
     expect(orch.isAuthenticated).toBe(true);
+    await waitForIdle(orch);
   });
 
   test('handleClientMessage initiate_auth sends auth_success when already authenticated', async () => {
@@ -418,4 +428,3 @@ describe('OrchestratorService', () => {
     expect((modeEvent!.data as { mode: string }).mode).toBe('Casting');
   });
 });
-
