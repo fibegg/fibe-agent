@@ -42,6 +42,8 @@ FROM node:24-slim
 
 ARG BUILDKIT_INLINE_CACHE=1
 ARG AGENT_PROVIDER=gemini
+ARG GITHUB_MCP_VERSION=1.0.0
+ARG GITEA_MCP_VERSION=1.1.0
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
@@ -71,6 +73,32 @@ RUN ARCH=$(uname -m) && \
     mv docker/docker /usr/local/bin/docker && \
     chmod +x /usr/local/bin/docker && \
     rm -rf docker docker.tgz
+
+# Official GitHub CLI (`gh`) Debian repository.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    mkdir -p -m 755 /etc/apt/keyrings /etc/apt/sources.list.d && \
+    wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+      https://cli.github.com/packages/githubcli-archive-keyring.gpg && \
+    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
+      > /etc/apt/sources.list.d/github-cli.list && \
+    apt-get update && apt-get install -y --no-install-recommends gh && \
+    rm -rf /var/lib/apt/lists/*
+
+# Official GitHub MCP server. `mcp-github` is kept as a compatibility wrapper
+# for the MCP config currently emitted by Fibe.
+RUN ARCH=$(uname -m) && \
+    if [ "$ARCH" = "x86_64" ]; then GITHUB_MCP_ARCH="x86_64"; \
+    elif [ "$ARCH" = "aarch64" ]; then GITHUB_MCP_ARCH="arm64"; \
+    else GITHUB_MCP_ARCH="x86_64"; fi && \
+    curl -fsSL -o github-mcp-server.tgz \
+      "https://github.com/github/github-mcp-server/releases/download/v${GITHUB_MCP_VERSION}/github-mcp-server_Linux_${GITHUB_MCP_ARCH}.tar.gz" && \
+    tar -xzf github-mcp-server.tgz -C /usr/local/bin github-mcp-server && \
+    rm -f github-mcp-server.tgz && \
+    chmod +x /usr/local/bin/github-mcp-server && \
+    printf '#!/bin/sh\nexec /usr/local/bin/github-mcp-server stdio "$@"\n' > /usr/local/bin/mcp-github && \
+    chmod +x /usr/local/bin/mcp-github
 
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
@@ -111,16 +139,19 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN --mount=type=cache,target=/root/.npm \
     npm rebuild node-pty --build-from-source
 
-# @playwright/mcp and other common MCP servers
+# npm-distributed MCP helper.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g @playwright/mcp@0.0.68 @modelcontextprotocol/server-github
+    npm install -g @playwright/mcp@0.0.68
 
-# Official Gitea MCP server Binary
+# Official Gitea MCP server binary.
 RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then GITEA_ARCH="x86_64"; \
-    elif [ "$ARCH" = "aarch64" ]; then GITEA_ARCH="arm64"; \
-    else GITEA_ARCH="x86_64"; fi && \
-    curl -sL "https://gitea.com/gitea/gitea-mcp/releases/download/v1.1.0/gitea-mcp_Linux_${GITEA_ARCH}.tar.gz" | tar -xz -C /usr/local/bin gitea-mcp
+    if [ "$ARCH" = "x86_64" ]; then GITEA_MCP_ARCH="x86_64"; \
+    elif [ "$ARCH" = "aarch64" ]; then GITEA_MCP_ARCH="arm64"; \
+    else GITEA_MCP_ARCH="x86_64"; fi && \
+    curl -fsSL \
+      "https://gitea.com/gitea/gitea-mcp/releases/download/v${GITEA_MCP_VERSION}/gitea-mcp_Linux_${GITEA_MCP_ARCH}.tar.gz" | \
+      tar -xz -C /usr/local/bin gitea-mcp && \
+    chmod +x /usr/local/bin/gitea-mcp
 
 # System libraries required by Chromium.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
