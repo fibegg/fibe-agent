@@ -2,6 +2,7 @@ import { describe, test, expect, afterEach } from 'bun:test';
 import { StrategyRegistryService } from './strategy-registry.service';
 import { MockStrategy } from './mock.strategy';
 import { ClaudeCodeStrategy } from './claude-code.strategy';
+import { CursorStrategy } from './cursor.strategy';
 import { GeminiStrategy } from './gemini.strategy';
 import { OpenaiCodexStrategy } from './openai-codex.strategy';
 import { OpencodeStrategy } from './opencode.strategy';
@@ -57,6 +58,12 @@ describe('StrategyRegistryService', () => {
     process.env.AGENT_PROVIDER = 'openai';
     const service = new StrategyRegistryService(mockConfig as never);
     expect(service.resolveStrategy()).toBeInstanceOf(OpenaiCodexStrategy);
+  });
+
+  test('resolveStrategy returns CursorStrategy when AGENT_PROVIDER is cursor', () => {
+    process.env.AGENT_PROVIDER = 'cursor';
+    const service = new StrategyRegistryService(mockConfig as never);
+    expect(service.resolveStrategy()).toBeInstanceOf(CursorStrategy);
   });
 
   test('resolveStrategy returns GeminiStrategy when AGENT_PROVIDER is gemini', () => {

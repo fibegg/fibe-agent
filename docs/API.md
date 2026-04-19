@@ -130,7 +130,7 @@ When the chat app is loaded inside an iframe (e.g. Fibe frame), the following ap
 
 The backend talks to external model providers via CLI-based strategies. Two env vars control which agent is active and how it authenticates:
 
-- `AGENT_PROVIDER`: `mock` | `gemini` | `claude-code` | `openai` | `openai-codex` | `opencode` (default `claude-code`)
+- `AGENT_PROVIDER`: `mock` | `gemini` | `claude-code` | `openai` | `openai-codex` | `cursor` | `opencode` (default `claude-code`)
 - `AGENT_AUTH_MODE`: `oauth` (default) | `api-token`
 
 When `AGENT_AUTH_MODE=api-token`, the strategies skip interactive OAuth/device flows and rely on provider API tokens from env vars:

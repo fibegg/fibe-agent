@@ -7,7 +7,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downl
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends python3 make g++ && rm -rf /var/lib/apt/lists/*
+    apt-get update && apt-get install -y --no-install-recommends python3 make g++ curl && rm -rf /var/lib/apt/lists/*
 
 RUN --mount=type=cache,target=/root/.npm \
     if [ "$AGENT_PROVIDER" = "gemini" ]; then \
@@ -18,7 +18,11 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g @openai/codex; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     npm install -g opencode-ai; \
+    elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
+    curl https://cursor.com/install -fsS | bash; \
     fi
+
+RUN mkdir -p /root/.local/share/cursor-agent
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
@@ -111,8 +115,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 COPY --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=cli /usr/local/bin /usr/local/bin
+COPY --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
 
 WORKDIR /app
+
+RUN if [ -d /usr/local/share/cursor-agent ]; then \
+    CURSOR_BIN=$$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
+    if [ -n "$$CURSOR_BIN" ]; then \
+    ln -sf "$$CURSOR_BIN" /usr/local/bin/cursor-agent; \
+    ln -sf "$$CURSOR_BIN" /usr/local/bin/agent; \
+    fi; \
+    fi
 
 # ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
 COPY apps/api/package.json ./package.json
@@ -155,6 +168,8 @@ RUN mkdir -p /app/data /app/playground /home/node/.cache \
     mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
+    elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
+    mkdir -p /home/node/.cursor && chown -R node:node /home/node/.cursor; \
     fi \
     && chown -R node:node /app/data /app/playground /home/node/.cache
 

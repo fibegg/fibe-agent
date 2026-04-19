@@ -49,6 +49,7 @@ Two WebSocket servers share a single HTTP upgrade dispatcher — `/ws` for chat 
 | `gemini`               | — | `@google/gemini-cli` | `gemini` |
 | `claude-code` (code default) | — | `@anthropic-ai/claude-code` | `claude-code` |
 | `openai-codex`         | `openai` | `@openai/codex` | `openai-codex` |
+| `cursor`               | — | `cursor-agent` | `cursor` |
 | `opencode`             | `opencodex` | `opencode-ai` | `opencode` |
 | `mock`                 | — | _(built-in, no CLI)_ | — |
 
@@ -65,6 +66,7 @@ All strategies live under `apps/api/src/app/strategies/`:
 | `gemini.strategy.ts` | Gemini CLI — OAuth device flow or `GEMINI_API_KEY` |
 | `claude-code.strategy.ts` | Claude Code — OAuth or `ANTHROPIC_API_KEY` |
 | `openai-codex.strategy.ts` | OpenAI Codex — OAuth or `OPENAI_API_KEY` |
+| `cursor.strategy.ts` | Cursor Agent CLI — `CURSOR_API_KEY`, stream-json |
 | `opencode.strategy.ts` | OpenCode — auto-detects key from env |
 | `mock.strategy.ts` | No-op mock for local development |
 | `abstract-cli.strategy.ts` | Shared base for all CLI strategies |
@@ -101,7 +103,7 @@ Copy `.env.example` to `.env` before starting.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | API listen port |
-| `AGENT_PROVIDER` | `gemini` | Active provider: `gemini` \| `claude-code` \| `openai-codex` \| `opencode` \| `mock` |
+| `AGENT_PROVIDER` | `gemini` | Active provider: `gemini` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
 | `AGENT_AUTH_MODE` | `oauth` | `oauth` — interactive browser/device flow; `api-token` — env-var key only |
 | `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` or `?token=<password>` |
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the selector (e.g. `flash-lite,flash,pro`) |
@@ -247,6 +249,7 @@ prompts/
     ├── gemini.md               ← Gemini CLI-specific prompt
     ├── claude-code.md          ← Claude Code-specific prompt
     ├── openai-codex.md         ← OpenAI Codex-specific prompt
+    ├── cursor.md               ← Cursor-specific prompt
     └── opencode.md             ← OpenCode-specific prompt
 ```
 
@@ -280,6 +283,7 @@ Each file in `prompts/providers/` extends the base code-playground behaviour wit
 | `providers/gemini.md` | `gemini` | `--yolo` mode, `--resume` sessions, output-length advice |
 | `providers/claude-code.md` | `claude-code` | Native file-edit tools, `--continue` sessions, extended thinking |
 | `providers/openai-codex.md` | `openai-codex` | Sandbox approval policy, full-file writes, o-series reasoning |
+| `providers/cursor.md` | `cursor` | `cursor-agent --print --output-format stream-json --force`, API-key auth |
 | `providers/opencode.md` | `opencode` | API auto-detection, MCP tool usage, monorepo commands |
 
 See [`prompts/README.md`](prompts/README.md) for full authoring guidelines.
@@ -421,6 +425,7 @@ CI publishes multi-arch (`linux/amd64`, `linux/arm64`) images to GHCR on every p
 ghcr.io/<owner>/fibe-agent:gemini-latest
 ghcr.io/<owner>/fibe-agent:claude-code-latest
 ghcr.io/<owner>/fibe-agent:openai-codex-latest
+ghcr.io/<owner>/fibe-agent:cursor-latest
 ghcr.io/<owner>/fibe-agent:opencode-latest
 
 # Dev branch:
@@ -449,6 +454,7 @@ docker run -p 3000:3000 \
 | `gemini` | `/home/node/.gemini` |
 | `claude-code` | `/home/node/.claude` |
 | `openai-codex` | `/home/node/.codex` |
+| `cursor` | `/home/node/.cursor` |
 | `opencode` | `/home/node/.local/share/opencode` |
 
 ---

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { ClaudeCodeStrategy } from './claude-code.strategy';
+import { CursorStrategy } from './cursor.strategy';
 import { GeminiStrategy } from './gemini.strategy';
 import { MockStrategy } from './mock.strategy';
 import { OpencodeStrategy } from './opencode.strategy';
@@ -11,6 +12,7 @@ const PROVIDER_NAMES = [
   'mock',
   'gemini',
   'claude-code',
+  'cursor',
   'openai',
   'openai-codex',
   'opencode',
@@ -49,6 +51,8 @@ export class StrategyRegistryService {
         return new GeminiStrategy(useApiToken, this.config);
       case 'claude-code':
         return new ClaudeCodeStrategy(useApiToken, this.config);
+      case 'cursor':
+        return new CursorStrategy(useApiToken, this.config);
       case 'openai':
       case 'openai-codex':
         return new OpenaiCodexStrategy(useApiToken, this.config);

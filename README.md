@@ -34,7 +34,7 @@
 
 | Area | Details |
 |------|---------|
-| **Multi-provider agents** | `gemini`, `claude-code`, `openai-codex`, `opencode`, `mock` — select via `AGENT_PROVIDER`. OAuth and API-token auth modes. |
+| **Multi-provider agents** | `gemini`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` — select via `AGENT_PROVIDER`. OAuth and API-token auth modes. |
 | **Streaming chat** | WebSocket at `/ws` with per-chunk streaming, reasoning/thinking steps, tool-call and file-created events, token usage, and agent interrupt. |
 | **Inline code editor** | CodeMirror 6 with syntax highlighting for 15+ languages (JS/TS, Python, Go, Rust, Java, C++, CSS, HTML, Markdown, SQL, YAML, …), unsaved-change indicators, keyboard shortcuts, and REST-backed file persistence. |
 | **Interactive terminal** | xterm.js terminal backed by `node-pty`, connected via WebSocket at `/ws-terminal`, spawning shell sessions in the playground directory. |
@@ -151,7 +151,7 @@ fibe-agent/
 | Module | Responsibility |
 |--------|---------------|
 | `orchestrator` | Drives agent runs, streams chunks, manages session state |
-| `strategies` | Provider adapters: `gemini`, `claude-code`, `openai-codex`, `opencode`, `mock` |
+| `strategies` | Provider adapters: `gemini`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` |
 | `agent` | `POST /api/agent/send-message` — async webhook endpoint |
 | `agent-files` | File watcher + REST for agent-generated files |
 | `auth` | Bearer token guard, login endpoint |
@@ -177,7 +177,7 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | API listen port |
-| `AGENT_PROVIDER` | `gemini` | Active agent: `gemini` \| `claude-code` \| `openai-codex` \| `opencode` \| `mock` |
+| `AGENT_PROVIDER` | `gemini` | Active agent: `gemini` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
 | `AGENT_AUTH_MODE` | `oauth` | `oauth` — interactive browser/device flow; `api-token` — env-var key only |
 | `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` |
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the model selector (e.g. `flash-lite,flash,pro`) |
@@ -282,7 +282,7 @@ ghcr.io/<owner>/fibe-agent:<provider>-<git-sha>
 ghcr.io/<owner>/fibe-agent:<provider>-latest-dev
 ```
 
-Providers: `gemini`, `claude-code`, `openai-codex`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and [ci.yml](.github/workflows/ci.yml).
+Providers: `gemini`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and [ci.yml](.github/workflows/ci.yml).
 
 ## Embedding (iframe)
 
