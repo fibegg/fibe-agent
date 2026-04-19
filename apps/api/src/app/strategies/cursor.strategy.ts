@@ -96,6 +96,7 @@ function getToolName(toolCall: CursorToolCall | undefined): string | undefined {
 }
 
 function getToolArgs(toolCall: CursorToolCall | undefined): CursorToolCallArgs | undefined {
+  if (!toolCall) return undefined;
   const toolName = getToolName(toolCall);
   if (!toolName) return undefined;
   return toolCall[toolName]?.args;
