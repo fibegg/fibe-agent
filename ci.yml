@@ -7,14 +7,17 @@ x-fibe.gg:
     source_defaults: true
 
 x-common-bun: &common-bun
-  image: oven/bun:1.3.11-slim
+  image: node:24-slim
   working_dir: /app
   volumes:
     - bun-cache:/root/.bun/install/cache
+    - npm-cache:/root/.npm
     - nx-cache:/app/.nx/cache
     - apt-cache:/var/cache/apt
+    - ci-tools:/opt/fibe-ci-tools
   environment:
     CI: "true"
+    PATH: "/opt/fibe-ci-tools/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 x-env-build: &env-build
   CI: "true"
@@ -225,6 +228,8 @@ volumes:
   bun-cache:
   nx-cache:
   apt-cache:
+  npm-cache:
+  ci-tools:
   trivy-cache:
   buildx-state:
 
@@ -232,13 +237,20 @@ configs:
   script_setup:
     content: |
       set -e
+      export DEBIAN_FRONTEND=noninteractive
+      export PATH="/opt/fibe-ci-tools/node_modules/.bin:$$PATH"
+      export npm_config_node_gyp="/opt/fibe-ci-tools/node_modules/.bin/node-gyp"
 
-      # Skip OS deps if already installed (persistent apt-cache volume)
-      if ! command -v node-gyp >/dev/null 2>&1; then
-        echo "--> Installing OS dependencies"
-        apt-get update && apt-get install -y --no-install-recommends python3 make g++ ca-certificates nodejs npm node-gyp
+      echo "--> Installing native build dependencies"
+      apt-get update
+      apt-get install -y --no-install-recommends python3 make g++ ca-certificates
+      rm -rf /var/lib/apt/lists/*
+
+      if ! command -v bun >/dev/null 2>&1 || ! command -v node-gyp >/dev/null 2>&1; then
+        echo "--> Installing cached Bun toolchain"
+        npm install --prefix /opt/fibe-ci-tools bun@1.3.11 node-gyp
       else
-        echo "--> OS dependencies already installed (cached)"
+        echo "--> Bun toolchain already installed (cached)"
       fi
 
       echo "--> Installing project dependencies"
