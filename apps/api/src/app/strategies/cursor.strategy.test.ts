@@ -18,6 +18,8 @@ function freshState(): CursorExecJsonState {
   return { errorResult: '', lastAssistantChunk: '', hasStartedReasoning: false, hasEmittedOutput: false };
 }
 
+const noop = (): void => undefined;
+
 function writeFakeCursor(path: string): void {
   writeFileSync(path, `#!/usr/bin/env node
 const fs = require('node:fs');
@@ -248,14 +250,14 @@ describe('CursorStrategy', () => {
     const strategy = new CursorStrategy(true);
     let success = false;
     strategy.executeAuth({
-      sendAuthUrlGenerated: () => { /* noop */ },
-      sendDeviceCode: () => { /* noop */ },
-      sendAuthManualToken: () => { /* noop */ },
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
+      sendAuthManualToken: noop,
       sendAuthSuccess: () => {
         success = true;
       },
-      sendAuthStatus: () => { /* noop */ },
-      sendError: () => { /* noop */ },
+      sendAuthStatus: noop,
+      sendError: noop,
     });
 
     strategy.submitAuthCode('cursor-key-123');
@@ -273,16 +275,16 @@ describe('CursorStrategy', () => {
     let manualTokenPrompted = false;
 
     strategy.executeAuth({
-      sendAuthUrlGenerated: () => { /* noop */ },
-      sendDeviceCode: () => { /* noop */ },
+      sendAuthUrlGenerated: noop,
+      sendDeviceCode: noop,
       sendAuthManualToken: () => {
         manualTokenPrompted = true;
       },
       sendAuthSuccess: () => {
         success = true;
       },
-      sendAuthStatus: () => { /* noop */ },
-      sendError: () => { /* noop */ },
+      sendAuthStatus: noop,
+      sendError: noop,
     });
 
     expect(success).toBe(true);
