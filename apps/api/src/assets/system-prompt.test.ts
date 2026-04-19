@@ -92,7 +92,7 @@ describe('prompts/ library — base prompts', () => {
 });
 
 describe('prompts/ library — provider prompts', () => {
-  const providers = ['gemini', 'claude-code', 'openai-codex', 'opencode'];
+  const providers = ['gemini', 'claude-code', 'openai-codex', 'opencode', 'cursor'];
 
   for (const provider of providers) {
     const filePath = repo('prompts', 'providers', `${provider}.md`);

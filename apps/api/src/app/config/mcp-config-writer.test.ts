@@ -352,6 +352,104 @@ describe('writeMcpConfig', () => {
     });
   });
 
+  describe('cursor provider', () => {
+    beforeEach(() => {
+      process.env.AGENT_PROVIDER = 'cursor';
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          fibe: {
+            command: 'fibe',
+            args: ['mcp', 'serve', '--tools', 'full', '--yolo'],
+            env: { FIBE_API_KEY: 'fibe_test_key' },
+          },
+        },
+      });
+      process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          docker: { command: 'uvx', args: ['mcp-server-docker'] },
+        },
+      });
+      delete process.env.SESSION_DIR;
+      delete process.env.DATA_DIR;
+      delete process.env.FIBE_AGENT_ID;
+      delete process.env.CONVERSATION_ID;
+    });
+
+    it('writes workspace .cursor/mcp.json when FIBE_AGENT_ID is available', () => {
+      process.env.DATA_DIR = join(testHome, 'data');
+      process.env.FIBE_AGENT_ID = 'agent/123';
+
+      writeMcpConfig();
+
+      const configPath = join(testHome, 'data', 'agent_123', 'cursor_workspace', '.cursor', 'mcp.json');
+      expect(existsSync(configPath)).toBe(true);
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      expect(config.mcpServers['fibe']).toEqual({
+        command: 'fibe',
+        args: ['mcp', 'serve', '--tools', 'full', '--yolo'],
+        env: { FIBE_API_KEY: 'fibe_test_key' },
+      });
+      expect(config.mcpServers['docker']).toEqual({
+        command: 'uvx',
+        args: ['mcp-server-docker'],
+      });
+    });
+
+    it('falls back to SESSION_DIR/mcp.json without a conversation id', () => {
+      process.env.SESSION_DIR = join(testHome, '.cursor-session');
+
+      writeMcpConfig();
+
+      const configPath = join(testHome, '.cursor-session', 'mcp.json');
+      expect(existsSync(configPath)).toBe(true);
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      expect(config.mcpServers['fibe']).toBeDefined();
+    });
+
+    it('writes remote MCP servers via mcp-remote-wrapper', () => {
+      process.env.DATA_DIR = join(testHome, 'data');
+      process.env.FIBE_AGENT_ID = 'agent-remote';
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          remote: {
+            serverUrl: 'http://rails.test:3000/mcp',
+            authHeader: 'Bearer cursor_key',
+          },
+        },
+      });
+      delete process.env.DOCKER_MCP_CONFIG_JSON;
+
+      writeMcpConfig();
+
+      const config = JSON.parse(
+        readFileSync(join(testHome, 'data', 'agent-remote', 'cursor_workspace', '.cursor', 'mcp.json'), 'utf8'),
+      );
+      expect(config.mcpServers['remote']).toEqual({
+        command: 'mcp-remote-wrapper',
+        args: ['http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer cursor_key'],
+      });
+    });
+
+    it('preserves existing cursor mcp.json content', () => {
+      process.env.DATA_DIR = join(testHome, 'data');
+      process.env.FIBE_AGENT_ID = 'agent-merge';
+      const dir = join(testHome, 'data', 'agent-merge', 'cursor_workspace', '.cursor');
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, 'mcp.json'), JSON.stringify({
+        mcpServers: { existing: { command: 'node', args: ['server.js'] } },
+        ui: { theme: 'dark' },
+      }));
+
+      writeMcpConfig();
+
+      const config = JSON.parse(readFileSync(join(dir, 'mcp.json'), 'utf8'));
+      expect(config.ui).toEqual({ theme: 'dark' });
+      expect(config.mcpServers['existing']).toEqual({ command: 'node', args: ['server.js'] });
+      expect(config.mcpServers['fibe']).toBeDefined();
+      expect(config.mcpServers['docker']).toBeDefined();
+    });
+  });
+
   describe('legacy format support', () => {
     it('handles legacy flat { serverUrl, authHeader } format', () => {
       process.env.AGENT_PROVIDER = 'gemini';

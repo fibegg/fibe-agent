@@ -1,9 +1,10 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { Logger } from '@nestjs/common';
 
 const getHome = () => process.env.HOME ?? '/home/node';
 const getSessionDir = () => process.env.SESSION_DIR;
+const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const logger = new Logger('McpConfigWriter');
 
 /**
@@ -63,6 +64,38 @@ function escapeTomlString(value: string): string {
 
 function quotedTomlString(value: string): string {
   return `"${escapeTomlString(value)}"`;
+}
+
+function sanitizeConversationId(id: string): string {
+  const sanitized = id
+    .replace(/[^a-zA-Z0-9_-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+  return sanitized || 'default';
+}
+
+function getDataDir(): string {
+  return process.env.DATA_DIR ?? join(process.cwd(), 'data');
+}
+
+function getConversationId(): string | null {
+  const raw = process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim() || '';
+  return raw || null;
+}
+
+function getCursorMcpConfigPath(): string {
+  const conversationId = getConversationId();
+  if (!conversationId) {
+    return join(getSessionDir() || join(getHome(), '.cursor'), 'mcp.json');
+  }
+
+  return join(
+    getDataDir(),
+    sanitizeConversationId(conversationId),
+    CURSOR_WORKSPACE_SUBDIR,
+    '.cursor',
+    'mcp.json',
+  );
 }
 
 function codexBearerTokenEnvVar(entry: McpServerEntry): string | null {
@@ -325,6 +358,42 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     };
     process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
     logger.log('Injected MCP servers into OPENCODE_CONFIG_CONTENT env var');
+  },
+
+  /**
+   * Cursor CLI: project .cursor/mcp.json when a conversation id is available,
+   * otherwise SESSION_DIR/ ~/.cursor/mcp.json.
+   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
+   */
+  cursor: (servers) => {
+    const configPath = getCursorMcpConfigPath();
+    const dir = dirname(configPath);
+    let existing: Record<string, unknown> = {};
+
+    try {
+      if (existsSync(configPath)) {
+        existing = JSON.parse(readFileSync(configPath, 'utf8'));
+      }
+    } catch {
+      /* start fresh */
+    }
+
+    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+
+    const nativeServers: Record<string, unknown> = {};
+    for (const [name, entry] of Object.entries(servers)) {
+      nativeServers[name] = toNativeJsonEntry(entry);
+    }
+
+    const config = {
+      ...existing,
+      mcpServers: {
+        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
+        ...nativeServers,
+      },
+    };
+    writeFileSync(configPath, JSON.stringify(config, null, 2));
+    logger.log(`Wrote Cursor MCP config to ${configPath}`);
   },
 };
 

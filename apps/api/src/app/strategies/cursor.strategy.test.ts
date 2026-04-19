@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -15,7 +15,36 @@ function mkEvent(obj: Record<string, unknown>): string {
 }
 
 function freshState(): CursorExecJsonState {
-  return { errorResult: '', lastAssistantChunk: '', hasStartedReasoning: false };
+  return { errorResult: '', lastAssistantChunk: '', hasStartedReasoning: false, hasEmittedOutput: false };
+}
+
+function writeFakeCursor(path: string): void {
+  writeFileSync(path, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (process.env.CURSOR_FAKE_ARGS_PATH) {
+  fs.writeFileSync(process.env.CURSOR_FAKE_ARGS_PATH, JSON.stringify(args));
+}
+if (process.env.CURSOR_FAKE_MODE === 'error') {
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: process.env.CURSOR_FAKE_SESSION_ID || 'session-error', model: 'Composer 2' }));
+  console.error('fake cursor failed');
+  process.exit(7);
+}
+if (process.env.CURSOR_FAKE_MODE === 'empty') {
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: process.env.CURSOR_FAKE_SESSION_ID || 'session-empty', model: 'Composer 2' }));
+  process.exit(0);
+}
+if (process.env.CURSOR_FAKE_EMIT_SESSION !== 'false') {
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: process.env.CURSOR_FAKE_SESSION_ID || 'session-new', model: 'Composer 2' }));
+}
+if (process.env.CURSOR_FAKE_OUTPUT_MODE === 'tool') {
+  console.log(JSON.stringify({ type: 'tool_call', subtype: 'started', tool_call: { shellToolCall: { args: { command: 'pwd' } } } }));
+} else {
+  console.log(JSON.stringify({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'text', text: process.env.CURSOR_FAKE_MESSAGE || 'fake response' }] } }));
+}
+console.log(JSON.stringify({ type: 'result', result: process.env.CURSOR_FAKE_RESULT || '', usage: { inputTokens: 1, outputTokens: 2 } }));
+`, { mode: 0o755 });
+  chmodSync(path, 0o755);
 }
 
 interface Spy {
@@ -64,6 +93,7 @@ describe('handleCursorExecJsonLine', () => {
     expect(spy.reasoningStartCount).toBe(1);
     expect(spy.reasoning).toEqual(['Model: Composer 2\n']);
     expect(spy.sessionIds).toEqual(['session-1']);
+    expect(state.hasEmittedOutput).toBe(false);
   });
 
   test('assistant content is streamed as chunks and reasoning previews', () => {
@@ -81,6 +111,7 @@ describe('handleCursorExecJsonLine', () => {
     expect(spy.reasoningStartCount).toBe(1);
     expect(spy.reasoning).toEqual(['I will inspect the repo.']);
     expect(spy.chunks).toEqual(['I will inspect the repo.']);
+    expect(state.hasEmittedOutput).toBe(true);
   });
 
   test('duplicate assistant chunks are ignored', () => {
@@ -122,6 +153,7 @@ describe('handleCursorExecJsonLine', () => {
         summary: 'writeToolCall',
       },
     ]);
+    expect(state.hasEmittedOutput).toBe(true);
   });
 
   test('result ends reasoning', () => {
@@ -152,20 +184,51 @@ describe('handleCursorExecJsonLine', () => {
       spy.handlers
     );
     expect(spy.usage).toEqual([{ inputTokens: 12, outputTokens: 34 }]);
+    expect(state.hasEmittedOutput).toBe(true);
+  });
+
+  test('error events mark useful output and accumulate error text', () => {
+    const state = freshState();
+    const spy = createSpy();
+    handleCursorExecJsonLine(mkEvent({ type: 'error', error: 'rate limited' }), state, spy.handlers);
+
+    expect(state.errorResult).toBe('rate limited');
+    expect(state.hasEmittedOutput).toBe(true);
+    expect(spy.chunks).toEqual(['⚠️ rate limited']);
+  });
+
+  test('non-json fallback text marks useful output', () => {
+    const state = freshState();
+    const spy = createSpy();
+    handleCursorExecJsonLine('plain cursor output', state, spy.handlers);
+
+    expect(state.hasEmittedOutput).toBe(true);
+    expect(spy.chunks).toEqual(['plain cursor output']);
   });
 });
 
 describe('CursorStrategy', () => {
   let testHome = '';
+  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
+    originalEnv = { ...process.env };
     testHome = mkdtempSync(join(tmpdir(), 'cursor-strategy-test-'));
     process.env.SESSION_DIR = testHome;
     delete process.env.CURSOR_API_KEY;
+    delete process.env.CURSOR_AGENT_BIN;
+    delete process.env.CURSOR_FAKE_ARGS_PATH;
+    delete process.env.CURSOR_FAKE_MODE;
+    delete process.env.CURSOR_FAKE_SESSION_ID;
+    delete process.env.CURSOR_FAKE_EMIT_SESSION;
+    delete process.env.CURSOR_FAKE_MESSAGE;
+    delete process.env.CURSOR_FAKE_OUTPUT_MODE;
+    delete process.env.CURSOR_FAKE_RESULT;
   });
 
   afterEach(() => {
     rmSync(testHome, { recursive: true, force: true });
+    process.env = originalEnv;
   });
 
   test('getModelArgs returns cursor model flag', () => {
@@ -241,5 +304,123 @@ describe('CursorStrategy', () => {
       '--',
       '---\nfrontmatter-like prompt',
     ]);
+  });
+
+  test('executePromptStreaming saves captured session id after successful useful output', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    const argsPath = join(testHome, 'cursor-args.json');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_ARGS_PATH = argsPath;
+    process.env.CURSOR_FAKE_SESSION_ID = 'session-new';
+
+    const convDir = join(testHome, 'conv-data');
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    await strategy.executePromptStreaming('hello', 'Composer 2', (chunk) => chunks.push(chunk));
+
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '--print',
+      '--output-format',
+      'stream-json',
+      '--force',
+      '--model',
+      'Composer 2',
+      '--',
+      'hello',
+    ]);
+    expect(chunks).toEqual(['fake response']);
+    expect(readFileSync(join(convDir, 'cursor_workspace', '.cursor_session'), 'utf8')).toBe('session-new');
+    expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('executePromptStreaming does not save captured session id after failed run', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_MODE = 'error';
+    process.env.CURSOR_FAKE_SESSION_ID = 'session-failed';
+
+    const convDir = join(testHome, 'failed-conv');
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', '', () => undefined)).rejects.toThrow('fake cursor failed');
+    expect(existsSync(join(convDir, 'cursor_workspace', '.cursor_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming rejects successful empty run and does not save first-run marker', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_MODE = 'empty';
+    process.env.CURSOR_FAKE_SESSION_ID = 'session-empty';
+
+    const convDir = join(testHome, 'empty-conv');
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', '', () => undefined)).rejects.toThrow(
+      'Agent process completed successfully but returned no output'
+    );
+    expect(existsSync(join(convDir, 'cursor_workspace', '.cursor_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming resumes existing session and preserves marker when no new session id is emitted', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    const argsPath = join(testHome, 'cursor-resume-args.json');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_ARGS_PATH = argsPath;
+    process.env.CURSOR_FAKE_EMIT_SESSION = 'false';
+
+    const convDir = join(testHome, 'resume-conv');
+    const markerDir = join(convDir, 'cursor_workspace');
+    mkdirSync(markerDir, { recursive: true });
+    writeFileSync(join(markerDir, '.cursor_session'), 'session-existing');
+
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('continue', '', () => undefined);
+
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '--print',
+      '--output-format',
+      'stream-json',
+      '--force',
+      '--resume',
+      'session-existing',
+      '--',
+      'continue',
+    ]);
+    expect(readFileSync(join(markerDir, '.cursor_session'), 'utf8')).toBe('session-existing');
+  });
+
+  test('executePromptStreaming treats tool events as useful output', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_OUTPUT_MODE = 'tool';
+
+    const convDir = join(testHome, 'tool-output-conv');
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('hello', '', () => undefined);
+
+    expect(readFileSync(join(convDir, 'cursor_workspace', '.cursor_session'), 'utf8')).toBe('session-new');
   });
 });
