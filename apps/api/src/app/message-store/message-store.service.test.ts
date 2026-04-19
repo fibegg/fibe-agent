@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MessageStoreService } from './message-store.service';
@@ -83,5 +83,30 @@ describe('MessageStoreService', () => {
     const service = new MessageStoreService(config as never);
     service.finalizeLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
     expect(service.all()).toHaveLength(0);
+  });
+
+  test('flush persists messages.json immediately', async () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
+    const service = new MessageStoreService(config as never);
+
+    service.add('user', 'durable');
+    await service.flush();
+
+    const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
+    expect(JSON.parse(raw)[0].body).toBe('durable');
+  });
+
+  test('onModuleDestroy flushes pending messages.json writes', async () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined };
+    const service = new MessageStoreService(config as never);
+
+    service.add('assistant', 'shutdown-safe');
+    await service.onModuleDestroy();
+
+    expect(existsSync(join(dataDir, 'messages.json'))).toBe(true);
+    const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
+    expect(JSON.parse(raw)[0].body).toBe('shutdown-safe');
   });
 });

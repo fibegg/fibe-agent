@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -20,7 +20,7 @@ function mkEvent(obj: Record<string, unknown>): string {
 }
 
 function freshState(): CodexExecJsonState {
-  return { errorResult: '', inReasoning: false };
+  return { errorResult: '', inReasoning: false, hasEmittedOutput: false };
 }
 
 interface Spy {
@@ -29,6 +29,7 @@ interface Spy {
   reasoningStartCount: number;
   reasoningEndCount: number;
   tools: ToolEvent[];
+  threadIds: string[];
   usage: { inputTokens: number; outputTokens: number } | undefined;
   handlers: CodexExecJsonHandlers;
 }
@@ -40,6 +41,7 @@ function createSpy(): Spy {
     reasoningStartCount: 0,
     reasoningEndCount: 0,
     tools: [],
+    threadIds: [],
     usage: undefined,
     handlers: {} as CodexExecJsonHandlers,
   };
@@ -50,8 +52,34 @@ function createSpy(): Spy {
     onReasoningEnd: () => spy.reasoningEndCount++,
     onTool: (e) => spy.tools.push(e),
     onUsage: (u) => { spy.usage = u; },
+    onThreadId: (threadId) => spy.threadIds.push(threadId),
   };
   return spy;
+}
+
+function writeFakeCodex(path: string): void {
+  writeFileSync(path, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (process.env.CODEX_FAKE_ARGS_PATH) {
+  fs.writeFileSync(process.env.CODEX_FAKE_ARGS_PATH, JSON.stringify(args));
+}
+if (process.env.CODEX_FAKE_MODE === 'error') {
+  console.error('fake codex failed');
+  process.exit(7);
+}
+if (process.env.CODEX_FAKE_MODE === 'empty') {
+  console.log(JSON.stringify({ type: 'thread.started', thread_id: 'thread-empty' }));
+  process.exit(0);
+}
+if (process.env.CODEX_FAKE_EMIT_THREAD !== 'false') {
+  console.log(JSON.stringify({ type: 'thread.started', thread_id: process.env.CODEX_FAKE_THREAD_ID || 'thread-123' }));
+}
+console.log(JSON.stringify({ type: 'turn.started' }));
+console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: process.env.CODEX_FAKE_MESSAGE || 'fake response' } }));
+console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 2 } }));
+`, { mode: 0o755 });
+  chmodSync(path, 0o755);
 }
 
 /* ================================================ */
@@ -400,7 +428,7 @@ describe('handleCodexExecJsonLine', () => {
     expect(spy.chunks).toEqual([]);
   });
 
-  test('thread.started is silently ignored', () => {
+  test('thread.started captures the native Codex thread id without user-visible output', () => {
     const state = freshState();
     const spy = createSpy();
     handleCodexExecJsonLine(
@@ -411,6 +439,7 @@ describe('handleCodexExecJsonLine', () => {
     expect(spy.chunks).toEqual([]);
     expect(spy.reasoning).toEqual([]);
     expect(spy.reasoningStartCount).toBe(0);
+    expect(spy.threadIds).toEqual(['abc']);
   });
 
   test('unknown item type is silently ignored', () => {
@@ -471,6 +500,12 @@ describe('OpenaiCodexStrategy', () => {
     savedEnv.HOME = process.env.HOME;
     savedEnv.SESSION_DIR = process.env.SESSION_DIR;
     savedEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    savedEnv.CODEX_BIN = process.env.CODEX_BIN;
+    savedEnv.CODEX_FAKE_ARGS_PATH = process.env.CODEX_FAKE_ARGS_PATH;
+    savedEnv.CODEX_FAKE_MODE = process.env.CODEX_FAKE_MODE;
+    savedEnv.CODEX_FAKE_THREAD_ID = process.env.CODEX_FAKE_THREAD_ID;
+    savedEnv.CODEX_FAKE_EMIT_THREAD = process.env.CODEX_FAKE_EMIT_THREAD;
+    savedEnv.CODEX_FAKE_MESSAGE = process.env.CODEX_FAKE_MESSAGE;
     process.env.HOME = TEST_HOME;
     process.env.SESSION_DIR = join(TEST_HOME, '.codex');
     if (existsSync(TEST_HOME)) {
@@ -485,6 +520,18 @@ describe('OpenaiCodexStrategy', () => {
     else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
     if (savedEnv.OPENAI_API_KEY === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = savedEnv.OPENAI_API_KEY;
+    if (savedEnv.CODEX_BIN === undefined) delete process.env.CODEX_BIN;
+    else process.env.CODEX_BIN = savedEnv.CODEX_BIN;
+    if (savedEnv.CODEX_FAKE_ARGS_PATH === undefined) delete process.env.CODEX_FAKE_ARGS_PATH;
+    else process.env.CODEX_FAKE_ARGS_PATH = savedEnv.CODEX_FAKE_ARGS_PATH;
+    if (savedEnv.CODEX_FAKE_MODE === undefined) delete process.env.CODEX_FAKE_MODE;
+    else process.env.CODEX_FAKE_MODE = savedEnv.CODEX_FAKE_MODE;
+    if (savedEnv.CODEX_FAKE_THREAD_ID === undefined) delete process.env.CODEX_FAKE_THREAD_ID;
+    else process.env.CODEX_FAKE_THREAD_ID = savedEnv.CODEX_FAKE_THREAD_ID;
+    if (savedEnv.CODEX_FAKE_EMIT_THREAD === undefined) delete process.env.CODEX_FAKE_EMIT_THREAD;
+    else process.env.CODEX_FAKE_EMIT_THREAD = savedEnv.CODEX_FAKE_EMIT_THREAD;
+    if (savedEnv.CODEX_FAKE_MESSAGE === undefined) delete process.env.CODEX_FAKE_MESSAGE;
+    else process.env.CODEX_FAKE_MESSAGE = savedEnv.CODEX_FAKE_MESSAGE;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
     }
@@ -630,6 +677,13 @@ describe('OpenaiCodexStrategy', () => {
     strategy.interruptAgent();
   });
 
+  test('getModelArgs returns Codex model args only for real model names', () => {
+    const strategy = new OpenaiCodexStrategy();
+    expect(strategy.getModelArgs('gpt-5.4')).toEqual(['-m', 'gpt-5.4']);
+    expect(strategy.getModelArgs('')).toEqual([]);
+    expect(strategy.getModelArgs('undefined')).toEqual([]);
+  });
+
   test('constructor with conversationDataDir', () => {
     const strategy = new OpenaiCodexStrategy(false, {
       getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
@@ -651,5 +705,104 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
     expect(strategy.getWorkingDir()).toBe(join(convDir, 'codex_workspace'));
+  });
+
+  test('hasNativeSessionSupport is true only when a Codex session marker exists', () => {
+    const convDir = join(TEST_HOME, 'native-support-conv');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    expect(strategy.hasNativeSessionSupport()).toBe(false);
+
+    const markerDir = join(convDir, 'codex_workspace');
+    mkdirSync(markerDir, { recursive: true });
+    writeFileSync(join(markerDir, '.codex_session'), 'thread-abc');
+
+    expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('executePromptStreaming starts a new Codex exec run and saves the captured thread id', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex');
+    const argsPath = join(TEST_HOME, 'codex-args.json');
+    writeFakeCodex(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_ARGS_PATH = argsPath;
+    process.env.CODEX_FAKE_THREAD_ID = 'thread-new';
+
+    const convDir = join(TEST_HOME, 'new-session-conv');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    await strategy.executePromptStreaming('hello', 'gpt-5.4', (chunk) => chunks.push(chunk));
+
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      'exec',
+      '--json',
+      '--color',
+      'never',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '-m',
+      'gpt-5.4',
+      'hello',
+    ]);
+    expect(readFileSync(join(convDir, 'codex_workspace', '.codex_session'), 'utf8')).toBe('thread-new');
+    expect(chunks).toEqual(['fake response']);
+    expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('executePromptStreaming resumes an existing Codex session and keeps marker when no new thread id is emitted', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex');
+    const argsPath = join(TEST_HOME, 'codex-args.json');
+    writeFakeCodex(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_ARGS_PATH = argsPath;
+    process.env.CODEX_FAKE_EMIT_THREAD = 'false';
+
+    const convDir = join(TEST_HOME, 'resume-session-conv');
+    const markerDir = join(convDir, 'codex_workspace');
+    mkdirSync(markerDir, { recursive: true });
+    writeFileSync(join(markerDir, '.codex_session'), 'thread-existing');
+
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined);
+
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      'exec',
+      'resume',
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '-m',
+      'gpt-5.4',
+      'thread-existing',
+      'continue',
+    ]);
+    expect(readFileSync(join(markerDir, '.codex_session'), 'utf8')).toBe('thread-existing');
+  });
+
+  test('executePromptStreaming does not save a first-run session marker when Codex returns no output', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex');
+    writeFakeCodex(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_MODE = 'empty';
+
+    const convDir = join(TEST_HOME, 'empty-session-conv');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', '', () => undefined)).rejects.toThrow(
+      'Agent process completed successfully but returned no output'
+    );
+    expect(existsSync(join(convDir, 'codex_workspace', '.codex_session'))).toBe(false);
   });
 });

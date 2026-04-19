@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
@@ -8,7 +8,7 @@ import { decryptData } from '../crypto/crypto.util';
 import type { CapturedProviderRequest } from './types';
 
 @Injectable()
-export class ProviderTrafficStoreService {
+export class ProviderTrafficStoreService implements OnModuleDestroy {
   private readonly filePath: string;
   private readonly jsonWriter: SequentialJsonWriter;
   private records: CapturedProviderRequest[] = [];
@@ -43,6 +43,14 @@ export class ProviderTrafficStoreService {
   clear(): void {
     this.records = [];
     this.jsonWriter.schedule();
+  }
+
+  flush(): Promise<void> {
+    return this.jsonWriter.flush();
+  }
+
+  onModuleDestroy(): Promise<void> {
+    return this.flush();
   }
 
   private load(): CapturedProviderRequest[] {
