@@ -161,6 +161,27 @@ services:
         target: /run.sh
     command: ["/bin/sh", "/run.sh"]
 
+  ci-build-cursor:
+    <<: *common-build
+    depends_on:
+      ci-lint:
+        condition: service_completed_successfully
+      ci-test:
+        condition: service_completed_successfully
+      ci-scan:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    environment:
+      <<: *env-build
+      PROVIDER: cursor
+      TAG_NAME: cursor
+    configs:
+      - source: script_build
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
   ci-notify-slack:
     image: docker:29.3.1-cli
     working_dir: /app
@@ -172,6 +193,8 @@ services:
       ci-build-codex:
         condition: service_completed_successfully
       ci-build-opencode:
+        condition: service_completed_successfully
+      ci-build-cursor:
         condition: service_completed_successfully
     labels:
       fibe.gg/job_watch: "true"
