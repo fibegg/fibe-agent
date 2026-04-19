@@ -1,16 +1,35 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { NotFoundException } from '@nestjs/common';
-import { PlaygroundsService } from './playgrounds.service';
+
+const globalMocks = globalThis as any;
+const mockExecFileAsync = globalMocks.__mockExecFileAsync ?? mock();
+globalMocks.__mockExecFileAsync = mockExecFileAsync;
+
+mock.module('node:util', () => {
+  const util = import.meta.require('node:util');
+  return {
+    ...util,
+    promisify: (fn: any) => {
+      if (fn === import.meta.require('node:child_process').execFile) {
+        return mockExecFileAsync;
+      }
+      return util.promisify(fn);
+    }
+  };
+});
+
+const { PlaygroundsService } = require('./playgrounds.service');
 
 describe('PlaygroundsService', () => {
   let playgroundDir: string;
 
   beforeEach(() => {
     playgroundDir = mkdtempSync(join(tmpdir(), 'playground-'));
+    mockExecFileAsync.mockClear();
   });
 
   afterEach(() => {
@@ -315,5 +334,69 @@ describe('PlaygroundsService', () => {
 
     expect(files.length).toBeGreaterThan(0);
     expect(files[0].path).toContain('deep.txt');
+  });
+
+  test('getUrls uses local-playgrounds urls when a current link exists', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getPlayroomsRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => 'project' };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'web|web.example.test\n' });
+
+    const urls = await service.getUrls();
+
+    expect(urls).toEqual(['web|web.example.test']);
+    expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
+    expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+      '--output',
+      'table',
+      'local-playgrounds',
+      'urls',
+      'project',
+    ]);
+    expect(mockExecFileAsync.mock.calls[0][2].env.PLAYROOMS_ROOT).toBe('/opt/fibe/playgrounds');
+  });
+
+  test('getUrls lists playgrounds and combines urls when no current link exists', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getPlayroomsRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => null };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync
+      .mockResolvedValueOnce({ stdout: 'pg1|spec1\npg2|spec2\n' })
+      .mockResolvedValueOnce({ stdout: 'web|web1.example.test\n' })
+      .mockResolvedValueOnce({ stdout: 'api|api2.example.test\n' });
+
+    const urls = await service.getUrls();
+
+    expect(urls).toEqual(['web|web1.example.test', 'api|api2.example.test']);
+    expect(mockExecFileAsync).toHaveBeenCalledTimes(3);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local-playgrounds', 'list']);
+    expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'table', 'local-playgrounds', 'urls', 'pg1']);
+    expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'table', 'local-playgrounds', 'urls', 'pg2']);
+  });
+
+  test('getUrls returns empty array on local-playgrounds failure', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getPlayroomsRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => null };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync.mockRejectedValueOnce(new Error('fibe failed'));
+    const consoleError = mock(() => {});
+    const originalConsoleError = console.error;
+    console.error = consoleError as unknown as typeof console.error;
+
+    try {
+      expect(await service.getUrls()).toEqual([]);
+    } finally {
+      console.error = originalConsoleError;
+    }
   });
 });

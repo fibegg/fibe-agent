@@ -229,14 +229,12 @@ RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-COPY playgrounds-explorer /app/playgrounds-explorer
-RUN chmod +x /app/playgrounds-explorer
-
 # ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
-    && /usr/local/bin/fibe version
+    && /usr/local/bin/fibe version \
+    && /usr/local/bin/fibe local-playgrounds --help >/dev/null
 
 # ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
