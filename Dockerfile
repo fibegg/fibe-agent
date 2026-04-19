@@ -165,6 +165,8 @@ RUN if [ -d /usr/local/share/cursor-agent ]; then \
     fi; \
     fi
 
+RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then cursor-agent --help >/dev/null; fi
+
 # ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
 COPY apps/api/package.json ./package.json
 
