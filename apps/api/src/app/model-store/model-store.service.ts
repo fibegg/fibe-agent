@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
@@ -6,7 +6,7 @@ import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
 import { decryptData } from '../crypto/crypto.util';
 
 @Injectable()
-export class ModelStoreService {
+export class ModelStoreService implements OnModuleDestroy {
   private readonly modelPath: string;
   private readonly jsonWriter: SequentialJsonWriter;
   private cached: string | null = null;
@@ -51,6 +51,14 @@ export class ModelStoreService {
     this.cached = value;
     this.jsonWriter.schedule();
     return value;
+  }
+
+  flush(): Promise<void> {
+    return this.jsonWriter.flush();
+  }
+
+  onModuleDestroy(): Promise<void> {
+    return this.flush();
   }
 
   private ensureDataDir(): void {

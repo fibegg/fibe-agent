@@ -196,8 +196,7 @@ describe('ActivityStoreService', () => {
 
   test('loads activities from disk on construction with valid JSON', async () => {
     service.createWithEntry({ id: 'e1', type: 'step', message: 'Loaded', timestamp: '2026-01-01T00:00:00Z' });
-    // Wait for async JSON writer to flush
-    await new Promise((r) => setTimeout(r, 50));
+    await service.flush();
     // Second service instance reads the same file
     const service2 = new ActivityStoreService(makeConfig(dataDir));
     const activities = service2.all();
@@ -237,5 +236,13 @@ describe('ActivityStoreService', () => {
     expect(activities).toHaveLength(1);
     expect(activities[0].story).toHaveLength(2);
     expect(activities[0].story.map((e: { id: string }) => e.id)).toEqual(['s1', 's2']);
+  });
+
+  test('onModuleDestroy flushes pending activity writes', async () => {
+    service.createWithEntry({ id: 'e1', type: 'step', message: 'Shutdown', timestamp: '' });
+    await service.onModuleDestroy();
+
+    const svc = new ActivityStoreService(makeConfig(dataDir));
+    expect(svc.all()[0].story[0].message).toBe('Shutdown');
   });
 });

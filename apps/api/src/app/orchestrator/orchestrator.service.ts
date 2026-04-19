@@ -114,6 +114,14 @@ export class OrchestratorService implements OnModuleInit {
     };
   }
 
+  private async flushStores(): Promise<void> {
+    await Promise.all([
+      this.messageStore.flush(),
+      this.activityStore.flush(),
+      this.modelStore.flush(),
+    ]);
+  }
+
   ensureStrategySettings(): void {
     this.strategy.ensureSettings?.();
   }
@@ -299,6 +307,7 @@ export class OrchestratorService implements OnModuleInit {
       text,
       imageUrls.length ? imageUrls : undefined
     );
+    await this.messageStore.flush();
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
     return {
       messageId: userMessage.id,
@@ -412,6 +421,7 @@ export class OrchestratorService implements OnModuleInit {
         this._send(WS_EVENT.ERROR, { message });
       }
     } finally {
+      await this.flushStores();
       this.isProcessing = false;
     }
   }
@@ -445,6 +455,7 @@ export class OrchestratorService implements OnModuleInit {
     if (!text.trim()) return;
     await this.steering.enqueue(text);
     const userMessage = this.messageStore.add('user', text);
+    await this.messageStore.flush();
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
     void this.fibeSync.syncMessages(() => JSON.stringify(this.messageStore.all()));
   }
@@ -475,7 +486,7 @@ export class OrchestratorService implements OnModuleInit {
     };
   }
 
-  private handleSubmitStory(story: StoredStoryEntry[]): void {
+  private async handleSubmitStory(story: StoredStoryEntry[]): Promise<void> {
     if (this.currentActivityId) {
       const entry = this.activityStore.getById(this.currentActivityId);
       const backendStory = entry?.story ?? [];
@@ -501,14 +512,19 @@ export class OrchestratorService implements OnModuleInit {
     void this.fibeSync.syncActivity(() =>
       JSON.stringify(this.activityStore.all())
     );
+    await Promise.all([
+      this.messageStore.flush(),
+      this.activityStore.flush(),
+    ]);
   }
 
   private handleGetModel(): void {
     this._send(WS_EVENT.MODEL_UPDATED, { model: this.modelStore.get() });
   }
 
-  private handleSetModel(model: string): void {
+  private async handleSetModel(model: string): Promise<void> {
     const value = this.modelStore.set(model);
+    await this.modelStore.flush();
     this._send(WS_EVENT.MODEL_UPDATED, { model: value });
   }
 }

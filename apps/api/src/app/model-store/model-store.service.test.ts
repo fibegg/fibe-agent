@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ModelStoreService } from './model-store.service';
@@ -54,5 +54,29 @@ describe('ModelStoreService', () => {
     service.set('cached');
     expect(service.get()).toBe('cached');
     expect(service.get()).toBe('cached');
+  });
+
+  test('flush persists model.json immediately', async () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getDefaultModel: () => '', getEncryptionKey: () => undefined };
+    const service = new ModelStoreService(config as never);
+
+    service.set('gpt-5.4');
+    await service.flush();
+
+    const raw = readFileSync(join(dataDir, 'model.json'), 'utf8');
+    expect(JSON.parse(raw)).toEqual({ model: 'gpt-5.4' });
+  });
+
+  test('onModuleDestroy flushes pending model writes', async () => {
+    const config = { getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined, getDefaultModel: () => '', getEncryptionKey: () => undefined };
+    const service = new ModelStoreService(config as never);
+
+    service.set('sonnet');
+    await service.onModuleDestroy();
+
+    const raw = readFileSync(join(dataDir, 'model.json'), 'utf8');
+    expect(JSON.parse(raw)).toEqual({ model: 'sonnet' });
   });
 });

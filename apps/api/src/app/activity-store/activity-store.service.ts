@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -20,7 +20,7 @@ function dedupeStoryById(story: StoredStoryEntry[]): StoredStoryEntry[] {
 }
 
 @Injectable()
-export class ActivityStoreService {
+export class ActivityStoreService implements OnModuleDestroy {
   private readonly activityPath: string;
   private readonly jsonWriter: SequentialJsonWriter;
   private activities: StoredActivityEntry[] = [];
@@ -105,6 +105,14 @@ export class ActivityStoreService {
     this.activities = [];
     this.indexById.clear();
     this.jsonWriter.schedule();
+  }
+
+  flush(): Promise<void> {
+    return this.jsonWriter.flush();
+  }
+
+  onModuleDestroy(): Promise<void> {
+    return this.flush();
   }
 
   private ensureDataDir(): void {
