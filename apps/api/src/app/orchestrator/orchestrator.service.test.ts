@@ -412,7 +412,7 @@ describe('OrchestratorService', () => {
 
     const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
-    expect((modeEvent!.data as { mode: string }).mode).toBe('Exploring');
+    expect((modeEvent?.data as { mode: string })?.mode).toBe('Exploring');
   });
 
   test('handleClientConnected sends agent_mode_updated with current mode', async () => {
@@ -425,6 +425,6 @@ describe('OrchestratorService', () => {
 
     const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
-    expect((modeEvent!.data as { mode: string }).mode).toBe('Casting');
+    expect((modeEvent?.data as { mode: string })?.mode).toBe('Casting');
   });
 });

@@ -1,7 +1,6 @@
 import { describe, test, expect, afterEach } from 'bun:test';
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
 import { request as httpRequest } from 'node:http';
-import { connect as tlsConnect } from 'node:tls';
 import forge from 'node-forge';
 import { CertificateManager } from './certificate-manager';
 import { ConnectProxy } from './connect-proxy';
@@ -9,7 +8,7 @@ import type { CapturedProviderRequest } from './types';
 import { INTERCEPTED_DOMAINS } from './types';
 
 /** Create a self-signed HTTPS server to act as a fake provider endpoint. */
-function createFakeProvider(hostname: string): {
+function _createFakeProvider(hostname: string): {
   server: HttpsServer;
   start: () => Promise<number>;
   stop: () => Promise<void>;
@@ -49,7 +48,7 @@ function createFakeProvider(hostname: string): {
       new Promise((resolve) => {
         server.listen(0, '127.0.0.1', () => {
           const addr = server.address();
-          resolve(typeof addr === 'object' ? addr!.port : 0);
+          resolve(typeof addr === 'object' && addr !== null ? addr.port : 0);
         });
       }),
     stop: () => new Promise((resolve) => server.close(() => resolve())),

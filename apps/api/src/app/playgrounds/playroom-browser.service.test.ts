@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalMocks = globalThis as any;
 const mockExecFileAsync = globalMocks.__mockExecFileAsync ?? mock();
 globalMocks.__mockExecFileAsync = mockExecFileAsync;
@@ -12,6 +13,7 @@ mock.module('node:util', () => {
   const util = import.meta.require('node:util');
   return {
     ...util,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     promisify: (fn: any) => {
       if (fn === import.meta.require('node:child_process').execFile) {
         return mockExecFileAsync;
@@ -31,6 +33,7 @@ function tmpDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeService(rootDir: string, playgroundDir: string): any {
   return new PlayroomBrowserService({
     getPlayroomsRoot: () => rootDir,
@@ -45,6 +48,7 @@ function makeService(rootDir: string, playgroundDir: string): any {
 describe('PlayroomBrowserService', () => {
   let rootDir: string;
   let playgroundDir: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let service: any;
 
   beforeEach(() => {

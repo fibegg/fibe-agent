@@ -39,15 +39,15 @@ describe('TrafficRecorder', () => {
 
     const result = getResult();
     expect(result).not.toBeNull();
-    expect(result!.provider).toBe('anthropic');
-    expect(result!.request.method).toBe('POST');
-    expect(result!.request.url).toBe('https://api.anthropic.com/v1/messages');
-    expect(result!.request.headers['authorization']).toBe('[REDACTED]');
-    expect(result!.request.headers['content-type']).toBe('application/json');
-    expect(result!.request.body).toBe('{"model":"claude-sonnet-4-20250514"}');
-    expect(result!.response.statusCode).toBe(200);
-    expect(result!.response.body).toBe('{"result":"done"}');
-    expect(result!.error).toBeNull();
+    expect(result?.provider).toBe('anthropic');
+    expect(result?.request.method).toBe('POST');
+    expect(result?.request.url).toBe('https://api.anthropic.com/v1/messages');
+    expect(result?.request.headers['authorization']).toBe('[REDACTED]');
+    expect(result?.request.headers['content-type']).toBe('application/json');
+    expect(result?.request.body).toBe('{"model":"claude-sonnet-4-20250514"}');
+    expect(result?.response.statusCode).toBe(200);
+    expect(result?.response.body).toBe('{"result":"done"}');
+    expect(result?.error).toBeNull();
   });
 
   test('handles chunked transfer encoding', () => {
@@ -78,8 +78,8 @@ describe('TrafficRecorder', () => {
 
     const result = getResult();
     expect(result).not.toBeNull();
-    expect(result!.response.body).toBe('Hello World');
-    expect(result!.isStreaming).toBe(true);
+    expect(result?.response.body).toBe('Hello World');
+    expect(result?.isStreaming).toBe(true);
   });
 
   test('handles streaming data arriving in multiple chunks', () => {
@@ -109,7 +109,7 @@ describe('TrafficRecorder', () => {
     recorder.end();
 
     const result = getResult();
-    expect(result!.response.body).toBe('Hello World');
+    expect(result?.response.body).toBe('Hello World');
   });
 
   test('truncates bodies exceeding max size', () => {
@@ -133,9 +133,9 @@ describe('TrafficRecorder', () => {
     recorder.end();
 
     const result = getResult();
-    expect(result!.request.bodyTruncated).toBe(true);
-    expect(result!.request.body!.length).toBe(10);
-    expect(result!.response.bodyTruncated).toBe(false);
+    expect(result?.request.bodyTruncated).toBe(true);
+    expect(result?.request.body?.length).toBe(10);
+    expect(result?.response.bodyTruncated).toBe(false);
   });
 
   test('redacts bodies when option is set', () => {
@@ -159,8 +159,8 @@ describe('TrafficRecorder', () => {
     recorder.end();
 
     const result = getResult();
-    expect(result!.request.body).toBe('[REDACTED]');
-    expect(result!.response.body).toBe('[REDACTED]');
+    expect(result?.request.body).toBe('[REDACTED]');
+    expect(result?.response.body).toBe('[REDACTED]');
   });
 
   test('records error on abnormal end', () => {
@@ -184,8 +184,8 @@ describe('TrafficRecorder', () => {
     recorder.end('client_disconnected');
 
     const result = getResult();
-    expect(result!.error).toBe('client_disconnected');
-    expect(result!.response.statusCode).toBe(200);
+    expect(result?.error).toBe('client_disconnected');
+    expect(result?.response.statusCode).toBe(200);
   });
 
   test('only emits once even if end() called multiple times', () => {
@@ -226,10 +226,10 @@ describe('TrafficRecorder', () => {
     recorder.end();
 
     const result = getResult();
-    expect(result!.usage).toBeDefined();
-    expect(result!.usage!.inputTokens).toBe(100);
-    expect(result!.usage!.outputTokens).toBe(25);
-    expect(result!.usage!.cacheReadTokens).toBe(50);
+    expect(result?.usage).toBeDefined();
+    expect(result?.usage?.inputTokens).toBe(100);
+    expect(result?.usage?.outputTokens).toBe(25);
+    expect(result?.usage?.cacheReadTokens).toBe(50);
   });
 
   test('extracts OpenAI usage from SSE stream', () => {
@@ -251,9 +251,9 @@ describe('TrafficRecorder', () => {
     recorder.end();
 
     const result = getResult();
-    expect(result!.usage).toBeDefined();
-    expect(result!.usage!.inputTokens).toBe(80);
-    expect(result!.usage!.outputTokens).toBe(15);
+    expect(result?.usage).toBeDefined();
+    expect(result?.usage?.inputTokens).toBe(80);
+    expect(result?.usage?.outputTokens).toBe(15);
   });
 
   test('resolves correct provider from hostname', () => {
@@ -270,7 +270,7 @@ describe('TrafficRecorder', () => {
       recorder.feedRequest(Buffer.from(`GET / HTTP/1.1\r\nHost: ${hostname}\r\n\r\n`));
       recorder.feedResponse(Buffer.from('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'));
       recorder.end();
-      expect(getResult()!.provider).toBe(expected);
+      expect(getResult()?.provider).toBe(expected);
     }
   });
 });
