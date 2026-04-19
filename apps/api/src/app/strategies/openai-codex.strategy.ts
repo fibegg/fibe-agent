@@ -16,6 +16,7 @@ import { runAuthProcess } from './auth-process-helper';
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
 
 const CODEX_WORKSPACE_SUBDIR = 'codex_workspace';
+const SESSION_MARKER_FILE = '.codex_session';
 const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 const RESPONSE_PREVIEW_MAX = 200;
@@ -25,6 +26,8 @@ function getCodexHome(): string {
 }
 
 function getCodexCommand(): string {
+  if (process.env.CODEX_BIN?.trim()) return process.env.CODEX_BIN.trim();
+
   try {
     const pkgPath = require.resolve('@openai/codex/package.json');
     const nodeModules = join(pkgPath, '..', '..', '..');
@@ -85,6 +88,7 @@ export interface CodexExecJsonHandlers {
   onReasoningEnd?: () => void;
   onTool?: (event: ToolEvent) => void;
   onUsage?: (usage: TokenUsage) => void;
+  onThreadId?: (threadId: string) => void;
 }
 
 /**
@@ -96,6 +100,7 @@ export interface CodexExecJsonHandlers {
  *   item: agent_message → onReasoningChunk (preview) + onReasoningEnd + onChunk
  *   item: command_exec  → onReasoningChunk + onTool
  *   item: file_change   → onReasoningChunk + onTool
+ *   thread.started      → onThreadId
  *   turn.completed      → onReasoningEnd + onUsage
  *   error / turn.failed → onChunk (prefixed with ⚠️)
  *   non-JSON            → onChunk (ANSI stripped)
@@ -123,6 +128,11 @@ export function handleCodexExecJsonLine(
   try {
     const event = JSON.parse(line) as CodexJsonEvent;
     const type = event.type ?? '';
+
+    if (type === 'thread.started') {
+      if (event.thread_id) handlers.onThreadId?.(event.thread_id);
+      return;
+    }
 
     if (type === 'turn.started') {
       startReasoning();
@@ -255,11 +265,73 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     return getCodexHome();
   }
 
+  private getSessionMarkerPath(): string {
+    return join(this.getWorkingDir(), SESSION_MARKER_FILE);
+  }
+
+  private readSessionId(): string | null {
+    try {
+      const markerPath = this.getSessionMarkerPath();
+      if (!existsSync(markerPath)) return null;
+      return readFileSync(markerPath, 'utf8').trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
+  private writeSessionId(sessionId: string): void {
+    const workspaceDir = this.getWorkingDir();
+    if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
+    writeFileSync(this.getSessionMarkerPath(), sessionId, { mode: 0o600 });
+  }
+
+  private clearSessionId(): void {
+    try {
+      const markerPath = this.getSessionMarkerPath();
+      if (existsSync(markerPath)) unlinkSync(markerPath);
+    } catch {
+      /* ignore cleanup errors */
+    }
+  }
+
   getWorkingDir(): string {
     if (this.conversationDataDir) {
       return join(this.conversationDataDir.getConversationDataDir(), CODEX_WORKSPACE_SUBDIR);
     }
     return join(process.cwd(), CODEX_WORKSPACE_SUBDIR);
+  }
+
+  getModelArgs(model: string): string[] {
+    if (!model || model === 'undefined') return [];
+    return ['-m', model];
+  }
+
+  private buildExecArgs(prompt: string, model: string, sessionId: string | null): string[] {
+    const modelArgs = this.getModelArgs(model);
+    if (sessionId) {
+      return [
+        'exec',
+        'resume',
+        '--json',
+        '--dangerously-bypass-approvals-and-sandbox',
+        ...modelArgs,
+        sessionId,
+        prompt,
+      ];
+    }
+    return [
+      'exec',
+      '--json',
+      '--color',
+      'never',
+      '--dangerously-bypass-approvals-and-sandbox',
+      ...modelArgs,
+      prompt,
+    ];
+  }
+
+  hasNativeSessionSupport(): boolean {
+    return this.readSessionId() !== null;
   }
 
   ensureSettings(): void {
@@ -388,7 +460,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
 
   executePromptStreaming(
     prompt: string,
-    _model: string,
+    model: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
     systemPrompt?: string
@@ -401,9 +473,11 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
+      const existingSessionId = this.readSessionId();
+      const args = this.buildExecArgs(effectivePrompt, model, existingSessionId);
       const codexProcess = spawn(
         getCodexCommand(),
-        ['exec', '--json', '--color', 'never', '--dangerously-bypass-approvals-and-sandbox', effectivePrompt],
+        args,
         { env: { ...process.env, ...this.getProxyEnv(), CODEX_HOME: this.getCodexHomeForSession() }, cwd: playgroundDir, shell: false }
       );
       this.currentStreamProcess = codexProcess;
@@ -411,6 +485,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       let errorResult = '';
       let lineBuffer = '';
       let stderrReasoningStarted = false;
+      let capturedThreadId: string | null = null;
       const jsonState: CodexExecJsonState = { errorResult: '', inReasoning: false, hasEmittedOutput: false };
 
       const handleJsonLine = (raw: string) => {
@@ -421,6 +496,9 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
           onReasoningEnd: callbacks?.onReasoningEnd,
           onTool: callbacks?.onTool,
           onUsage: callbacks?.onUsage,
+          onThreadId: (threadId) => {
+            capturedThreadId = threadId;
+          },
         });
         errorResult = jsonState.errorResult;
       };
@@ -451,12 +529,16 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         if (jsonState.inReasoning || stderrReasoningStarted) callbacks?.onReasoningEnd?.();
         if (this.streamInterrupted) { reject(new Error(INTERRUPTED_MESSAGE)); return; }
         if ((code === 0 || code === null) && !jsonState.hasEmittedOutput) {
+          if (!existingSessionId) this.clearSessionId();
           reject(new Error('Agent process completed successfully but returned no output. Session not saved.'));
           return;
         }
         if (code !== 0 && code !== null) {
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
+          if (capturedThreadId) {
+            this.writeSessionId(capturedThreadId);
+          }
           resolve();
         }
       });

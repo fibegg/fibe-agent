@@ -82,8 +82,7 @@ describe('ProviderTrafficStoreService', () => {
     service.append(makeSampleRecord());
     service.append(makeSampleRecord({ id: 'test-id-2', provider: 'openai' }));
 
-    // Wait for async write
-    await new Promise((r) => setTimeout(r, 100));
+    await service.flush();
 
     const filePath = join(dataDir, 'raw-providers.json');
     expect(existsSync(filePath)).toBe(true);
@@ -100,7 +99,7 @@ describe('ProviderTrafficStoreService', () => {
     const record = makeSampleRecord();
     service.append(record);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await service.flush();
 
     // Create new service instance pointing to same dir
     const service2 = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
@@ -115,9 +114,17 @@ describe('ProviderTrafficStoreService', () => {
     service.clear();
     expect(service.all()).toEqual([]);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await service.flush();
     const filePath = join(dataDir, 'raw-providers.json');
     const raw = readFileSync(filePath, 'utf-8');
     expect(JSON.parse(raw)).toEqual([]);
+  });
+
+  test('onModuleDestroy flushes pending raw provider writes', async () => {
+    service.append(makeSampleRecord());
+    await service.onModuleDestroy();
+
+    const service2 = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    expect(service2.all()).toHaveLength(1);
   });
 });

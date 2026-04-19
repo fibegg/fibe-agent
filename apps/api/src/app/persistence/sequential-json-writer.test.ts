@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from 'bun:test';
 import { SequentialJsonWriter } from './sequential-json-writer';
-import { readFileSync, unlinkSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { readdirSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
+import { basename, join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 describe('SequentialJsonWriter', () => {
@@ -14,8 +14,7 @@ describe('SequentialJsonWriter', () => {
   test('writes snapshot to file as JSON', async () => {
     const data = { count: 0 };
     const writer = new SequentialJsonWriter(testFile, () => data);
-    writer.schedule();
-    await new Promise((r) => setTimeout(r, 100));
+    await writer.schedule();
 
     const content = readFileSync(testFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ count: 0 });
@@ -29,7 +28,7 @@ describe('SequentialJsonWriter', () => {
     counter = 2; writer.schedule();
     counter = 3; writer.schedule();
 
-    await new Promise((r) => setTimeout(r, 300));
+    await writer.flush();
 
     const content = readFileSync(testFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ value: 3 });
@@ -39,14 +38,12 @@ describe('SequentialJsonWriter', () => {
     const badPath = '/nonexistent/dir/file.json';
     const writer = new SequentialJsonWriter(badPath, () => ({ data: true }));
 
-    writer.schedule();
-    await new Promise((r) => setTimeout(r, 100));
+    await writer.schedule();
 
     // Should not throw; chain should still work
     const goodFile = testFile;
     const writer2 = new SequentialJsonWriter(goodFile, () => ({ recovered: true }));
-    writer2.schedule();
-    await new Promise((r) => setTimeout(r, 100));
+    await writer2.schedule();
 
     const content = readFileSync(goodFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ recovered: true });
@@ -54,8 +51,7 @@ describe('SequentialJsonWriter', () => {
 
   test('writes encrypted data when encryption key is provided', async () => {
     const writer = new SequentialJsonWriter(testFile, () => ({ secret: 'value' }), 'my-key');
-    writer.schedule();
-    await new Promise((r) => setTimeout(r, 100));
+    await writer.schedule();
 
     const content = readFileSync(testFile, 'utf8');
     expect(content.startsWith('ENC:')).toBe(true);
@@ -67,40 +63,26 @@ describe('SequentialJsonWriter', () => {
       throw new Error('snapshot failed');
     });
 
-    writer.schedule();
-    await new Promise((r) => setTimeout(r, 100));
+    await writer.schedule();
 
     // Should not crash the process; file should not be created
     expect(existsSync(testFile)).toBe(false);
   });
 
-  test('chain recovers after a write failure (BUG: data loss on disk-full)', async () => {
+  test('chain recovers after a snapshot failure', async () => {
     let shouldFail = true;
-    const originalWriteFile = require('node:fs/promises').writeFile;
-
-    // First write will "fail"
-    const writer = new SequentialJsonWriter(testFile, () => ({ attempt: shouldFail ? 'failed' : 'recovered' }));
-
-    // Mock writeFile to fail on first call
-    const fs = require('node:fs/promises');
-    const origWrite = fs.writeFile;
-    let callCount = 0;
-    fs.writeFile = async (...args: unknown[]) => {
-      callCount++;
-      if (callCount === 1) {
-        throw new Error('ENOSPC: no space left on device');
+    const writer = new SequentialJsonWriter(testFile, () => {
+      if (shouldFail) {
+        throw new Error('snapshot failed');
       }
-      return origWrite(...args);
-    };
+      return { attempt: 'recovered' };
+    });
 
-    writer.schedule(); // will fail
-    await new Promise((r) => setTimeout(r, 100));
+    await writer.schedule();
+    expect(existsSync(testFile)).toBe(false);
 
     shouldFail = false;
-    writer.schedule(); // should recover
-    await new Promise((r) => setTimeout(r, 100));
-
-    fs.writeFile = origWrite; // restore
+    await writer.schedule();
 
     const content = readFileSync(testFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ attempt: 'recovered' });
@@ -112,12 +94,35 @@ describe('SequentialJsonWriter', () => {
       data: 'x'.repeat(100),
     }));
     const writer = new SequentialJsonWriter(testFile, () => largeArray);
-    writer.schedule();
-    await new Promise((r) => setTimeout(r, 300));
+    await writer.schedule();
 
     const content = readFileSync(testFile, 'utf8');
     const parsed = JSON.parse(content);
     expect(parsed.length).toBe(1000);
     expect(parsed[999].id).toBe(999);
+  });
+
+  test('atomic writes do not leave temporary files after success', async () => {
+    const writer = new SequentialJsonWriter(testFile, () => ({ ok: true }));
+    await writer.schedule();
+
+    const tempPrefix = `.${basename(testFile)}.`;
+    const leftovers = readdirSync(tmpdir()).filter((name) =>
+      name.startsWith(tempPrefix) && name.endsWith('.tmp')
+    );
+    expect(leftovers).toEqual([]);
+  });
+
+  test('failed write leaves previous file content intact', async () => {
+    const goodWriter = new SequentialJsonWriter(testFile, () => ({ version: 'old' }));
+    await goodWriter.schedule();
+
+    const failingWriter = new SequentialJsonWriter(testFile, () => {
+      throw new Error('snapshot failed');
+    });
+    await failingWriter.schedule();
+
+    const content = readFileSync(testFile, 'utf8');
+    expect(JSON.parse(content)).toEqual({ version: 'old' });
   });
 });
