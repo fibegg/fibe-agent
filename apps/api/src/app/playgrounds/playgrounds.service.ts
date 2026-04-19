@@ -8,6 +8,7 @@ import { PlayroomBrowserService } from './playroom-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { runLocalPlaygroundsCli } from './local-playgrounds-cli';
 
 const execAsync = promisify(exec);
 
@@ -35,6 +36,12 @@ function pathInIgnoredDir(relPath: string): boolean {
   return segments.some((seg) => IGNORED_NAMES.has(seg));
 }
 
+function parseCliLines(stdout: string): string[] {
+  return stdout.split('\n')
+    .map((l: string) => l.trim())
+    .filter((l: string) => l.length > 0 && !l.includes('Network: Internal only'));
+}
+
 @Injectable()
 export class PlaygroundsService {
   constructor(
@@ -56,20 +63,21 @@ export class PlaygroundsService {
   async getUrls(): Promise<string[]> {
     try {
       const currentLink = await this.playroomBrowser.getCurrentLink();
-      const projectName = currentLink || '';
+      if (currentLink) {
+        const stdout = await runLocalPlaygroundsCli(this.config, ['urls', currentLink]);
+        return parseCliLines(stdout);
+      }
 
-      const scriptPath = join(process.cwd(), 'playgrounds-explorer');
-      const targetBase = join(this.config.getPlayroomsRoot(), 'playgrounds');
-      const { execFile: execFileCb } = require('child_process');
-      const { promisify } = require('util');
-      const execFileAsync = promisify(execFileCb);
-      const args = [scriptPath, ...(projectName ? [projectName] : []), '--urls'];
-      const { stdout } = await execFileAsync('node', args, {
-        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
-      });
-      return stdout.split('\n')
-        .map((l: string) => l.trim())
-        .filter((l: string) => l.length > 0 && !l.includes('Network: Internal only'));
+      const listStdout = await runLocalPlaygroundsCli(this.config, ['list']);
+      const playgrounds = parseCliLines(listStdout).map((line) => line.split('|')[0]).filter(Boolean);
+      const urls: string[] = [];
+
+      for (const playground of playgrounds) {
+        const stdout = await runLocalPlaygroundsCli(this.config, ['urls', playground]);
+        urls.push(...parseCliLines(stdout));
+      }
+
+      return urls;
     } catch (err: unknown) {
       console.error('ERROR IN GETURLS:', err);
       if (err instanceof Error && err.stack) {

@@ -2,10 +2,7 @@ import { access, readFile } from 'node:fs/promises';
 import { resolve, relative } from 'node:path';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
+import { runLocalPlaygroundsCli } from './local-playgrounds-cli';
 
 export interface BrowseEntry {
   name: string;
@@ -36,17 +33,12 @@ async function pathExists(p: string): Promise<boolean> {
 export class PlayroomBrowserService {
   constructor(private readonly config: ConfigService) {}
 
-  /** List entries explicitly via playgrounds-explorer. */
+  /** List local playgrounds through the Fibe CLI. */
   async browse(relPath = ''): Promise<BrowseEntry[]> {
     if (relPath) return []; // Flattened UI workflow doesn't browse subdirectories
 
     try {
-      const scriptPath = process.env.PLAYGROUNDS_EXPLORER_PATH || resolve(process.cwd(), 'playgrounds-explorer');
-      const targetBase = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
-
-      const { stdout } = await execFileAsync('node', [scriptPath], {
-        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
-      });
+      const stdout = await runLocalPlaygroundsCli(this.config, ['list']);
       const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
 
       const entries: BrowseEntry[] = [];
@@ -58,12 +50,12 @@ export class PlayroomBrowserService {
       }
       return entries;
     } catch {
-      throw new NotFoundException(`Cannot execute Playgrounds Explorer.`);
+      throw new NotFoundException(`Cannot execute Fibe local playgrounds command.`);
     }
   }
 
   /**
-   * Run playgrounds-explorer --link to map the target services to /app/playground.
+   * Link the target services to /app/playground through the Fibe CLI.
    *
    * Throws:
    *  - BadRequestException  if relPath is empty / invalid
@@ -83,18 +75,14 @@ export class PlayroomBrowserService {
     }
 
     try {
-      const scriptPath = process.env.PLAYGROUNDS_EXPLORER_PATH || resolve(process.cwd(), 'playgrounds-explorer');
       const linkDir = resolve(this.config.getPlaygroundsDir());
-      const targetBase = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
 
-      await execFileAsync('node', [scriptPath, relPath, '--link', '--link-dir', linkDir], {
-        env: { ...process.env, PLAYROOMS_ROOT: targetBase }
-      });
+      await runLocalPlaygroundsCli(this.config, ['link', relPath, '--link-dir', linkDir]);
 
     } catch (err: unknown) {
       const e = err as Error;
       throw new BadRequestException(
-        `Failed to link playground via explorer: ${e.message}`,
+        `Failed to link playground via Fibe CLI: ${e.message}`,
       );
     }
 
