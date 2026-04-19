@@ -4,7 +4,9 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-const mockExecFileAsync = mock();
+const globalMocks = globalThis as any;
+const mockExecFileAsync = globalMocks.__mockExecFileAsync ?? mock();
+globalMocks.__mockExecFileAsync = mockExecFileAsync;
 
 mock.module('node:util', () => {
   const util = import.meta.require('node:util');
@@ -78,14 +80,15 @@ describe('PlayroomBrowserService', () => {
       expect(entries[1]).toEqual({ name: 'fibe.gg/play2', path: 'proj2', type: 'directory' });
 
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
-      expect(mockExecFileAsync.mock.calls[0][1]).toEqual([expect.stringContaining('playgrounds-explorer')]);
+      expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local-playgrounds', 'list']);
     });
 
     test('throws NotFoundException on execution failure', async () => {
       mockExecFileAsync.mockRejectedValueOnce(new Error('Script failed'));
 
       await expect(service.browse('')).rejects.toThrow(NotFoundException);
-      await expect(service.browse('')).rejects.toThrow('Cannot execute Playgrounds Explorer.');
+      await expect(service.browse('')).rejects.toThrow('Cannot execute Fibe local playgrounds command.');
     });
   });
 
@@ -107,7 +110,7 @@ describe('PlayroomBrowserService', () => {
       await expect(service.linkPlayground('nonexistent')).rejects.toThrow(NotFoundException);
     });
 
-    test('runs playgrounds-explorer --link when target exists', async () => {
+    test('runs fibe local-playgrounds link when target exists', async () => {
       mkdirSync(join(rootDir, 'playgrounds', 'project'), { recursive: true });
       mockExecFileAsync.mockResolvedValueOnce({ stdout: 'Linked' });
 
@@ -116,11 +119,16 @@ describe('PlayroomBrowserService', () => {
       expect(result.linkedPath).toContain('project');
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
 
-      const args = mockExecFileAsync.mock.calls[0][1];
-      expect(args).toContain('project');
-      expect(args).toContain('--link');
-      expect(args).toContain('--link-dir');
-      expect(args).toContain(playgroundDir);
+      expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+        '--output',
+        'table',
+        'local-playgrounds',
+        'link',
+        'project',
+        '--link-dir',
+        playgroundDir,
+      ]);
     });
 
     test('throws BadRequestException if scripting fails', async () => {
