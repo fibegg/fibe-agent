@@ -73,6 +73,7 @@ export interface CursorExecJsonState {
   errorResult: string;
   lastAssistantChunk: string;
   hasStartedReasoning: boolean;
+  hasEmittedOutput: boolean;
 }
 
 export interface CursorExecJsonHandlers {
@@ -154,6 +155,7 @@ export function handleCursorExecJsonLine(
       if (!text) return;
       if (text === state.lastAssistantChunk) return;
       state.lastAssistantChunk = text;
+      if (text.trim()) state.hasEmittedOutput = true;
       handlers.onReasoningChunk?.(preview(text) ?? text);
       handlers.onChunk(text);
       return;
@@ -166,6 +168,7 @@ export function handleCursorExecJsonLine(
       const path = args?.path ?? args?.filePath;
       const command = args?.command;
       const isFileTool = /read|write|edit|delete|file/i.test(toolName);
+      state.hasEmittedOutput = true;
       handlers.onReasoningChunk?.(`${toolName}${path ? `: ${path}` : command ? `: ${command}` : ''}\n`);
       handlers.onTool?.(
         isFileTool && path
@@ -189,6 +192,9 @@ export function handleCursorExecJsonLine(
 
     if (type === 'result') {
       endReasoning();
+      if (typeof event.result === 'string' && event.result.trim()) {
+        state.hasEmittedOutput = true;
+      }
       if (typeof event.result === 'string' && !state.lastAssistantChunk) {
         handlers.onChunk(event.result);
       }
@@ -200,12 +206,14 @@ export function handleCursorExecJsonLine(
       endReasoning();
       const msg = event.error ?? 'Unknown cursor error';
       state.errorResult += msg;
+      if (msg.trim()) state.hasEmittedOutput = true;
       handlers.onChunk(`⚠️ ${msg}`);
       return;
     }
   } catch {
     const cleaned = stripAnsi(trimmed);
     if (cleaned) {
+      state.hasEmittedOutput = true;
       handlers.onChunk(cleaned);
     }
   }
@@ -380,7 +388,9 @@ export class CursorStrategy extends AbstractCLIStrategy {
         errorResult: '',
         lastAssistantChunk: '',
         hasStartedReasoning: false,
+        hasEmittedOutput: false,
       };
+      let capturedSessionId: string | null = null;
 
       const handleJsonLine = (raw: string) => {
         handleCursorExecJsonLine(raw, jsonState, {
@@ -390,7 +400,9 @@ export class CursorStrategy extends AbstractCLIStrategy {
           onReasoningEnd: callbacks?.onReasoningEnd,
           onTool: callbacks?.onTool,
           onUsage: callbacks?.onUsage,
-          onSessionId: (sessionId) => this.writeSessionId(sessionId),
+          onSessionId: (sessionId) => {
+            capturedSessionId = sessionId;
+          },
         });
         errorResult = jsonState.errorResult;
       };
@@ -421,6 +433,14 @@ export class CursorStrategy extends AbstractCLIStrategy {
         }
 
         if (code === 0) {
+          if (!jsonState.hasEmittedOutput) {
+            if (!existingSessionId) this.clearSessionId();
+            reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+            return;
+          }
+          if (capturedSessionId) {
+            this.writeSessionId(capturedSessionId);
+          }
           resolve();
           return;
         }

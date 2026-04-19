@@ -17,7 +17,8 @@ prompts/
     ├── gemini.md               ← Gemini CLI-specific system prompt
     ├── claude-code.md          ← Claude Code-specific system prompt
     ├── openai-codex.md         ← OpenAI Codex-specific system prompt
-    └── opencode.md             ← OpenCode-specific system prompt
+    ├── opencode.md             ← OpenCode-specific system prompt
+    └── cursor.md               ← Cursor Agent-specific system prompt
 ```
 
 ### `base/`
