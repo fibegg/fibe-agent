@@ -248,14 +248,14 @@ describe('CursorStrategy', () => {
     const strategy = new CursorStrategy(true);
     let success = false;
     strategy.executeAuth({
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
-      sendAuthManualToken: () => {},
+      sendAuthUrlGenerated: () => { /* noop */ },
+      sendDeviceCode: () => { /* noop */ },
+      sendAuthManualToken: () => { /* noop */ },
       sendAuthSuccess: () => {
         success = true;
       },
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthStatus: () => { /* noop */ },
+      sendError: () => { /* noop */ },
     });
 
     strategy.submitAuthCode('cursor-key-123');
@@ -273,16 +273,16 @@ describe('CursorStrategy', () => {
     let manualTokenPrompted = false;
 
     strategy.executeAuth({
-      sendAuthUrlGenerated: () => {},
-      sendDeviceCode: () => {},
+      sendAuthUrlGenerated: () => { /* noop */ },
+      sendDeviceCode: () => { /* noop */ },
       sendAuthManualToken: () => {
         manualTokenPrompted = true;
       },
       sendAuthSuccess: () => {
         success = true;
       },
-      sendAuthStatus: () => {},
-      sendError: () => {},
+      sendAuthStatus: () => { /* noop */ },
+      sendError: () => { /* noop */ },
     });
 
     expect(success).toBe(true);

@@ -68,7 +68,7 @@ describe('ProxyService', () => {
 
     expect(service.isEnabled()).toBe(true);
     expect(process.env['__FIBE_PROXY_PORT']).toBeDefined();
-    expect(parseInt(process.env['__FIBE_PROXY_PORT']!, 10)).toBeGreaterThan(0);
+    expect(parseInt(process.env['__FIBE_PROXY_PORT'] ?? '0', 10)).toBeGreaterThan(0);
     expect(process.env['__FIBE_PROXY_CA_PATH']).toBeDefined();
     expect(process.env['__FIBE_PROXY_CA_PATH']).toContain('fibe-proxy-ca-');
 

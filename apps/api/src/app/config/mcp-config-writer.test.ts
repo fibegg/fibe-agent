@@ -502,7 +502,8 @@ describe('writeMcpConfig', () => {
     writeMcpConfig();
 
     expect(process.env.OPENCODE_CONFIG_CONTENT).toBeDefined();
-    const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT!);
+    const configContent = process.env.OPENCODE_CONFIG_CONTENT ?? '{}';
+    const config = JSON.parse(configContent);
     expect(config.mcpServers['test-server']).toBeDefined();
     expect(config.mcpServers['test-server'].url).toBe('https://example.com/mcp');
   });

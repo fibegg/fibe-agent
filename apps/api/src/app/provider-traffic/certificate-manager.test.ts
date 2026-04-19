@@ -53,7 +53,7 @@ describe('CertificateManager', () => {
     // Verify SAN
     const sanExt = leafCert.getExtension('subjectAltName') as { altNames?: { type: number; value: string }[] } | null;
     expect(sanExt).toBeTruthy();
-    expect(sanExt!.altNames).toEqual(
+    expect(sanExt?.altNames).toEqual(
       expect.arrayContaining([expect.objectContaining({ type: 2, value: 'api.anthropic.com' })])
     );
   });
