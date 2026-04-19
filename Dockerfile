@@ -1,13 +1,16 @@
-FROM node:24-slim AS cli
+FROM node:24-slim AS cli-base
 
 ARG BUILDKIT_INLINE_CACHE=1
-ARG AGENT_PROVIDER=gemini
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends python3 make g++ curl && rm -rf /var/lib/apt/lists/*
+
+FROM cli-base AS cli
+
+ARG AGENT_PROVIDER=gemini
 
 RUN --mount=type=cache,target=/root/.npm \
     if [ "$AGENT_PROVIDER" = "gemini" ]; then \
@@ -65,10 +68,9 @@ ENV NX_DAEMON=false \
 RUN --mount=type=cache,target=/app/.nx/cache \
     npx nx run-many --targets=build --projects=api,chat
 
-FROM node:24-slim
+FROM node:24-slim AS runtime-base
 
 ARG BUILDKIT_INLINE_CACHE=1
-ARG AGENT_PROVIDER=gemini
 ARG GITHUB_MCP_VERSION=1.0.0
 ARG GITEA_MCP_VERSION=1.1.0
 
@@ -143,29 +145,7 @@ RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/
 ENV DENO_INSTALL=/usr/local
 RUN curl -fsSL https://deno.land/install.sh | sh
 
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    apt-get update && apt-get install -y --no-install-recommends \
-    dbus gnome-keyring libsecret-1-0 \
-    && rm -rf /var/lib/apt/lists/*; \
-    fi
-
-COPY --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=cli /usr/local/bin /usr/local/bin
-COPY --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
-
 WORKDIR /app
-
-RUN if [ -d /usr/local/share/cursor-agent ]; then \
-    CURSOR_BIN=$$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
-    if [ -n "$$CURSOR_BIN" ]; then \
-    ln -sf "$$CURSOR_BIN" /usr/local/bin/cursor-agent; \
-    ln -sf "$$CURSOR_BIN" /usr/local/bin/agent; \
-    fi; \
-    fi
-
-RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then cursor-agent --help >/dev/null; fi
 
 # ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
 COPY apps/api/package.json ./package.json
@@ -200,17 +180,6 @@ RUN mkdir -p /etc/security/limits.d \
 # ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && touch /app/data/STEERING.md \
-    && if [ "$AGENT_PROVIDER" = "gemini" ]; then \
-    mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
-    elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
-    mkdir -p /home/node/.codex && chown -R node:node /home/node/.codex; \
-    elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
-    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
-    mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
-    elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
-    mkdir -p /home/node/.cursor && chown -R node:node /home/node/.cursor; \
-    fi \
     && chown -R node:node /app/data /app/playground /home/node/.cache
 
 USER node
@@ -237,6 +206,47 @@ RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
     && /usr/local/bin/fibe local-playgrounds --help >/dev/null
+
+FROM runtime-base
+
+ARG BUILDKIT_INLINE_CACHE=1
+ARG AGENT_PROVIDER=gemini
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
+    apt-get update && apt-get install -y --no-install-recommends \
+    dbus gnome-keyring libsecret-1-0 \
+    && rm -rf /var/lib/apt/lists/*; \
+    fi
+
+COPY --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=cli /usr/local/bin /usr/local/bin
+COPY --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
+
+WORKDIR /app
+
+RUN if [ -d /usr/local/share/cursor-agent ]; then \
+    CURSOR_BIN=$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
+    if [ -n "$CURSOR_BIN" ]; then \
+    ln -sf "$CURSOR_BIN" /usr/local/bin/cursor-agent; \
+    ln -sf "$CURSOR_BIN" /usr/local/bin/agent; \
+    fi; \
+    fi
+
+RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then cursor-agent --help >/dev/null; fi
+
+RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
+    mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
+    elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
+    mkdir -p /home/node/.codex && chown -R node:node /home/node/.codex; \
+    elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
+    mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
+    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
+    mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
+    elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
+    mkdir -p /home/node/.cursor && chown -R node:node /home/node/.cursor; \
+    fi
 
 # ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
