@@ -20,7 +20,7 @@ x-env-build: &env-build
   CI: "true"
   GH_USERNAME: ""
   GH_TOKEN: ""
-  BUILD_PARALLEL_JOBS: ""
+  BUILDX_BUILDER_NAME: fibe-agent-ci
 
 x-common-build: &common-build
   image: docker:29.3.1-cli
@@ -77,7 +77,7 @@ services:
       fibe.gg/job_watch: "true"
     command: ["fs", "--cache-dir", "/root/.cache/trivy", "--ignore-unfixed", "--format", "table", "--severity", "CRITICAL,HIGH", "."]
 
-  ci-build-gemini:
+  ci-build-common:
     <<: *common-build
     depends_on:
       ci-lint:
@@ -85,6 +85,19 @@ services:
       ci-test:
         condition: service_completed_successfully
       ci-scan:
+        condition: service_completed_successfully
+    labels:
+      fibe.gg/source_mount: "/app"
+      fibe.gg/job_watch: "true"
+    configs:
+      - source: script_build_common
+        target: /run.sh
+    command: ["/bin/sh", "/run.sh"]
+
+  ci-build-gemini:
+    <<: *common-build
+    depends_on:
+      ci-build-common:
         condition: service_completed_successfully
     labels:
       fibe.gg/source_mount: "/app"
@@ -101,11 +114,7 @@ services:
   ci-build-claude:
     <<: *common-build
     depends_on:
-      ci-lint:
-        condition: service_completed_successfully
-      ci-test:
-        condition: service_completed_successfully
-      ci-scan:
+      ci-build-common:
         condition: service_completed_successfully
     labels:
       fibe.gg/source_mount: "/app"
@@ -122,11 +131,7 @@ services:
   ci-build-codex:
     <<: *common-build
     depends_on:
-      ci-lint:
-        condition: service_completed_successfully
-      ci-test:
-        condition: service_completed_successfully
-      ci-scan:
+      ci-build-common:
         condition: service_completed_successfully
     labels:
       fibe.gg/source_mount: "/app"
@@ -143,11 +148,7 @@ services:
   ci-build-opencode:
     <<: *common-build
     depends_on:
-      ci-lint:
-        condition: service_completed_successfully
-      ci-test:
-        condition: service_completed_successfully
-      ci-scan:
+      ci-build-common:
         condition: service_completed_successfully
     labels:
       fibe.gg/source_mount: "/app"
@@ -164,11 +165,7 @@ services:
   ci-build-cursor:
     <<: *common-build
     depends_on:
-      ci-lint:
-        condition: service_completed_successfully
-      ci-test:
-        condition: service_completed_successfully
-      ci-scan:
+      ci-build-common:
         condition: service_completed_successfully
     labels:
       fibe.gg/source_mount: "/app"
@@ -259,6 +256,84 @@ configs:
         echo "--> No Integration tests found!"
       fi
 
+  script_build_common:
+    content: |
+      set -e
+      echo "--> Preparing shared Docker build cache"
+
+      GH_USERNAME="$${GH_USERNAME:-$${FIBE_REPOSITORY_OWNER:-fibegg}}"
+      LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
+
+      if [ -z "$$GH_TOKEN" ] || [ "$$GH_TOKEN" = '""' ] || [ "$$GH_TOKEN" = "''" ]; then
+        echo "--> Missing GH_TOKEN, skipping shared Docker cache warm-up"
+        exit 0
+      fi
+
+      echo "--> Logging into ghcr.io"
+      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin 2>/dev/null
+
+      IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
+      BUILDER_NAME="$${BUILDX_BUILDER_NAME:-fibe-agent-ci}"
+      RUNTIME_CACHE_REF="$$IMAGE:buildcache-runtime-base"
+      BUILDER_CACHE_REF="$$IMAGE:buildcache-builder"
+
+      echo "--> Installing binfmt emulators for amd64/arm64"
+      docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
+
+      ensure_shared_builder() {
+        if ! docker buildx inspect "$$BUILDER_NAME" >/dev/null 2>&1; then
+          echo "--> Creating shared buildx builder $$BUILDER_NAME"
+          docker buildx create \
+            --name "$$BUILDER_NAME" \
+            --driver docker-container \
+            --driver-opt network=host
+        fi
+
+        BUILDER_INFO=$$(docker buildx inspect "$$BUILDER_NAME" --bootstrap)
+        echo "$$BUILDER_INFO"
+
+        for platform in linux/amd64 linux/arm64; do
+          if ! echo "$$BUILDER_INFO" | grep -q "$$platform"; then
+            echo "--> Recreating $$BUILDER_NAME to restore $$platform support"
+            docker buildx rm "$$BUILDER_NAME" >/dev/null 2>&1 || true
+            docker buildx create \
+              --name "$$BUILDER_NAME" \
+              --driver docker-container \
+              --driver-opt network=host
+            BUILDER_INFO=$$(docker buildx inspect "$$BUILDER_NAME" --bootstrap)
+            echo "$$BUILDER_INFO"
+            echo "$$BUILDER_INFO" | grep -q "$$platform" || {
+              echo "ERROR: buildx builder $$BUILDER_NAME is missing $$platform"
+              exit 1
+            }
+          fi
+        done
+      }
+
+      ensure_shared_builder
+
+      echo "========================================="
+      echo "--> Warming runtime-base cache (linux/amd64 + linux/arm64)"
+      echo "========================================="
+      docker buildx build . \
+        --builder "$$BUILDER_NAME" \
+        --platform linux/amd64,linux/arm64 \
+        --target runtime-base \
+        --cache-from type=registry,ref=$$RUNTIME_CACHE_REF \
+        --cache-from type=registry,ref=$$BUILDER_CACHE_REF \
+        --cache-to type=registry,ref=$$RUNTIME_CACHE_REF,mode=max
+
+      echo "========================================="
+      echo "--> Warming builder cache (linux/amd64 + linux/arm64)"
+      echo "========================================="
+      docker buildx build . \
+        --builder "$$BUILDER_NAME" \
+        --platform linux/amd64,linux/arm64 \
+        --target builder \
+        --cache-from type=registry,ref=$$RUNTIME_CACHE_REF \
+        --cache-from type=registry,ref=$$BUILDER_CACHE_REF \
+        --cache-to type=registry,ref=$$BUILDER_CACHE_REF,mode=max
+
   script_build:
     content: |
       set -e
@@ -286,60 +361,42 @@ configs:
 
       IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
       CACHE_REF="$$IMAGE:buildcache-$$TAG_NAME"
+      RUNTIME_CACHE_REF="$$IMAGE:buildcache-runtime-base"
+      BUILDER_CACHE_REF="$$IMAGE:buildcache-builder"
+      BUILDER_NAME="$${BUILDX_BUILDER_NAME:-fibe-agent-ci}"
 
       echo "========================================="
       echo "--> Building $$PROVIDER (linux/amd64 + linux/arm64)"
       echo "========================================="
 
-      JOBS="$${BUILD_PARALLEL_JOBS:-4}"
-      RUN_ID=$$(hostname | tr -cd '[:alnum:]_.-')
-      BUILDER_NAME="fibe-builder-$$TAG_NAME-$$RUN_ID"
-      echo "--> Using $$JOBS parallel build jobs"
+      if ! docker buildx inspect "$$BUILDER_NAME" >/dev/null 2>&1; then
+        echo "--> Shared builder $$BUILDER_NAME is missing; creating it"
+        docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
+        docker buildx create \
+          --name "$$BUILDER_NAME" \
+          --driver docker-container \
+          --driver-opt network=host
+      fi
 
-      echo "--> Installing binfmt emulators for amd64/arm64"
-      docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
-
-      # Use a provider-scoped builder so parallel image jobs do not race over the
-      # same buildx instance/state. docker-container driver is required for
-      # multi-platform builds.
-      docker buildx use "$$BUILDER_NAME" 2>/dev/null \
-        || docker buildx create \
-             --name "$$BUILDER_NAME" \
-             --driver docker-container \
-             --driver-opt network=host \
-             --use
-      cleanup_builder() {
-        docker buildx rm "$$BUILDER_NAME" >/dev/null 2>&1 || true
-      }
-      trap cleanup_builder EXIT
-      BUILDER_INFO=$$(docker buildx inspect --bootstrap)
+      BUILDER_INFO=$$(docker buildx inspect "$$BUILDER_NAME" --bootstrap)
       echo "$$BUILDER_INFO"
 
       for platform in linux/amd64 linux/arm64; do
         if ! echo "$$BUILDER_INFO" | grep -q "$$platform"; then
-          echo "--> Recreating $$BUILDER_NAME to restore $$platform support"
-          docker buildx rm "$$BUILDER_NAME" >/dev/null 2>&1 || true
-          docker buildx create \
-            --name "$$BUILDER_NAME" \
-            --driver docker-container \
-            --driver-opt network=host \
-            --use
-          BUILDER_INFO=$$(docker buildx inspect --bootstrap)
-          echo "$$BUILDER_INFO"
-          echo "$$BUILDER_INFO" | grep -q "$$platform" || {
-            echo "ERROR: buildx builder $$BUILDER_NAME is missing $$platform support"
-            exit 1
-          }
+          echo "ERROR: buildx builder $$BUILDER_NAME is missing $$platform support"
+          exit 1
         fi
       done
 
       docker buildx build . \
+        --builder "$$BUILDER_NAME" \
         --platform linux/amd64,linux/arm64 \
         -t $$IMAGE:$$TAG_NAME-$$LATEST_TAG \
         -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
         --build-arg AGENT_PROVIDER=$$PROVIDER \
         --build-arg GIT_SHA=$$GIT_SHA \
-        --build-arg PARALLEL_JOBS=$$JOBS \
+        --cache-from type=registry,ref=$$RUNTIME_CACHE_REF \
+        --cache-from type=registry,ref=$$BUILDER_CACHE_REF \
         --cache-from type=registry,ref=$$CACHE_REF \
         --cache-from type=registry,ref=$$IMAGE:$$TAG_NAME-$$LATEST_TAG \
         --cache-to type=registry,ref=$$CACHE_REF,mode=max \
