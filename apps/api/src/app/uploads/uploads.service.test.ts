@@ -138,7 +138,9 @@ describe('UploadsService', () => {
       const filename = await service.saveImage(dataUrl);
 
       // Setup mocks
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sizeOf as unknown as Mock<() => any>).mockReturnValue({ width: 100, height: 200, type: 'png' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (Tesseract.recognize as unknown as Mock<() => any>).mockResolvedValue({ data: { text: 'hello OCR' } });
 
       const info1 = await service.extractImageInfo(filename);
@@ -161,6 +163,7 @@ describe('UploadsService', () => {
       const dataUrl = 'data:image/png;base64,' + Buffer.from('dummy').toString('base64');
       const filename = await service.saveImage(dataUrl);
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (sizeOf as unknown as Mock<() => any>).mockImplementation(() => { throw new Error('Corrupt'); });
       const info = await service.extractImageInfo(filename);
       expect(info).toBeNull();

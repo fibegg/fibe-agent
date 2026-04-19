@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { NotFoundException } from '@nestjs/common';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const globalMocks = globalThis as any;
 const mockExecFileAsync = globalMocks.__mockExecFileAsync ?? mock();
 globalMocks.__mockExecFileAsync = mockExecFileAsync;
@@ -13,6 +14,7 @@ mock.module('node:util', () => {
   const util = import.meta.require('node:util');
   return {
     ...util,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     promisify: (fn: any) => {
       if (fn === import.meta.require('node:child_process').execFile) {
         return mockExecFileAsync;
@@ -389,7 +391,7 @@ describe('PlaygroundsService', () => {
     const playroomBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
     mockExecFileAsync.mockRejectedValueOnce(new Error('fibe failed'));
-    const consoleError = mock(() => {});
+    const consoleError = mock(() => { /* noop */ });
     const originalConsoleError = console.error;
     console.error = consoleError as unknown as typeof console.error;
 
