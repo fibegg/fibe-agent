@@ -6,7 +6,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downl
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends python3 make g++ curl && rm -rf /var/lib/apt/lists/*
+    apt-get update && apt-get install -y --no-install-recommends python3 make g++ curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 FROM cli-base AS cli
 
@@ -22,7 +22,10 @@ RUN --mount=type=cache,target=/root/.npm \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     npm install -g opencode-ai; \
     elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
-    curl https://cursor.com/install -fsS | bash; \
+    curl -fsSL -o /tmp/cursor-install.sh https://cursor.com/install; \
+    bash /tmp/cursor-install.sh; \
+    rm -f /tmp/cursor-install.sh; \
+    /root/.local/bin/cursor-agent --help >/dev/null; \
     fi
 
 RUN mkdir -p /root/.local/share/cursor-agent
@@ -232,15 +235,19 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
 
 WORKDIR /app
 
-RUN if [ -d /usr/local/share/cursor-agent ]; then \
+RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then \
+    CURSOR_BIN=$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
+    test -n "$CURSOR_BIN"; \
+    ln -sf "$CURSOR_BIN" /usr/local/bin/cursor-agent; \
+    ln -sf "$CURSOR_BIN" /usr/local/bin/agent; \
+    cursor-agent --help >/dev/null; \
+    elif [ -d /usr/local/share/cursor-agent ]; then \
     CURSOR_BIN=$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
     if [ -n "$CURSOR_BIN" ]; then \
     ln -sf "$CURSOR_BIN" /usr/local/bin/cursor-agent; \
     ln -sf "$CURSOR_BIN" /usr/local/bin/agent; \
     fi; \
     fi
-
-RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then cursor-agent --help >/dev/null; fi
 
 RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
