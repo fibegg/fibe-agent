@@ -4,6 +4,7 @@ import { Logger } from '@nestjs/common';
 
 const getHome = () => process.env.HOME ?? '/home/node';
 const getSessionDir = () => process.env.SESSION_DIR;
+const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const logger = new Logger('McpConfigWriter');
 
@@ -17,6 +18,7 @@ interface McpServerEntry {
   serverUrl?: string;
   authHeader?: string;
   bearerTokenEnvVar?: string;
+  type?: string;
   command?: string;
   args?: string[];
   env?: Record<string, string>;
@@ -53,6 +55,18 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   return { command: 'mcp-remote-wrapper', args };
 }
 
+function toClaudeProjectJsonEntry(entry: McpServerEntry): Record<string, unknown> {
+  const native = toNativeJsonEntry(entry);
+  if (native.command) {
+    return {
+      type: entry.type ?? 'stdio',
+      ...native,
+    };
+  }
+
+  return native;
+}
+
 function escapeTomlString(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
@@ -81,6 +95,25 @@ function getDataDir(): string {
 function getConversationId(): string | null {
   const raw = process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim() || '';
   return raw || null;
+}
+
+function getClaudeProjectMcpConfigPath(): string | null {
+  const conversationId = getConversationId();
+  if (conversationId) {
+    return join(
+      getDataDir(),
+      sanitizeConversationId(conversationId),
+      CLAUDE_WORKSPACE_SUBDIR,
+      '.mcp.json',
+    );
+  }
+
+  const sessionDir = getSessionDir();
+  if (sessionDir) {
+    return join(dirname(sessionDir), CLAUDE_WORKSPACE_SUBDIR, '.mcp.json');
+  }
+
+  return null;
 }
 
 function getCursorMcpConfigPath(): string {
@@ -224,20 +257,50 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   },
 
   /**
-   * Claude Code: writes MCP servers to BOTH config locations:
-   *   1. ~/.claude/settings.json  — canonical location for Claude Code MCP servers
-   *   2. ~/.claude.json           — legacy/fallback location
+   * Claude Code: writes MCP servers to all known config locations:
+   *   1. <workspace>/.mcp.json     — project-scoped MCP config used by Claude Code
+   *   2. ~/.claude/settings.json   — settings fallback
+   *   3. ~/.claude.json            — legacy/fallback location
    *
-   * Writing to both ensures tools are discovered regardless of Claude Code version.
+   * Writing to all known paths ensures tools are discovered regardless of Claude Code version.
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
   'claude-code': (servers) => {
     const nativeServers: Record<string, unknown> = {};
+    const projectServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
       nativeServers[name] = toNativeJsonEntry(entry);
+      projectServers[name] = toClaudeProjectJsonEntry(entry);
     }
 
-    // Write to ~/.claude/settings.json (canonical location)
+    const projectPath = getClaudeProjectMcpConfigPath();
+    if (projectPath) {
+      const projectDir = dirname(projectPath);
+      let projectExisting: Record<string, unknown> = {};
+      try {
+        if (existsSync(projectPath)) {
+          projectExisting = JSON.parse(readFileSync(projectPath, 'utf8'));
+        }
+      } catch {
+        /* start fresh */
+      }
+
+      if (!existsSync(projectDir)) mkdirSync(projectDir, { recursive: true });
+
+      const projectConfig = {
+        ...projectExisting,
+        mcpServers: {
+          ...((projectExisting.mcpServers as Record<string, unknown>) ?? {}),
+          ...projectServers,
+        },
+      };
+      writeFileSync(projectPath, JSON.stringify(projectConfig, null, 2));
+      logger.log(`Wrote Claude project MCP config to ${projectPath}`);
+    } else {
+      logger.warn('Skipped Claude project .mcp.json because no conversation id or SESSION_DIR is available');
+    }
+
+    // Write to ~/.claude/settings.json
     // Respect SESSION_DIR if set — strategies read config from there
     const settingsDir = getSessionDir() || join(getHome(), '.claude');
     const settingsPath = join(settingsDir, 'settings.json');
