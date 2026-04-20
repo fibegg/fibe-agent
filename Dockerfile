@@ -224,6 +224,12 @@ COPY --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --from=cli /usr/local/bin /usr/local/bin
 COPY --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
 
+# The provider CLI stage inherits node's default docker-entrypoint.sh in
+# /usr/local/bin. Re-apply fibe-agent's smart entrypoint after copying CLI bins.
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && grep -q "dist/main.js" /usr/local/bin/docker-entrypoint.sh
+
 WORKDIR /app
 
 RUN if [ -d /usr/local/share/cursor-agent ]; then \
