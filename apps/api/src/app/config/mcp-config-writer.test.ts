@@ -237,6 +237,32 @@ describe('writeMcpConfig', () => {
       expect(config.firstStartTime).toBe('2026-01-01');
       expect(config.mcpServers['fibe']).toBeDefined();
     });
+
+    it('writes project .mcp.json with stdio type when FIBE_AGENT_ID is available', () => {
+      process.env.DATA_DIR = join(testHome, 'data');
+      process.env.FIBE_AGENT_ID = 'agent/claude';
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          fibe: {
+            command: 'fibe',
+            args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
+            env: { FIBE_API_KEY: 'fibe_test_key' },
+          },
+        },
+      });
+
+      writeMcpConfig();
+
+      const configPath = join(testHome, 'data', 'agent_claude', 'claude_workspace', '.mcp.json');
+      expect(existsSync(configPath)).toBe(true);
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      expect(config.mcpServers['fibe']).toEqual({
+        type: 'stdio',
+        command: 'fibe',
+        args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
+        env: { FIBE_API_KEY: 'fibe_test_key' },
+      });
+    });
   });
 
   describe('openai-codex provider', () => {
@@ -359,7 +385,7 @@ describe('writeMcpConfig', () => {
         mcpServers: {
           fibe: {
             command: 'fibe',
-            args: ['mcp', 'serve', '--tools', 'full', '--yolo'],
+            args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
             env: { FIBE_API_KEY: 'fibe_test_key' },
           },
         },
@@ -386,7 +412,7 @@ describe('writeMcpConfig', () => {
       const config = JSON.parse(readFileSync(configPath, 'utf8'));
       expect(config.mcpServers['fibe']).toEqual({
         command: 'fibe',
-        args: ['mcp', 'serve', '--tools', 'full', '--yolo'],
+        args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
         env: { FIBE_API_KEY: 'fibe_test_key' },
       });
       expect(config.mcpServers['docker']).toEqual({
@@ -601,8 +627,10 @@ describe('writeMcpConfig', () => {
     expect(content).toContain('model = "gpt-4"');
   });
 
-  it('claude-code writer writes to both settings.json and legacy .claude.json', () => {
+  it('claude-code writer writes to project .mcp.json, settings.json, and legacy .claude.json', () => {
     process.env.AGENT_PROVIDER = 'claude-code';
+    process.env.DATA_DIR = join(testHome, 'data');
+    process.env.FIBE_AGENT_ID = 'agent-three-paths';
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: { 'test': { serverUrl: 'https://test.com' } },
     });
@@ -613,7 +641,9 @@ describe('writeMcpConfig', () => {
 
     const settingsPath = join(testHome, '.claude', 'settings.json');
     const legacyPath = join(testHome, '.claude.json');
+    const projectPath = join(testHome, 'data', 'agent-three-paths', 'claude_workspace', '.mcp.json');
     expect(existsSync(settingsPath)).toBe(true);
     expect(existsSync(legacyPath)).toBe(true);
+    expect(existsSync(projectPath)).toBe(true);
   });
 });
