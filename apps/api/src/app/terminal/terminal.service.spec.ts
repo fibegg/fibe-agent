@@ -107,6 +107,28 @@ describe('TerminalService', () => {
     );
   });
 
+  it('adds fibe binary locations to PTY PATH', () => {
+    const savedPath = process.env.PATH;
+    const savedDataDir = process.env.DATA_DIR;
+    process.env.PATH = '/usr/bin:/bin';
+    process.env.DATA_DIR = '/custom/data';
+
+    service.create('s1');
+
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String),
+      [],
+      expect.objectContaining({
+        env: expect.objectContaining({
+          PATH: '/custom/data/.fibe/bin:/usr/local/bin:/usr/bin:/bin',
+        }),
+      }),
+    );
+
+    if (savedPath !== undefined) process.env.PATH = savedPath; else delete process.env.PATH;
+    if (savedDataDir !== undefined) process.env.DATA_DIR = savedDataDir; else delete process.env.DATA_DIR;
+  });
+
   it('falls back to PLAYGROUNDS_DIR when no explicit cwd given', () => {
     const saved = process.env.PLAYGROUNDS_DIR;
     process.env.PLAYGROUNDS_DIR = '/env/playground';
