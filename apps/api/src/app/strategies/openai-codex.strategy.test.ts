@@ -748,6 +748,7 @@ describe('OpenaiCodexStrategy', () => {
       '--dangerously-bypass-approvals-and-sandbox',
       '-m',
       'gpt-5.4',
+      '--',
       'hello',
     ]);
     expect(readFileSync(join(convDir, 'codex_workspace', '.codex_session'), 'utf8')).toBe('thread-new');
@@ -783,9 +784,34 @@ describe('OpenaiCodexStrategy', () => {
       '-m',
       'gpt-5.4',
       'thread-existing',
+      '--',
       'continue',
     ]);
     expect(readFileSync(join(markerDir, '.codex_session'), 'utf8')).toBe('thread-existing');
+  });
+
+  test('executePromptStreaming places `--` before a dash-prefixed prompt so Codex arg parsing does not treat it as a flag', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex');
+    const argsPath = join(TEST_HOME, 'codex-args.json');
+    writeFakeCodex(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_ARGS_PATH = argsPath;
+    process.env.CODEX_FAKE_THREAD_ID = 'thread-dash';
+
+    const convDir = join(TEST_HOME, 'dash-prefix-conv');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    const dashPrompt = '- bullet from system prompt\n[SYSCHECK]';
+    await strategy.executePromptStreaming(dashPrompt, 'gpt-5.4', () => undefined);
+
+    const recordedArgs = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
+    const separatorIndex = recordedArgs.indexOf('--');
+    expect(separatorIndex).toBeGreaterThan(-1);
+    expect(recordedArgs[separatorIndex + 1]).toBe(dashPrompt);
+    expect(recordedArgs[recordedArgs.length - 1]).toBe(dashPrompt);
   });
 
   test('executePromptStreaming does not save a first-run session marker when Codex returns no output', async () => {

@@ -42,6 +42,29 @@ function opencodeDataDir(): string {
   return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.local', 'share', 'opencode');
 }
 
+/**
+ * Build opencode CLI `run` args. The `'--'` separator forces the prompt to be
+ * treated as a positional even when it starts with `-` (e.g. a system prompt
+ * beginning with a markdown bullet). Without it, yargs rejects the arg as an
+ * unknown flag.
+ */
+export function buildOpencodeRunArgs(
+  effectivePrompt: string,
+  modelArgs: string[],
+  hasSession: boolean
+): string[] {
+  return [
+    'run',
+    ...(hasSession ? ['--continue'] : []),
+    '--format',
+    'json',
+    '--thinking',
+    ...modelArgs,
+    '--',
+    effectivePrompt,
+  ];
+}
+
 function opencodeAuthFile(): string {
   return join(opencodeDataDir(), 'auth.json');
 }
@@ -290,14 +313,7 @@ export class OpencodeStrategy implements AgentStrategy {
         : false;
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
-      const opencodeArgs = [
-        'run',
-        ...(hasSession ? ['--continue'] : []),
-        '--format', 'json',
-        '--thinking',
-        ...this.getModelArgs(model),
-        effectivePrompt,
-      ];
+      const opencodeArgs = buildOpencodeRunArgs(effectivePrompt, this.getModelArgs(model), hasSession);
 
       // Build env: start with process.env (inherits pre-set keys like
       // ANTHROPIC_API_KEY, OPENAI_API_KEY, GEMINI_API_KEY, etc.).
