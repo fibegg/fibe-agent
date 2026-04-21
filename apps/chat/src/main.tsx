@@ -6,13 +6,10 @@ import './app/postmessage-auth';
 import './app/keybind-forwarder';
 import { logConsoleBanner } from './app/console-banner';
 import App from './app/app';
+import { IframeReadySignal } from './app/iframe-ready-signal';
 
 logConsoleBanner();
 initTheme();
-
-if (typeof window !== 'undefined' && window !== window.parent) {
-  window.parent.postMessage({ type: 'iframe_ready' }, '*');
-}
 
 declare global {
   interface Window {
@@ -28,6 +25,7 @@ const basename = typeof window !== 'undefined' && window.__BASENAME__ ? window._
 
 root.render(
   <StrictMode>
+    <IframeReadySignal />
     <BrowserRouter basename={basename}>
       <App />
     </BrowserRouter>

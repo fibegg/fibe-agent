@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
@@ -11,6 +11,44 @@ const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
 const SESSION_MARKER_FILE = '.gemini_session';
+
+/**
+ * Gemini CLI resolves its config dir as `${homedir()}/.gemini`, where
+ * `homedir()` prefers the `GEMINI_CLI_HOME` env var over `os.homedir()`.
+ * When SESSION_DIR is set (e.g. `/app/data/<id>/.gemini`) we point the CLI at
+ * its parent so the CLI's lookup lands on our per-agent SESSION_DIR — which
+ * already holds the `settings.json` + `oauth_creds.json` written by the
+ * strategy and the credential injector.
+ */
+function getGeminiHomeEnv(): { GEMINI_CLI_HOME?: string } {
+  const sessionDir = process.env.SESSION_DIR;
+  if (!sessionDir) return {};
+  return { GEMINI_CLI_HOME: dirname(sessionDir) };
+}
+
+function getModelArgsList(model: string): string[] {
+  if (!model || model === 'undefined') return [];
+  return ['-m', model];
+}
+
+/**
+ * Build Gemini CLI args. The prompt is passed via the `-p=<value>` equals-sign
+ * form so yargs binds it to `-p` even when it starts with `-` (e.g. a system
+ * prompt that begins with a markdown bullet). Using `-p <value>` as two
+ * separate args fails with "Not enough arguments following: p".
+ */
+export function buildGeminiArgs(
+  effectivePrompt: string,
+  model: string,
+  hasSession: boolean
+): string[] {
+  return [
+    ...getModelArgsList(model),
+    ...(hasSession ? ['--resume'] : []),
+    '--yolo',
+    `-p=${effectivePrompt}`,
+  ];
+}
 
 export class GeminiStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
@@ -69,7 +107,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     let isCode42Expected = false;
 
     const { process: proc, cancel } = runAuthProcess('gemini', ['-p', ''], {
-      env: { ...process.env, NO_BROWSER: 'true' },
+      env: { ...process.env, ...getGeminiHomeEnv(), NO_BROWSER: 'true' },
       onData: (output) => {
         if (
           output.includes('No input provided via stdin') ||
@@ -153,7 +191,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       return;
     }
     const logoutProcess = spawn('gemini', ['auth', 'logout'], {
-      env: { ...process.env },
+      env: { ...process.env, ...getGeminiHomeEnv() },
       shell: false,
     });
 
@@ -193,7 +231,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     return new Promise((resolve) => {
       this.ensureSettings();
       const geminiProcess = spawn('gemini', ['-p', ''], {
-        env: { ...process.env, NO_BROWSER: 'true' },
+        env: { ...process.env, ...getGeminiHomeEnv(), NO_BROWSER: 'true' },
         shell: false,
       });
 
@@ -271,15 +309,9 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       }
 
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
-      const geminiArgs = [
-        ...this.getModelArgs(model),
-        ...(this._hasSession ? ['--resume'] : []),
-        '--yolo',
-        '-p',
-        effectivePrompt,
-      ];
+      const geminiArgs = buildGeminiArgs(effectivePrompt, model, this._hasSession);
 
-      const env: NodeJS.ProcessEnv = { ...process.env, ...this.getProxyEnv(), NO_BROWSER: 'true' };
+      const env: NodeJS.ProcessEnv = { ...process.env, ...this.getProxyEnv(), ...getGeminiHomeEnv(), NO_BROWSER: 'true' };
       if (this.useApiTokenMode) {
         const token = this.getApiToken();
         if (token) {

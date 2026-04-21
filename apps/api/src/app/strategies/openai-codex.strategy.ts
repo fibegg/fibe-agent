@@ -316,6 +316,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         '--dangerously-bypass-approvals-and-sandbox',
         ...modelArgs,
         sessionId,
+        '--',
         prompt,
       ];
     }
@@ -326,6 +327,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       'never',
       '--dangerously-bypass-approvals-and-sandbox',
       ...modelArgs,
+      '--',
       prompt,
     ];
   }

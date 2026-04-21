@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { GeminiStrategy } from './gemini.strategy';
+import { GeminiStrategy, buildGeminiArgs } from './gemini.strategy';
 
 describe('GeminiStrategy API token mode', () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -178,5 +178,32 @@ describe('GeminiStrategy API token mode', () => {
     };
     strategy.executeLogout(connection);
     expect(logoutSuccessCalled).toBe(true);
+  });
+});
+
+describe('buildGeminiArgs', () => {
+  test('passes the prompt via the -p=value equals form so yargs binds it to -p', () => {
+    const args = buildGeminiArgs('hello world', 'gemini-2.5-pro', false);
+    expect(args).toEqual(['-m', 'gemini-2.5-pro', '--yolo', '-p=hello world']);
+  });
+
+  test('keeps -p bound to the value when the prompt starts with a dash (markdown bullet)', () => {
+    const dashPrompt = '- bullet from system prompt\n[SYSCHECK]';
+    const args = buildGeminiArgs(dashPrompt, 'gemini-2.5-pro', false);
+    const promptArg = args.find((a) => a.startsWith('-p='));
+    expect(promptArg).toBeDefined();
+    expect(promptArg).toBe(`-p=${dashPrompt}`);
+    expect(args).not.toContain('-p');
+  });
+
+  test('includes --resume when hasSession is true', () => {
+    const args = buildGeminiArgs('continue', 'gemini-2.5-pro', true);
+    expect(args).toContain('--resume');
+    expect(args.find((a) => a.startsWith('-p='))).toBe('-p=continue');
+  });
+
+  test('omits -m when model is empty or the literal string "undefined"', () => {
+    expect(buildGeminiArgs('hi', '', false)).toEqual(['--yolo', '-p=hi']);
+    expect(buildGeminiArgs('hi', 'undefined', false)).toEqual(['--yolo', '-p=hi']);
   });
 });
