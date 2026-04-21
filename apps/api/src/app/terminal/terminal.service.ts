@@ -4,6 +4,8 @@ import { randomUUID } from 'node:crypto';
 
 const MIN_COLS = 10;
 const MIN_ROWS = 5;
+const DEFAULT_DATA_DIR = '/app/data';
+const RUNTIME_FIBE_BIN_RELATIVE_DIR = '.fibe/bin';
 
 export interface TerminalSessionInfo {
   id: string;
@@ -26,6 +28,17 @@ export class TerminalService implements OnModuleDestroy {
     return { cols: Math.max(cols, MIN_COLS), rows: Math.max(rows, MIN_ROWS) };
   }
 
+  private buildEnv(): Record<string, string> {
+    const env = { ...(process.env as Record<string, string>) };
+    const dataDir = env.DATA_DIR || DEFAULT_DATA_DIR;
+    const runtimeFibeBinDir = `${dataDir}/${RUNTIME_FIBE_BIN_RELATIVE_DIR}`;
+    const path = env.PATH || '';
+    env.PATH = [runtimeFibeBinDir, '/usr/local/bin', path].filter(Boolean).join(':');
+    env.TERM = 'xterm-256color';
+    env.COLORTERM = 'truecolor';
+    return env;
+  }
+
   /**
    * Spawn a new PTY shell session.
    * @param id      Session identifier (defaults to a fresh UUID).
@@ -42,7 +55,7 @@ export class TerminalService implements OnModuleDestroy {
       cols: c,
       rows: r,
       cwd: sessionCwd,
-      env: { ...(process.env as Record<string, string>), TERM: 'xterm-256color', COLORTERM: 'truecolor' },
+      env: this.buildEnv(),
     });
 
     this.sessions.set(id, ptyProcess);
