@@ -55,6 +55,31 @@ const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
+/** Returns a keyboard-aware terminal height for mobile.
+ *  On desktop (>= 640px) returns the fixed 280px.
+ *  On mobile it caps at 45dvh of the visual viewport so the terminal
+ *  stays visible above the virtual keyboard when it opens. */
+function useTerminalHeight(isMobile: boolean): string {
+  const [height, setHeight] = useState('280px');
+  useEffect(() => {
+    if (!isMobile) { setHeight('280px'); return; }
+    const update = () => {
+      const vvh = window.visualViewport?.height ?? window.innerHeight;
+      const maxH = Math.floor(vvh * 0.45);
+      setHeight(`${Math.max(160, Math.min(maxH, 280))}px`);
+    };
+    update();
+    const vv = window.visualViewport;
+    if (vv) vv.addEventListener('resize', update);
+    window.addEventListener('resize', update);
+    return () => {
+      if (vv) vv.removeEventListener('resize', update);
+      window.removeEventListener('resize', update);
+    };
+  }, [isMobile]);
+  return height;
+};
+
 export function ChatPage() {
   const navigate = useNavigate();
   const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => undefined);
@@ -93,6 +118,7 @@ export function ChatPage() {
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
+  const terminalHeight = useTerminalHeight(isMobile);
   const pgSelector = usePlaygroundSelector();
 
   const [tonyStarkMode, setTonyStarkMode] = useState(() => localStorage.getItem('tony-stark-mode') === 'true');
@@ -745,14 +771,14 @@ export function ChatPage() {
         />
         {terminalOpen && (
           <Suspense fallback={
-            <div className="shrink-0 flex items-center justify-center border-t border-violet-500/20 bg-background" style={{ height: '280px' }}>
+            <div className="shrink-0 flex items-center justify-center border-t border-violet-500/20 bg-background" style={{ height: terminalHeight }}>
               <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
               <span className="text-sm text-muted-foreground">Starting terminal…</span>
             </div>
           }>
             <div
               className="shrink-0 overflow-hidden border-t border-violet-500/20 transition-[height] duration-300 ease-out"
-              style={{ height: '280px' }}
+              style={{ height: terminalHeight }}
             >
               <LazyTerminalPanel onClose={closeTerminal} />
             </div>

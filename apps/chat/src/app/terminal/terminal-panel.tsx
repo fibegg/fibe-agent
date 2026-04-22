@@ -105,7 +105,7 @@ export function TerminalPanel({ onClose }: TerminalPanelProps) {
 
     // ── Resize observer ────────────────────────────────────────────
     let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
-    const ro = new ResizeObserver(() => {
+    const doResize = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         try {
@@ -115,12 +115,18 @@ export function TerminalPanel({ onClose }: TerminalPanelProps) {
           }
         } catch { /* ignore */ }
       }, 50);
-    });
+    };
+    const ro = new ResizeObserver(doResize);
     ro.observe(container);
+
+    // On mobile: refit when virtual keyboard appears/disappears
+    const vv = window.visualViewport;
+    if (vv) vv.addEventListener('resize', doResize);
 
     return () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       ro.disconnect();
+      if (vv) vv.removeEventListener('resize', doResize);
       onDataDisposable.dispose();
       ws.close();
       term.dispose();
