@@ -85,7 +85,10 @@ export function ChatInputArea({
     pendingImages.length + pendingAttachments.length < maxPendingTotal;
 
   return (
-    <div className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border/30 bg-card/30 backdrop-blur-sm">
+    <div
+      className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border/30 bg-card/30 backdrop-blur-sm"
+      style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))' }}
+    >
       <div className="flex flex-col gap-2">
         {(pendingImages.length > 0 || pendingVoice || pendingAttachments.length > 0) && (
           <div className="flex flex-wrap gap-2 items-center">
