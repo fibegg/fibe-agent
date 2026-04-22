@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ModelSelector } from './model-selector';
 
@@ -212,5 +212,79 @@ describe('ModelSelector', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     fireEvent.change(screen.getByLabelText('Search models'), { target: { value: 'xyz' } });
     expect(screen.getByText(/No models match/)).toBeTruthy();
+  });
+
+  // ─── Mobile visibility ────────────────────────────────────────────────────
+
+  it('trigger button is present in the DOM regardless of viewport width', () => {
+    // Previously the trigger was hidden with "hidden md:flex" — it should now be
+    // always present so mobile users can change the model.
+    render(
+      <ModelSelector
+        currentModel=""
+        options={['flash']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+      />
+    );
+    const btn = screen.getByRole('button', { name: 'Select model' });
+    expect(btn).toBeTruthy();
+    // Must NOT have the old "hidden md:flex" class that hid it on mobile
+    expect(btn.className).not.toContain('hidden md:');
+  });
+
+  it('trigger container does not have hidden md:block class', () => {
+    const { container } = render(
+      <ModelSelector
+        currentModel=""
+        options={['flash']}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+      />
+    );
+    // The wrapper div must NOT hide below md breakpoint
+    const wrapper = container.firstElementChild as HTMLElement;
+    expect(wrapper?.className ?? '').not.toContain('hidden md:block');
+  });
+
+  // ─── Outside-tap close (touchstart) ───────────────────────────────────────
+
+  describe('touchstart closes dropdown', () => {
+    beforeEach(() => {
+      // Provide a minimal visualViewport stub so effect runs without error
+      Object.defineProperty(window, 'visualViewport', {
+        value: { height: 800, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+        configurable: true,
+      });
+    });
+
+    afterEach(() => {
+      Object.defineProperty(window, 'visualViewport', {
+        value: undefined,
+        configurable: true,
+      });
+    });
+
+    it('closes dropdown on touchstart outside the component', () => {
+      render(
+        <ModelSelector
+          currentModel=""
+          options={['flash']}
+          onSelect={vi.fn()}
+          onInputChange={vi.fn()}
+          visible
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+      // Dropdown is open (panelRect is set asynchronously via getBoundingClientRect;
+      // in JSDOM it returns all zeros so the panel may not render via portal, but
+      // the touchstart listener should still fire and close state)
+      fireEvent.touchStart(document.body);
+      // After outside touchstart the button should reflect closed state
+      const btn = screen.getByRole('button', { name: 'Select model' });
+      expect(btn.getAttribute('aria-expanded')).toBe('false');
+    });
   });
 });

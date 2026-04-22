@@ -11,6 +11,7 @@ import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 
 export interface ChatHeaderProps {
   isMobile: boolean;
+  agentName?: string;
   state: string;
   agentMode?: string;
   errorMessage: string | null;
@@ -141,6 +142,7 @@ function TerminalButton({
 
 export function ChatHeader({
   isMobile,
+  agentName,
   state,
   agentMode,
   errorMessage,
@@ -170,9 +172,12 @@ export function ChatHeader({
   onToggleTonyStarkMode,
   ...rest
 }: ChatHeaderProps) {
+  // Derive a display name: agentName > currentModel > fallback
+  const displayName = agentName || (currentModel && currentModel.trim()) || 'LLM Agent';
   // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
   const playgroundProps: ChatHeaderProps = {
     isMobile,
+    agentName,
     state,
     agentMode,
     errorMessage,
@@ -235,7 +240,7 @@ export function ChatHeader({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="font-semibold text-sm text-foreground truncate">AI Assistant</h2>
+              <h2 className="font-semibold text-sm text-foreground truncate" title={displayName}>{displayName}</h2>
               {sessionTimeMs > 0 && (
                 <span
                   className="text-[10px] sm:text-xs font-medium tabular-nums text-muted-foreground"

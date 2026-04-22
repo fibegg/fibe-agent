@@ -51,9 +51,25 @@ const DEFAULT_PROPS = {
 // ─── Core rendering ───────────────────────────────────────────────────────────
 
 describe('ChatHeader', () => {
-  it('renders "AI Assistant" heading', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} />);
-    expect(screen.getByText('AI Assistant')).toBeTruthy();
+  it('shows currentModel as heading when agentName is not provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} currentModel="claude-3-5" />);
+    expect(screen.getByText('claude-3-5')).toBeTruthy();
+  });
+
+  it('shows agentName as heading when provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" currentModel="claude-3-5" />);
+    expect(screen.getByText('My Agent')).toBeTruthy();
+    expect(screen.queryByText('claude-3-5')).toBeNull();
+  });
+
+  it('falls back to "LLM Agent" when no agentName and no currentModel', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} currentModel="" />);
+    expect(screen.getByText('LLM Agent')).toBeTruthy();
+  });
+
+  it('heading has title attribute for truncation tooltip', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" />);
+    expect(screen.getByTitle('My Agent')).toBeTruthy();
   });
 
   it('shows session time when sessionTimeMs > 0', () => {
@@ -201,8 +217,10 @@ describe('ChatHeader', () => {
 
   it('shows ModelSelector when showModelSelector is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} showModelSelector={true} currentModel="gpt-4" />);
-    expect(screen.getByTestId('model-selector')).toBeTruthy();
-    expect(screen.getByText('gpt-4')).toBeTruthy();
+    const selector = screen.getByTestId('model-selector');
+    expect(selector).toBeTruthy();
+    // The model-selector stub renders the currentModel inside it
+    expect(selector.textContent).toBe('gpt-4');
   });
 
   // ─── Terminal button ──────────────────────────────────────────────────────
