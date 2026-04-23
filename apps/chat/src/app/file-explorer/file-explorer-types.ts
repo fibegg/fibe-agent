@@ -5,4 +5,5 @@ export interface PlaygroundEntry {
   mtime?: number;
   children?: PlaygroundEntry[];
   gitStatus?: 'modified' | 'untracked' | 'deleted' | 'added' | 'renamed';
+  source?: 'playground' | 'agent';
 }

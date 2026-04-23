@@ -28,11 +28,13 @@ export function FileViewerPanel({
 export function FileDetailsDialog({
   entry,
   onClose,
+  apiBasePath,
   onDirtyChange,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
+  apiBasePath?: string;
   onDirtyChange?: (path: string, isDirty: boolean) => void;
 }) {
-  return <FileEditorDialog entry={entry} onClose={onClose} onDirtyChange={onDirtyChange} />;
+  return <FileEditorDialog entry={entry} onClose={onClose} apiBasePath={apiBasePath} onDirtyChange={onDirtyChange} />;
 }
