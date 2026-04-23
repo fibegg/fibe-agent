@@ -1,10 +1,47 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeCodeStrategy, toolUseToEvent } from './claude-code.strategy';
 
 const CLAUDE_TEST_HOME = join(tmpdir(), `claude-test-home-${process.pid}`);
+
+function writeFakeClaude(path: string): void {
+  writeFileSync(path, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (process.env.CLAUDE_FAKE_ARGS_PATH) {
+  fs.writeFileSync(process.env.CLAUDE_FAKE_ARGS_PATH, JSON.stringify(args));
+}
+if (process.env.CLAUDE_FAKE_ENV_PATH) {
+  fs.writeFileSync(process.env.CLAUDE_FAKE_ENV_PATH, JSON.stringify({
+    HOME: process.env.HOME,
+    SESSION_DIR: process.env.SESSION_DIR,
+    XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME,
+    XDG_DATA_HOME: process.env.XDG_DATA_HOME,
+    XDG_STATE_HOME: process.env.XDG_STATE_HOME,
+    XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+  }));
+}
+if (process.env.CLAUDE_FAKE_MODE === 'missing-session') {
+  console.error('No conversation found with session ID: stale-session-id');
+  process.exit(1);
+}
+if (process.env.CLAUDE_FAKE_MODE === 'empty') {
+  process.exit(0);
+}
+console.log(JSON.stringify({
+  type: 'stream_event',
+  session_id: process.env.CLAUDE_FAKE_SESSION_ID || 'session-new',
+  event: {
+    type: 'content_block_delta',
+    delta: { type: 'text_delta', text: process.env.CLAUDE_FAKE_MESSAGE || 'fake response' }
+  }
+}));
+process.exit(0);
+`, { mode: 0o755 });
+  chmodSync(path, 0o755);
+}
 
 describe('toolUseToEvent', () => {
   test('returns file_created for write_file with path', () => {
@@ -104,6 +141,16 @@ describe('ClaudeCodeStrategy API token mode', () => {
 
   beforeEach(() => {
     savedEnv.HOME = process.env.HOME;
+    savedEnv.PATH = process.env.PATH;
+    savedEnv.SESSION_DIR = process.env.SESSION_DIR;
+    savedEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
+    savedEnv.XDG_DATA_HOME = process.env.XDG_DATA_HOME;
+    savedEnv.XDG_STATE_HOME = process.env.XDG_STATE_HOME;
+    savedEnv.XDG_CACHE_HOME = process.env.XDG_CACHE_HOME;
+    savedEnv.CLAUDE_FAKE_MODE = process.env.CLAUDE_FAKE_MODE;
+    savedEnv.CLAUDE_FAKE_ARGS_PATH = process.env.CLAUDE_FAKE_ARGS_PATH;
+    savedEnv.CLAUDE_FAKE_ENV_PATH = process.env.CLAUDE_FAKE_ENV_PATH;
+    savedEnv.CLAUDE_FAKE_SESSION_ID = process.env.CLAUDE_FAKE_SESSION_ID;
     process.env.HOME = CLAUDE_TEST_HOME;
     if (!existsSync(CLAUDE_TEST_HOME)) {
       mkdirSync(CLAUDE_TEST_HOME, { recursive: true });
@@ -116,6 +163,25 @@ describe('ClaudeCodeStrategy API token mode', () => {
 
   afterEach(() => {
     process.env.HOME = savedEnv.HOME;
+    process.env.PATH = savedEnv.PATH;
+    if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
+    else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
+    if (savedEnv.XDG_CONFIG_HOME === undefined) delete process.env.XDG_CONFIG_HOME;
+    else process.env.XDG_CONFIG_HOME = savedEnv.XDG_CONFIG_HOME;
+    if (savedEnv.XDG_DATA_HOME === undefined) delete process.env.XDG_DATA_HOME;
+    else process.env.XDG_DATA_HOME = savedEnv.XDG_DATA_HOME;
+    if (savedEnv.XDG_STATE_HOME === undefined) delete process.env.XDG_STATE_HOME;
+    else process.env.XDG_STATE_HOME = savedEnv.XDG_STATE_HOME;
+    if (savedEnv.XDG_CACHE_HOME === undefined) delete process.env.XDG_CACHE_HOME;
+    else process.env.XDG_CACHE_HOME = savedEnv.XDG_CACHE_HOME;
+    if (savedEnv.CLAUDE_FAKE_MODE === undefined) delete process.env.CLAUDE_FAKE_MODE;
+    else process.env.CLAUDE_FAKE_MODE = savedEnv.CLAUDE_FAKE_MODE;
+    if (savedEnv.CLAUDE_FAKE_ARGS_PATH === undefined) delete process.env.CLAUDE_FAKE_ARGS_PATH;
+    else process.env.CLAUDE_FAKE_ARGS_PATH = savedEnv.CLAUDE_FAKE_ARGS_PATH;
+    if (savedEnv.CLAUDE_FAKE_ENV_PATH === undefined) delete process.env.CLAUDE_FAKE_ENV_PATH;
+    else process.env.CLAUDE_FAKE_ENV_PATH = savedEnv.CLAUDE_FAKE_ENV_PATH;
+    if (savedEnv.CLAUDE_FAKE_SESSION_ID === undefined) delete process.env.CLAUDE_FAKE_SESSION_ID;
+    else process.env.CLAUDE_FAKE_SESSION_ID = savedEnv.CLAUDE_FAKE_SESSION_ID;
     for (const key of CLAUDE_ENV_TOKEN_KEYS) {
       if (savedEnv[key] === undefined) delete process.env[key];
       else process.env[key] = savedEnv[key];
@@ -281,5 +347,68 @@ describe('ClaudeCodeStrategy API token mode', () => {
     // The session ID will be loaded when sendMessage is called.
     // We verify the strategy was constructed without error and has session support.
     expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('executePromptStreaming clears stale session marker when Claude reports missing conversation', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+    process.env.CLAUDE_FAKE_MODE = 'missing-session';
+
+    const argsPath = join(CLAUDE_TEST_HOME, 'claude-args.json');
+    process.env.CLAUDE_FAKE_ARGS_PATH = argsPath;
+
+    const convDir = join(CLAUDE_TEST_HOME, 'missing-session-conv');
+    const workspaceDir = join(convDir, 'claude_workspace');
+    mkdirSync(workspaceDir, { recursive: true });
+    writeFileSync(join(workspaceDir, '.claude_session'), 'stale-session-id');
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('continue', '', () => undefined)).rejects.toThrow(
+      'No conversation found with session ID: stale-session-id'
+    );
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '--resume',
+      'stale-session-id',
+      '-p',
+      'continue',
+      '--dangerously-skip-permissions',
+    ]);
+    expect(existsSync(join(workspaceDir, '.claude_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming points Claude HOME at the persisted SESSION_DIR parent', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+    process.env.HOME = join(CLAUDE_TEST_HOME, 'non-persistent-home');
+    process.env.SESSION_DIR = join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.claude');
+
+    const envPath = join(CLAUDE_TEST_HOME, 'claude-env.json');
+    process.env.CLAUDE_FAKE_ENV_PATH = envPath;
+
+    const convDir = join(CLAUDE_TEST_HOME, 'persisted-home-conv');
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', '', () => undefined)).resolves.toBeUndefined();
+    expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
+      HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data'),
+      SESSION_DIR: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.claude'),
+      XDG_CONFIG_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.config'),
+      XDG_DATA_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.local', 'share'),
+      XDG_STATE_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.local', 'state'),
+      XDG_CACHE_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.cache'),
+    });
   });
 });

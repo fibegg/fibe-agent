@@ -11,6 +11,11 @@ const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
 const SESSION_MARKER_FILE = '.gemini_session';
+const MISSING_SESSION_ERROR_PATTERNS = [
+  /No conversation found with session ID:/i,
+  /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
+  /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
+];
 
 /**
  * Gemini CLI resolves its config dir as `${homedir()}/.gemini`, where
@@ -50,6 +55,10 @@ export function buildGeminiArgs(
   ];
 }
 
+function missingSessionError(message: string): boolean {
+  return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 export class GeminiStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
   private _apiToken: string | null = null;
@@ -67,6 +76,16 @@ export class GeminiStrategy extends AbstractCLIStrategy {
 
   getWorkingDir(): string {
     return this.getGeminiWorkspaceDir();
+  }
+
+  private clearStoredSession(workspaceDir: string): void {
+    this._hasSession = false;
+    if (!this.conversationDataDir) return;
+    try {
+      rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true });
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 
   ensureSettings(): void {
@@ -388,10 +407,11 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           );
           return;
         }
+        if (code !== 0 && missingSessionError(errorResult)) {
+          this.clearStoredSession(workspaceDir);
+        }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
-          if (this.conversationDataDir) {
-            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
-          }
+          this.clearStoredSession(workspaceDir);
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }

@@ -10,6 +10,11 @@ const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
 const SESSION_MARKER_FILE = '.opencode_session';
 const OPENCODE_CONFIG_FILE = 'opencode.json';
+const MISSING_SESSION_ERROR_PATTERNS = [
+  /No conversation found with session ID:/i,
+  /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
+  /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
+];
 
 /**
  * Full-yolo opencode.json config that auto-approves everything.
@@ -76,6 +81,10 @@ function hasEnvApiKey(): boolean {
   return API_KEY_ENV_VARS.some((k) => !!process.env[k]?.trim());
 }
 
+function missingSessionError(message: string): boolean {
+  return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
 export class OpencodeStrategy implements AgentStrategy {
   private readonly logger = new Logger(OpencodeStrategy.name);
   private currentConnection: AuthConnection | null = null;
@@ -96,6 +105,15 @@ export class OpencodeStrategy implements AgentStrategy {
 
   getWorkingDir(): string {
     return this.getOpencodeWorkspaceDir();
+  }
+
+  private clearStoredSession(workspaceDir: string): void {
+    if (!this.conversationDataDir) return;
+    try {
+      rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true });
+    } catch {
+      /* ignore cleanup errors */
+    }
   }
 
   /**
@@ -471,13 +489,14 @@ export class OpencodeStrategy implements AgentStrategy {
           return;
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
-          if (this.conversationDataDir) {
-            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
-          }
+          this.clearStoredSession(workspaceDir);
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code !== 0 && code !== null) {
+          if (missingSessionError(errorResult)) {
+            this.clearStoredSession(workspaceDir);
+          }
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
           if (this.conversationDataDir) {

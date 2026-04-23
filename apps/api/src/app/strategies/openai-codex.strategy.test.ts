@@ -68,6 +68,10 @@ if (process.env.CODEX_FAKE_MODE === 'error') {
   console.error('fake codex failed');
   process.exit(7);
 }
+if (process.env.CODEX_FAKE_MODE === 'missing-session') {
+  console.error('No conversation found with session ID: ' + (process.env.CODEX_FAKE_THREAD_ID || 'stale-thread-id'));
+  process.exit(7);
+}
 if (process.env.CODEX_FAKE_MODE === 'empty') {
   console.log(JSON.stringify({ type: 'thread.started', thread_id: 'thread-empty' }));
   process.exit(0);
@@ -830,5 +834,41 @@ describe('OpenaiCodexStrategy', () => {
       'Agent process completed successfully but returned no output'
     );
     expect(existsSync(join(convDir, 'codex_workspace', '.codex_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming clears stale session marker when Codex reports missing conversation', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex');
+    const argsPath = join(TEST_HOME, 'codex-missing-session-args.json');
+    writeFakeCodex(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_ARGS_PATH = argsPath;
+    process.env.CODEX_FAKE_MODE = 'missing-session';
+    process.env.CODEX_FAKE_THREAD_ID = 'stale-thread-id';
+
+    const convDir = join(TEST_HOME, 'missing-session-conv');
+    const markerDir = join(convDir, 'codex_workspace');
+    mkdirSync(markerDir, { recursive: true });
+    writeFileSync(join(markerDir, '.codex_session'), 'stale-thread-id');
+
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined)).rejects.toThrow(
+      'No conversation found with session ID: stale-thread-id'
+    );
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      'exec',
+      'resume',
+      '--json',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '-m',
+      'gpt-5.4',
+      'stale-thread-id',
+      '--',
+      'continue',
+    ]);
+    expect(existsSync(join(markerDir, '.codex_session'))).toBe(false);
   });
 });

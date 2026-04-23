@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection, ToolEvent } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
@@ -11,17 +11,40 @@ function getClaudeConfigDir(): string {
   return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude');
 }
 
+function getClaudeHomeDir(): string {
+  const sessionDir = process.env.SESSION_DIR;
+  return sessionDir ? dirname(sessionDir) : (process.env.HOME ?? '/home/node');
+}
+
+function getClaudeXdgEnv(): Record<string, string> {
+  if (!process.env.SESSION_DIR) return {};
+  const homeDir = getClaudeHomeDir();
+  return {
+    XDG_CONFIG_HOME: join(homeDir, '.config'),
+    XDG_DATA_HOME: join(homeDir, '.local', 'share'),
+    XDG_STATE_HOME: join(homeDir, '.local', 'state'),
+    XDG_CACHE_HOME: join(homeDir, '.cache'),
+  };
+}
+
 function getTokenFilePath(): string {
   return join(getClaudeConfigDir(), 'agent_token.txt');
 }
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const SESSION_MARKER_FILE = '.claude_session';
+const MISSING_SESSION_ERROR_PATTERNS = [
+  /No conversation found with session ID:/i,
+];
 
 const FILE_WRITING_TOOL_NAMES = ['write_file', 'edit_file', 'search_replace'];
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
+}
+
+function missingSessionError(message: string): boolean {
+  return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 function buildCommandFromInput(input: Record<string, unknown> | undefined): string | undefined {
@@ -102,6 +125,17 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
     return this.getClaudeWorkspaceDir();
   }
 
+  private clearStoredSession(workspaceDir?: string): void {
+    this._hasSession = false;
+    this._sessionId = null;
+    if (!this.conversationDataDir) return;
+    try {
+      rmSync(join(workspaceDir ?? this.getClaudeWorkspaceDir(), SESSION_MARKER_FILE), { force: true });
+    } catch {
+      /* ignore cleanup errors */
+    }
+  }
+
   private getEnvToken(): string | null {
     for (const key of ENV_TOKEN_VARS) {
       const value = process.env[key];
@@ -122,6 +156,16 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       return readFileSync(tokenPath, 'utf8').trim();
     }
     return null;
+  }
+
+  private getClaudeProcessEnv(extraEnv: Record<string, string> = {}): NodeJS.ProcessEnv {
+    return {
+      ...process.env,
+      ...this.getProxyEnv(),
+      HOME: getClaudeHomeDir(),
+      ...getClaudeXdgEnv(),
+      ...extraEnv,
+    };
   }
 
   executeAuth(connection: AuthConnection): void {
@@ -168,7 +212,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
   executeLogout(connection: LogoutConnection): void {
     const token = this.getToken();
     const logoutProcess = spawn('claude', ['auth', 'logout'], {
-      env: { ...process.env, CLAUDE_CODE_OAUTH_TOKEN: token ?? '' },
+      env: this.getClaudeProcessEnv({ CLAUDE_CODE_OAUTH_TOKEN: token ?? '' }),
       shell: false,
     });
     logoutProcess.stdin?.end();
@@ -206,7 +250,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       }
 
       const checkProcess = spawn('claude', ['auth', 'status'], {
-        env: { ...process.env, ...this.getProxyEnv(), CLAUDE_CODE_OAUTH_TOKEN: token },
+        env: this.getClaudeProcessEnv({ CLAUDE_CODE_OAUTH_TOKEN: token }),
         shell: false,
       });
       checkProcess.stdin?.end();
@@ -299,13 +343,11 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
       const token = this.getToken();
       const claudeProcess = spawn('claude', args, {
-        env: {
-          ...process.env,
-          ...this.getProxyEnv(),
+        env: this.getClaudeProcessEnv({
           CLAUDE_CODE_OAUTH_TOKEN: token ?? '',
           BROWSER: '/bin/true',
           DISPLAY: '',
-        },
+        }),
         cwd: workspaceDir,
         shell: false,
       });
@@ -444,11 +486,12 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           return;
         }
         if (code !== 0 && errorResult.trim()) {
+          if (missingSessionError(errorResult)) {
+            this.clearStoredSession(workspaceDir);
+          }
           reject(new Error(errorResult || `Process exited with code ${code}`));
         } else if (!hasEmittedOutput) {
-          if (this.conversationDataDir) {
-            try { rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true }); } catch { /* ignore cleanup errors */ }
-          }
+          this.clearStoredSession(workspaceDir);
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
         } else {
           this._hasSession = true;

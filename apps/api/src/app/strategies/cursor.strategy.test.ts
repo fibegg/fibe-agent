@@ -32,6 +32,11 @@ if (process.env.CURSOR_FAKE_MODE === 'error') {
   console.error('fake cursor failed');
   process.exit(7);
 }
+if (process.env.CURSOR_FAKE_MODE === 'missing-session') {
+  console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: process.env.CURSOR_FAKE_SESSION_ID || 'stale-session-id', model: 'Composer 2' }));
+  console.error('No conversation found with session ID: ' + (process.env.CURSOR_FAKE_SESSION_ID || 'stale-session-id'));
+  process.exit(7);
+}
 if (process.env.CURSOR_FAKE_MODE === 'empty') {
   console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: process.env.CURSOR_FAKE_SESSION_ID || 'session-empty', model: 'Composer 2' }));
   process.exit(0);
@@ -424,5 +429,40 @@ describe('CursorStrategy', () => {
     await strategy.executePromptStreaming('hello', '', () => undefined);
 
     expect(readFileSync(join(convDir, 'cursor_workspace', '.cursor_session'), 'utf8')).toBe('session-new');
+  });
+
+  test('executePromptStreaming clears stale session marker when Cursor reports missing conversation', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    const argsPath = join(testHome, 'cursor-missing-session-args.json');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_ARGS_PATH = argsPath;
+    process.env.CURSOR_FAKE_MODE = 'missing-session';
+    process.env.CURSOR_FAKE_SESSION_ID = 'stale-session-id';
+
+    const convDir = join(testHome, 'missing-session-conv');
+    const markerDir = join(convDir, 'cursor_workspace');
+    mkdirSync(markerDir, { recursive: true });
+    writeFileSync(join(markerDir, '.cursor_session'), 'stale-session-id');
+
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('continue', '', () => undefined)).rejects.toThrow(
+      'No conversation found with session ID: stale-session-id'
+    );
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '--print',
+      '--output-format',
+      'stream-json',
+      '--force',
+      '--resume',
+      'stale-session-id',
+      '--',
+      'continue',
+    ]);
+    expect(existsSync(join(markerDir, '.cursor_session'))).toBe(false);
   });
 });

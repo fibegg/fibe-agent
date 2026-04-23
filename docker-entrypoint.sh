@@ -44,12 +44,16 @@ chown_dev_paths() {
 
 run_dev_command() {
   command="$1"
-
-  if [ "$(id -u)" = "0" ]; then
-    exec su node -c "export HOME=/home/node PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
+  runtime_home="${HOME:-/home/node}"
+  if [ "$(id -u)" = "0" ] && [ "$runtime_home" = "/root" ]; then
+    runtime_home="/home/node"
   fi
 
-  exec sh -c "export HOME=/home/node PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
+  if [ "$(id -u)" = "0" ]; then
+    exec su node -c "export HOME=${runtime_home} PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
+  fi
+
+  exec sh -c "export HOME=${runtime_home} PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
 }
 
 ensure_runtime_fibe() {

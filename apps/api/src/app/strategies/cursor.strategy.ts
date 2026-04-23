@@ -19,6 +19,11 @@ const CURSOR_API_KEY_ENV = 'CURSOR_API_KEY';
 const CURSOR_BIN_NAME = process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent';
 const RESPONSE_PREVIEW_MAX = 200;
 const CURSOR_AUTH_FILE = 'auth.json';
+const MISSING_SESSION_ERROR_PATTERNS = [
+  /No conversation found with session ID:/i,
+  /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
+  /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
+];
 
 function getCursorHome(): string {
   return process.env.SESSION_DIR ?? DEFAULT_CURSOR_HOME;
@@ -32,6 +37,10 @@ function getCursorCommand(): string {
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\u001b\[[0-9;]*[a-zA-Z]/g;
 const stripAnsi = (s: string) => s.replace(ANSI_RE, '');
+
+function missingSessionError(message: string): boolean {
+  return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
 
 interface CursorStreamContentPart {
   type?: string;
@@ -446,6 +455,9 @@ export class CursorStrategy extends AbstractCLIStrategy {
         }
 
         const message = errorResult.trim() || 'Cursor agent exited with a non-zero status';
+        if (missingSessionError(message)) {
+          this.clearSessionId();
+        }
         reject(new Error(message));
       });
     });

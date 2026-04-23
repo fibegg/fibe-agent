@@ -1,11 +1,30 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { OpencodeStrategy, buildOpencodeRunArgs } from './opencode.strategy';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 
 const TEST_HOME = join(tmpdir(), `opencode-test-home-${process.pid}`);
+
+function writeFakeOpencode(path: string): void {
+  writeFileSync(path, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (process.env.OPENCODE_FAKE_ARGS_PATH) {
+  fs.writeFileSync(process.env.OPENCODE_FAKE_ARGS_PATH, JSON.stringify(args));
+}
+if (process.env.OPENCODE_FAKE_MODE === 'missing-session') {
+  console.error('No conversation found with session ID: stale-opencode-session');
+  process.exit(1);
+}
+if (process.env.OPENCODE_FAKE_MODE === 'empty') {
+  process.exit(0);
+}
+console.log(JSON.stringify({ type: 'text', part: { text: process.env.OPENCODE_FAKE_MESSAGE || 'fake response' } }));
+`, { mode: 0o755 });
+  chmodSync(path, 0o755);
+}
 
 describe('OpencodeStrategy', () => {
   let _oldHome: string | undefined;
@@ -14,11 +33,15 @@ describe('OpencodeStrategy', () => {
   // Keys we may set/clear during tests
   const envKeys = [
     'HOME',
+    'PATH',
     'ANTHROPIC_API_KEY',
     'OPENAI_API_KEY',
     'GEMINI_API_KEY',
     'OPENROUTER_API_KEY',
     'OPENAI_API_BASE',
+    'OPENCODE_FAKE_ARGS_PATH',
+    'OPENCODE_FAKE_MODE',
+    'OPENCODE_FAKE_MESSAGE',
   ] as const;
 
   beforeEach(() => {
@@ -30,6 +53,9 @@ describe('OpencodeStrategy', () => {
     delete process.env.GEMINI_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENAI_API_BASE;
+    delete process.env.OPENCODE_FAKE_ARGS_PATH;
+    delete process.env.OPENCODE_FAKE_MODE;
+    delete process.env.OPENCODE_FAKE_MESSAGE;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
     }
@@ -256,6 +282,44 @@ describe('OpencodeStrategy', () => {
   test('clearCredentials is safe when no auth file exists', () => {
     const strategy = new OpencodeStrategy();
     strategy.clearCredentials();
+  });
+
+  test('executePromptStreaming clears stale session marker when OpenCode reports missing conversation', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const argsPath = join(TEST_HOME, 'opencode-args.json');
+    process.env.OPENCODE_FAKE_ARGS_PATH = argsPath;
+    process.env.OPENCODE_FAKE_MODE = 'missing-session';
+
+    const convDir = join(TEST_HOME, 'missing-session-conv');
+    const workspaceDir = join(convDir, 'opencode_workspace');
+    mkdirSync(workspaceDir, { recursive: true });
+    writeFileSync(join(workspaceDir, '.opencode_session'), '');
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('continue', 'openai/gpt-5.4', () => undefined)).rejects.toThrow(
+      'No conversation found with session ID: stale-opencode-session'
+    );
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      'run',
+      '--continue',
+      '--format',
+      'json',
+      '--thinking',
+      '--model',
+      'openai/gpt-5.4',
+      '--',
+      'continue',
+    ]);
+    expect(existsSync(join(workspaceDir, '.opencode_session'))).toBe(false);
   });
 });
 

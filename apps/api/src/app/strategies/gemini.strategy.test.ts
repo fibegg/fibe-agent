@@ -1,5 +1,27 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { GeminiStrategy, buildGeminiArgs } from './gemini.strategy';
+
+function writeFakeGemini(path: string): void {
+  writeFileSync(path, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+if (process.env.GEMINI_FAKE_ARGS_PATH) {
+  fs.writeFileSync(process.env.GEMINI_FAKE_ARGS_PATH, JSON.stringify(args));
+}
+if (process.env.GEMINI_FAKE_MODE === 'missing-session') {
+  console.error('No conversation found with session ID: stale-gemini-session');
+  process.exit(1);
+}
+if (process.env.GEMINI_FAKE_MODE === 'empty') {
+  process.exit(0);
+}
+console.log(process.env.GEMINI_FAKE_MESSAGE || 'fake response');
+`, { mode: 0o755 });
+  chmodSync(path, 0o755);
+}
 
 describe('GeminiStrategy API token mode', () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -205,5 +227,70 @@ describe('buildGeminiArgs', () => {
   test('omits -m when model is empty or the literal string "undefined"', () => {
     expect(buildGeminiArgs('hi', '', false)).toEqual(['--yolo', '-p=hi']);
     expect(buildGeminiArgs('hi', 'undefined', false)).toEqual(['--yolo', '-p=hi']);
+  });
+});
+
+describe('GeminiStrategy session recovery', () => {
+  let testHome = '';
+  const savedEnv: Record<string, string | undefined> = {};
+
+  beforeEach(() => {
+    savedEnv.PATH = process.env.PATH;
+    savedEnv.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+    savedEnv.GEMINI_FAKE_ARGS_PATH = process.env.GEMINI_FAKE_ARGS_PATH;
+    savedEnv.GEMINI_FAKE_MODE = process.env.GEMINI_FAKE_MODE;
+    savedEnv.GEMINI_FAKE_MESSAGE = process.env.GEMINI_FAKE_MESSAGE;
+
+    testHome = mkdtempSync(join(tmpdir(), 'gemini-strategy-test-'));
+    const fakeBinDir = join(testHome, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeGemini(join(fakeBinDir, 'gemini'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.GEMINI_API_KEY = 'test-key';
+    delete process.env.GEMINI_FAKE_ARGS_PATH;
+    delete process.env.GEMINI_FAKE_MODE;
+    delete process.env.GEMINI_FAKE_MESSAGE;
+  });
+
+  afterEach(() => {
+    if (savedEnv.PATH === undefined) delete process.env.PATH;
+    else process.env.PATH = savedEnv.PATH;
+    if (savedEnv.GEMINI_API_KEY === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = savedEnv.GEMINI_API_KEY;
+    if (savedEnv.GEMINI_FAKE_ARGS_PATH === undefined) delete process.env.GEMINI_FAKE_ARGS_PATH;
+    else process.env.GEMINI_FAKE_ARGS_PATH = savedEnv.GEMINI_FAKE_ARGS_PATH;
+    if (savedEnv.GEMINI_FAKE_MODE === undefined) delete process.env.GEMINI_FAKE_MODE;
+    else process.env.GEMINI_FAKE_MODE = savedEnv.GEMINI_FAKE_MODE;
+    if (savedEnv.GEMINI_FAKE_MESSAGE === undefined) delete process.env.GEMINI_FAKE_MESSAGE;
+    else process.env.GEMINI_FAKE_MESSAGE = savedEnv.GEMINI_FAKE_MESSAGE;
+    rmSync(testHome, { recursive: true, force: true });
+  });
+
+  test('executePromptStreaming clears stale session marker when Gemini reports missing conversation', async () => {
+    const argsPath = join(testHome, 'gemini-args.json');
+    process.env.GEMINI_FAKE_ARGS_PATH = argsPath;
+    process.env.GEMINI_FAKE_MODE = 'missing-session';
+
+    const convDir = join(testHome, 'missing-session-conv');
+    const workspaceDir = join(convDir, 'gemini_workspace');
+    mkdirSync(workspaceDir, { recursive: true });
+    writeFileSync(join(workspaceDir, '.gemini_session'), '');
+
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('continue', 'gemini-2.5-pro', () => undefined)).rejects.toThrow(
+      'No conversation found with session ID: stale-gemini-session'
+    );
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '-m',
+      'gemini-2.5-pro',
+      '--resume',
+      '--yolo',
+      '-p=continue',
+    ]);
+    expect(existsSync(join(workspaceDir, '.gemini_session'))).toBe(false);
   });
 });
