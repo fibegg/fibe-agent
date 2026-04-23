@@ -13,6 +13,7 @@
 !vitest.workspace.ts
 !playgrounds-explorer
 !.fibe-version
+!mode
 
 # 3. Whitelist ONLY directories explicitly manipulated by `Dockerfile`
 !apps/api/

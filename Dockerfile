@@ -203,6 +203,10 @@ RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
+# ---- MODE HELPER (agent mode switcher) ----
+COPY mode /app/mode
+RUN chmod +x /app/mode
+
 # ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh \
