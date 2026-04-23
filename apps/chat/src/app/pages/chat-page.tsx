@@ -20,6 +20,7 @@ import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
 import { useChatStreaming } from '../chat/use-chat-streaming';
 import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
+import { API_PATHS } from '@shared/api-paths';
 import type { FileTab } from '../file-explorer/file-explorer-tabs';
 import { ChatLeftPanel } from './chat-left-panel';
 import { ChatRightPanel } from './chat-right-panel';
@@ -732,7 +733,7 @@ export function ChatPage() {
                 entry={viewingFile!}
                 onClose={() => setViewingFile(null)}
                 inline
-                apiBasePath={activeFileTab === 'agent' ? '/api/agent-files/file' : undefined}
+                apiBasePath={viewingFile.source === 'agent' ? API_PATHS.AGENT_FILES_FILE : undefined}
                 onDirtyChange={handlePageDirtyChange}
               />
             </div>
@@ -787,4 +788,3 @@ export function ChatPage() {
     </ChatLayout>
   );
 }
-
