@@ -101,6 +101,13 @@ export function FileExplorer({
     : agentTree.length > 0 && playgroundTree.length === 0 ? 'agent'
     : 'playground';
   const tree = effectiveTab === 'agent' ? agentTree : playgroundTree;
+  const agentFileContentApiPath = useMemo(() => {
+    const raw = agentFileApiPath || API_PATHS.AGENT_FILES_FILE;
+    if (raw.startsWith('/api/')) return raw;
+
+    const normalized = raw.replace(/^\/+/, '');
+    return normalized.startsWith('api/') ? `/${normalized}` : `/api/${normalized}`;
+  }, [agentFileApiPath]);
 
   const selectedFile = selectedPathProp !== undefined
     ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
@@ -243,12 +250,12 @@ export function FileExplorer({
     (entry: PlaygroundEntry) => {
       if (entry.type !== 'file') return;
       if (onFileSelect) {
-        onFileSelect(entry);
+        onFileSelect({ ...entry, source: effectiveTab });
       } else {
         setSelectedFileLocal(entry);
       }
     },
-    [onFileSelect]
+    [effectiveTab, onFileSelect]
   );
 
   const handleDirtyChange = useCallback((path: string, isDirty: boolean) => {
@@ -481,6 +488,7 @@ export function FileExplorer({
         <FileDetailsDialog
           entry={openFileEntry}
           onClose={() => setSelectedFileLocal(null)}
+          apiBasePath={effectiveTab === 'agent' ? agentFileContentApiPath : undefined}
           onDirtyChange={handleDirtyChange}
         />
       )}

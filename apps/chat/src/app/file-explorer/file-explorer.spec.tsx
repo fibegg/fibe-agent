@@ -180,6 +180,30 @@ describe('FileExplorer', () => {
     expect(screen.getByText('src')).toBeTruthy();
   });
 
+  it('tags selected files with agent source when only the agent tree is visible', () => {
+    const onFileSelect = vi.fn();
+    const agentTree: PlaygroundEntry[] = [
+      { name: 'CLAUDE.md', path: 'CLAUDE.md', type: 'file' },
+    ];
+
+    render(
+      <FileExplorer
+        tree={[]}
+        agentTree={agentTree}
+        onFileSelect={onFileSelect}
+      />
+    );
+
+    fireEvent.click(screen.getByText('CLAUDE.md'));
+
+    expect(onFileSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'CLAUDE.md',
+        source: 'agent',
+      })
+    );
+  });
+
   it('expands and collapses directory when folder is clicked', async () => {
     const tree: PlaygroundEntry[] = [
       {
