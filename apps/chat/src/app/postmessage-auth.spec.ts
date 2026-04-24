@@ -82,6 +82,35 @@ describe('waitForAutoAuth', () => {
     const result = await mod.waitForAutoAuth();
     expect(result).toBe(true);
   });
+
+  it('dispatches a success event when auto_auth succeeds after the initial wait timed out', async () => {
+    const fakeParent = {} as Window;
+    vi.stubGlobal('parent', fakeParent);
+    localStorage.removeItem('agent_password');
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, token: 'tok' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const mod = await import('./postmessage-auth');
+    const onSuccess = vi.fn();
+    window.addEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
+
+    const promise = mod.waitForAutoAuth();
+    await vi.runAllTimersAsync();
+    await expect(promise).resolves.toBe(false);
+
+    window.dispatchEvent(
+      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(onSuccess).toHaveBeenCalledTimes(1);
+    window.removeEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
+  });
 });
 
 describe('postmessage-auth onMessage handler', () => {
@@ -232,4 +261,3 @@ describe('postmessage-auth onMessage handler', () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 });
-

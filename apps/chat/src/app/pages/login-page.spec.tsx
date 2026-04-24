@@ -11,6 +11,7 @@ vi.mock('../api-url', () => ({
 
 // Mock postmessage-auth module
 vi.mock('../postmessage-auth', () => ({
+  AUTO_AUTH_SUCCESS_EVENT: 'fibe:auto-auth-success',
   waitForAutoAuth: vi.fn().mockResolvedValue(false),
 }));
 
@@ -97,6 +98,24 @@ describe('LoginPage', () => {
     fireEvent.change(input, { target: { value: 'correct' } });
     const form = container.querySelector('form');
     if (form) fireEvent.submit(form);
+
+    await waitFor(() => {
+      expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });
+    });
+  });
+
+  it('navigates when iframe auto-auth succeeds after the waiting state timed out', async () => {
+    vi.stubGlobal('parent', {} as Window);
+    const { AUTO_AUTH_SUCCESS_EVENT, waitForAutoAuth } = await import('../postmessage-auth');
+    vi.mocked(waitForAutoAuth).mockResolvedValue(false);
+
+    renderLoginPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /login/i })).toBeTruthy();
+    });
+
+    window.dispatchEvent(new CustomEvent(AUTO_AUTH_SUCCESS_EVENT));
 
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/', { replace: true });

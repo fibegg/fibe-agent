@@ -1,6 +1,7 @@
 import { loginWithPassword, isAuthenticated } from './api-url';
 
 const AUTO_AUTH_TIMEOUT_MS = 3000;
+export const AUTO_AUTH_SUCCESS_EVENT = 'fibe:auto-auth-success';
 
 type AuthResolve = () => void;
 let pendingResolve: AuthResolve | null = null;
@@ -47,6 +48,10 @@ async function handleAutoAuth(password: string): Promise<boolean> {
   return result.success;
 }
 
+function notifyAutoAuthSuccess(): void {
+  window.dispatchEvent(new CustomEvent(AUTO_AUTH_SUCCESS_EVENT));
+}
+
 function onMessage(event: MessageEvent): void {
   const data = event.data as { action?: string; password?: string } | undefined;
   const password = data?.password;
@@ -69,7 +74,9 @@ function onMessage(event: MessageEvent): void {
           pendingResolve = null;
         } else {
           // LoginPage hasn't mounted yet — store for when it calls waitForAutoAuth()
+          // If it already timed out, the page-level listener below will navigate.
           earlyAuthSuccess = true;
+          notifyAutoAuthSuccess();
         }
       }
     } finally {

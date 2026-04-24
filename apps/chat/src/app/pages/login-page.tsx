@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { loginWithPassword, isAuthenticated } from '../api-url';
 import { FibeLogo } from '../fibe-logo';
-import { waitForAutoAuth } from '../postmessage-auth';
+import { AUTO_AUTH_SUCCESS_EVENT, waitForAutoAuth } from '../postmessage-auth';
 
 export function LoginPage() {
   const [password, setPassword] = useState('');
@@ -13,10 +13,14 @@ export function LoginPage() {
 
   useEffect(() => {
     if (window === window.parent) return;
+    const handleAutoAuthSuccess = () => navigate('/', { replace: true });
+    window.addEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
+
     if (isAuthenticated()) {
       navigate('/', { replace: true });
-      return;
+      return () => window.removeEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
     }
+
     let cancelled = false;
     void (async () => {
       const success = await waitForAutoAuth();
@@ -26,6 +30,7 @@ export function LoginPage() {
     })();
     return () => {
       cancelled = true;
+      window.removeEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
     };
   }, [navigate]);
 
