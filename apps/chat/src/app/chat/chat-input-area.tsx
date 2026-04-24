@@ -23,7 +23,7 @@ export interface ChatInputAreaProps {
   playgroundEntries: PlaygroundEntryItem[];
   onMentionSelect: (path: string) => void;
   onMentionClose: () => void;
-  pendingImages: string[];
+  pendingImages: { url: string; filename: string }[];
   pendingAttachments: Array<{ filename: string; name: string }>;
   pendingVoice: string | null;
   voiceRecorder: {
@@ -105,10 +105,10 @@ export function ChatInputArea({
                 </button>
               </div>
             )}
-            {pendingImages.map((dataUrl, i) => (
+            {pendingImages.map((img, i) => (
               <div key={`img-${i}`} className="relative inline-block">
                 <img
-                  src={dataUrl}
+                  src={img.url}
                   alt=""
                   className="w-16 h-16 object-cover rounded-xl border border-border/50"
                 />

@@ -105,7 +105,7 @@ describe('ChatInputArea', () => {
   });
 
   it('shows pending image thumbnails', () => {
-    render(<ChatInputArea {...BASE_PROPS} pendingImages={['data:image/png;base64,abc']} />);
+    render(<ChatInputArea {...BASE_PROPS} pendingImages={[{ url: 'data:image/png;base64,abc', filename: 'test.png' }]} />);
     expect(screen.getByRole('button', { name: /remove image/i })).toBeTruthy();
   });
 
@@ -114,7 +114,7 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        pendingImages={['data:image/png;base64,abc']}
+        pendingImages={[{ url: 'data:image/png;base64,abc', filename: 'test.png' }]}
         onRemovePendingImage={onRemovePendingImage}
       />
     );

@@ -15,6 +15,8 @@ function mockClipboard(getData: (type: string) => string) {
   return { getData } as unknown as ClipboardEvent['clipboardData'];
 }
 
+global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+
 describe('getClipboardTextForContentEditablePaste', () => {
   it('returns null when clipboardData is null', () => {
     expect(getClipboardTextForContentEditablePaste(null)).toBe(null);
@@ -91,18 +93,18 @@ describe('useChatAttachments', () => {
 
   it('addImage adds a data URL to pendingImages', () => {
     const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
-    act(() => { result.current.addImage('data:image/png;base64,abc'); });
-    expect(result.current.pendingImages).toEqual(['data:image/png;base64,abc']);
+    act(() => { result.current.addImage('data:image/png;base64,abc', 'test.png'); });
+    expect(result.current.pendingImages).toEqual([{ url: 'data:image/png;base64,abc', filename: 'test.png' }]);
   });
 
   it('removePendingImage removes by index', () => {
     const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
     act(() => {
-      result.current.addImage('img1');
-      result.current.addImage('img2');
+      result.current.addImage('img1', 'f1.png');
+      result.current.addImage('img2', 'f2.png');
     });
     act(() => { result.current.removePendingImage(0); });
-    expect(result.current.pendingImages).toEqual(['img2']);
+    expect(result.current.pendingImages).toEqual([{ url: 'img2', filename: 'f2.png' }]);
   });
 
   it('addAttachment adds an attachment entry', () => {
@@ -124,7 +126,7 @@ describe('useChatAttachments', () => {
   it('clearPending resets all state', () => {
     const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
     act(() => {
-      result.current.addImage('img1');
+      result.current.addImage('img1', 'f1.png');
       result.current.addAttachment('a.txt', 'A');
     });
     act(() => { result.current.clearPending(); });
@@ -221,17 +223,13 @@ describe('useChatAttachments', () => {
   });
 
   it('handleDrop calls addFiles with dropped files', async () => {
-    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const { apiRequest } = await import('../api-url');
+    vi.mocked(apiRequest).mockResolvedValue({
+      ok: true,
+      json: async () => ({ filename: 'uploaded.png' }),
+    } as Response);
 
-    // Stub FileReader as a class constructor
-    class FakeFileReader {
-      result = 'data:image/png;base64,abc';
-      onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
-      readAsDataURL(_file: File) {
-        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
-      }
-    }
-    vi.stubGlobal('FileReader', FakeFileReader);
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
 
     const file = new File(['pixel'], 'photo.png', { type: 'image/png' });
     const mockFileList = { 0: file, length: 1, item: (i: number) => (i === 0 ? file : null) } as unknown as FileList;
@@ -252,16 +250,13 @@ describe('useChatAttachments', () => {
   });
 
   it('handlePaste reads image from clipboard items', async () => {
-    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const { apiRequest } = await import('../api-url');
+    vi.mocked(apiRequest).mockResolvedValue({
+      ok: true,
+      json: async () => ({ filename: 'uploaded.png' }),
+    } as Response);
 
-    class FakeFileReader {
-      result = 'data:image/png;base64,xyz';
-      onload: ((e: ProgressEvent<FileReader>) => void) | null = null;
-      readAsDataURL(_file: File) {
-        queueMicrotask(() => this.onload?.({} as ProgressEvent<FileReader>));
-      }
-    }
-    vi.stubGlobal('FileReader', FakeFileReader);
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
 
     const fakeFile = new File(['pixel'], 'image.png', { type: 'image/png' });
     const pasteEvent = {
@@ -342,7 +337,7 @@ describe('useChatAttachments', () => {
       
       // Manually saturate pendingImages + attachments up to MAX_PENDING_TOTAL (10)
       act(() => {
-        for(let i=0; i<5; i++) result.current.addImage(`img${i}`);
+        for(let i=0; i<5; i++) result.current.addImage(`img${i}`, `f${i}.png`);
         for(let i=0; i<5; i++) result.current.addAttachment(`att${i}`, 'test');
       });
 
@@ -358,7 +353,7 @@ describe('useChatAttachments', () => {
     it('handleDrop respects capacity limits', () => {
       const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
       act(() => {
-        for(let i=0; i<10; i++) result.current.addImage(`img${i}`); // Overload images array directly (ignoring max 5 images logic for capacity test)
+        for(let i=0; i<10; i++) result.current.addImage(`img${i}`, `f${i}.png`); // Overload images array directly (ignoring max 5 images logic for capacity test)
       });
       
       const file = new File(['text'], 'test.txt', { type: 'text/plain' });

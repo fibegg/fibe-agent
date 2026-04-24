@@ -38,7 +38,7 @@ export interface UseChatAttachmentsParams {
 }
 
 export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams) {
-  const [pendingImages, setPendingImages] = useState<string[]>([]);
+  const [pendingImages, setPendingImages] = useState<{ url: string; filename: string }[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<{ filename: string; name: string }[]>([]);
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
   const [pendingVoiceFilename, setPendingVoiceFilename] = useState<string | null>(null);
@@ -47,8 +47,8 @@ export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
 
-  const addImage = useCallback((dataUrl: string) => {
-    setPendingImages((prev) => (prev.length < MAX_PENDING_IMAGES ? [...prev, dataUrl] : prev));
+  const addImage = useCallback((url: string, filename: string) => {
+    setPendingImages((prev) => (prev.length < MAX_PENDING_IMAGES ? [...prev, { url, filename }] : prev));
   }, []);
 
   const removePendingImage = useCallback((index: number) => {
@@ -87,13 +87,15 @@ export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams
       for (const file of arr) {
         const total = pendingImages.length + pendingAttachments.length;
         if (total >= MAX_PENDING_TOTAL) break;
+        
         if (file.type.startsWith('image/') && pendingImages.length < MAX_PENDING_IMAGES) {
-          const reader = new FileReader();
-          reader.onload = () => {
-            const dataUrl = reader.result as string;
-            if (dataUrl) addImage(dataUrl);
-          };
-          reader.readAsDataURL(file);
+          const filename = await uploadAttachment(file);
+          if (filename) {
+            const url = URL.createObjectURL(file);
+            addImage(url, filename);
+          } else {
+            setAttachmentUploadError(`Could not upload ${file.name}`);
+          }
         } else if (pendingAttachments.length < MAX_PENDING_ATTACHMENTS) {
           const filename = await uploadAttachment(file);
           if (filename) addAttachment(filename, file.name);
@@ -169,14 +171,17 @@ export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams
       if (!item || pendingImages.length >= MAX_PENDING_IMAGES) return;
       const file = item.getAsFile();
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const dataUrl = reader.result as string;
-        if (dataUrl) addImage(dataUrl);
-      };
-      reader.readAsDataURL(file);
+      
+      void uploadAttachment(file).then((filename) => {
+        if (filename) {
+          const url = URL.createObjectURL(file);
+          addImage(url, filename);
+        } else {
+          setAttachmentUploadError('Could not upload pasted image');
+        }
+      });
     },
-    [addImage, pendingImages.length]
+    [addImage, uploadAttachment, pendingImages.length]
   );
 
   return {

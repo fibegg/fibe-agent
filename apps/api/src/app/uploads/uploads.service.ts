@@ -35,6 +35,7 @@ export class UploadsService {
   }
 
   async saveImage(dataUrl: string): Promise<string> {
+    if (!dataUrl.startsWith('data:')) return dataUrl;
     this.ensureUploadsDir();
     const match = dataUrl.match(DATA_URL_REGEX);
     const ext = match?.[1]?.startsWith('image/')

@@ -412,7 +412,7 @@ export function ChatPage() {
       send({
         action: 'send_chat_message',
         text: currentInput || '',
-        ...(currentPendingImages.length ? { images: currentPendingImages } : {}),
+        ...(currentPendingImages.length ? { images: currentPendingImages.map(img => img.filename) } : {}),
         ...(currentPendingVoiceFilename ? { audioFilename: currentPendingVoiceFilename } : currentPendingVoice ? { audio: currentPendingVoice } : {}),
         ...(currentPendingAttachments.length ? { attachmentFilenames: currentPendingAttachments.map((a) => a.filename) } : {}),
       });
