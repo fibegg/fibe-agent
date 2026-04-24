@@ -229,7 +229,6 @@ describe('buildGeminiArgs', () => {
     expect(buildGeminiArgs('hi', 'undefined', false)).toEqual(['--yolo', '-p=hi']);
   });
 });
-
 describe('GeminiStrategy session recovery', () => {
   let testHome = '';
   const savedEnv: Record<string, string | undefined> = {};

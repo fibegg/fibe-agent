@@ -430,7 +430,6 @@ describe('CursorStrategy', () => {
 
     expect(readFileSync(join(convDir, 'cursor_workspace', '.cursor_session'), 'utf8')).toBe('session-new');
   });
-
   test('executePromptStreaming clears stale session marker when Cursor reports missing conversation', async () => {
     const fakeCursorPath = join(testHome, 'fake-cursor-agent');
     const argsPath = join(testHome, 'cursor-missing-session-args.json');

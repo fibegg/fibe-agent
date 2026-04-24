@@ -835,7 +835,6 @@ describe('OpenaiCodexStrategy', () => {
     );
     expect(existsSync(join(convDir, 'codex_workspace', '.codex_session'))).toBe(false);
   });
-
   test('executePromptStreaming clears stale session marker when Codex reports missing conversation', async () => {
     const fakeCodexPath = join(TEST_HOME, 'fake-codex');
     const argsPath = join(TEST_HOME, 'codex-missing-session-args.json');

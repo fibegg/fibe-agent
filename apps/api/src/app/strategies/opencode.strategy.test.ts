@@ -352,3 +352,33 @@ describe('buildOpencodeRunArgs', () => {
     expect(args).toEqual(['run', '--continue', '--format', 'json', '--thinking', '--', 'hi']);
   });
 });
+
+describe('buildOpencodeRunArgs', () => {
+  test('places `--` immediately before the prompt so opencode treats it as a positional', () => {
+    const args = buildOpencodeRunArgs('hello', ['--model', 'openai/gpt-5.4'], false);
+    expect(args).toEqual([
+      'run',
+      '--format',
+      'json',
+      '--thinking',
+      '--model',
+      'openai/gpt-5.4',
+      '--',
+      'hello',
+    ]);
+  });
+
+  test('still delimits the prompt with `--` when it starts with a dash (markdown bullet)', () => {
+    const dashPrompt = '- bullet from system prompt\n[SYSCHECK]';
+    const args = buildOpencodeRunArgs(dashPrompt, ['--model', 'openai/gpt-5.4'], false);
+    const separatorIndex = args.indexOf('--');
+    expect(separatorIndex).toBeGreaterThan(-1);
+    expect(args[separatorIndex + 1]).toBe(dashPrompt);
+    expect(args[args.length - 1]).toBe(dashPrompt);
+  });
+
+  test('includes --continue when hasSession is true', () => {
+    const args = buildOpencodeRunArgs('hi', [], true);
+    expect(args).toEqual(['run', '--continue', '--format', 'json', '--thinking', '--', 'hi']);
+  });
+});
