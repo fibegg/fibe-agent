@@ -91,6 +91,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ca-certificates \
     sqlite3 pandoc htop strace \
     imagemagick ffmpeg ghostscript \
+    poppler-utils qpdf pdfgrep mupdf-tools \
     build-essential \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/fdfind /usr/local/bin/fd
