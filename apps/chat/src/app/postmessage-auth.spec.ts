@@ -105,10 +105,8 @@ describe('waitForAutoAuth', () => {
     window.dispatchEvent(
       new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
     );
-    await Promise.resolve();
-    await Promise.resolve();
 
-    expect(onSuccess).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
     window.removeEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
   });
 });
