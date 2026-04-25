@@ -31,11 +31,14 @@ For the system prompt library see [`prompts/README.md`](prompts/README.md).
 The API (`apps/api`) acts as a thin orchestration layer between the chat frontend and an agent provider CLI. Each incoming WebSocket message is dispatched through the **OrchestratorService** → **StrategyRegistryService** → the active **AgentStrategy**, which spawns or communicates with a provider process and streams chunks back over the same WebSocket.
 
 ```
-Chat UI  ──ws──▶  OrchestratorService  ──▶  StrategyRegistryService
-                                                     │
-                        ┌────────────────────────────┤
-                        ▼            ▼               ▼
-                   GeminiStrategy  ClaudeStrategy  OpenCodeStrategy  …
+Chat UI  ──ws──▶  OrchestratorService  ──▶  GemmaRouterService (local Ollama)
+                          │                         │ injects tool hint
+                          ▼                         ▼
+                  StrategyRegistryService ◀──────────
+                          │
+          ┌───────────────┤
+          ▼       ▼       ▼
+   GeminiStrategy  ClaudeStrategy  OpenCodeStrategy  …
 ```
 
 Two WebSocket servers share a single HTTP upgrade dispatcher — `/ws` for chat and `/ws-terminal` for PTY shell sessions — avoiding competing upgrade listeners.
@@ -127,6 +130,11 @@ Copy `.env.example` to `.env` before starting.
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
 | `MCP_CONFIG_JSON` | — | JSON object `{ mcpServers: { "<name>": { serverUrl?, authHeader?, bearerTokenEnvVar?, command?, args?, env? } } }` — stdio/HTTP MCP servers injected into provider config at startup. In Fibe deployments this always includes the canonical built-in Fibe MCP entry `fibe mcp serve --yolo` with `FIBE_API_KEY` and `FIBE_DOMAIN`. Keep that built-in Fibe server unique per environment; avoid exposing duplicate Fibe MCPs over multiple transports to the same agent. |
 | `DOCKER_MCP_CONFIG_JSON` | — | Same format as `MCP_CONFIG_JSON`; merged with it. Typically carries Docker-specific MCP servers (e.g. docker MCP toolkit) |
+| `GEMMA_ROUTER_ENABLED` | `false` | Enable the local Gemma intent router via Ollama (`true`/`false`) |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint for the Gemma router |
+| `GEMMA_MODEL` | `gemma3:4b` | Ollama model name for intent classification |
+| `GEMMA_CONFIDENCE_THRESHOLD` | `0.80` | Minimum confidence score (0–1) for injecting a tool hint into the prompt |
+| `GEMMA_TIMEOUT_MS` | `30000` | Per-request timeout (ms) for Ollama calls. Allow 30s+ — `gemma3:4b` may need time to load into VRAM on first request |
 
 ### Provider API keys (`AGENT_AUTH_MODE=api-token`)
 
@@ -151,6 +159,50 @@ These variables are consumed at **runtime** (not build time) — the frontend fe
 | `USER_AVATAR_BASE64` | Base64-encoded SVG/PNG for the user avatar (takes precedence over URL) |
 | `VITE_THEME_SOURCE` | `localStorage` (default) or `frame` — drive theme from parent via `postMessage` |
 | `VITE_HIDE_THEME_SWITCH` | `1` / `true` — hide the in-app theme toggle |
+
+---
+
+## Gemma Router (Local Intent Classification)
+
+Fibe Agent includes an optional local LLM pre-processing layer powered by [Ollama](https://ollama.com) and Google's Gemma model. When enabled, it intercepts incoming user messages, runs a fast local classification to determine which MCP tools would help answer the request, and injects tool suggestions into the prompt before the main agent strategy sees it.
+
+**Benefits:**
+- **Improved tool accuracy:** Helps the main agent (Claude, Gemini, etc.) immediately pick the right MCP tool without having to infer it from context.
+- **Privacy-preserving:** Runs 100% locally — no data leaves the machine.
+- **Graceful degradation:** If Ollama is unavailable or too slow, the request proceeds normally without a hint.
+- **Self-healing:** Uses lazy re-probe — if Ollama was down at startup, GemmaRouterService automatically retries connectivity before each request.
+
+### Enabling the Router
+
+1. Start Ollama and pull the model:
+   ```sh
+   docker run -d --name ollama -v ollama:/root/.ollama -p 11434:11434 ollama/ollama
+   docker exec ollama ollama pull gemma3:4b
+   ```
+2. Set env vars in `.env`:
+   ```env
+   GEMMA_ROUTER_ENABLED=true
+   OLLAMA_URL=http://localhost:11434
+   GEMMA_MODEL=gemma3:4b
+   GEMMA_CONFIDENCE_THRESHOLD=0.75
+   GEMMA_TIMEOUT_MS=30000
+   ```
+
+### How it works
+
+1. **Startup probe:** At startup, `GemmaRouterService` checks Ollama is reachable via `GET /api/tags`. On success, it fires a tiny warm-up inference (prompt: `"hi"`, 1 token) to pre-load the model into VRAM, eliminating cold-start latency on the first real user request.
+2. **Lazy re-probe:** If Ollama was down at startup or crashes mid-session, the service automatically re-probes before each request and recovers without a server restart.
+3. **Classification:** When a user sends a message, `GemmaRouterService` asks the local model to pick relevant tools from the `MCP_CONFIG_JSON` tool list based on user intent.
+4. **Injection:** If confidence ≥ `GEMMA_CONFIDENCE_THRESHOLD`, a `[SYSTEM]Suggested MCP tools: ...[/SYSTEM]` block is prepended to the prompt sent to the main agent. **The persisted message history is never modified.**
+5. **MCP config delivery:** For `claude-code`, the configured `.mcp.json` is passed via `--mcp-config <path>` directly to the Claude process, ensuring tools are always available regardless of project trust settings.
+
+### Troubleshooting
+
+| Symptom | Likely cause | Fix |
+|---------|-------------|-----|
+| Logs show `skipped: true` | Ollama not running or model not pulled | Run `docker exec ollama ollama pull gemma3:4b` |
+| First request takes 30s | Model not warm (VRAM cold start) | Expected on first run; warm-up fires automatically at startup |
+| Hint injected but agent ignores tool | MCP server not connected | Verify `MCP_CONFIG_JSON` is set and `--mcp-config` path is valid |
 
 ---
 
@@ -570,6 +622,7 @@ flowchart LR
 |--------|----------|----------------|
 | `orchestrator` | `app/orchestrator/` | Drives agent runs, streams chunks, manages session state |
 | `strategies` | `app/strategies/` | Provider adapters + strategy registry |
+| `gemma-router` | `app/gemma-router/` | Local Ollama intent classifier — suggests MCP tools before the main agent runs |
 | `agent` | `app/agent/` | `POST /api/agent/send-message` — async webhook endpoint |
 | `agent-files` | `app/agent-files/` | File watcher + REST for agent-generated files |
 | `auth` | `app/auth/` | Bearer token guard and login endpoint |

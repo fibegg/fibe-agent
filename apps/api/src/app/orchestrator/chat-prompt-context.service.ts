@@ -53,6 +53,18 @@ export class ChatPromptContextService {
     return `\n\n[Conversation History — ${lines.length} prior messages]\n${lines.join('\n')}\n[End of Conversation History]\n\n`;
   }
 
+  /**
+   * Prepends a system-level MCP tool hint block to the user message text.
+   * This is injected only when GemmaRouter returns a high-confidence suggestion.
+   * The stored chat history is never affected — only the built prompt changes.
+   */
+  injectToolHint(text: string, tools: string[], confidence: number): string {
+    if (!tools.length) return text;
+    const pct = Math.round(confidence * 100);
+    const hint = `[SYSTEM]Suggested MCP tools: ${tools.join(', ')} — confidence ${pct}%[/SYSTEM]`;
+    return `${hint}\n${text}`;
+  }
+
   private async buildImageContext(imageUrls: string[]): Promise<string> {
     if (!imageUrls.length) return '';
     const strings: string[] = [];

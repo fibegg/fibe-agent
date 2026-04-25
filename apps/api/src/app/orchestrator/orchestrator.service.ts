@@ -35,6 +35,7 @@ import { writeMcpConfig } from '../config/mcp-config-writer';
 import { ChatPromptContextService } from './chat-prompt-context.service';
 import { finishAgentStream, type FinishAgentStreamDeps } from './finish-agent-stream';
 import { createStreamingCallbacks } from './orchestrator-streaming-callbacks';
+import { GemmaRouterService } from '../gemma-router/gemma-router.service';
 
 export interface OutboundEvent {
   type: string;
@@ -53,6 +54,8 @@ export class OrchestratorService implements OnModuleInit {
   private reasoningTextAccumulated = '';
   private lastStreamUsage: TokenUsage | undefined = undefined;
   private agentMode = 'Exploring...';
+  /** Cached MCP tool list with descriptions, fetched once at startup. */
+  private mcpToolsCache: Array<{ name: string; description: string }> | null = null;
 
   constructor(
     private readonly activityStore: ActivityStoreService,
@@ -64,6 +67,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly fibeSync: FibeSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
     private readonly steering: SteeringService,
+    private readonly gemmaRouter: GemmaRouterService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
   }
@@ -85,6 +89,11 @@ export class OrchestratorService implements OnModuleInit {
     this.steering.count$.subscribe((count) => {
       this._send(WS_EVENT.QUEUE_UPDATED, { count });
     });
+
+    // Pre-fetch MCP tool descriptions for Gemma classification (non-blocking)
+    if (this.config.isGemmaRouterEnabled()) {
+      void this.fetchMcpToolDescriptions();
+    }
   }
 
   get outbound(): Subject<OutboundEvent> {
@@ -350,8 +359,30 @@ export class OrchestratorService implements OnModuleInit {
               ? allMessages.slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
               : undefined;
           })();
+
+      // Gemma pre-pass: classify user intent → inject MCP tool hints into the prompt.
+      // Runs only when GEMMA_ROUTER_ENABLED=true and Ollama is reachable.
+      // Stored chat history is never modified — only the built prompt changes.
+      let routedText = text;
+      if (this.config.isGemmaRouterEnabled()) {
+        const mcpTools = this.getMcpTools();
+        this.logger.log(`[GemmaRouter] input: "${text.slice(0, 80)}", tools: ${mcpTools.length}`);
+        if (mcpTools.length) {
+          const gemmaResult = await this.gemmaRouter.analyze(text, mcpTools);
+          this.logger.log(`[GemmaRouter] result: ${JSON.stringify(gemmaResult)}`);
+          if (!gemmaResult.skipped && gemmaResult.confidence >= this.config.getGemmaConfidenceThreshold()) {
+            routedText = this.chatPromptContext.injectToolHint(text, gemmaResult.tools, gemmaResult.confidence);
+            this.logger.log(
+              `[GemmaRouter] injected hint — tools: [${gemmaResult.tools.join(', ')}], confidence: ${Math.round(gemmaResult.confidence * 100)}%`
+            );
+          } else {
+            this.logger.log(`[GemmaRouter] no hint injected — skipped: ${gemmaResult.skipped}, confidence: ${gemmaResult.confidence}`);
+          }
+        }
+      }
+
       const fullPrompt = await this.chatPromptContext.buildFullPrompt(
-        text,
+        routedText,
         imageUrls,
         audioFilename,
         attachmentFilenames,
@@ -526,5 +557,130 @@ export class OrchestratorService implements OnModuleInit {
     const value = this.modelStore.set(model);
     await this.modelStore.flush();
     this._send(WS_EVENT.MODEL_UPDATED, { model: value });
+  }
+
+  /**
+   * Returns the list of configured MCP server/tool names from env vars.
+   * These are the same names that writeMcpConfig() uses to register tools with the agent strategy.
+   */
+  /**
+   * Returns MCP tool list with descriptions for Gemma classification.
+   * Uses the cached list from fetchMcpToolDescriptions() if available,
+   * falling back to plain server names from env vars.
+   */
+  private getMcpTools(): string[] | Array<{ name: string; description: string }> {
+    if (this.mcpToolsCache && this.mcpToolsCache.length > 0) {
+      return this.mcpToolsCache;
+    }
+    return this.getMcpToolNamesFromEnv();
+  }
+
+  /** Extracts plain MCP server names from MCP_CONFIG_JSON / DOCKER_MCP_CONFIG_JSON. */
+  private getMcpToolNamesFromEnv(): Array<{ name: string; description: string }> {
+    const sources = [process.env.MCP_CONFIG_JSON, process.env.DOCKER_MCP_CONFIG_JSON];
+    const tools: Array<{ name: string; description: string }> = [];
+    const names = new Set<string>();
+    
+    for (const raw of sources) {
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as { mcpServers?: Record<string, unknown>; serverUrl?: string };
+        if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
+          for (const name of Object.keys(parsed.mcpServers)) {
+            names.add(name);
+          }
+        } else if (parsed.serverUrl) {
+          names.add('fibe');
+        }
+      } catch {
+        // Ignore parse errors — same tolerance as mcp-config-writer
+      }
+    }
+    
+    // For stdio servers (which fetchMcpToolDescriptions can't query), provide hardcoded fallbacks
+    // so Gemma knows what they do.
+    if (names.has('fibe')) {
+      tools.push({ name: 'fibe_me', description: 'Returns current user profile and email' });
+      tools.push({ name: 'fibe_agents_list', description: 'Lists all available agents' });
+      tools.push({ name: 'fibe_playgrounds_get', description: 'Lists all playground environments' });
+    } else {
+      // If fibe isn't explicitly defined but we fallback, we can just map raw names
+      for (const name of names) {
+        tools.push({ name, description: `The ${name} MCP server` });
+      }
+    }
+    
+    if (names.has('github')) {
+      tools.push({ name: 'github', description: 'GitHub operations: pull requests, issues, repos' });
+    }
+    
+    return tools.length > 0 ? tools : Array.from(names).map(n => ({ name: n, description: n }));
+  }
+
+  /**
+   * Fetches the full MCP tool list (with descriptions) from the configured MCP server
+   * using the MCP JSON-RPC tools/list method. Results are cached in mcpToolsCache.
+   * Runs non-blocking at startup; any failure falls back to plain env-var names.
+   */
+  private async fetchMcpToolDescriptions(): Promise<void> {
+    // Extract server URLs from MCP config
+    const urls = this.getMcpServerUrls();
+    if (!urls.length) return;
+
+    const allTools: Array<{ name: string; description: string }> = [];
+
+    for (const serverUrl of urls) {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
+        const res = await fetch(serverUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        if (!res.ok) continue;
+        const data = await res.json() as {
+          result?: { tools?: Array<{ name: string; description?: string }> }
+        };
+        const tools = data?.result?.tools ?? [];
+        for (const tool of tools) {
+          if (tool.name) {
+            allTools.push({ name: tool.name, description: tool.description ?? tool.name });
+          }
+        }
+        this.logger.log(`GemmaRouter: fetched ${tools.length} MCP tool descriptions from ${serverUrl}`);
+      } catch {
+        this.logger.debug(`GemmaRouter: could not fetch tool list from ${serverUrl}`);
+      }
+    }
+
+    if (allTools.length > 0) {
+      this.mcpToolsCache = allTools;
+    }
+  }
+
+  /** Extracts MCP server HTTP URLs (streamable-HTTP servers only). */
+  private getMcpServerUrls(): string[] {
+    const sources = [process.env.MCP_CONFIG_JSON, process.env.DOCKER_MCP_CONFIG_JSON];
+    const urls: string[] = [];
+    for (const raw of sources) {
+      if (!raw) continue;
+      try {
+        const parsed = JSON.parse(raw) as {
+          mcpServers?: Record<string, { serverUrl?: string }>;
+          serverUrl?: string;
+        };
+        if (parsed.mcpServers) {
+          for (const entry of Object.values(parsed.mcpServers)) {
+            if (entry.serverUrl) urls.push(entry.serverUrl);
+          }
+        } else if (parsed.serverUrl) {
+          urls.push(parsed.serverUrl);
+        }
+      } catch { /* ignore */ }
+    }
+    return urls;
   }
 }

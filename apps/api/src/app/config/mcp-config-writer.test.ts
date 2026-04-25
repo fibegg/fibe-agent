@@ -30,7 +30,7 @@ describe('writeMcpConfig', () => {
     expect(existsSync(join(testHome, '.gemini', 'settings.json'))).toBe(false);
   });
 
-  it('does nothing when AGENT_PROVIDER is not set', () => {
+  it('defaults to claude-code provider when AGENT_PROVIDER is not set', () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
         'fibe': {
@@ -41,9 +41,11 @@ describe('writeMcpConfig', () => {
     });
     delete process.env.AGENT_PROVIDER;
     writeMcpConfig();
-    // No provider directories should be created
+    // Falls back to claude-code: should write claude config files
+    expect(existsSync(join(testHome, '.claude'))).toBe(true);
+    expect(existsSync(join(testHome, '.claude.json'))).toBe(true);
+    // Should NOT write gemini or codex dirs
     expect(existsSync(join(testHome, '.gemini'))).toBe(false);
-    expect(existsSync(join(testHome, '.claude'))).toBe(false);
     expect(existsSync(join(testHome, '.codex'))).toBe(false);
   });
 
@@ -423,6 +425,9 @@ describe('writeMcpConfig', () => {
 
     it('falls back to SESSION_DIR/mcp.json without a conversation id', () => {
       process.env.SESSION_DIR = join(testHome, '.cursor-session');
+      delete process.env.DATA_DIR;
+      delete process.env.FIBE_AGENT_ID;
+      delete process.env.CONVERSATION_ID;
 
       writeMcpConfig();
 

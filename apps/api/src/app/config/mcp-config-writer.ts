@@ -92,36 +92,30 @@ function getDataDir(): string {
   return process.env.DATA_DIR ?? join(process.cwd(), 'data');
 }
 
-function getConversationId(): string | null {
+function getConversationId(): string {
   const raw = process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim() || '';
-  return raw || null;
+  return raw || 'default';
 }
 
-function getClaudeProjectMcpConfigPath(): string | null {
+function getClaudeProjectMcpConfigPath(): string {
   const conversationId = getConversationId();
-  if (conversationId) {
-    return join(
-      getDataDir(),
-      sanitizeConversationId(conversationId),
-      CLAUDE_WORKSPACE_SUBDIR,
-      '.mcp.json',
-    );
-  }
-
-  const sessionDir = getSessionDir();
-  if (sessionDir) {
-    return join(dirname(sessionDir), CLAUDE_WORKSPACE_SUBDIR, '.mcp.json');
-  }
-
-  return null;
+  // We now always have a conversationId (falls back to 'default')
+  // so this will always match the path Claude uses via ConfigService.
+  return join(
+    getDataDir(),
+    sanitizeConversationId(conversationId),
+    CLAUDE_WORKSPACE_SUBDIR,
+    '.mcp.json',
+  );
 }
 
 function getCursorMcpConfigPath(): string {
-  const conversationId = getConversationId();
-  if (!conversationId) {
+  const hasConversationId = !!(process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim());
+  if (!hasConversationId) {
     return join(getSessionDir() || join(getHome(), '.cursor'), 'mcp.json');
   }
 
+  const conversationId = getConversationId();
   return join(
     getDataDir(),
     sanitizeConversationId(conversationId),
@@ -488,12 +482,7 @@ function parseServersFromJson(raw: string): Record<string, McpServerEntry> | nul
  * can connect to all configured MCP servers on startup.
  */
 export function writeMcpConfig(): void {
-  const rawProvider = process.env.AGENT_PROVIDER;
-  if (!rawProvider) {
-    const hasMcp = process.env.MCP_CONFIG_JSON || process.env.DOCKER_MCP_CONFIG_JSON;
-    if (hasMcp) logger.warn('MCP config env vars are set but AGENT_PROVIDER is missing');
-    return;
-  }
+  const rawProvider = process.env.AGENT_PROVIDER || 'claude-code';
 
   // Normalize: Dockerfile uses underscores (claude_code), registry uses hyphens (claude-code)
   const provider = rawProvider.replace(/_/g, '-');

@@ -40,6 +40,7 @@ import { RuntimeConfigController } from './runtime-config/runtime-config.control
 import { TerminalService } from './terminal/terminal.service';
 import { ProxyService } from './provider-traffic/proxy.service';
 import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic-store.service';
+import { GemmaRouterService } from './gemma-router/gemma-router.service';
 
 @Module({
   imports: [
@@ -89,6 +90,7 @@ import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic
     TerminalService,
     ProviderTrafficStoreService,
     ProxyService,
+    GemmaRouterService,
   ],
 })
 export class AppModule {}

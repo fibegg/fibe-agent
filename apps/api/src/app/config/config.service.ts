@@ -85,4 +85,28 @@ export class ConfigService {
   getEncryptionKey(): string | undefined {
     return process.env.ENCRYPTION_KEY;
   }
+
+  // ─── Gemma Router (local LLM pre-processor via Ollama) ───────────
+
+  isGemmaRouterEnabled(): boolean {
+    return process.env.GEMMA_ROUTER_ENABLED === 'true';
+  }
+
+  getGemmaUrl(): string {
+    return process.env.OLLAMA_URL?.trim() || 'http://localhost:11434';
+  }
+
+  getGemmaModel(): string {
+    return process.env.GEMMA_MODEL?.trim() || 'gemma3:4b';
+  }
+
+  getGemmaConfidenceThreshold(): number {
+    const val = parseFloat(process.env.GEMMA_CONFIDENCE_THRESHOLD ?? '');
+    return isNaN(val) ? 0.8 : Math.max(0, Math.min(1, val));
+  }
+
+  getGemmaTimeoutMs(): number {
+    const val = parseInt(process.env.GEMMA_TIMEOUT_MS ?? '', 10);
+    return isNaN(val) ? 30000 : Math.max(500, val);
+  }
 }

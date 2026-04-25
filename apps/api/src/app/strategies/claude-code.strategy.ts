@@ -318,6 +318,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       }
 
       const useStreamJson = !!callbacks;
+      const mcpConfigPath = join(workspaceDir, '.mcp.json');
       const args = [
         ...(this._sessionId
           ? ['--resume', this._sessionId]
@@ -327,6 +328,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         '-p',
         prompt,
         '--dangerously-skip-permissions',
+        ...(existsSync(mcpConfigPath) ? ['--mcp-config', mcpConfigPath] : []),
         ...(systemPrompt ? ['--system-prompt', systemPrompt.trim()] : []),
         ...(useStreamJson
           ? [

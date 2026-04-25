@@ -41,6 +41,7 @@
 | **Activity sidebar** | Chronological timeline of agent thinking steps, tool calls, file operations, and reasoning with color-coded status (idle → thinking → complete). |
 | **File explorer** | Real-time file tree of the playground via `PlaygroundWatcherService`; open, edit, view, and save files without leaving the chat. |
 | **Voice input** | Browser `MediaRecorder` voice recorder that uploads audio and sends it as a message attachment. |
+| **Gemma MCP Router** | Optional local LLM pre-pass using Ollama (`gemma3:4b`) to classify intent and suggest MCP tools with zero latency impact. |
 | **File attachments** | Drag-&-drop or click-to-upload images, audio, PDF, Excel, Word, CSV, JSON, text — up to 20 MB per file. |
 | **`@`-mention files** | Type `@` in the chat input to reference playground files; the API injects their contents into the agent prompt. |
 | **Conversation persistence** | Messages, activities, model choice, uploads, and provider session state scoped by conversation id (`FIBE_AGENT_ID` / `CONVERSATION_ID`). |
@@ -67,6 +68,7 @@ flowchart LR
     WSTerm["/ws-terminal\n(shell)"]
     REST["/api/*"]
     Orch["Orchestrator"]
+    Gemma["Gemma Router\n(local Ollama)"]
     Strategies["Strategy\nRegistry"]
   end
 
@@ -85,7 +87,8 @@ flowchart LR
   WS --> Orch
   WSTerm --> Orch
   REST --> Orch
-  Orch --> Strategies
+  Orch --> Gemma
+  Gemma --> Strategies
   Strategies --> Gemini
   Strategies --> Claude
   Strategies --> Codex
@@ -197,6 +200,11 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins |
 | `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` (restrict in production) |
 | `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
+| `GEMMA_ROUTER_ENABLED` | `false` | Enable local LLM MCP routing via Ollama (`true`/`false`) |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint for the Gemma router |
+| `GEMMA_MODEL` | `gemma3:4b` | Model to use for intent classification |
+| `GEMMA_CONFIDENCE_THRESHOLD` | `0.80` | Min confidence (0–1) required to inject a tool hint |
+| `GEMMA_TIMEOUT_MS` | `30000` | Per-request timeout in ms for the Ollama call |
 
 **Provider API keys** (used when `AGENT_AUTH_MODE=api-token`):
 

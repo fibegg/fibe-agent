@@ -9,6 +9,7 @@ import { ModelStoreService } from '../model-store/model-store.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { SteeringService } from '../steering/steering.service';
+import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
 
 describe('OrchestratorService', () => {
@@ -38,6 +39,7 @@ describe('OrchestratorService', () => {
       getSystemPrompt: () => undefined,
       getModelOptions: () => [],
       getDefaultModel: () => '',
+      isGemmaRouterEnabled: () => false,
     };
     const activityStore = new ActivityStoreService(config as never);
     const messageStore = new MessageStoreService(config as never);
@@ -59,7 +61,11 @@ describe('OrchestratorService', () => {
         _audioFilename: string | null,
         _attachmentFilenames?: string[],
       ) => text.trim(),
+      injectToolHint: (text: string) => text,
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
+    const gemmaRouter = {
+      analyze: async () => ({ tools: [], confidence: 0, skipped: true }),
+    } as unknown as GemmaRouterService;
     const steering = new SteeringService(config as never);
     lastSteering = steering;
     steering.onModuleInit();
@@ -73,6 +79,7 @@ describe('OrchestratorService', () => {
       fibeSync,
       chatPromptContext,
       steering,
+      gemmaRouter,
     );
     await orch.onModuleInit();
     return orch;
