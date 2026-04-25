@@ -59,44 +59,6 @@ function missingSessionError(message: string): boolean {
   return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-/**
- * Gemini CLI resolves its config dir as `${homedir()}/.gemini`, where
- * `homedir()` prefers the `GEMINI_CLI_HOME` env var over `os.homedir()`.
- * When SESSION_DIR is set (e.g. `/app/data/<id>/.gemini`) we point the CLI at
- * its parent so the CLI's lookup lands on our per-agent SESSION_DIR — which
- * already holds the `settings.json` + `oauth_creds.json` written by the
- * strategy and the credential injector.
- */
-function getGeminiHomeEnv(): { GEMINI_CLI_HOME?: string } {
-  const sessionDir = process.env.SESSION_DIR;
-  if (!sessionDir) return {};
-  return { GEMINI_CLI_HOME: dirname(sessionDir) };
-}
-
-function getModelArgsList(model: string): string[] {
-  if (!model || model === 'undefined') return [];
-  return ['-m', model];
-}
-
-/**
- * Build Gemini CLI args. The prompt is passed via the `-p=<value>` equals-sign
- * form so yargs binds it to `-p` even when it starts with `-` (e.g. a system
- * prompt that begins with a markdown bullet). Using `-p <value>` as two
- * separate args fails with "Not enough arguments following: p".
- */
-export function buildGeminiArgs(
-  effectivePrompt: string,
-  model: string,
-  hasSession: boolean
-): string[] {
-  return [
-    ...getModelArgsList(model),
-    ...(hasSession ? ['--resume'] : []),
-    '--yolo',
-    `-p=${effectivePrompt}`,
-  ];
-}
-
 export class GeminiStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
   private _apiToken: string | null = null;
