@@ -102,6 +102,7 @@ x-provider-build-step: &provider-build-step
 services:
   ci-setup:
     <<: *bun-ci-step
+    labels: *source-labels
     environment:
       <<: [*env-bun, *required-ci-env]
       CI_STEP_NAME: ci-setup
@@ -111,6 +112,7 @@ services:
 
   ci-lint:
     <<: *bun-ci-step
+    labels: *source-labels
     depends_on:
       ci-setup:
         condition: service_healthy
@@ -122,6 +124,7 @@ services:
 
   ci-test:
     <<: *bun-ci-step
+    labels: *source-labels
     depends_on:
       ci-setup:
         condition: service_healthy
@@ -152,6 +155,7 @@ services:
 
   ci-build-common:
     <<: *build-ci-step
+    labels: *source-labels
     depends_on:
       ci-lint:
         condition: service_healthy
@@ -168,6 +172,7 @@ services:
 
   ci-build-gemini:
     <<: *provider-build-step
+    labels: *source-labels
     environment:
       <<: *provider-build-env
       CI_STEP_NAME: ci-build-gemini
@@ -176,6 +181,7 @@ services:
 
   ci-build-claude:
     <<: *provider-build-step
+    labels: *source-labels
     environment:
       <<: *provider-build-env
       CI_STEP_NAME: ci-build-claude
@@ -184,6 +190,7 @@ services:
 
   ci-build-codex:
     <<: *provider-build-step
+    labels: *source-labels
     environment:
       <<: *provider-build-env
       CI_STEP_NAME: ci-build-codex
@@ -192,6 +199,7 @@ services:
 
   ci-build-opencode:
     <<: *provider-build-step
+    labels: *source-labels
     environment:
       <<: *provider-build-env
       CI_STEP_NAME: ci-build-opencode
@@ -200,6 +208,7 @@ services:
 
   ci-build-cursor:
     <<: *provider-build-step
+    labels: *source-labels
     environment:
       <<: *provider-build-env
       CI_STEP_NAME: ci-build-cursor
