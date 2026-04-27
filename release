@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")"
+
+required_prompt() {
+  local var_name="$1"
+  local prompt="$2"
+  local secret="${3:-false}"
+  local value="${!var_name:-}"
+
+  if [ -z "$value" ]; then
+    if [ "$secret" = "true" ]; then
+      read -r -s -p "$prompt: " value
+      printf '\n'
+    else
+      read -r -p "$prompt: " value
+    fi
+  fi
+
+  if [ -z "$value" ]; then
+    echo "ERROR: $var_name is required." >&2
+    exit 1
+  fi
+
+  export "$var_name=$value"
+}
+
+optional_prompt() {
+  local var_name="$1"
+  local prompt="$2"
+  local description="$3"
+  local secret="${4:-false}"
+  local value="${!var_name:-}"
+
+  if [ -z "$value" ]; then
+    echo "$description"
+    if [ "$secret" = "true" ]; then
+      read -r -s -p "$prompt (optional, leave empty to skip): " value
+      printf '\n'
+    else
+      read -r -p "$prompt (optional, leave empty to skip): " value
+    fi
+  fi
+
+  export "$var_name=$value"
+}
+
+github_repository_path_from_url() {
+  local url="$1"
+  local path=""
+
+  if [[ "$url" == git@github.com:* ]]; then
+    path="${url#git@github.com:}"
+  elif [[ "$url" == https://github.com/* ]]; then
+    path="${url#https://github.com/}"
+  fi
+
+  path="${path%.git}"
+  printf '%s' "$path"
+}
+
+detect_docker_cpu_count() {
+  local cpus=""
+
+  cpus="$(docker info --format '{{.NCPU}}' 2>/dev/null || true)"
+  if [[ "$cpus" =~ ^[0-9]+$ ]] && [ "$cpus" -gt 0 ]; then
+    printf '%s' "$cpus"
+    return
+  fi
+
+  cpus="$(getconf _NPROCESSORS_ONLN 2>/dev/null || true)"
+  if [[ "$cpus" =~ ^[0-9]+$ ]] && [ "$cpus" -gt 0 ]; then
+    printf '%s' "$cpus"
+    return
+  fi
+
+  printf '4'
+}
+
+current_branch="$(git branch --show-current)"
+if [ -z "$current_branch" ]; then
+  echo "ERROR: Could not determine current Git branch. Checkout a branch before release." >&2
+  exit 1
+fi
+
+export FIBE_BRANCH="$current_branch"
+echo "Using FIBE_BRANCH=$FIBE_BRANCH"
+
+if [ -z "${FIBE_REPOSITORY_URL:-}" ]; then
+  remote_url="$(git config --get remote.origin.url || true)"
+  if [[ "$remote_url" == git@github.com:* ]]; then
+    remote_path="${remote_url#git@github.com:}"
+    remote_path="${remote_path%.git}"
+    export FIBE_REPOSITORY_URL="https://github.com/$remote_path"
+  elif [[ "$remote_url" == https://github.com/* ]]; then
+    export FIBE_REPOSITORY_URL="${remote_url%.git}"
+  else
+    export FIBE_REPOSITORY_URL="https://github.com/fibegg/fibe-agent"
+  fi
+fi
+echo "Using FIBE_REPOSITORY_URL=$FIBE_REPOSITORY_URL"
+
+repository_path="$(github_repository_path_from_url "$FIBE_REPOSITORY_URL")"
+if [ -z "${FIBE_REPOSITORY_OWNER:-}" ] && [ -n "$repository_path" ]; then
+  export FIBE_REPOSITORY_OWNER="${repository_path%%/*}"
+fi
+if [ -z "${FIBE_REPOSITORY_LABEL:-}" ] && [ -n "$repository_path" ]; then
+  export FIBE_REPOSITORY_LABEL="$repository_path"
+fi
+
+echo "Using FIBE_REPOSITORY_OWNER=${FIBE_REPOSITORY_OWNER:-fibegg}"
+echo "Using FIBE_REPOSITORY_LABEL=${FIBE_REPOSITORY_LABEL:-fibegg/fibe-agent}"
+
+required_prompt "GH_USERNAME" "GitHub username for ghcr.io login"
+required_prompt "GH_TOKEN" "GitHub token with GHCR push permissions" "true"
+
+optional_prompt \
+  "SLACK_WEBHOOK_URL" \
+  "Slack incoming webhook URL" \
+  "Optional: when omitted, the final success/failure notification is printed to stdout instead of sent to Slack."
+
+optional_prompt \
+  "DPASTE_TOKEN" \
+  "Dpaste token" \
+  "Optional: when omitted, failure logs are printed to stdout instead of uploaded to Dpaste." \
+  "true"
+
+docker_cpu_count="$(detect_docker_cpu_count)"
+export NX_PARALLEL="${NX_PARALLEL:-$docker_cpu_count}"
+export NPM_CONFIG_JOBS="${NPM_CONFIG_JOBS:-$docker_cpu_count}"
+export BUILDKIT_MAX_PARALLELISM="${BUILDKIT_MAX_PARALLELISM:-$docker_cpu_count}"
+export BUILDX_PROGRESS="${BUILDX_PROGRESS:-quiet}"
+export BUILDX_BUILDER_RECREATE="${BUILDX_BUILDER_RECREATE:-false}"
+export BUILDKIT_STEP_LOG_MAX_SIZE="${BUILDKIT_STEP_LOG_MAX_SIZE:-10485760}"
+export BUILDKIT_STEP_LOG_MAX_SPEED="${BUILDKIT_STEP_LOG_MAX_SPEED:-10485760}"
+export BUILDX_PROVENANCE="${BUILDX_PROVENANCE:-false}"
+export BUILDX_SBOM="${BUILDX_SBOM:-false}"
+export CI_COMMON_CACHE_EXPORT="${CI_COMMON_CACHE_EXPORT:-false}"
+export CI_COMMON_CACHE_WARM_PARALLEL="${CI_COMMON_CACHE_WARM_PARALLEL:-false}"
+export CI_PROVIDER_CACHE_EXPORT="${CI_PROVIDER_CACHE_EXPORT:-false}"
+export CI_STEP_HEALTH_INTERVAL="${CI_STEP_HEALTH_INTERVAL:-1s}"
+export CI_STEP_HEALTH_TIMEOUT="${CI_STEP_HEALTH_TIMEOUT:-1s}"
+export CI_STEP_HEALTH_RETRIES="${CI_STEP_HEALTH_RETRIES:-3}"
+export CI_STEP_HEALTH_START_PERIOD="${CI_STEP_HEALTH_START_PERIOD:-7200s}"
+export CI_FORCE_RECREATE="${CI_FORCE_RECREATE:-false}"
+
+echo "Optional resource knobs:"
+echo "  NX_PARALLEL=$NX_PARALLEL"
+echo "  NPM_CONFIG_JOBS=$NPM_CONFIG_JOBS"
+echo "  BUILDKIT_MAX_PARALLELISM=$BUILDKIT_MAX_PARALLELISM"
+echo "  BUILDX_PROGRESS=$BUILDX_PROGRESS"
+echo "  BUILDX_BUILDER_RECREATE=$BUILDX_BUILDER_RECREATE"
+echo "  BUILDKIT_STEP_LOG_MAX_SIZE=$BUILDKIT_STEP_LOG_MAX_SIZE"
+echo "  BUILDKIT_STEP_LOG_MAX_SPEED=$BUILDKIT_STEP_LOG_MAX_SPEED"
+echo "  BUILDX_PROVENANCE=$BUILDX_PROVENANCE"
+echo "  BUILDX_SBOM=$BUILDX_SBOM"
+echo "  CI_COMMON_CACHE_EXPORT=$CI_COMMON_CACHE_EXPORT"
+echo "  CI_COMMON_CACHE_WARM_PARALLEL=$CI_COMMON_CACHE_WARM_PARALLEL"
+echo "  CI_PROVIDER_CACHE_EXPORT=$CI_PROVIDER_CACHE_EXPORT"
+echo "  CI_STEP_HEALTH_INTERVAL=$CI_STEP_HEALTH_INTERVAL"
+echo "  CI_STEP_HEALTH_TIMEOUT=$CI_STEP_HEALTH_TIMEOUT"
+echo "  CI_STEP_HEALTH_RETRIES=$CI_STEP_HEALTH_RETRIES"
+echo "  CI_STEP_HEALTH_START_PERIOD=$CI_STEP_HEALTH_START_PERIOD"
+echo "  CI_FORCE_RECREATE=$CI_FORCE_RECREATE"
+
+compose_up_args=(up --remove-orphans --exit-code-from ci-results-notify)
+if [ "$CI_FORCE_RECREATE" = "true" ]; then
+  compose_up_args+=(--force-recreate)
+fi
+
+docker compose -f ci.yml -p fibe-agent-ci-$FIBE_BRANCH "${compose_up_args[@]}"

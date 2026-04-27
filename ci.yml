@@ -6,223 +6,233 @@ x-fibe.gg:
     job_mode: true
     source_defaults: true
 
+x-env-bun: &env-bun
+  CI: "true"
+  NPM_CONFIG_JOBS:
+  NX_PARALLEL:
+  PATH: "/opt/fibe-ci-tools/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
 x-common-bun: &common-bun
-  image: node:24-slim
+  image: node:24
   working_dir: /app
   volumes:
+    - ./:/app
     - bun-cache:/root/.bun/install/cache
     - npm-cache:/root/.npm
     - nx-cache:/app/.nx/cache
     - apt-cache:/var/cache/apt
     - ci-tools:/opt/fibe-ci-tools
-  environment:
-    CI: "true"
-    PATH: "/opt/fibe-ci-tools/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    - ci-results:/results
+  environment: *env-bun
 
 x-env-build: &env-build
   CI: "true"
-  GH_USERNAME: ""
-  GH_TOKEN: ""
+  FIBE_BRANCH:
+  FIBE_REPOSITORY_OWNER:
+  FIBE_REPOSITORY_URL:
+  GH_USERNAME:
+  GH_TOKEN:
   BUILDX_BUILDER_NAME: fibe-agent-ci
+  BUILDX_BUILDER_RECREATE:
+  BUILDX_PROGRESS:
+  BUILDKIT_MAX_PARALLELISM:
+  BUILDKIT_STEP_LOG_MAX_SIZE:
+  BUILDKIT_STEP_LOG_MAX_SPEED:
+  BUILDX_PROVENANCE:
+  BUILDX_SBOM:
+  CI_COMMON_CACHE_EXPORT:
+  CI_COMMON_CACHE_WARM_PARALLEL:
+  CI_PROVIDER_CACHE_EXPORT:
+  NPM_CONFIG_JOBS:
+  NX_PARALLEL:
+
+x-required-ci-env: &required-ci-env
+  FIBE_BRANCH:
+  GH_USERNAME:
+  GH_TOKEN:
 
 x-common-build: &common-build
   image: docker:29.3.1-cli
   working_dir: /app
   volumes:
+    - ./:/app
     - /var/run/docker.sock:/var/run/docker.sock
     - buildx-state:/root/.docker/buildx
+    - ci-results:/results
   environment: *env-build
+
+x-ci-healthcheck: &ci-healthcheck
+  test: ["CMD-SHELL", "test -f /tmp/ci-done"]
+  interval: ${CI_STEP_HEALTH_INTERVAL:-1s}
+  timeout: ${CI_STEP_HEALTH_TIMEOUT:-1s}
+  retries: ${CI_STEP_HEALTH_RETRIES:-3}
+  # Grace period for the first slow cache-warming run. A successful check still
+  # marks the service healthy immediately; this does not add a 7200s delay.
+  start_period: ${CI_STEP_HEALTH_START_PERIOD:-7200s}
+
+x-source-labels: &source-labels
+  fibe.gg/source_mount: "/app"
+  fibe.gg/job_watch: "false"
+
+x-completed-step: &completed-step
+  restart: 'no'
+  healthcheck: *ci-healthcheck
+
+x-bun-ci-step: &bun-ci-step
+  <<: [*common-bun, *completed-step]
+  labels: *source-labels
+
+x-build-ci-step: &build-ci-step
+  <<: [*common-build, *completed-step]
+  labels: *source-labels
+  entrypoint: ["/bin/sh", "-lc"]
+
+x-provider-build-env: &provider-build-env
+  <<: *env-build
+  CI_REQUIRED_STEPS: ci-build-common
+
+x-provider-build-step: &provider-build-step
+  <<: *build-ci-step
+  depends_on:
+    ci-build-common:
+      condition: service_healthy
+  command:
+    - apk add --no-cache nodejs git >/dev/null 2>&1 && exec node /app/scripts/ci/ci-step.mjs node /app/scripts/ci/build-provider.mjs
 
 services:
   ci-setup:
-    <<: *common-bun
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
-    configs:
-      - source: script_setup
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
+    <<: *bun-ci-step
+    environment:
+      <<: [*env-bun, *required-ci-env]
+      CI_STEP_NAME: ci-setup
+      CI_REQUIRED_STEPS: ""
+      CI_REQUIRED_ENVS: "FIBE_BRANCH GH_USERNAME GH_TOKEN"
+    command: ["node", "/app/scripts/ci/ci-step.mjs", "node", "/app/scripts/ci/setup.mjs"]
 
   ci-lint:
-    <<: *common-bun
+    <<: *bun-ci-step
     depends_on:
       ci-setup:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
-    command: ["bun", "run", "ci:notest"]
+        condition: service_healthy
+    environment:
+      <<: *env-bun
+      CI_STEP_NAME: ci-lint
+      CI_REQUIRED_STEPS: ci-setup
+    command: ["node", "/app/scripts/ci/ci-step.mjs", "node", "/app/scripts/ci/lint.mjs"]
 
   ci-test:
-    <<: *common-bun
+    <<: *bun-ci-step
     depends_on:
       ci-setup:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
-    configs:
-      - source: script_test
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
+        condition: service_healthy
+    environment:
+      <<: *env-bun
+      CI_STEP_NAME: ci-test
+      CI_REQUIRED_STEPS: ci-setup
+    command: ["node", "/app/scripts/ci/ci-step.mjs", "node", "/app/scripts/ci/test.mjs"]
 
   ci-scan:
     image: aquasec/trivy:0.69.3
     working_dir: /app
     depends_on:
       ci-setup:
-        condition: service_completed_successfully
+        condition: service_healthy
     volumes:
+      - ./:/app
       - trivy-cache:/root/.cache/trivy
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
-    command: ["fs", "--cache-dir", "/root/.cache/trivy", "--ignore-unfixed", "--format", "table", "--severity", "CRITICAL,HIGH", "."]
+      - ci-results:/results
+    labels: *source-labels
+    environment:
+      CI_STEP_NAME: ci-scan
+      CI_REQUIRED_STEPS: ci-setup
+    <<: *completed-step
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - apk add --no-cache nodejs >/dev/null 2>&1 && exec node /app/scripts/ci/ci-step.mjs trivy fs --cache-dir /root/.cache/trivy --ignore-unfixed --format table --severity CRITICAL,HIGH .
 
   ci-build-common:
-    <<: *common-build
+    <<: *build-ci-step
     depends_on:
       ci-lint:
-        condition: service_completed_successfully
+        condition: service_healthy
       ci-test:
-        condition: service_completed_successfully
+        condition: service_healthy
       ci-scan:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
-    configs:
-      - source: script_build_common
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
+        condition: service_healthy
+    environment:
+      <<: *env-build
+      CI_STEP_NAME: ci-build-common
+      CI_REQUIRED_STEPS: "ci-lint ci-test ci-scan"
+    command:
+      - apk add --no-cache nodejs >/dev/null 2>&1 && exec node /app/scripts/ci/ci-step.mjs node /app/scripts/ci/build-common.mjs
 
   ci-build-gemini:
-    <<: *common-build
-    depends_on:
-      ci-build-common:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
+    <<: *provider-build-step
     environment:
-      <<: *env-build
+      <<: *provider-build-env
+      CI_STEP_NAME: ci-build-gemini
       PROVIDER: gemini
       TAG_NAME: gemini
-    configs:
-      - source: script_build
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
 
   ci-build-claude:
-    <<: *common-build
-    depends_on:
-      ci-build-common:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
+    <<: *provider-build-step
     environment:
-      <<: *env-build
+      <<: *provider-build-env
+      CI_STEP_NAME: ci-build-claude
       PROVIDER: claude_code
       TAG_NAME: claude-code
-    configs:
-      - source: script_build
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
 
   ci-build-codex:
-    <<: *common-build
-    depends_on:
-      ci-build-common:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
+    <<: *provider-build-step
     environment:
-      <<: *env-build
+      <<: *provider-build-env
+      CI_STEP_NAME: ci-build-codex
       PROVIDER: openai_codex
       TAG_NAME: openai-codex
-    configs:
-      - source: script_build
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
 
   ci-build-opencode:
-    <<: *common-build
-    depends_on:
-      ci-build-common:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
+    <<: *provider-build-step
     environment:
-      <<: *env-build
+      <<: *provider-build-env
+      CI_STEP_NAME: ci-build-opencode
       PROVIDER: opencode
       TAG_NAME: opencode
-    configs:
-      - source: script_build
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
 
   ci-build-cursor:
-    <<: *common-build
-    depends_on:
-      ci-build-common:
-        condition: service_completed_successfully
-    labels:
-      fibe.gg/source_mount: "/app"
-      fibe.gg/job_watch: "true"
+    <<: *provider-build-step
     environment:
-      <<: *env-build
+      <<: *provider-build-env
+      CI_STEP_NAME: ci-build-cursor
       PROVIDER: cursor
       TAG_NAME: cursor
-    configs:
-      - source: script_build
-        target: /run.sh
-    command: ["/bin/sh", "/run.sh"]
 
-  ci-notify-slack:
-    image: docker:29.3.1-cli
+  ci-results-notify:
+    image: node:24-slim
     working_dir: /app
     depends_on:
       ci-build-gemini:
-        condition: service_completed_successfully
+        condition: service_healthy
       ci-build-claude:
-        condition: service_completed_successfully
+        condition: service_healthy
       ci-build-codex:
-        condition: service_completed_successfully
+        condition: service_healthy
       ci-build-opencode:
-        condition: service_completed_successfully
+        condition: service_healthy
       ci-build-cursor:
-        condition: service_completed_successfully
+        condition: service_healthy
+    volumes:
+      - ./:/app
+      - ci-results:/results
     labels:
+      fibe.gg/source_mount: "/app"
       fibe.gg/job_watch: "true"
     environment:
-      SLACK_WORKFLOW_URL: ""
+      SLACK_WEBHOOK_URL:
+      DPASTE_TOKEN:
+      FIBE_BRANCH:
+      FIBE_REPOSITORY_LABEL:
     restart: 'no'
-    command:
-      - /bin/sh
-      - -lc
-      - |
-        if [ -z "$$SLACK_WORKFLOW_URL" ]; then
-          echo "--> SLACK_WORKFLOW_URL is not set; skipping Slack notification"
-          exit 0
-        fi
-
-        if ! command -v curl >/dev/null 2>&1; then
-          apk add --no-cache curl >/dev/null 2>&1 || {
-            echo "WARNING: curl is unavailable; skipping Slack notification"
-            exit 0
-          }
-        fi
-
-        if ! curl -fsS -X POST \
-          -H "Content-Type: application/json" \
-          -d '{"message":"New docker image was pushed"}' \
-          "$$SLACK_WORKFLOW_URL"; then
-          echo "WARNING: Failed to notify Slack workflow"
-        fi
+    command: ["node", "/app/scripts/ci/notify.mjs"]
 
 volumes:
   bun-cache:
@@ -232,198 +242,4 @@ volumes:
   ci-tools:
   trivy-cache:
   buildx-state:
-
-configs:
-  script_setup:
-    content: |
-      set -e
-      export DEBIAN_FRONTEND=noninteractive
-      export PATH="/opt/fibe-ci-tools/node_modules/.bin:$$PATH"
-      export npm_config_node_gyp="/opt/fibe-ci-tools/node_modules/.bin/node-gyp"
-
-      echo "--> Installing native build dependencies"
-      apt-get update
-      apt-get install -y --no-install-recommends python3 make g++ ca-certificates
-      rm -rf /var/lib/apt/lists/*
-
-      if ! command -v bun >/dev/null 2>&1 || ! command -v node-gyp >/dev/null 2>&1; then
-        echo "--> Installing cached Bun toolchain"
-        npm install --prefix /opt/fibe-ci-tools bun@1.3.11 node-gyp
-      else
-        echo "--> Bun toolchain already installed (cached)"
-      fi
-
-      echo "--> Installing project dependencies"
-      bun install --frozen-lockfile
-
-  script_test:
-    content: |
-      set -e
-      echo "--> Running Integration tests"
-      if [ -f tests/bin/gemini ]; then
-        sed -i "s/\r$$//" tests/bin/gemini
-        chmod +x tests/bin/gemini
-        bun run test:integration
-      else
-        echo "--> No Integration tests found!"
-      fi
-
-  script_build_common:
-    content: |
-      set -e
-      echo "--> Preparing shared Docker build cache"
-
-      GH_USERNAME="$${GH_USERNAME:-$${FIBE_REPOSITORY_OWNER:-fibegg}}"
-      LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
-
-      if [ -z "$$GH_TOKEN" ] || [ "$$GH_TOKEN" = '""' ] || [ "$$GH_TOKEN" = "''" ]; then
-        echo "--> Missing GH_TOKEN, skipping shared Docker cache warm-up"
-        exit 0
-      fi
-
-      echo "--> Logging into ghcr.io"
-      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin 2>/dev/null
-
-      IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
-      BUILDER_NAME="$${BUILDX_BUILDER_NAME:-fibe-agent-ci}"
-      RUNTIME_CACHE_REF="$$IMAGE:buildcache-runtime-base"
-      BUILDER_CACHE_REF="$$IMAGE:buildcache-builder"
-
-      echo "--> Installing binfmt emulators for amd64/arm64"
-      docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
-
-      ensure_shared_builder() {
-        if ! docker buildx inspect "$$BUILDER_NAME" >/dev/null 2>&1; then
-          echo "--> Creating shared buildx builder $$BUILDER_NAME"
-          docker buildx create \
-            --name "$$BUILDER_NAME" \
-            --driver docker-container \
-            --driver-opt network=host
-        fi
-
-        BUILDER_INFO=$$(docker buildx inspect "$$BUILDER_NAME" --bootstrap)
-        echo "$$BUILDER_INFO"
-
-        for platform in linux/amd64 linux/arm64; do
-          if ! echo "$$BUILDER_INFO" | grep -q "$$platform"; then
-            echo "--> Recreating $$BUILDER_NAME to restore $$platform support"
-            docker buildx rm "$$BUILDER_NAME" >/dev/null 2>&1 || true
-            docker buildx create \
-              --name "$$BUILDER_NAME" \
-              --driver docker-container \
-              --driver-opt network=host
-            BUILDER_INFO=$$(docker buildx inspect "$$BUILDER_NAME" --bootstrap)
-            echo "$$BUILDER_INFO"
-            echo "$$BUILDER_INFO" | grep -q "$$platform" || {
-              echo "ERROR: buildx builder $$BUILDER_NAME is missing $$platform"
-              exit 1
-            }
-          fi
-        done
-      }
-
-      ensure_shared_builder
-
-      echo "========================================="
-      echo "--> Warming runtime-base cache (linux/amd64 + linux/arm64)"
-      echo "========================================="
-      docker buildx build . \
-        --builder "$$BUILDER_NAME" \
-        --platform linux/amd64,linux/arm64 \
-        --target runtime-base \
-        --cache-from type=registry,ref=$$RUNTIME_CACHE_REF \
-        --cache-from type=registry,ref=$$BUILDER_CACHE_REF \
-        --cache-to type=registry,ref=$$RUNTIME_CACHE_REF,mode=max
-
-      echo "========================================="
-      echo "--> Warming builder cache (linux/amd64 + linux/arm64)"
-      echo "========================================="
-      docker buildx build . \
-        --builder "$$BUILDER_NAME" \
-        --platform linux/amd64,linux/arm64 \
-        --target builder \
-        --cache-from type=registry,ref=$$RUNTIME_CACHE_REF \
-        --cache-from type=registry,ref=$$BUILDER_CACHE_REF \
-        --cache-to type=registry,ref=$$BUILDER_CACHE_REF,mode=max
-
-  script_build:
-    content: |
-      set -e
-      echo "--> Preparing for Docker Build & Push"
-      apk add --no-cache git
-      git config --global --add safe.directory /app
-      GIT_SHA=$$(git rev-parse HEAD || echo "unknown")
-
-      GH_USERNAME="$${GH_USERNAME:-$${FIBE_REPOSITORY_OWNER:-fibegg}}"
-      SOURCE_BRANCH="$${FIBE_BRANCH:-main}"
-      LOWER_OWNER=$$(echo "$$GH_USERNAME" | tr "[:upper:]" "[:lower:]")
-      LATEST_TAG="latest"
-      if [ "$$SOURCE_BRANCH" != "main" ] && [ "$$SOURCE_BRANCH" != "master" ]; then
-        SAFE_BRANCH=$$(echo "$$SOURCE_BRANCH" | tr '/:@ ' '----')
-        LATEST_TAG="latest-$$SAFE_BRANCH"
-      fi
-
-      if [ -z "$$GH_TOKEN" ] || [ "$$GH_TOKEN" = '""' ] || [ "$$GH_TOKEN" = "''" ]; then
-        echo "--> Missing GH_TOKEN, skipping build/push"
-        exit 0
-      fi
-
-      echo "--> Logging into ghcr.io"
-      echo "$$GH_TOKEN" | docker login ghcr.io -u "$$GH_USERNAME" --password-stdin 2>/dev/null
-
-      IMAGE="ghcr.io/$$LOWER_OWNER/fibe-agent"
-      CACHE_REF="$$IMAGE:buildcache-$$TAG_NAME"
-      RUNTIME_CACHE_REF="$$IMAGE:buildcache-runtime-base"
-      BUILDER_CACHE_REF="$$IMAGE:buildcache-builder"
-      BUILDER_NAME="$${BUILDX_BUILDER_NAME:-fibe-agent-ci}"
-
-      echo "========================================="
-      echo "--> Building $$PROVIDER (linux/amd64 + linux/arm64)"
-      echo "========================================="
-
-      if ! docker buildx inspect "$$BUILDER_NAME" >/dev/null 2>&1; then
-        echo "--> Shared builder $$BUILDER_NAME is missing; creating it"
-        docker run --privileged --rm tonistiigi/binfmt --install amd64,arm64
-        docker buildx create \
-          --name "$$BUILDER_NAME" \
-          --driver docker-container \
-          --driver-opt network=host
-      fi
-
-      BUILDER_INFO=$$(docker buildx inspect "$$BUILDER_NAME" --bootstrap)
-      echo "$$BUILDER_INFO"
-
-      for platform in linux/amd64 linux/arm64; do
-        if ! echo "$$BUILDER_INFO" | grep -q "$$platform"; then
-          echo "ERROR: buildx builder $$BUILDER_NAME is missing $$platform support"
-          exit 1
-        fi
-      done
-
-      docker buildx build . \
-        --builder "$$BUILDER_NAME" \
-        --platform linux/amd64,linux/arm64 \
-        -t $$IMAGE:$$TAG_NAME-$$LATEST_TAG \
-        -t $$IMAGE:$$TAG_NAME-$$GIT_SHA \
-        --build-arg AGENT_PROVIDER=$$PROVIDER \
-        --build-arg GIT_SHA=$$GIT_SHA \
-        --cache-from type=registry,ref=$$RUNTIME_CACHE_REF \
-        --cache-from type=registry,ref=$$BUILDER_CACHE_REF \
-        --cache-from type=registry,ref=$$CACHE_REF \
-        --cache-from type=registry,ref=$$IMAGE:$$TAG_NAME-$$LATEST_TAG \
-        --cache-to type=registry,ref=$$CACHE_REF,mode=max \
-        --push
-
-      echo "--> Verifying multi-arch manifests"
-      for tag in "$$TAG_NAME-$$LATEST_TAG" "$$TAG_NAME-$$GIT_SHA"; do
-        MANIFEST_INFO=$$(docker buildx imagetools inspect "$$IMAGE:$$tag")
-        echo "$$MANIFEST_INFO"
-        echo "$$MANIFEST_INFO" | grep -q "linux/amd64" || {
-          echo "ERROR: $$IMAGE:$$tag is missing linux/amd64"
-          exit 1
-        }
-        echo "$$MANIFEST_INFO" | grep -q "linux/arm64" || {
-          echo "ERROR: $$IMAGE:$$tag is missing linux/arm64"
-          exit 1
-        }
-      done
+  ci-results:

@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.7
+
 FROM node:24-slim AS cli-base
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -33,9 +35,11 @@ RUN mkdir -p /root/.local/share/cursor-agent
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
 FROM node:24-slim AS builder
-COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
+COPY --link --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
 
 ARG BUILDKIT_INLINE_CACHE=1
+ARG NPM_CONFIG_JOBS
+ARG NX_PARALLEL
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
@@ -49,33 +53,36 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 WORKDIR /app
 
-COPY package.json bun.lock package-lock.json* nx.json tsconfig.base.json tsconfig.json eslint.config.mjs vitest.workspace.ts ./
-COPY apps/api/package.json apps/api/
-COPY apps/chat/package.json apps/chat/
-COPY apps/e2e-api/package.json apps/e2e-api/
-COPY apps/e2e-chat/package.json apps/e2e-chat/
+COPY --link package.json bun.lock package-lock.json* nx.json tsconfig.base.json tsconfig.json eslint.config.mjs vitest.workspace.ts ./
+COPY --link apps/api/package.json apps/api/
+COPY --link apps/chat/package.json apps/chat/
+COPY --link apps/e2e-api/package.json apps/e2e-api/
+COPY --link apps/e2e-chat/package.json apps/e2e-chat/
 
 RUN --mount=type=cache,target=/root/.bun/install/cache \
-    bun install
+    NPM_CONFIG_JOBS="${NPM_CONFIG_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
+    npm_config_jobs="${NPM_CONFIG_JOBS}" bun install
 
-COPY apps/api apps/api
-COPY apps/chat apps/chat
-COPY apps/e2e-api apps/e2e-api
-COPY apps/e2e-chat apps/e2e-chat
-COPY shared shared
+COPY --link apps/api apps/api
+COPY --link apps/chat apps/chat
+COPY --link apps/e2e-api apps/e2e-api
+COPY --link apps/e2e-chat apps/e2e-chat
+COPY --link shared shared
 
 ENV NX_DAEMON=false \
     VITE_THEME_SOURCE=frame \
     VITE_HIDE_THEME_SWITCH=true
 
 RUN --mount=type=cache,target=/app/.nx/cache \
-    npx nx run-many --targets=build --projects=api,chat
+    NX_PARALLEL="${NX_PARALLEL:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
+    npx nx run-many --targets=build --projects=api,chat --parallel="${NX_PARALLEL}"
 
 FROM node:24-slim AS runtime-base
 
 ARG BUILDKIT_INLINE_CACHE=1
 ARG GITHUB_MCP_VERSION=1.0.0
 ARG GITEA_MCP_VERSION=1.1.0
+ARG NPM_CONFIG_JOBS
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
@@ -142,7 +149,7 @@ RUN ARCH=$(uname -m) && \
       tar -xz -C /usr/local/bin gitea-mcp && \
     chmod +x /usr/local/bin/gitea-mcp
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --link --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
     && chmod +x /usr/local/bin/uvx
 
@@ -152,7 +159,7 @@ RUN curl -fsSL https://deno.land/install.sh | sh
 WORKDIR /app
 
 # ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
-COPY apps/api/package.json ./package.json
+COPY --link apps/api/package.json ./package.json
 
 # node-gyp must be globally available for native addon compilation.
 RUN --mount=type=cache,target=/root/.npm \
@@ -160,12 +167,14 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Install production JS deps AND mcp-remote
 RUN --mount=type=cache,target=/root/.npm \
-    npm install --omit=dev --ignore-scripts && \
+    NPM_CONFIG_JOBS="${NPM_CONFIG_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
+    npm_config_jobs="${NPM_CONFIG_JOBS}" npm install --omit=dev --ignore-scripts && \
     npm install -g mcp-remote
 
 # Compile node-pty native addon for the target platform.
 RUN --mount=type=cache,target=/root/.npm \
-    npm rebuild node-pty --build-from-source
+    NPM_CONFIG_JOBS="${NPM_CONFIG_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
+    npm_config_jobs="${NPM_CONFIG_JOBS}" npm rebuild node-pty --build-from-source
 
 # npm-distributed MCP helper.
 RUN --mount=type=cache,target=/root/.npm \
@@ -194,22 +203,22 @@ RUN npx -y playwright install chromium
 USER root
 
 # ---- MCP REMOTE RECONNECTION WRAPPER ----
-COPY scripts/mcp-remote-wrapper.sh /usr/local/bin/mcp-remote-wrapper
+COPY --link scripts/mcp-remote-wrapper.sh /usr/local/bin/mcp-remote-wrapper
 RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 
 # ---- SMART ENTRYPOINT ----
 # Detects prod (dist/ present) vs dev (source code mounted, no dist/) at runtime.
 # In dev mode it runs `npm install` then `nx serve` so the container works
 # when the entire project root is volume-mounted (e.g. local Rails orchestration).
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --link docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
 # ---- MODE HELPER (agent mode switcher) ----
-COPY mode /app/mode
+COPY --link mode /app/mode
 RUN chmod +x /app/mode
 
 # ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
-COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
+COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
@@ -228,13 +237,13 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/*; \
     fi
 
-COPY --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
-COPY --from=cli /usr/local/bin /usr/local/bin
-COPY --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
+COPY --link --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --link --from=cli /usr/local/bin /usr/local/bin
+COPY --link --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
 
 # The provider CLI stage inherits node's default docker-entrypoint.sh in
 # /usr/local/bin. Re-apply fibe-agent's smart entrypoint after copying CLI bins.
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY --link docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
     && grep -q "dist/main.js" /usr/local/bin/docker-entrypoint.sh
 
@@ -268,12 +277,16 @@ RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
 
 # ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
-COPY --from=builder /app/apps/api/dist ./dist/
-COPY --from=builder /app/apps/chat/dist ./chat/
+COPY --link --from=builder /app/apps/api/dist ./dist/
+COPY --link --from=builder /app/apps/chat/dist ./chat/
 
 # Inject git SHA at the last possible moment so it doesn't bust previous caches
 ARG GIT_SHA
 ENV GIT_SHA=$GIT_SHA
+
+# Cheap tracked marker for proving a fresh image was produced without
+# invalidating dependency or build layers.
+COPY --link ci /app/ci
 
 USER node
 
