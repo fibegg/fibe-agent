@@ -533,9 +533,21 @@ export class OrchestratorService implements OnModuleInit {
       }
       this.currentActivityId = null;
     } else {
-      this.messageStore.finalizeLastAssistant(story);
-      const entry = this.activityStore.append(story);
-      this._send(WS_EVENT.ACTIVITY_APPENDED, { entry });
+      // If currentActivityId is null, this might be a duplicate submission from a second tab.
+      // Instead of appending a new activity, we just update the last assistant message's story if it exists.
+      this.logger.debug('Received submit_story but currentActivityId is null (possible duplicate from another tab).');
+      const allMessages = this.messageStore.all();
+      const lastMsg = allMessages[allMessages.length - 1];
+      if (lastMsg && lastMsg.role === 'assistant') {
+         const backendStory = lastMsg.story ?? [];
+         const useClientStory = story.length > backendStory.length;
+         if (useClientStory) {
+            this.messageStore.finalizeLastAssistant(story, lastMsg.activityId);
+            if (lastMsg.activityId) {
+               this.activityStore.replaceStory(lastMsg.activityId, story);
+            }
+         }
+      }
     }
     void this.fibeSync.syncMessages(() =>
       JSON.stringify(this.messageStore.all())

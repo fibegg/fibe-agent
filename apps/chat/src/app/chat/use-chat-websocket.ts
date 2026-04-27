@@ -70,6 +70,8 @@ export function useChatWebSocket(
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const responseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const messageQueueRef = useRef<Record<string, unknown>[]>([]);
   const onMessageRef = useRef(onMessage);
   const onStreamChunkRef = useRef(onStreamChunk);
   const onStreamStartRef = useRef(onStreamStart);
@@ -102,6 +104,8 @@ export function useChatWebSocket(
       const ws = wsRef.current;
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(msg));
+      } else {
+        messageQueueRef.current.push(msg);
       }
     },
     []
@@ -136,8 +140,23 @@ export function useChatWebSocket(
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+        offlineTimerRef.current = null;
+      }
       setErrorMessage(null);
       send({ action: 'get_model' });
+
+      // Flush queued messages
+      const queue = messageQueueRef.current;
+      messageQueueRef.current = [];
+      queue.forEach((msg) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify(msg));
+        } else {
+          messageQueueRef.current.push(msg);
+        }
+      });
     };
 
     const handlers: Record<string, (d: ServerMessage) => void> = {
@@ -265,7 +284,12 @@ export function useChatWebSocket(
         setState(CHAT_STATES.ERROR);
         return;
       }
-      setState(CHAT_STATES.AGENT_OFFLINE);
+      if (!offlineTimerRef.current) {
+        offlineTimerRef.current = setTimeout(() => {
+          setState(CHAT_STATES.AGENT_OFFLINE);
+          offlineTimerRef.current = null;
+        }, 3000);
+      }
       if (!reconnectTimerRef.current) {
         reconnectTimerRef.current = setTimeout(() => {
           reconnectTimerRef.current = null;
@@ -284,6 +308,9 @@ export function useChatWebSocket(
     return () => {
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
+      }
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
       }
       clearResponseTimer();
       wsRef.current?.close();
@@ -304,6 +331,10 @@ export function useChatWebSocket(
     if (reconnectTimerRef.current) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
+    }
+    if (offlineTimerRef.current) {
+      clearTimeout(offlineTimerRef.current);
+      offlineTimerRef.current = null;
     }
     clearResponseTimer();
     wsRef.current?.close();

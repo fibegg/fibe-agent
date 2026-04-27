@@ -45,25 +45,33 @@ function attachChatWs(
   orchestrator: OrchestratorService,
   playgroundWatcher: PlaygroundWatcherService,
 ): void {
-  let activeClient: WebSocket | null = null;
+  const activeClients = new Set<WebSocket>();
 
-  const sendToClient = (type: string, data: Record<string, unknown> = {}): void => {
-    if (activeClient?.readyState === WebSocket.OPEN) {
-      activeClient.send(JSON.stringify({ type, ...data }));
+  const broadcastToClients = (type: string, data: Record<string, unknown> = {}): void => {
+    const payload = JSON.stringify({ type, ...data });
+    for (const client of activeClients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload);
+      }
     }
   };
 
-  orchestrator.outbound.subscribe((ev) => sendToClient(ev.type, ev.data as Record<string, unknown>));
-  playgroundWatcher.playgroundChanged$.subscribe(() => sendToClient(WS_EVENT.PLAYGROUND_CHANGED, {}));
+  orchestrator.outbound.subscribe((ev) => broadcastToClients(ev.type, ev.data as Record<string, unknown>));
+  playgroundWatcher.playgroundChanged$.subscribe(() => broadcastToClients(WS_EVENT.PLAYGROUND_CHANGED, {}));
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     if (rejectIfUnauthorized(ws, req, config.getAgentPassword())) return;
 
-    // Take over the session from any previous client.
-    if (activeClient?.readyState === WebSocket.OPEN) {
-      activeClient.close(WS_CLOSE.SESSION_TAKEN_OVER, 'Session taken over by another client');
+    // Limit to 5 concurrent connections by dropping the oldest
+    if (activeClients.size >= 5) {
+      const oldestClient = activeClients.values().next().value;
+      if (oldestClient) {
+        oldestClient.close(WS_CLOSE.SESSION_TAKEN_OVER, 'Maximum number of connections reached (5). Oldest session closed.');
+        activeClients.delete(oldestClient);
+      }
     }
-    activeClient = ws;
+
+    activeClients.add(ws);
     orchestrator.handleClientConnected();
     logWs({ event: 'connect' });
 
@@ -88,8 +96,8 @@ function attachChatWs(
 
     ws.on('close', (code?: number) => {
       clearInterval(resetInterval);
+      activeClients.delete(ws);
       logWs({ event: 'disconnect', closeCode: code });
-      if (activeClient === ws) activeClient = null;
     });
 
     ws.on('error', (err) => {

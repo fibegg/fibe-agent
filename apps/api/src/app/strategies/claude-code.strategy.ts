@@ -109,6 +109,7 @@ export function toolUseToEvent(
 export class ClaudeCodeStrategy extends AbstractCLIStrategy {
   private _hasSession = false;
   private _sessionId: string | null = null;
+  private _pendingAuthCheck: Promise<boolean> | null = null;
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     super(ClaudeCodeStrategy.name, useApiTokenMode, conversationDataDir);
@@ -211,8 +212,12 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
   executeLogout(connection: LogoutConnection): void {
     const token = this.getToken();
+    const envOverrides: Record<string, string> = {};
+    if (token) {
+      envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
+    }
     const logoutProcess = spawn('claude', ['auth', 'logout'], {
-      env: this.getClaudeProcessEnv({ CLAUDE_CODE_OAUTH_TOKEN: token ?? '' }),
+      env: this.getClaudeProcessEnv(envOverrides),
       shell: false,
     });
     logoutProcess.stdin?.end();
@@ -242,15 +247,24 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       return Promise.resolve(this.getToken() !== null);
     }
 
-    return new Promise((resolve) => {
-      const token = this.getToken();
-      if (!token) {
-        resolve(false);
-        return;
-      }
+    if (this.currentStreamProcess) {
+      return Promise.resolve(true);
+    }
 
+    const token = this.getToken();
+
+    if (this._pendingAuthCheck) {
+      return this._pendingAuthCheck;
+    }
+
+    this._pendingAuthCheck = new Promise<boolean>((resolve) => {
+      const envOverrides: Record<string, string> = {};
+      if (token) {
+        envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
+      }
+      
       const checkProcess = spawn('claude', ['auth', 'status'], {
-        env: this.getClaudeProcessEnv({ CLAUDE_CODE_OAUTH_TOKEN: token }),
+        env: this.getClaudeProcessEnv(envOverrides),
         shell: false,
       });
       checkProcess.stdin?.end();
@@ -262,6 +276,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         if (resolved) return;
         resolved = true;
         clearTimeout(timer);
+        this._pendingAuthCheck = null;
         resolve(result);
       };
 
@@ -280,7 +295,14 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           return;
         }
         try {
-          const status = JSON.parse(outputStr) as { loggedIn?: boolean };
+          // Claude CLI v2.1.119+ emits ANSI/VT terminal escape sequences around
+          // the JSON output (e.g. \x1b7, \x1b8, \x1b[>4m). Strip them before parsing.
+          // eslint-disable-next-line no-control-regex
+          const cleaned = outputStr.replace(/\x1b(?:\[[0-9;]*[a-zA-Z]|[=>]?[0-9]*[a-zA-Z]|\][^\x07]*\x07|[78])/g, '').replace(/\r/g, '');
+          const jsonStart = cleaned.indexOf('{');
+          const jsonEnd = cleaned.lastIndexOf('}');
+          const jsonStr = jsonStart !== -1 && jsonEnd !== -1 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+          const status = JSON.parse(jsonStr) as { loggedIn?: boolean };
           finish(status.loggedIn === true);
         } catch {
           finish(false);
@@ -291,6 +313,8 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         finish(false);
       });
     });
+
+    return this._pendingAuthCheck;
   }
 
 
@@ -344,12 +368,17 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       }
 
       const token = this.getToken();
+      
+      const envOverrides: Record<string, string> = {
+        BROWSER: '/bin/true',
+        DISPLAY: '',
+      };
+      if (token) {
+        envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
+      }
+
       const claudeProcess = spawn('claude', args, {
-        env: this.getClaudeProcessEnv({
-          CLAUDE_CODE_OAUTH_TOKEN: token ?? '',
-          BROWSER: '/bin/true',
-          DISPLAY: '',
-        }),
+        env: this.getClaudeProcessEnv(envOverrides),
         cwd: workspaceDir,
         shell: false,
       });
@@ -487,11 +516,26 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
         }
-        if (code !== 0 && errorResult.trim()) {
+        if (code !== 0) {
           if (missingSessionError(errorResult)) {
             this.clearStoredSession(workspaceDir);
           }
-          reject(new Error(errorResult || `Process exited with code ${code}`));
+          // Try to extract an error from stdout if stderr is empty
+          let fallbackError = errorResult;
+          if (!fallbackError.trim() && stdoutBuffer.trim()) {
+            try {
+               const lines = stdoutBuffer.trim().split('\n');
+               const lastObj = JSON.parse(lines.pop() || '');
+               if (lastObj && lastObj.error) fallbackError = typeof lastObj.error === 'string' ? lastObj.error : JSON.stringify(lastObj.error);
+               if (!fallbackError && lastObj && lastObj.result && typeof lastObj.result === 'string') fallbackError = lastObj.result;
+            } catch {
+               const cleanOut = stdoutBuffer.trim();
+               if (cleanOut) {
+                   fallbackError = cleanOut.length > 300 ? cleanOut.slice(-300) + '...' : cleanOut;
+               }
+            }
+          }
+          reject(new Error(fallbackError.trim() || `Process exited with code ${code}`));
         } else if (!hasEmittedOutput) {
           this.clearStoredSession(workspaceDir);
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
