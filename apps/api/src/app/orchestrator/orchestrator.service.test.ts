@@ -376,7 +376,7 @@ describe('OrchestratorService', () => {
     expect(hasActivityEvent).toBe(true);
   });
 
-  test('handleClientMessage submit_story without prior activity creates new', async () => {
+  test('handleClientMessage submit_story without prior activity is ignored', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
@@ -384,8 +384,8 @@ describe('OrchestratorService', () => {
       { id: 's1', type: 'step', message: 'New story', timestamp: new Date().toISOString() },
     ];
     await orch.handleClientMessage({ action: WS_ACTION.SUBMIT_STORY, story });
-    const appended = events.find((e) => e.type === WS_EVENT.ACTIVITY_APPENDED);
-    expect(appended).toBeDefined();
+    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_APPENDED)).toBe(false);
+    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_UPDATED)).toBe(false);
   });
 
   test('outbound getter returns the Subject', async () => {
