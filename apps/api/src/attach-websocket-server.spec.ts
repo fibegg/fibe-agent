@@ -163,17 +163,23 @@ describe('attachWebSocketServer — chat auth guard', () => {
 // ─── Chat WS — session takeover ───────────────────────────────────────────────
 
 describe('attachWebSocketServer — session takeover', () => {
-  it('closes previous client with 4002 when a second client connects', () => {
+  it('closes previous client with 4002 when a 6th client connects', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
       makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService,
     );
 
     const ws1 = makeWsStub();
-    const ws2 = makeWsStub();
 
     wss.emit('connection', ws1, makeReq('/ws'));
-    wss.emit('connection', ws2, makeReq('/ws'));
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+
+    // 6th connection triggers the drop of the oldest (ws1)
+    const ws6 = makeWsStub();
+    wss.emit('connection', ws6, makeReq('/ws'));
 
     expect(ws(ws1).close).toHaveBeenCalledTimes(1);
     expect(ws(ws1).close.mock.calls[0][0]).toBe(4002); // SESSION_TAKEN_OVER

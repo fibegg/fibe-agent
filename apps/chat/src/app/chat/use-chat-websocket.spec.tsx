@@ -632,7 +632,7 @@ describe('useChatWebSocket message handlers', () => {
     act(() => {
       createdWs?._onclose?.({ code: 1006 });
     });
-    expect(result.current.state).toBe(CHAT_STATES.AGENT_OFFLINE);
+    expect(result.current.state).toBe(CHAT_STATES.INITIALIZING);
 
     // Call reconnect while the timer is STILL active (hits lines 300-301)
     act(() => {
@@ -648,6 +648,8 @@ describe('useChatWebSocket message handlers', () => {
     act(() => {
       vi.runAllTimers();
     });
+    
+    expect(result.current.state).toBe(CHAT_STATES.AGENT_OFFLINE);
 
     // It reconnects, so wait for the next open
     act(() => {
