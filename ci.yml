@@ -10,6 +10,8 @@ x-env-bun: &env-bun
   CI: "true"
   NPM_CONFIG_JOBS:
   NX_PARALLEL:
+  CI_DEPENDENCY_WAIT_TIMEOUT_MS:
+  CI_DEPENDENCY_WAIT_INTERVAL_MS:
   PATH: "/opt/fibe-ci-tools/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 x-common-bun: &common-bun
@@ -45,6 +47,8 @@ x-env-build: &env-build
   CI_PROVIDER_CACHE_EXPORT:
   NPM_CONFIG_JOBS:
   NX_PARALLEL:
+  CI_DEPENDENCY_WAIT_TIMEOUT_MS:
+  CI_DEPENDENCY_WAIT_INTERVAL_MS:
 
 x-required-ci-env: &required-ci-env
   FIBE_BRANCH:
@@ -94,7 +98,7 @@ x-provider-build-env: &provider-build-env
 x-provider-build-step: &provider-build-step
   <<: *build-ci-step
   depends_on:
-    ci-build-common:
+    ci-setup:
       condition: service_healthy
   command:
     - apk add --no-cache nodejs git >/dev/null 2>&1 && exec node /app/scripts/ci/ci-step.mjs node /app/scripts/ci/build-provider.mjs
@@ -148,6 +152,8 @@ services:
     environment:
       CI_STEP_NAME: ci-scan
       CI_REQUIRED_STEPS: ci-setup
+      CI_DEPENDENCY_WAIT_TIMEOUT_MS:
+      CI_DEPENDENCY_WAIT_INTERVAL_MS:
     <<: *completed-step
     entrypoint: ["/bin/sh", "-lc"]
     command:
@@ -157,11 +163,7 @@ services:
     <<: *build-ci-step
     labels: *source-labels
     depends_on:
-      ci-lint:
-        condition: service_healthy
-      ci-test:
-        condition: service_healthy
-      ci-scan:
+      ci-setup:
         condition: service_healthy
     environment:
       <<: *env-build
@@ -219,15 +221,7 @@ services:
     image: node:24-slim
     working_dir: /app
     depends_on:
-      ci-build-gemini:
-        condition: service_healthy
-      ci-build-claude:
-        condition: service_healthy
-      ci-build-codex:
-        condition: service_healthy
-      ci-build-opencode:
-        condition: service_healthy
-      ci-build-cursor:
+      ci-setup:
         condition: service_healthy
     volumes:
       - ./:/app
@@ -240,6 +234,9 @@ services:
       DPASTE_TOKEN:
       FIBE_BRANCH:
       FIBE_REPOSITORY_LABEL:
+      CI_EXPECTED_STEPS: "ci-setup ci-lint ci-test ci-scan ci-build-common ci-build-gemini ci-build-claude ci-build-codex ci-build-opencode ci-build-cursor"
+      CI_RESULTS_WAIT_TIMEOUT_MS:
+      CI_RESULTS_WAIT_INTERVAL_MS:
     restart: 'no'
     command: ["node", "/app/scripts/ci/notify.mjs"]
 

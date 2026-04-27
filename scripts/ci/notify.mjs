@@ -1,10 +1,16 @@
 import { readFile, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 
 const resultsDir = process.env.CI_RESULTS_DIR || '/results';
 const branch = process.env.FIBE_BRANCH || '';
 const repositoryLabel = process.env.FIBE_REPOSITORY_LABEL || 'fibegg/fibe-agent';
+const expectedSteps = (process.env.CI_EXPECTED_STEPS || '')
+  .split(/\s+/)
+  .filter(Boolean);
+const resultWaitTimeoutMs = Number(process.env.CI_RESULTS_WAIT_TIMEOUT_MS || 7_200_000);
+const resultWaitIntervalMs = Number(process.env.CI_RESULTS_WAIT_INTERVAL_MS || 1_000);
 
 const imageStepLabels = {
   'ci-build-gemini': 'Gemini',
@@ -44,6 +50,31 @@ function decodeOutput(encoded) {
     return '';
   }
   return Buffer.from(encoded, 'base64').toString('utf8');
+}
+
+async function waitForExpectedResults() {
+  if (expectedSteps.length === 0) {
+    return [];
+  }
+
+  const deadline = Date.now() + resultWaitTimeoutMs;
+  let lastWaitingLog = 0;
+
+  while (Date.now() < deadline) {
+    const missing = expectedSteps.filter((step) => !existsSync(path.join(resultsDir, `${step}.json`)));
+    if (missing.length === 0) {
+      return [];
+    }
+
+    if (Date.now() - lastWaitingLog > 30_000) {
+      console.log(`--> ci-results-notify waiting for result file(s): ${missing.join(', ')}`);
+      lastWaitingLog = Date.now();
+    }
+
+    await sleep(resultWaitIntervalMs);
+  }
+
+  return expectedSteps.filter((step) => !existsSync(path.join(resultsDir, `${step}.json`)));
 }
 
 function printFailurePayload(payload) {
@@ -118,12 +149,23 @@ async function uploadFailurePayload(payload) {
 const summary = ['Fibe Agent CI results', `Branch: ${branch}`, '', 'Service Results:'];
 const detail = [];
 let failures = 0;
+const missingExpectedResults = await waitForExpectedResults();
 
 const resultFiles = existsSync(resultsDir)
   ? (await readdir(resultsDir)).filter((file) => file.endsWith('.json')).sort()
   : [];
 
-if (resultFiles.length === 0) {
+if (missingExpectedResults.length > 0) {
+  failures += missingExpectedResults.length;
+  for (const service of missingExpectedResults) {
+    summary.push(`- ${service}: missing result (exit code -1)`);
+    detail.push(`---- ${service}: missing result (exit code -1) ----`);
+    detail.push(`The service did not produce ${path.join(resultsDir, `${service}.json`)} before the notifier timeout.`);
+    detail.push('');
+  }
+}
+
+if (resultFiles.length === 0 && missingExpectedResults.length === 0) {
   failures += 1;
   summary.push('- unknown: missing all CI result files');
   detail.push('No CI result files were produced.', `Results directory: ${resultsDir}`);

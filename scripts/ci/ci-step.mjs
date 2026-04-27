@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
+import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 import { isBlank } from './lib.mjs';
 
@@ -8,6 +9,8 @@ const serviceName = process.env.CI_STEP_NAME || process.argv[2] || 'ci-step';
 const resultsDir = process.env.CI_RESULTS_DIR || '/results';
 const resultFile = path.join(resultsDir, `${serviceName}.json`);
 const maxCaptureBytes = Number(process.env.CI_CAPTURE_MAX_BYTES || 2_000_000);
+const dependencyWaitTimeoutMs = Number(process.env.CI_DEPENDENCY_WAIT_TIMEOUT_MS || 7_200_000);
+const dependencyWaitIntervalMs = Number(process.env.CI_DEPENDENCY_WAIT_INTERVAL_MS || 1_000);
 
 function encodeText(value) {
   return Buffer.from(value).toString('base64');
@@ -62,25 +65,52 @@ async function validateRequiredEnvs() {
 }
 
 async function validateRequiredSteps() {
-  const blocked = [];
-  for (const dependency of (process.env.CI_REQUIRED_STEPS || '').split(/\s+/).filter(Boolean)) {
-    const dependencyFile = path.join(resultsDir, `${dependency}.json`);
-    if (!existsSync(dependencyFile)) {
-      blocked.push(`${dependency}: missing result`);
-      continue;
-    }
-
-    const status = await resultStatus(dependency);
-    if (status !== 'passed') {
-      blocked.push(`${dependency}: ${status}`);
-    }
-  }
-
-  if (blocked.length === 0) {
+  const requiredSteps = (process.env.CI_REQUIRED_STEPS || '').split(/\s+/).filter(Boolean);
+  if (requiredSteps.length === 0) {
     return true;
   }
 
-  const message = `Blocked because required CI step(s) did not pass:\n${blocked.map((line) => `- ${line}`).join('\n')}`;
+  const deadline = Date.now() + dependencyWaitTimeoutMs;
+  let lastWaitingLog = 0;
+
+  while (Date.now() < deadline) {
+    const blocked = [];
+    const missing = [];
+
+    for (const dependency of requiredSteps) {
+      const dependencyFile = path.join(resultsDir, `${dependency}.json`);
+      if (!existsSync(dependencyFile)) {
+        missing.push(dependency);
+        continue;
+      }
+
+      const status = await resultStatus(dependency);
+      if (status !== 'passed') {
+        blocked.push(`${dependency}: ${status}`);
+      }
+    }
+
+    if (blocked.length > 0) {
+      const message = `Blocked because required CI step(s) did not pass:\n${blocked.map((line) => `- ${line}`).join('\n')}`;
+      console.log(`--> ${serviceName} blocked`);
+      console.log(message);
+      await writeResult('blocked', 0, message);
+      return false;
+    }
+
+    if (missing.length === 0) {
+      return true;
+    }
+
+    if (Date.now() - lastWaitingLog > 30_000) {
+      console.log(`--> ${serviceName} waiting for required step result(s): ${missing.join(', ')}`);
+      lastWaitingLog = Date.now();
+    }
+
+    await sleep(dependencyWaitIntervalMs);
+  }
+
+  const message = `Blocked because required CI step result(s) were not produced before timeout:\n${requiredSteps.map((step) => `- ${step}`).join('\n')}`;
   console.log(`--> ${serviceName} blocked`);
   console.log(message);
   await writeResult('blocked', 0, message);
