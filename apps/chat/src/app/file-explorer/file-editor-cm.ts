@@ -186,7 +186,10 @@ export function createEditor({
     highlightActiveLineGutter(),
     lineNumbers(),
     foldGutter(),
-    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab]),
+    // NOTE: cast required to resolve @codemirror/view dual-version type conflict caused by
+    // bun's .bun/ nested package isolation (@codemirror/autocomplete pulls view@6.40.0 while
+    // the hoisted top-level is view@6.41.1). The types are structurally identical.
+    keymap.of([...closeBracketsKeymap, ...defaultKeymap, ...historyKeymap, ...foldKeymap, indentWithTab] as Parameters<typeof keymap.of>[0]),
     keymap.of([{ key: 'Mod-s', run(view) { onSave?.(view.state.doc.toString()); return true; } }]),
     EditorView.updateListener.of((u) => { if (u.docChanged) onChange?.(u.state.doc.toString()); }),
     EditorView.lineWrapping,
