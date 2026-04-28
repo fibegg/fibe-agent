@@ -6,11 +6,13 @@ import { OrchestratorService } from './orchestrator.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { MessageStoreService } from '../message-store/message-store.service';
 import { ModelStoreService } from '../model-store/model-store.service';
+import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
 import { SteeringService } from '../steering/steering.service';
 import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
+import { AGENT_MODES } from '@shared/agent-mode.constants';
 
 describe('OrchestratorService', () => {
   let dataDir: string;
@@ -62,6 +64,7 @@ describe('OrchestratorService', () => {
         _attachmentFilenames?: string[],
       ) => text.trim(),
       injectToolHint: (text: string) => text,
+      injectModeHint: (text: string) => text,
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
     const gemmaRouter = {
       analyze: async () => ({ tools: [], confidence: 0, skipped: true }),
@@ -69,6 +72,7 @@ describe('OrchestratorService', () => {
     const steering = new SteeringService(config as never);
     lastSteering = steering;
     steering.onModuleInit();
+    const agentModeStore = new AgentModeStoreService(config as never);
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -80,6 +84,7 @@ describe('OrchestratorService', () => {
       chatPromptContext,
       steering,
       gemmaRouter,
+      agentModeStore,
     );
     await orch.onModuleInit();
     return orch;
@@ -415,16 +420,33 @@ describe('OrchestratorService', () => {
     const events: { type: string; data: unknown }[] = [];
     orch.outbound.subscribe((e: { type: string; data: unknown }) => events.push(e));
 
-    orch.setAgentMode('Exploring');
+    const result = orch.setAgentMode('exploring');
+    expect(result).toBe(AGENT_MODES.exploring);
 
     const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
-    expect((modeEvent?.data as { mode: string })?.mode).toBe('Exploring');
+    expect((modeEvent?.data as { mode: string })?.mode).toBe(AGENT_MODES.exploring);
+  });
+
+  test('setAgentMode with display string is accepted (backwards compat)', async () => {
+    const orch = await createOrchestrator();
+    const result = orch.setAgentMode('Casting...');
+    expect(result).toBe(AGENT_MODES.casting);
+  });
+
+  test('setAgentMode with unknown mode returns null and does not emit', async () => {
+    const orch = await createOrchestrator();
+    const events: { type: string; data: unknown }[] = [];
+    orch.outbound.subscribe((e: { type: string; data: unknown }) => events.push(e));
+
+    const result = orch.setAgentMode('hacking');
+    expect(result).toBeNull();
+    expect(events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED)).toBeUndefined();
   });
 
   test('handleClientConnected sends agent_mode_updated with current mode', async () => {
     const orch = await createOrchestrator();
-    orch.setAgentMode('Casting');
+    orch.setAgentMode('casting');
 
     const events: { type: string; data: unknown }[] = [];
     orch.outbound.subscribe((e: { type: string; data: unknown }) => events.push(e));
@@ -432,6 +454,6 @@ describe('OrchestratorService', () => {
 
     const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
-    expect((modeEvent?.data as { mode: string })?.mode).toBe('Casting');
+    expect((modeEvent?.data as { mode: string })?.mode).toBe(AGENT_MODES.casting);
   });
 });

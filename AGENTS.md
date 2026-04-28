@@ -373,6 +373,7 @@ All messages are JSON objects with an `action` field.
 | `get_model` | — | Request current model |
 | `set_model` | `{ model }` | Set model name |
 | `interrupt_agent` | — | Stop the current agent run |
+| `set_agent_mode` | `{ mode }` | Set agent mode; `mode` is a canonical key (`exploring`, `casting`, `overseeing`, `greenfielding`, `brownfielding`) or its display string |
 
 ### Server → Client
 
@@ -404,6 +405,7 @@ All messages are JSON objects with a `type` field.
 | `playground_changed` | — | Playground directory changed |
 | `queue_updated` | `count` | Number of queued messages |
 | `model_updated` | `model` | Current model name changed |
+| `agent_mode_updated` | `mode` | Current agent mode display string (e.g. `Exploring...`) |
 
 **Story / activity timeline:** the client assembles a chronological story from `stream_start`, `reasoning_*`, `thinking_step`, `tool_call`, and `file_created` events (in order) and submits it back with `submit_story` after `stream_end`.
 
@@ -462,6 +464,8 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `GET` | `/api/data-privacy/export` | Bearer | Export conversation data as JSON |
 | `DELETE` | `/api/data-privacy` | Bearer | Permanently delete conversation data |
 | `GET` | `/api/runtime-config` | No | Runtime env vars exposed to the chat frontend (avatars, etc.) |
+| `GET` | `/api/agent-mode` | Bearer | Current agent mode → `{ mode: string }` (display string, e.g. `"Exploring..."`) |
+| `POST` | `/api/agent-mode` | Bearer | `{ mode }` — set mode by key or display string → `{ success, mode }`. Valid keys: `exploring`, `casting`, `overseeing`, `greenfielding`, `brownfielding`. Returns 400 for unknown values. |
 
 **`POST /api/agent/send-message`** is designed for webhooks and integrations (e.g. Sentry). It returns `400` (empty text), `403` (need auth), or `409` (agent busy).
 

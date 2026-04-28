@@ -11,6 +11,7 @@ export const WS_ACTION = {
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
   INTERRUPT_AGENT: 'interrupt_agent',
+  SET_AGENT_MODE: 'set_agent_mode',
 } as const;
 
 export const WS_EVENT = {

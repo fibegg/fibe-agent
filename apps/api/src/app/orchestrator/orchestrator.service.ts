@@ -13,6 +13,7 @@ import { FibeSyncService } from '../fibe-sync/fibe-sync.service';
 
 import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
+import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { UploadsService } from '../uploads/uploads.service';
 import type {
   AgentStrategy,
@@ -29,6 +30,7 @@ import {
   WS_ACTION,
   WS_EVENT,
 } from '@shared/ws-constants';
+import type { AgentModeValue } from '@shared/agent-mode.constants';
 
 import { writeMcpConfig } from '../config/mcp-config-writer';
 
@@ -53,7 +55,6 @@ export class OrchestratorService implements OnModuleInit {
   private currentActivityId: string | null = null;
   private reasoningTextAccumulated = '';
   private lastStreamUsage: TokenUsage | undefined = undefined;
-  private agentMode = 'Exploring...';
   /** Cached MCP tool list with descriptions, fetched once at startup. */
   private mcpToolsCache: Array<{ name: string; description: string }> | null = null;
 
@@ -68,6 +69,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly chatPromptContext: ChatPromptContextService,
     private readonly steering: SteeringService,
     private readonly gemmaRouter: GemmaRouterService,
+    private readonly agentModeStore: AgentModeStoreService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
   }
@@ -135,9 +137,15 @@ export class OrchestratorService implements OnModuleInit {
     this.strategy.ensureSettings?.();
   }
 
-  setAgentMode(mode: string): void {
-    this.agentMode = mode;
-    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode });
+  /**
+   * Validate, persist, and broadcast a new agent mode.
+   * Returns the resolved display string, or `null` when the mode is invalid.
+   */
+  setAgentMode(mode: string): AgentModeValue | null {
+    const resolved = this.agentModeStore.set(mode);
+    if (!resolved) return null;
+    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: resolved });
+    return resolved;
   }
 
 
@@ -146,6 +154,7 @@ export class OrchestratorService implements OnModuleInit {
     code?: string;
     text?: string;
     model?: string;
+    mode?: string;
     images?: string[];
     audio?: string;
     audioFilename?: string;
@@ -179,6 +188,7 @@ export class OrchestratorService implements OnModuleInit {
       [WS_ACTION.INTERRUPT_AGENT]: () => {
         if (this.isProcessing) this.strategy.interruptAgent?.();
       },
+      [WS_ACTION.SET_AGENT_MODE]: () => this.handleSetAgentMode(msg.mode ?? ''),
     };
 
     const handler = handlers[msg.action];
@@ -198,7 +208,7 @@ export class OrchestratorService implements OnModuleInit {
       activity: this.activityStore.all(),
     });
     this._send(WS_EVENT.QUEUE_UPDATED, { count: this.steering.count });
-    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentMode });
+    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
   }
 
   private async checkAndSendAuthStatus(): Promise<void> {
@@ -380,6 +390,11 @@ export class OrchestratorService implements OnModuleInit {
           }
         }
       }
+
+      // Mode hint injection — tells the agent CLI what mode the operator has set.
+      // Applied after Gemma routing so the mode frame is the outermost context.
+      const currentMode = this.agentModeStore.get();
+      routedText = this.chatPromptContext.injectModeHint(routedText, currentMode);
 
       const fullPrompt = await this.chatPromptContext.buildFullPrompt(
         routedText,
@@ -569,6 +584,13 @@ export class OrchestratorService implements OnModuleInit {
     const value = this.modelStore.set(model);
     await this.modelStore.flush();
     this._send(WS_EVENT.MODEL_UPDATED, { model: value });
+  }
+
+  private handleSetAgentMode(mode: string): void {
+    const resolved = this.setAgentMode(mode);
+    if (!resolved) {
+      this.logger.warn(`SET_AGENT_MODE: invalid mode "${mode}" — ignoring`);
+    }
   }
 
   /**

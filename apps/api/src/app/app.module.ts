@@ -41,6 +41,8 @@ import { TerminalService } from './terminal/terminal.service';
 import { ProxyService } from './provider-traffic/proxy.service';
 import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic-store.service';
 import { GemmaRouterService } from './gemma-router/gemma-router.service';
+import { AgentModeController } from './agent-mode/agent-mode.controller';
+import { AgentModeStoreService } from './agent-mode/agent-mode.store.service';
 
 @Module({
   imports: [
@@ -64,6 +66,7 @@ import { GemmaRouterService } from './gemma-router/gemma-router.service';
     AgentController,
     DataPrivacyController,
     RuntimeConfigController,
+    AgentModeController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -91,6 +94,7 @@ import { GemmaRouterService } from './gemma-router/gemma-router.service';
     ProviderTrafficStoreService,
     ProxyService,
     GemmaRouterService,
+    AgentModeStoreService,
   ],
 })
 export class AppModule {}

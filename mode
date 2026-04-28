@@ -7,14 +7,24 @@ if [ -z "$MODE" ]; then
   exit 1
 fi
 
+# Validate against known keys
 case "$MODE" in
-  exploring) MODE_STR="Exploring..." ;;
-  casting) MODE_STR="Casting..." ;;
-  overseeing) MODE_STR="Overseeing..." ;;
-  greenfielding) MODE_STR="Greenfielding..." ;;
-  brownfielding) MODE_STR="Brownfielding..." ;;
-  *) MODE_STR="$MODE" ;; # Custom fallback
+  exploring|casting|overseeing|greenfielding|brownfielding) ;;
+  *)
+    echo "Unknown mode \"$MODE\". Valid options: exploring, casting, overseeing, greenfielding, brownfielding"
+    exit 1
+    ;;
 esac
 
-curl -s -X POST -H "Content-Type: application/json" -d "{\"mode\":\"$MODE_STR\"}" http://localhost:3000/api/agent-mode > /dev/null
-echo "Mode updated to $MODE_STR"
+RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+  -X POST \
+  -H "Content-Type: application/json" \
+  -d "{\"mode\":\"$MODE\"}" \
+  http://localhost:3000/api/agent-mode)
+
+if [ "$RESPONSE" = "200" ]; then
+  echo "Mode updated to: $MODE"
+else
+  echo "Failed to update mode (HTTP $RESPONSE). Is the agent running on :3000?"
+  exit 1
+fi

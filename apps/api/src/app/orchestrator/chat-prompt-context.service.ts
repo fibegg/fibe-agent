@@ -65,6 +65,16 @@ export class ChatPromptContextService {
     return `${hint}\n${text}`;
   }
 
+  /**
+   * Prepends the current operator mode to the prompt text.
+   * This is injected on every request so the agent CLI knows what mode it's operating in.
+   * Example: "[MODE]Casting...[/MODE]\n<user message>"
+   */
+  injectModeHint(text: string, mode: string): string {
+    if (!mode) return text;
+    return `[MODE]${mode}[/MODE]\n${text}`;
+  }
+
   private async buildImageContext(imageUrls: string[]): Promise<string> {
     if (!imageUrls.length) return '';
     const strings: string[] = [];

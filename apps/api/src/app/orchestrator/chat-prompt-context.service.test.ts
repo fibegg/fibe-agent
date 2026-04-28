@@ -155,4 +155,36 @@ describe('ChatPromptContextService', () => {
       expect(result.length).toBeLessThan(35000);
     });
   });
+
+  describe('injectModeHint', () => {
+    const uploads = { getPath: () => null, extractImageInfo: async () => null };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+
+    test('prepends [MODE] block to text', () => {
+      const result = service.injectModeHint('do something', 'Casting...');
+      expect(result).toBe('[MODE]Casting...[/MODE]\ndo something');
+    });
+
+    test('returns text unchanged when mode is empty', () => {
+      const result = service.injectModeHint('do something', '');
+      expect(result).toBe('do something');
+    });
+
+    test('works with all canonical mode display strings', () => {
+      const modes = ['Exploring...', 'Casting...', 'Overseeing...', 'Greenfielding...', 'Brownfielding...'];
+      for (const mode of modes) {
+        const result = service.injectModeHint('go', mode);
+        expect(result).toContain(`[MODE]${mode}[/MODE]`);
+        expect(result).toContain('go');
+      }
+    });
+
+    test('mode hint appears before the user text', () => {
+      const result = service.injectModeHint('my message', 'Exploring...');
+      const modeIdx = result.indexOf('[MODE]');
+      const textIdx = result.indexOf('my message');
+      expect(modeIdx).toBeLessThan(textIdx);
+    });
+  });
 });
