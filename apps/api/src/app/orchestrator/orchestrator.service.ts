@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { exec } from 'node:child_process';
+import { promisify } from 'node:util';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
@@ -423,13 +425,21 @@ export class OrchestratorService implements OnModuleInit {
         if (mcpTools.length) {
           const gemmaResult = await this.gemmaRouter.analyze(text, mcpTools);
           this.logger.log(`[GemmaRouter] result: ${JSON.stringify(gemmaResult)}`);
-          if (!gemmaResult.skipped && gemmaResult.confidence >= this.config.getGemmaConfidenceThreshold()) {
-            routedText = this.chatPromptContext.injectToolHint(text, gemmaResult.tools, gemmaResult.confidence);
-            this.logger.log(
-              `[GemmaRouter] injected hint — tools: [${gemmaResult.tools.join(', ')}], confidence: ${Math.round(gemmaResult.confidence * 100)}%`
-            );
+          if (!gemmaResult.skipped && gemmaResult.action) {
+            const action = gemmaResult.action;
+            if (action.type === 'EXECUTE_CLI') {
+              await this.executeCliDirectly(action.command, syntheticStepId, syntheticStep);
+              return; // Short-circuit Big LLM
+            } else if (action.type === 'DELEGATE_TO_AGENT') {
+              if (action.confidence >= this.config.getGemmaConfidenceThreshold()) {
+                routedText = this.chatPromptContext.injectToolHint(text, action.tools, action.confidence);
+                this.logger.log(`[GemmaRouter] injected hint — tools: [${action.tools.join(', ')}], confidence: ${Math.round(action.confidence * 100)}%`);
+              } else {
+                this.logger.log(`[GemmaRouter] no hint injected — confidence: ${action.confidence}`);
+              }
+            }
           } else {
-            this.logger.log(`[GemmaRouter] no hint injected — skipped: ${gemmaResult.skipped}, confidence: ${gemmaResult.confidence}`);
+            this.logger.log(`[GemmaRouter] skipped`);
           }
         }
       }
@@ -799,5 +809,38 @@ export class OrchestratorService implements OnModuleInit {
       } catch { /* ignore */ }
     }
     return urls;
+  }
+  
+  private async executeCliDirectly(command: string, syntheticStepId: string, syntheticStep: ThinkingStep): Promise<void> {
+    this.logger.log(`[GemmaRouter] executing CLI directly: ${command}`);
+    const model = 'CLI Router';
+    this._send(WS_EVENT.STREAM_START, { model });
+    const streamStartEntry: StoredStoryEntry = {
+      id: randomUUID(),
+      type: 'stream_start',
+      message: 'Response started',
+      timestamp: new Date().toISOString(),
+      details: `Model: ${model}`,
+    };
+    const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
+    this.currentActivityId = currentActivity.id;
+    this._send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
+    
+    const execAsync = promisify(exec);
+    let cliOut = `> ${command}\n\n`;
+    this._send(WS_EVENT.STREAM_CHUNK, { text: cliOut });
+    
+    try {
+      const envPath = `${process.env['DATA_DIR'] || '/app/data'}/.fibe/bin:/usr/local/bin:${process.env.PATH || ''}`;
+      const { stdout, stderr } = await execAsync(command, { env: { ...process.env, PATH: envPath } });
+      const output = stdout || stderr || 'Command executed successfully with no output.';
+      cliOut += output;
+      this._send(WS_EVENT.STREAM_CHUNK, { text: output });
+    } catch (e) {
+      const errText = e instanceof Error ? e.message : String(e);
+      cliOut += `Error: ${errText}`;
+      this._send(WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
+    }
+    finishAgentStream(this.finishStreamDeps(), cliOut, syntheticStepId, syntheticStep, undefined);
   }
 }

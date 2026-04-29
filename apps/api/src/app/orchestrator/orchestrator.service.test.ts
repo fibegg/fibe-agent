@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -78,7 +78,7 @@ describe('OrchestratorService', () => {
       injectModeHint: (text: string) => text,
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
     const gemmaRouter = {
-      analyze: async () => ({ tools: [], confidence: 0, skipped: true }),
+      analyze: async () => ({ action: { type: 'DELEGATE_TO_AGENT', tools: [], confidence: 0 }, skipped: true }),
     } as unknown as GemmaRouterService;
     const steering = new SteeringService(config as never);
     lastSteering = steering;
@@ -547,4 +547,33 @@ describe('OrchestratorService', () => {
     expect(fwdEvent).toBeDefined();
     expect((fwdEvent?.data as Record<string, unknown>)['questionId']).toBe('q1');
   });
+
+  test('send_chat_message with EXECUTE_CLI from GemmaRouter short-circuits to CLI execution', async () => {
+    const { service: localMcp } = makeLocalMcpStub();
+    const orch = await createOrchestrator(localMcp);
+    orch.isAuthenticated = true;
+
+    // Force gemmaRouter to return an EXECUTE_CLI action
+    const configSpy = spyOn(orch['config'], 'isGemmaRouterEnabled').mockReturnValue(true);
+    orch['mcpToolsCache'] = [{ name: 'fibe', description: 'desc' }];
+    orch['gemmaRouter'].analyze = async () => ({
+      skipped: false,
+      action: { type: 'EXECUTE_CLI', command: 'echo hello_from_cli' },
+    });
+
+    const events: { type: string; data: Record<string, unknown> }[] = [];
+    orch.outbound.subscribe((e) => events.push(e as any));
+
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hello CLI' });
+
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_START && e.data.model === 'CLI Router')).toBe(true);
+    const chunkEvents = events.filter((e) => e.type === WS_EVENT.STREAM_CHUNK);
+    expect(chunkEvents.length).toBeGreaterThan(0);
+    const allChunks = chunkEvents.map((e) => String(e.data.text)).join('');
+    expect(allChunks).toContain('hello_from_cli');
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
+    
+    configSpy.mockRestore();
+  });
 });
+

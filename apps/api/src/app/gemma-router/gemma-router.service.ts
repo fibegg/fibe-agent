@@ -2,8 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import type { GemmaRouterResult } from './gemma-router.types';
 
-const UNAVAILABLE_RESULT: GemmaRouterResult = { tools: [], confidence: 0, skipped: true };
-
+const UNAVAILABLE_RESULT: GemmaRouterResult = { skipped: true };
 /**
  * GemmaRouterService
  *
@@ -155,16 +154,22 @@ export class GemmaRouterService implements OnModuleInit {
       .map((t) => (typeof t === 'string' ? t : t.name))
       .join(', ');
 
-    return `You are an MCP tool router. Given a user message and a list of available MCP tool names, decide which tools (if any) would help answer the request.
+    return `You are an intent router for a coding assistant. Given a user message and a list of available MCP tool names, you must decide how to handle the request.
 
-Output ONLY a single valid JSON object with no extra text, no markdown, no explanation:
-{"tools": ["tool_name_1"], "confidence": 0.0}
+Output ONLY a single valid JSON object with no extra text, no markdown, no explanation.
 
-Rules:
+Decision 1: Direct CLI Command
+If the user's intent is simple and can be answered immediately by running a fibe CLI command (like checking playgrounds), output:
+{"type": "EXECUTE_CLI", "command": "fibe playgrounds list"}
+
+Decision 2: Delegate to Heavy Agent
+If the user wants to write code, build an app, or requires complex reasoning, delegate the task and suggest tools:
+{"type": "DELEGATE_TO_AGENT", "tools": ["tool_name_1"], "confidence": 0.8}
+
+Rules for DELEGATE_TO_AGENT:
 - "tools" must be a subset of these exact tool names: ${toolNames}
 - "confidence" is a float between 0.0 and 1.0 reflecting how sure you are those tools are needed.
-- If the message is general chat or coding work that doesn't need any specific tool, return {"tools": [], "confidence": 0.0}.
-- Output ONLY the JSON object. Nothing else.
+- If the message is general chat or coding work that doesn't need any specific tool, return {"type": "DELEGATE_TO_AGENT", "tools": [], "confidence": 0.0}.
 
 Available MCP tools:
 ${toolList}
@@ -215,7 +220,18 @@ JSON:`;
     try {
       // Ollama sometimes wraps in markdown code fences even with format:json
       const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
-      const parsed = JSON.parse(cleaned) as { tools?: unknown; confidence?: unknown };
+      const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+
+      if (parsed.type === 'EXECUTE_CLI') {
+        return {
+          action: {
+            type: 'EXECUTE_CLI',
+            command: typeof parsed.command === 'string' ? parsed.command : '',
+            reason: typeof parsed.reason === 'string' ? parsed.reason : undefined,
+          },
+          skipped: false,
+        };
+      }
 
       const tools = Array.isArray(parsed.tools)
         ? (parsed.tools as unknown[]).filter((t): t is string => typeof t === 'string')
@@ -225,7 +241,10 @@ JSON:`;
         ? Math.max(0, Math.min(1, parsed.confidence))
         : 0;
 
-      return { tools, confidence, skipped: false };
+      return {
+        action: { type: 'DELEGATE_TO_AGENT', tools, confidence },
+        skipped: false,
+      };
     } catch {
       this.logger.debug(`Could not parse Gemma response as JSON: ${raw.slice(0, 120)}`);
       return UNAVAILABLE_RESULT;

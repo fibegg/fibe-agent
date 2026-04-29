@@ -33,7 +33,7 @@ describe('GemmaRouterService', () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
       const result = await service.analyze('what is my email?', ['fibe_me']);
       expect(result.skipped).toBe(true);
-      expect(result.tools).toEqual([]);
+      expect(result.action).toBeUndefined();
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
@@ -59,24 +59,23 @@ describe('GemmaRouterService', () => {
     it('returns tools and confidence on valid JSON response', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ response: '{"tools":["fibe_me"],"confidence":0.92}' }),
+        json: async () => ({ response: '{"type":"DELEGATE_TO_AGENT","tools":["fibe_me"],"confidence":0.92}' }),
       } as Response);
 
       const result = await service.analyze('what is my email?', ['fibe_me', 'fibe_playgrounds_get']);
       expect(result.skipped).toBe(false);
-      expect(result.tools).toEqual(['fibe_me']);
-      expect(result.confidence).toBeCloseTo(0.92);
+      expect(result.action).toEqual({ type: 'DELEGATE_TO_AGENT', tools: ['fibe_me'], confidence: 0.92 });
     });
 
     it('handles markdown-wrapped JSON from Ollama', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ response: '```json\n{"tools":["fibe_me"],"confidence":0.85}\n```' }),
+        json: async () => ({ response: '```json\n{"type":"DELEGATE_TO_AGENT","tools":["fibe_me"],"confidence":0.85}\n```' }),
       } as Response);
 
       const result = await service.analyze('show my profile', ['fibe_me']);
       expect(result.skipped).toBe(false);
-      expect(result.tools).toEqual(['fibe_me']);
+      expect(result.action).toEqual({ type: 'DELEGATE_TO_AGENT', tools: ['fibe_me'], confidence: 0.85 });
     });
 
     it('returns skipped on HTTP error from Ollama', async () => {
@@ -109,21 +108,21 @@ describe('GemmaRouterService', () => {
     it('clamps confidence to [0, 1]', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ response: '{"tools":[],"confidence":1.5}' }),
+        json: async () => ({ response: '{"type":"DELEGATE_TO_AGENT","tools":[],"confidence":1.5}' }),
       } as Response);
 
       const result = await service.analyze('hello', ['fibe_me']);
-      expect(result.confidence).toBe(1);
+      expect((result.action as any).confidence).toBe(1);
     });
 
     it('ignores non-string entries in tools array', async () => {
       vi.spyOn(globalThis, 'fetch').mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ response: '{"tools":["fibe_me",42,null],"confidence":0.9}' }),
+        json: async () => ({ response: '{"type":"DELEGATE_TO_AGENT","tools":["fibe_me",42,null],"confidence":0.9}' }),
       } as Response);
 
       const result = await service.analyze('hello', ['fibe_me']);
-      expect(result.tools).toEqual(['fibe_me']);
+      expect((result.action as any).tools).toEqual(['fibe_me']);
     });
   });
 

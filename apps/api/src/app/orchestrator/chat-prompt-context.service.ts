@@ -60,8 +60,8 @@ export class ChatPromptContextService {
    */
   injectToolHint(text: string, tools: string[], confidence: number): string {
     if (!tools.length) return text;
-    const pct = Math.round(confidence * 100);
-    const hint = `[SYSTEM]Suggested MCP tools: ${tools.join(', ')} — confidence ${pct}%[/SYSTEM]`;
+    const recommended_tools = tools.map((name) => ({ name, confidence }));
+    const hint = `[FIBE]${JSON.stringify({ recommended_tools })}[/FIBE]`;
     return `${hint}\n${text}`;
   }
 

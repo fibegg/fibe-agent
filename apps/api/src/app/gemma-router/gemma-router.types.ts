@@ -1,8 +1,9 @@
+export type RouterAction =
+  | { type: 'EXECUTE_CLI'; command: string; reason?: string }
+  | { type: 'DELEGATE_TO_AGENT'; tools: string[]; confidence: number };
+
 export interface GemmaRouterResult {
-  /** MCP tool names Gemma suggests using to answer the user message. */
-  tools: string[];
-  /** Confidence score [0, 1] returned by Gemma. */
-  confidence: number;
+  action?: RouterAction;
   /** True when Gemma was unavailable, timed out, or returned an unparseable response. */
   skipped: boolean;
 }
