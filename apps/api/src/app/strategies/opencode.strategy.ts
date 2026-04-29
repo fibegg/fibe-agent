@@ -1,9 +1,9 @@
-import { Logger } from '@nestjs/common';
-import { spawn, type ChildProcess } from 'node:child_process';
+
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
-import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
+import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { getProxyEnv } from '../provider-traffic/types';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
@@ -85,15 +85,11 @@ function missingSessionError(message: string): boolean {
   return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-export class OpencodeStrategy implements AgentStrategy {
-  private readonly logger = new Logger(OpencodeStrategy.name);
-  private currentConnection: AuthConnection | null = null;
-  private currentStreamProcess: ChildProcess | null = null;
-  private streamInterrupted = false;
-  private readonly conversationDataDir: ConversationDataDirProvider | undefined;
+import { AbstractCLIStrategy } from './abstract-cli.strategy';
 
+export class OpencodeStrategy extends AbstractCLIStrategy {
   constructor(conversationDataDir?: ConversationDataDirProvider) {
-    this.conversationDataDir = conversationDataDir;
+    super(OpencodeStrategy.name, false, conversationDataDir);
   }
 
   private getOpencodeWorkspaceDir(): string {
@@ -174,7 +170,7 @@ export class OpencodeStrategy implements AgentStrategy {
     }
   }
 
-  cancelAuth(): void {
+  override cancelAuth(): void {
     this.currentConnection = null;
   }
 
@@ -309,7 +305,7 @@ export class OpencodeStrategy implements AgentStrategy {
     });
   }
 
-  interruptAgent(): void {
+  override interruptAgent(): void {
     this.streamInterrupted = true;
     this.currentStreamProcess?.kill();
   }
@@ -352,7 +348,12 @@ export class OpencodeStrategy implements AgentStrategy {
         ? existsSync(join(workspaceDir, SESSION_MARKER_FILE))
         : false;
 
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
+      const pendingMessages = this.consumePendingMessages();
+      let finalPrompt = prompt;
+      if (pendingMessages) {
+        finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
+      }
+      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
       const opencodeArgs = buildOpencodeRunArgs(effectivePrompt, this.getModelArgs(model), hasSession);
 
       // Build env: start with process.env (inherits pre-set keys like

@@ -338,6 +338,16 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
 
 
+  override steerAgent(message: string): void {
+    if (this.currentStreamProcess?.stdin?.writable) {
+      const jsonMsg = JSON.stringify({
+        type: 'user',
+        message: { role: 'user', content: message }
+      });
+      this.currentStreamProcess.stdin.write(jsonMsg + '\n');
+    }
+  }
+
   executePromptStreaming(
     prompt: string,
     _model: string,
@@ -383,6 +393,8 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         ...(systemPrompt ? [systemPromptFlag, systemPrompt.trim()] : []),
         ...(useStreamJson
           ? [
+              '--input-format',
+              'stream-json',
               '--output-format',
               'stream-json',
               '--include-partial-messages',
@@ -407,7 +419,6 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         shell: false,
       });
       this.currentStreamProcess = claudeProcess;
-      claudeProcess.stdin?.end();
 
       let errorResult = '';
       let stdoutBuffer = '';

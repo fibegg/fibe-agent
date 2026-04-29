@@ -540,6 +540,10 @@ export class OrchestratorService implements OnModuleInit {
     await this.messageStore.flush();
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
     void this.fibeSync.syncMessages(() => JSON.stringify(this.messageStore.all()));
+    
+    if (this.strategy.steerAgent) {
+      this.strategy.steerAgent(text);
+    }
   }
 
   private createAuthConnection(): AuthConnection {

@@ -65,6 +65,7 @@ export interface AgentStrategy {
   getModelArgs?(model: string): string[];
   listModels?(): Promise<string[]>;
   interruptAgent?(): void;
+  steerAgent?(message: string): void;
   hasNativeSessionSupport?(): boolean;
   executePromptStreaming(
     prompt: string,

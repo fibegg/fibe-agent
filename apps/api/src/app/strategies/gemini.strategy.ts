@@ -345,7 +345,12 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         this._hasSession = existsSync(join(workspaceDir, SESSION_MARKER_FILE));
       }
 
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
+      const pendingMessages = this.consumePendingMessages();
+      let finalPrompt = prompt;
+      if (pendingMessages) {
+        finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
+      }
+      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
       const geminiArgs = buildGeminiArgs(effectivePrompt, model, this._hasSession);
 
       const env: NodeJS.ProcessEnv = getGeminiProcessEnv(this.getProxyEnv());

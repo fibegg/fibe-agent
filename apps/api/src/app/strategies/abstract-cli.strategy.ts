@@ -56,9 +56,23 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
     this.currentConnection = null;
   }
 
+  protected pendingSteerMessages: string[] = [];
+
   interruptAgent(): void {
     this.streamInterrupted = true;
     this.currentStreamProcess?.kill();
+  }
+
+  steerAgent(message: string): void {
+    this.pendingSteerMessages.push(message);
+    this.interruptAgent();
+  }
+
+  protected consumePendingMessages(): string | undefined {
+    if (!this.pendingSteerMessages.length) return undefined;
+    const prefix = this.pendingSteerMessages.join('\n\n');
+    this.pendingSteerMessages = [];
+    return prefix;
   }
 
   /**

@@ -381,7 +381,12 @@ export class CursorStrategy extends AbstractCLIStrategy {
       const playgroundDir = this.getWorkingDir();
       if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
 
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
+      const pendingMessages = this.consumePendingMessages();
+      let finalPrompt = prompt;
+      if (pendingMessages) {
+        finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
+      }
+      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
       const existingSessionId = this.readSessionId();
       const args = this.buildExecArgs(effectivePrompt, model, existingSessionId);
       const cursorProcess = spawn(getCursorCommand(), args, {
