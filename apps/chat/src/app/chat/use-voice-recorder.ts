@@ -79,10 +79,16 @@ export function useVoiceRecorder(): UseVoiceRecorderReturn {
   const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const transcriptRef = useRef<string[]>([]);
 
+  const isIOS =
+    typeof navigator !== 'undefined' &&
+    (/iPad|iPhone|iPod/.test(navigator.userAgent || '') ||
+      (navigator.userAgent?.includes('Mac') && typeof document !== 'undefined' && 'ontouchend' in document));
+
   const isSupported =
     typeof navigator !== 'undefined' &&
     !!navigator.mediaDevices?.getUserMedia &&
-    typeof MediaRecorder !== 'undefined';
+    typeof MediaRecorder !== 'undefined' &&
+    !isIOS;
 
   const startRecording = useCallback(async () => {
     setError(null);
