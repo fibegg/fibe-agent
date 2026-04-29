@@ -44,7 +44,6 @@ import { GemmaRouterService } from './gemma-router/gemma-router.service';
 import { AgentModeController } from './agent-mode/agent-mode.controller';
 import { AgentModeStoreService } from './agent-mode/agent-mode.store.service';
 import { LocalMcpModule } from './local-mcp/local-mcp.module';
-import { LocalMcpController } from './local-mcp/local-mcp.controller';
 
 @Module({
   imports: [
@@ -70,7 +69,6 @@ import { LocalMcpController } from './local-mcp/local-mcp.controller';
     DataPrivacyController,
     RuntimeConfigController,
     AgentModeController,
-    LocalMcpController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

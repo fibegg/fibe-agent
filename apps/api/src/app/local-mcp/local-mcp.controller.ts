@@ -18,7 +18,7 @@ import type { LocalToolCallRequest, LocalToolCallResponse } from './local-mcp-ty
  * valid bearer token (or no password configured) are accepted.
  */
 @UseGuards(AgentAuthGuard)
-@Controller('api/local-tool-call')
+@Controller('local-tool-call')
 export class LocalMcpController {
   constructor(private readonly localMcp: LocalMcpService) {}
 
