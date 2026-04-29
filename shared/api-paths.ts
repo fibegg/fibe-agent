@@ -12,6 +12,8 @@ export const API_PATHS = {
   AGENT_FILES: '/api/agent-files',
   AGENT_FILES_FILE: '/api/agent-files/file',
   AGENT_FILES_STATS: '/api/agent-files/stats',
+  AGENT_FILES_UPLOAD: '/api/agent-files/upload',
+  PLAYGROUNDS_UPLOAD: '/api/playgrounds/upload',
   ACTIVITIES: '/api/activities',
   ACTIVITIES_BY_ENTRY: '/api/activities/by-entry',
   INIT_STATUS: '/api/init-status',

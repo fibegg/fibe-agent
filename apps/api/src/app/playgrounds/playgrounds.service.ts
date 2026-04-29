@@ -216,6 +216,23 @@ export class PlaygroundsService {
     await writeFile(absPath, content, 'utf-8');
   }
 
+  async uploadFile(relativeDir: string, filename: string, buffer: Buffer): Promise<string> {
+    const base = resolve(this.config.getPlaygroundsDir());
+    const settings = await loadFibeSettings(base);
+    // Sanitise filename — strip any path separators so callers can't traverse
+    const safeName = basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
+    const targetDir = relativeDir ? resolve(base, relativeDir) : base;
+    const relDir = relative(base, targetDir);
+    const segments = relDir.replace(/\\/g, '/').split('/');
+    if (relDir.startsWith('..') || segments.some((seg) => settings.ignoredNames.has(seg))) {
+      throw new NotFoundException('Invalid upload path');
+    }
+    await mkdir(targetDir, { recursive: true });
+    const absPath = join(targetDir, safeName);
+    await writeFile(absPath, buffer);
+    return relativeDir ? `${relDir}/${safeName}` : safeName;
+  }
+
   async getFolderFileContents(
     relativePath: string
   ): Promise<{ path: string; content: string }[]> {

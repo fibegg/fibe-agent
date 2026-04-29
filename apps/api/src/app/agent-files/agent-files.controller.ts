@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
+import { Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { AgentFilesService } from './agent-files.service';
 
@@ -24,5 +25,16 @@ export class AgentFilesController {
     }
     const content = await this.agentFiles.getFileContent(path);
     return { content };
+  }
+
+  @Post('agent-files/upload')
+  @HttpCode(HttpStatus.OK)
+  async uploadFile(@Req() req: FastifyRequest, @Query('dir') dir?: string) {
+    type MultipartFile = { filename: string; toBuffer: () => Promise<Buffer> };
+    const data = await (req as unknown as { file: () => Promise<MultipartFile> }).file();
+    if (!data) throw new NotFoundException('No file uploaded');
+    const buffer = await data.toBuffer();
+    const savedPath = await this.agentFiles.uploadFile(dir ?? '', data.filename, buffer);
+    return { ok: true, path: savedPath };
   }
 }

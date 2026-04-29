@@ -611,6 +611,8 @@ export function ChatPage() {
                 }}
                 selectedPath={viewingFile?.path ?? null}
                 dirtyPaths={pageDirtyPaths}
+                onPlaygroundUploaded={refetchPlaygrounds}
+                onAgentUploaded={refetchPlaygrounds}
               />
             </div>
           </>
@@ -660,6 +662,8 @@ export function ChatPage() {
             onResizeStart={leftResize.startResize}
             selectedPath={viewingFile?.path ?? null}
             dirtyPaths={pageDirtyPaths}
+            onPlaygroundUploaded={refetchPlaygrounds}
+            onAgentUploaded={refetchPlaygrounds}
           />
         ) : null
       }
@@ -885,7 +889,6 @@ export function ChatPage() {
           }>
             <LazyTerminalPanel />
           </Suspense>
-<<<<<<< HEAD
         </RightDrawer>
         <RightDrawer
           open={diffOpen}
@@ -904,9 +907,6 @@ export function ChatPage() {
             {diffOpen && <LazyDiffPanel />}
           </Suspense>
         </RightDrawer>
-=======
-        )}
->>>>>>> 6863215 (feat: conversation reset with archive, separator UI, and unit tests)
     <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
     </ChatLayout>
   );

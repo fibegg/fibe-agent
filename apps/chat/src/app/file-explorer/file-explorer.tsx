@@ -31,6 +31,8 @@ import {
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FileDetailsDialog } from './file-viewer-panel';
 import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-tabs';
+import { useWorkspaceDrop } from './use-workspace-drop';
+import { DragDropOverlay } from '../chat/drag-drop-overlay';
 
 export type { PlaygroundEntry } from './file-explorer-types';
 
@@ -58,6 +60,8 @@ export function FileExplorer({
   agentStats,
   dirtyPaths: dirtyPathsProp,
   onDirtyChange: onDirtyChangeProp,
+  onPlaygroundUploaded,
+  onAgentUploaded,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -77,6 +81,10 @@ export function FileExplorer({
   dirtyPaths?: Set<string>;
   /** Callback for dirty state changes from the internal FileDetailsDialog */
   onDirtyChange?: (path: string, isDirty: boolean) => void;
+  /** Called after files are uploaded to the playground via drag & drop */
+  onPlaygroundUploaded?: () => void;
+  /** Called after files are uploaded to the AI workspace via drag & drop */
+  onAgentUploaded?: () => void;
 } = {}) {
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -282,7 +290,22 @@ export function FileExplorer({
 
   const filteredTree = useMemo(() => filterTreeByQuery(displayTree, searchQuery), [displayTree, searchQuery]);
   const flatTree = useMemo(() => flattenTree(filteredTree, expanded), [filteredTree, expanded]);
-  
+
+  // ── Workspace drop zones ──────────────────────────────────────────────────
+  const playgroundDrop = useWorkspaceDrop({
+    uploadUrl: API_PATHS.PLAYGROUNDS_UPLOAD,
+    onUploaded: onPlaygroundUploaded,
+    disabled: effectiveTab !== 'playground',
+  });
+  const agentDrop = useWorkspaceDrop({
+    uploadUrl: API_PATHS.AGENT_FILES_UPLOAD,
+    onUploaded: onAgentUploaded,
+    disabled: effectiveTab !== 'agent',
+  });
+  const activeDrop = effectiveTab === 'agent' ? agentDrop : playgroundDrop;
+  const dropLabel =
+    effectiveTab === 'agent' ? 'Drop to add to AI workspace' : 'Drop to add to Playground';
+
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
     count: flatTree.length,
@@ -402,7 +425,12 @@ export function FileExplorer({
             })}
           </div>
         )}
-        <div className="flex-1 overflow-auto pb-2" ref={parentRef}>
+        <div
+          className="relative flex-1 overflow-auto pb-2"
+          ref={parentRef}
+          {...activeDrop.dragHandlers}
+        >
+          {activeDrop.isDragOver && <DragDropOverlay label={dropLabel} />}
           {loadingState && tree.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
               Loading…

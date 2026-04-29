@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
@@ -94,6 +94,25 @@ export class AgentFilesService {
       throw new NotFoundException('File not found');
     }
     return readFile(absPath, 'utf-8');
+  }
+
+  async uploadFile(relativeDir: string, filename: string, buffer: Buffer): Promise<string> {
+    const dir = this.getAgentWorkingDir();
+    if (!dir) throw new NotFoundException('No agent working directory');
+    const base = resolve(dir);
+    const settings = await loadFibeSettings(base);
+    // Sanitise filename — strip any path separators so callers can't traverse
+    const safeName = basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
+    const targetDir = relativeDir ? resolve(base, relativeDir) : base;
+    const relDir = relative(base, targetDir);
+    const segments = relDir.replace(/\\/g, '/').split('/');
+    if (relDir.startsWith('..') || segments.some((seg) => settings.ignoredNames.has(seg))) {
+      throw new NotFoundException('Invalid upload path');
+    }
+    await mkdir(targetDir, { recursive: true });
+    const absPath = join(targetDir, safeName);
+    await writeFile(absPath, buffer);
+    return relativeDir ? `${relDir}/${safeName}` : safeName;
   }
 
   private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings): Promise<AgentFileEntry[]> {

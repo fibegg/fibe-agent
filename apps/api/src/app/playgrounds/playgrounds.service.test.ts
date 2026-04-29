@@ -401,6 +401,7 @@ describe('PlaygroundsService', () => {
       console.error = originalConsoleError;
     }
   });
+
   test('getDiff returns isGitRepo=false for a non-git directory', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never, {} as never);
@@ -499,5 +500,23 @@ describe('PlaygroundsService', () => {
     expect(result.files.some((f) => f.path === 'file.ts')).toBe(true);
     // diff against HEAD fails gracefully (no commits) — diff is empty string
     expect(result.diff).toBe('');
+  test('uploadFile sanitizes filename and writes to target directory', async () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const buffer = Buffer.from('hello world');
+    
+    const result = await service.uploadFile('sub', '../../../unsafe/file!name.txt', buffer);
+    
+    // basename strips directory, regex replaces ! with _
+    expect(result).toBe('sub/file_name.txt');
+    const { readFileSync: rfs } = require('node:fs');
+    expect(rfs(join(playgroundDir, 'sub', 'file_name.txt'), 'utf8')).toBe('hello world');
+  });
+
+  test('uploadFile rejects directory traversal in relativeDir', async () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const buffer = Buffer.from('test');
+    await expect(service.uploadFile('../outside', 'file.txt', buffer)).rejects.toThrow(NotFoundException);
   });
 });

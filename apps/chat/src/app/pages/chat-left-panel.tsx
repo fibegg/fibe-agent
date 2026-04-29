@@ -22,6 +22,8 @@ interface ChatLeftPanelProps {
   onResizeStart: (e: React.PointerEvent) => void;
   selectedPath: string | null;
   dirtyPaths: Set<string>;
+  onPlaygroundUploaded?: () => void;
+  onAgentUploaded?: () => void;
 }
 
 export const ChatLeftPanel = memo(function ChatLeftPanel({
@@ -42,6 +44,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onResizeStart,
   selectedPath,
   dirtyPaths,
+  onPlaygroundUploaded,
+  onAgentUploaded,
 }: ChatLeftPanelProps) {
   const isCollapsed = !hasAnyFiles || sidebarCollapsed;
   return (
@@ -67,6 +71,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
           onFileSelect={onFileSelect}
           selectedPath={selectedPath}
           dirtyPaths={dirtyPaths}
+          onPlaygroundUploaded={onPlaygroundUploaded}
+          onAgentUploaded={onAgentUploaded}
         />
         {!isCollapsed && (
           <PanelResizeHandle

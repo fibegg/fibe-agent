@@ -1,4 +1,5 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, UseGuards } from '@nestjs/common';
+import type { FastifyRequest } from 'fastify';
+import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { PlaygroundsService } from './playgrounds.service';
 import { PlayroomBrowserService } from './playroom-browser.service';
@@ -55,6 +56,17 @@ export class PlaygroundsController {
     }
     await this.playgrounds.saveFileContent(path, content);
     return { ok: true };
+  }
+
+  @Post('playgrounds/upload')
+  @HttpCode(HttpStatus.OK)
+  async uploadFile(@Req() req: FastifyRequest, @Query('dir') dir?: string) {
+    type MultipartFile = { filename: string; toBuffer: () => Promise<Buffer> };
+    const data = await (req as unknown as { file: () => Promise<MultipartFile> }).file();
+    if (!data) throw new NotFoundException('No file uploaded');
+    const buffer = await data.toBuffer();
+    const savedPath = await this.playgrounds.uploadFile(dir ?? '', data.filename, buffer);
+    return { ok: true, path: savedPath };
   }
 
   @Get('playrooms/browse')
