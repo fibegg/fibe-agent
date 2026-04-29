@@ -2,6 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
+import { Subject } from 'rxjs';
 import { OrchestratorService } from './orchestrator.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { MessageStoreService } from '../message-store/message-store.service';
@@ -11,6 +12,7 @@ import { StrategyRegistryService } from '../strategies/strategy-registry.service
 import { UploadsService } from '../uploads/uploads.service';
 import { SteeringService } from '../steering/steering.service';
 import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
+import type { LocalMcpService } from '../local-mcp/local-mcp.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
 import { AGENT_MODES } from '@shared/agent-mode.constants';
 
@@ -32,7 +34,18 @@ describe('OrchestratorService', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  async function createOrchestrator(): Promise<OrchestratorService> {
+  function makeLocalMcpStub(): { service: LocalMcpService; resolved: Map<string, unknown> } {
+    const resolved = new Map<string, unknown>();
+    const service = {
+      outbound$: new Subject<{ type: string; data: Record<string, unknown> }>(),
+      registerModeAccessors: () => undefined,
+      resolveQuestion: (id: string, payload: unknown) => { resolved.set(id, payload); },
+      getServerScriptPath: () => '/dev/null/local-mcp.server.js',
+    } as unknown as LocalMcpService;
+    return { service, resolved };
+  }
+
+  async function createOrchestrator(localMcp?: LocalMcpService): Promise<OrchestratorService> {
     const config = {
       getDataDir: () => dataDir,
       getConversationDataDir: () => dataDir,
@@ -49,12 +62,8 @@ describe('OrchestratorService', () => {
     const strategyRegistry = new StrategyRegistryService(config as never);
     const uploadsService = new UploadsService(config as never);
     const fibeSync = {
-      syncMessages: (getContent: () => string) => {
-        void getContent();
-      },
-      syncActivity: (getContent: () => string) => {
-        void getContent();
-      },
+      syncMessages: (getContent: () => string) => { void getContent(); },
+      syncActivity: (getContent: () => string) => { void getContent(); },
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
     const chatPromptContext = {
       buildFullPrompt: async (
@@ -73,6 +82,7 @@ describe('OrchestratorService', () => {
     lastSteering = steering;
     steering.onModuleInit();
     const agentModeStore = new AgentModeStoreService(config as never);
+    const stub = localMcp ?? makeLocalMcpStub().service;
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -85,6 +95,7 @@ describe('OrchestratorService', () => {
       steering,
       gemmaRouter,
       agentModeStore,
+      stub,
     );
     await orch.onModuleInit();
     return orch;
@@ -455,5 +466,62 @@ describe('OrchestratorService', () => {
     const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
     expect(modeEvent).toBeDefined();
     expect((modeEvent?.data as { mode: string })?.mode).toBe(AGENT_MODES.casting);
+  });
+
+  // ─── Local MCP tool WS actions ───────────────────────────────────────────
+
+  test('answer_user_question resolves a pending LocalMcp question', async () => {
+    const { service: localMcp, resolved } = makeLocalMcpStub();
+    const orch = await createOrchestrator(localMcp);
+
+    await orch.handleClientMessage({
+      action: WS_ACTION.ANSWER_USER_QUESTION,
+      questionId: 'q-abc',
+      answer: 'Paris',
+    } as never);
+
+    expect(resolved.get('q-abc')).toEqual({ answer: 'Paris' });
+  });
+
+  test('confirm_action_response resolves a pending LocalMcp confirm (confirmed=true)', async () => {
+    const { service: localMcp, resolved } = makeLocalMcpStub();
+    const orch = await createOrchestrator(localMcp);
+
+    await orch.handleClientMessage({
+      action: WS_ACTION.CONFIRM_ACTION_RESPONSE,
+      questionId: 'q-xyz',
+      confirmed: true,
+    } as never);
+
+    expect(resolved.get('q-xyz')).toEqual({ confirmed: true });
+  });
+
+  test('confirm_action_response with confirmed=false passes false', async () => {
+    const { service: localMcp, resolved } = makeLocalMcpStub();
+    const orch = await createOrchestrator(localMcp);
+
+    await orch.handleClientMessage({
+      action: WS_ACTION.CONFIRM_ACTION_RESPONSE,
+      questionId: 'q-no',
+      confirmed: false,
+    } as never);
+
+    expect(resolved.get('q-no')).toEqual({ confirmed: false });
+  });
+
+  test('LocalMcp outbound$ events are forwarded to orchestrator outbound', async () => {
+    const { service: localMcp } = makeLocalMcpStub();
+    const orch = await createOrchestrator(localMcp);
+
+    const events: { type: string; data: unknown }[] = [];
+    orch.outbound.subscribe((e) => events.push(e));
+
+    // Emit a synthetic ask_user_prompt event from the localMcp stub
+    (localMcp as unknown as { outbound$: Subject<{ type: string; data: Record<string, unknown> }> })
+      .outbound$.next({ type: 'ask_user_prompt', data: { questionId: 'q1', question: 'Name?' } });
+
+    const fwdEvent = events.find((e) => e.type === 'ask_user_prompt');
+    expect(fwdEvent).toBeDefined();
+    expect((fwdEvent?.data as Record<string, unknown>)['questionId']).toBe('q1');
   });
 });

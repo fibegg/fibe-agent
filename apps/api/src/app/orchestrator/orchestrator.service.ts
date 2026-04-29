@@ -38,6 +38,7 @@ import { ChatPromptContextService } from './chat-prompt-context.service';
 import { finishAgentStream, type FinishAgentStreamDeps } from './finish-agent-stream';
 import { createStreamingCallbacks } from './orchestrator-streaming-callbacks';
 import { GemmaRouterService } from '../gemma-router/gemma-router.service';
+import { LocalMcpService } from '../local-mcp/local-mcp.service';
 
 export interface OutboundEvent {
   type: string;
@@ -70,12 +71,25 @@ export class OrchestratorService implements OnModuleInit {
     private readonly steering: SteeringService,
     private readonly gemmaRouter: GemmaRouterService,
     private readonly agentModeStore: AgentModeStoreService,
+    private readonly localMcp: LocalMcpService,
   ) {
     this.strategy = this.strategyRegistry.resolveStrategy();
   }
 
   async onModuleInit(): Promise<void> {
-    writeMcpConfig();
+    // Build the fibe-local entry here, where we already hold a reference to the
+    // LocalMcpService and can use __dirname-based resolution without touching webpack.
+    const localServerPath = this.localMcp.getServerScriptPath();
+    writeMcpConfig({
+      'fibe-local': {
+        command: process.execPath,
+        args: [localServerPath],
+        env: {
+          PORT: process.env['PORT'] ?? '3000',
+          ...(process.env['AGENT_PASSWORD'] ? { AGENT_PASSWORD: process.env['AGENT_PASSWORD'] } : {}),
+        },
+      },
+    });
     if (!this.config.getSystemPrompt()) {
       const path = this.config.getSystemPromptPath();
       if (existsSync(path)) {
@@ -91,6 +105,17 @@ export class OrchestratorService implements OnModuleInit {
     this.steering.count$.subscribe((count) => {
       this._send(WS_EVENT.QUEUE_UPDATED, { count });
     });
+
+    // Forward local MCP tool WS events (ask_user_prompt, confirm_action_prompt, etc.) to the chat UI
+    this.localMcp.outbound$.subscribe((event) => {
+      this._send(event.type, event.data);
+    });
+
+    // Register mode accessors so local tools can read/write the agent mode
+    this.localMcp.registerModeAccessors(
+      () => this.agentModeStore.get(),
+      (mode) => this.setAgentMode(mode),
+    );
 
     // Pre-fetch MCP tool descriptions for Gemma classification (non-blocking)
     if (this.config.isGemmaRouterEnabled()) {
@@ -189,6 +214,16 @@ export class OrchestratorService implements OnModuleInit {
         if (this.isProcessing) this.strategy.interruptAgent?.();
       },
       [WS_ACTION.SET_AGENT_MODE]: () => this.handleSetAgentMode(msg.mode ?? ''),
+      [WS_ACTION.ANSWER_USER_QUESTION]: () =>
+        this.handleAnswerUserQuestion(
+          (msg as { questionId?: string; answer?: string }).questionId ?? '',
+          (msg as { answer?: string }).answer ?? '',
+        ),
+      [WS_ACTION.CONFIRM_ACTION_RESPONSE]: () =>
+        this.handleConfirmActionResponse(
+          (msg as { questionId?: string; confirmed?: boolean }).questionId ?? '',
+          !!(msg as { confirmed?: boolean }).confirmed,
+        ),
     };
 
     const handler = handlers[msg.action];
@@ -584,6 +619,14 @@ export class OrchestratorService implements OnModuleInit {
     const value = this.modelStore.set(model);
     await this.modelStore.flush();
     this._send(WS_EVENT.MODEL_UPDATED, { model: value });
+  }
+
+  private handleAnswerUserQuestion(questionId: string, answer: string): void {
+    this.localMcp.resolveQuestion(questionId, { answer });
+  }
+
+  private handleConfirmActionResponse(questionId: string, confirmed: boolean): void {
+    this.localMcp.resolveQuestion(questionId, { confirmed });
   }
 
   private handleSetAgentMode(mode: string): void {

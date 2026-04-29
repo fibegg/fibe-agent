@@ -16,6 +16,7 @@ For the system prompt library see [`prompts/README.md`](prompts/README.md).
 - [Conversation context & persistence](#conversation-context--persistence)
 - [Steering](#steering)
 - [Prompts](#prompts)
+- [Local MCP tools](#local-mcp-tools)
 - [WebSocket protocol (`/ws`)](#websocket-protocol-ws)
 - [WebSocket terminal (`/ws-terminal`)](#websocket-terminal-ws-terminal)
 - [REST API](#rest-api)
@@ -342,6 +343,50 @@ See [`prompts/README.md`](prompts/README.md) for full authoring guidelines.
 
 ---
 
+## Local MCP tools
+
+Every agent CLI that supports MCP automatically receives a built-in **local tool server** (`fibe-local`) injected into its `--mcp-config` at startup. This enables the AI to interact with the operator and the chat UI without any manual configuration.
+
+### Available tools
+
+| Tool | Blocking? | Description |
+|------|-----------|-------------|
+| `ask_user` | ✅ Yes | Ask the operator an open-ended question. Returns `{ answer: string }`. A `QuestionCard` appears in the chat; the agent is blocked until the operator submits a reply. |
+| `confirm_action` | ✅ Yes | Ask for a yes/no decision before a destructive action. Returns `{ confirmed: boolean }`. A `ConfirmCard` appears in the chat. |
+| `show_image` | No | Render an image inline in the chat thread. Accepts `url` or `base64` + `mimeType`. Returns `{ ok: true }`. |
+| `set_mode` | No | Change the agent mode (`exploring`, `casting`, `overseeing`, `greenfielding`, `brownfielding`). Returns `{ ok, mode }`. |
+| `get_mode` | No | Read the current agent mode. Returns `{ mode: string }`. |
+| `notify` | No | Send a toast notification (`info`, `success`, `warning`, `error`). Returns `{ ok: true }`. |
+| `set_title` | No | Update the activity run title in the sidebar. Returns `{ ok: true }`. |
+
+### Architecture
+
+```
+Agent CLI (MCP client)
+    │ stdio JSON-RPC
+    ▼
+local-mcp.server.ts (child process)
+    │ HTTP POST /api/local-tool-call (loopback)
+    ▼
+LocalMcpService (NestJS)
+    │ outbound$ Subject
+    ▼
+OrchestratorService → WebSocket → Chat UI
+    ▲
+    │ answer_user_question / confirm_action_response WS actions
+Chat UI (QuestionCard / ConfirmCard)
+```
+
+`ask_user` and `confirm_action` **block** the agent CLI until the operator responds in the chat UI. All other tools are fire-and-forget.
+
+### Environment variable
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ASK_USER_TIMEOUT_MS` | `300000` (5 min) | How long `LocalMcpService` waits for an operator reply before rejecting blocking tool calls with a timeout error. |
+
+---
+
 ## WebSocket protocol (`/ws`)
 
 **URL:** `ws://localhost:3000/ws` (or `wss://` in production)  
@@ -374,6 +419,8 @@ All messages are JSON objects with an `action` field.
 | `set_model` | `{ model }` | Set model name |
 | `interrupt_agent` | — | Stop the current agent run |
 | `set_agent_mode` | `{ mode }` | Set agent mode; `mode` is a canonical key (`exploring`, `casting`, `overseeing`, `greenfielding`, `brownfielding`) or its display string |
+| `answer_user_question` | `{ questionId, answer }` | Reply to an `ask_user_prompt` event from the agent; `questionId` must match the one from the event |
+| `confirm_action_response` | `{ questionId, confirmed }` | Reply to a `confirm_action_prompt` event; `confirmed` is a boolean |
 
 ### Server → Client
 
@@ -406,6 +453,10 @@ All messages are JSON objects with a `type` field.
 | `queue_updated` | `count` | Number of queued messages |
 | `model_updated` | `model` | Current model name changed |
 | `agent_mode_updated` | `mode` | Current agent mode display string (e.g. `Exploring...`) |
+| `ask_user_prompt` | `questionId`, `question`, `placeholder?` | Agent is asking the operator a question; a `QuestionCard` appears in the chat UI. Block the agent until `answer_user_question` is sent. |
+| `confirm_action_prompt` | `questionId`, `message`, `confirmLabel?`, `cancelLabel?` | Agent requires a yes/no decision before proceeding; a `ConfirmCard` appears. Block the agent until `confirm_action_response` is sent. |
+| `show_image` | `url?`, `base64?`, `mimeType?`, `caption?` | Display an image inline in the chat thread (non-blocking). |
+| `notify` | `message`, `level` | Show a transient toast notification (`info` \| `success` \| `warning` \| `error`); non-blocking. |
 
 **Story / activity timeline:** the client assembles a chronological story from `stream_start`, `reasoning_*`, `thinking_step`, `tool_call`, and `file_created` events (in order) and submits it back with `submit_story` after `stream_end`.
 
@@ -466,6 +517,7 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `GET` | `/api/runtime-config` | No | Runtime env vars exposed to the chat frontend (avatars, etc.) |
 | `GET` | `/api/agent-mode` | Bearer | Current agent mode → `{ mode: string }` (display string, e.g. `"Exploring..."`) |
 | `POST` | `/api/agent-mode` | Bearer | `{ mode }` — set mode by key or display string → `{ success, mode }`. Valid keys: `exploring`, `casting`, `overseeing`, `greenfielding`, `brownfielding`. Returns 400 for unknown values. |
+| `POST` | `/api/local-tool-call` | Bearer | Internal loopback endpoint called by the local MCP stdio child process. Forwards tool calls (`ask_user`, `confirm_action`, etc.) to `LocalMcpService`. Not intended for external callers. |
 
 **`POST /api/agent/send-message`** is designed for webhooks and integrations (e.g. Sentry). It returns `400` (empty text), `403` (need auth), or `409` (agent busy).
 

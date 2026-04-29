@@ -88,6 +88,16 @@ export interface ServerMessage {
   entry?: StoredActivityEntry;
   count?: number;
   usage?: { inputTokens: number; outputTokens: number };
+  // local MCP tool events
+  questionId?: string;
+  question?: string;
+  placeholder?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  base64?: string;
+  mimeType?: string;
+  caption?: string;
+  level?: string;
 }
 
 

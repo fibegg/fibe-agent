@@ -58,7 +58,8 @@ export function useChatWebSocket(
   onStreamStart?: (data?: { model?: string }) => void,
   onStreamEnd?: (usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
   thinkingCallbacks?: ThinkingCallbacks,
-  onPlaygroundChanged?: () => void
+  onPlaygroundChanged?: () => void,
+  onLocalToolEvent?: (data: ServerMessage) => void
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -78,12 +79,14 @@ export function useChatWebSocket(
   const onStreamEndRef = useRef(onStreamEnd);
   const thinkingRef = useRef(thinkingCallbacks);
   const onPlaygroundChangedRef = useRef(onPlaygroundChanged);
+  const onLocalToolEventRef = useRef(onLocalToolEvent);
   thinkingRef.current = thinkingCallbacks;
   onMessageRef.current = onMessage;
   onStreamChunkRef.current = onStreamChunk;
   onStreamStartRef.current = onStreamStart;
   onStreamEndRef.current = onStreamEnd;
   onPlaygroundChangedRef.current = onPlaygroundChanged;
+  onLocalToolEventRef.current = onLocalToolEvent;
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -257,6 +260,10 @@ export function useChatWebSocket(
       agent_mode_updated: (d) => {
         if (d.mode) setAgentMode(d.mode);
       },
+      ask_user_prompt: (d) => onLocalToolEventRef.current?.(d),
+      confirm_action_prompt: (d) => onLocalToolEventRef.current?.(d),
+      show_image: (d) => onLocalToolEventRef.current?.(d),
+      notify: (d) => onLocalToolEventRef.current?.(d),
     };
 
     ws.onmessage = (event: MessageEvent) => {

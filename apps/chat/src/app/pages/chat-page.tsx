@@ -50,6 +50,13 @@ import { ChatInputArea } from '../chat/chat-input-area';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
 import { useTerminalPanel } from '../terminal/use-terminal-panel';
+import {
+  QuestionCard,
+  ConfirmCard,
+  ShowImageCard,
+  NotifyToastContainer,
+  type ToastItem,
+} from '../chat/components/local-tool-cards';
 
 const LazyFileViewerPanel = lazy(() => import('../file-explorer/file-viewer-panel').then((m) => ({ default: m.FileViewerPanel })));
 const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel })));
@@ -121,6 +128,67 @@ export function ChatPage() {
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const terminalHeight = useTerminalHeight(isMobile);
   const pgSelector = usePlaygroundSelector();
+
+  // ─── Local MCP tool state ─────────────────────────────────────────────────
+
+  type LocalToolItem =
+    | { kind: 'ask'; questionId: string; question: string; placeholder?: string }
+    | { kind: 'confirm'; questionId: string; message: string; confirmLabel?: string; cancelLabel?: string }
+    | { kind: 'image'; key: string; url?: string; base64?: string; mimeType?: string; caption?: string };
+
+  const [localToolItems, setLocalToolItems] = useState<LocalToolItem[]>([]);
+  const [toasts, setToasts] = useState<ToastItem[]>([]);
+
+  const handleLocalToolEvent = useCallback((data: ServerMessage) => {
+    if (data.type === 'ask_user_prompt' && data.questionId && data.question) {
+      setLocalToolItems((prev) => [
+        ...prev,
+        { kind: 'ask', questionId: data.questionId!, question: data.question!, placeholder: data.placeholder },
+      ]);
+    } else if (data.type === 'confirm_action_prompt' && data.questionId && data.message) {
+      setLocalToolItems((prev) => [
+        ...prev,
+        {
+          kind: 'confirm',
+          questionId: data.questionId!,
+          message: data.message!,
+          confirmLabel: data.confirmLabel,
+          cancelLabel: data.cancelLabel,
+        },
+      ]);
+    } else if (data.type === 'show_image') {
+      setLocalToolItems((prev) => [
+        ...prev,
+        {
+          kind: 'image',
+          key: crypto.randomUUID(),
+          url: data.url ?? undefined,
+          base64: data.base64 ?? undefined,
+          mimeType: data.mimeType,
+          caption: data.caption,
+        },
+      ]);
+    } else if (data.type === 'notify' && data.message) {
+      setToasts((prev) => [
+        ...prev,
+        { id: crypto.randomUUID(), message: data.message!, level: data.level ?? 'info' },
+      ]);
+    }
+  }, []);
+
+  const handleAnswerQuestion = useCallback((questionId: string, answer: string) => {
+    sendRef.current({ action: 'answer_user_question', questionId, answer });
+    setLocalToolItems((prev) => prev.filter((i) => !('questionId' in i) || i.questionId !== questionId));
+  }, []);
+
+  const handleConfirmQuestion = useCallback((questionId: string, confirmed: boolean) => {
+    sendRef.current({ action: 'confirm_action_response', questionId, confirmed });
+    setLocalToolItems((prev) => prev.filter((i) => !('questionId' in i) || i.questionId !== questionId));
+  }, []);
+
+  const handleDismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   const [tonyStarkMode, setTonyStarkMode] = useState(() => localStorage.getItem('tony-stark-mode') === 'true');
   const handleToggleTonyStarkMode = useCallback(() => {
@@ -283,7 +351,8 @@ export function ChatPage() {
     handleStreamStart,
     handleStreamEnd,
     thinkingCallbacks,
-    refetchPlaygrounds
+    refetchPlaygrounds,
+    handleLocalToolEvent
   );
 
   useEffect(() => {
@@ -704,6 +773,48 @@ export function ChatPage() {
               <div ref={scroll.endRef} />
             </div>
           </div>
+          {/* Local MCP tool cards — rendered below message list, above input */}
+          {localToolItems.length > 0 && (
+            <div className="px-3 sm:px-4 md:px-6 flex flex-col gap-1">
+              {localToolItems.map((item) => {
+                if (item.kind === 'ask') {
+                  return (
+                    <QuestionCard
+                      key={item.questionId}
+                      questionId={item.questionId}
+                      question={item.question}
+                      placeholder={item.placeholder}
+                      onAnswer={handleAnswerQuestion}
+                    />
+                  );
+                }
+                if (item.kind === 'confirm') {
+                  return (
+                    <ConfirmCard
+                      key={item.questionId}
+                      questionId={item.questionId}
+                      message={item.message}
+                      confirmLabel={item.confirmLabel}
+                      cancelLabel={item.cancelLabel}
+                      onConfirm={handleConfirmQuestion}
+                    />
+                  );
+                }
+                if (item.kind === 'image') {
+                  return (
+                    <ShowImageCard
+                      key={item.key}
+                      url={item.url}
+                      base64={item.base64}
+                      mimeType={item.mimeType}
+                      caption={item.caption}
+                    />
+                  );
+                }
+                return null;
+              })}
+            </div>
+          )}
           {!scroll.isAtBottom && (
             <button
               type="button"
@@ -785,6 +896,7 @@ export function ChatPage() {
             </div>
           </Suspense>
         )}
+    <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
     </ChatLayout>
   );
 }

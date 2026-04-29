@@ -43,6 +43,7 @@ import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic
 import { GemmaRouterService } from './gemma-router/gemma-router.service';
 import { AgentModeController } from './agent-mode/agent-mode.controller';
 import { AgentModeStoreService } from './agent-mode/agent-mode.store.service';
+import { LocalMcpModule } from './local-mcp/local-mcp.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { AgentModeStoreService } from './agent-mode/agent-mode.store.service';
       exclude: ['/api/(.*)', '/ws'],
       serveStaticOptions: { fallthrough: true, index: false },
     }),
+    LocalMcpModule,
   ],
   controllers: [
     AppController,
