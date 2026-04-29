@@ -54,9 +54,9 @@ describe('prompts/ library — README', () => {
     expect(existsSync(readmePath)).toBe(true);
   });
 
-  test('README.md documents SYSTEM_PROMPT_PATH', () => {
+  test('README.md documents SYSTEM_PROMPT', () => {
     const content = readFileSync(readmePath, 'utf8');
-    expect(content).toContain('SYSTEM_PROMPT_PATH');
+    expect(content).toContain('SYSTEM_PROMPT');
   });
 });
 

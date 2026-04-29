@@ -10,9 +10,9 @@ export async function runLocalPlaygroundsCli(
   config: ConfigService,
   args: string[],
 ): Promise<string> {
-  const targetBase = resolve(config.getPlayroomsRoot(), 'playgrounds');
+  const targetBase = resolve(config.getMarqueeRoot(), 'playgrounds');
   const { stdout } = await execFileAsync('fibe', [...BASE_ARGS, ...args], {
-    env: { ...process.env, PLAYROOMS_ROOT: targetBase },
+    env: { ...process.env, MARQUEE_ROOT: targetBase },
   });
   return String(stdout);
 }

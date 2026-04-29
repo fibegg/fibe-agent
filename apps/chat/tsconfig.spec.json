@@ -27,6 +27,7 @@
     "src/**/*.js",
     "src/**/*.jsx",
     "../../shared/api-paths.ts",
+    "../../shared/effort.constants.ts",
     "../../shared/ws-constants.ts",
     "../../shared/types.ts"
   ]

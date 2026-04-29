@@ -1,7 +1,6 @@
 import { describe, it, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tmpdir } from 'node:os';
 import { parseYaml, loadFibeSettings, applyFibeSettings } from './fibe-settings';
 
 // ─── parseYaml ───────────────────────────────────────────────────────────────
@@ -66,20 +65,55 @@ describe('parseYaml', () => {
     const result = parseYaml('systemPrompt: "You are a TypeScript expert."\n');
     expect(result).toEqual({ systemPrompt: 'You are a TypeScript expert.' });
   });
+
+  it('parses deeply nested objects (3+ levels)', () => {
+    const yaml = [
+      'mcpConfig:',
+      '  mcpServers:',
+      '    fibe:',
+      '      command: fibe',
+      '      args:',
+      '        - mcp',
+      '        - serve',
+      '      env:',
+      '        FIBE_API_KEY: test-key',
+      '        FIBE_DOMAIN: https://fibe.gg',
+      '    docker:',
+      '      command: uvx',
+      '      args:',
+      '        - mcp-server-docker',
+      'agentProvider: gemini',
+    ].join('\n');
+    const result = parseYaml(yaml);
+    expect(result.agentProvider).toBe('gemini');
+    const mcpConfig = result.mcpConfig as Record<string, unknown>;
+    const servers = mcpConfig.mcpServers as Record<string, unknown>;
+    const fibe = servers.fibe as Record<string, unknown>;
+    expect(fibe.command).toBe('fibe');
+    expect(fibe.args).toEqual(['mcp', 'serve']);
+    const env = fibe.env as Record<string, string>;
+    expect(env.FIBE_API_KEY).toBe('test-key');
+    expect(env.FIBE_DOMAIN).toBe('https://fibe.gg');
+    const docker = servers.docker as Record<string, unknown>;
+    expect(docker.command).toBe('uvx');
+    expect(docker.args).toEqual(['mcp-server-docker']);
+  });
+
+  it('parses flat credentials as nested object', () => {
+    const yaml = [
+      'agentCredentials:',
+      '  agent_token.txt: sk-ant-123',
+      '  auth.json: "{}"',
+    ].join('\n');
+    const result = parseYaml(yaml);
+    expect(result.agentCredentials).toEqual({
+      'agent_token.txt': 'sk-ant-123',
+      'auth.json': '{}',
+    });
+  });
 });
 
 // ─── Helpers for file-based tests ────────────────────────────────────────────
-
-let testDir: string;
-
-function setupTestDir() {
-  testDir = join(tmpdir(), `fibe-settings-test-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-  mkdirSync(testDir, { recursive: true });
-}
-
-function teardownTestDir() {
-  try { rmSync(testDir, { recursive: true, force: true }); } catch { /* ok */ }
-}
 
 // ─── loadFibeSettings ────────────────────────────────────────────────────────
 // The loader checks '/app/fibe.yml' and './fibe.yml' (cwd).
@@ -145,15 +179,21 @@ describe('loadFibeSettings', () => {
 describe('applyFibeSettings', () => {
   const MANAGED_KEYS = [
     'FIBE_SETTINGS_JSON',
-    'AGENT_PROVIDER', 'AGENT_PASSWORD', 'MODEL_OPTIONS', 'DEFAULT_MODEL',
+    'AGENT_PROVIDER', 'AGENT_PASSWORD', 'AGENT_AUTH_MODE', 'MODEL_OPTIONS', 'DEFAULT_MODEL', 'CLAUDE_EFFORT',
     'USER_AVATAR_URL', 'USER_AVATAR_BASE64',
     'ASSISTANT_AVATAR_URL', 'ASSISTANT_AVATAR_BASE64',
     'LOCK_CHAT_MODEL',
     'GEMMA_ROUTER_ENABLED', 'OLLAMA_URL', 'GEMMA_MODEL',
     'GEMMA_CONFIDENCE_THRESHOLD', 'GEMMA_TIMEOUT_MS',
-    'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON', 'DOCKER_MCP_CONFIG_JSON',
-    'FIBE_SYNC_ENABLED', 'DATA_DIR', 'FIBE_API_URL', 'FIBE_API_KEY',
+    'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON',
+    'FIBE_SYNC_ENABLED', 'DATA_DIR', 'SESSION_DIR', 'FIBE_API_KEY',
     'CORS_ORIGINS', 'FRAME_ANCESTORS',
+    'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN',
+    'FIBE_CLI_VERSION', 'PROVIDER_ARGS', 'SKILL_TOGGLES', 'SYSCHECK_ENABLED',
+    'AGENT_CREDENTIALS_JSON', 'AGENT_RUNTIME_FILES_JSON',
+    // Credential env keys injected from credentialEnv
+    'GEMINI_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'CURSOR_API_KEY',
+    'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
   ];
   const savedEnv: Record<string, string | undefined> = {};
   const localYml = join(process.cwd(), 'fibe.yml');
@@ -210,6 +250,12 @@ describe('applyFibeSettings', () => {
     expect(process.env.MODEL_OPTIONS).toBe('flash,pro');
   });
 
+  test('promotes claudeEffort to CLAUDE_EFFORT', () => {
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ claudeEffort: 'high' });
+    applyFibeSettings();
+    expect(process.env.CLAUDE_EFFORT).toBe('high');
+  });
+
   test('does NOT overwrite existing individual env vars (individual wins)', () => {
     process.env.AGENT_PROVIDER = 'claude-code'; // pre-existing individual var
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock' });
@@ -254,5 +300,73 @@ describe('applyFibeSettings', () => {
     applyFibeSettings();
     expect(process.env.CORS_ORIGINS).toBe('https://app.example.com');
     expect(process.env.FRAME_ANCESTORS).toBe('https://parent.example.com');
+  });
+
+  test('promotes credentialEnv entries to process.env', () => {
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      credentialEnv: { GEMINI_API_KEY: 'AIza-test', ANTHROPIC_API_KEY: 'sk-ant-test' },
+    });
+    applyFibeSettings();
+    expect(process.env.GEMINI_API_KEY).toBe('AIza-test');
+    expect(process.env.ANTHROPIC_API_KEY).toBe('sk-ant-test');
+  });
+
+  test('credentialEnv does not overwrite existing env vars', () => {
+    process.env.GEMINI_API_KEY = 'already-set';
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      credentialEnv: { GEMINI_API_KEY: 'from-yaml' },
+    });
+    applyFibeSettings();
+    expect(process.env.GEMINI_API_KEY).toBe('already-set');
+  });
+
+  test('promotes mcpConfigJson string directly to MCP_CONFIG_JSON', () => {
+    const mcpJson = '{"mcpServers":{"fibe":{"command":"fibe"}}}';
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ mcpConfigJson: mcpJson });
+    applyFibeSettings();
+    expect(process.env.MCP_CONFIG_JSON).toBe(mcpJson);
+  });
+
+  test('mcpConfigJson takes precedence over mcpConfig', () => {
+    const mcpJson = '{"mcpServers":{"fibe":{"from":"string"}}}';
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      mcpConfigJson: mcpJson,
+      mcpConfig: { mcpServers: { fibe: { from: 'object' } } },
+    });
+    applyFibeSettings();
+    expect(process.env.MCP_CONFIG_JSON).toBe(mcpJson);
+  });
+
+  test('promotes credentialEnv from YAML file', () => {
+    writeFileSync(localYml, 'credentialEnv:\n  CLAUDE_CODE_OAUTH_TOKEN: test-token\n');
+    applyFibeSettings();
+    expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('test-token');
+  });
+
+  test('promotes agentCredentials object to AGENT_CREDENTIALS_JSON string', () => {
+    writeFileSync(localYml, 'agentCredentials:\n  agent_token.txt: sk-ant-123\n');
+    applyFibeSettings();
+    expect(process.env.AGENT_CREDENTIALS_JSON).toBe('{"agent_token.txt":"sk-ant-123"}');
+  });
+
+  test('promotes mcpConfig from nested YAML to MCP_CONFIG_JSON string', () => {
+    writeFileSync(localYml, [
+      'mcpConfig:',
+      '  mcpServers:',
+      '    fibe:',
+      '      command: fibe',
+    ].join('\n') + '\n');
+    applyFibeSettings();
+    expect(process.env.MCP_CONFIG_JSON).toBe('{"mcpServers":{"fibe":{"command":"fibe"}}}');
+  });
+
+  test('agentCredentialsJson string takes precedence over agentCredentials object', () => {
+    const json = '{"token.txt":"from-string"}';
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      agentCredentialsJson: json,
+      agentCredentials: { 'token.txt': 'from-object' },
+    });
+    applyFibeSettings();
+    expect(process.env.AGENT_CREDENTIALS_JSON).toBe(json);
   });
 });

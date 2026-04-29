@@ -9,8 +9,11 @@ set -e
 # Default to container-safe Nx behavior, but let compose/environment override it.
 export NX_DAEMON="${NX_DAEMON:-false}"
 export NX_NATIVE_FILE_WATCHER="${NX_NATIVE_FILE_WATCHER:-false}"
+export npm_config_cache="${npm_config_cache:-/home/node/.npm}"
 RUNTIME_FIBE_BIN_DIR="${DATA_DIR:-/app/data}/.fibe/bin"
 RUNTIME_FIBE_BIN="${RUNTIME_FIBE_BIN_DIR}/fibe"
+DEV_DEPS_LOCK_DIR="${DEV_DEPS_LOCK_DIR:-/app/.nx/dev-deps-install.lock}"
+DEV_DEPS_LOCK_TIMEOUT_SECONDS="${DEV_DEPS_LOCK_TIMEOUT_SECONDS:-600}"
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
 
 fix_file_limits() {
@@ -25,20 +28,158 @@ setup_docker_group() {
   fi
 }
 
+dev_deps_signature() {
+  {
+    node --version
+    npm --version
+    uname -m
+    for file in package.json package-lock.json bun.lock nx.json; do
+      [ -f "$file" ] && sha256sum "$file"
+    done
+    find apps -maxdepth 2 -name package.json -print 2>/dev/null | sort | while IFS= read -r file; do
+      sha256sum "$file"
+    done
+  } | sha256sum | awk '{print $1}'
+}
+
+dev_deps_current() {
+  signature="$1"
+  [ -f node_modules/.npm_dev_installed ] || return 1
+  [ -f node_modules/.npm_dev_signature ] || return 1
+  [ "$(cat node_modules/.npm_dev_signature 2>/dev/null)" = "$signature" ]
+}
+
+acquire_dev_deps_lock() {
+  mkdir -p "$(dirname "$DEV_DEPS_LOCK_DIR")"
+  waited=0
+
+  while ! mkdir "$DEV_DEPS_LOCK_DIR" 2>/dev/null; do
+    waited=$((waited + 1))
+    if [ "$waited" -eq 1 ] || [ $((waited % 10)) -eq 0 ]; then
+      echo "[entrypoint] Waiting for dev dependency install lock..."
+    fi
+    if [ "$waited" -ge "$DEV_DEPS_LOCK_TIMEOUT_SECONDS" ]; then
+      echo "[entrypoint] Timed out waiting for dev dependency install lock after ${DEV_DEPS_LOCK_TIMEOUT_SECONDS}s" >&2
+      return 1
+    fi
+    sleep 1
+  done
+}
+
+release_dev_deps_lock() {
+  rmdir "$DEV_DEPS_LOCK_DIR" 2>/dev/null || true
+}
+
 install_dev_deps() {
-  if [ ! -f node_modules/.npm_dev_installed ]; then
-    echo "[entrypoint] Installing dev dependencies..."
-    rm -rf node_modules/*
+  mkdir -p node_modules
+  desired_signature="$(dev_deps_signature)"
+  dev_deps_current "$desired_signature" && return
+
+  acquire_dev_deps_lock
+  trap 'release_dev_deps_lock' EXIT INT TERM HUP
+
+  if dev_deps_current "$desired_signature"; then
+    release_dev_deps_lock
+    trap - EXIT INT TERM HUP
+    return
+  fi
+
+  echo "[entrypoint] Installing dev dependencies..."
+  clean_dev_node_modules
+  prepare_dev_writable_paths
+  if [ "$(id -u)" = "0" ]; then
+    su node -c "cd /app && npm install --prefer-offline --no-audit --no-fund --package-lock=false"
+  else
     npm install --prefer-offline --no-audit --no-fund --package-lock=false
-    touch node_modules/.npm_dev_installed
-    chown_dev_paths
+  fi
+
+  printf '%s\n' "$desired_signature" > node_modules/.npm_dev_signature
+  touch node_modules/.npm_dev_installed
+  if [ "$(id -u)" = "0" ]; then
+    chown node:node node_modules/.npm_dev_signature node_modules/.npm_dev_installed 2>/dev/null || true
+  fi
+
+  release_dev_deps_lock
+  trap - EXIT INT TERM HUP
+}
+
+clean_dev_node_modules() {
+  mkdir -p node_modules
+  find node_modules -mindepth 1 -maxdepth 1 -exec rm -rf {} +
+
+  for modules_dir in apps/*/node_modules; do
+    [ -e "$modules_dir" ] || continue
+    rm -rf "$modules_dir"
+  done
+}
+
+ensure_node_owns_path() {
+  path="$1"
+  [ -e "$path" ] || return 0
+  node_owner="$(id -u node):$(id -g node)"
+  path_owner="$(stat -c '%u:%g' "$path" 2>/dev/null || true)"
+  if [ "$path_owner" != "$node_owner" ]; then
+    chown node:node "$path" 2>/dev/null || true
   fi
 }
 
-chown_dev_paths() {
-  if [ "$(id -u)" = "0" ]; then
-    chown -R node:node /app/node_modules /app/.nx /app/data 2>/dev/null || true
+ensure_node_owns_tree() {
+  path="$1"
+  [ -e "$path" ] || return 0
+  node_owner="$(id -u node):$(id -g node)"
+  path_owner="$(stat -c '%u:%g' "$path" 2>/dev/null || true)"
+  if [ "$path_owner" != "$node_owner" ]; then
+    chown -R node:node "$path" 2>/dev/null || true
   fi
+}
+
+prepare_dev_writable_paths() {
+  if [ "$(id -u)" = "0" ]; then
+    mkdir -p /app/node_modules /app/.nx /app/data /tmp/.nx-cache /home/node/.npm
+    ensure_node_owns_path /app/node_modules
+    ensure_node_owns_path /tmp/.nx-cache
+    ensure_node_owns_path /app/data
+    ensure_node_owns_tree /home/node/.npm
+    for workspace_dir in /app/apps/*; do
+      [ -d "$workspace_dir" ] || continue
+      ensure_node_owns_path "$workspace_dir"
+    done
+    ensure_node_owns_tree /app/.nx
+  fi
+}
+
+prepare_runtime_home() {
+  runtime_home="$1"
+  [ "$(id -u)" = "0" ] || return
+
+  runtime_config_home="${XDG_CONFIG_HOME:-$runtime_home/.config}"
+  runtime_data_home="${XDG_DATA_HOME:-$runtime_home/.local/share}"
+  runtime_state_home="${XDG_STATE_HOME:-$runtime_home/.local/state}"
+  runtime_cache_home="${XDG_CACHE_HOME:-$runtime_home/.cache}"
+
+  mkdir -p \
+    "$runtime_home" \
+    "$runtime_config_home" \
+    "$runtime_data_home" \
+    "$runtime_state_home" \
+    "$runtime_cache_home" \
+    "$runtime_home/.claude" \
+    "$runtime_home/claude_workspace"
+
+  for path in \
+    "$runtime_home" \
+    "$runtime_config_home" \
+    "$runtime_data_home" \
+    "$runtime_state_home" \
+    "$runtime_cache_home" \
+    "$runtime_home/.claude" \
+    "$runtime_home/claude_workspace" \
+    "$runtime_home/audit.log" \
+    "$runtime_home/.claude/settings.json" \
+    "$runtime_home/.claude.json" \
+    "$runtime_home/claude_workspace/.mcp.json"; do
+    ensure_node_owns_path "$path"
+  done
 }
 
 run_dev_command() {
@@ -49,6 +190,7 @@ run_dev_command() {
   fi
 
   if [ "$(id -u)" = "0" ]; then
+    prepare_runtime_home "$runtime_home"
     exec su node -c "export HOME=${runtime_home} PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
   fi
 
@@ -123,8 +265,7 @@ else
   fix_file_limits || true # WIP
   setup_docker_group
   install_dev_deps
-  chown_dev_paths
-  chown -R node:node /tmp/.nx-cache 2>/dev/null || true
+  prepare_dev_writable_paths
 
   if [ "$#" -gt 0 ]; then
     dev_command="$*"

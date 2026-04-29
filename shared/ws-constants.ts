@@ -10,6 +10,8 @@ export const WS_ACTION = {
   SUBMIT_STORY: 'submit_story',
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
+  GET_EFFORT: 'get_effort',
+  SET_EFFORT: 'set_effort',
   INTERRUPT_AGENT: 'interrupt_agent',
   SET_AGENT_MODE: 'set_agent_mode',
   /** Reply to an ask_user_prompt from the agent. */
@@ -34,6 +36,7 @@ export const WS_EVENT = {
   STREAM_CHUNK: 'stream_chunk',
   STREAM_END: 'stream_end',
   MODEL_UPDATED: 'model_updated',
+  EFFORT_UPDATED: 'effort_updated',
   REASONING_START: 'reasoning_start',
   REASONING_CHUNK: 'reasoning_chunk',
   REASONING_END: 'reasoning_end',

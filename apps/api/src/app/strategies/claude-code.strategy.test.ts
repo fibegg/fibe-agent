@@ -155,6 +155,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     savedEnv.CLAUDE_FAKE_ARGS_PATH = process.env.CLAUDE_FAKE_ARGS_PATH;
     savedEnv.CLAUDE_FAKE_ENV_PATH = process.env.CLAUDE_FAKE_ENV_PATH;
     savedEnv.CLAUDE_FAKE_SESSION_ID = process.env.CLAUDE_FAKE_SESSION_ID;
+    savedEnv.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
     process.env.HOME = CLAUDE_TEST_HOME;
     if (!existsSync(CLAUDE_TEST_HOME)) {
       mkdirSync(CLAUDE_TEST_HOME, { recursive: true });
@@ -190,6 +191,8 @@ describe('ClaudeCodeStrategy API token mode', () => {
     else process.env.CLAUDE_FAKE_ENV_PATH = savedEnv.CLAUDE_FAKE_ENV_PATH;
     if (savedEnv.CLAUDE_FAKE_SESSION_ID === undefined) delete process.env.CLAUDE_FAKE_SESSION_ID;
     else process.env.CLAUDE_FAKE_SESSION_ID = savedEnv.CLAUDE_FAKE_SESSION_ID;
+    if (savedEnv.CLAUDE_EFFORT === undefined) delete process.env.CLAUDE_EFFORT;
+    else process.env.CLAUDE_EFFORT = savedEnv.CLAUDE_EFFORT;
     for (const key of CLAUDE_ENV_TOKEN_KEYS) {
       if (savedEnv[key] === undefined) delete process.env[key];
       else process.env[key] = savedEnv[key];
@@ -385,13 +388,36 @@ describe('ClaudeCodeStrategy API token mode', () => {
       '--resume',
       'stale-session-id',
       '-p',
-      '--no-chrome',
       '--effort',
       'max',
       'continue',
       '--dangerously-skip-permissions',
+      '--no-chrome',
     ]);
     expect(existsSync(join(workspaceDir, '.claude_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming uses runtime effort option', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+
+    const argsPath = join(CLAUDE_TEST_HOME, 'claude-runtime-effort-args.json');
+    process.env.CLAUDE_FAKE_ARGS_PATH = argsPath;
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'runtime-effort-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined, undefined, undefined, { effort: 'low' })
+    ).resolves.toBeUndefined();
+
+    const args = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
+    expect(args[args.indexOf('--effort') + 1]).toBe('low');
   });
 
   test('executePromptStreaming preserves Rails-provided Claude HOME and XDG env', async () => {

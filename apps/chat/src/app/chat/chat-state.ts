@@ -73,6 +73,7 @@ export interface ServerMessage {
   created_at?: string;
   text?: string;
   model?: string;
+  effort?: string;
   imageUrls?: string[];
   id?: string;
   title?: string;
@@ -101,5 +102,4 @@ export interface ServerMessage {
   /** Included in the conversation_reset event payload. */
   resetAt?: string;
 }
-
 

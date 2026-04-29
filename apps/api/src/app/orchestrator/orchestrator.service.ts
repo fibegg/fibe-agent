@@ -2,6 +2,7 @@ import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
@@ -13,6 +14,7 @@ import { FibeSyncService } from '../fibe-sync/fibe-sync.service';
 
 import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
+import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { UploadsService } from '../uploads/uploads.service';
 import type {
@@ -63,6 +65,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly activityStore: ActivityStoreService,
     private readonly messageStore: MessageStoreService,
     private readonly modelStore: ModelStoreService,
+    private readonly effortStore: EffortStoreService,
     private readonly config: ConfigService,
     private readonly strategyRegistry: StrategyRegistryService,
     private readonly uploadsService: UploadsService,
@@ -91,12 +94,12 @@ export class OrchestratorService implements OnModuleInit {
       },
     });
     if (!this.config.getSystemPrompt()) {
-      const path = this.config.getSystemPromptPath();
-      if (existsSync(path)) {
+      const builtinPath = join(process.cwd(), 'dist', 'assets', 'SYSTEM_PROMPT.md');
+      if (existsSync(builtinPath)) {
         try {
-          this.cachedSystemPromptFromFile = await readFile(path, 'utf8');
+          this.cachedSystemPromptFromFile = await readFile(builtinPath, 'utf8');
         } catch {
-          this.logger.warn('Failed to read system prompt file');
+          this.logger.warn('Failed to read built-in system prompt file');
         }
       }
     }
@@ -155,6 +158,7 @@ export class OrchestratorService implements OnModuleInit {
       this.messageStore.flush(),
       this.activityStore.flush(),
       this.modelStore.flush(),
+      this.effortStore.flush(),
     ]);
   }
 
@@ -179,6 +183,7 @@ export class OrchestratorService implements OnModuleInit {
     code?: string;
     text?: string;
     model?: string;
+    effort?: string;
     mode?: string;
     images?: string[];
     audio?: string;
@@ -210,6 +215,8 @@ export class OrchestratorService implements OnModuleInit {
       [WS_ACTION.SUBMIT_STORY]: () => this.handleSubmitStory(msg.story ?? []),
       [WS_ACTION.GET_MODEL]: () => this.handleGetModel(),
       [WS_ACTION.SET_MODEL]: () => this.handleSetModel(msg.model ?? ''),
+      [WS_ACTION.GET_EFFORT]: () => this.handleGetEffort(),
+      [WS_ACTION.SET_EFFORT]: () => this.handleSetEffort(msg.effort ?? ''),
       [WS_ACTION.INTERRUPT_AGENT]: () => {
         if (this.isProcessing) this.strategy.interruptAgent?.();
       },
@@ -440,6 +447,7 @@ export class OrchestratorService implements OnModuleInit {
         historyMessages,
       );
       const model = this.modelStore.get();
+      const effort = this.effortStore.get();
       this._send(WS_EVENT.STREAM_START, { model });
       const streamStartEntry: StoredStoryEntry = {
         id: randomUUID(),
@@ -480,7 +488,7 @@ export class OrchestratorService implements OnModuleInit {
       await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
         this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
-      }, callbacks, systemPrompt || undefined);
+      }, callbacks, systemPrompt || undefined, { effort });
       finishAgentStream(
         this.finishStreamDeps(),
         accumulated,
@@ -626,6 +634,16 @@ export class OrchestratorService implements OnModuleInit {
     this._send(WS_EVENT.MODEL_UPDATED, { model: value });
   }
 
+  private handleGetEffort(): void {
+    this._send(WS_EVENT.EFFORT_UPDATED, { effort: this.effortStore.get() });
+  }
+
+  private async handleSetEffort(effort: string): Promise<void> {
+    const value = this.effortStore.set(effort);
+    await this.effortStore.flush();
+    this._send(WS_EVENT.EFFORT_UPDATED, { effort: value });
+  }
+
   private handleAnswerUserQuestion(questionId: string, answer: string): void {
     this.localMcp.resolveQuestion(questionId, { answer });
   }
@@ -674,9 +692,9 @@ export class OrchestratorService implements OnModuleInit {
     return this.getMcpToolNamesFromEnv();
   }
 
-  /** Extracts plain MCP server names from MCP_CONFIG_JSON / DOCKER_MCP_CONFIG_JSON. */
+  /** Extracts plain MCP server names from MCP_CONFIG_JSON. */
   private getMcpToolNamesFromEnv(): Array<{ name: string; description: string }> {
-    const sources = [process.env.MCP_CONFIG_JSON, process.env.DOCKER_MCP_CONFIG_JSON];
+    const sources = [process.env.MCP_CONFIG_JSON];
     const tools: Array<{ name: string; description: string }> = [];
     const names = new Set<string>();
     
@@ -762,7 +780,7 @@ export class OrchestratorService implements OnModuleInit {
 
   /** Extracts MCP server HTTP URLs (streamable-HTTP servers only). */
   private getMcpServerUrls(): string[] {
-    const sources = [process.env.MCP_CONFIG_JSON, process.env.DOCKER_MCP_CONFIG_JSON];
+    const sources = [process.env.MCP_CONFIG_JSON];
     const urls: string[] = [];
     for (const raw of sources) {
       if (!raw) continue;

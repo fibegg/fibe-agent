@@ -4,6 +4,7 @@ import { ConfigService } from '../config/config.service';
 import { MessageStoreService } from '../message-store/message-store.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { ModelStoreService } from '../model-store/model-store.service';
+import { EffortStoreService } from '../effort-store/effort-store.service';
 
 @Injectable()
 export class DataPrivacyService {
@@ -13,7 +14,8 @@ export class DataPrivacyService {
     private readonly config: ConfigService,
     private readonly messageStore: MessageStoreService,
     private readonly activityStore: ActivityStoreService,
-    private readonly modelStore: ModelStoreService
+    private readonly modelStore: ModelStoreService,
+    private readonly effortStore: EffortStoreService
   ) {}
 
   exportData(): Record<string, unknown> {
@@ -21,6 +23,7 @@ export class DataPrivacyService {
       messages: this.messageStore.all(),
       activities: this.activityStore.all(),
       model: this.modelStore.get(),
+      effort: this.effortStore.get(),
       exported_at: new Date().toISOString(),
       agent_id: this.config.getConversationId(),
     };

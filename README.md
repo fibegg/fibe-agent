@@ -44,7 +44,7 @@
 | **Gemma MCP Router** | Optional local LLM pre-pass using Ollama (`gemma3:4b`) to classify intent and suggest MCP tools with zero latency impact. |
 | **File attachments** | Drag-&-drop or click-to-upload images, audio, PDF, Excel, Word, CSV, JSON, text — up to 20 MB per file. |
 | **`@`-mention files** | Type `@` in the chat input to reference playground files; the API injects their contents into the agent prompt. |
-| **Conversation persistence** | Messages, activities, model choice, uploads, and provider session state scoped by conversation id (`FIBE_AGENT_ID` / `CONVERSATION_ID`). |
+| **Conversation persistence** | Messages, activities, model/effort choice, uploads, and provider session state scoped by conversation id (`FIBE_AGENT_ID` / `CONVERSATION_ID`). |
 | **Fibe integration** | `FibeSyncService`, `postMessage` auto-auth, and iframe embed support with parent-controlled theming. |
 | **Security** | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), JWT-style bearer token auth, multipart validation. |
 | **Structured logging** | One JSON object per line to stdout; request IDs, HTTP and WebSocket context, configurable via `LOG_LEVEL`. |
@@ -185,6 +185,7 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` |
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the model selector (e.g. `flash-lite,flash,pro`) |
 | `DEFAULT_MODEL` | first in `MODEL_OPTIONS` | Pre-selected model |
+| `CLAUDE_EFFORT` | `max` | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`) |
 | `DATA_DIR` | `./data` | Base data directory |
 | `FIBE_AGENT_ID` | — | Conversation id (set by Fibe); data stored at `DATA_DIR/<id>/` |
 | `CONVERSATION_ID` | — | Fallback conversation id for non-Fibe multi-conversation setups |
@@ -253,9 +254,9 @@ Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSo
 
 Connect with `?token=<password>` when `AGENT_PASSWORD` is set. Only one active session at a time; a new connection displaces the old one (close code `4002`).
 
-**Key client→server actions:** `send_chat_message`, `interrupt_agent`, `set_model`, `initiate_auth`, `submit_auth_code`, `cancel_auth`, `reauthenticate`, `logout`.
+**Key client→server actions:** `send_chat_message`, `interrupt_agent`, `set_model`, `set_effort`, `initiate_auth`, `submit_auth_code`, `cancel_auth`, `reauthenticate`, `logout`.
 
-**Key server→client events:** `stream_start`, `stream_chunk`, `stream_end`, `reasoning_start/chunk/end`, `thinking_step`, `tool_call`, `file_created`, `auth_status`, `model_updated`.
+**Key server→client events:** `stream_start`, `stream_chunk`, `stream_end`, `reasoning_start/chunk/end`, `thinking_step`, `tool_call`, `file_created`, `auth_status`, `model_updated`, `effort_updated`.
 
 ### WebSocket `/ws-terminal`
 

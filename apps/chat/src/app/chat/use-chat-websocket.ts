@@ -152,6 +152,7 @@ export function useChatWebSocket(
       }
       setErrorMessage(null);
       send({ action: 'get_model' });
+      send({ action: 'get_effort' });
 
       // Flush queued messages
       const queue = messageQueueRef.current;
@@ -258,6 +259,7 @@ export function useChatWebSocket(
         }
       },
       model_updated: (d) => onMessageRef.current?.(d),
+      effort_updated: (d) => onMessageRef.current?.(d),
       playground_changed: () => onPlaygroundChangedRef.current?.(),
       queue_updated: (d) => setQueuedCount(typeof d.count === 'number' ? d.count : 0),
       agent_mode_updated: (d) => {

@@ -318,11 +318,11 @@ describe('OpencodeStrategy', () => {
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       'run',
       '--continue',
-      '--format',
-      'json',
-      '--thinking',
       '--model',
       'openai/gpt-5.4',
+      '--thinking',
+      '--format',
+      'json',
       '--',
       'continue',
     ]);
@@ -364,11 +364,11 @@ describe('buildOpencodeRunArgs', () => {
     const args = buildOpencodeRunArgs('hello', ['--model', 'openai/gpt-5.4'], false);
     expect(args).toEqual([
       'run',
-      '--format',
-      'json',
-      '--thinking',
       '--model',
       'openai/gpt-5.4',
+      '--thinking',
+      '--format',
+      'json',
       '--',
       'hello',
     ]);
@@ -385,7 +385,7 @@ describe('buildOpencodeRunArgs', () => {
 
   test('includes --continue when hasSession is true', () => {
     const args = buildOpencodeRunArgs('hi', [], true);
-    expect(args).toEqual(['run', '--continue', '--format', 'json', '--thinking', '--', 'hi']);
+    expect(args).toEqual(['run', '--continue', '--thinking', '--format', 'json', '--', 'hi']);
   });
 });
 
@@ -394,11 +394,11 @@ describe('buildOpencodeRunArgs', () => {
     const args = buildOpencodeRunArgs('hello', ['--model', 'openai/gpt-5.4'], false);
     expect(args).toEqual([
       'run',
-      '--format',
-      'json',
-      '--thinking',
       '--model',
       'openai/gpt-5.4',
+      '--thinking',
+      '--format',
+      'json',
       '--',
       'hello',
     ]);
@@ -415,6 +415,6 @@ describe('buildOpencodeRunArgs', () => {
 
   test('includes --continue when hasSession is true', () => {
     const args = buildOpencodeRunArgs('hi', [], true);
-    expect(args).toEqual(['run', '--continue', '--format', 'json', '--thinking', '--', 'hi']);
+    expect(args).toEqual(['run', '--continue', '--thinking', '--format', 'json', '--', 'hi']);
   });
 });

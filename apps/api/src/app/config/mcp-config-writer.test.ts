@@ -24,7 +24,6 @@ describe('writeMcpConfig', () => {
 
   it('does nothing when MCP_CONFIG_JSON is not set', () => {
     delete process.env.MCP_CONFIG_JSON;
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     process.env.AGENT_PROVIDER = 'gemini';
     writeMcpConfig();
     expect(existsSync(join(testHome, '.gemini', 'settings.json'))).toBe(false);
@@ -60,8 +59,7 @@ describe('writeMcpConfig', () => {
           },
         },
       });
-      delete process.env.DOCKER_MCP_CONFIG_JSON;
-    });
+      });
 
     it('writes settings.json with mcpServers block', () => {
       writeMcpConfig();
@@ -108,16 +106,8 @@ describe('writeMcpConfig', () => {
       });
     });
 
-    it('merges DOCKER_MCP_CONFIG_JSON servers', () => {
-      process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
-        mcpServers: {
-          docker: {
-            command: 'uvx',
-            args: ['mcp-server-docker'],
-          },
-        },
-      });
-      writeMcpConfig();
+    it('merges extraServers over MCP_CONFIG_JSON servers', () => {
+      writeMcpConfig({ docker: { command: 'uvx', args: ['mcp-server-docker'] } });
       const config = JSON.parse(
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
@@ -191,8 +181,7 @@ describe('writeMcpConfig', () => {
           },
         },
       });
-      delete process.env.DOCKER_MCP_CONFIG_JSON;
-    });
+      });
 
     it('writes .claude.json with mcpServers block', () => {
       writeMcpConfig();
@@ -216,13 +205,8 @@ describe('writeMcpConfig', () => {
       });
     });
 
-    it('merges docker and playgrounds servers', () => {
-      process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
-        mcpServers: {
-          docker: { command: 'uvx', args: ['mcp-server-docker'] },
-        },
-      });
-      writeMcpConfig();
+    it('merges extraServers into claude config', () => {
+      writeMcpConfig({ docker: { command: 'uvx', args: ['mcp-server-docker'] } });
       const config = JSON.parse(
         readFileSync(join(testHome, '.claude.json'), 'utf8'),
       );
@@ -278,8 +262,7 @@ describe('writeMcpConfig', () => {
           },
         },
       });
-      delete process.env.DOCKER_MCP_CONFIG_JSON;
-    });
+      });
 
     it('writes config.toml with mcp_servers block', () => {
       writeMcpConfig();
@@ -334,12 +317,7 @@ describe('writeMcpConfig', () => {
     });
 
     it('writes stdio servers as type = stdio in toml', () => {
-      process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
-        mcpServers: {
-          docker: { command: 'uvx', args: ['mcp-server-docker'] },
-        },
-      });
-      writeMcpConfig();
+      writeMcpConfig({ docker: { command: 'uvx', args: ['mcp-server-docker'] } });
       const content = readFileSync(join(testHome, '.codex', 'config.toml'), 'utf8');
       expect(content).toContain('[mcp_servers."docker"]');
       expect(content).toContain('type = "stdio"');
@@ -392,11 +370,7 @@ describe('writeMcpConfig', () => {
           },
         },
       });
-      process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
-        mcpServers: {
-          docker: { command: 'uvx', args: ['mcp-server-docker'] },
-        },
-      });
+
       delete process.env.SESSION_DIR;
       delete process.env.DATA_DIR;
       delete process.env.FIBE_AGENT_ID;
@@ -417,10 +391,7 @@ describe('writeMcpConfig', () => {
         args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
         env: { FIBE_API_KEY: 'fibe_test_key' },
       });
-      expect(config.mcpServers['docker']).toEqual({
-        command: 'uvx',
-        args: ['mcp-server-docker'],
-      });
+
     });
 
     it('falls back to SESSION_DIR/mcp.json without a conversation id', () => {
@@ -448,8 +419,7 @@ describe('writeMcpConfig', () => {
           },
         },
       });
-      delete process.env.DOCKER_MCP_CONFIG_JSON;
-
+  
       writeMcpConfig();
 
       const config = JSON.parse(
@@ -477,7 +447,6 @@ describe('writeMcpConfig', () => {
       expect(config.ui).toEqual({ theme: 'dark' });
       expect(config.mcpServers['existing']).toEqual({ command: 'node', args: ['server.js'] });
       expect(config.mcpServers['fibe']).toBeDefined();
-      expect(config.mcpServers['docker']).toBeDefined();
     });
   });
 
@@ -488,8 +457,7 @@ describe('writeMcpConfig', () => {
         serverUrl: 'https://fibe.gg',
         authHeader: 'Bearer legacy_key',
       });
-      delete process.env.DOCKER_MCP_CONFIG_JSON;
-      writeMcpConfig();
+        writeMcpConfig();
       const config = JSON.parse(
         readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'),
       );
@@ -503,7 +471,6 @@ describe('writeMcpConfig', () => {
   it('handles invalid JSON gracefully', () => {
     process.env.AGENT_PROVIDER = 'gemini';
     process.env.MCP_CONFIG_JSON = 'not-json';
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     expect(() => writeMcpConfig()).not.toThrow();
   });
 
@@ -517,7 +484,6 @@ describe('writeMcpConfig', () => {
         },
       },
     });
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     expect(() => writeMcpConfig()).not.toThrow();
   });
 
@@ -528,7 +494,6 @@ describe('writeMcpConfig', () => {
         'test-server': { serverUrl: 'https://example.com/mcp' },
       },
     });
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
 
     writeMcpConfig();
 
@@ -546,7 +511,6 @@ describe('writeMcpConfig', () => {
         'test-server': { serverUrl: 'https://example.com/mcp', authHeader: 'Bearer tok' },
       },
     });
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     delete process.env.SESSION_DIR;
 
     writeMcpConfig();
@@ -555,17 +519,13 @@ describe('writeMcpConfig', () => {
     expect(existsSync(settingsPath)).toBe(true);
   });
 
-  it('merges DOCKER_MCP_CONFIG_JSON with MCP_CONFIG_JSON', () => {
+  it('merges extraServers with MCP_CONFIG_JSON', () => {
     process.env.AGENT_PROVIDER = 'gemini';
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: { 'server-a': { serverUrl: 'https://a.com' } },
     });
-    process.env.DOCKER_MCP_CONFIG_JSON = JSON.stringify({
-      mcpServers: { 'server-b': { serverUrl: 'https://b.com' } },
-    });
-    delete process.env.SESSION_DIR;
 
-    writeMcpConfig();
+    writeMcpConfig({ 'server-b': { serverUrl: 'https://b.com' } });
 
     const config = JSON.parse(readFileSync(join(testHome, '.gemini', 'settings.json'), 'utf8'));
     expect(config.mcpServers['server-a']).toBeDefined();
@@ -575,7 +535,6 @@ describe('writeMcpConfig', () => {
   it('handles malformed MCP_CONFIG_JSON gracefully', () => {
     process.env.AGENT_PROVIDER = 'gemini';
     process.env.MCP_CONFIG_JSON = 'not-valid-json{{{';
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     delete process.env.SESSION_DIR;
 
     expect(() => writeMcpConfig()).not.toThrow();
@@ -591,7 +550,6 @@ describe('writeMcpConfig', () => {
         },
       },
     });
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     delete process.env.SESSION_DIR;
 
     writeMcpConfig();
@@ -605,7 +563,6 @@ describe('writeMcpConfig', () => {
 
   it('TOML writer preserves existing non-MCP sections', () => {
     process.env.AGENT_PROVIDER = 'openai-codex';
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     delete process.env.SESSION_DIR;
 
     const codexDir = join(testHome, '.codex');
@@ -639,7 +596,6 @@ describe('writeMcpConfig', () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: { 'test': { serverUrl: 'https://test.com' } },
     });
-    delete process.env.DOCKER_MCP_CONFIG_JSON;
     delete process.env.SESSION_DIR;
 
     writeMcpConfig();

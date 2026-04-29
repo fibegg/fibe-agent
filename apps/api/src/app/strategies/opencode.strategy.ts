@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { getProxyEnv } from '../provider-traffic/types';
+import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
@@ -47,6 +48,16 @@ function opencodeDataDir(): string {
   return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.local', 'share', 'opencode');
 }
 
+const OPENCODE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
+  defaultArgs: {
+    '--thinking': true,
+  },
+  blockedArgs: {
+    // Output format, always enforced for structured parsing
+    '--format': 'json',
+  },
+};
+
 /**
  * Build opencode CLI `run` args. The `'--'` separator forces the prompt to be
  * treated as a positional even when it starts with `-` (e.g. a system prompt
@@ -61,10 +72,8 @@ export function buildOpencodeRunArgs(
   return [
     'run',
     ...(hasSession ? ['--continue'] : []),
-    '--format',
-    'json',
-    '--thinking',
     ...modelArgs,
+    ...buildProviderArgs(OPENCODE_PROVIDER_ARGS_CONFIG),
     '--',
     effectivePrompt,
   ];

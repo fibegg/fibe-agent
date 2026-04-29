@@ -582,6 +582,14 @@ describe('useChatWebSocket message handlers', () => {
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'model_updated', model: 'gpt-4' }) } as MessageEvent));
     expect(onMessage).toHaveBeenCalled();
   });
+
+  it('handles effort_updated', async () => {
+    const onMessage = vi.fn();
+    renderHook(() => useChatWebSocket(onMessage), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    act(() => messageHandler?.({ data: JSON.stringify({ type: 'effort_updated', effort: 'high' }) } as MessageEvent));
+    expect(onMessage).toHaveBeenCalled();
+  });
   
   it('handles invalid json payload safely', async () => {
     renderHook(() => useChatWebSocket(), { wrapper });

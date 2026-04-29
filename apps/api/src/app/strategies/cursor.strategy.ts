@@ -11,6 +11,7 @@ import type {
 } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
+import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 
 const DEFAULT_CURSOR_HOME = join(process.env.HOME ?? '/home/node', '.cursor');
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
@@ -24,6 +25,17 @@ const MISSING_SESSION_ERROR_PATTERNS = [
   /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
   /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
 ];
+
+const CURSOR_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
+  defaultArgs: {},
+  blockedArgs: {
+    // Critical: non-interactive mode, always enforced
+    '--print': true,
+    '--force': true,
+    // Output format, always enforced for structured parsing
+    '--output-format': 'stream-json',
+  },
+};
 
 function getCursorHome(): string {
   return process.env.CURSOR_CONFIG_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CURSOR_HOME;
@@ -312,7 +324,8 @@ export class CursorStrategy extends AbstractCLIStrategy {
 
   private buildExecArgs(prompt: string, model: string, sessionId: string | null): string[] {
     const modelArgs = this.getModelArgs(model);
-    const baseArgs = ['--print', '--output-format', 'stream-json', '--force', ...modelArgs];
+    const providerTokens = buildProviderArgs(CURSOR_PROVIDER_ARGS_CONFIG);
+    const baseArgs = [...modelArgs, ...providerTokens];
     if (sessionId) {
       return [...baseArgs, '--resume', sessionId, '--', prompt];
     }

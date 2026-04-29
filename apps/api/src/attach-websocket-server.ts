@@ -16,6 +16,7 @@ type ClientMessage = {
   code?: string;
   text?: string;
   model?: string;
+  effort?: string;
   images?: string[];
   audio?: string;
   audioFilename?: string;

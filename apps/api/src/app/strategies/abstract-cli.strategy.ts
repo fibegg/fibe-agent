@@ -4,6 +4,7 @@ import type {
   AgentStrategy,
   AuthConnection,
   ConversationDataDirProvider,
+  AgentRuntimeOptions,
   LogoutConnection,
   StreamingCallbacks,
 } from './strategy.types';
@@ -46,7 +47,8 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
     model: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
-    systemPrompt?: string
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
   ): Promise<void>;
 
   cancelAuth(): void {

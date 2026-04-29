@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Key, Loader2, LogOut, X, Download, Trash2 } from 'lucide-react';
+import { EFFORT_LABELS, EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
 import { ThemeToggle } from '../theme-toggle';
@@ -31,6 +32,8 @@ export interface ChatSettingsModalProps {
   onStartAuth: () => void;
   onReauthenticate: () => void;
   onLogout: () => void;
+  currentEffort?: string;
+  onEffortSelect?: (effort: string) => void;
 }
 
 export function ChatSettingsModal({
@@ -40,9 +43,12 @@ export function ChatSettingsModal({
   onStartAuth,
   onReauthenticate,
   onLogout,
+  currentEffort = 'max',
+  onEffortSelect,
 }: ChatSettingsModalProps) {
   const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
+  const selectedEffort = resolveEffort(currentEffort);
 
   useEffect(() => {
     if (!open) return;
@@ -136,6 +142,31 @@ export function ChatSettingsModal({
               onTypeFilterChange={setTypeFilter}
             />
           </div>
+          {onEffortSelect && (
+            <div className="space-y-2.5 border-t border-border/30 pt-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Claude Effort</span>
+              <div className="grid grid-cols-5 rounded-lg border border-border/50 bg-muted/20 p-1" role="group" aria-label="Claude effort">
+                {EFFORT_OPTIONS.map((effort) => {
+                  const active = effort === selectedEffort;
+                  return (
+                    <button
+                      key={effort}
+                      type="button"
+                      onClick={() => onEffortSelect(effort)}
+                      aria-pressed={active}
+                      className={`h-8 min-w-0 rounded-md px-1 text-[11px] font-medium transition-colors ${
+                        active
+                          ? 'bg-primary text-primary-foreground shadow-sm'
+                          : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+                      }`}
+                    >
+                      {EFFORT_LABELS[effort]}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <div className="space-y-2.5 border-t border-border/30 pt-4">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data Privacy (GDPR/CCPA)</span>
             <div className="flex flex-col gap-2">

@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs';
+import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { NotFoundException } from '@nestjs/common';
@@ -28,7 +28,7 @@ describe('AgentFilesService', () => {
     const service = new AgentFilesService(mockStrategyRegistry as never);
     const buffer = Buffer.from('agent file content');
     
-    const result = await service.uploadFile('assets', 'dangerous/file\\name.txt', buffer);
+    const _result = await service.uploadFile('assets', 'dangerous/file\\name.txt', buffer);
     
     // sanitizes to 'dangerous_file_name.txt' or similar (replaces non-alphanumeric/dot/dash/underscore with _)
     // Wait, basename('dangerous/file\\name.txt') -> 'file\\name.txt' or 'dangerous/file\\name.txt' depending on os.

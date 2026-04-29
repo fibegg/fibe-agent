@@ -16,6 +16,7 @@ import { useChatAttachments, MAX_PENDING_TOTAL } from '../chat/use-chat-attachme
 import { useChatActivityLog } from '../chat/use-chat-activity-log';
 import { useChatInitialData } from '../chat/use-chat-initial-data';
 import { useChatModel } from '../chat/use-chat-model';
+import { useChatEffort } from '../chat/use-chat-effort';
 import { useChatDisplayState } from '../chat/use-chat-display-state';
 import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
@@ -213,6 +214,7 @@ export function ChatPage() {
   }, []);
 
   const { currentModel, setCurrentModel, handleModelSelect, handleModelInputChange } = useChatModel(sendRef);
+  const { currentEffort, setCurrentEffort, handleEffortSelect } = useChatEffort(sendRef);
 
   const {
     activityLog,
@@ -266,7 +268,10 @@ export function ChatPage() {
     if (data.type === 'model_updated' && data.model !== undefined) {
       setCurrentModel(data.model);
     }
-  }, [setCurrentModel, setMessages]);
+    if (data.type === 'effort_updated' && data.effort !== undefined) {
+      setCurrentEffort(data.effort);
+    }
+  }, [setCurrentEffort, setCurrentModel, setMessages]);
 
   const voiceRecorder = useVoiceRecorder();
   const localStt = useLocalStt();
@@ -583,6 +588,8 @@ export function ChatPage() {
             onStartAuth={startAuth}
             onReauthenticate={reauthenticate}
             onLogout={logout}
+            currentEffort={currentEffort}
+            onEffortSelect={handleEffortSelect}
           />
         </>
       }

@@ -341,7 +341,7 @@ describe('PlaygroundsService', () => {
   test('getUrls uses local-playgrounds urls when a current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getPlayroomsRoot: () => '/opt/fibe',
+      getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => 'project' };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
@@ -359,13 +359,13 @@ describe('PlaygroundsService', () => {
       'urls',
       'project',
     ]);
-    expect(mockExecFileAsync.mock.calls[0][2].env.PLAYROOMS_ROOT).toBe('/opt/fibe/playgrounds');
+    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe('/opt/fibe/playgrounds');
   });
 
   test('getUrls lists playgrounds and combines urls when no current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getPlayroomsRoot: () => '/opt/fibe',
+      getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
@@ -386,7 +386,7 @@ describe('PlaygroundsService', () => {
   test('getUrls returns empty array on local-playgrounds failure', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getPlayroomsRoot: () => '/opt/fibe',
+      getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
@@ -500,6 +500,8 @@ describe('PlaygroundsService', () => {
     expect(result.files.some((f) => f.path === 'file.ts')).toBe(true);
     // diff against HEAD fails gracefully (no commits) — diff is empty string
     expect(result.diff).toBe('');
+  });
+
   test('uploadFile sanitizes filename and writes to target directory', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never, {} as never);

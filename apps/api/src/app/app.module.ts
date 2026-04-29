@@ -18,6 +18,7 @@ import { ActivityStoreService } from './activity-store/activity-store.service';
 import { MessageStoreService } from './message-store/message-store.service';
 import { MessagesController } from './messages/messages.controller';
 import { ModelStoreService } from './model-store/model-store.service';
+import { EffortStoreService } from './effort-store/effort-store.service';
 import { ModelOptionsController } from './model-options/model-options.controller';
 import { OrchestratorService } from './orchestrator/orchestrator.service';
 import { ChatPromptContextService } from './orchestrator/chat-prompt-context.service';
@@ -80,6 +81,7 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     ActivityStoreService,
     MessageStoreService,
     ModelStoreService,
+    EffortStoreService,
     StrategyRegistryService,
     OrchestratorService,
     ChatPromptContextService,

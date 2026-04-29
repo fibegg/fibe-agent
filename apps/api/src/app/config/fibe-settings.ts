@@ -15,28 +15,51 @@ export interface FibeSettings {
   // Agent / auth
   agentPassword?: string;
   agentProvider?: string;
+  agentAuthMode?: string;
   /** Array or comma-separated string of model names. */
   modelOptions?: string | string[];
   defaultModel?: string;
+  /** Default Claude Code --effort value. Runtime UI changes are stored per conversation. */
+  claudeEffort?: string;
   dataDir?: string;
-  systemPromptPath?: string;
+  sessionDir?: string;
   systemPrompt?: string;
   encryptionKey?: string;
   fibeAgentId?: string;
   conversationId?: string;
-  playroomsRoot?: string;
-  fibeApiUrl?: string;
+  marqueeRoot?: string;
+  marqueeRootDomain?: string;
   fibeApiKey?: string;
   fibeSyncEnabled?: boolean;
   postInitScript?: string;
   corsOrigins?: string;
   frameAncestors?: string;
 
+  // Cascade settings
+  cliVersion?: string;
+  providerArgs?: Record<string, unknown>;
+  skillToggles?: Record<string, unknown>;
+  syscheckEnabled?: boolean;
+
+  // Credentials & runtime files (string OR object form — YAML emits objects, legacy uses strings)
+  agentCredentialsJson?: string;
+  /** Native object form from YAML (preferred). Serialized to JSON for AGENT_CREDENTIALS_JSON. */
+  agentCredentials?: Record<string, unknown>;
+  agentRuntimeFilesJson?: string;
+  /** Native object form from YAML (preferred). Serialized to JSON for AGENT_RUNTIME_FILES_JSON. */
+  agentRuntimeFiles?: Record<string, unknown>;
+  /**
+   * Pre-computed credential env vars (CLAUDE_CODE_OAUTH_TOKEN, GEMINI_API_KEY, etc.).
+   * Rails computes these from the credential data and provider mode.
+   * fibe-agent injects them into process.env for native CLI tools.
+   */
+  credentialEnv?: Record<string, string>;
+
   // MCP
-  /** Equivalent to MCP_CONFIG_JSON. */
+  /** Equivalent to MCP_CONFIG_JSON (object form from YAML). */
   mcpConfig?: { mcpServers: Record<string, unknown> };
-  /** Equivalent to DOCKER_MCP_CONFIG_JSON. */
-  dockerMcpConfig?: { mcpServers: Record<string, unknown> };
+  /** Equivalent to MCP_CONFIG_JSON (string form from Rails). */
+  mcpConfigJson?: string;
   askUserTimeoutMs?: number;
 
   // Gemma Router
@@ -55,95 +78,20 @@ export interface FibeSettings {
   lockChatModel?: boolean;
 }
 
-// ─── Minimal YAML parser ──────────────────────────────────────────────────────
-//
-// Intentionally avoids third-party dependencies.
-// Handles the flat / one-level-nested subset used in fibe.yml:
-//   key: scalar          → string / number / boolean / null
-//   key:                 → nested object { k: v, ... }
-//     nested: scalar
-//   key:                 → scalar array
-//     - item
-// Comments (#) and blank lines are ignored.
-// Unknown / complex structures are silently skipped — never crash.
+// ─── YAML parser ─────────────────────────────────────────────────────────────
 
-type YamlValue = string | number | boolean | null | Record<string, unknown> | unknown[];
-
-function parseScalar(raw: string): YamlValue {
-  const v = raw.trim();
-  if (v === '' || v === 'null' || v === '~') return null;
-  if (v === 'true') return true;
-  if (v === 'false') return false;
-  if (/^-?\d+$/.test(v)) return parseInt(v, 10);
-  if (/^-?\d+\.\d+$/.test(v)) return parseFloat(v);
-  if ((v[0] === '"' && v.at(-1) === '"') || (v[0] === "'" && v.at(-1) === "'")) {
-    return v.slice(1, -1);
-  }
-  return v;
-}
-
-const TOP_KEY_RE = /^([a-zA-Z_]\w*):\s*(.*)/;
-const NESTED_KEY_RE = /^([a-zA-Z_]\w*):\s*(.*)/;
-const ARRAY_ITEM_RE = /^-\s+(.*)/;
+import jsYaml from 'js-yaml';
 
 export function parseYaml(content: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = content.split('\n');
-  let i = 0;
-
-  while (i < lines.length) {
-    const stripped = lines[i].replace(/#.*$/, '').trimEnd();
-    if (!stripped.trim()) { i++; continue; }
-
-    const top = stripped.match(TOP_KEY_RE);
-    if (!top) { i++; continue; }
-
-    const [, key, afterColon] = top;
-    const valueStr = afterColon.replace(/#.*$/, '').trim();
-
-    if (valueStr) {
-      result[key] = parseScalar(valueStr);
-      i++;
-      continue;
+  try {
+    const result = jsYaml.load(content);
+    if (result && typeof result === 'object' && !Array.isArray(result)) {
+      return result as Record<string, unknown>;
     }
-
-    // Block: peek ahead for indented children
-    i++;
-    const children: Record<string, unknown> = {};
-    const items: unknown[] = [];
-    let isArray = false;
-
-    while (i < lines.length) {
-      const childRaw = lines[i];
-      const childStripped = childRaw.replace(/#.*$/, '').trimEnd();
-      if (!childStripped.trim()) { i++; continue; }
-      if (childRaw.search(/\S/) <= 0) break;
-
-      const trimmed = childStripped.trim();
-      const arrayMatch = trimmed.match(ARRAY_ITEM_RE);
-      if (arrayMatch) {
-        isArray = true;
-        items.push(parseScalar(arrayMatch[1]));
-        i++;
-        continue;
-      }
-
-      const nested = trimmed.match(NESTED_KEY_RE);
-      if (nested) {
-        const [, nKey, nVal] = nested;
-        children[nKey] = nVal.replace(/#.*$/, '').trim() || null;
-        // parse scalar if non-empty
-        if (children[nKey]) children[nKey] = parseScalar(children[nKey] as string);
-        i++;
-        continue;
-      }
-      i++;
-    }
-
-    result[key] = isArray ? items : Object.keys(children).length ? children : null;
+    return {};
+  } catch {
+    return {};
   }
-
-  return result;
 }
 
 // ─── Readers ─────────────────────────────────────────────────────────────────
@@ -191,26 +139,47 @@ function promoteToEnv(s: FibeSettings): void {
   // Agent
   set('AGENT_PASSWORD', s.agentPassword);
   set('AGENT_PROVIDER', s.agentProvider);
+  set('AGENT_AUTH_MODE', s.agentAuthMode);
   if (s.modelOptions !== undefined)
     set('MODEL_OPTIONS', Array.isArray(s.modelOptions) ? s.modelOptions.join(',') : s.modelOptions);
   set('DEFAULT_MODEL', s.defaultModel);
+  set('CLAUDE_EFFORT', s.claudeEffort);
   set('DATA_DIR', s.dataDir);
-  set('SYSTEM_PROMPT_PATH', s.systemPromptPath);
+  set('SESSION_DIR', s.sessionDir);
   set('SYSTEM_PROMPT', s.systemPrompt);
   set('ENCRYPTION_KEY', s.encryptionKey);
   set('FIBE_AGENT_ID', s.fibeAgentId);
   set('CONVERSATION_ID', s.conversationId);
-  set('PLAYROOMS_ROOT', s.playroomsRoot);
-  set('FIBE_API_URL', s.fibeApiUrl);
+  set('MARQUEE_ROOT', s.marqueeRoot);
+  set('MARQUEE_ROOT_DOMAIN', s.marqueeRootDomain);
   set('FIBE_API_KEY', s.fibeApiKey);
   if (s.fibeSyncEnabled !== undefined) set('FIBE_SYNC_ENABLED', bool(s.fibeSyncEnabled));
   set('POST_INIT_SCRIPT', s.postInitScript);
   set('CORS_ORIGINS', s.corsOrigins);
   set('FRAME_ANCESTORS', s.frameAncestors);
 
-  // MCP
-  if (s.mcpConfig !== undefined) set('MCP_CONFIG_JSON', JSON.stringify(s.mcpConfig));
-  if (s.dockerMcpConfig !== undefined) set('DOCKER_MCP_CONFIG_JSON', JSON.stringify(s.dockerMcpConfig));
+  // Cascade settings
+  set('FIBE_CLI_VERSION', s.cliVersion);
+  if (s.providerArgs !== undefined) set('PROVIDER_ARGS', JSON.stringify(s.providerArgs));
+  if (s.skillToggles !== undefined) set('SKILL_TOGGLES', JSON.stringify(s.skillToggles));
+  if (s.syscheckEnabled !== undefined) set('SYSCHECK_ENABLED', bool(s.syscheckEnabled));
+
+  // Credentials & runtime files — accept both string (legacy) and object (YAML-native) forms
+  if (s.agentCredentialsJson !== undefined) set('AGENT_CREDENTIALS_JSON', s.agentCredentialsJson);
+  else if (s.agentCredentials !== undefined) set('AGENT_CREDENTIALS_JSON', JSON.stringify(s.agentCredentials));
+  if (s.agentRuntimeFilesJson !== undefined) set('AGENT_RUNTIME_FILES_JSON', s.agentRuntimeFilesJson);
+  else if (s.agentRuntimeFiles !== undefined) set('AGENT_RUNTIME_FILES_JSON', JSON.stringify(s.agentRuntimeFiles));
+
+  // Credential env — pre-computed by Rails, injected for native CLI tools
+  if (s.credentialEnv) {
+    for (const [k, v] of Object.entries(s.credentialEnv)) {
+      set(k, v);
+    }
+  }
+
+  // MCP — accept both object (mcpConfig) and string (mcpConfigJson) forms
+  if (s.mcpConfigJson !== undefined) set('MCP_CONFIG_JSON', s.mcpConfigJson);
+  else if (s.mcpConfig !== undefined) set('MCP_CONFIG_JSON', JSON.stringify(s.mcpConfig));
   if (s.askUserTimeoutMs !== undefined) set('ASK_USER_TIMEOUT_MS', String(s.askUserTimeoutMs));
 
   // Gemma Router

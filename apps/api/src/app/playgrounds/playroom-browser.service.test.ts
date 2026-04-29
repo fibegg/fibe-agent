@@ -36,7 +36,7 @@ function tmpDir(prefix: string): string {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeService(rootDir: string, playgroundDir: string): any {
   return new PlayroomBrowserService({
-    getPlayroomsRoot: () => rootDir,
+    getMarqueeRoot: () => rootDir,
     getPlaygroundsDir: () => playgroundDir,
   } as never);
 }

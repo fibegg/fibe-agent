@@ -30,7 +30,7 @@ Path constants are defined in `shared/api-paths.ts` (`API_PATHS.*`, `API_PATH_UP
 | GET    | /api/playrooms/current | Bearer | Returns `{ current: string \| null }` — the relative path (under `PLAYROOMS_ROOT`) that `PLAYGROUNDS_DIR` currently points to, or `null` if not linked. |
 | GET    | /api/init-status      | Bearer | Post-init script status. Returns `{ state: 'disabled'\|'pending'\|'running'\|'done'\|'failed', output?, error?, finishedAt? }`. |
 | POST   | /api/agent/send-message | Bearer | Send a message to the agent asynchronously. Body: `{ text, images?, attachmentFilenames? }`. Returns `202` with `{ accepted: true, messageId }` when the message is accepted for processing. Rejects with `400` (empty text), `403` (NEED_AUTH), or `409` (AGENT_BUSY). Intended for webhooks and integrations (e.g. Sentry). |
-| GET    | /api/data-privacy/export | Bearer | Export active conversation core data (`messages.json`, `activity.json`, `model.json`) as a standardized JSON structure. |
+| GET    | /api/data-privacy/export | Bearer | Export active conversation core data (`messages.json`, `activity.json`, `model.json`, `effort.json`) as a standardized JSON structure. |
 | DELETE | /api/data-privacy     | Bearer | Permanently delete the isolated conversation data directory and clear associated in-memory cache stores. |
 
 When `AGENT_PASSWORD` is set, `GET /api/messages`, `GET /api/activities`, `GET /api/model-options`, `GET /api/playgrounds`, `GET /api/playgrounds/stats`, `GET /api/playgrounds/file`, `PUT /api/playgrounds/file`, `GET /api/playrooms/browse`, `POST /api/playrooms/link`, `GET /api/playrooms/current`, `GET /api/init-status`, and `POST /api/agent/send-message` require `Authorization: Bearer <password>` or `?token=<password>`.
@@ -41,7 +41,7 @@ All API logs are written as **one JSON object per line** to stdout/stderr so con
 
 | Env var             | Description |
 |---------------------|-------------|
-| `DATA_DIR`          | Base directory for persistence (default: `./data`). When `FIBE_AGENT_ID` or `CONVERSATION_ID` is set, conversation data is stored under `DATA_DIR/<conversation-id>/` (messages, activities, model, uploads, steering, init-status, and provider session dirs). |
+| `DATA_DIR`          | Base directory for persistence (default: `./data`). When `FIBE_AGENT_ID` or `CONVERSATION_ID` is set, conversation data is stored under `DATA_DIR/<conversation-id>/` (messages, activities, model, effort, uploads, steering, init-status, and provider session dirs). |
 | `POST_INIT_SCRIPT`  | Optional. Shell script run once on first container load (e.g. to install tools). State is stored under the conversation data dir and exposed at `GET /api/init-status`. |
 | `LOG_LEVEL`         | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` (case-insensitive). Minimum level emitted. `info` and `log` are equivalent. |
 | `PLAYROOMS_ROOT`    | Root directory the Playroom Browser serves (default: `/opt/fibe`). The UI's Playground Selector browses this tree and links a subdirectory as the active workspace via `PLAYGROUNDS_DIR`. |
@@ -80,6 +80,8 @@ All API logs are written as **one JSON object per line** to stdout/stderr so con
 | submit_story       | `{ story }` | Submit activity story (array of `{ id, type, message, timestamp, details?, command?, path? }`) for the last assistant message; call after stream ends. Entries with `command` (e.g. tool_call) or `path` (e.g. file_created) are shown as terminal/file blocks in the UI. |
 | get_model          | —           | Request current model          |
 | set_model          | `{ model }` | Set model name                 |
+| get_effort         | —           | Request current Claude effort  |
+| set_effort         | `{ effort }` | Set Claude effort (`low`, `medium`, `high`, `xhigh`, `max`) |
 | interrupt_agent    | —           | Stop the current agent run; server sends `stream_end` with accumulated text so far. |
 
 ### Server → Client (JSON)
@@ -101,6 +103,7 @@ Each message is an object with a `type` and optional extra fields.
 | stream_chunk        | text                | Chunk of assistant response          |
 | stream_end          | usage?, model?      | End of stream; optional `usage: { inputTokens, outputTokens }`; optional `model` (name of model that produced the response) for per-message display. |
 | model_updated       | model               | Current model name                   |
+| effort_updated      | effort              | Current Claude effort                |
 | reasoning_start     | —                   | Start of reasoning/thinking stream (optional) |
 | reasoning_chunk     | text                | Chunk of reasoning text              |
 | reasoning_end       | —                   | End of reasoning stream              |
@@ -132,6 +135,7 @@ The backend talks to external model providers via CLI-based strategies. Two env 
 
 - `AGENT_PROVIDER`: `mock` | `gemini` | `claude-code` | `openai` | `openai-codex` | `cursor` | `opencode` (default `claude-code`)
 - `AGENT_AUTH_MODE`: `oauth` (default) | `api-token`
+- `CLAUDE_EFFORT`: default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`; default `max`)
 
 When `AGENT_AUTH_MODE=api-token`, the strategies skip interactive OAuth/device flows and rely on provider API tokens from env vars:
 
@@ -147,7 +151,7 @@ In `api-token` mode:
 
 ## Conversation context
 
-Persistence (messages, activities, model choice, uploads, steering, init-status, and provider session state) is scoped by **conversation id**. This allows the same agent to always continue the same conversation after restarts.
+Persistence (messages, activities, model choice, effort choice, uploads, steering, init-status, and provider session state) is scoped by **conversation id**. This allows the same agent to always continue the same conversation after restarts.
 
 | Env var | Description |
 |---------|-------------|

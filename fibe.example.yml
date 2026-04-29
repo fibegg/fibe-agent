@@ -1,0 +1,257 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# fibe.yml — Fibe Agent configuration file
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Place this file at /app/fibe.yml (Docker) or ./fibe.yml (project root).
+# All values are optional — unset keys use built-in defaults.
+#
+# Configuration priority (highest → lowest):
+#   1. Individual env vars (AGENT_PROVIDER, etc.) — always win
+#   2. FIBE_SETTINGS_JSON env var (JSON blob)
+#   3. This file (fibe.yml)
+#
+# Note: FIBE_API_KEY, FIBE_DOMAIN, FIBE_AGENT_ID, FIBE_MARQUEE_ID are always
+# read from environment variables (consumed by the Go SDK/CLI), never from
+# this file.
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Agent Core
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# AI provider backend.
+# Supported: gemini, claude-code, openai-codex, opencode, cursor
+# Default: claude-code
+# agentProvider: gemini
+
+# Password required to access the agent chat UI.
+# When unset, the UI is open (no authentication prompt).
+# agentPassword: my-secret
+
+# Authentication mode for the agent.
+# Controls how the agent authenticates with the AI provider.
+# Possible values depend on the provider (e.g. "api_key", "oauth").
+# agentAuthMode: api_key
+
+# Available models shown in the model selector dropdown.
+# Can be a comma-separated string or a YAML list.
+# When unset, the provider's default model list is used.
+# modelOptions: flash-lite,flash,pro
+#
+# Or as a YAML list:
+# modelOptions:
+#   - flash-lite
+#   - flash
+#   - pro
+
+# Default model selected on startup.
+# When unset, the first entry from modelOptions is used.
+# defaultModel: flash
+
+# Custom system prompt injected into every conversation.
+# Overrides the built-in system prompt (dist/assets/SYSTEM_PROMPT.md).
+# For multi-line prompts, use YAML block scalar syntax:
+# systemPrompt: |
+#   You are a TypeScript expert.
+#   Always use strict mode.
+#   Prefer functional patterns.
+
+# Lock the model selector — users cannot switch models in the UI.
+# Default: false
+# lockChatModel: true
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Paths & Storage
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Root directory for persistent data (conversations, activity, uploads).
+# Default: <cwd>/data
+# dataDir: /app/data
+
+# Directory used by providers that need a separate session workspace
+# (e.g. Cursor). When unset, derived from dataDir.
+# sessionDir: /app/sessions
+
+# Root directory of the Marquee (host machine managed by Fibe).
+# Used to discover and link local playgrounds.
+# Default: /opt/fibe
+# marqueeRoot: /opt/fibe
+
+# Root domain for playground subdomain routing on the Marquee.
+# Example: if set to "dev.example.com", services get
+# subdomains like web.dev.example.com.
+# marqueeRootDomain: dev.example.com
+
+# Encryption key for at-rest data encryption.
+# When unset, data is stored unencrypted.
+# encryptionKey: my-32-byte-encryption-key-here!
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Fibe Platform Sync
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Enable real-time sync of messages and activity to the Fibe Platform.
+# Requires FIBE_API_KEY and FIBE_DOMAIN to be set in environment.
+# Default: false
+# fibeSyncEnabled: true
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Lifecycle Scripts
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Shell command(s) executed once after agent initialization.
+# Runs before the agent starts accepting chat messages.
+# Useful for installing dependencies, seeding data, etc.
+# postInitScript: |
+#   npm install
+#   npm run db:migrate
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# MCP (Model Context Protocol) Servers
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Configures external MCP servers the AI agent can connect to.
+# The agent writes provider-specific config files at startup so the
+# underlying CLI tool (gemini, claude, codex, etc.) discovers them.
+#
+# Two server types are supported:
+#   1. Remote (streamable-HTTP) — specify serverUrl
+#   2. Stdio (local process)    — specify command + args
+#
+# mcpConfig:
+#   mcpServers:
+#     # Remote MCP server with auth
+#     fibe:
+#       serverUrl: https://fibe.gg
+#       authHeader: "Bearer ${env:FIBE_API_KEY}"
+#
+#     # Remote MCP server without auth
+#     sentry:
+#       serverUrl: https://mcp.sentry.dev/mcp
+#
+#     # Stdio MCP server (local process)
+#     github:
+#       command: npx
+#       args:
+#         - -y
+#         - "@modelcontextprotocol/server-github"
+#       env:
+#         GITHUB_PERSONAL_ACCESS_TOKEN: ghp_xxxxxxxxxxxx
+#
+#     # Fibe CLI as an MCP server
+#     fibe-local:
+#       command: fibe
+#       args:
+#         - mcp
+#         - serve
+#         - --tools
+#         - core
+#         - --yolo
+
+# Timeout (ms) for ask_user MCP tool prompts before auto-declining.
+# Default: 300000 (5 minutes)
+# askUserTimeoutMs: 300000
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Cascade Settings
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# These are typically set by the Fibe Platform through the config cascade
+# (Admin → Player defaults → Agent overrides). You can override them here
+# for local development or standalone deployments.
+
+# Version of the Fibe CLI binary to use.
+# When managed by the platform, this is set automatically.
+# cliVersion: "0.9.42"
+
+# Extra CLI arguments passed to the AI provider process.
+# Keys and values depend on the provider. Example for claude-code:
+# providerArgs:
+#   max-tokens: 8192
+#   permission-mode: plan
+
+# Toggle individual agent skills on or off.
+# skillToggles:
+#   web-search: true
+#   code-execution: false
+
+# Enable system health checks on agent startup.
+# Default: true
+# syscheckEnabled: true
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Credentials & Runtime Files
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# JSON-encoded strings injected by the Fibe Platform.
+# Not typically set manually — managed through Admin/Player settings.
+
+# JSON blob of credentials (API keys, tokens) injected at runtime.
+# agentCredentialsJson: '{"OPENAI_API_KEY":"sk-..."}'
+
+# JSON blob of files to materialize in the agent workspace at startup.
+# agentRuntimeFilesJson: '[{"path":".env","content":"DATABASE_URL=..."}]'
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Gemma Router (Local LLM Pre-processor)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# Routes simple queries through a local Gemma model via Ollama before
+# sending to the primary (expensive) cloud model. Reduces API costs
+# by handling trivial queries locally.
+
+# Enable the Gemma Router.
+# Default: false
+# gemmaRouterEnabled: true
+
+# Ollama server URL.
+# Default: http://localhost:11434
+# ollamaUrl: http://ollama:11434
+
+# Gemma model identifier in Ollama.
+# Default: gemma3:4b
+# gemmaModel: gemma3:4b
+
+# Confidence threshold (0.0 – 1.0).
+# Queries with confidence above this threshold are routed to Gemma;
+# below it, they go to the primary cloud model.
+# Default: 0.8
+# gemmaConfidenceThreshold: 0.8
+
+# Timeout (ms) for Gemma inference calls.
+# Default: 30000
+# gemmaTimeoutMs: 30000
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# UI & Chat Appearance
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Custom avatar for the user in the chat UI.
+# Use URL or inline base64 (only one needed per role).
+# userAvatarUrl: https://example.com/avatars/user.png
+# userAvatarBase64: "data:image/png;base64,iVBORw0KGgo..."
+
+# Custom avatar for the AI assistant in the chat UI.
+# assistantAvatarUrl: https://example.com/avatars/bot.png
+# assistantAvatarBase64: "data:image/png;base64,iVBORw0KGgo..."
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Security & Embedding
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Allowed CORS origins for the agent HTTP API.
+# Comma-separated list of origins.
+# corsOrigins: https://app.example.com,https://admin.example.com
+
+# Allowed frame-ancestors for Content-Security-Policy.
+# Controls which domains can embed the agent UI in an iframe.
+# frameAncestors: https://parent.example.com

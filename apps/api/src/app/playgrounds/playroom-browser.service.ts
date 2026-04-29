@@ -66,7 +66,7 @@ export class PlayroomBrowserService {
       throw new BadRequestException('Path is required');
     }
 
-    const root = resolve(this.config.getPlayroomsRoot(), 'playgrounds');
+    const root = resolve(this.config.getMarqueeRoot(), 'playgrounds');
     const target = resolve(root, relPath);
     assertSafePath(root, target);
 

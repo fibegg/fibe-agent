@@ -47,6 +47,10 @@ export interface StreamingCallbacks {
   onUsage?: (usage: TokenUsage) => void;
 }
 
+export interface AgentRuntimeOptions {
+  effort?: string;
+}
+
 export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
 
 export interface ConversationDataDirProvider {
@@ -72,6 +76,7 @@ export interface AgentStrategy {
     model: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
-    systemPrompt?: string
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
   ): Promise<void>;
 }

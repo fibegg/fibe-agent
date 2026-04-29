@@ -477,9 +477,9 @@ function parseServersFromJson(raw: string): Record<string, McpServerEntry> | nul
 }
 
 /**
- * Reads MCP_CONFIG_JSON and DOCKER_MCP_CONFIG_JSON env vars and writes the
- * appropriate provider-specific MCP configuration files so the AI agent CLI
- * can connect to all configured MCP servers on startup.
+ * Reads MCP_CONFIG_JSON env var and writes the appropriate provider-specific
+ * MCP configuration files so the AI agent CLI can connect to all configured
+ * MCP servers on startup.
  *
  * @param extraServers Optional additional server entries merged in last (highest priority).
  *   Use this to inject built-in servers (e.g. fibe-local) from callers that already
@@ -505,13 +505,6 @@ export function writeMcpConfig(extraServers?: Record<string, McpServerEntry>): v
     const servers = parseServersFromJson(mcpRaw);
     if (servers) Object.assign(allServers, servers);
     else logger.warn('MCP_CONFIG_JSON could not be parsed');
-  }
-
-  const dockerRaw = process.env.DOCKER_MCP_CONFIG_JSON;
-  if (dockerRaw) {
-    const servers = parseServersFromJson(dockerRaw);
-    if (servers) Object.assign(allServers, servers);
-    else logger.warn('DOCKER_MCP_CONFIG_JSON could not be parsed');
   }
 
   // Merge caller-supplied servers last so they always win

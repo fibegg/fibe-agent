@@ -4,6 +4,7 @@ import { ConfigService } from '../config/config.service';
 import { MessageStoreService } from '../message-store/message-store.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { ModelStoreService } from '../model-store/model-store.service';
+import { EffortStoreService } from '../effort-store/effort-store.service';
 import * as fs from 'node:fs';
 
 describe('DataPrivacyService', () => {
@@ -12,6 +13,7 @@ describe('DataPrivacyService', () => {
   let mockMessageStore: unknown;
   let mockActivityStore: unknown;
   let mockModelStore: unknown;
+  let mockEffortStore: unknown;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,12 +33,16 @@ describe('DataPrivacyService', () => {
     mockModelStore = {
       get: vi.fn().mockReturnValue('mock-model'),
     };
+    mockEffortStore = {
+      get: vi.fn().mockReturnValue('high'),
+    };
 
     service = new DataPrivacyService(
       mockConfig as ConfigService,
       mockMessageStore as MessageStoreService,
       mockActivityStore as ActivityStoreService,
-      mockModelStore as ModelStoreService
+      mockModelStore as ModelStoreService,
+      mockEffortStore as EffortStoreService
     );
   });
 
@@ -45,6 +51,7 @@ describe('DataPrivacyService', () => {
     expect(data.messages).toEqual([{ id: 'msg1' }]);
     expect(data.activities).toEqual([{ id: 'act1' }]);
     expect(data.model).toBe('mock-model');
+    expect(data.effort).toBe('high');
     expect(data.agent_id).toBe('test-conv-id');
     expect(data.exported_at).toBeDefined();
   });

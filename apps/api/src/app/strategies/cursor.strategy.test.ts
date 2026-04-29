@@ -309,12 +309,12 @@ describe('CursorStrategy', () => {
     };
 
     expect(strategy.buildExecArgs('---\nfrontmatter-like prompt', 'Auto', null)).toEqual([
-      '--print',
-      '--output-format',
-      'stream-json',
-      '--force',
       '--model',
       'Auto',
+      '--print',
+      '--force',
+      '--output-format',
+      'stream-json',
       '--',
       '---\nfrontmatter-like prompt',
     ]);
@@ -338,12 +338,12 @@ describe('CursorStrategy', () => {
     await strategy.executePromptStreaming('hello', 'Composer 2', (chunk) => chunks.push(chunk));
 
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
-      '--print',
-      '--output-format',
-      'stream-json',
-      '--force',
       '--model',
       'Composer 2',
+      '--print',
+      '--force',
+      '--output-format',
+      'stream-json',
       '--',
       'hello',
     ]);
@@ -432,9 +432,9 @@ describe('CursorStrategy', () => {
 
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       '--print',
+      '--force',
       '--output-format',
       'stream-json',
-      '--force',
       '--resume',
       'session-existing',
       '--',
@@ -483,9 +483,9 @@ describe('CursorStrategy', () => {
     );
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       '--print',
+      '--force',
       '--output-format',
       'stream-json',
-      '--force',
       '--resume',
       'stale-session-id',
       '--',

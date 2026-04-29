@@ -7,6 +7,7 @@ import { OrchestratorService } from './orchestrator.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import { MessageStoreService } from '../message-store/message-store.service';
 import { ModelStoreService } from '../model-store/model-store.service';
+import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
@@ -50,15 +51,16 @@ describe('OrchestratorService', () => {
       getDataDir: () => dataDir,
       getConversationDataDir: () => dataDir,
       getEncryptionKey: () => undefined,
-      getSystemPromptPath: () => join(dataDir, 'nonexistent.md'),
       getSystemPrompt: () => undefined,
       getModelOptions: () => [],
       getDefaultModel: () => '',
+      getDefaultEffort: () => 'max',
       isGemmaRouterEnabled: () => false,
     };
     const activityStore = new ActivityStoreService(config as never);
     const messageStore = new MessageStoreService(config as never);
     const modelStore = new ModelStoreService(config as never);
+    const effortStore = new EffortStoreService(config as never);
     const strategyRegistry = new StrategyRegistryService(config as never);
     const uploadsService = new UploadsService(config as never);
     const fibeSync = {
@@ -87,6 +89,7 @@ describe('OrchestratorService', () => {
       activityStore,
       messageStore,
       modelStore,
+      effortStore,
       config as never,
       strategyRegistry,
       uploadsService,
@@ -143,6 +146,26 @@ describe('OrchestratorService', () => {
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.MODEL_UPDATED);
     expect(events[0].data.model).toBe('gemini-2');
+  });
+
+  test('handleClientMessage get_effort sends effort_updated', async () => {
+    const orch = await createOrchestrator();
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    orch.handleClientMessage({ action: WS_ACTION.GET_EFFORT });
+    expect(events.length).toBe(1);
+    expect(events[0].type).toBe(WS_EVENT.EFFORT_UPDATED);
+    expect(events[0].data.effort).toBe('max');
+  });
+
+  test('handleClientMessage set_effort sends effort_updated with value', async () => {
+    const orch = await createOrchestrator();
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.SET_EFFORT, effort: 'high' });
+    expect(events.length).toBe(1);
+    expect(events[0].type).toBe(WS_EVENT.EFFORT_UPDATED);
+    expect(events[0].data.effort).toBe('high');
   });
 
   test('handleClientMessage send_chat_message without auth sends error NEED_AUTH', async () => {

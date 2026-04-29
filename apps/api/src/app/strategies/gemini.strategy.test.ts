@@ -212,7 +212,7 @@ describe('GeminiStrategy API token mode', () => {
 describe('buildGeminiArgs', () => {
   test('passes the prompt via the -p=value equals form so yargs binds it to -p', () => {
     const args = buildGeminiArgs('hello world', 'gemini-2.5-pro', false);
-    expect(args).toEqual(['-m', 'gemini-2.5-pro', '--yolo', '-p=hello world']);
+    expect(args).toEqual(['-m', 'gemini-2.5-pro', '-p=hello world', '--yolo']);
   });
 
   test('keeps -p bound to the value when the prompt starts with a dash (markdown bullet)', () => {
@@ -231,8 +231,8 @@ describe('buildGeminiArgs', () => {
   });
 
   test('omits -m when model is empty or the literal string "undefined"', () => {
-    expect(buildGeminiArgs('hi', '', false)).toEqual(['--yolo', '-p=hi']);
-    expect(buildGeminiArgs('hi', 'undefined', false)).toEqual(['--yolo', '-p=hi']);
+    expect(buildGeminiArgs('hi', '', false)).toEqual(['-p=hi', '--yolo']);
+    expect(buildGeminiArgs('hi', 'undefined', false)).toEqual(['-p=hi', '--yolo']);
   });
 });
 describe('GeminiStrategy session recovery', () => {
@@ -309,8 +309,8 @@ describe('GeminiStrategy session recovery', () => {
       '-m',
       'gemini-2.5-pro',
       '--resume',
-      '--yolo',
       '-p=continue',
+      '--yolo',
     ]);
     expect(existsSync(join(workspaceDir, '.gemini_session'))).toBe(false);
   });

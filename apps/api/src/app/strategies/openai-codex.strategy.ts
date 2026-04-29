@@ -12,6 +12,7 @@ import type {
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
+import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
 
@@ -25,6 +26,20 @@ const MISSING_SESSION_ERROR_PATTERNS = [
   /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
   /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
 ];
+
+const CODEX_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
+  defaultArgs: {
+    '--color': 'never',
+  },
+  blockedArgs: {
+    // Critical: non-interactive mode, always enforced
+    '--dangerously-bypass-approvals-and-sandbox': true,
+    // Output format, always enforced
+    '--json': true,
+    // Color must stay never for structured parsing
+    '--color': 'never',
+  },
+};
 
 function getCodexHome(): string {
   return process.env.CODEX_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
@@ -317,13 +332,13 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
 
   private buildExecArgs(prompt: string, model: string, sessionId: string | null): string[] {
     const modelArgs = this.getModelArgs(model);
+    const providerTokens = buildProviderArgs(CODEX_PROVIDER_ARGS_CONFIG);
     if (sessionId) {
       return [
         'exec',
         'resume',
-        '--json',
-        '--dangerously-bypass-approvals-and-sandbox',
         ...modelArgs,
+        ...providerTokens,
         sessionId,
         '--',
         prompt,
@@ -331,11 +346,8 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     }
     return [
       'exec',
-      '--json',
-      '--color',
-      'never',
-      '--dangerously-bypass-approvals-and-sandbox',
       ...modelArgs,
+      ...providerTokens,
       '--',
       prompt,
     ];

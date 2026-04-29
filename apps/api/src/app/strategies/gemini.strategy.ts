@@ -5,6 +5,7 @@ import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } fr
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
+import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 
 const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
@@ -52,6 +53,14 @@ function getModelArgsList(model: string): string[] {
   return ['-m', model];
 }
 
+const GEMINI_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
+  defaultArgs: {},
+  blockedArgs: {
+    '--yolo': true,    // non-interactive mode, always enforced
+    '-p': false,       // handled dynamically
+  },
+};
+
 /**
  * Build Gemini CLI args. The prompt is passed via the `-p=<value>` equals-sign
  * form so yargs binds it to `-p` even when it starts with `-` (e.g. a system
@@ -66,8 +75,8 @@ export function buildGeminiArgs(
   return [
     ...getModelArgsList(model),
     ...(hasSession ? ['--resume'] : []),
-    '--yolo',
     `-p=${effectivePrompt}`,
+    ...buildProviderArgs(GEMINI_PROVIDER_ARGS_CONFIG),
   ];
 }
 

@@ -75,6 +75,27 @@ describe('ChatSettingsModal', () => {
     expect(screen.getByText('v1.0.0')).toBeTruthy();
   });
 
+  it('renders Claude effort controls and calls onEffortSelect', () => {
+    const onEffortSelect = vi.fn();
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+        currentEffort="high"
+        onEffortSelect={onEffortSelect}
+      />
+    );
+
+    expect(screen.getByRole('group', { name: /claude effort/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'High' }).getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(screen.getByRole('button', { name: 'Low' }));
+    expect(onEffortSelect).toHaveBeenCalledWith('low');
+  });
+
   it('calls onClose when Close button clicked', () => {
     const onClose = vi.fn();
     render(

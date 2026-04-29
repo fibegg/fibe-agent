@@ -39,6 +39,11 @@ function spawnChild(command, args, options = {}) {
   });
 }
 
+async function ensureProjectGraphCache() {
+  const { createProjectGraphAsync } = await import('nx/src/project-graph/project-graph.js');
+  await createProjectGraphAsync({ exitOnError: false, resetDaemonClient: false });
+}
+
 function stopProcess(child, signal = 'SIGTERM') {
   if (!child || child.exitCode !== null || child.signalCode !== null) return Promise.resolve();
 
@@ -114,7 +119,7 @@ function handleWebpackOutput(chunk, stream) {
   stream.write(text);
 
   const plain = text.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
-  if (plain.match(/webpack compiled .*successfully/i)) {
+  if (plain.match(/webpack compiled (successfully|with \d+ warnings?)/i)) {
     scheduleRestart();
   }
 }
@@ -134,6 +139,13 @@ process.on('SIGINT', () => void shutdown(130));
 process.on('SIGTERM', () => void shutdown(143));
 
 rmSync(distDir, { recursive: true, force: true });
+
+try {
+  await ensureProjectGraphCache();
+} catch (error) {
+  console.error(`[dev-api] failed to create Nx project graph: ${error instanceof Error ? error.message : String(error)}`);
+  process.exit(1);
+}
 
 webpackProcess = spawnChild(bin('webpack-cli'), ['build', '--node-env=development', '--watch'], {
   cwd: apiRoot,

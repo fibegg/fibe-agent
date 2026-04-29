@@ -89,7 +89,7 @@ Every provider implements `AgentStrategy` from `strategy.types.ts`:
 | `clearCredentials()` | ✓ | Delete cached tokens / session files |
 | `executeLogout(connection)` | ✓ | Run provider logout command |
 | `checkAuthStatus()` | ✓ | Async — return `true` if authenticated |
-| `executePromptStreaming(prompt, model, onChunk, callbacks?, systemPrompt?)` | ✓ | Stream a response; call `onChunk` per text chunk |
+| `executePromptStreaming(prompt, model, onChunk, callbacks?, systemPrompt?, runtimeOptions?)` | ✓ | Stream a response; call `onChunk` per text chunk |
 | `ensureSettings?()` | optional | Write provider config files before first run |
 | `getWorkingDir?()` | optional | Working directory override for the CLI process |
 | `getModelArgs?(model)` | optional | Translate a model name to CLI args |
@@ -112,6 +112,7 @@ Copy `.env.example` to `.env` before starting.
 | `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` or `?token=<password>` |
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the selector (e.g. `flash-lite,flash,pro`) |
 | `DEFAULT_MODEL` | first in `MODEL_OPTIONS` | Pre-selected model on startup |
+| `CLAUDE_EFFORT` | `max` | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`) |
 | `DATA_DIR` | `./data` | Base data directory for persistence |
 | `FIBE_AGENT_ID` | — | Conversation id set by Fibe; data stored at `DATA_DIR/<id>/` |
 | `CONVERSATION_ID` | — | Fallback conversation id for non-Fibe multi-conversation use |
@@ -249,7 +250,7 @@ When `AGENT_AUTH_MODE=api-token`:
 
 ## Conversation context & persistence
 
-All agent state (messages, activities, model choice, uploads, steering, init-status, and provider session dirs) is scoped by a **conversation id**:
+All agent state (messages, activities, model/effort choice, uploads, steering, init-status, and provider session dirs) is scoped by a **conversation id**:
 
 | Env var | Description |
 |---------|-------------|
@@ -266,6 +267,7 @@ DATA_DIR/
     ├── messages.json
     ├── activity.json
     ├── model.json
+    ├── effort.json
     ├── uploads/
     ├── steering/
     └── init-status/
@@ -417,6 +419,8 @@ All messages are JSON objects with an `action` field.
 | `submit_story` | `{ story }` | Submit activity story array after stream ends |
 | `get_model` | — | Request current model |
 | `set_model` | `{ model }` | Set model name |
+| `get_effort` | — | Request current Claude effort |
+| `set_effort` | `{ effort }` | Set Claude effort (`low`, `medium`, `high`, `xhigh`, `max`) |
 | `interrupt_agent` | — | Stop the current agent run |
 | `set_agent_mode` | `{ mode }` | Set agent mode; `mode` is a canonical key (`exploring`, `casting`, `overseeing`, `greenfielding`, `brownfielding`) or its display string |
 | `answer_user_question` | `{ questionId, answer }` | Reply to an `ask_user_prompt` event from the agent; `questionId` must match the one from the event |
@@ -452,6 +456,7 @@ All messages are JSON objects with a `type` field.
 | `playground_changed` | — | Playground directory changed |
 | `queue_updated` | `count` | Number of queued messages |
 | `model_updated` | `model` | Current model name changed |
+| `effort_updated` | `effort` | Current Claude effort changed |
 | `agent_mode_updated` | `mode` | Current agent mode display string (e.g. `Exploring...`) |
 | `ask_user_prompt` | `questionId`, `question`, `placeholder?` | Agent is asking the operator a question; a `QuestionCard` appears in the chat UI. Block the agent until `answer_user_question` is sent. |
 | `confirm_action_prompt` | `questionId`, `message`, `confirmLabel?`, `cancelLabel?` | Agent requires a yes/no decision before proceeding; a `ConfirmCard` appears. Block the agent until `confirm_action_response` is sent. |
@@ -685,7 +690,7 @@ flowchart LR
 | `auth` | `app/auth/` | Bearer token guard and login endpoint |
 | `messages` / `message-store` | `app/messages/`, `app/message-store/` | Message history REST + in-memory store |
 | `activity` / `activity-store` | `app/activity/`, `app/activity-store/` | Activity timeline REST + in-memory store |
-| `model-options` / `model-store` | `app/model-options/`, `app/model-store/` | Model list + selection state |
+| `model-options` / `model-store` / `effort-store` | `app/model-options/`, `app/model-store/`, `app/effort-store/` | Model list + model/effort selection state |
 | `playgrounds` | `app/playgrounds/` | File tree watcher, REST, playroom browser + linker |
 | `uploads` | `app/uploads/` | Multipart upload validation + file serving |
 | `terminal` | `app/terminal/` | `node-pty` shell sessions over `/ws-terminal` |

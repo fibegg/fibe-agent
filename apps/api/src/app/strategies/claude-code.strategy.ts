@@ -1,20 +1,16 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import type { AuthConnection, ConversationDataDirProvider, LogoutConnection, ToolEvent } from './strategy.types';
+import { resolveEffort } from '@shared/effort.constants';
+import type { AgentRuntimeOptions, AuthConnection, ConversationDataDirProvider, LogoutConnection, ToolEvent } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
+import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 
 const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
 
 function getClaudeConfigDir(): string {
   return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude');
-}
-
-function getEffort(): string {
-  // TODO: should be configured in the same way as --model is right now
-  // Effort level for the current session (low, medium, high, xhigh, max)
-  return process.env.CLAUDE_EFFORT || 'max';
 }
 
 function isNativeHomeFallback(home: string | undefined): boolean {
@@ -57,6 +53,28 @@ const MISSING_SESSION_ERROR_PATTERNS = [
 ];
 
 const FILE_WRITING_TOOL_NAMES = ['write_file', 'edit_file', 'search_replace'];
+
+/**
+ * Claude Code: blocked args are critical flags that must never be overridden.
+ * Default args are strategy baseline — overrideable via PROVIDER_ARGS env unless blocked.
+ *
+ * Note: `-p`, `--effort`, `--output-format`, `--mcp-config`, `--resume`, `--continue`,
+ * `--add-dir`, `--append-system-prompt` are constructed dynamically and not part of
+ * this config — they are built from session/context state.
+ */
+const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
+  defaultArgs: {},
+  blockedArgs: {
+    // Critical: non-interactive mode, always enforced
+    '--dangerously-skip-permissions': true,
+    // Critical: suppress browser launch
+    '--no-chrome': true,
+    // Runtime setting, controlled through the chat UI
+    '--effort': false,
+    // Never let player override auth-related flags
+    '-p': false, // handled dynamically, strip if user tries to pass it
+  },
+};
 
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
@@ -353,7 +371,8 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
     _model: string,
     onChunk: (chunk: string) => void,
     callbacks?: import('./strategy.types').StreamingCallbacks,
-    systemPrompt?: string
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
@@ -383,12 +402,8 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
             ? ['--continue']
             : []),
         '-p',
-        '--no-chrome', // TODO: Check if makes sense, compare to Playwright
-        '--effort', getEffort(),
-        // ['--exclude-dynamic-system-prompt-sections', ['true']],
-        // ['--disallowedTools', ['AskUserQuestion EnterPlanMode EnterWorktree ExitPlanMode ExitWorktree NotebookEdit PowerShell TaskCreate TaskGet TaskList TaskOutput TaskUpdate']],
+        '--effort', resolveEffort(runtimeOptions?.effort ?? process.env.CLAUDE_EFFORT),
         prompt,
-        '--dangerously-skip-permissions',
         ...(existsSync(mcpConfigPath) ? ['--mcp-config', mcpConfigPath] : []),
         ...(systemPrompt ? [systemPromptFlag, systemPrompt.trim()] : []),
         ...(useStreamJson
@@ -401,6 +416,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
               '--verbose',
             ]
           : []),
+        ...buildProviderArgs(CLAUDE_PROVIDER_ARGS_CONFIG),
       ];
       for (const dir of this.getPlaygroundDirs()) {
         args.push('--add-dir', dir);

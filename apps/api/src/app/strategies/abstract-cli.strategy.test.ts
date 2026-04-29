@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach } from 'bun:test';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import type { AuthConnection } from './strategy.types';
 
@@ -12,8 +12,8 @@ class MockCLIStrategy extends AbstractCLIStrategy {
   getWorkingDir(): string {
     return '/tmp/mock-dir';
   }
-  executeAuth(connection: AuthConnection): void {}
-  cancelAuth(): void {}
+  executeAuth(_connection: AuthConnection): void { /* noop */ }
+  cancelAuth(): void { /* noop */ }
   checkAuthStatus(): Promise<boolean> { return Promise.resolve(true); }
   
   override interruptAgent(): void {
