@@ -119,3 +119,11 @@ export const INPUT_ROUNDED =
   'rounded-xl bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:border-violet-500 dark:focus:border-primary focus:ring-2 focus:ring-violet-500/20 dark:focus:ring-primary/30 outline-none transition-shadow w-full px-3 py-2.5';
 export const BUTTON_PRIMARY_ROUNDED =
   'rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white text-sm font-medium shadow-lg shadow-violet-500/30 transition-opacity flex items-center gap-2 px-4 py-2.5';
+
+/** Full-screen translucent backdrop behind the right drawer. */
+export const RIGHT_DRAWER_OVERLAY =
+  'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm';
+
+/** The sliding drawer panel itself — positioned at the right edge of the viewport. */
+export const RIGHT_DRAWER_PANEL =
+  'fixed top-0 bottom-0 right-0 z-50 flex flex-col bg-background border-l border-violet-500/20 shadow-2xl shadow-black/40 will-change-transform';

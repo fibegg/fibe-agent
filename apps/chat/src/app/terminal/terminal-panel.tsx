@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { X, TerminalSquare } from 'lucide-react';
+
 import { getWsUrl, getAuthTokenForRequest } from '../api-url';
 
 import '@xterm/xterm/css/xterm.css';
@@ -52,10 +52,11 @@ export function buildTerminalWsUrl(): string {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 interface TerminalPanelProps {
-  onClose: () => void;
+  /** Called when the close button is clicked. Optional — drawer handles close. */
+  onClose?: () => void;
 }
 
-export function TerminalPanel({ onClose }: TerminalPanelProps) {
+export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps) {
   const containerRef  = useRef<HTMLDivElement | null>(null);
   const termRef       = useRef<Terminal | null>(null);
   const fitAddonRef   = useRef<FitAddon | null>(null);
@@ -137,22 +138,12 @@ export function TerminalPanel({ onClose }: TerminalPanelProps) {
   }, []);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#0d0d14] border-t border-violet-500/20">
-      {/* ── Header ──────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#0d0d14]/90 border-b border-violet-500/15 shrink-0">
-        <div className="flex items-center gap-2">
-          <TerminalSquare className="size-3.5 text-violet-400" aria-hidden />
-          <span className="text-xs font-medium text-violet-300 tracking-wide">Shell</span>
-          <span className="text-[10px] text-muted-foreground/60">bash · fibe-agent</span>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="size-6 flex items-center justify-center rounded hover:bg-white/10 text-muted-foreground hover:text-foreground transition-colors"
-          aria-label="Close terminal"
-        >
-          <X className="size-3.5" />
-        </button>
+    <div className="flex flex-col h-full min-h-0 bg-[#0d0d14]">
+      {/* ── Sub-header: shell info bar ────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-1 bg-[#0d0d14]/90 border-b border-violet-500/10 shrink-0">
+        <span className="text-[10px] font-medium text-violet-300/70 tracking-wide">bash</span>
+        <span className="text-[10px] text-muted-foreground/40">·</span>
+        <span className="text-[10px] text-muted-foreground/50">fibe-agent</span>
       </div>
 
       {/* ── xterm.js mount point ──────────────────────────────── */}

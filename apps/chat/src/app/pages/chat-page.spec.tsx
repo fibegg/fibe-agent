@@ -455,8 +455,12 @@ describe('ChatPage', () => {
       closeSettings: vi.fn(),
     });
     render(<ChatPage />, { wrapper });
-    // Desktop sidebars not present in mobile mode
+    // Desktop left/right panels not present in mobile mode
     expect(screen.queryByTestId('file-explorer')).toBeNull();
-    expect(screen.queryByTestId('agent-thinking-sidebar')).toBeNull();
+    // The RightDrawer keeps AgentThinkingSidebar in DOM (visibility:hidden) when closed.
+    // Assert the drawer panel element is not visible (translateX(100%)).
+    const drawerPanel = document.querySelector('[role="dialog"][aria-label="Activity"]');
+    expect(drawerPanel).not.toBeNull();
+    expect((drawerPanel as HTMLElement).style.visibility).toBe('hidden');
   });
 });

@@ -3,6 +3,7 @@ import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
+import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 
 export interface AgentFileEntry {
   name: string;
@@ -13,14 +14,6 @@ export interface AgentFileEntry {
 }
 
 const HIDDEN_PREFIX = '.';
-const IGNORED_NAMES = new Set<string>(['node_modules', '.git']);
-/** Hidden (dot-prefixed) directories that should still appear in the file tree. */
-const VISIBLE_HIDDEN = new Set<string>(['.claude']);
-
-function pathInIgnoredDir(relPath: string): boolean {
-  const segments = relPath.replace(/\\/g, '/').split('/');
-  return segments.some((seg) => IGNORED_NAMES.has(seg));
-}
 
 @Injectable()
 export class AgentFilesService {
@@ -34,18 +27,20 @@ export class AgentFilesService {
   async getTree(): Promise<AgentFileEntry[]> {
     const dir = this.getAgentWorkingDir();
     if (!dir) return [];
+    const settings = await loadFibeSettings(dir);
     const ig = await loadGitignore(dir);
-    return this.readDir(dir, '', ig);
+    return this.readDir(dir, '', ig, settings);
   }
 
   async getStats(): Promise<{ fileCount: number; totalLines: number }> {
     const dir = this.getAgentWorkingDir();
     if (!dir) return { fileCount: 0, totalLines: 0 };
+    const settings = await loadFibeSettings(dir);
     const ig = await loadGitignore(dir);
-    return this.countStats(dir, ig);
+    return this.countStats(dir, ig, settings);
   }
 
-  private async countStats(absPath: string, parentIg: GitignoreFilter): Promise<{ fileCount: number; totalLines: number }> {
+  private async countStats(absPath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings): Promise<{ fileCount: number; totalLines: number }> {
     let fileCount = 0;
     let totalLines = 0;
     try {
@@ -53,7 +48,12 @@ export class AgentFilesService {
       const entries = await readdir(absPath, { withFileTypes: true });
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
+        if (
+          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          settings.ignoredNames.has(name)
+        ) {
+          continue;
+        }
         if (ig.ignores(name)) continue;
         const childAbs = join(absPath, name);
         if (e.isFile()) {
@@ -63,7 +63,7 @@ export class AgentFilesService {
             totalLines += content.split('\n').length;
           } catch { /* skip binary/unreadable */ }
         } else if (e.isDirectory()) {
-          const sub = await this.countStats(childAbs, ig);
+          const sub = await this.countStats(childAbs, ig, settings);
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
         }
@@ -75,10 +75,12 @@ export class AgentFilesService {
   async getFileContent(relativePath: string): Promise<string> {
     const dir = this.getAgentWorkingDir();
     if (!dir) throw new NotFoundException('No agent working directory');
+    const settings = await loadFibeSettings(dir);
     const base = resolve(dir);
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
+    const segments = rel.replace(/\\/g, '/').split('/');
+    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
       throw new NotFoundException('File not found');
     }
     let st: Awaited<ReturnType<typeof stat>>;
@@ -93,8 +95,8 @@ export class AgentFilesService {
     return readFile(absPath, 'utf-8');
   }
 
-  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter): Promise<AgentFileEntry[]> {
-    if (IGNORED_NAMES.has(basename(absPath))) return [];
+  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings): Promise<AgentFileEntry[]> {
+    if (settings.ignoredNames.has(basename(absPath))) return [];
     try {
       const ig = await loadGitignore(absPath, parentIg);
       const entries = await readdir(absPath, { withFileTypes: true });
@@ -103,7 +105,12 @@ export class AgentFilesService {
       const files: { name: string; rel: string }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
+        if (
+          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          settings.ignoredNames.has(name)
+        ) {
+          continue;
+        }
         const rel = relativePath ? `${relativePath}/${name}` : name;
         if (ig.ignores(name)) continue;
         if (e.isDirectory()) {
@@ -119,7 +126,7 @@ export class AgentFilesService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: await this.readDir(d.abs, d.rel, ig),
+          children: await this.readDir(d.abs, d.rel, ig, settings),
         });
       }
       for (const f of files) {

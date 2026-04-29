@@ -6,6 +6,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { PlayroomBrowserService } from './playroom-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
+import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
 import { runLocalPlaygroundsCli } from './local-playgrounds-cli';
@@ -23,18 +24,8 @@ export interface PlaygroundEntry {
 
 const HIDDEN_PREFIX = '.';
 
-const IGNORED_NAMES = new Set<string>(['node_modules', '.git']);
-
-/** Hidden (dot-prefixed) directories that should still appear in the file tree. */
-const VISIBLE_HIDDEN = new Set<string>(['.claude']);
-
 /** Maximum recursion depth for directory traversal (prevents symlink cycle crashes). */
 const MAX_DEPTH = 50;
-
-function pathInIgnoredDir(relPath: string): boolean {
-  const segments = relPath.replace(/\\/g, '/').split('/');
-  return segments.some((seg) => IGNORED_NAMES.has(seg));
-}
 
 function parseCliLines(stdout: string): string[] {
   return stdout.split('\n')
@@ -50,14 +41,16 @@ export class PlaygroundsService {
   ) {}
 
   async getTree(): Promise<PlaygroundEntry[]> {
+    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
     const statuses = await this.getGitStatuses(this.config.getPlaygroundsDir());
-    return this.readDir(this.config.getPlaygroundsDir(), '', ig, statuses);
+    return this.readDir(this.config.getPlaygroundsDir(), '', ig, statuses, settings);
   }
 
   async getStats(): Promise<{ fileCount: number; totalLines: number }> {
+    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
-    return this.countStats(this.config.getPlaygroundsDir(), ig);
+    return this.countStats(this.config.getPlaygroundsDir(), ig, settings);
   }
 
   async getUrls(): Promise<string[]> {
@@ -87,7 +80,7 @@ export class PlaygroundsService {
     }
   }
 
-  private async countStats(absPath: string, parentIg: GitignoreFilter, depth = 0): Promise<{ fileCount: number; totalLines: number }> {
+  private async countStats(absPath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings, depth = 0): Promise<{ fileCount: number; totalLines: number }> {
     if (depth > MAX_DEPTH) return { fileCount: 0, totalLines: 0 };
     let fileCount = 0;
     let totalLines = 0;
@@ -96,7 +89,12 @@ export class PlaygroundsService {
       const entries = await readdir(absPath, { withFileTypes: true });
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
+        if (
+          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          settings.ignoredNames.has(name)
+        ) {
+          continue;
+        }
         if (ig.ignores(name)) continue;
         const childAbs = join(absPath, name);
         let isDir = e.isDirectory();
@@ -119,7 +117,7 @@ export class PlaygroundsService {
             totalLines += content.split('\n').length;
           } catch { /* skip binary/unreadable */ }
         } else if (isDir) {
-          const sub = await this.countStats(childAbs, ig, depth + 1);
+          const sub = await this.countStats(childAbs, ig, settings, depth + 1);
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
         }
@@ -128,10 +126,12 @@ export class PlaygroundsService {
     return { fileCount, totalLines };
   }
   async getFileContent(relativePath: string): Promise<string> {
+    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
+    const segments = rel.replace(/\\/g, '/').split('/');
+    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
       throw new NotFoundException('File not found');
     }
     let st: Awaited<ReturnType<typeof stat>>;
@@ -147,10 +147,12 @@ export class PlaygroundsService {
   }
 
   async saveFileContent(relativePath: string, content: string): Promise<void> {
+    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
+    const segments = rel.replace(/\\/g, '/').split('/');
+    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
       throw new NotFoundException('File not found');
     }
     // Ensure parent directory exists
@@ -161,10 +163,12 @@ export class PlaygroundsService {
   async getFolderFileContents(
     relativePath: string
   ): Promise<{ path: string; content: string }[]> {
+    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const base = resolve(this.config.getPlaygroundsDir());
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    if (rel.startsWith('..') || absPath === base || pathInIgnoredDir(rel)) {
+    const segments = rel.replace(/\\/g, '/').split('/');
+    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
       throw new NotFoundException('Folder not found');
     }
     let st: Awaited<ReturnType<typeof stat>>;
@@ -176,7 +180,7 @@ export class PlaygroundsService {
     if (!st.isDirectory()) {
       throw new NotFoundException('Folder not found');
     }
-    return this.collectFileContents(absPath, rel);
+    return this.collectFileContents(absPath, rel, settings);
   }
 
   private async getGitStatuses(dir: string): Promise<Map<string, PlaygroundEntry['gitStatus']>> {
@@ -232,9 +236,10 @@ export class PlaygroundsService {
 
   private async collectFileContents(
     absPath: string,
-    relPath: string
+    relPath: string,
+    settings: ResolvedFibeSettings
   ): Promise<{ path: string; content: string }[]> {
-    if (IGNORED_NAMES.has(basename(absPath))) return [];
+    if (settings.ignoredNames.has(basename(absPath))) return [];
     const result: { path: string; content: string }[] = [];
     let entries;
     try {
@@ -244,7 +249,12 @@ export class PlaygroundsService {
     }
     for (const e of entries) {
       const name = typeof e.name === 'string' ? e.name : String(e.name);
-      if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
+      if (
+        (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+        settings.ignoredNames.has(name)
+      ) {
+        continue;
+      }
       const childRel = relPath ? `${relPath}/${name}` : name;
       const childAbs = join(absPath, name);
       let isDir = e.isDirectory();
@@ -268,15 +278,15 @@ export class PlaygroundsService {
           /* skip unreadable files */
         }
       } else if (isDir) {
-        const sub = await this.collectFileContents(childAbs, childRel);
+        const sub = await this.collectFileContents(childAbs, childRel, settings);
         result.push(...sub);
       }
     }
     return result;
   }
 
-  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, statuses: Map<string, PlaygroundEntry['gitStatus']>, depth = 0): Promise<PlaygroundEntry[]> {
-    if (depth > MAX_DEPTH || IGNORED_NAMES.has(basename(absPath))) return [];
+  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, statuses: Map<string, PlaygroundEntry['gitStatus']>, settings: ResolvedFibeSettings, depth = 0): Promise<PlaygroundEntry[]> {
+    if (depth > MAX_DEPTH || settings.ignoredNames.has(basename(absPath))) return [];
     try {
       const ig = await loadGitignore(absPath, parentIg);
       const entries = await readdir(absPath, { withFileTypes: true });
@@ -285,7 +295,12 @@ export class PlaygroundsService {
       const files: { name: string; rel: string }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if ((name.startsWith(HIDDEN_PREFIX) && !VISIBLE_HIDDEN.has(name)) || IGNORED_NAMES.has(name)) continue;
+        if (
+          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          settings.ignoredNames.has(name)
+        ) {
+          continue;
+        }
         const rel = relativePath ? `${relativePath}/${name}` : name;
         if (ig.ignores(name)) continue;
         let isDir = e.isDirectory();
@@ -314,7 +329,7 @@ export class PlaygroundsService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: await this.readDir(d.abs, d.rel, ig, statuses, depth + 1),
+          children: await this.readDir(d.abs, d.rel, ig, statuses, settings, depth + 1),
         });
       }
       for (const f of files) {

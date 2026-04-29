@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { TerminalPanel, buildTerminalWsUrl } from './terminal-panel';
 
 // ─── Mock Terminal & addons ────────────────────────────────────────────────────
@@ -98,27 +98,18 @@ describe('buildTerminalWsUrl', () => {
 // ─── TerminalPanel rendering ──────────────────────────────────────────────────
 
 describe('TerminalPanel', () => {
-  it('renders the Shell header label', () => {
-    render(<TerminalPanel onClose={vi.fn()} />);
-    expect(screen.getByText('Shell')).toBeTruthy();
-  });
-
-  it('renders the fibe-agent subtitle', () => {
-    render(<TerminalPanel onClose={vi.fn()} />);
+  it('renders the bash shell sub-header', () => {
+    render(<TerminalPanel />);
+    expect(screen.getByText('bash')).toBeTruthy();
     expect(screen.getByText(/fibe-agent/i)).toBeTruthy();
   });
 
-  it('renders a close button', () => {
-    render(<TerminalPanel onClose={vi.fn()} />);
-    expect(screen.getByRole('button', { name: /close terminal/i })).toBeTruthy();
+  it('renders the fibe-agent subtitle', () => {
+    render(<TerminalPanel />);
+    expect(screen.getByText(/fibe-agent/i)).toBeTruthy();
   });
 
-  it('calls onClose when close button is clicked', () => {
-    const onClose = vi.fn();
-    render(<TerminalPanel onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: /close terminal/i }));
-    expect(onClose).toHaveBeenCalledTimes(1);
-  });
+  // Note: close button is now handled by the parent RightDrawer component
 
   // ── WebSocket lifecycle ─────────────────────────────────────────────────────
 

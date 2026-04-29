@@ -1,4 +1,4 @@
-import { ChevronDown, Loader2 } from 'lucide-react';
+import { ChevronDown, Loader2, TerminalSquare } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
@@ -50,6 +50,7 @@ import { ChatInputArea } from '../chat/chat-input-area';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
 import { useTerminalPanel } from '../terminal/use-terminal-panel';
+import { RightDrawer } from '../right-drawer';
 import {
   QuestionCard,
   ConfirmCard,
@@ -63,30 +64,6 @@ const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
-/** Returns a keyboard-aware terminal height for mobile.
- *  On desktop (>= 640px) returns the fixed 280px.
- *  On mobile it caps at 45dvh of the visual viewport so the terminal
- *  stays visible above the virtual keyboard when it opens. */
-function useTerminalHeight(isMobile: boolean): string {
-  const [height, setHeight] = useState('280px');
-  useEffect(() => {
-    if (!isMobile) { setHeight('280px'); return; }
-    const update = () => {
-      const vvh = window.visualViewport?.height ?? window.innerHeight;
-      const maxH = Math.floor(vvh * 0.45);
-      setHeight(`${Math.max(160, Math.min(maxH, 280))}px`);
-    };
-    update();
-    const vv = window.visualViewport;
-    if (vv) vv.addEventListener('resize', update);
-    window.addEventListener('resize', update);
-    return () => {
-      if (vv) vv.removeEventListener('resize', update);
-      window.removeEventListener('resize', update);
-    };
-  }, [isMobile]);
-  return height;
-};
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -126,7 +103,6 @@ export function ChatPage() {
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
-  const terminalHeight = useTerminalHeight(isMobile);
   const pgSelector = usePlaygroundSelector();
 
   // ─── Local MCP tool state ─────────────────────────────────────────────────
@@ -629,30 +605,27 @@ export function ChatPage() {
         ) : null
       }
       mobileActivity={
-        isMobile && rightSidebarOpen ? (
-          <>
-            <div
-              className={`${MODAL_OVERLAY_DARK} lg:hidden`}
-              aria-hidden
-              onClick={() => setRightSidebarOpen(false)}
+        isMobile ? (
+          <RightDrawer
+            open={rightSidebarOpen}
+            onClose={() => setRightSidebarOpen(false)}
+            title="Activity"
+          >
+            <AgentThinkingSidebar
+              isCollapsed={false}
+              onToggle={() => setRightSidebarOpen(false)}
+              isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+              reasoningText={reasoningText}
+              streamingResponseText={streamingText}
+              thinkingSteps={thinkingSteps}
+              storyItems={displayStory}
+              sessionActivity={sessionActivity}
+              pastActivityFromMessages={pastActivityFromMessages}
+              sessionTokenUsage={sessionTokenUsage}
+              mobileOverlay
+              onActivityClick={(payload) => navigate(getActivityPath(payload))}
             />
-            <div className={`${MOBILE_SHEET_PANEL} right-0 bg-background border-l border-violet-500/20`}>
-              <AgentThinkingSidebar
-                isCollapsed={false}
-                onToggle={() => setRightSidebarOpen(false)}
-                isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-                reasoningText={reasoningText}
-                streamingResponseText={streamingText}
-                thinkingSteps={thinkingSteps}
-                storyItems={displayStory}
-                sessionActivity={sessionActivity}
-                pastActivityFromMessages={pastActivityFromMessages}
-                sessionTokenUsage={sessionTokenUsage}
-                mobileOverlay
-                onActivityClick={(payload) => navigate(getActivityPath(payload))}
-              />
-            </div>
-          </>
+          </RightDrawer>
         ) : null
       }
       leftPanel={
@@ -881,21 +854,23 @@ export function ChatPage() {
           maxPendingTotal={MAX_PENDING_TOTAL}
           queuedCount={queuedCount}
         />
-        {terminalOpen && (
+        <RightDrawer
+          open={terminalOpen}
+          onClose={closeTerminal}
+          title="Shell"
+          icon={<TerminalSquare />}
+          width="min(90vw, 680px)"
+          className="font-mono"
+        >
           <Suspense fallback={
-            <div className="shrink-0 flex items-center justify-center border-t border-violet-500/20 bg-background" style={{ height: terminalHeight }}>
-              <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
+            <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
+              <Loader2 className="size-5 animate-spin text-violet-400 mr-2" />
               <span className="text-sm text-muted-foreground">Starting terminal…</span>
             </div>
           }>
-            <div
-              className="shrink-0 overflow-hidden border-t border-violet-500/20 transition-[height] duration-300 ease-out"
-              style={{ height: terminalHeight }}
-            >
-              <LazyTerminalPanel onClose={closeTerminal} />
-            </div>
+            <LazyTerminalPanel />
           </Suspense>
-        )}
+        </RightDrawer>
     <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
     </ChatLayout>
   );
