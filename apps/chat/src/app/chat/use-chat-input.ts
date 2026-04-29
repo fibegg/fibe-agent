@@ -29,6 +29,40 @@ export function useChatInput({ playgroundEntries, onSendRef, isMobile }: UseChat
     setTimeout(() => chatInputRef.current?.focus(), 50);
   }, []);
 
+  /**
+   * Iframe focus-recovery: when the parent window receives a postMessage from
+   * this iframe, the browser may shift `document` focus back to the parent,
+   * leaving the contenteditable input without a caret. We detect `window blur`
+   * (only fires when focus truly leaves this frame) and restore focus to the
+   * chat input — but only if nothing else inside the iframe intentionally took
+   * focus (e.g. a dropdown, button, or file picker).
+   *
+   * No-op in standalone (non-iframe) mode.
+   */
+  useEffect(() => {
+    const isEmbedded = typeof window !== 'undefined' && window !== window.parent;
+    if (!isEmbedded) return;
+
+    let rafId: ReturnType<typeof requestAnimationFrame>;
+
+    const onWindowBlur = () => {
+      rafId = requestAnimationFrame(() => {
+        // After the rAF, if no element inside the iframe owns focus, restore it.
+        const active = document.activeElement;
+        if (!active || active === document.body) {
+          chatInputRef.current?.focus();
+        }
+      });
+    };
+
+    window.addEventListener('blur', onWindowBlur);
+    return () => {
+      window.removeEventListener('blur', onWindowBlur);
+      cancelAnimationFrame(rafId);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
       if (e.key === 'Enter' && !e.shiftKey) {
@@ -73,5 +107,6 @@ export function useChatInput({ playgroundEntries, onSendRef, isMobile }: UseChat
     handleKeyDown,
     handleMentionSelect,
     handleMentionClose,
+    focusInput,
   };
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useChatInput } from './use-chat-input';
 
@@ -194,5 +194,101 @@ describe('useChatInput', () => {
     expect(focusMock).toHaveBeenCalledOnce();
 
     vi.useRealTimers();
+  });
+
+  // ── iframe focus-recovery ────────────────────────────────────────────────
+
+  describe('iframe focus-recovery blur listener', () => {
+    afterEach(() => {
+      // Reset window.parent to itself (standalone mode)
+      Object.defineProperty(window, 'parent', { value: window, writable: true, configurable: true });
+    });
+
+    it('restores focus to chat input on window blur when body is active element (iframe mode)', () => {
+      vi.useFakeTimers();
+
+      // Must mock BEFORE rendering so the effect sees isEmbedded = true
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const focusMock = vi.fn();
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+        focus: focusMock,
+      };
+
+      document.body.focus();
+
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+        // Flush requestAnimationFrame
+        vi.runAllTimers();
+      });
+
+      expect(focusMock).toHaveBeenCalledOnce();
+
+      vi.useRealTimers();
+    });
+
+    it('does NOT restore focus when another element is focused (intentional focus)', () => {
+      vi.useFakeTimers();
+
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const focusMock = vi.fn();
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+        focus: focusMock,
+      };
+
+      // Another element has intentional focus
+      const btn = document.createElement('button');
+      document.body.appendChild(btn);
+      btn.focus();
+
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+        vi.runAllTimers();
+      });
+
+      expect(focusMock).not.toHaveBeenCalled();
+
+      document.body.removeChild(btn);
+      vi.useRealTimers();
+    });
+
+    it('does NOT attach blur listener in standalone mode (window === window.parent)', () => {
+      vi.useFakeTimers();
+
+      // jsdom default: window.parent === window — standalone mode
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const focusMock = vi.fn();
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+        focus: focusMock,
+      };
+
+      document.body.focus();
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+        vi.runAllTimers();
+      });
+
+      expect(focusMock).not.toHaveBeenCalled();
+
+      vi.useRealTimers();
+    });
   });
 });
