@@ -24,6 +24,7 @@ export interface PlaygroundEntry {
 
 const HIDDEN_PREFIX = '.';
 
+
 /** Maximum recursion depth for directory traversal (prevents symlink cycle crashes). */
 const MAX_DEPTH = 50;
 

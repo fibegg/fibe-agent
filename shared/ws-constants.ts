@@ -52,7 +52,6 @@ export const WS_EVENT = {
   SHOW_IMAGE: 'show_image',
   /** Agent sends a non-blocking notification/toast. */
   NOTIFY: 'notify',
-  /** Agent requests an update to the activity title in the sidebar. */
   SET_TITLE: 'set_title',
 } as const;
 

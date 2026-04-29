@@ -519,7 +519,10 @@ export function writeMcpConfig(extraServers?: Record<string, McpServerEntry>): v
     Object.assign(allServers, extraServers);
   }
 
-  if (Object.keys(allServers).length === 0) return;
+  if (Object.keys(allServers).length === 0) {
+    logger.log('No MCP servers configured — skipping config write');
+    return;
+  }
 
   try {
     writer(allServers);

@@ -15,6 +15,7 @@ export interface AgentFileEntry {
 
 const HIDDEN_PREFIX = '.';
 
+
 @Injectable()
 export class AgentFilesService {
   constructor(private readonly strategyRegistry: StrategyRegistryService) {}
