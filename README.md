@@ -269,7 +269,8 @@ The repo keeps **`bun.lock`** (Bun, CI, Docker) and **`package-lock.json`** (npm
 
 | Script | Command | Description |
 |--------|---------|-------------|
-| `dev` | `bun run dev` | API + Chat in parallel |
+| `dev` | `bun run dev` | Local API + Chat through Nx |
+| `dev:docker` | `bun run dev:docker` | Docker/Mutagen API + Chat with serialized API restarts |
 | `build` | `bun run build` | Build all apps |
 | `lint` | `bun run lint` | Lint all projects |
 | `test` | `bun run test` | Unit tests (100% coverage) |

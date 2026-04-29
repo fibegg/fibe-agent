@@ -6,7 +6,7 @@
 # tools, same MCP servers, same entrypoint) but SKIPS the builder stage.
 #
 # In dev mode the source tree is volume-mounted at /app and the entrypoint
-# detects this (no dist/main.js) and runs `npm install` + `nx serve`.
+# detects this (no dist/main.js), installs deps, and runs the compose command.
 # There is no need to compile dist/ during the Docker build.
 #
 # Keep this file in sync with the runtime stage of the main Dockerfile.
@@ -51,6 +51,8 @@ ARG BUILDKIT_INLINE_CACHE=1
 ARG AGENT_PROVIDER=gemini
 ARG GITHUB_MCP_VERSION=1.0.0
 ARG GITEA_MCP_VERSION=1.1.0
+
+COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
@@ -216,7 +218,7 @@ RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 
 # ---- SMART ENTRYPOINT ----
 # Detects prod (dist/ present) vs dev (source code mounted, no dist/) at runtime.
-# In dev mode it runs `npm install` then `nx serve` so the container works
+# In dev mode it installs deps then runs the compose command so the container works
 # when the entire project root is volume-mounted (e.g. local Rails orchestration).
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

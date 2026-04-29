@@ -1,6 +1,15 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
 const { join } = require('path');
 
+function envNumber(name, fallback) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
+const watchPoll = process.env.WATCHPACK_POLLING === 'true'
+  ? envNumber('WATCHPACK_POLLING_INTERVAL', 1000)
+  : undefined;
+
 module.exports = {
   node: { __dirname: false },
   resolve: {
@@ -30,5 +39,6 @@ module.exports = {
   ],
   watchOptions: {
     ignored: ['**/node_modules/**', '**/data/**', '**/playground/**'],
+    ...(watchPoll ? { poll: watchPoll } : {}),
   },
 };

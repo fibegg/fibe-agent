@@ -6,10 +6,9 @@ set -e
 # (built dist/ is present) or development (source code is mounted, no dist/).
 # ---------------------------------------------------------------------------
 
-# Disable NX daemon — it crashes in container environments
-export NX_DAEMON=false
-# Use JS file-watcher instead of native binaries (macOS binaries won't load on Linux)
-export NX_NATIVE_FILE_WATCHER=false
+# Default to container-safe Nx behavior, but let compose/environment override it.
+export NX_DAEMON="${NX_DAEMON:-false}"
+export NX_NATIVE_FILE_WATCHER="${NX_NATIVE_FILE_WATCHER:-false}"
 RUNTIME_FIBE_BIN_DIR="${DATA_DIR:-/app/data}/.fibe/bin"
 RUNTIME_FIBE_BIN="${RUNTIME_FIBE_BIN_DIR}/fibe"
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
@@ -127,8 +126,12 @@ else
   chown_dev_paths
   chown -R node:node /tmp/.nx-cache 2>/dev/null || true
 
-  dev_command="${FIBE_AGENT_DEV_COMMAND:-npx nx reset && npx nx run-many --targets=serve,dev --parallel=2}"
+  if [ "$#" -gt 0 ]; then
+    dev_command="$*"
+  else
+    dev_command="${FIBE_AGENT_DEV_COMMAND:-bun run dev:docker}"
+  fi
 
-  echo "[entrypoint] Starting API + Chat dev servers..."
+  echo "[entrypoint] Starting dev command: ${dev_command}"
   run_dev_command "$dev_command"
 fi

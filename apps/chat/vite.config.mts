@@ -13,6 +13,11 @@ const CHAT_ENV_KEYS = [
   'LOCK_CHAT_MODEL',
 ] as const;
 
+function envNumber(name: string, fallback: number) {
+  const value = Number(process.env[name]);
+  return Number.isFinite(value) && value > 0 ? value : fallback;
+}
+
 function chatEnvDefine() {
   const entries = CHAT_ENV_KEYS.map((key) => [
     `__${key}__`,
@@ -20,6 +25,10 @@ function chatEnvDefine() {
   ]);
   return Object.fromEntries(entries);
 }
+
+const devServerPort = envNumber('VITE_PORT', 3100);
+const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true';
+const pollingInterval = envNumber('CHOKIDAR_INTERVAL', 1000);
 
 export default defineConfig(() => ({
   base: '',
@@ -33,8 +42,9 @@ export default defineConfig(() => ({
     include: ['@huggingface/transformers'],
   },
   server: {
-    port: 3100,
+    port: devServerPort,
     host: process.env.VITE_HOST || true,
+    watch: usePolling ? { usePolling: true, interval: pollingInterval } : undefined,
     allowedHosts: ['.ngrok-free.dev', '.phoenix.test'],
     proxy: {
       '/api': 'http://localhost:3000',
@@ -103,4 +113,3 @@ export default defineConfig(() => ({
     },
   },
 }));
-
