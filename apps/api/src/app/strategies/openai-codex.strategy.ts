@@ -27,7 +27,7 @@ const MISSING_SESSION_ERROR_PATTERNS = [
 ];
 
 function getCodexHome(): string {
-  return process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
+  return process.env.CODEX_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
 }
 
 function getCodexCommand(): string {
@@ -352,8 +352,9 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     }
     if (this.useApiTokenMode) {
       const key = process.env[OPENAI_API_KEY_ENV]?.trim();
-      if (key) {
-        writeFileSync(join(codexHome, 'auth.json'), JSON.stringify({ api_key: key }), { mode: 0o600 });
+      const authPath = join(codexHome, 'auth.json');
+      if (key && !existsSync(authPath)) {
+        writeFileSync(authPath, JSON.stringify({ api_key: key }), { mode: 0o600 });
       }
     }
   }

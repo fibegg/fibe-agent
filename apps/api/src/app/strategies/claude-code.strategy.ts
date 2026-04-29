@@ -11,20 +11,39 @@ function getClaudeConfigDir(): string {
   return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude');
 }
 
+function getEffort(): string {
+  // TODO: should be configured in the same way as --model is right now
+  // Effort level for the current session (low, medium, high, xhigh, max)
+  return process.env.CLAUDE_EFFORT || 'max';
+}
+
+function isNativeHomeFallback(home: string | undefined): boolean {
+  return !home || home === '/home/node' || home === '/home/claude';
+}
+
 function getClaudeHomeDir(): string {
   const sessionDir = process.env.SESSION_DIR;
-  return sessionDir ? dirname(sessionDir) : (process.env.HOME ?? '/home/node');
+  const home = process.env.HOME?.trim();
+  if (sessionDir && isNativeHomeFallback(home)) return dirname(sessionDir);
+  return home || '/home/node';
 }
 
 function getClaudeXdgEnv(): Record<string, string> {
   if (!process.env.SESSION_DIR) return {};
   const homeDir = getClaudeHomeDir();
-  return {
-    XDG_CONFIG_HOME: join(homeDir, '.config'),
-    XDG_DATA_HOME: join(homeDir, '.local', 'share'),
-    XDG_STATE_HOME: join(homeDir, '.local', 'state'),
-    XDG_CACHE_HOME: join(homeDir, '.cache'),
-  };
+  const env: Record<string, string> = {};
+  if (!process.env.XDG_CONFIG_HOME?.trim()) env.XDG_CONFIG_HOME = join(homeDir, '.config');
+  if (!process.env.XDG_DATA_HOME?.trim()) env.XDG_DATA_HOME = join(homeDir, '.local', 'share');
+  if (!process.env.XDG_STATE_HOME?.trim()) env.XDG_STATE_HOME = join(homeDir, '.local', 'state');
+  if (!process.env.XDG_CACHE_HOME?.trim()) env.XDG_CACHE_HOME = join(homeDir, '.cache');
+  return env;
+}
+
+function claudeProcessDefaults(): Record<string, string> {
+  const env: Record<string, string> = {};
+  if (!process.env.BROWSER?.trim()) env.BROWSER = '/bin/true';
+  if (!process.env.DISPLAY?.trim()) env.DISPLAY = '';
+  return env;
 }
 
 function getTokenFilePath(): string {
@@ -341,6 +360,10 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         }
       }
 
+      // Option: const systemPromptFlag = '--system-prompt'
+      // Option: --bare
+      const systemPromptFlag = '--append-system-prompt'
+
       const useStreamJson = !!callbacks;
       const mcpConfigPath = join(workspaceDir, '.mcp.json');
       const args = [
@@ -350,10 +373,14 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
             ? ['--continue']
             : []),
         '-p',
+        '--no-chrome', // TODO: Check if makes sense, compare to Playwright
+        '--effort', getEffort(),
+        // ['--exclude-dynamic-system-prompt-sections', ['true']],
+        // ['--disallowedTools', ['AskUserQuestion EnterPlanMode EnterWorktree ExitPlanMode ExitWorktree NotebookEdit PowerShell TaskCreate TaskGet TaskList TaskOutput TaskUpdate']],
         prompt,
         '--dangerously-skip-permissions',
         ...(existsSync(mcpConfigPath) ? ['--mcp-config', mcpConfigPath] : []),
-        ...(systemPrompt ? ['--system-prompt', systemPrompt.trim()] : []),
+        ...(systemPrompt ? [systemPromptFlag, systemPrompt.trim()] : []),
         ...(useStreamJson
           ? [
               '--output-format',
@@ -369,10 +396,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
       const token = this.getToken();
       
-      const envOverrides: Record<string, string> = {
-        BROWSER: '/bin/true',
-        DISPLAY: '',
-      };
+      const envOverrides: Record<string, string> = claudeProcessDefaults();
       if (token) {
         envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
       }

@@ -155,7 +155,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           'local-dev': {
-            serverUrl: 'http://rails.test:3000/mcp',
+            serverUrl: 'http://fibe.test/mcp',
             authHeader: 'Bearer dev_key',
           },
         },
@@ -166,7 +166,7 @@ describe('writeMcpConfig', () => {
       );
       expect(config.mcpServers['local-dev']).toEqual({
         command: 'mcp-remote-wrapper',
-        args: ['http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer dev_key'],
+        args: ['http://fibe.test/mcp', '--allow-http', '--header', 'Authorization:Bearer dev_key'],
       });
     });
 
@@ -443,7 +443,7 @@ describe('writeMcpConfig', () => {
       process.env.MCP_CONFIG_JSON = JSON.stringify({
         mcpServers: {
           remote: {
-            serverUrl: 'http://rails.test:3000/mcp',
+            serverUrl: 'http://fibe.test/mcp',
             authHeader: 'Bearer cursor_key',
           },
         },
@@ -457,7 +457,7 @@ describe('writeMcpConfig', () => {
       );
       expect(config.mcpServers['remote']).toEqual({
         command: 'mcp-remote-wrapper',
-        args: ['http://rails.test:3000/mcp', '--allow-http', '--header', 'Authorization:Bearer cursor_key'],
+        args: ['http://fibe.test/mcp', '--allow-http', '--header', 'Authorization:Bearer cursor_key'],
       });
     });
 

@@ -27,6 +27,11 @@ const args = process.argv.slice(2);
 if (process.env.CURSOR_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.CURSOR_FAKE_ARGS_PATH, JSON.stringify(args));
 }
+if (process.env.CURSOR_FAKE_ENV_PATH) {
+  fs.writeFileSync(process.env.CURSOR_FAKE_ENV_PATH, JSON.stringify({
+    CURSOR_CONFIG_HOME: process.env.CURSOR_CONFIG_HOME,
+  }));
+}
 if (process.env.CURSOR_FAKE_MODE === 'error') {
   console.log(JSON.stringify({ type: 'system', subtype: 'init', session_id: process.env.CURSOR_FAKE_SESSION_ID || 'session-error', model: 'Composer 2' }));
   console.error('fake cursor failed');
@@ -225,12 +230,14 @@ describe('CursorStrategy', () => {
     delete process.env.CURSOR_API_KEY;
     delete process.env.CURSOR_AGENT_BIN;
     delete process.env.CURSOR_FAKE_ARGS_PATH;
+    delete process.env.CURSOR_FAKE_ENV_PATH;
     delete process.env.CURSOR_FAKE_MODE;
     delete process.env.CURSOR_FAKE_SESSION_ID;
     delete process.env.CURSOR_FAKE_EMIT_SESSION;
     delete process.env.CURSOR_FAKE_MESSAGE;
     delete process.env.CURSOR_FAKE_OUTPUT_MODE;
     delete process.env.CURSOR_FAKE_RESULT;
+    delete process.env.CURSOR_CONFIG_HOME;
   });
 
   afterEach(() => {
@@ -343,6 +350,28 @@ describe('CursorStrategy', () => {
     expect(chunks).toEqual(['fake response']);
     expect(readFileSync(join(convDir, 'cursor_workspace', '.cursor_session'), 'utf8')).toBe('session-new');
     expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('executePromptStreaming preserves Rails-provided CURSOR_CONFIG_HOME', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    const envPath = join(testHome, 'cursor-env.json');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+    process.env.CURSOR_FAKE_ENV_PATH = envPath;
+    process.env.CURSOR_CONFIG_HOME = join(testHome, 'fibe-cursor-home');
+    process.env.SESSION_DIR = join(testHome, 'legacy-cursor-session');
+    process.env.CURSOR_API_KEY = 'cursor-key';
+
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'fibe-cursor-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('hello', 'Composer 2', () => undefined);
+
+    expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
+      CURSOR_CONFIG_HOME: join(testHome, 'fibe-cursor-home'),
+    });
   });
 
   test('executePromptStreaming does not save captured session id after failed run', async () => {

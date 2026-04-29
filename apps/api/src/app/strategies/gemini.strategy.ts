@@ -6,7 +6,6 @@ import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 
-const GEMINI_CONFIG_DIR = process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.gemini');
 const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
@@ -26,9 +25,26 @@ const MISSING_SESSION_ERROR_PATTERNS = [
  * strategy and the credential injector.
  */
 function getGeminiHomeEnv(): { GEMINI_CLI_HOME?: string } {
+  if (process.env.GEMINI_CLI_HOME?.trim()) return {};
+
   const sessionDir = process.env.SESSION_DIR;
   if (!sessionDir) return {};
   return { GEMINI_CLI_HOME: dirname(sessionDir) };
+}
+
+function getGeminiProcessEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  return {
+    ...getGeminiHomeEnv(),
+    NO_BROWSER: 'true',
+    ...process.env,
+    ...extraEnv,
+  };
+}
+
+function getGeminiConfigDir(): string {
+  if (process.env.SESSION_DIR?.trim()) return process.env.SESSION_DIR;
+  if (process.env.GEMINI_CLI_HOME?.trim()) return join(process.env.GEMINI_CLI_HOME, '.gemini');
+  return join(process.env.HOME ?? '/home/node', '.gemini');
 }
 
 function getModelArgsList(model: string): string[] {
@@ -89,10 +105,11 @@ export class GeminiStrategy extends AbstractCLIStrategy {
   }
 
   ensureSettings(): void {
-    if (!existsSync(GEMINI_CONFIG_DIR)) {
-      mkdirSync(GEMINI_CONFIG_DIR, { recursive: true });
+    const geminiConfigDir = getGeminiConfigDir();
+    if (!existsSync(geminiConfigDir)) {
+      mkdirSync(geminiConfigDir, { recursive: true });
     }
-    const settingsPath = join(GEMINI_CONFIG_DIR, 'settings.json');
+    const settingsPath = join(geminiConfigDir, 'settings.json');
     let existing: Record<string, unknown> = {};
     try {
       if (existsSync(settingsPath)) {
@@ -126,7 +143,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     let isCode42Expected = false;
 
     const { process: proc, cancel } = runAuthProcess('gemini', ['-p', ''], {
-      env: { ...process.env, ...getGeminiHomeEnv(), NO_BROWSER: 'true' },
+      env: getGeminiProcessEnv(),
       onData: (output) => {
         if (
           output.includes('No input provided via stdin') ||
@@ -188,15 +205,16 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     this._apiToken = null;
     this._hasSession = false;
     const credentialFiles = ['oauth_creds.json', 'credentials.json', '.credentials.json'];
+    const geminiConfigDir = getGeminiConfigDir();
     for (const file of credentialFiles) {
-      const filePath = join(GEMINI_CONFIG_DIR, file);
+      const filePath = join(geminiConfigDir, file);
       if (existsSync(filePath)) {
         unlinkSync(filePath);
       }
     }
     const configSubDirs = ['Configure', 'auth'];
     for (const dir of configSubDirs) {
-      const dirPath = join(GEMINI_CONFIG_DIR, dir);
+      const dirPath = join(geminiConfigDir, dir);
       if (existsSync(dirPath)) {
         rmSync(dirPath, { recursive: true, force: true });
       }
@@ -210,7 +228,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       return;
     }
     const logoutProcess = spawn('gemini', ['auth', 'logout'], {
-      env: { ...process.env, ...getGeminiHomeEnv() },
+      env: getGeminiProcessEnv(),
       shell: false,
     });
 
@@ -250,7 +268,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     return new Promise((resolve) => {
       this.ensureSettings();
       const geminiProcess = spawn('gemini', ['-p', ''], {
-        env: { ...process.env, ...getGeminiHomeEnv(), NO_BROWSER: 'true' },
+        env: getGeminiProcessEnv(),
         shell: false,
       });
 
@@ -330,7 +348,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${prompt}` : prompt;
       const geminiArgs = buildGeminiArgs(effectivePrompt, model, this._hasSession);
 
-      const env: NodeJS.ProcessEnv = { ...process.env, ...this.getProxyEnv(), ...getGeminiHomeEnv(), NO_BROWSER: 'true' };
+      const env: NodeJS.ProcessEnv = getGeminiProcessEnv(this.getProxyEnv());
       if (this.useApiTokenMode) {
         const token = this.getApiToken();
         if (token) {

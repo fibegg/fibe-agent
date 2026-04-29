@@ -223,20 +223,41 @@ export class OpencodeStrategy implements AgentStrategy {
    * non-interactive, yolo-mode execution.
    */
   private static readonly YOLO_ENV: Record<string, string> = {
-    // OPENCODE_CONFIG_CONTENT is the highest-precedence config source.
-    // It takes full inline JSON and overrides project/global/remote configs.
-    // We use this instead of OPENCODE_PERMISSION because the latter expects
-    // a JSON-parseable value (bare `allow` causes a parse error).
-    OPENCODE_CONFIG_CONTENT: JSON.stringify({
-      permission: 'allow',
-      autoupdate: false,
-      share: 'disabled',
-    }),
     OPENCODE_DISABLE_AUTOUPDATE: '1',
     OPENCODE_DISABLE_MODELS_FETCH: '1',
     OPENCODE_DISABLE_LSP_DOWNLOAD: '1',
     OPENCODE_DISABLE_PRUNE: '1',
   };
+
+  private static readonly YOLO_CONFIG: Record<string, unknown> = {
+    permission: 'allow',
+    autoupdate: false,
+    share: 'disabled',
+  };
+
+  /**
+   * OPENCODE_CONFIG_CONTENT is the highest-precedence config source. It may
+   * already contain MCP servers injected at startup, so merge yolo defaults
+   * instead of replacing it.
+   */
+  private static applyYoloConfigContent(env: NodeJS.ProcessEnv): void {
+    let existing: Record<string, unknown> = {};
+    try {
+      if (env.OPENCODE_CONFIG_CONTENT) {
+        const parsed = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          existing = parsed as Record<string, unknown>;
+        }
+      }
+    } catch {
+      existing = {};
+    }
+
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      ...existing,
+      ...OpencodeStrategy.YOLO_CONFIG,
+    });
+  }
 
   listModels(): Promise<string[]> {
     return new Promise((resolve) => {
@@ -245,6 +266,7 @@ export class OpencodeStrategy implements AgentStrategy {
         ...getProxyEnv(),
         ...OpencodeStrategy.YOLO_ENV,
       };
+      OpencodeStrategy.applyYoloConfigContent(env);
       const storedKey = this.getStoredApiKey();
       if (storedKey) {
         for (const varName of API_KEY_ENV_VARS) {
@@ -343,6 +365,7 @@ export class OpencodeStrategy implements AgentStrategy {
         ...getProxyEnv(),
         ...OpencodeStrategy.YOLO_ENV,
       };
+      OpencodeStrategy.applyYoloConfigContent(env);
       const storedKey = this.getStoredApiKey();
 
       if (storedKey) {

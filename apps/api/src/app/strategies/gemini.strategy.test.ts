@@ -11,6 +11,12 @@ const args = process.argv.slice(2);
 if (process.env.GEMINI_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.GEMINI_FAKE_ARGS_PATH, JSON.stringify(args));
 }
+if (process.env.GEMINI_FAKE_ENV_PATH) {
+  fs.writeFileSync(process.env.GEMINI_FAKE_ENV_PATH, JSON.stringify({
+    GEMINI_CLI_HOME: process.env.GEMINI_CLI_HOME,
+    NO_BROWSER: process.env.NO_BROWSER,
+  }));
+}
 if (process.env.GEMINI_FAKE_MODE === 'missing-session') {
   console.error('No conversation found with session ID: stale-gemini-session');
   process.exit(1);
@@ -237,8 +243,12 @@ describe('GeminiStrategy session recovery', () => {
     savedEnv.PATH = process.env.PATH;
     savedEnv.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     savedEnv.GEMINI_FAKE_ARGS_PATH = process.env.GEMINI_FAKE_ARGS_PATH;
+    savedEnv.GEMINI_FAKE_ENV_PATH = process.env.GEMINI_FAKE_ENV_PATH;
     savedEnv.GEMINI_FAKE_MODE = process.env.GEMINI_FAKE_MODE;
     savedEnv.GEMINI_FAKE_MESSAGE = process.env.GEMINI_FAKE_MESSAGE;
+    savedEnv.GEMINI_CLI_HOME = process.env.GEMINI_CLI_HOME;
+    savedEnv.NO_BROWSER = process.env.NO_BROWSER;
+    savedEnv.SESSION_DIR = process.env.SESSION_DIR;
 
     testHome = mkdtempSync(join(tmpdir(), 'gemini-strategy-test-'));
     const fakeBinDir = join(testHome, 'fake-bin');
@@ -247,8 +257,12 @@ describe('GeminiStrategy session recovery', () => {
     process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
     process.env.GEMINI_API_KEY = 'test-key';
     delete process.env.GEMINI_FAKE_ARGS_PATH;
+    delete process.env.GEMINI_FAKE_ENV_PATH;
     delete process.env.GEMINI_FAKE_MODE;
     delete process.env.GEMINI_FAKE_MESSAGE;
+    delete process.env.GEMINI_CLI_HOME;
+    delete process.env.NO_BROWSER;
+    delete process.env.SESSION_DIR;
   });
 
   afterEach(() => {
@@ -258,10 +272,18 @@ describe('GeminiStrategy session recovery', () => {
     else process.env.GEMINI_API_KEY = savedEnv.GEMINI_API_KEY;
     if (savedEnv.GEMINI_FAKE_ARGS_PATH === undefined) delete process.env.GEMINI_FAKE_ARGS_PATH;
     else process.env.GEMINI_FAKE_ARGS_PATH = savedEnv.GEMINI_FAKE_ARGS_PATH;
+    if (savedEnv.GEMINI_FAKE_ENV_PATH === undefined) delete process.env.GEMINI_FAKE_ENV_PATH;
+    else process.env.GEMINI_FAKE_ENV_PATH = savedEnv.GEMINI_FAKE_ENV_PATH;
     if (savedEnv.GEMINI_FAKE_MODE === undefined) delete process.env.GEMINI_FAKE_MODE;
     else process.env.GEMINI_FAKE_MODE = savedEnv.GEMINI_FAKE_MODE;
     if (savedEnv.GEMINI_FAKE_MESSAGE === undefined) delete process.env.GEMINI_FAKE_MESSAGE;
     else process.env.GEMINI_FAKE_MESSAGE = savedEnv.GEMINI_FAKE_MESSAGE;
+    if (savedEnv.GEMINI_CLI_HOME === undefined) delete process.env.GEMINI_CLI_HOME;
+    else process.env.GEMINI_CLI_HOME = savedEnv.GEMINI_CLI_HOME;
+    if (savedEnv.NO_BROWSER === undefined) delete process.env.NO_BROWSER;
+    else process.env.NO_BROWSER = savedEnv.NO_BROWSER;
+    if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
+    else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
     rmSync(testHome, { recursive: true, force: true });
   });
 
@@ -291,5 +313,41 @@ describe('GeminiStrategy session recovery', () => {
       '-p=continue',
     ]);
     expect(existsSync(join(workspaceDir, '.gemini_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming preserves Rails-provided Gemini env', async () => {
+    const envPath = join(testHome, 'gemini-env.json');
+    process.env.GEMINI_FAKE_ENV_PATH = envPath;
+    process.env.GEMINI_CLI_HOME = join(testHome, 'fibe-gemini-home');
+    process.env.NO_BROWSER = 'fibe-set';
+
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'fibe-env-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
+      GEMINI_CLI_HOME: join(testHome, 'fibe-gemini-home'),
+      NO_BROWSER: 'fibe-set',
+    });
+  });
+
+  test('executePromptStreaming keeps legacy Gemini env fallback from SESSION_DIR', async () => {
+    const envPath = join(testHome, 'gemini-fallback-env.json');
+    const sessionDir = join(testHome, 'agent-data', '.gemini');
+    process.env.GEMINI_FAKE_ENV_PATH = envPath;
+    process.env.SESSION_DIR = sessionDir;
+
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'fallback-env-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
+      GEMINI_CLI_HOME: join(testHome, 'agent-data'),
+      NO_BROWSER: 'true',
+    });
   });
 });

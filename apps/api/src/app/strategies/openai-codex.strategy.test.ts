@@ -64,6 +64,11 @@ const args = process.argv.slice(2);
 if (process.env.CODEX_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.CODEX_FAKE_ARGS_PATH, JSON.stringify(args));
 }
+if (process.env.CODEX_FAKE_ENV_PATH) {
+  fs.writeFileSync(process.env.CODEX_FAKE_ENV_PATH, JSON.stringify({
+    CODEX_HOME: process.env.CODEX_HOME,
+  }));
+}
 if (process.env.CODEX_FAKE_MODE === 'error') {
   console.error('fake codex failed');
   process.exit(7);
@@ -504,14 +509,17 @@ describe('OpenaiCodexStrategy', () => {
     savedEnv.HOME = process.env.HOME;
     savedEnv.SESSION_DIR = process.env.SESSION_DIR;
     savedEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
+    savedEnv.CODEX_HOME = process.env.CODEX_HOME;
     savedEnv.CODEX_BIN = process.env.CODEX_BIN;
     savedEnv.CODEX_FAKE_ARGS_PATH = process.env.CODEX_FAKE_ARGS_PATH;
+    savedEnv.CODEX_FAKE_ENV_PATH = process.env.CODEX_FAKE_ENV_PATH;
     savedEnv.CODEX_FAKE_MODE = process.env.CODEX_FAKE_MODE;
     savedEnv.CODEX_FAKE_THREAD_ID = process.env.CODEX_FAKE_THREAD_ID;
     savedEnv.CODEX_FAKE_EMIT_THREAD = process.env.CODEX_FAKE_EMIT_THREAD;
     savedEnv.CODEX_FAKE_MESSAGE = process.env.CODEX_FAKE_MESSAGE;
     process.env.HOME = TEST_HOME;
     process.env.SESSION_DIR = join(TEST_HOME, '.codex');
+    delete process.env.CODEX_HOME;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
     }
@@ -524,10 +532,14 @@ describe('OpenaiCodexStrategy', () => {
     else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
     if (savedEnv.OPENAI_API_KEY === undefined) delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = savedEnv.OPENAI_API_KEY;
+    if (savedEnv.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
+    else process.env.CODEX_HOME = savedEnv.CODEX_HOME;
     if (savedEnv.CODEX_BIN === undefined) delete process.env.CODEX_BIN;
     else process.env.CODEX_BIN = savedEnv.CODEX_BIN;
     if (savedEnv.CODEX_FAKE_ARGS_PATH === undefined) delete process.env.CODEX_FAKE_ARGS_PATH;
     else process.env.CODEX_FAKE_ARGS_PATH = savedEnv.CODEX_FAKE_ARGS_PATH;
+    if (savedEnv.CODEX_FAKE_ENV_PATH === undefined) delete process.env.CODEX_FAKE_ENV_PATH;
+    else process.env.CODEX_FAKE_ENV_PATH = savedEnv.CODEX_FAKE_ENV_PATH;
     if (savedEnv.CODEX_FAKE_MODE === undefined) delete process.env.CODEX_FAKE_MODE;
     else process.env.CODEX_FAKE_MODE = savedEnv.CODEX_FAKE_MODE;
     if (savedEnv.CODEX_FAKE_THREAD_ID === undefined) delete process.env.CODEX_FAKE_THREAD_ID;
@@ -758,6 +770,27 @@ describe('OpenaiCodexStrategy', () => {
     expect(readFileSync(join(convDir, 'codex_workspace', '.codex_session'), 'utf8')).toBe('thread-new');
     expect(chunks).toEqual(['fake response']);
     expect(strategy.hasNativeSessionSupport()).toBe(true);
+  });
+
+  test('executePromptStreaming preserves Rails-provided CODEX_HOME', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex');
+    const envPath = join(TEST_HOME, 'codex-env.json');
+    writeFakeCodex(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_ENV_PATH = envPath;
+    process.env.CODEX_HOME = join(TEST_HOME, 'fibe-codex-home');
+    process.env.SESSION_DIR = join(TEST_HOME, 'legacy-session-codex');
+
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => join(TEST_HOME, 'fibe-codex-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('hello', 'gpt-5.4', () => undefined);
+
+    expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
+      CODEX_HOME: join(TEST_HOME, 'fibe-codex-home'),
+    });
   });
 
   test('executePromptStreaming resumes an existing Codex session and keeps marker when no new thread id is emitted', async () => {

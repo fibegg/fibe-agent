@@ -14,6 +14,9 @@ const args = process.argv.slice(2);
 if (process.env.OPENCODE_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.OPENCODE_FAKE_ARGS_PATH, JSON.stringify(args));
 }
+if (process.env.OPENCODE_FAKE_ENV_PATH) {
+  fs.writeFileSync(process.env.OPENCODE_FAKE_ENV_PATH, process.env.OPENCODE_CONFIG_CONTENT || '');
+}
 if (process.env.OPENCODE_FAKE_MODE === 'missing-session') {
   console.error('No conversation found with session ID: stale-opencode-session');
   process.exit(1);
@@ -40,8 +43,10 @@ describe('OpencodeStrategy', () => {
     'OPENROUTER_API_KEY',
     'OPENAI_API_BASE',
     'OPENCODE_FAKE_ARGS_PATH',
+    'OPENCODE_FAKE_ENV_PATH',
     'OPENCODE_FAKE_MODE',
     'OPENCODE_FAKE_MESSAGE',
+    'OPENCODE_CONFIG_CONTENT',
   ] as const;
 
   beforeEach(() => {
@@ -54,8 +59,10 @@ describe('OpencodeStrategy', () => {
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENAI_API_BASE;
     delete process.env.OPENCODE_FAKE_ARGS_PATH;
+    delete process.env.OPENCODE_FAKE_ENV_PATH;
     delete process.env.OPENCODE_FAKE_MODE;
     delete process.env.OPENCODE_FAKE_MESSAGE;
+    delete process.env.OPENCODE_CONFIG_CONTENT;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
     }
@@ -320,6 +327,35 @@ describe('OpencodeStrategy', () => {
       'continue',
     ]);
     expect(existsSync(join(workspaceDir, '.opencode_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming preserves MCP servers in OPENCODE_CONFIG_CONTENT', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      mcpServers: {
+        fibe: { command: 'fibe', args: ['mcp', 'serve'] },
+      },
+    });
+
+    const envPath = join(TEST_HOME, 'opencode-env.json');
+    process.env.OPENCODE_FAKE_ENV_PATH = envPath;
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'mcp-config-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined);
+
+    const config = JSON.parse(readFileSync(envPath, 'utf8'));
+    expect(config.permission).toBe('allow');
+    expect(config.autoupdate).toBe(false);
+    expect(config.share).toBe('disabled');
+    expect(config.mcpServers.fibe).toEqual({ command: 'fibe', args: ['mcp', 'serve'] });
   });
 });
 

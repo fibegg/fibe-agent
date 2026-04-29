@@ -21,6 +21,8 @@ if (process.env.CLAUDE_FAKE_ENV_PATH) {
     XDG_DATA_HOME: process.env.XDG_DATA_HOME,
     XDG_STATE_HOME: process.env.XDG_STATE_HOME,
     XDG_CACHE_HOME: process.env.XDG_CACHE_HOME,
+    BROWSER: process.env.BROWSER,
+    DISPLAY: process.env.DISPLAY,
   }));
 }
 if (process.env.CLAUDE_FAKE_MODE === 'missing-session') {
@@ -147,6 +149,8 @@ describe('ClaudeCodeStrategy API token mode', () => {
     savedEnv.XDG_DATA_HOME = process.env.XDG_DATA_HOME;
     savedEnv.XDG_STATE_HOME = process.env.XDG_STATE_HOME;
     savedEnv.XDG_CACHE_HOME = process.env.XDG_CACHE_HOME;
+    savedEnv.BROWSER = process.env.BROWSER;
+    savedEnv.DISPLAY = process.env.DISPLAY;
     savedEnv.CLAUDE_FAKE_MODE = process.env.CLAUDE_FAKE_MODE;
     savedEnv.CLAUDE_FAKE_ARGS_PATH = process.env.CLAUDE_FAKE_ARGS_PATH;
     savedEnv.CLAUDE_FAKE_ENV_PATH = process.env.CLAUDE_FAKE_ENV_PATH;
@@ -174,6 +178,10 @@ describe('ClaudeCodeStrategy API token mode', () => {
     else process.env.XDG_STATE_HOME = savedEnv.XDG_STATE_HOME;
     if (savedEnv.XDG_CACHE_HOME === undefined) delete process.env.XDG_CACHE_HOME;
     else process.env.XDG_CACHE_HOME = savedEnv.XDG_CACHE_HOME;
+    if (savedEnv.BROWSER === undefined) delete process.env.BROWSER;
+    else process.env.BROWSER = savedEnv.BROWSER;
+    if (savedEnv.DISPLAY === undefined) delete process.env.DISPLAY;
+    else process.env.DISPLAY = savedEnv.DISPLAY;
     if (savedEnv.CLAUDE_FAKE_MODE === undefined) delete process.env.CLAUDE_FAKE_MODE;
     else process.env.CLAUDE_FAKE_MODE = savedEnv.CLAUDE_FAKE_MODE;
     if (savedEnv.CLAUDE_FAKE_ARGS_PATH === undefined) delete process.env.CLAUDE_FAKE_ARGS_PATH;
@@ -377,20 +385,30 @@ describe('ClaudeCodeStrategy API token mode', () => {
       '--resume',
       'stale-session-id',
       '-p',
+      '--no-chrome',
+      '--effort',
+      'max',
       'continue',
       '--dangerously-skip-permissions',
     ]);
     expect(existsSync(join(workspaceDir, '.claude_session'))).toBe(false);
   });
 
-  test('executePromptStreaming points Claude HOME at the persisted SESSION_DIR parent', async () => {
+  test('executePromptStreaming preserves Rails-provided Claude HOME and XDG env', async () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
     process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    process.env.HOME = join(CLAUDE_TEST_HOME, 'non-persistent-home');
-    process.env.SESSION_DIR = join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.claude');
+    const fibeHome = join(CLAUDE_TEST_HOME, 'persisted-agent-data');
+    process.env.HOME = fibeHome;
+    process.env.SESSION_DIR = join(fibeHome, '.claude');
+    process.env.XDG_CONFIG_HOME = join(fibeHome, '.config');
+    process.env.XDG_DATA_HOME = join(fibeHome, '.local', 'share');
+    process.env.XDG_STATE_HOME = join(fibeHome, '.local', 'state');
+    process.env.XDG_CACHE_HOME = join(fibeHome, '.cache');
+    process.env.BROWSER = '/fibe/browser';
+    process.env.DISPLAY = ':99';
 
     const envPath = join(CLAUDE_TEST_HOME, 'claude-env.json');
     process.env.CLAUDE_FAKE_ENV_PATH = envPath;
@@ -403,12 +421,51 @@ describe('ClaudeCodeStrategy API token mode', () => {
 
     await expect(strategy.executePromptStreaming('hello', '', () => undefined)).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
-      HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data'),
-      SESSION_DIR: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.claude'),
-      XDG_CONFIG_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.config'),
-      XDG_DATA_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.local', 'share'),
-      XDG_STATE_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.local', 'state'),
-      XDG_CACHE_HOME: join(CLAUDE_TEST_HOME, 'persisted-agent-data', '.cache'),
+      HOME: fibeHome,
+      SESSION_DIR: join(fibeHome, '.claude'),
+      XDG_CONFIG_HOME: join(fibeHome, '.config'),
+      XDG_DATA_HOME: join(fibeHome, '.local', 'share'),
+      XDG_STATE_HOME: join(fibeHome, '.local', 'state'),
+      XDG_CACHE_HOME: join(fibeHome, '.cache'),
+      BROWSER: '/fibe/browser',
+      DISPLAY: ':99',
+    });
+  });
+
+  test('executePromptStreaming keeps legacy Claude HOME fallback from SESSION_DIR', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+    process.env.HOME = '/home/node';
+    const sessionDir = join(CLAUDE_TEST_HOME, 'legacy-agent-data', '.claude');
+    process.env.SESSION_DIR = sessionDir;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.XDG_DATA_HOME;
+    delete process.env.XDG_STATE_HOME;
+    delete process.env.XDG_CACHE_HOME;
+    delete process.env.BROWSER;
+    delete process.env.DISPLAY;
+
+    const envPath = join(CLAUDE_TEST_HOME, 'claude-fallback-env.json');
+    process.env.CLAUDE_FAKE_ENV_PATH = envPath;
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'legacy-claude-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', '', () => undefined)).resolves.toBeUndefined();
+    expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
+      HOME: join(CLAUDE_TEST_HOME, 'legacy-agent-data'),
+      SESSION_DIR: sessionDir,
+      XDG_CONFIG_HOME: join(CLAUDE_TEST_HOME, 'legacy-agent-data', '.config'),
+      XDG_DATA_HOME: join(CLAUDE_TEST_HOME, 'legacy-agent-data', '.local', 'share'),
+      XDG_STATE_HOME: join(CLAUDE_TEST_HOME, 'legacy-agent-data', '.local', 'state'),
+      XDG_CACHE_HOME: join(CLAUDE_TEST_HOME, 'legacy-agent-data', '.cache'),
+      BROWSER: '/bin/true',
+      DISPLAY: '',
     });
   });
 });

@@ -26,7 +26,7 @@ const MISSING_SESSION_ERROR_PATTERNS = [
 ];
 
 function getCursorHome(): string {
-  return process.env.SESSION_DIR ?? DEFAULT_CURSOR_HOME;
+  return process.env.CURSOR_CONFIG_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CURSOR_HOME;
 }
 
 function getCursorCommand(): string {
@@ -262,9 +262,9 @@ export class CursorStrategy extends AbstractCLIStrategy {
 
   private buildCursorEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {
+      CURSOR_CONFIG_HOME: this.getCursorHomeForSession(),
       ...process.env,
       ...this.getProxyEnv(),
-      CURSOR_CONFIG_HOME: this.getCursorHomeForSession(),
     };
     const storedKey = this.getStoredApiKey();
     if (!env[CURSOR_API_KEY_ENV]?.trim() && storedKey) {

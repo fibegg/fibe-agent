@@ -19,6 +19,7 @@ import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.s
 import { attachWebSocketServer } from './attach-websocket-server';
 import { ContainerLoggerService, logRequest } from './container-logger';
 import { loadInjectedCredentials } from './credential-injector';
+import { writeRuntimeFiles } from './runtime-files-writer';
 import { runPostInitOnce } from './post-init-runner';
 import { TerminalService } from './app/terminal/terminal.service';
 
@@ -37,6 +38,11 @@ try { mkdirSync(playgroundsDir, { recursive: true }); } catch { /* ignore if it 
 
 async function bootstrap() {
   const logger = new ContainerLoggerService('Bootstrap');
+  const runtimeFilesWritten = writeRuntimeFiles();
+  if (runtimeFilesWritten > 0) {
+    logger.log(`Runtime config files written: ${runtimeFilesWritten}.`);
+  }
+
   const injected = loadInjectedCredentials();
   if (injected) {
     logger.log('Stored agent credentials loaded — skipping manual auth.');
