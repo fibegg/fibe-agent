@@ -27,6 +27,11 @@ export class PlaygroundsController {
     return { urls };
   }
 
+  @Get('playgrounds/diff')
+  async getDiff() {
+    return this.playgrounds.getDiff();
+  }
+
   @Get('playgrounds/file')
   async getFileContent(@Query('path') path: string) {
     if (!path || typeof path !== 'string') {

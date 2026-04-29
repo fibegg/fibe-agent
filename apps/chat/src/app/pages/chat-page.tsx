@@ -1,4 +1,4 @@
-import { ChevronDown, Loader2, TerminalSquare } from 'lucide-react';
+import { ChevronDown, GitCompareArrows, Loader2, TerminalSquare } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
@@ -50,6 +50,7 @@ import { ChatInputArea } from '../chat/chat-input-area';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
 import { useTerminalPanel } from '../terminal/use-terminal-panel';
+import { useDiffPanel } from '../diff/use-diff-panel';
 import { RightDrawer } from '../right-drawer';
 import {
   QuestionCard,
@@ -61,6 +62,7 @@ import {
 
 const LazyFileViewerPanel = lazy(() => import('../file-explorer/file-viewer-panel').then((m) => ({ default: m.FileViewerPanel })));
 const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel })));
+const LazyDiffPanel = lazy(() => import('../diff/diff-panel').then((m) => ({ default: m.DiffPanel })));
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
@@ -103,6 +105,7 @@ export function ChatPage() {
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
+  const { diffOpen, toggleDiff, closeDiff } = useDiffPanel();
   const pgSelector = usePlaygroundSelector();
 
   // ─── Local MCP tool state ─────────────────────────────────────────────────
@@ -700,6 +703,8 @@ export function ChatPage() {
           refreshingModels={refreshingModels}
           onToggleTerminal={toggleTerminal}
           terminalOpen={terminalOpen}
+          onToggleDiff={toggleDiff}
+          diffOpen={diffOpen}
           playgroundEntries={pgSelector.entries}
           playgroundLoading={pgSelector.loading}
           playgroundError={pgSelector.error}
@@ -869,6 +874,23 @@ export function ChatPage() {
             </div>
           }>
             <LazyTerminalPanel />
+          </Suspense>
+        </RightDrawer>
+        <RightDrawer
+          open={diffOpen}
+          onClose={closeDiff}
+          title="Playground Diff"
+          icon={<GitCompareArrows className="size-4" />}
+          width="min(90vw, 720px)"
+          className="font-mono"
+        >
+          <Suspense fallback={
+            <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
+              <Loader2 className="size-5 animate-spin text-emerald-400 mr-2" />
+              <span className="text-sm text-muted-foreground">Loading diff…</span>
+            </div>
+          }>
+            {diffOpen && <LazyDiffPanel />}
           </Suspense>
         </RightDrawer>
     <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />

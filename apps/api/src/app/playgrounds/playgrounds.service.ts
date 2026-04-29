@@ -22,6 +22,26 @@ export interface PlaygroundEntry {
   gitStatus?: 'modified' | 'untracked' | 'deleted' | 'added' | 'renamed';
 }
 
+export interface ChangedFile {
+  /** Short path relative to the playground root. */
+  path: string;
+  /** X column of `git status --short`: index status. */
+  index: string;
+  /** Y column of `git status --short`: worktree status. */
+  worktree: string;
+}
+
+export interface PlaygroundDiffResult {
+  /** List of changed / untracked files. */
+  files: ChangedFile[];
+  /** Raw unified-diff output of `git diff HEAD`. */
+  diff: string;
+  /** True when there is any diff content or status entries. */
+  hasDiff: boolean;
+  /** True when the directory is inside a git repository. */
+  isGitRepo: boolean;
+}
+
 const HIDDEN_PREFIX = '.';
 
 
@@ -52,6 +72,41 @@ export class PlaygroundsService {
     const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const ig = await loadGitignore(this.config.getPlaygroundsDir());
     return this.countStats(this.config.getPlaygroundsDir(), ig, settings);
+  }
+
+  async getDiff(): Promise<PlaygroundDiffResult> {
+    const dir = this.config.getPlaygroundsDir();
+    const empty: PlaygroundDiffResult = { files: [], diff: '', hasDiff: false, isGitRepo: false };
+    if (!dir) return empty;
+
+    // Verify directory is inside a git repository
+    try {
+      await execAsync('git rev-parse --git-dir', { cwd: dir });
+    } catch {
+      return empty;
+    }
+
+    // Run both git commands concurrently
+    const [statusResult, diffResult] = await Promise.all([
+      execAsync('git status --short -unormal', { cwd: dir }).catch(() => ({ stdout: '' })),
+      execAsync('git diff HEAD', { cwd: dir, maxBuffer: 5 * 1024 * 1024 }).catch(() => ({ stdout: '' })),
+    ]);
+
+    // Parse changed files from `git status --short`
+    const files: ChangedFile[] = [];
+    for (const line of statusResult.stdout.split('\n')) {
+      if (line.length < 3) continue;
+      const path = line.slice(3).trim();
+      if (path) files.push({ path, index: line[0], worktree: line[1] });
+    }
+
+    const diff = diffResult.stdout;
+    return {
+      files,
+      diff,
+      hasDiff: files.length > 0 || diff.length > 0,
+      isGitRepo: true,
+    };
   }
 
   async getUrls(): Promise<string[]> {

@@ -401,4 +401,103 @@ describe('PlaygroundsService', () => {
       console.error = originalConsoleError;
     }
   });
+  test('getDiff returns isGitRepo=false for a non-git directory', async () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+    expect(result.isGitRepo).toBe(false);
+    expect(result.hasDiff).toBe(false);
+    expect(result.files).toEqual([]);
+    expect(result.diff).toBe('');
+  });
+
+  test('getDiff returns isGitRepo=false when dir is empty string', async () => {
+    const config = { getPlaygroundsDir: () => '' };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+    expect(result.isGitRepo).toBe(false);
+  });
+
+  test('getDiff returns hasDiff=false on a clean git repository', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'readme.md'), '# hi');
+    execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+
+    expect(result.isGitRepo).toBe(true);
+    expect(result.hasDiff).toBe(false);
+    expect(result.files).toEqual([]);
+    expect(result.diff).toBe('');
+  });
+
+  test('getDiff detects modified file and returns diff output', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 1;');
+    execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
+
+    // Modify the file
+    writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 2;');
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+
+    expect(result.isGitRepo).toBe(true);
+    expect(result.hasDiff).toBe(true);
+    expect(result.files.length).toBe(1);
+    expect(result.files[0].path).toBe('app.ts');
+    expect(result.files[0].worktree).toBe('M');
+    expect(result.diff).toContain('app.ts');
+    expect(result.diff).toContain('-const x = 1;');
+    expect(result.diff).toContain('+const x = 2;');
+  });
+
+  test('getDiff detects untracked file with ? status', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'existing.ts'), 'export {};');
+    execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
+
+    // Add a new untracked file
+    writeFileSync(join(playgroundDir, 'new.ts'), 'export const a = 1;');
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+
+    expect(result.isGitRepo).toBe(true);
+    expect(result.hasDiff).toBe(true);
+    const newFile = result.files.find((f) => f.path === 'new.ts');
+    expect(newFile).toBeDefined();
+    expect(newFile?.worktree).toBe('?');
+  });
+
+  test('getDiff handles repository with no commits (status works, diff falls back to empty)', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'file.ts'), 'hello');
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+
+    // isGitRepo is true since rev-parse succeeded
+    expect(result.isGitRepo).toBe(true);
+    // untracked file appears in status
+    expect(result.files.some((f) => f.path === 'file.ts')).toBe(true);
+    // diff against HEAD fails gracefully (no commits) — diff is empty string
+    expect(result.diff).toBe('');
+  });
 });

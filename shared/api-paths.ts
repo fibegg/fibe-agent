@@ -8,6 +8,7 @@ export const API_PATHS = {
   PLAYGROUNDS_FILE: '/api/playgrounds/file',
   PLAYGROUNDS_STATS: '/api/playgrounds/stats',
   PLAYGROUNDS_URLS: '/api/playgrounds/urls',
+  PLAYGROUNDS_DIFF: '/api/playgrounds/diff',
   AGENT_FILES: '/api/agent-files',
   AGENT_FILES_FILE: '/api/agent-files/file',
   AGENT_FILES_STATS: '/api/agent-files/stats',

@@ -1,4 +1,4 @@
-import { Brain, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, GitCompareArrows, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
@@ -37,6 +37,8 @@ export interface ChatHeaderProps {
   refreshingModels?: boolean;
   onToggleTerminal?: () => void;
   terminalOpen?: boolean;
+  onToggleDiff?: () => void;
+  diffOpen?: boolean;
   tonyStarkMode?: boolean;
   onToggleTonyStarkMode?: () => void;
   // Playground selector
@@ -112,6 +114,34 @@ function PlaygroundSelectorSlot({
   );
 }
 
+/** Diff toggle button, shared between the desktop top-row and the mobile search-row. */
+function DiffButton({
+  open,
+  onToggle,
+  className,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  className: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`${className} rounded-md flex items-center justify-center transition-colors shrink-0 ${
+        open
+          ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
+          : 'text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-300'
+      }`}
+      title={open ? 'Close diff' : 'Show playground diff'}
+      aria-label={open ? 'Close diff' : 'Show playground diff'}
+      aria-pressed={open}
+    >
+      <GitCompareArrows className="size-4" />
+    </button>
+  );
+}
+
 /** Terminal toggle button, shared between the desktop top-row and the mobile search-row. */
 function TerminalButton({
   open,
@@ -168,6 +198,8 @@ export function ChatHeader({
   refreshingModels,
   onToggleTerminal,
   terminalOpen = false,
+  onToggleDiff,
+  diffOpen = false,
   tonyStarkMode = false,
   onToggleTonyStarkMode,
   ...rest
@@ -203,6 +235,8 @@ export function ChatHeader({
     refreshingModels,
     onToggleTerminal,
     terminalOpen,
+    onToggleDiff,
+    diffOpen,
     tonyStarkMode,
     onToggleTonyStarkMode,
     ...rest,
@@ -339,6 +373,10 @@ export function ChatHeader({
           />
           {/* Desktop-only: playground selector in top row */}
           <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
+          {/* Desktop-only: diff button in top row */}
+          {onToggleDiff && (
+            <DiffButton open={diffOpen} onToggle={onToggleDiff} className="hidden sm:flex size-9" />
+          )}
           {/* Desktop-only: terminal button in top row */}
           {onToggleTerminal && (
             <TerminalButton open={terminalOpen} onToggle={onToggleTerminal} className="hidden sm:flex size-9" />
@@ -381,6 +419,11 @@ export function ChatHeader({
             </button>
           )}
         </div>
+
+        {/* Mobile-only: diff button right of search, before terminal */}
+        {onToggleDiff && (
+          <DiffButton open={diffOpen} onToggle={onToggleDiff} className="sm:hidden size-8" />
+        )}
 
         {/* Mobile-only: terminal button right of search */}
         {onToggleTerminal && (
