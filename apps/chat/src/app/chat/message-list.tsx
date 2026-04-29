@@ -10,7 +10,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Brain, Check, Clock, Copy, RotateCw, Sparkles, User, Play, Square } from 'lucide-react';
+import { Brain, Check, Clock, Copy, RefreshCcw, RotateCw, Sparkles, User, Play, Square } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { useLocalTts } from './use-local-tts';
 import { API_PATH_UPLOADS_BY_FILENAME } from '@shared/api-paths';
@@ -257,6 +257,38 @@ export interface ChatMessage {
   model?: string;
 }
 
+/** Sentinel inserted into the message list when a conversation reset happens. */
+export interface ConversationResetSeparator {
+  kind: 'reset_separator';
+  resetAt: string;
+}
+
+export type ChatListItem = ChatMessage | ConversationResetSeparator;
+
+function isResetSeparator(item: ChatListItem): item is ConversationResetSeparator {
+  return (item as ConversationResetSeparator).kind === 'reset_separator';
+}
+
+function ResetSeparatorRow({ resetAt }: { resetAt: string }) {
+  const d = new Date(resetAt);
+  const label = d.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+  return (
+    <div className="flex items-center gap-3 py-2 select-none" role="separator" aria-label={`Conversation reset on ${label}`}>
+      <div className="flex-1 h-px bg-border/40" />
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/60 whitespace-nowrap">
+        <RefreshCcw className="size-3 shrink-0" aria-hidden />
+        Agent doesn&rsquo;t remember anything before {label}
+      </span>
+      <div className="flex-1 h-px bg-border/40" />
+    </div>
+  );
+}
+
 function formatTime(iso: string): string {
   const d = new Date(iso);
   let h = d.getHours();
@@ -459,7 +491,7 @@ export interface MessageListHandle {
 }
 
 export interface MessageListProps {
-  messages: ChatMessage[];
+  messages: ChatListItem[];
   streamingText: string;
   isStreaming: boolean;
   lastUserMessage?: string | null;
@@ -518,10 +550,11 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     count: messages.length,
     getScrollElement: () => scrollRef?.current ?? null,
     estimateSize: (index) => {
-      const msg = messages[index];
+      const item = messages[index];
+      if (isResetSeparator(item)) return 48;
       const bubbleWidth = containerWidthPx * BUBBLE_WIDTH_FRACTION;
-      return estimateMessageHeight(msg.body, bubbleWidth, {
-        hasCode: msg.body.includes('```'),
+      return estimateMessageHeight(item.body, bubbleWidth, {
+        hasCode: item.body.includes('```'),
       });
     },
     gap: ROW_GAP,
@@ -572,8 +605,22 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
       style={{ height: totalHeight, contain: 'layout' } as React.CSSProperties}
     >
       {virtualItems.map((virtualRow) => {
-        const msg = messages[virtualRow.index];
-        const rowKey = msg.id ?? `msg-${virtualRow.index}-${msg.created_at}-${msg.role}`;
+        const item = messages[virtualRow.index];
+        if (isResetSeparator(item)) {
+          const rowKey = `reset-${item.resetAt}-${virtualRow.index}`;
+          return (
+            <div
+              key={rowKey}
+              data-index={virtualRow.index}
+              ref={virtualizer.measureElement}
+              className="absolute left-0 w-full"
+              style={{ top: virtualRow.start, minHeight: virtualRow.size }}
+            >
+              <ResetSeparatorRow resetAt={item.resetAt} />
+            </div>
+          );
+        }
+        const rowKey = item.id ?? `msg-${virtualRow.index}-${item.created_at}-${item.role}`;
         return (
           <div
             key={rowKey}
@@ -586,9 +633,9 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
             }}
           >
             <MessageRow
-              msg={msg}
+              msg={item}
               maxWidthClass={maxWidthClass}
-              isNoOutput={isNoOutputMessage(msg, noOutputBody)}
+              isNoOutput={isNoOutputMessage(item, noOutputBody)}
               onRetry={onRetry}
               containerWidthPx={containerWidthPx}
               onPlay={handlePlay}
@@ -600,18 +647,23 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     </div>
   ) : (
     <div className="space-y-4 sm:space-y-6">
-      {messages.map((msg, i) => (
-        <MessageRow
-          key={msg.id ?? `msg-${i}-${msg.created_at}-${msg.role}`}
-          msg={msg}
-          maxWidthClass={maxWidthClass}
-          isNoOutput={isNoOutputMessage(msg, noOutputBody)}
-          onRetry={onRetry}
-          containerWidthPx={containerWidthPx}
-          onPlay={handlePlay}
-          playingId={playingId}
-        />
-      ))}
+      {messages.map((item, i) => {
+        if (isResetSeparator(item)) {
+          return <ResetSeparatorRow key={`reset-${item.resetAt}-${i}`} resetAt={item.resetAt} />;
+        }
+        return (
+          <MessageRow
+            key={item.id ?? `msg-${i}-${item.created_at}-${item.role}`}
+            msg={item}
+            maxWidthClass={maxWidthClass}
+            isNoOutput={isNoOutputMessage(item, noOutputBody)}
+            onRetry={onRetry}
+            containerWidthPx={containerWidthPx}
+            onPlay={handlePlay}
+            playingId={playingId}
+          />
+        );
+      })}
     </div>
   );
 

@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useChatDisplayState } from './use-chat-display-state';
 import { CHAT_STATES } from './chat-state';
-import type { ChatMessage } from './message-list';
+import type { ChatListItem } from './message-list';
 import type { ThinkingActivity } from './thinking-types';
 
 vi.mock('./use-mobile-brain-classes', () => ({
@@ -10,7 +10,7 @@ vi.mock('./use-mobile-brain-classes', () => ({
 }));
 
 const baseParams = {
-  messages: [] as ChatMessage[],
+  messages: [] as ChatListItem[],
   searchQuery: '',
   state: CHAT_STATES.AUTHENTICATED,
   activityLog: [] as ThinkingActivity[],
@@ -40,7 +40,8 @@ describe('useChatDisplayState', () => {
       useChatDisplayState({ ...baseParams, messages, searchQuery: 'hello' })
     );
     expect(result.current.filteredMessages).toHaveLength(1);
-    expect(result.current.filteredMessages[0].body).toBe('hello world');
+    const first = result.current.filteredMessages[0];
+    expect(!('kind' in first) && first.body).toBe('hello world');
   });
 
   it('returns lastUserMessage from lastSentMessage when set', () => {
@@ -104,5 +105,53 @@ describe('useChatDisplayState', () => {
     ];
     const { result } = renderHook(() => useChatDisplayState({ ...baseParams, messages }));
     expect(result.current.sessionTokenUsage).toEqual({ inputTokens: 15, outputTokens: 35 });
+  });
+
+  // ──────────────────────────────────────────────────────
+  // ConversationResetSeparator guard tests
+  // ──────────────────────────────────────────────────────
+
+  it('excludes separator from search-filtered results when query is active', () => {
+    const messages: ChatListItem[] = [
+      { role: 'user', body: 'hello world', created_at: '2020-01-01' },
+      { kind: 'reset_separator', resetAt: '2020-01-02T00:00:00.000Z' },
+    ];
+    const { result } = renderHook(() =>
+      useChatDisplayState({ ...baseParams, messages, searchQuery: 'hello' })
+    );
+    // Only the matching message — separator is stripped when a filter is active
+    expect(result.current.filteredMessages).toHaveLength(1);
+    expect('kind' in result.current.filteredMessages[0]).toBe(false);
+  });
+
+  it('passes separator through filteredMessages when searchQuery is empty', () => {
+    const messages: ChatListItem[] = [
+      { role: 'user', body: 'hi', created_at: '2020-01-01' },
+      { kind: 'reset_separator', resetAt: '2020-01-02T00:00:00.000Z' },
+    ];
+    const { result } = renderHook(() =>
+      useChatDisplayState({ ...baseParams, messages, searchQuery: '' })
+    );
+    expect(result.current.filteredMessages).toHaveLength(2);
+  });
+
+  it('skips separator when resolving lastUserMessage from history', () => {
+    const messages: ChatListItem[] = [
+      { role: 'user', body: 'last user', created_at: '2020-01-01' },
+      { kind: 'reset_separator', resetAt: '2020-01-02T00:00:00.000Z' },
+    ];
+    const { result } = renderHook(() =>
+      useChatDisplayState({ ...baseParams, messages, lastSentMessage: null })
+    );
+    expect(result.current.lastUserMessage).toBe('last user');
+  });
+
+  it('excludes separator from sessionTokenUsage calculation', () => {
+    const messages: ChatListItem[] = [
+      { role: 'assistant', body: 'x', created_at: '', usage: { inputTokens: 5, outputTokens: 10 } },
+      { kind: 'reset_separator', resetAt: '2020-01-02T00:00:00.000Z' },
+    ];
+    const { result } = renderHook(() => useChatDisplayState({ ...baseParams, messages }));
+    expect(result.current.sessionTokenUsage).toEqual({ inputTokens: 5, outputTokens: 10 });
   });
 });

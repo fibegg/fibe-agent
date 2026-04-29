@@ -1,7 +1,7 @@
 import { createRef } from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act, fireEvent, waitFor } from '@testing-library/react';
-import { MessageList, type ChatMessage, type MessageListHandle } from './message-list';
+import { MessageList, type ChatMessage, type MessageListHandle, type ConversationResetSeparator } from './message-list';
 
 vi.mock('../api-url', () => ({
   buildApiUrl: (path: string) => path,
@@ -598,6 +598,44 @@ describe('MessageList', () => {
       await waitFor(() => {
         expect(writeText).toHaveBeenCalledWith(streamingText);
       });
+    });
+  });
+
+  // ───────────────────────────────────────
+  // ConversationResetSeparator
+  // ───────────────────────────────────────
+  describe('ConversationResetSeparator', () => {
+    function sep(ts: string): ConversationResetSeparator {
+      return { kind: 'reset_separator', resetAt: ts };
+    }
+
+    it('renders the reset separator with timestamp text', () => {
+      const separator = sep('2025-03-11T17:00:00.000Z');
+      render(<MessageList messages={[separator]} streamingText="" isStreaming={false} />);
+      expect(screen.getByRole('separator')).toBeTruthy();
+      expect(screen.getByRole('separator').getAttribute('aria-label')).toMatch(/Conversation reset on/i);
+    });
+
+    it('renders separator between normal messages', () => {
+      const separator = sep('2025-03-11T12:00:00.000Z');
+      const messages = [
+        { role: 'user', body: 'Before', created_at: '2025-03-11T11:00:00.000Z' } as ChatMessage,
+        separator,
+        { role: 'assistant', body: 'After', created_at: '2025-03-11T13:00:00.000Z' } as ChatMessage,
+      ];
+      render(<MessageList messages={messages} streamingText="" isStreaming={false} />);
+      expect(screen.getByText('Before')).toBeTruthy();
+      expect(screen.getByText('After')).toBeTruthy();
+      expect(screen.getByRole('separator')).toBeTruthy();
+    });
+
+    it('renders separator-only list without throwing', () => {
+      const messages = [
+        sep('2025-01-01T00:00:00.000Z'),
+      ];
+      expect(() =>
+        render(<MessageList messages={messages} streamingText="" isStreaming={false} />)
+      ).not.toThrow();
     });
   });
 });

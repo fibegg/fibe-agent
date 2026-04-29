@@ -98,6 +98,8 @@ export interface ServerMessage {
   mimeType?: string;
   caption?: string;
   level?: string;
+  /** Included in the conversation_reset event payload. */
+  resetAt?: string;
 }
 
 

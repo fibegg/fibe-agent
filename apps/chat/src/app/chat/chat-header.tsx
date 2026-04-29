@@ -1,4 +1,5 @@
-import { Brain, GitCompareArrows, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, GitCompareArrows, Loader2, Menu, RefreshCcw, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
@@ -56,6 +57,7 @@ export interface ChatHeaderProps {
   onPlaygroundLink?: (path: string) => Promise<boolean>;
   onPlaygroundLinked?: () => void;
   onPlaygroundSmartMount?: () => void;
+  onResetConversation?: () => void;
 }
 
 const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -142,6 +144,49 @@ function DiffButton({
   );
 }
 
+/** Two-tap RESET button — first click arms it (3 s window), second click fires. */
+function ResetConversationButton({ onReset }: { onReset: () => void }) {
+  const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const disarm = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setArmed(false);
+  }, []);
+
+  const handleClick = useCallback(() => {
+    if (!armed) {
+      setArmed(true);
+      timerRef.current = setTimeout(disarm, 3000);
+    } else {
+      disarm();
+      onReset();
+    }
+  }, [armed, disarm, onReset]);
+
+  return (
+    <button
+      id="reset-conversation-btn"
+      type="button"
+      onClick={handleClick}
+      className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all shrink-0 border ${
+        armed
+          ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 hover:bg-rose-500/30 animate-pulse'
+          : 'bg-transparent border-border/40 text-muted-foreground hover:border-rose-500/40 hover:text-rose-400 hover:bg-rose-500/10'
+      }`}
+      title={armed ? 'Click again to confirm reset' : 'Reset conversation (clears agent memory)'}
+      aria-label={armed ? 'Confirm reset' : 'Reset conversation'}
+      aria-pressed={armed}
+    >
+      <RefreshCcw className="size-3" aria-hidden />
+      {armed ? 'Confirm?' : 'Reset'}
+    </button>
+  );
+}
+
 /** Terminal toggle button, shared between the desktop top-row and the mobile search-row. */
 function TerminalButton({
   open,
@@ -202,6 +247,7 @@ export function ChatHeader({
   diffOpen = false,
   tonyStarkMode = false,
   onToggleTonyStarkMode,
+  onResetConversation,
   ...rest
 }: ChatHeaderProps) {
   // Derive a display name: agentName > currentModel > fallback
@@ -371,6 +417,10 @@ export function ChatHeader({
             onRefresh={onRefreshModels}
             refreshing={refreshingModels}
           />
+          {/* RESET button — only shown when the agent is idle */}
+          {onResetConversation && state !== CHAT_STATES.AWAITING_RESPONSE && (
+            <ResetConversationButton onReset={onResetConversation} />
+          )}
           {/* Desktop-only: playground selector in top row */}
           <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
           {/* Desktop-only: diff button in top row */}

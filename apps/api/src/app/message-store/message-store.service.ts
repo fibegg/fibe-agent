@@ -1,6 +1,6 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
@@ -23,12 +23,14 @@ export interface StoredMessage {
 @Injectable()
 export class MessageStoreService implements OnModuleDestroy {
   private readonly messagesPath: string;
+  private readonly previousMessagesPath: string;
   private readonly jsonWriter: SequentialJsonWriter;
   private messages: StoredMessage[] = [];
 
   constructor(private readonly config: ConfigService) {
     const dataDir = this.config.getConversationDataDir();
     this.messagesPath = join(dataDir, 'messages.json');
+    this.previousMessagesPath = join(dataDir, 'messages.previous.json');
     this.jsonWriter = new SequentialJsonWriter(
       this.messagesPath, 
       () => this.messages,
@@ -66,6 +68,22 @@ export class MessageStoreService implements OnModuleDestroy {
   }
 
   clear(): void {
+    this.messages = [];
+    this.jsonWriter.schedule();
+  }
+
+  /**
+   * Archive the current messages to messages.previous.json, then clear the active store.
+   * A single rolling archive is kept (previous is overwritten on each reset).
+   */
+  reset(): void {
+    if (this.messages.length > 0) {
+      try {
+        writeFileSync(this.previousMessagesPath, JSON.stringify(this.messages, null, 2), 'utf8');
+      } catch (err) {
+        console.error('Failed to archive messages to previous:', err);
+      }
+    }
     this.messages = [];
     this.jsonWriter.schedule();
   }

@@ -2,7 +2,8 @@ import { ChevronDown, GitCompareArrows, Loader2, TerminalSquare } from 'lucide-r
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
-import { MessageList, type MessageListHandle } from '../chat/message-list';
+import { MessageList, type MessageListHandle, type ConversationResetSeparator, type ChatMessage } from '../chat/message-list';
+import { WS_ACTION } from '@shared/ws-constants';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
@@ -155,6 +156,12 @@ export function ChatPage() {
     }
   }, []);
 
+  const handleConversationReset = useCallback((resetAt: string) => {
+    const separator: ConversationResetSeparator = { kind: 'reset_separator', resetAt };
+    setMessages(() => [separator]);
+    setTimeout(() => messageListRef.current?.scrollToBottom('auto'), 50);
+  }, [setMessages]);
+
   const handleAnswerQuestion = useCallback((questionId: string, answer: string) => {
     sendRef.current({ action: 'answer_user_question', questionId, answer });
     setLocalToolItems((prev) => prev.filter((i) => !('questionId' in i) || i.questionId !== questionId));
@@ -249,8 +256,9 @@ export function ChatPage() {
       };
       setMessages((prev) => {
         const last = prev[prev.length - 1];
-        if (last?.role === 'user' && last?.optimistic && last.body === body) {
-          return [...prev.slice(0, -1), { ...serverMsg, ...(last.queued ? { queued: true } : {}) }];
+        const lastMsg = last && !('kind' in last) ? last as ChatMessage : null;
+        if (lastMsg?.role === 'user' && lastMsg?.optimistic && lastMsg.body === body) {
+          return [...prev.slice(0, -1), { ...serverMsg, ...(lastMsg.queued ? { queued: true } : {}) }];
         }
         return [...prev, serverMsg];
       });
@@ -331,7 +339,8 @@ export function ChatPage() {
     handleStreamEnd,
     thinkingCallbacks,
     refetchPlaygrounds,
-    handleLocalToolEvent
+    handleLocalToolEvent,
+    handleConversationReset
   );
 
   useEffect(() => {
@@ -516,8 +525,8 @@ export function ChatPage() {
     prevQueuedCountRef.current = queuedCount;
     if (wasPositive && queuedCount === 0) {
       setMessages((prev) => {
-        if (!prev.some((m) => m.queued)) return prev;
-        return prev.map((m) => (m.queued ? { ...m, queued: false } : m));
+        if (!prev.some((m) => !('kind' in m) && m.queued)) return prev;
+        return prev.map((m) => (!('kind' in m) && m.queued ? { ...m, queued: false } : m));
       });
     }
   }, [queuedCount, setMessages]);
@@ -721,6 +730,7 @@ export function ChatPage() {
           onPlaygroundSmartMount={pgSelector.smartMount}
           tonyStarkMode={tonyStarkMode}
           onToggleTonyStarkMode={handleToggleTonyStarkMode}
+          onResetConversation={() => send({ action: WS_ACTION.RESET_CONVERSATION })}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
@@ -875,6 +885,7 @@ export function ChatPage() {
           }>
             <LazyTerminalPanel />
           </Suspense>
+<<<<<<< HEAD
         </RightDrawer>
         <RightDrawer
           open={diffOpen}
@@ -893,6 +904,9 @@ export function ChatPage() {
             {diffOpen && <LazyDiffPanel />}
           </Suspense>
         </RightDrawer>
+=======
+        )}
+>>>>>>> 6863215 (feat: conversation reset with archive, separator UI, and unit tests)
     <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
     </ChatLayout>
   );

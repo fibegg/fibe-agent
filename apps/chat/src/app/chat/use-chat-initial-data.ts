@@ -2,11 +2,11 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
-import type { ChatMessage } from './message-list';
+import type { ChatListItem } from './message-list';
 
 export function useChatInitialData(authenticated: boolean) {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatListItem[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [refreshingModels, setRefreshingModels] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
@@ -18,7 +18,7 @@ export function useChatInitialData(authenticated: boolean) {
         navigate('/login', { replace: true });
         return;
       }
-      const data = (await res.json()) as ChatMessage[];
+      const data = (await res.json()) as ChatListItem[];
       setMessages(Array.isArray(data) ? data : []);
       setMessagesLoaded(true);
     } catch {

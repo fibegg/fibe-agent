@@ -224,6 +224,7 @@ export class OrchestratorService implements OnModuleInit {
           (msg as { questionId?: string; confirmed?: boolean }).questionId ?? '',
           !!(msg as { confirmed?: boolean }).confirmed,
         ),
+      [WS_ACTION.RESET_CONVERSATION]: () => this.handleResetConversation(),
     };
 
     const handler = handlers[msg.action];
@@ -634,6 +635,23 @@ export class OrchestratorService implements OnModuleInit {
     if (!resolved) {
       this.logger.warn(`SET_AGENT_MODE: invalid mode "${mode}" — ignoring`);
     }
+  }
+
+  /**
+   * Reset the conversation: archive messages, clear stores, notify all connected clients.
+   * Refused while the agent is actively processing a request.
+   */
+  private async handleResetConversation(): Promise<void> {
+    if (this.isProcessing) {
+      this._send(WS_EVENT.ERROR, { message: 'Cannot reset while the agent is processing a request.' });
+      return;
+    }
+    const resetAt = new Date().toISOString();
+    this.messageStore.reset();
+    this.activityStore.clear();
+    await this.flushStores();
+    this.logger.log(`Conversation reset at ${resetAt}`);
+    this._send(WS_EVENT.CONVERSATION_RESET, { resetAt });
   }
 
   /**

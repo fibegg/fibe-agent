@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useChatInitialData } from './use-chat-initial-data';
+import type { ChatListItem } from './message-list';
 
 const mockApiRequest = vi.fn();
 vi.mock('../api-url', () => ({
@@ -52,10 +53,11 @@ describe('useChatInitialData', () => {
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalled();
     });
-    result.current.setMessages([{ role: 'user', body: 'hi', created_at: '2020-01-01' }]);
+    result.current.setMessages([{ role: 'user', body: 'hi', created_at: '2020-01-01' }] as ChatListItem[]);
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
-      expect(result.current.messages[0].body).toBe('hi');
+      const first = result.current.messages[0];
+      expect(!('kind' in first) && first.body).toBe('hi');
     });
   });
 

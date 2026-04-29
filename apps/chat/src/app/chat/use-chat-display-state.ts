@@ -4,10 +4,10 @@ import type { StoredActivityEntry } from './chat-state';
 import type { ThinkingActivity } from './thinking-types';
 import { buildFullStoryItems, computeSessionStats, toTimestampMs } from '../agent-thinking-utils';
 import { useMobileBrainClasses } from './use-mobile-brain-classes';
-import type { ChatMessage } from './message-list';
+import type { ChatMessage, ChatListItem } from './message-list';
 
 export interface UseChatDisplayStateParams {
-  messages: ChatMessage[];
+  messages: ChatListItem[];
   searchQuery: string;
   state: string;
   activityLog: ThinkingActivity[];
@@ -27,9 +27,10 @@ export function useChatDisplayState({
     () =>
       searchQuery.trim() === ''
         ? messages
-        : messages.filter((m) =>
-            m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase())
-          ),
+        : messages.filter((m) => {
+            if ('kind' in m) return false; // pass separator through only when no filter
+            return m.body?.toLowerCase().includes(searchQuery.trim().toLowerCase());
+          }),
     [messages, searchQuery]
   );
 
@@ -38,6 +39,7 @@ export function useChatDisplayState({
     let lastUserBody: string | null = null;
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
+      if ('kind' in m) continue; // skip separators
       if (!lastAssistant && m.role === 'assistant') lastAssistant = m;
       if (lastUserBody === null && m.role === 'user') lastUserBody = m.body ?? null;
       if (lastAssistant && lastUserBody !== null) break;
@@ -58,7 +60,7 @@ export function useChatDisplayState({
   const pastActivityFromMessages = useMemo(
     () =>
       messages
-        .filter((m) => m.role === 'assistant' && Array.isArray(m.story))
+        .filter((m): m is ChatMessage => !('kind' in m) && m.role === 'assistant' && Array.isArray(m.story))
         .map((m) => ({
           id: m.activityId ?? m.created_at,
           created_at: m.created_at,
@@ -99,6 +101,7 @@ export function useChatDisplayState({
     let inputTokens = 0;
     let outputTokens = 0;
     for (const m of messages) {
+      if ('kind' in m) continue; // skip separators
       if (m.role === 'assistant' && m.usage) {
         inputTokens += m.usage.inputTokens;
         outputTokens += m.usage.outputTokens;

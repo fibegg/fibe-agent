@@ -16,6 +16,8 @@ export const WS_ACTION = {
   ANSWER_USER_QUESTION: 'answer_user_question',
   /** Reply to a confirm_action_prompt from the agent (yes/no). */
   CONFIRM_ACTION_RESPONSE: 'confirm_action_response',
+  /** Reset the conversation — archives current messages and starts fresh. */
+  RESET_CONVERSATION: 'reset_conversation',
 } as const;
 
 export const WS_EVENT = {
@@ -53,6 +55,8 @@ export const WS_EVENT = {
   /** Agent sends a non-blocking notification/toast. */
   NOTIFY: 'notify',
   SET_TITLE: 'set_title',
+  /** Conversation was reset — all clients should clear their message list and show a separator. */
+  CONVERSATION_RESET: 'conversation_reset',
 } as const;
 
 export const AUTH_STATUS = {

@@ -59,7 +59,8 @@ export function useChatWebSocket(
   onStreamEnd?: (usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void,
-  onLocalToolEvent?: (data: ServerMessage) => void
+  onLocalToolEvent?: (data: ServerMessage) => void,
+  onConversationReset?: (resetAt: string) => void
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -80,6 +81,7 @@ export function useChatWebSocket(
   const thinkingRef = useRef(thinkingCallbacks);
   const onPlaygroundChangedRef = useRef(onPlaygroundChanged);
   const onLocalToolEventRef = useRef(onLocalToolEvent);
+  const onConversationResetRef = useRef(onConversationReset);
   thinkingRef.current = thinkingCallbacks;
   onMessageRef.current = onMessage;
   onStreamChunkRef.current = onStreamChunk;
@@ -87,6 +89,7 @@ export function useChatWebSocket(
   onStreamEndRef.current = onStreamEnd;
   onPlaygroundChangedRef.current = onPlaygroundChanged;
   onLocalToolEventRef.current = onLocalToolEvent;
+  onConversationResetRef.current = onConversationReset;
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -264,6 +267,7 @@ export function useChatWebSocket(
       confirm_action_prompt: (d) => onLocalToolEventRef.current?.(d),
       show_image: (d) => onLocalToolEventRef.current?.(d),
       notify: (d) => onLocalToolEventRef.current?.(d),
+      conversation_reset: (d) => onConversationResetRef.current?.(typeof d.resetAt === 'string' ? d.resetAt : new Date().toISOString()),
     };
 
     ws.onmessage = (event: MessageEvent) => {
