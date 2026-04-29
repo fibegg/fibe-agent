@@ -9,7 +9,7 @@ import multipart from '@fastify/multipart';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { loadDevEnv } from './load-env';
+import { loadDevEnv, loadFibeEnv } from './load-env';
 import { AppModule } from './app/app.module';
 import { ConfigService } from './app/config/config.service';
 import { getCorsOrigin, getFrameAncestors } from './cors-frame.config';
@@ -24,6 +24,9 @@ import { TerminalService } from './app/terminal/terminal.service';
 
 // Must be called before any service reads process.env
 loadDevEnv();
+// Apply unified settings from FIBE_SETTINGS_JSON and /app/fibe.yml
+// (after dotenv so .env values — which win — are already in process.env)
+loadFibeEnv();
 
 const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
 const DEFAULT_PORT = 3000;

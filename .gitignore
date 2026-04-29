@@ -59,3 +59,8 @@ playground
 
 # fibe binaries (downloaded from GitHub Releases at build time)
 bin/fibe-*
+
+# Local / Docker fibe.yml overrides (fibe.yml template in root is tracked)
+# Users should NOT commit their customised fibe.yml
+/app/fibe.yml
+# Allow the repo template to be tracked (do NOT add /fibe.yml here)
