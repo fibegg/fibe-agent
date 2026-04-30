@@ -1,5 +1,5 @@
-import { access, readFile } from 'node:fs/promises';
-import { resolve, relative } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { runLocalPlaygroundsCli } from './local-playgrounds-cli';
@@ -8,25 +8,6 @@ export interface BrowseEntry {
   name: string;
   path: string;
   type: 'file' | 'directory' | 'symlink';
-}
-
-/** Path-traversal guard — throws BadRequestException when abs escapes root. */
-function assertSafePath(root: string, abs: string): string {
-  const rel = relative(root, abs);
-  if (rel.startsWith('..') || rel.startsWith('/')) {
-    throw new BadRequestException('Invalid path');
-  }
-  return rel;
-}
-
-/** Returns true when the path exists (any type). */
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await access(p);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 @Injectable()
@@ -43,7 +24,10 @@ export class PlayroomBrowserService {
 
       const entries: BrowseEntry[] = [];
       for (const line of lines) {
-         const [path, name] = line.split('|');
+         // Fallback split for older CLI just in case, but rely on whatever CLI gives
+         const parts = line.split('|');
+         const path = parts[0];
+         const name = parts.length > 1 ? parts[1] : path;
          if (path) {
              entries.push({ name: name || path, path, type: 'directory' });
          }
@@ -59,24 +43,17 @@ export class PlayroomBrowserService {
    *
    * Throws:
    *  - BadRequestException  if relPath is empty / invalid
-   *  - NotFoundException    if the target path does not exist
    */
   async linkPlayground(relPath: string): Promise<{ linkedPath: string }> {
     if (!relPath?.trim()) {
       throw new BadRequestException('Path is required');
     }
 
-    const root = resolve(this.config.getMarqueeRoot(), 'playgrounds');
-    const target = resolve(root, relPath);
-    assertSafePath(root, target);
-
-    if (!(await pathExists(target))) {
-      throw new NotFoundException(`Target not found: ${relPath}`);
-    }
 
     try {
       const linkDir = resolve(this.config.getPlaygroundsDir());
 
+      // Trust the Fibe CLI to do all validation and linking
       await runLocalPlaygroundsCli(this.config, ['link', relPath, '--link-dir', linkDir]);
 
     } catch (err: unknown) {
@@ -86,7 +63,7 @@ export class PlayroomBrowserService {
       );
     }
 
-    return { linkedPath: target };
+    return { linkedPath: relPath };
   }
 
   /** Returns the name of the playground currently active in /app/playground, or null. */

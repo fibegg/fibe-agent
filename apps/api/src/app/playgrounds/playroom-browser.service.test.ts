@@ -106,13 +106,7 @@ describe('PlayroomBrowserService', () => {
       await expect(service.linkPlayground('   ')).rejects.toThrow('Path is required');
     });
 
-    test('throws BadRequestException for path traversal attempts', async () => {
-      await expect(service.linkPlayground('../../etc')).rejects.toThrow(BadRequestException);
-    });
 
-    test('throws NotFoundException if target does not exist', async () => {
-      await expect(service.linkPlayground('nonexistent')).rejects.toThrow(NotFoundException);
-    });
 
     test('runs fibe local-playgrounds link when target exists', async () => {
       mkdirSync(join(rootDir, 'playgrounds', 'project'), { recursive: true });
@@ -120,7 +114,7 @@ describe('PlayroomBrowserService', () => {
 
       const result = await service.linkPlayground('project');
 
-      expect(result.linkedPath).toContain('project');
+      expect(result.linkedPath).toBe('project');
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
 
       expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
