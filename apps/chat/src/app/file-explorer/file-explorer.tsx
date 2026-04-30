@@ -12,7 +12,6 @@ import {
   BUTTON_ICON_MUTED,
   CLEAR_BUTTON_POSITION,
   HEADER_FIRST_ROW,
-  HEADER_PADDING,
   INPUT_SEARCH,
   SEARCH_ICON_POSITION,
   SEARCH_ROW_WRAPPER,
@@ -345,8 +344,8 @@ export function FileExplorer({
   const expandedContent = (
     <div className="min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl border-r border-border/50">
       <div
-        className={`border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0 ${HEADER_PADDING}`}
-        style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
+        className={`border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0 px-4 pb-3`}
+        style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
       >
         <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
           <div className="flex items-center gap-2 min-w-0">

@@ -111,7 +111,10 @@ export function RightDrawer({
         }}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-violet-500/15 shrink-0 bg-background/95 backdrop-blur-sm">
+        <div 
+          className="flex items-center justify-between px-4 pb-3 border-b border-violet-500/15 shrink-0 bg-background/95 backdrop-blur-sm"
+          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
+        >
           <div className="flex items-center gap-2 min-w-0">
             {icon && (
               <span className="size-4 text-violet-400 shrink-0 flex items-center justify-center" aria-hidden>

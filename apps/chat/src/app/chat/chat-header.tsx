@@ -6,7 +6,7 @@ import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
 import { TypewriterText } from './typewriter-text';
 import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
-import { HEADER_FIRST_ROW, HEADER_PADDING, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
+import { HEADER_FIRST_ROW, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 
 export interface ChatHeaderProps {
@@ -263,8 +263,8 @@ export function ChatHeader({
 
   return (
     <header
-      className={`border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`}
-      style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}
+      className={`border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 px-4 pb-3`}
+      style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
     >
       {isMobile && (
         <style>{`
