@@ -10,6 +10,7 @@ export interface StoryEntry {
   type: string;
   message: string;
   timestamp: string;
+  details?: string;
 }
 
 export interface StoredMessage {
@@ -19,7 +20,12 @@ export interface StoredMessage {
   created_at: string;
   story?: StoryEntry[];
   model?: string;
+  activityId?: string;
+  imageUrls?: string[];
 }
+
+/** Alias for consumers that import the story-entry type from this module. */
+export type StoredStoryEntry = StoryEntry;
 
 @Injectable()
 export class MessageStoreService implements OnModuleDestroy {
@@ -53,14 +59,14 @@ export class MessageStoreService implements OnModuleDestroy {
     return this.messages;
   }
 
-  add(role: 'user' | 'assistant', body: string, story?: StoryEntry[], model?: string): StoredMessage {
+  add(role: 'user' | 'assistant', body: string, imageUrls?: string[], model?: string): StoredMessage {
     const msg: StoredMessage = {
       id: randomUUID(),
       role,
       body,
       created_at: new Date().toISOString(),
     };
-    if (story) msg.story = story;
+    if (imageUrls?.length) msg.imageUrls = imageUrls;
     if (model) msg.model = model;
 
     this.messages.push(msg);
@@ -96,11 +102,12 @@ export class MessageStoreService implements OnModuleDestroy {
     }
   }
 
-  finalizeLastAssistant(story: StoryEntry[]): void {
+  finalizeLastAssistant(story: StoryEntry[], activityId?: string | null): void {
     if (this.messages.length === 0) return;
     const last = this.messages[this.messages.length - 1];
     if (last.role === 'assistant') {
       last.story = story;
+      if (activityId) last.activityId = activityId;
       this.jsonWriter.schedule();
     }
   }
@@ -111,5 +118,6 @@ export class MessageStoreService implements OnModuleDestroy {
 
   async onModuleDestroy(): Promise<void> {
     await this.jsonWriter.flush();
+    this.jsonWriter.destroy();
   }
 }

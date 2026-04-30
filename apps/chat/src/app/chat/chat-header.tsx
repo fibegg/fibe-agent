@@ -1,5 +1,5 @@
-import { Brain, Command, GitCompareArrows, Loader2, Menu, RefreshCcw, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { Brain, Command, GitCompareArrows, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+
 import { Link } from 'react-router-dom';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
