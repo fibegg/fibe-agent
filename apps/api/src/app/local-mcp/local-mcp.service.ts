@@ -138,16 +138,16 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     tool: LocalToolName,
     args: Record<string, unknown>,
   ): Promise<unknown> {
-    const str = (key: string, fallback?: string) =>
-      args[key] !== undefined ? String(args[key]) : fallback;
+    const str = (key: string) =>
+      args[key] !== undefined ? String(args[key]) : undefined;
 
     switch (tool) {
       case LOCAL_TOOL.ASK_USER:
-        return this.askUser(str('question', '') as string, str('placeholder'));
+        return this.askUser(str('question') ?? '', str('placeholder'));
 
       case LOCAL_TOOL.CONFIRM_ACTION:
         return this.confirmAction(
-          str('message', '') as string,
+          str('message') ?? '',
           str('confirmLabel'),
           str('cancelLabel'),
         );
@@ -156,16 +156,16 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
         return this.showImage(str('url'), str('base64'), str('mimeType'), str('caption'));
 
       case LOCAL_TOOL.NOTIFY:
-        return this.emit(WS_EVENT.NOTIFY, { message: str('message', '') as string, level: str('level') ?? 'info' });
+        return this.emit(WS_EVENT.NOTIFY, { message: str('message') ?? '', level: str('level') ?? 'info' });
 
       case LOCAL_TOOL.SET_TITLE:
-        return this.emit(WS_EVENT.SET_TITLE, { title: str('title', '') as string });
+        return this.emit(WS_EVENT.SET_TITLE, { title: str('title') ?? '' });
 
       case LOCAL_TOOL.GET_MODE:
         return { mode: this.modeGetter ? this.modeGetter() : 'Exploring...' };
 
       case LOCAL_TOOL.SET_MODE: {
-        const raw = str('mode', '') as string;
+        const raw = str('mode') ?? '';
         if (!AGENT_MODE_KEYS.includes(raw as never)) {
           throw new Error(`Invalid mode "${raw}". Valid values: ${AGENT_MODE_KEYS.join(', ')}`);
         }

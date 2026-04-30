@@ -160,8 +160,8 @@ describe('LocalMcpService', () => {
     const ev = events.find((e) => e.type === WS_EVENT.ASK_USER_PROMPT);
     expect(ev?.data['question']).toBe('What is your name?');
     expect(ev?.data['placeholder']).toBe('e.g. Alice');
-    expect(ev).toBeDefined();
-    const questionId = ev?.data['questionId'] as string;
+    if (!ev) throw new Error('Missing event');
+    const questionId = ev.data['questionId'] as string;
     svc.resolveQuestion(questionId, { answer: 'Bob' });
     const res = await promise;
     expect(res.ok).toBe(true);
@@ -193,8 +193,8 @@ describe('LocalMcpService', () => {
     const ev = events.find((e) => e.type === WS_EVENT.CONFIRM_ACTION_PROMPT);
     expect(ev?.data['message']).toBe('Delete all data?');
     expect(ev?.data['confirmLabel']).toBe('Delete');
-    expect(ev).toBeDefined();
-    const questionId = ev?.data['questionId'] as string;
+    if (!ev) throw new Error('Missing event');
+    const questionId = ev.data['questionId'] as string;
     svc.resolveQuestion(questionId, { confirmed: false });
     const res = await promise;
     expect(res.ok).toBe(true);
@@ -219,8 +219,8 @@ describe('LocalMcpService', () => {
     const ev = events.find((e) => e.type === WS_EVENT.CONFIRM_ACTION_PROMPT);
     expect(ev?.data['confirmLabel']).toBe('Yes');
     expect(ev?.data['cancelLabel']).toBe('No');
-    expect(ev).toBeDefined();
-    const questionId = ev?.data['questionId'] as string;
+    if (!ev) throw new Error('Missing event');
+    const questionId = ev.data['questionId'] as string;
     svc.resolveQuestion(questionId, { confirmed: true });
     await promise;
   });

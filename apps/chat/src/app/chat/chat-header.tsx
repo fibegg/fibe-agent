@@ -1,4 +1,5 @@
-import { Brain, GitCompareArrows, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, Command, GitCompareArrows, Loader2, Menu, RefreshCcw, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
@@ -33,6 +34,8 @@ export interface ChatHeaderProps {
   terminalOpen?: boolean;
   onToggleDiff?: () => void;
   diffOpen?: boolean;
+  onToggleCli?: () => void;
+  cliOpen?: boolean;
   tonyStarkMode?: boolean;
   onToggleTonyStarkMode?: () => void;
   // Playground selector
@@ -105,6 +108,34 @@ function PlaygroundSelectorSlot({
         visible={true}
       />
     </div>
+  );
+}
+
+/** CLI Commands toggle button, shared between the desktop top-row and the mobile search-row. */
+function CliButton({
+  open,
+  onToggle,
+  className,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  className: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`${className} rounded-md flex items-center justify-center transition-colors shrink-0 ${
+        open
+          ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
+          : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-300'
+      }`}
+      title={open ? 'Close CLI commands' : 'Show CLI commands'}
+      aria-label={open ? 'Close CLI commands' : 'Show CLI commands'}
+      aria-pressed={open}
+    >
+      <Command className="size-4" />
+    </button>
   );
 }
 
@@ -189,6 +220,8 @@ export function ChatHeader({
   terminalOpen = false,
   onToggleDiff,
   diffOpen = false,
+  onToggleCli,
+  cliOpen = false,
   tonyStarkMode = false,
   onToggleTonyStarkMode,
   ...rest
@@ -221,6 +254,8 @@ export function ChatHeader({
     terminalOpen,
     onToggleDiff,
     diffOpen,
+    onToggleCli,
+    cliOpen,
     tonyStarkMode,
     onToggleTonyStarkMode,
     ...rest,
@@ -359,6 +394,10 @@ export function ChatHeader({
           {onToggleDiff && (
             <DiffButton open={diffOpen} onToggle={onToggleDiff} className="hidden sm:flex size-9" />
           )}
+          {/* Desktop-only: CLI button in top row */}
+          {onToggleCli && (
+            <CliButton open={cliOpen} onToggle={onToggleCli} className="hidden sm:flex size-9" />
+          )}
           {/* Desktop-only: terminal button in top row */}
           {onToggleTerminal && (
             <TerminalButton open={terminalOpen} onToggle={onToggleTerminal} className="hidden sm:flex size-9" />
@@ -405,6 +444,11 @@ export function ChatHeader({
         {/* Mobile-only: diff button right of search, before terminal */}
         {onToggleDiff && (
           <DiffButton open={diffOpen} onToggle={onToggleDiff} className="sm:hidden size-8" />
+        )}
+
+        {/* Mobile-only: CLI button right of search */}
+        {onToggleCli && (
+          <CliButton open={cliOpen} onToggle={onToggleCli} className="sm:hidden size-8" />
         )}
 
         {/* Mobile-only: terminal button right of search */}

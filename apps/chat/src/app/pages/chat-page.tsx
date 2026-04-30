@@ -62,6 +62,8 @@ import {
   NotifyToastContainer,
   type ToastItem,
 } from '../chat/components/local-tool-cards';
+import { CliDrawerContent } from '../chat/components/cli-drawer';
+import { Command } from 'lucide-react';
 
 const LazyFileViewerPanel = lazy(() => import('../file-explorer/file-viewer-panel').then((m) => ({ default: m.FileViewerPanel })));
 const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel })));
@@ -112,6 +114,9 @@ export function ChatPage() {
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const { diffOpen, toggleDiff, closeDiff } = useDiffPanel();
+  const [cliOpen, setCliOpen] = useState(false);
+  const toggleCli = useCallback(() => setCliOpen(v => !v), []);
+  const closeCli = useCallback(() => setCliOpen(false), []);
   const pgSelector = usePlaygroundSelector();
   const [standaloneMode, setStandaloneMode] = useState(() => isStandaloneMode());
   const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
@@ -782,6 +787,8 @@ export function ChatPage() {
           terminalOpen={terminalOpen}
           onToggleDiff={canShowDiff ? toggleDiff : undefined}
           diffOpen={diffOpen}
+          onToggleCli={toggleCli}
+          cliOpen={cliOpen}
           playgroundEntries={pgSelector.entries}
           playgroundLoading={pgSelector.loading}
           playgroundError={pgSelector.error}
@@ -970,6 +977,21 @@ export function ChatPage() {
           }>
             {diffOpen && <LazyDiffPanel />}
           </Suspense>
+        </RightDrawer>
+        <RightDrawer
+          open={cliOpen}
+          onClose={closeCli}
+          title="CLI Commands"
+          icon={<Command className="size-4" />}
+          width="min(90vw, 520px)"
+        >
+          <CliDrawerContent
+            onSelectCommand={(cmd) => {
+              setInputState({ value: cmd, cursor: cmd.length });
+              closeCli();
+              chatInputRef.current?.focus();
+            }}
+          />
         </RightDrawer>
     <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
     </ChatLayout>
