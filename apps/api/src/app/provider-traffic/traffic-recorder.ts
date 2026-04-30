@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import type { CapturedProviderRequest, ProviderName } from './types';
 import { sanitizeHeaders, resolveProvider, DEFAULT_MAX_BODY_SIZE } from './types';
 
@@ -28,11 +29,12 @@ export class TrafficRecorder {
 
   // --- response side ---
   private resHeadersDone = false;
-  private resHeaderBuf = '';
+  private resHeaderBuf = Buffer.alloc(0);
   private resStatusCode = 0;
   private resStatusMessage = '';
   private resHeaders: Record<string, string> = {};
   private resBody = '';
+  private resBodyBuffers: Buffer[] = [];
   private resBodyTruncated = false;
   private resBodyBytesRead = 0;
   private resChunked = false;
@@ -77,21 +79,20 @@ export class TrafficRecorder {
   /** Feed bytes received from the server (provider) toward the client (CLI). */
   feedResponse(data: Buffer): void {
     this.bytesReceived += data.length;
-    const str = data.toString('utf-8');
 
     if (!this.resHeadersDone) {
-      this.resHeaderBuf += str;
+      this.resHeaderBuf = Buffer.concat([this.resHeaderBuf, data]);
       const headerEnd = this.resHeaderBuf.indexOf('\r\n\r\n');
       if (headerEnd === -1) return;
 
-      const headerSection = this.resHeaderBuf.slice(0, headerEnd);
-      const bodyStart = this.resHeaderBuf.slice(headerEnd + 4);
+      const headerSection = this.resHeaderBuf.subarray(0, headerEnd).toString('utf-8');
+      const bodyStart = this.resHeaderBuf.subarray(headerEnd + 4);
       this.parseResponseHeaders(headerSection);
       this.resHeadersDone = true;
 
       if (bodyStart.length > 0) this.appendResBody(bodyStart);
     } else {
-      this.appendResBody(str);
+      this.appendResBody(data);
     }
   }
 
@@ -107,6 +108,7 @@ export class TrafficRecorder {
 
     const provider: ProviderName = resolveProvider(this.hostname);
     const scheme = this.port === 443 ? 'https' : 'http';
+    this.resBody = this.decodeResponseBody();
 
     const record: CapturedProviderRequest = {
       id: this.id,
@@ -174,18 +176,17 @@ export class TrafficRecorder {
     }
   }
 
-  private appendResBody(data: string): void {
+  private appendResBody(data: Buffer): void {
     if (this.resBodyTruncated) return;
-    if (this.resChunked) {
-      this.resBody += dechunk(data, this.resChunkState);
-    } else {
-      this.resBody += data;
-    }
-    this.resBodyBytesRead += Buffer.byteLength(data, 'utf-8');
+    const bodyChunk = this.resChunked ? dechunkBuffer(data, this.resChunkState) : data;
+    this.resBodyBytesRead += bodyChunk.length;
     if (this.resBodyBytesRead > this.maxBodySize) {
-      this.resBody = this.resBody.slice(0, this.maxBodySize);
+      const remaining = Math.max(this.maxBodySize - (this.resBodyBytesRead - bodyChunk.length), 0);
+      if (remaining > 0) this.resBodyBuffers.push(bodyChunk.subarray(0, remaining));
       this.resBodyTruncated = true;
+      return;
     }
+    if (bodyChunk.length > 0) this.resBodyBuffers.push(bodyChunk);
   }
 
   // ── Usage extraction ───────────────────────────────────────────
@@ -305,6 +306,22 @@ export class TrafficRecorder {
     }
     return undefined;
   }
+
+  private decodeResponseBody(): string {
+    const raw = Buffer.concat(this.resBodyBuffers);
+    if (raw.length === 0) return '';
+
+    const encoding = (this.resHeaders['content-encoding'] ?? '').toLowerCase();
+    try {
+      if (encoding.includes('gzip')) return gunzipSync(raw).toString('utf-8');
+      if (encoding.includes('br')) return brotliDecompressSync(raw).toString('utf-8');
+      if (encoding.includes('deflate')) return inflateSync(raw).toString('utf-8');
+    } catch {
+      return raw.toString('utf-8');
+    }
+
+    return raw.toString('utf-8');
+  }
 }
 
 // ── Helpers ────────────────────────────────────────────────────
@@ -370,4 +387,43 @@ function dechunk(data: string, state: ChunkParseState): string {
   }
 
   return output;
+}
+
+function dechunkBuffer(data: Buffer, state: ChunkParseState): Buffer {
+  const chunks: Buffer[] = [];
+  let pos = 0;
+
+  while (pos < data.length) {
+    if (state.phase === 'size') {
+      const nl = data.indexOf('\r\n', pos);
+      if (nl === -1) {
+        state.sizeBuf += data.subarray(pos).toString('ascii');
+        break;
+      }
+      state.sizeBuf += data.subarray(pos, nl).toString('ascii');
+      const size = parseInt(state.sizeBuf.trim(), 16);
+      state.sizeBuf = '';
+      pos = nl + 2;
+      if (size === 0) {
+        state.phase = 'trailer';
+        break;
+      }
+      state.remaining = size;
+      state.phase = 'data';
+    } else if (state.phase === 'data') {
+      const available = data.length - pos;
+      const take = Math.min(state.remaining, available);
+      chunks.push(data.subarray(pos, pos + take));
+      pos += take;
+      state.remaining -= take;
+      if (state.remaining === 0) {
+        if (data.subarray(pos, pos + 2).toString('ascii') === '\r\n') pos += 2;
+        state.phase = 'size';
+      }
+    } else {
+      break;
+    }
+  }
+
+  return Buffer.concat(chunks);
 }

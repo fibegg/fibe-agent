@@ -1,4 +1,5 @@
 import { describe, test, expect } from 'bun:test';
+import { gzipSync } from 'node:zlib';
 import { TrafficRecorder } from './traffic-recorder';
 import type { CapturedProviderRequest } from './types';
 
@@ -80,6 +81,31 @@ describe('TrafficRecorder', () => {
     expect(result).not.toBeNull();
     expect(result?.response.body).toBe('Hello World');
     expect(result?.isStreaming).toBe(true);
+  });
+
+  test('decompresses gzip response bodies before recording', () => {
+    const { recorder, getResult } = makeRecorder();
+    const responseBody = '{"result":"compressed"}';
+    const compressed = gzipSync(Buffer.from(responseBody));
+    const headers = Buffer.from(
+      'HTTP/1.1 200 OK\r\n' +
+      'Content-Type: application/json\r\n' +
+      'Content-Encoding: gzip\r\n' +
+      `Content-Length: ${compressed.length}\r\n` +
+      '\r\n'
+    );
+
+    recorder.feedRequest(Buffer.from(
+      'POST /v1/messages HTTP/1.1\r\n' +
+      'Host: api.anthropic.com\r\n' +
+      'Content-Length: 2\r\n' +
+      '\r\n' +
+      '{}'
+    ));
+    recorder.feedResponse(Buffer.concat([headers, compressed]));
+    recorder.end();
+
+    expect(getResult()?.response.body).toBe(responseBody);
   });
 
   test('handles streaming data arriving in multiple chunks', () => {
