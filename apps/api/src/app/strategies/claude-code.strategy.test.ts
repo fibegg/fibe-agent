@@ -420,6 +420,64 @@ describe('ClaudeCodeStrategy API token mode', () => {
     expect(args[args.indexOf('--effort') + 1]).toBe('low');
   });
 
+  test('executePromptStreaming streams JSON output without enabling streaming stdin', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+
+    const argsPath = join(CLAUDE_TEST_HOME, 'claude-stream-json-output-args.json');
+    process.env.CLAUDE_FAKE_ARGS_PATH = argsPath;
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'stream-json-output-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    const chunks: string[] = [];
+    await expect(
+      strategy.executePromptStreaming(
+        'hello',
+        '',
+        (chunk) => chunks.push(chunk),
+        { onTool: () => undefined },
+      )
+    ).resolves.toBeUndefined();
+
+    const args = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
+    expect(args).toContain('--output-format');
+    expect(args).toContain('stream-json');
+    expect(args).not.toContain('--input-format');
+    expect(args[args.indexOf('--effort') + 2]).toBe('hello');
+    expect(chunks.join('')).toBe('fake response');
+  });
+
+  test('executePromptStreaming includes pending steering in the next prompt', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+
+    const argsPath = join(CLAUDE_TEST_HOME, 'claude-pending-steering-args.json');
+    process.env.CLAUDE_FAKE_ARGS_PATH = argsPath;
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'pending-steering-conv'),
+      getEncryptionKey: () => undefined,
+    });
+    strategy.steerAgent('adjust the plan');
+
+    await expect(strategy.executePromptStreaming('continue', '', () => undefined)).resolves.toBeUndefined();
+
+    const args = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
+    const promptArg = args[args.indexOf('--effort') + 2];
+    expect(promptArg).toContain('[Operator Interruption]');
+    expect(promptArg).toContain('adjust the plan');
+    expect(promptArg).toContain('continue');
+  });
+
   test('executePromptStreaming preserves Rails-provided Claude HOME and XDG env', async () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });

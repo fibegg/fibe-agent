@@ -356,16 +356,6 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
 
 
-  override steerAgent(message: string): void {
-    if (this.currentStreamProcess?.stdin?.writable) {
-      const jsonMsg = JSON.stringify({
-        type: 'user',
-        message: { role: 'user', content: message }
-      });
-      this.currentStreamProcess.stdin.write(jsonMsg + '\n');
-    }
-  }
-
   executePromptStreaming(
     prompt: string,
     _model: string,
@@ -395,6 +385,12 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
       const useStreamJson = !!callbacks;
       const mcpConfigPath = join(workspaceDir, '.mcp.json');
+      const pendingMessages = this.consumePendingMessages();
+      let finalPrompt = prompt;
+      if (pendingMessages) {
+        finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
+      }
+
       const args = [
         ...(this._sessionId
           ? ['--resume', this._sessionId]
@@ -403,13 +399,11 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
             : []),
         '-p',
         '--effort', resolveEffort(runtimeOptions?.effort ?? process.env.CLAUDE_EFFORT),
-        prompt,
+        finalPrompt,
         ...(existsSync(mcpConfigPath) ? ['--mcp-config', mcpConfigPath] : []),
         ...(systemPrompt ? [systemPromptFlag, systemPrompt.trim()] : []),
         ...(useStreamJson
           ? [
-              '--input-format',
-              'stream-json',
               '--output-format',
               'stream-json',
               '--include-partial-messages',
@@ -435,6 +429,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         shell: false,
       });
       this.currentStreamProcess = claudeProcess;
+      claudeProcess.stdin?.end();
 
       let errorResult = '';
       let stdoutBuffer = '';
