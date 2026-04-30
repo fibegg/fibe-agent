@@ -14,13 +14,16 @@ FROM cli-base AS cli
 
 ARG AGENT_PROVIDER=gemini
 
+COPY --link package.json ./
 RUN --mount=type=cache,target=/root/.npm \
     if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     npm install -g @google/gemini-cli; \
     elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    npm install -g @anthropic-ai/claude-code; \
+    CLAUDE_VER=$(grep '"@anthropic-ai/claude-code"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
+    npm install -g "@anthropic-ai/claude-code@${CLAUDE_VER:-latest}"; \
     elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
-    npm install -g @openai/codex; \
+    CODEX_VER=$(grep '"@openai/codex"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
+    npm install -g "@openai/codex@${CODEX_VER:-latest}"; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     npm install -g opencode-ai; \
     elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
