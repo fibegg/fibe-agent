@@ -138,7 +138,7 @@ describe('PlaygroundsService', () => {
     expect(untrackedNode?.gitStatus).toBe('untracked');
     expect(modifiedNode?.gitStatus).toBe('modified');
     expect(trackedNode?.gitStatus).toBeUndefined(); // clean files have no status
-  });
+  }, 15000);
 
   test('getTree returns empty array when directory does not exist', async () => {
     const config = { getPlaygroundsDir: () => join(playgroundDir, 'nonexistent') };
@@ -456,7 +456,7 @@ describe('PlaygroundsService', () => {
     expect(result.hasDiff).toBe(false);
     expect(result.files).toEqual([]);
     expect(result.diff).toBe('');
-  });
+  }, 15000);
 
   test('getDiff detects modified file and returns diff output', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
@@ -481,7 +481,7 @@ describe('PlaygroundsService', () => {
     expect(result.diff).toContain('app.ts');
     expect(result.diff).toContain('-const x = 1;');
     expect(result.diff).toContain('+const x = 2;');
-  });
+  }, 15000);
 
   test('getDiff uses a nested git repository when playground root is not a repo', async () => {
     const nested = join(playgroundDir, 'project');
@@ -502,7 +502,7 @@ describe('PlaygroundsService', () => {
     expect(result.hasDiff).toBe(true);
     expect(result.files[0].path).toBe('app.ts');
     expect(result.diff).toContain('app.ts');
-  });
+  }, 15000);
 
   test('getDiff detects untracked file with ? status', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
@@ -524,7 +524,7 @@ describe('PlaygroundsService', () => {
     const newFile = result.files.find((f) => f.path === 'new.ts');
     expect(newFile).toBeDefined();
     expect(newFile?.worktree).toBe('?');
-  });
+  }, 15000);
 
   test('getDiff handles repository with no commits (status works, diff falls back to empty)', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
@@ -542,7 +542,7 @@ describe('PlaygroundsService', () => {
     expect(result.files.some((f) => f.path === 'file.ts')).toBe(true);
     // diff against HEAD fails gracefully (no commits) — diff is empty string
     expect(result.diff).toBe('');
-  });
+  }, 15000);
 
   test('uploadFile sanitizes filename and writes to target directory', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };

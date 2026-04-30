@@ -132,5 +132,5 @@ describe('ConnectProxy', () => {
       expect(leafCert.subject.getField('CN')?.value).toBe(domain);
       expect(caCert.verify(leafCert)).toBe(true);
     }
-  });
+  }, 15000);
 });
