@@ -96,10 +96,16 @@ export function parseYaml(content: string): Record<string, unknown> {
 
 // ─── Readers ─────────────────────────────────────────────────────────────────
 
-const YAML_CANDIDATES = ['/app/fibe.yml', join(process.cwd(), 'fibe.yml')];
+function yamlCandidates(): string[] {
+  const override = process.env.FIBE_SETTINGS_YAML_PATHS;
+  if (override) {
+    return override.split(',').map((path) => path.trim()).filter(Boolean);
+  }
+  return ['/app/fibe.yml', join(process.cwd(), 'fibe.yml')];
+}
 
 function readYaml(): Record<string, unknown> {
-  for (const path of YAML_CANDIDATES) {
+  for (const path of yamlCandidates()) {
     if (!existsSync(path)) continue;
     try {
       return parseYaml(readFileSync(path, 'utf8'));

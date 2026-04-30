@@ -101,6 +101,35 @@ describe('FibeSyncService', () => {
     }
   });
 
+  test('syncRawProviders makes PUT request with raw_providers endpoint', async () => {
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () =>
+      new Response('', { status: 200 })
+    ) as unknown as typeof fetch;
+
+    try {
+      const service = new FibeSyncService(mockConfig as never);
+      service.syncRawProviders(() => '[{"id":"raw-1"}]');
+      // Wait for debounce timer to fire
+      await new Promise((r) => setTimeout(r, 600));
+
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://fibe.test/api/agents/agent-1/raw_providers',
+        expect.objectContaining({
+          method: 'PUT',
+          body: JSON.stringify({ content: '[{"id":"raw-1"}]' }),
+        }),
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('handles non-ok response without throwing', async () => {
     mockConfig.isFibeSyncEnabled = () => true;
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';

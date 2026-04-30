@@ -120,13 +120,14 @@ describe('parseYaml', () => {
 // We use cwd-based path by writing to process.cwd()/fibe.yml and then cleaning up.
 
 describe('loadFibeSettings', () => {
-  const MANAGED = ['FIBE_SETTINGS_JSON'];
+  const MANAGED = ['FIBE_SETTINGS_JSON', 'FIBE_SETTINGS_YAML_PATHS'];
   const savedEnv: Record<string, string | undefined> = {};
   // Path to local fibe.yml (CWD-based, second candidate checked by loader)
   const localYml = join(process.cwd(), 'fibe.yml');
 
   beforeEach(() => {
     for (const k of MANAGED) { savedEnv[k] = process.env[k]; delete process.env[k]; }
+    process.env.FIBE_SETTINGS_YAML_PATHS = localYml;
   });
 
   afterEach(() => {
@@ -179,6 +180,7 @@ describe('loadFibeSettings', () => {
 describe('applyFibeSettings', () => {
   const MANAGED_KEYS = [
     'FIBE_SETTINGS_JSON',
+    'FIBE_SETTINGS_YAML_PATHS',
     'AGENT_PROVIDER', 'AGENT_PASSWORD', 'AGENT_AUTH_MODE', 'MODEL_OPTIONS', 'DEFAULT_MODEL', 'CLAUDE_EFFORT',
     'USER_AVATAR_URL', 'USER_AVATAR_BASE64',
     'ASSISTANT_AVATAR_URL', 'ASSISTANT_AVATAR_BASE64',
@@ -200,6 +202,7 @@ describe('applyFibeSettings', () => {
 
   beforeEach(() => {
     for (const k of MANAGED_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
+    process.env.FIBE_SETTINGS_YAML_PATHS = localYml;
   });
 
   afterEach(() => {

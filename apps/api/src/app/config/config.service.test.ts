@@ -12,6 +12,7 @@ describe('ConfigService', () => {
 
   beforeEach(() => {
     envBackup.FIBE_SETTINGS_JSON = process.env.FIBE_SETTINGS_JSON;
+    envBackup.FIBE_SETTINGS_YAML_PATHS = process.env.FIBE_SETTINGS_YAML_PATHS;
     envBackup.PLAYGROUNDS_DIR = process.env.PLAYGROUNDS_DIR;
     envBackup.FIBE_AGENT_ID = process.env.FIBE_AGENT_ID;
     envBackup.CONVERSATION_ID = process.env.CONVERSATION_ID;
@@ -21,12 +22,15 @@ describe('ConfigService', () => {
     envBackup.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
     // Clear to avoid cross-test leakage
     delete process.env.FIBE_SETTINGS_JSON;
+    process.env.FIBE_SETTINGS_YAML_PATHS = join(process.cwd(), 'config-service-test-fibe.yml');
     delete process.env.FIBE_SYNC_ENABLED;
     delete process.env.CLAUDE_EFFORT;
   });
 
   afterEach(() => {
     process.env.FIBE_SETTINGS_JSON = envBackup.FIBE_SETTINGS_JSON;
+    if (envBackup.FIBE_SETTINGS_YAML_PATHS === undefined) delete process.env.FIBE_SETTINGS_YAML_PATHS;
+    else process.env.FIBE_SETTINGS_YAML_PATHS = envBackup.FIBE_SETTINGS_YAML_PATHS;
     process.env.PLAYGROUNDS_DIR = envBackup.PLAYGROUNDS_DIR;
     process.env.FIBE_AGENT_ID = envBackup.FIBE_AGENT_ID;
     process.env.CONVERSATION_ID = envBackup.CONVERSATION_ID;
