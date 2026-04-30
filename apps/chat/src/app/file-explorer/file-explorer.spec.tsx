@@ -57,6 +57,13 @@ describe('FileExplorer', () => {
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
+  it('shows provider and model in the explorer header', () => {
+    render(<FileExplorer tree={[]} agentTree={[]} agentProviderLabel="Claude" currentModel="haiku" />);
+    expect(screen.getByText('Claude')).toBeTruthy();
+    expect(screen.getByText('haiku')).toBeTruthy();
+    expect(screen.getByTitle('Model: haiku')).toBeTruthy();
+  });
+
   it('shows empty playground message when API returns empty array', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,

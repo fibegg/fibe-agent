@@ -28,8 +28,9 @@ import { ChatLeftPanel } from './chat-left-panel';
 import { ChatRightPanel } from './chat-right-panel';
 import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
-import { isAuthenticated, isChatModelLocked } from '../api-url';
+import { apiRequest, isAuthenticated, isChatModelLocked } from '../api-url';
 import { consumeGreeting } from '../postmessage-greeting';
+import { isStandaloneMode } from '../embed-config';
 import { ChatLayout } from './chat-layout';
 import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 import { usePanelResize } from '../use-panel-resize';
@@ -68,6 +69,9 @@ const LazyDiffPanel = lazy(() => import('../diff/diff-panel').then((m) => ({ def
 
 const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
+interface RuntimeConfigResponse {
+  agentProviderLabel?: string | null;
+}
 
 export function ChatPage() {
   const navigate = useNavigate();
@@ -109,6 +113,9 @@ export function ChatPage() {
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const { diffOpen, toggleDiff, closeDiff } = useDiffPanel();
   const pgSelector = usePlaygroundSelector();
+  const [standaloneMode, setStandaloneMode] = useState(() => isStandaloneMode());
+  const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
+  const canShowDiff = playgroundStats.hasGitRepo;
 
   // ─── Local MCP tool state ─────────────────────────────────────────────────
 
@@ -216,6 +223,32 @@ export function ChatPage() {
   const { currentModel, setCurrentModel, handleModelSelect, handleModelInputChange } = useChatModel(sendRef);
   const { currentEffort, setCurrentEffort, handleEffortSelect } = useChatEffort(sendRef);
 
+  useEffect(() => {
+    setStandaloneMode(isStandaloneMode());
+    if (!authenticated) return;
+
+    let cancelled = false;
+    apiRequest(API_PATHS.RUNTIME_CONFIG)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((config: RuntimeConfigResponse | null) => {
+        if (cancelled) return;
+        setAgentProviderLabel(config?.agentProviderLabel?.trim() || 'Claude');
+      })
+      .catch(() => {
+        if (!cancelled) setAgentProviderLabel('Claude');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authenticated]);
+
+  useEffect(() => {
+    if (!canShowDiff && diffOpen) {
+      closeDiff();
+    }
+  }, [canShowDiff, diffOpen, closeDiff]);
+
   const {
     activityLog,
     activityLogRef,
@@ -233,7 +266,8 @@ export function ChatPage() {
     handleKeyDown,
     handleMentionSelect,
     handleMentionClose,
-  } = useChatInput({ playgroundEntries, onSendRef: handleSendRef, isMobile });
+    focusInput,
+  } = useChatInput({ playgroundEntries, onSendRef: handleSendRef });
   const messageListRef = useRef<MessageListHandle | null>(null);
 
   useEffect(() => {
@@ -496,9 +530,10 @@ export function ChatPage() {
     setInputState({ value: '', cursor: 0 });
     if (!isQueuing) clearPending();
     scroll.markJustSent();
+    focusInput({ persistent: true });
   }, [
     send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll,
-    clearPending, setInputState, setMessages, stopAndTranscribe,
+    clearPending, focusInput, setInputState, setMessages, stopAndTranscribe,
   ]);
 
   const handleSendContinue = useCallback(() => {
@@ -556,6 +591,15 @@ export function ChatPage() {
     state,
     authModal
   );
+  const chatModelLocked = isChatModelLocked();
+
+  const openSettings = useCallback(() => {
+    if (isMobile) {
+      closeMobileSidebar();
+      setRightSidebarOpen(false);
+    }
+    setSettingsOpen(true);
+  }, [isMobile, closeMobileSidebar, setRightSidebarOpen, setSettingsOpen]);
 
   if (!authenticated) {
     return null;
@@ -585,11 +629,25 @@ export function ChatPage() {
             open={settingsOpen}
             onClose={closeSettings}
             state={state}
+            isStandalone={standaloneMode}
             onStartAuth={startAuth}
             onReauthenticate={reauthenticate}
             onLogout={logout}
             currentEffort={currentEffort}
             onEffortSelect={handleEffortSelect}
+            showModelSelector={showModelSelector}
+            currentModel={currentModel}
+            modelOptions={modelOptions}
+            onModelSelect={handleModelSelect}
+            onModelInputChange={handleModelInputChange}
+            modelLocked={chatModelLocked}
+            onRefreshModels={refreshModelOptions}
+            refreshingModels={refreshingModels}
+            onResetConversation={
+              state !== CHAT_STATES.AWAITING_RESPONSE
+                ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
+                : undefined
+            }
           />
         </>
       }
@@ -610,7 +668,7 @@ export function ChatPage() {
                 agentFileApiPath="agent-files/file"
                 playgroundStats={playgroundStats}
                 agentStats={agentStats}
-                onSettingsClick={() => setSettingsOpen(true)}
+                onSettingsClick={openSettings}
                 onClose={closeMobileSidebar}
                 onFileSelect={(entry) => {
                   setViewingFile(entry);
@@ -620,6 +678,8 @@ export function ChatPage() {
                 dirtyPaths={pageDirtyPaths}
                 onPlaygroundUploaded={refetchPlaygrounds}
                 onAgentUploaded={refetchPlaygrounds}
+                agentProviderLabel={agentProviderLabel}
+                currentModel={currentModel}
               />
             </div>
           </>
@@ -663,7 +723,7 @@ export function ChatPage() {
             onTabChange={setActiveFileTab}
             playgroundStats={playgroundStats}
             agentStats={agentStats}
-            onSettingsClick={() => setSettingsOpen(true)}
+            onSettingsClick={openSettings}
             onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
             onFileSelect={(entry) => setViewingFile(entry)}
             onResizeStart={leftResize.startResize}
@@ -671,6 +731,8 @@ export function ChatPage() {
             dirtyPaths={pageDirtyPaths}
             onPlaygroundUploaded={refetchPlaygrounds}
             onAgentUploaded={refetchPlaygrounds}
+            agentProviderLabel={agentProviderLabel}
+            currentModel={currentModel}
           />
         ) : null
       }
@@ -699,6 +761,8 @@ export function ChatPage() {
         <ChatHeader
           isMobile={isMobile}
           agentProvider={agentProvider}
+          agentProviderLabel={agentProviderLabel}
+          currentModel={currentModel}
           state={state}
           agentMode={agentMode}
           errorMessage={errorMessage}
@@ -707,24 +771,16 @@ export function ChatPage() {
           sessionTokenUsage={sessionTokenUsage}
           mobileBrainClasses={mobileBrainClasses}
           statusClass={statusClass}
-          showModelSelector={showModelSelector}
-          currentModel={currentModel}
-          modelOptions={modelOptions}
           searchQuery={searchQuery}
           filteredMessagesCount={filteredMessages.length}
           onSearchChange={setSearchQuery}
-          onModelSelect={handleModelSelect}
-          onModelInputChange={handleModelInputChange}
           onReconnect={reconnect}
           onStartAuth={startAuth}
           onOpenMenu={() => setSidebarOpen(true)}
           onOpenActivity={() => setRightSidebarOpen(true)}
-          modelLocked={isChatModelLocked()}
-          onRefreshModels={refreshModelOptions}
-          refreshingModels={refreshingModels}
           onToggleTerminal={toggleTerminal}
           terminalOpen={terminalOpen}
-          onToggleDiff={toggleDiff}
+          onToggleDiff={canShowDiff ? toggleDiff : undefined}
           diffOpen={diffOpen}
           playgroundEntries={pgSelector.entries}
           playgroundLoading={pgSelector.loading}
@@ -742,7 +798,6 @@ export function ChatPage() {
           onPlaygroundSmartMount={pgSelector.smartMount}
           tonyStarkMode={tonyStarkMode}
           onToggleTonyStarkMode={handleToggleTonyStarkMode}
-          onResetConversation={() => send({ action: WS_ACTION.RESET_CONVERSATION })}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
@@ -876,6 +931,7 @@ export function ChatPage() {
           onRemovePendingVoice={removePendingVoice}
           onFileChange={handleFileChange}
           onSend={handleSend}
+          onRequestInputFocus={() => focusInput({ persistent: true })}
           onInterrupt={interruptAgent}
           onVoiceToggle={handleVoiceToggle}
           maxPendingTotal={MAX_PENDING_TOTAL}
@@ -899,7 +955,7 @@ export function ChatPage() {
           </Suspense>
         </RightDrawer>
         <RightDrawer
-          open={diffOpen}
+          open={canShowDiff && diffOpen}
           onClose={closeDiff}
           title="Playground Diff"
           icon={<GitCompareArrows className="size-4" />}

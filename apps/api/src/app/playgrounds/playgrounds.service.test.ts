@@ -269,6 +269,27 @@ describe('PlaygroundsService', () => {
     const stats = await service.getStats();
 
     expect(stats.fileCount).toBe(2);
+    expect(stats.hasGitRepo).toBe(false);
+  });
+
+  test('getStats reports hasGitRepo=true when playground root is a git repository', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const stats = await service.getStats();
+
+    expect(stats.hasGitRepo).toBe(true);
+  });
+
+  test('getStats reports hasGitRepo=true when a child directory is a git repository', async () => {
+    const nested = join(playgroundDir, 'project');
+    mkdirSync(nested);
+    execSync('git init', { cwd: nested, stdio: 'ignore' });
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never);
+    const stats = await service.getStats();
+
+    expect(stats.hasGitRepo).toBe(true);
   });
 
   test('getTree does not crash on broken symlinks', async () => {
@@ -460,6 +481,27 @@ describe('PlaygroundsService', () => {
     expect(result.diff).toContain('app.ts');
     expect(result.diff).toContain('-const x = 1;');
     expect(result.diff).toContain('+const x = 2;');
+  });
+
+  test('getDiff uses a nested git repository when playground root is not a repo', async () => {
+    const nested = join(playgroundDir, 'project');
+    mkdirSync(nested);
+    execSync('git init', { cwd: nested, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: nested, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: nested, stdio: 'ignore' });
+    writeFileSync(join(nested, 'app.ts'), 'const x = 1;');
+    execSync('git add .', { cwd: nested, stdio: 'ignore' });
+    execSync('git commit -m "init"', { cwd: nested, stdio: 'ignore' });
+    writeFileSync(join(nested, 'app.ts'), 'const x = 2;');
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    const result = await service.getDiff();
+
+    expect(result.isGitRepo).toBe(true);
+    expect(result.hasDiff).toBe(true);
+    expect(result.files[0].path).toBe('app.ts');
+    expect(result.diff).toContain('app.ts');
   });
 
   test('getDiff detects untracked file with ? status', async () => {

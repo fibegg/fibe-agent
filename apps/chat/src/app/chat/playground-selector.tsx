@@ -12,6 +12,14 @@ const ENTRY_CLASS_BASE =
 const PANEL_DATA_ATTR = 'data-playground-selector-panel';
 const ENTRY_HOVER_CLASS = 'text-foreground hover:bg-violet-500/10 hover:text-violet-400';
 const LINKED_CLASS = 'text-emerald-400 bg-emerald-500/10';
+const PANEL_WIDTH_PX = 320;
+const PANEL_GUTTER_PX = 8;
+
+type PanelRect = {
+  top: number;
+  left: number;
+  maxHeight: number;
+};
 
 export function smartCutLabel(link: string): string {
   const segment = link.split('/').filter(Boolean).pop() ?? 'Playground';
@@ -43,7 +51,7 @@ export function PlaygroundSelector({
   visible = true,
 }: PlaygroundSelectorProps) {
   const [open, setOpen] = useState(false);
-  const [panelRect, setPanelRect] = useState<{ top: number; right: number } | null>(null);
+  const [panelRect, setPanelRect] = useState<PanelRect | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -55,14 +63,31 @@ export function PlaygroundSelector({
     if (!el) return;
     const updateRect = () => {
       const r = el.getBoundingClientRect();
-      setPanelRect({ top: r.bottom + 6, right: window.innerWidth - r.right });
+      const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const panelWidth = Math.min(PANEL_WIDTH_PX, viewportWidth - PANEL_GUTTER_PX * 2);
+      const left = Math.min(
+        Math.max(PANEL_GUTTER_PX, r.left),
+        Math.max(PANEL_GUTTER_PX, viewportWidth - panelWidth - PANEL_GUTTER_PX),
+      );
+      const top = Math.max(
+        PANEL_GUTTER_PX,
+        Math.min(r.bottom + 6, viewportHeight - PANEL_GUTTER_PX - 160),
+      );
+      setPanelRect({
+        top,
+        left,
+        maxHeight: Math.max(80, viewportHeight - top - PANEL_GUTTER_PX),
+      });
     };
     updateRect();
     window.addEventListener('scroll', updateRect, true);
     window.addEventListener('resize', updateRect);
+    window.visualViewport?.addEventListener('resize', updateRect);
     return () => {
       window.removeEventListener('scroll', updateRect, true);
       window.removeEventListener('resize', updateRect);
+      window.visualViewport?.removeEventListener('resize', updateRect);
     };
   }, [open]);
 
@@ -117,7 +142,13 @@ export function PlaygroundSelector({
             className={PANEL_CLASS}
             role="listbox"
             aria-label="Playground linker"
-            style={{ position: 'fixed', top: panelRect.top, right: panelRect.right }}
+            style={{
+              position: 'fixed',
+              top: panelRect.top,
+              left: panelRect.left,
+              width: 'min(320px, calc(100vw - 16px))',
+              maxHeight: panelRect.maxHeight,
+            }}
           >
             <div className="overflow-auto flex-1 min-h-0">
               {loading && (

@@ -8,8 +8,12 @@ import { MODEL_OPTION_SELECTED } from '../ui-classes';
 const DEFAULT_LABEL = 'Model (default)';
 const MOBILE_BREAKPOINT_PX = 640;
 
-const TRIGGER_CLASS =
-  'flex items-center gap-1.5 min-w-0 max-w-[120px] sm:max-w-[180px] h-8 px-2 sm:px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
+const TRIGGER_CLASS_BASE =
+  'flex items-center gap-1.5 min-w-0 h-8 px-2 sm:px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
+const TRIGGER_CLASS_BY_VARIANT = {
+  compact: 'max-w-[120px] sm:max-w-[180px]',
+  settings: 'w-full max-w-none justify-between',
+} as const;
 const PANEL_CLASS =
   'min-w-[220px] max-w-[340px] max-h-96 overflow-hidden rounded-lg border border-border bg-card shadow-lg z-[100] flex flex-col';
 const OPTION_CLASS_BASE =
@@ -47,6 +51,7 @@ interface ModelSelectorProps {
   modelLocked?: boolean;
   onRefresh?: () => void;
   refreshing?: boolean;
+  variant?: keyof typeof TRIGGER_CLASS_BY_VARIANT;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -60,6 +65,7 @@ export function ModelSelector({
   modelLocked = false,
   onRefresh,
   refreshing = false,
+  variant = 'compact',
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [customValue, setCustomValue] = useState('');
@@ -74,6 +80,7 @@ export function ModelSelector({
   const trimmed = currentModel.trim();
   const displayLabel = trimmed || DEFAULT_LABEL;
   const allOptions = trimmed && !options.includes(trimmed) ? [trimmed, ...options] : options;
+  const triggerClass = `${TRIGGER_CLASS_BASE} ${TRIGGER_CLASS_BY_VARIANT[variant]}`;
 
   const query = searchQuery.trim().toLowerCase();
   const filteredOptions = query
@@ -157,7 +164,7 @@ export function ModelSelector({
 
   if (modelLocked) {
     return (
-      <div className={`${TRIGGER_CLASS} cursor-default opacity-90 border-border-subtle`} aria-label="Model in use">
+      <div className={`${triggerClass} cursor-default opacity-90 border-border-subtle`} aria-label="Model in use">
         <span className="truncate">{displayLabel}</span>
       </div>
     );
@@ -170,11 +177,11 @@ export function ModelSelector({
     : {};
 
   return (
-    <div ref={containerRef} className="relative">
+    <div ref={containerRef} className={variant === 'settings' ? 'relative w-full' : 'relative'}>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={TRIGGER_CLASS}
+        className={triggerClass}
         aria-haspopup="listbox"
         aria-expanded={open}
         aria-label="Select model"
@@ -275,6 +282,7 @@ export function ModelSelector({
                 <button
                   type="button"
                   role="option"
+                  aria-selected={false}
                   onClick={() => setCustomMode(true)}
                   className={`${OPTION_CLASS_BASE} text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 border-t border-border/50 mt-1 pt-2`}
                 >

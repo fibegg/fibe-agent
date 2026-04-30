@@ -68,10 +68,15 @@ export class PlaygroundsService {
     return this.readDir(this.config.getPlaygroundsDir(), '', ig, statuses, settings);
   }
 
-  async getStats(): Promise<{ fileCount: number; totalLines: number }> {
-    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
-    const ig = await loadGitignore(this.config.getPlaygroundsDir());
-    return this.countStats(this.config.getPlaygroundsDir(), ig, settings);
+  async getStats(): Promise<{ fileCount: number; totalLines: number; hasGitRepo: boolean }> {
+    const dir = this.config.getPlaygroundsDir();
+    const settings = await loadFibeSettings(dir);
+    const ig = await loadGitignore(dir);
+    const [counts, gitRepoDir] = await Promise.all([
+      this.countStats(dir, ig, settings),
+      this.findFirstGitRepoDir(dir, ig, settings),
+    ]);
+    return { ...counts, hasGitRepo: gitRepoDir !== null };
   }
 
   async getDiff(): Promise<PlaygroundDiffResult> {
@@ -79,17 +84,17 @@ export class PlaygroundsService {
     const empty: PlaygroundDiffResult = { files: [], diff: '', hasDiff: false, isGitRepo: false };
     if (!dir) return empty;
 
-    // Verify directory is inside a git repository
-    try {
-      await execAsync('git rev-parse --git-dir', { cwd: dir });
-    } catch {
+    const settings = await loadFibeSettings(dir);
+    const ig = await loadGitignore(dir);
+    const repoDir = await this.findFirstGitRepoDir(dir, ig, settings);
+    if (!repoDir) {
       return empty;
     }
 
     // Run both git commands concurrently
     const [statusResult, diffResult] = await Promise.all([
-      execAsync('git status --short -unormal', { cwd: dir }).catch(() => ({ stdout: '' })),
-      execAsync('git diff HEAD', { cwd: dir, maxBuffer: 5 * 1024 * 1024 }).catch(() => ({ stdout: '' })),
+      execAsync('git status --short -unormal', { cwd: repoDir }).catch(() => ({ stdout: '' })),
+      execAsync('git diff HEAD', { cwd: repoDir, maxBuffer: 5 * 1024 * 1024 }).catch(() => ({ stdout: '' })),
     ]);
 
     // Parse changed files from `git status --short`
@@ -181,6 +186,59 @@ export class PlaygroundsService {
     } catch { /* dir not accessible */ }
     return { fileCount, totalLines };
   }
+
+  private async findFirstGitRepoDir(
+    absPath: string,
+    parentIg: GitignoreFilter,
+    settings: ResolvedFibeSettings,
+    depth = 0,
+  ): Promise<string | null> {
+    if (depth > MAX_DEPTH) return null;
+
+    try {
+      await stat(join(absPath, '.git'));
+      return absPath;
+    } catch {
+      // Continue scanning child directories.
+    }
+
+    try {
+      const ig = await loadGitignore(absPath, parentIg);
+      const entries = await readdir(absPath, { withFileTypes: true });
+      for (const e of entries) {
+        const name = typeof e.name === 'string' ? e.name : String(e.name);
+        if (
+          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          settings.ignoredNames.has(name)
+        ) {
+          continue;
+        }
+        if (ig.ignores(name)) continue;
+
+        const childAbs = join(absPath, name);
+        let isDir = e.isDirectory();
+
+        if (e.isSymbolicLink()) {
+          try {
+            const st = await stat(childAbs);
+            isDir = st.isDirectory();
+          } catch {
+            continue;
+          }
+        }
+
+        if (!isDir) continue;
+
+        const repoDir = await this.findFirstGitRepoDir(childAbs, ig, settings, depth + 1);
+        if (repoDir) return repoDir;
+      }
+    } catch {
+      return null;
+    }
+
+    return null;
+  }
+
   async getFileContent(relativePath: string): Promise<string> {
     const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
     const base = resolve(this.config.getPlaygroundsDir());

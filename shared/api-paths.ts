@@ -3,6 +3,7 @@ export const API_PATHS = {
   MESSAGES: '/api/messages',
   MODEL_OPTIONS: '/api/model-options',
   REFRESH_MODEL_OPTIONS: '/api/model-options/refresh',
+  RUNTIME_CONFIG: '/api/runtime-config',
   UPLOADS: '/api/uploads',
   PLAYGROUNDS: '/api/playgrounds',
   PLAYGROUNDS_FILE: '/api/playgrounds/file',

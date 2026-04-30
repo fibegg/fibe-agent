@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { ChatInputArea } from './chat-input-area';
 import { CHAT_STATES } from './chat-state';
 
@@ -57,6 +57,7 @@ const BASE_PROPS = {
   onRemovePendingVoice: vi.fn(),
   onFileChange: vi.fn(),
   onSend: vi.fn(),
+  onRequestInputFocus: vi.fn(),
   onInterrupt: vi.fn(),
   onVoiceToggle: vi.fn(),
   maxPendingTotal: 5,
@@ -245,49 +246,31 @@ describe('ChatInputArea', () => {
     expect(input.getAttribute('disabled')).not.toBeNull();
   });
 
-  // ── Deferred focus after Send (iframe postMessage fix) ───────────────────
-  // Clicking a button blurs the input. We restore focus via setTimeout(fn, 0)
-  // so the call happens *after* the parent frame's sortable-tabs DOM mutation
-  // triggered by window.parent.postMessage({ type: 'player_message_sent' }).
+  // ── Focus after Send (iframe postMessage fix) ────────────────────────────
+  // Clicking a button blurs the input, so the button asks the owner hook to run
+  // the same persistent focus recovery used by keyboard sends.
 
-  it('Send button restores focus to chatInputRef asynchronously, not synchronously', () => {
-    vi.useFakeTimers();
-    const focusMock = vi.fn();
-    const chatInputRef = { current: { focus: focusMock } } as unknown as React.RefObject<HTMLDivElement>;
-
-    render(<ChatInputArea {...BASE_PROPS} chatInputRef={chatInputRef} />);
+  it('Send button requests persistent chat input focus recovery', () => {
+    const onRequestInputFocus = vi.fn();
+    render(<ChatInputArea {...BASE_PROPS} onRequestInputFocus={onRequestInputFocus} />);
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
 
-    // Must NOT have been called synchronously during the click handler
-    expect(focusMock).not.toHaveBeenCalled();
-
-    // Flush the deferred setTimeout(fn, 0)
-    act(() => vi.runAllTimers());
-    expect(focusMock).toHaveBeenCalledOnce();
-
-    vi.useRealTimers();
+    expect(onRequestInputFocus).toHaveBeenCalledOnce();
   });
 
-  it('Queue-message button restores focus asynchronously when AWAITING_RESPONSE', () => {
-    vi.useFakeTimers();
-    const focusMock = vi.fn();
-    const chatInputRef = { current: { focus: focusMock } } as unknown as React.RefObject<HTMLDivElement>;
+  it('Queue-message button requests persistent chat input focus recovery', () => {
+    const onRequestInputFocus = vi.fn();
 
     render(
       <ChatInputArea
         {...BASE_PROPS}
         state={CHAT_STATES.AWAITING_RESPONSE}
         inputValue="hello"
-        chatInputRef={chatInputRef}
+        onRequestInputFocus={onRequestInputFocus}
       />
     );
     fireEvent.click(screen.getByRole('button', { name: /queue message/i }));
 
-    expect(focusMock).not.toHaveBeenCalled();
-
-    act(() => vi.runAllTimers());
-    expect(focusMock).toHaveBeenCalledOnce();
-
-    vi.useRealTimers();
+    expect(onRequestInputFocus).toHaveBeenCalledOnce();
   });
 });

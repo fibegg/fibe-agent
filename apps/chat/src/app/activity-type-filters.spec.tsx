@@ -22,13 +22,13 @@ describe('ActivityTypeFilters', () => {
   it('"All" button is active (highlighted) when typeFilter is empty', () => {
     render(<ActivityTypeFilters typeFilter={[]} onTypeFilterChange={vi.fn()} />);
     const allBtn = screen.getByText('All');
-    expect(allBtn.className).toContain('bg-violet-500/20');
+    expect(allBtn.className).toContain('bg-primary');
   });
 
   it('"All" button is inactive when typeFilter has entries', () => {
     render(<ActivityTypeFilters typeFilter={['tool_call']} onTypeFilterChange={vi.fn()} />);
     const allBtn = screen.getByText('All');
-    expect(allBtn.className).not.toContain('bg-violet-500/20');
+    expect(allBtn.className).not.toContain('bg-primary');
   });
 
   it('clicking "All" calls onTypeFilterChange with empty array', () => {

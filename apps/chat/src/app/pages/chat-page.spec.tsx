@@ -66,7 +66,7 @@ vi.mock('../chat/use-playground-files', () => ({
     entries: [],
     tree: [],
     loading: false,
-    stats: { fileCount: 0, totalLines: 0 },
+    stats: { fileCount: 0, totalLines: 0, hasGitRepo: false },
     refetch: vi.fn(),
   }),
   MAX_PENDING_TOTAL: 5,
@@ -195,6 +195,7 @@ vi.mock('../chat/use-chat-input', () => ({
     handleKeyDown: vi.fn(),
     handleMentionSelect: vi.fn(),
     handleMentionClose: vi.fn(),
+    focusInput: vi.fn(),
   }),
 }));
 
@@ -261,6 +262,7 @@ vi.mock('../chat/drag-drop-overlay', () => ({
 
 vi.mock('../embed-config', () => ({
   shouldHideThemeSwitch: vi.fn().mockReturnValue(false),
+  isStandaloneMode: vi.fn().mockReturnValue(true),
 }));
 
 vi.mock('../theme-toggle', () => ({
