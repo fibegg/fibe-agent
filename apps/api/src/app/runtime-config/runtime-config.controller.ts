@@ -5,6 +5,7 @@ export interface RuntimeConfig {
   userAvatarBase64: string | null;
   assistantAvatarUrl: string | null;
   assistantAvatarBase64: string | null;
+  agentProvider: string | null;
 }
 
 @Controller()
@@ -16,6 +17,7 @@ export class RuntimeConfigController {
       userAvatarBase64: process.env.USER_AVATAR_BASE64?.trim() || null,
       assistantAvatarUrl: process.env.ASSISTANT_AVATAR_URL?.trim() || null,
       assistantAvatarBase64: process.env.ASSISTANT_AVATAR_BASE64?.trim() || null,
+      agentProvider: process.env.AGENT_PROVIDER?.trim() || null,
     };
   }
 }

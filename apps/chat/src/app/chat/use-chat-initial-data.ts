@@ -10,6 +10,7 @@ export function useChatInitialData(authenticated: boolean) {
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [refreshingModels, setRefreshingModels] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [agentProvider, setAgentProvider] = useState<string | null>(null);
 
   const loadMessages = useCallback(async () => {
     try {
@@ -53,6 +54,22 @@ export function useChatInitialData(authenticated: boolean) {
     }
   }, []);
 
+  const loadRuntimeConfig = useCallback(async () => {
+    try {
+      const res = await fetch('/api/runtime-config');
+      if (res.ok) {
+        const data = await res.json() as { agentProvider: string | null };
+        setAgentProvider(data.agentProvider);
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRuntimeConfig();
+  }, [loadRuntimeConfig]);
+
   useEffect(() => {
     if (authenticated) {
       loadMessages();
@@ -60,5 +77,5 @@ export function useChatInitialData(authenticated: boolean) {
     }
   }, [authenticated, loadMessages, loadModelOptions]);
 
-  return { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, loadMessages, refreshModelOptions };
+  return { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, loadMessages, refreshModelOptions, agentProvider };
 }

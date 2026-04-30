@@ -51,25 +51,19 @@ const DEFAULT_PROPS = {
 // ─── Core rendering ───────────────────────────────────────────────────────────
 
 describe('ChatHeader', () => {
-  it('shows currentModel as heading when agentName is not provided', () => {
+  it('shows Claude (unknown) by default when no agentProvider is passed', () => {
     render(<ChatHeader {...DEFAULT_PROPS} currentModel="claude-3-5" />);
-    expect(screen.getByText('claude-3-5')).toBeTruthy();
+    expect(screen.getByText('Claude (unknown)')).toBeTruthy();
   });
 
-  it('shows agentName as heading when provided', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" currentModel="claude-3-5" />);
-    expect(screen.getByText('My Agent')).toBeTruthy();
-    expect(screen.queryByText('claude-3-5')).toBeNull();
-  });
-
-  it('falls back to "LLM Agent" when no agentName and no currentModel', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} currentModel="" />);
-    expect(screen.getByText('LLM Agent')).toBeTruthy();
+  it('shows Claude with agentProvider when provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} agentProvider="gemini" currentModel="claude-3-5" />);
+    expect(screen.getByText('Claude (gemini)')).toBeTruthy();
   });
 
   it('heading has title attribute for truncation tooltip', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" />);
-    expect(screen.getByTitle('My Agent')).toBeTruthy();
+    render(<ChatHeader {...DEFAULT_PROPS} agentProvider="claude-code" />);
+    expect(screen.getByTitle('Claude (claude-code)')).toBeTruthy();
   });
 
   it('shows session time when sessionTimeMs > 0', () => {

@@ -11,6 +11,7 @@ interface RuntimeConfig {
   userAvatarBase64: string | null;
   assistantAvatarUrl: string | null;
   assistantAvatarBase64: string | null;
+  agentProvider: string | null;
 }
 
 /** Extracted logic identical to RuntimeConfigController.getConfig */
@@ -20,6 +21,7 @@ function getRuntimeConfig(): RuntimeConfig {
     userAvatarBase64: process.env.USER_AVATAR_BASE64?.trim() || null,
     assistantAvatarUrl: process.env.ASSISTANT_AVATAR_URL?.trim() || null,
     assistantAvatarBase64: process.env.ASSISTANT_AVATAR_BASE64?.trim() || null,
+    agentProvider: process.env.AGENT_PROVIDER?.trim() || null,
   };
 }
 
@@ -31,10 +33,12 @@ describe('RuntimeConfigController — getConfig logic', () => {
     envBackup.USER_AVATAR_BASE64 = process.env.USER_AVATAR_BASE64;
     envBackup.ASSISTANT_AVATAR_URL = process.env.ASSISTANT_AVATAR_URL;
     envBackup.ASSISTANT_AVATAR_BASE64 = process.env.ASSISTANT_AVATAR_BASE64;
+    envBackup.AGENT_PROVIDER = process.env.AGENT_PROVIDER;
     delete process.env.USER_AVATAR_URL;
     delete process.env.USER_AVATAR_BASE64;
     delete process.env.ASSISTANT_AVATAR_URL;
     delete process.env.ASSISTANT_AVATAR_BASE64;
+    delete process.env.AGENT_PROVIDER;
   });
 
   afterEach(() => {
@@ -42,6 +46,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
     process.env.USER_AVATAR_BASE64 = envBackup.USER_AVATAR_BASE64;
     process.env.ASSISTANT_AVATAR_URL = envBackup.ASSISTANT_AVATAR_URL;
     process.env.ASSISTANT_AVATAR_BASE64 = envBackup.ASSISTANT_AVATAR_BASE64;
+    process.env.AGENT_PROVIDER = envBackup.AGENT_PROVIDER;
   });
 
   test('returns all nulls when no env vars are set', () => {
@@ -50,6 +55,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
       userAvatarBase64: null,
       assistantAvatarUrl: null,
       assistantAvatarBase64: null,
+      agentProvider: null,
     });
   });
 
@@ -83,16 +89,23 @@ describe('RuntimeConfigController — getConfig logic', () => {
     expect(getRuntimeConfig().assistantAvatarBase64).toBe('aGVsbG8=');
   });
 
+  test('returns agentProvider when AGENT_PROVIDER is set', () => {
+    process.env.AGENT_PROVIDER = 'gemini';
+    expect(getRuntimeConfig().agentProvider).toBe('gemini');
+  });
+
   test('returns correct shape when all env vars are set', () => {
     process.env.USER_AVATAR_URL = 'https://user.png';
     process.env.USER_AVATAR_BASE64 = 'dXNlcg==';
     process.env.ASSISTANT_AVATAR_URL = 'https://bot.png';
     process.env.ASSISTANT_AVATAR_BASE64 = 'Ym90';
+    process.env.AGENT_PROVIDER = 'claude-code';
     expect(getRuntimeConfig()).toEqual({
       userAvatarUrl: 'https://user.png',
       userAvatarBase64: 'dXNlcg==',
       assistantAvatarUrl: 'https://bot.png',
       assistantAvatarBase64: 'Ym90',
+      agentProvider: 'claude-code',
     });
   });
 });

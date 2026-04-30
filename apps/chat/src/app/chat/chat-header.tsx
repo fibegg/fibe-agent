@@ -13,6 +13,7 @@ import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 export interface ChatHeaderProps {
   isMobile: boolean;
   agentName?: string;
+  agentProvider?: string | null;
   state: string;
   agentMode?: string;
   errorMessage: string | null;
@@ -218,6 +219,7 @@ function TerminalButton({
 export function ChatHeader({
   isMobile,
   agentName,
+  agentProvider,
   state,
   agentMode,
   errorMessage,
@@ -251,11 +253,12 @@ export function ChatHeader({
   ...rest
 }: ChatHeaderProps) {
   // Derive a display name: agentName > currentModel > fallback
-  const displayName = agentName || (currentModel && currentModel.trim()) || 'LLM Agent';
+  const displayName = `Claude (${agentProvider || 'unknown'})`;
   // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
   const playgroundProps: ChatHeaderProps = {
     isMobile,
     agentName,
+    agentProvider,
     state,
     agentMode,
     errorMessage,
