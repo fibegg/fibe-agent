@@ -24,6 +24,8 @@ interface ChatLeftPanelProps {
   dirtyPaths: Set<string>;
   onPlaygroundUploaded?: () => void;
   onAgentUploaded?: () => void;
+  agentProviderLabel?: string;
+  currentModel?: string;
 }
 
 export const ChatLeftPanel = memo(function ChatLeftPanel({
@@ -46,6 +48,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   dirtyPaths,
   onPlaygroundUploaded,
   onAgentUploaded,
+  agentProviderLabel,
+  currentModel,
 }: ChatLeftPanelProps) {
   const isCollapsed = !hasAnyFiles || sidebarCollapsed;
   return (
@@ -73,6 +77,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
           dirtyPaths={dirtyPaths}
           onPlaygroundUploaded={onPlaygroundUploaded}
           onAgentUploaded={onAgentUploaded}
+          agentProviderLabel={agentProviderLabel}
+          currentModel={currentModel}
         />
         {!isCollapsed && (
           <PanelResizeHandle

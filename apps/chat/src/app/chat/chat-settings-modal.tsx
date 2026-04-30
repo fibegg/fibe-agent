@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Key, Loader2, LogOut, X, Download, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Key, Loader2, LogOut, X, Download, Trash2, RefreshCcw } from 'lucide-react';
 import { EFFORT_LABELS, EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
@@ -7,6 +7,7 @@ import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from './chat-state';
 import type { ChatState } from './chat-state';
 import { shouldHideThemeSwitch } from '../embed-config';
+import { ModelSelector } from './model-selector';
 import {
   BUTTON_DESTRUCTIVE_GHOST,
   BUTTON_OUTLINE_ACCENT,
@@ -29,29 +30,96 @@ export interface ChatSettingsModalProps {
   open: boolean;
   onClose: () => void;
   state: ChatState;
+  isStandalone?: boolean;
   onStartAuth: () => void;
   onReauthenticate: () => void;
   onLogout: () => void;
   currentEffort?: string;
   onEffortSelect?: (effort: string) => void;
+  showModelSelector?: boolean;
+  currentModel?: string;
+  modelOptions?: string[];
+  onModelSelect?: (model: string) => void;
+  onModelInputChange?: (value: string) => void;
+  modelLocked?: boolean;
+  onRefreshModels?: () => void;
+  refreshingModels?: boolean;
+  onResetConversation?: () => void;
+}
+
+function ResetConversationButton({ onReset }: { onReset: () => void }) {
+  const [armed, setArmed] = useState(false);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const disarm = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setArmed(false);
+  }, []);
+
+  const handleClick = useCallback(() => {
+    if (!armed) {
+      setArmed(true);
+      timerRef.current = setTimeout(disarm, 3000);
+      return;
+    }
+    disarm();
+    onReset();
+  }, [armed, disarm, onReset]);
+
+  useEffect(() => disarm, [disarm]);
+
+  return (
+    <button
+      id="reset-conversation-btn"
+      type="button"
+      onClick={handleClick}
+      className={`flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-all ${
+        armed
+          ? 'animate-pulse border-rose-500/50 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
+          : 'border-border/50 bg-muted/20 text-muted-foreground hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400'
+      }`}
+      title={armed ? 'Click again to confirm reset' : 'Reset conversation'}
+      aria-label={armed ? 'Confirm reset' : 'Reset conversation'}
+      aria-pressed={armed}
+    >
+      <RefreshCcw className="size-4" aria-hidden />
+      {armed ? 'Confirm reset' : 'Reset'}
+    </button>
+  );
 }
 
 export function ChatSettingsModal({
   open,
   onClose,
   state,
+  isStandalone = true,
   onStartAuth,
   onReauthenticate,
   onLogout,
   currentEffort = 'max',
   onEffortSelect,
+  showModelSelector = false,
+  currentModel = '',
+  modelOptions = [],
+  onModelSelect,
+  onModelInputChange,
+  modelLocked = false,
+  onRefreshModels,
+  refreshingModels = false,
+  onResetConversation,
 }: ChatSettingsModalProps) {
   const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
   const selectedEffort = resolveEffort(currentEffort);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !isStandalone) {
+      if (!isStandalone) setInitStatus(null);
+      return;
+    }
     let cancelled = false;
     apiRequest(API_PATHS.INIT_STATUS)
       .then((r) => (r.ok ? r.json() : null))
@@ -64,7 +132,7 @@ export function ChatSettingsModal({
     return () => {
       cancelled = true;
     };
-  }, [open]);
+  }, [open, isStandalone]);
 
   if (!open) return null;
 
@@ -109,7 +177,7 @@ export function ChatSettingsModal({
     <>
       <div className={MODAL_OVERLAY_DARK} aria-hidden onClick={onClose} />
       <div
-        className={`fixed top-1/2 left-1/2 z-50 w-full max-w-sm -translate-x-1/2 -translate-y-1/2 ${MODAL_CARD} max-h-[85vh] flex flex-col`}
+        className={`fixed top-1/2 left-1/2 z-50 h-[80vh] w-[calc(100vw-24px)] max-w-5xl -translate-x-1/2 -translate-y-1/2 sm:w-[80vw] ${MODAL_CARD} flex flex-col`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -142,6 +210,22 @@ export function ChatSettingsModal({
               onTypeFilterChange={setTypeFilter}
             />
           </div>
+          {showModelSelector && onModelSelect && onModelInputChange && (
+            <div className="space-y-2.5 border-t border-border/30 pt-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model</span>
+              <ModelSelector
+                currentModel={currentModel}
+                options={modelOptions}
+                onSelect={onModelSelect}
+                onInputChange={onModelInputChange}
+                visible={true}
+                modelLocked={modelLocked}
+                onRefresh={onRefreshModels}
+                refreshing={refreshingModels}
+                variant="settings"
+              />
+            </div>
+          )}
           {onEffortSelect && (
             <div className="space-y-2.5 border-t border-border/30 pt-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Claude Effort</span>
@@ -167,28 +251,36 @@ export function ChatSettingsModal({
               </div>
             </div>
           )}
-          <div className="space-y-2.5 border-t border-border/30 pt-4">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data Privacy (GDPR/CCPA)</span>
-            <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                onClick={handleExportData}
-                className={BUTTON_OUTLINE_ACCENT}
-              >
-                <Download className="size-4" />
-                Export My Data
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteData}
-                className={BUTTON_DESTRUCTIVE_GHOST}
-              >
-                <Trash2 className="size-4" />
-                Delete My Data
-              </button>
+          {onResetConversation && state !== CHAT_STATES.AWAITING_RESPONSE && (
+            <div className="space-y-2.5 border-t border-border/30 pt-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversation</span>
+              <ResetConversationButton onReset={onResetConversation} />
             </div>
-          </div>
-          {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
+          )}
+          {isStandalone && (
+            <div className="space-y-2.5 border-t border-border/30 pt-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data Privacy (GDPR/CCPA)</span>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={handleExportData}
+                  className={BUTTON_OUTLINE_ACCENT}
+                >
+                  <Download className="size-4" />
+                  Export My Data
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteData}
+                  className={BUTTON_DESTRUCTIVE_GHOST}
+                >
+                  <Trash2 className="size-4" />
+                  Delete My Data
+                </button>
+              </div>
+            </div>
+          )}
+          {isStandalone && (state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
             <div className="border-t border-border/30 pt-4 space-y-2.5">
               {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
                 <button
@@ -212,7 +304,7 @@ export function ChatSettingsModal({
               )}
             </div>
           )}
-          {initStatus && (
+          {isStandalone && initStatus && (
             <div className="border-t border-border/30 pt-4 space-y-3">
               <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-2.5">
                 <div className="flex items-center gap-2 text-sm">

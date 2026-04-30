@@ -58,12 +58,42 @@ describe('useChatInput', () => {
     expect(onSendRef.current).not.toHaveBeenCalled();
   });
 
-  it('handleKeyDown does not call onSendRef when isMobile is true', () => {
+  it('handleKeyDown calls onSendRef on Enter in mobile-sized layouts', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef, isMobile: true })
+      useChatInput({ playgroundEntries: [], onSendRef })
     );
     const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    expect(onSendRef.current).toHaveBeenCalledOnce();
+    expect(e.preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it('handleKeyDown calls onSendRef on Enter in iframe mode', () => {
+    const mockParent = {} as Window;
+    Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+    try {
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
+      act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+
+      expect(onSendRef.current).toHaveBeenCalledOnce();
+      expect(e.preventDefault).toHaveBeenCalledOnce();
+    } finally {
+      Object.defineProperty(window, 'parent', { value: window, writable: true, configurable: true });
+    }
+  });
+
+  it('handleKeyDown does not send when event was already handled', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    const e = { key: 'Enter', shiftKey: false, defaultPrevented: true, preventDefault: vi.fn() };
     act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
     expect(onSendRef.current).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
@@ -99,9 +129,29 @@ describe('useChatInput', () => {
     // focus must NOT have been called synchronously
     expect(focusMock).not.toHaveBeenCalled();
 
-    // Flush the deferred setTimeout(fn, 0)
+    // Flush the deferred persistent focus retries
     act(() => vi.runAllTimers());
-    expect(focusMock).toHaveBeenCalledOnce();
+    expect(focusMock.mock.calls.length).toBeGreaterThan(1);
+
+    vi.useRealTimers();
+  });
+
+  it('focusInput can retry focus during the post-send iframe handoff window', () => {
+    vi.useFakeTimers();
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+
+    const focusMock = vi.fn();
+    (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+      focus: focusMock,
+    };
+
+    act(() => result.current.focusInput({ persistent: true }));
+    act(() => vi.runAllTimers());
+
+    expect(focusMock.mock.calls.length).toBeGreaterThan(1);
 
     vi.useRealTimers();
   });
@@ -202,6 +252,7 @@ describe('useChatInput', () => {
     afterEach(() => {
       // Reset window.parent to itself (standalone mode)
       Object.defineProperty(window, 'parent', { value: window, writable: true, configurable: true });
+      vi.restoreAllMocks();
     });
 
     it('restores focus to chat input on window blur when body is active element (iframe mode)', () => {
@@ -210,6 +261,7 @@ describe('useChatInput', () => {
       // Must mock BEFORE rendering so the effect sees isEmbedded = true
       const mockParent = {} as Window;
       Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      vi.spyOn(window, 'focus').mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
@@ -239,6 +291,7 @@ describe('useChatInput', () => {
 
       const mockParent = {} as Window;
       Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      vi.spyOn(window, 'focus').mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
@@ -263,6 +316,71 @@ describe('useChatInput', () => {
       expect(focusMock).not.toHaveBeenCalled();
 
       document.body.removeChild(btn);
+      vi.useRealTimers();
+    });
+
+    it('restores focus on iframe blur during the post-send focus window even when activeElement is stale', () => {
+      vi.useFakeTimers();
+
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const focusMock = vi.fn();
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
+        focus: focusMock,
+      };
+
+      const btn = document.createElement('button');
+      document.body.appendChild(btn);
+      btn.focus();
+
+      act(() => result.current.focusInput({ persistent: true }));
+      act(() => vi.advanceTimersByTime(0));
+      focusMock.mockClear();
+
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+        vi.advanceTimersByTime(16);
+      });
+
+      expect(focusMock).toHaveBeenCalled();
+
+      document.body.removeChild(btn);
+      vi.useRealTimers();
+    });
+
+    it('persistent iframe focus requests frame focus and restores the contenteditable caret', () => {
+      vi.useFakeTimers();
+
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      const windowFocus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const input = document.createElement('div');
+      input.contentEditable = 'true';
+      input.textContent = 'hello';
+      document.body.appendChild(input);
+      result.current.chatInputRef.current = input;
+
+      act(() => result.current.focusInput({ persistent: true }));
+      act(() => vi.advanceTimersByTime(0));
+
+      const selection = window.getSelection();
+      expect(windowFocus).toHaveBeenCalled();
+      expect(selection?.anchorNode ? input.contains(selection.anchorNode) : false).toBe(true);
+
+      document.body.removeChild(input);
       vi.useRealTimers();
     });
 

@@ -36,7 +36,7 @@ import { DragDropOverlay } from '../chat/drag-drop-overlay';
 
 export type { PlaygroundEntry } from './file-explorer-types';
 
-const SIDEBAR_TITLE = 'Standalone';
+const SIDEBAR_TITLE = 'Claude';
 const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
 const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
 
@@ -62,6 +62,8 @@ export function FileExplorer({
   onDirtyChange: onDirtyChangeProp,
   onPlaygroundUploaded,
   onAgentUploaded,
+  agentProviderLabel,
+  currentModel,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -85,6 +87,10 @@ export function FileExplorer({
   onPlaygroundUploaded?: () => void;
   /** Called after files are uploaded to the AI workspace via drag & drop */
   onAgentUploaded?: () => void;
+  /** Agent provider label shown in the explorer header. */
+  agentProviderLabel?: string;
+  /** Active model shown as muted secondary text in the explorer header. */
+  currentModel?: string;
 } = {}) {
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -99,6 +105,8 @@ export function FileExplorer({
 
   const controlled = isControlledTree(treeProp);
   const controlledAgent = isControlledTree(agentTreeProp);
+  const titleLabel = agentProviderLabel?.trim() || SIDEBAR_TITLE;
+  const modelLabel = currentModel?.trim() ?? '';
   const playgroundTree = controlled ? treeProp : internalTree;
   const agentTree = controlledAgent ? agentTreeProp : [];
   const loadingState = controlled ? false : loading;
@@ -343,7 +351,19 @@ export function FileExplorer({
         <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
           <div className="flex items-center gap-2 min-w-0">
             <div className="min-w-0">
-              <h2 className="font-semibold text-xs sm:text-sm text-foreground">{SIDEBAR_TITLE}</h2>
+              <div className="flex min-w-0 items-baseline gap-2">
+                <h2 className="font-semibold text-xs sm:text-sm text-foreground truncate" title={titleLabel}>
+                  {titleLabel}
+                </h2>
+                {modelLabel && (
+                  <span
+                    className="max-w-28 truncate text-[10px] font-medium leading-none text-muted-foreground/70 sm:max-w-40 sm:text-[11px]"
+                    title={`Model: ${modelLabel}`}
+                  >
+                    {modelLabel}
+                  </span>
+                )}
+              </div>
               <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
             </div>
           </div>

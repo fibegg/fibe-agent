@@ -11,15 +11,43 @@ interface RuntimeConfig {
   userAvatarBase64: string | null;
   assistantAvatarUrl: string | null;
   assistantAvatarBase64: string | null;
+  agentProvider: string;
+  agentProviderLabel: string;
+}
+
+function providerLabel(provider: string): string {
+  switch (provider.trim().toLowerCase()) {
+    case 'claude-code':
+    case 'claude':
+      return 'Claude';
+    case 'openai-codex':
+    case 'openai':
+    case 'codex':
+      return 'Codex';
+    case 'gemini':
+      return 'Gemini';
+    case 'opencode':
+    case 'opencodex':
+      return 'OpenCode';
+    case 'cursor':
+      return 'Cursor';
+    case 'mock':
+      return 'Mock';
+    default:
+      return provider.trim() || 'Claude';
+  }
 }
 
 /** Extracted logic identical to RuntimeConfigController.getConfig */
 function getRuntimeConfig(): RuntimeConfig {
+  const agentProvider = process.env.AGENT_PROVIDER?.trim() || 'claude-code';
   return {
     userAvatarUrl: process.env.USER_AVATAR_URL?.trim() || null,
     userAvatarBase64: process.env.USER_AVATAR_BASE64?.trim() || null,
     assistantAvatarUrl: process.env.ASSISTANT_AVATAR_URL?.trim() || null,
     assistantAvatarBase64: process.env.ASSISTANT_AVATAR_BASE64?.trim() || null,
+    agentProvider,
+    agentProviderLabel: providerLabel(agentProvider),
   };
 }
 
@@ -31,10 +59,12 @@ describe('RuntimeConfigController — getConfig logic', () => {
     envBackup.USER_AVATAR_BASE64 = process.env.USER_AVATAR_BASE64;
     envBackup.ASSISTANT_AVATAR_URL = process.env.ASSISTANT_AVATAR_URL;
     envBackup.ASSISTANT_AVATAR_BASE64 = process.env.ASSISTANT_AVATAR_BASE64;
+    envBackup.AGENT_PROVIDER = process.env.AGENT_PROVIDER;
     delete process.env.USER_AVATAR_URL;
     delete process.env.USER_AVATAR_BASE64;
     delete process.env.ASSISTANT_AVATAR_URL;
     delete process.env.ASSISTANT_AVATAR_BASE64;
+    delete process.env.AGENT_PROVIDER;
   });
 
   afterEach(() => {
@@ -42,6 +72,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
     process.env.USER_AVATAR_BASE64 = envBackup.USER_AVATAR_BASE64;
     process.env.ASSISTANT_AVATAR_URL = envBackup.ASSISTANT_AVATAR_URL;
     process.env.ASSISTANT_AVATAR_BASE64 = envBackup.ASSISTANT_AVATAR_BASE64;
+    process.env.AGENT_PROVIDER = envBackup.AGENT_PROVIDER;
   });
 
   test('returns all nulls when no env vars are set', () => {
@@ -50,6 +81,8 @@ describe('RuntimeConfigController — getConfig logic', () => {
       userAvatarBase64: null,
       assistantAvatarUrl: null,
       assistantAvatarBase64: null,
+      agentProvider: 'claude-code',
+      agentProviderLabel: 'Claude',
     });
   });
 
@@ -93,6 +126,20 @@ describe('RuntimeConfigController — getConfig logic', () => {
       userAvatarBase64: 'dXNlcg==',
       assistantAvatarUrl: 'https://bot.png',
       assistantAvatarBase64: 'Ym90',
+      agentProvider: 'claude-code',
+      agentProviderLabel: 'Claude',
     });
+  });
+
+  test('returns provider label for configured AGENT_PROVIDER', () => {
+    process.env.AGENT_PROVIDER = 'openai-codex';
+    expect(getRuntimeConfig().agentProvider).toBe('openai-codex');
+    expect(getRuntimeConfig().agentProviderLabel).toBe('Codex');
+  });
+
+  test('trims AGENT_PROVIDER and labels Gemini', () => {
+    process.env.AGENT_PROVIDER = '  gemini  ';
+    expect(getRuntimeConfig().agentProvider).toBe('gemini');
+    expect(getRuntimeConfig().agentProviderLabel).toBe('Gemini');
   });
 });

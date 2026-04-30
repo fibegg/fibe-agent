@@ -21,9 +21,19 @@ vi.mock('../activity-type-filters', () => ({
   ActivityTypeFilters: () => <div data-testid="activity-filters" />,
 }));
 
+vi.mock('./model-selector', () => ({
+  ModelSelector: ({ currentModel, visible }: { currentModel: string; visible: boolean }) =>
+    visible ? <div data-testid="model-selector">{currentModel}</div> : null,
+}));
+
 describe('ChatSettingsModal', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.stubGlobal('__APP_VERSION__', '1.0.0');
+    const { apiRequest } = await import('../api-url');
+    vi.mocked(apiRequest).mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'done', output: 'ok' }),
+    } as Response);
     localStorage.clear();
   });
 
@@ -96,6 +106,47 @@ describe('ChatSettingsModal', () => {
     expect(onEffortSelect).toHaveBeenCalledWith('low');
   });
 
+  it('renders the model selector in settings when enabled', () => {
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+        showModelSelector={true}
+        currentModel="claude-sonnet"
+        modelOptions={['claude-sonnet']}
+        onModelSelect={vi.fn()}
+        onModelInputChange={vi.fn()}
+      />
+    );
+
+    expect(screen.getByText('Model')).toBeTruthy();
+    expect(screen.getByTestId('model-selector').textContent).toBe('claude-sonnet');
+  });
+
+  it('runs reset only after confirmation click', () => {
+    const onResetConversation = vi.fn();
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+        onResetConversation={onResetConversation}
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /reset conversation/i }));
+    expect(onResetConversation).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: /confirm reset/i }));
+    expect(onResetConversation).toHaveBeenCalledTimes(1);
+  });
+
   it('calls onClose when Close button clicked', () => {
     const onClose = vi.fn();
     render(
@@ -141,6 +192,26 @@ describe('ChatSettingsModal', () => {
       />
     );
     expect(screen.getByRole('button', { name: /re-authenticate/i })).toBeTruthy();
+  });
+
+  it('hides standalone-only controls when rendered from Rails', () => {
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        isStandalone={false}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByText(/data privacy/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /re-authenticate/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /logout/i })).toBeNull();
+    expect(screen.queryByText(/post-init script/i)).toBeNull();
+    expect(screen.queryByText(/system_prompt/i)).toBeNull();
   });
 
   it('shows "Start Auth" button when state is UNAUTHENTICATED', () => {

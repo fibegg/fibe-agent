@@ -4,11 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import { ChatHeader } from './chat-header';
 import { CHAT_STATES } from './chat-state';
 
-vi.mock('./model-selector', () => ({
-  ModelSelector: ({ visible, currentModel }: { visible: boolean; currentModel: string }) =>
-    visible ? <div data-testid="model-selector">{currentModel}</div> : null,
-}));
-
 // Lightweight stub so PlaygroundSelector renders a recognisable element.
 vi.mock('./playground-selector', () => ({
   PlaygroundSelector: ({ currentLink }: { currentLink: string | null }) => (
@@ -33,38 +28,39 @@ const DEFAULT_PROPS = {
   sessionTokenUsage: null,
   mobileBrainClasses: { brain: 'text-violet-500', accent: 'text-violet-400' },
   statusClass: 'text-green-500',
-  showModelSelector: false,
-  currentModel: 'claude-3',
-  modelOptions: ['claude-3', 'gpt-4'],
   searchQuery: '',
   filteredMessagesCount: 0,
   onSearchChange: vi.fn(),
-  onModelSelect: vi.fn(),
-  onModelInputChange: vi.fn(),
   onReconnect: vi.fn(),
   onStartAuth: vi.fn(),
   onOpenMenu: vi.fn(),
   onOpenActivity: vi.fn(),
-  modelLocked: false,
 };
 
 // ─── Core rendering ───────────────────────────────────────────────────────────
 
 describe('ChatHeader', () => {
-  it('shows currentModel as heading when agentName is not provided', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} currentModel="claude-3-5" />);
-    expect(screen.getByText('claude-3-5')).toBeTruthy();
+  it('shows agent provider label as heading when agentName is not provided', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} agentProviderLabel="Claude" />);
+    expect(screen.getByText('Claude')).toBeTruthy();
+  });
+
+  it('shows current model as muted secondary text beside provider label', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} agentProviderLabel="Claude" currentModel="haiku" />);
+    expect(screen.getByText('Claude')).toBeTruthy();
+    expect(screen.getByText('haiku')).toBeTruthy();
+    expect(screen.getByTitle('Model: haiku')).toBeTruthy();
   });
 
   it('shows agentName as heading when provided', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" currentModel="claude-3-5" />);
+    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" agentProviderLabel="Claude" />);
     expect(screen.getByText('My Agent')).toBeTruthy();
-    expect(screen.queryByText('claude-3-5')).toBeNull();
+    expect(screen.queryByText('Claude')).toBeNull();
   });
 
-  it('falls back to "LLM Agent" when no agentName and no currentModel', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} currentModel="" />);
-    expect(screen.getByText('LLM Agent')).toBeTruthy();
+  it('falls back to "Claude" when no provider label is available', () => {
+    render(<ChatHeader {...DEFAULT_PROPS} />);
+    expect(screen.getByText('Claude')).toBeTruthy();
   });
 
   it('heading has title attribute for truncation tooltip', () => {
@@ -74,7 +70,9 @@ describe('ChatHeader', () => {
 
   it('shows session time when sessionTimeMs > 0', () => {
     render(<ChatHeader {...DEFAULT_PROPS} sessionTimeMs={65000} />);
-    expect(screen.getByTitle('Session time')).toBeTruthy();
+    const timer = screen.getByTitle('Session time');
+    expect(timer).toBeTruthy();
+    expect(timer.parentElement?.textContent).toContain('Ready');
   });
 
   it('shows state label for AUTHENTICATED', () => {
@@ -211,16 +209,6 @@ describe('ChatHeader', () => {
       <ChatHeader {...DEFAULT_PROPS} isMobile={true} state={CHAT_STATES.AWAITING_RESPONSE} />,
     );
     expect(container.querySelector('.animate-spin')).toBeTruthy();
-  });
-
-  // ─── ModelSelector ────────────────────────────────────────────────────────
-
-  it('shows ModelSelector when showModelSelector is true', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} showModelSelector={true} currentModel="gpt-4" />);
-    const selector = screen.getByTestId('model-selector');
-    expect(selector).toBeTruthy();
-    // The model-selector stub renders the currentModel inside it
-    expect(selector.textContent).toBe('gpt-4');
   });
 
   // ─── Terminal button ──────────────────────────────────────────────────────

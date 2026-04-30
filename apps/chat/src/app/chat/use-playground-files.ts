@@ -18,6 +18,12 @@ export interface PlaygroundTreeEntry {
   children?: PlaygroundTreeEntry[];
 }
 
+export interface PlaygroundStats {
+  fileCount: number;
+  totalLines: number;
+  hasGitRepo: boolean;
+}
+
 function flattenEntries(entries: PlaygroundTreeEntry[]): PlaygroundEntryItem[] {
   const out: PlaygroundEntryItem[] = [];
   for (const e of entries) {
@@ -41,13 +47,13 @@ export function usePlaygroundFiles(): {
   tree: PlaygroundTreeEntry[];
   loading: boolean;
   error: string | null;
-  stats: { fileCount: number; totalLines: number };
+  stats: PlaygroundStats;
   refetch: () => Promise<void>;
 } {
   const [tree, setTree] = useState<PlaygroundTreeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<{ fileCount: number; totalLines: number }>({ fileCount: 0, totalLines: 0 });
+  const [stats, setStats] = useState<PlaygroundStats>({ fileCount: 0, totalLines: 0, hasGitRepo: false });
 
   const entries = useMemo(
     () => sortEntries(flattenEntries(tree)),
@@ -96,8 +102,12 @@ export function usePlaygroundFiles(): {
     try {
       const res = await apiRequest(API_PATHS.PLAYGROUNDS_STATS);
       if (res.ok) {
-        const data = await res.json() as { fileCount: number; totalLines: number };
-        setStats(data);
+        const data = await res.json() as Partial<PlaygroundStats>;
+        setStats({
+          fileCount: data.fileCount ?? 0,
+          totalLines: data.totalLines ?? 0,
+          hasGitRepo: data.hasGitRepo === true,
+        });
       }
     } catch { /* ignore */ }
   }, []);

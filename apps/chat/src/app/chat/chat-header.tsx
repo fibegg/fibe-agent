@@ -1,7 +1,5 @@
-import { Brain, GitCompareArrows, Loader2, Menu, RefreshCcw, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { Brain, GitCompareArrows, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { ModelSelector } from './model-selector';
 import { PlaygroundSelector } from './playground-selector';
 import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
@@ -13,6 +11,8 @@ import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 export interface ChatHeaderProps {
   isMobile: boolean;
   agentName?: string;
+  agentProviderLabel?: string;
+  currentModel?: string;
   state: string;
   agentMode?: string;
   errorMessage: string | null;
@@ -21,21 +21,13 @@ export interface ChatHeaderProps {
   sessionTokenUsage?: { inputTokens: number; outputTokens: number } | null;
   mobileBrainClasses: { brain: string; accent: string };
   statusClass: string;
-  showModelSelector: boolean;
-  currentModel: string;
-  modelOptions: string[];
   searchQuery: string;
   filteredMessagesCount: number;
   onSearchChange: (value: string) => void;
-  onModelSelect: (model: string) => void;
-  onModelInputChange: (value: string) => void;
   onReconnect: () => void;
   onStartAuth: () => void;
   onOpenMenu: () => void;
   onOpenActivity: () => void;
-  modelLocked: boolean;
-  onRefreshModels?: () => void;
-  refreshingModels?: boolean;
   onToggleTerminal?: () => void;
   terminalOpen?: boolean;
   onToggleDiff?: () => void;
@@ -57,7 +49,6 @@ export interface ChatHeaderProps {
   onPlaygroundLink?: (path: string) => Promise<boolean>;
   onPlaygroundLinked?: () => void;
   onPlaygroundSmartMount?: () => void;
-  onResetConversation?: () => void;
 }
 
 const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -144,49 +135,6 @@ function DiffButton({
   );
 }
 
-/** Two-tap RESET button — first click arms it (3 s window), second click fires. */
-function ResetConversationButton({ onReset }: { onReset: () => void }) {
-  const [armed, setArmed] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const disarm = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-    setArmed(false);
-  }, []);
-
-  const handleClick = useCallback(() => {
-    if (!armed) {
-      setArmed(true);
-      timerRef.current = setTimeout(disarm, 3000);
-    } else {
-      disarm();
-      onReset();
-    }
-  }, [armed, disarm, onReset]);
-
-  return (
-    <button
-      id="reset-conversation-btn"
-      type="button"
-      onClick={handleClick}
-      className={`flex items-center gap-1 px-2 py-1 rounded-md text-[10px] sm:text-xs font-medium transition-all shrink-0 border ${
-        armed
-          ? 'bg-rose-500/20 border-rose-500/50 text-rose-300 hover:bg-rose-500/30 animate-pulse'
-          : 'bg-transparent border-border/40 text-muted-foreground hover:border-rose-500/40 hover:text-rose-400 hover:bg-rose-500/10'
-      }`}
-      title={armed ? 'Click again to confirm reset' : 'Reset conversation (clears agent memory)'}
-      aria-label={armed ? 'Confirm reset' : 'Reset conversation'}
-      aria-pressed={armed}
-    >
-      <RefreshCcw className="size-3" aria-hidden />
-      {armed ? 'Confirm?' : 'Reset'}
-    </button>
-  );
-}
-
 /** Terminal toggle button, shared between the desktop top-row and the mobile search-row. */
 function TerminalButton({
   open,
@@ -218,6 +166,8 @@ function TerminalButton({
 export function ChatHeader({
   isMobile,
   agentName,
+  agentProviderLabel,
+  currentModel,
   state,
   agentMode,
   errorMessage,
@@ -226,36 +176,29 @@ export function ChatHeader({
   sessionTokenUsage = null,
   mobileBrainClasses,
   statusClass,
-  showModelSelector,
-  currentModel,
-  modelOptions,
   searchQuery,
   filteredMessagesCount,
   onSearchChange,
-  onModelSelect,
-  onModelInputChange,
   onReconnect,
   onStartAuth,
   onOpenMenu,
   onOpenActivity,
-  modelLocked,
-  onRefreshModels,
-  refreshingModels,
   onToggleTerminal,
   terminalOpen = false,
   onToggleDiff,
   diffOpen = false,
   tonyStarkMode = false,
   onToggleTonyStarkMode,
-  onResetConversation,
   ...rest
 }: ChatHeaderProps) {
-  // Derive a display name: agentName > currentModel > fallback
-  const displayName = agentName || (currentModel && currentModel.trim()) || 'LLM Agent';
+  const displayName = agentName || agentProviderLabel?.trim() || 'Claude';
+  const modelLabel = currentModel?.trim() ?? '';
   // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
   const playgroundProps: ChatHeaderProps = {
     isMobile,
     agentName,
+    agentProviderLabel,
+    currentModel,
     state,
     agentMode,
     errorMessage,
@@ -264,21 +207,13 @@ export function ChatHeader({
     sessionTokenUsage,
     mobileBrainClasses,
     statusClass,
-    showModelSelector,
-    currentModel,
-    modelOptions,
     searchQuery,
     filteredMessagesCount,
     onSearchChange,
-    onModelSelect,
-    onModelInputChange,
     onReconnect,
     onStartAuth,
     onOpenMenu,
     onOpenActivity,
-    modelLocked,
-    onRefreshModels,
-    refreshingModels,
     onToggleTerminal,
     terminalOpen,
     onToggleDiff,
@@ -319,8 +254,25 @@ export function ChatHeader({
             </button>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-baseline gap-2 flex-wrap">
               <h2 className="font-semibold text-sm text-foreground truncate" title={displayName}>{displayName}</h2>
+              {modelLabel && (
+                <span
+                  className="max-w-28 truncate text-[11px] font-medium leading-none text-muted-foreground/70 sm:max-w-40"
+                  title={`Model: ${modelLabel}`}
+                >
+                  {modelLabel}
+                </span>
+              )}
+            </div>
+            <div className="min-h-[14px] mt-0.5 flex items-center gap-2">
+              <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
+                {state === CHAT_STATES.AWAITING_RESPONSE && agentMode
+                  ? <TypewriterText text={agentMode} speed={40} />
+                  : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
+                  ? truncateError(errorMessage)
+                  : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state}
+              </p>
               {sessionTimeMs > 0 && (
                 <span
                   className="text-[10px] sm:text-xs font-medium tabular-nums text-muted-foreground"
@@ -329,15 +281,6 @@ export function ChatHeader({
                   {formatSessionDurationMs(sessionTimeMs)}
                 </span>
               )}
-            </div>
-            <div className="min-h-[14px] mt-0.5 flex items-center">
-              <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
-                {state === CHAT_STATES.AWAITING_RESPONSE && agentMode
-                  ? <TypewriterText text={agentMode} speed={40} />
-                  : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
-                  ? truncateError(errorMessage)
-                  : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state}
-              </p>
             </div>
           </div>
         </div>
@@ -407,20 +350,6 @@ export function ChatHeader({
             </Link>
           )}
 
-          <ModelSelector
-            currentModel={currentModel}
-            options={modelOptions}
-            onSelect={onModelSelect}
-            onInputChange={onModelInputChange}
-            visible={showModelSelector}
-            modelLocked={modelLocked}
-            onRefresh={onRefreshModels}
-            refreshing={refreshingModels}
-          />
-          {/* RESET button — only shown when the agent is idle */}
-          {onResetConversation && state !== CHAT_STATES.AWAITING_RESPONSE && (
-            <ResetConversationButton onReset={onResetConversation} />
-          )}
           {/* Desktop-only: playground selector in top row */}
           <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
           {/* Desktop-only: diff button in top row */}
