@@ -245,4 +245,15 @@ describe('ActivityStoreService', () => {
     const svc = new ActivityStoreService(makeConfig(dataDir));
     expect(svc.all()[0].story[0].message).toBe('Shutdown');
   });
+
+  test('hydrate overwrites activities and rebuilds index', async () => {
+    service.hydrate([{ id: 'act1', created_at: 'now', story: [{ id: 's1', type: 'step', message: 'hydrated', timestamp: '' }] }]);
+    expect(service.all()).toHaveLength(1);
+    expect(service.getById('act1')).toBeDefined();
+    expect(service.getById('act1')?.story[0].message).toBe('hydrated');
+
+    await service.flush();
+    const svc = new ActivityStoreService(makeConfig(dataDir));
+    expect(svc.getById('act1')).toBeDefined();
+  });
 });

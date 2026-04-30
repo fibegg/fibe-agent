@@ -1,70 +1,71 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
-import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
-import { decryptData } from '../crypto/crypto.util';
-import type { StoredStoryEntry } from '@shared/types';
+import { AsyncJsonWriter } from '../../utils/async-json-writer';
 
-export type { StoredStoryEntry } from '@shared/types';
+export interface StoryEntry {
+  id: string;
+  type: string;
+  message: string;
+  timestamp: string;
+}
 
 export interface StoredMessage {
   id: string;
-  role: string;
+  role: 'user' | 'assistant';
   body: string;
   created_at: string;
-  imageUrls?: string[];
-  story?: StoredStoryEntry[];
-  activityId?: string;
+  story?: StoryEntry[];
   model?: string;
 }
 
 @Injectable()
 export class MessageStoreService implements OnModuleDestroy {
-  private readonly messagesPath: string;
-  private readonly previousMessagesPath: string;
-  private readonly jsonWriter: SequentialJsonWriter;
   private messages: StoredMessage[] = [];
+  private readonly storePath: string;
+  private readonly previousMessagesPath: string;
+  private readonly jsonWriter: AsyncJsonWriter<StoredMessage[]>;
 
   constructor(private readonly config: ConfigService) {
-    const dataDir = this.config.getConversationDataDir();
-    this.messagesPath = join(dataDir, 'messages.json');
-    this.previousMessagesPath = join(dataDir, 'messages.previous.json');
-    this.jsonWriter = new SequentialJsonWriter(
-      this.messagesPath, 
-      () => this.messages,
-      this.config.getEncryptionKey()
-    );
-    this.ensureDataDir();
-    this.messages = this.load();
+    const dir = this.config.getConversationDataDir();
+    this.storePath = join(dir, 'messages.json');
+    this.previousMessagesPath = join(dir, 'messages.previous.json');
+    
+    this.jsonWriter = new AsyncJsonWriter({
+      filePath: this.storePath,
+      getData: () => this.messages,
+      encryptionKey: this.config.getEncryptionKey(),
+    });
+
+    if (existsSync(this.storePath)) {
+      try {
+        const raw = readFileSync(this.storePath, 'utf8');
+        this.messages = JSON.parse(raw);
+      } catch (err) {
+        console.error('Failed to parse messages.json:', err);
+      }
+    }
   }
 
   all(): StoredMessage[] {
     return this.messages;
   }
 
-  add(role: string, body: string, imageUrls?: string[], model?: string): StoredMessage {
-    const message: StoredMessage = {
+  add(role: 'user' | 'assistant', body: string, story?: StoryEntry[], model?: string): StoredMessage {
+    const msg: StoredMessage = {
       id: randomUUID(),
       role,
       body,
       created_at: new Date().toISOString(),
-      ...(imageUrls?.length ? { imageUrls } : {}),
-      ...(model ? { model } : {}),
     };
-    this.messages.push(message);
-    this.jsonWriter.schedule();
-    return message;
-  }
+    if (story) msg.story = story;
+    if (model) msg.model = model;
 
-  finalizeLastAssistant(story: StoredStoryEntry[], activityId?: string): void {
-    const last = this.messages[this.messages.length - 1];
-    if (last?.role === 'assistant') {
-      if (Array.isArray(story)) last.story = story;
-      if (activityId) last.activityId = activityId;
-      this.jsonWriter.schedule();
-    }
+    this.messages.push(msg);
+    this.jsonWriter.schedule();
+    return msg;
   }
 
   clear(): void {
@@ -88,31 +89,27 @@ export class MessageStoreService implements OnModuleDestroy {
     this.jsonWriter.schedule();
   }
 
+  hydrate(messages: StoredMessage[]): void {
+    if (Array.isArray(messages) && messages.length > 0) {
+      this.messages = messages;
+      this.jsonWriter.schedule();
+    }
+  }
+
+  finalizeLastAssistant(story: StoryEntry[]): void {
+    if (this.messages.length === 0) return;
+    const last = this.messages[this.messages.length - 1];
+    if (last.role === 'assistant') {
+      last.story = story;
+      this.jsonWriter.schedule();
+    }
+  }
+
   flush(): Promise<void> {
     return this.jsonWriter.flush();
   }
 
-  onModuleDestroy(): Promise<void> {
-    return this.flush();
+  async onModuleDestroy(): Promise<void> {
+    await this.jsonWriter.flush();
   }
-
-  private ensureDataDir(): void {
-    const dataDir = this.config.getConversationDataDir();
-    if (!existsSync(dataDir)) {
-      mkdirSync(dataDir, { recursive: true });
-    }
-  }
-
-  private load(): StoredMessage[] {
-    if (!existsSync(this.messagesPath)) return [];
-    try {
-      const raw = readFileSync(this.messagesPath, 'utf8');
-      const decrypted = decryptData(raw, this.config.getEncryptionKey());
-      return JSON.parse(decrypted);
-    } catch (err) {
-      console.error('Failed to parse messages load:', err);
-      return [];
-    }
-  }
-
 }

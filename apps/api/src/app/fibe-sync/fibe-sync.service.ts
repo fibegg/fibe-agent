@@ -80,4 +80,36 @@ export class FibeSyncService {
       this.logger.warn(`Fibe sync ${type} error: ${err}`);
     }
   }
+
+  async hydrate(type: 'messages' | 'activity'): Promise<string | null> {
+    if (!this.config.isFibeSyncEnabled() || !this.config.isFibeHydrateEnabled()) return null;
+
+    const apiUrl = this.config.getFibeApiUrl();
+    const apiKey = this.config.getFibeApiKey();
+    const agentId = this.config.getFibeAgentId();
+
+    if (!apiUrl || !apiKey || !agentId) return null;
+
+    const url = `${apiUrl}/api/agents/${agentId}/${type}`;
+
+    try {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+
+      if (!res.ok) {
+        if (res.status !== 404) {
+          this.logger.warn(`Fibe hydrate ${type} failed: ${res.status} ${res.statusText}`);
+        }
+        return null;
+      }
+
+      const data = (await res.json()) as { content?: string };
+      return data?.content ?? null;
+    } catch (err) {
+      this.logger.warn(`Fibe hydrate ${type} error: ${err}`);
+      return null;
+    }
+  }
 }

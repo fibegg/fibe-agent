@@ -56,6 +56,7 @@ describe('OrchestratorService', () => {
       getDefaultModel: () => '',
       getDefaultEffort: () => 'max',
       isGemmaRouterEnabled: () => false,
+      isFibeHydrateEnabled: () => false,
     };
     const activityStore = new ActivityStoreService(config as never);
     const messageStore = new MessageStoreService(config as never);
@@ -66,6 +67,7 @@ describe('OrchestratorService', () => {
     const fibeSync = {
       syncMessages: (getContent: () => string) => { void getContent(); },
       syncActivity: (getContent: () => string) => { void getContent(); },
+      hydrate: async () => null,
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
     const chatPromptContext = {
       buildFullPrompt: async (

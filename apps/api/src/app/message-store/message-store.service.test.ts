@@ -82,6 +82,7 @@ describe('MessageStoreService', () => {
     const service = makeService();
     service.add('user', 'durable');
     await service.flush();
+
     const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
     expect(JSON.parse(raw)[0].body).toBe('durable');
   });
@@ -90,6 +91,7 @@ describe('MessageStoreService', () => {
     const service = makeService();
     service.add('assistant', 'shutdown-safe');
     await service.onModuleDestroy();
+
     expect(existsSync(join(dataDir, 'messages.json'))).toBe(true);
     const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
     expect(JSON.parse(raw)[0].body).toBe('shutdown-safe');
@@ -145,5 +147,17 @@ describe('MessageStoreService', () => {
     await service.flush();
     const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
     expect(JSON.parse(raw)).toEqual([]);
+  });
+
+  test('hydrate overwrites messages and schedules write', async () => {
+    const service = makeService();
+
+    service.hydrate([{ id: '1', role: 'user', body: 'hydrated', created_at: 'now' }]);
+    expect(service.all()).toHaveLength(1);
+    expect(service.all()[0].body).toBe('hydrated');
+
+    await service.flush();
+    const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
+    expect(JSON.parse(raw)[0].body).toBe('hydrated');
   });
 });

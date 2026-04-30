@@ -126,6 +126,32 @@ export class OrchestratorService implements OnModuleInit {
     if (this.config.isGemmaRouterEnabled()) {
       void this.fetchMcpToolDescriptions();
     }
+
+    if (this.config.isFibeHydrateEnabled()) {
+      try {
+        const messagesContent = await this.fibeSync.hydrate('messages');
+        if (messagesContent) {
+          try {
+            const parsed = JSON.parse(messagesContent);
+            this.messageStore.hydrate(parsed);
+          } catch (e) {
+            this.logger.warn(`Failed to parse hydrated messages: ${e}`);
+          }
+        }
+
+        const activityContent = await this.fibeSync.hydrate('activity');
+        if (activityContent) {
+          try {
+            const parsed = JSON.parse(activityContent);
+            this.activityStore.hydrate(parsed);
+          } catch (e) {
+            this.logger.warn(`Failed to parse hydrated activity: ${e}`);
+          }
+        }
+      } catch (err) {
+        this.logger.error(`Error during hydration: ${err}`);
+      }
+    }
   }
 
   get outbound(): Subject<OutboundEvent> {

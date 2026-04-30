@@ -92,6 +92,10 @@ export class ConfigService {
     return this.settings.fibeSyncEnabled === true || process.env.FIBE_SYNC_ENABLED === 'true';
   }
 
+  isFibeHydrateEnabled(): boolean {
+    return process.env.FIBE_HYDRATE_ON_INIT === 'true';
+  }
+
   getPostInitScript(): string | undefined {
     return this.settings.postInitScript?.trim() || undefined;
   }

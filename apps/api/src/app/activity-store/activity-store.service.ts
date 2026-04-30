@@ -107,6 +107,17 @@ export class ActivityStoreService implements OnModuleDestroy {
     this.jsonWriter.schedule();
   }
 
+  hydrate(activities: StoredActivityEntry[]): void {
+    if (Array.isArray(activities) && activities.length > 0) {
+      this.activities = activities.map((a) => ({
+        ...a,
+        story: dedupeStoryById(Array.isArray(a.story) ? a.story : []),
+      }));
+      this.rebuildIndex();
+      this.jsonWriter.schedule();
+    }
+  }
+
   flush(): Promise<void> {
     return this.jsonWriter.flush();
   }
