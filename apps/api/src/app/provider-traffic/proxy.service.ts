@@ -1,7 +1,8 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Optional } from '@nestjs/common';
 import { CertificateManager } from './certificate-manager';
 import { ConnectProxy } from './connect-proxy';
 import { ProviderTrafficStoreService } from './provider-traffic-store.service';
+import { FibeSyncSettingsStoreService } from '../fibe-sync/fibe-sync-settings-store.service';
 
 /**
  * Orchestrates the MITM proxy lifecycle. Only starts if the
@@ -23,15 +24,32 @@ export class ProxyService implements OnModuleInit, OnModuleDestroy {
   private proxy: ConnectProxy | null = null;
   private enabled = false;
 
-  constructor(private readonly trafficStore: ProviderTrafficStoreService) {}
+  constructor(
+    private readonly trafficStore: ProviderTrafficStoreService,
+    @Optional() private readonly settingsStore?: FibeSyncSettingsStoreService
+  ) {}
 
   async onModuleInit(): Promise<void> {
-    this.enabled = process.env['PROVIDER_TRAFFIC_CAPTURE'] === 'true';
-    if (!this.enabled) {
+    const captureEnabled = this.settingsStore?.get().rawProviderCapture ?? process.env['PROVIDER_TRAFFIC_CAPTURE'] === 'true';
+    if (!captureEnabled) {
       this.logger.log('Provider traffic capture is disabled (set PROVIDER_TRAFFIC_CAPTURE=true to enable)');
       return;
     }
 
+    await this.startCapture();
+  }
+
+  async setCaptureEnabled(enabled: boolean): Promise<void> {
+    if (enabled) {
+      await this.startCapture();
+    } else {
+      await this.stopCapture();
+    }
+  }
+
+  private async startCapture(): Promise<void> {
+    if (this.enabled) return;
+    this.enabled = true;
     this.logger.log('Initializing MITM provider traffic capture...');
 
     // Clean up orphaned CA files from previous crashed processes
@@ -66,9 +84,14 @@ export class ProxyService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    await this.stopCapture();
+  }
+
+  private async stopCapture(): Promise<void> {
     if (!this.enabled) return;
 
     this.logger.log('Shutting down MITM proxy...');
+    this.enabled = false;
 
     delete process.env['__FIBE_PROXY_PORT'];
     delete process.env['__FIBE_PROXY_CA_PATH'];

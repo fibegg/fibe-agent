@@ -44,5 +44,6 @@ export function finishAgentStream(
       deps.send(WS_EVENT.ACTIVITY_UPDATED, { entry });
     }
   }
+  void deps.fibeSync.syncActivity(() => JSON.stringify(deps.activityStore.all()));
   deps.clearLastStreamUsage();
 }

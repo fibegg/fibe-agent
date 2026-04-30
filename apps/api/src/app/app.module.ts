@@ -32,6 +32,8 @@ import { AgentController } from './agent/agent.controller';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
 import { PlayroomBrowserService } from './playgrounds/playroom-browser.service';
 import { FibeSyncService } from './fibe-sync/fibe-sync.service';
+import { FibeSyncSettingsController } from './fibe-sync/fibe-sync-settings.controller';
+import { FibeSyncSettingsStoreService } from './fibe-sync/fibe-sync-settings-store.service';
 import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
 import { SteeringService } from './steering/steering.service';
 import { AgentFilesController } from './agent-files/agent-files.controller';
@@ -40,6 +42,7 @@ import { AgentFilesWatcherService } from './agent-files/agent-files-watcher.serv
 import { RuntimeConfigController } from './runtime-config/runtime-config.controller';
 import { TerminalService } from './terminal/terminal.service';
 import { ProxyService } from './provider-traffic/proxy.service';
+import { ProviderTrafficController } from './provider-traffic/provider-traffic.controller';
 import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic-store.service';
 import { GemmaRouterService } from './gemma-router/gemma-router.service';
 import { AgentModeController } from './agent-mode/agent-mode.controller';
@@ -69,6 +72,8 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     AgentController,
     DataPrivacyController,
     RuntimeConfigController,
+    FibeSyncSettingsController,
+    ProviderTrafficController,
     AgentModeController,
   ],
   providers: [
@@ -92,6 +97,7 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     AgentFilesService,
     AgentFilesWatcherService,
     FibeSyncService,
+    FibeSyncSettingsStoreService,
     GithubTokenRefreshService,
     SteeringService,
     TerminalService,

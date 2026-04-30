@@ -1,5 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Key, Loader2, LogOut, X, Download, Trash2, RefreshCcw } from 'lucide-react';
+import type { ReactNode } from 'react';
+import {
+  Activity,
+  DatabaseZap,
+  Download,
+  Key,
+  Loader2,
+  LogOut,
+  MessageSquareText,
+  RefreshCcw,
+  ServerCog,
+  ShieldCheck,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { EFFORT_LABELS, EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
@@ -17,6 +31,8 @@ import {
 } from '../ui-classes';
 import { ActivityTypeFilters } from '../activity-type-filters';
 import { usePersistedTypeFilter } from '../use-persisted-type-filter';
+import { RightDrawer } from '../right-drawer';
+import { RawProviderActivityDrawerContent } from './raw-provider-activity-drawer';
 
 interface InitStatusResponse {
   state: 'disabled' | 'pending' | 'running' | 'done' | 'failed';
@@ -24,6 +40,13 @@ interface InitStatusResponse {
   error?: string;
   finishedAt?: string;
   systemPrompt?: string;
+}
+
+interface FibeSyncSettings {
+  messages: boolean;
+  activity: boolean;
+  rawProviders: boolean;
+  rawProviderCapture: boolean;
 }
 
 export interface ChatSettingsModalProps {
@@ -91,6 +114,69 @@ function ResetConversationButton({ onReset }: { onReset: () => void }) {
   );
 }
 
+function SettingsSwitch({
+  checked,
+  onChange,
+  label,
+  disabled = false,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative h-6 w-11 shrink-0 rounded-full border p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked ? 'border-primary/60 bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'border-border/70 bg-background/70'
+      }`}
+    >
+      <span
+        className={`block size-5 rounded-full shadow-sm transition-transform ${
+          checked ? 'translate-x-5 bg-white' : 'translate-x-0 bg-muted-foreground/70'
+        }`}
+      />
+    </button>
+  );
+}
+
+function FibeSyncRow({
+  label,
+  icon,
+  checked,
+  disabled,
+  onChange,
+}: {
+  label: string;
+  icon: ReactNode;
+  checked: boolean;
+  disabled: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
+          {icon}
+        </span>
+        <span className="truncate text-sm font-medium text-foreground">{label}</span>
+      </div>
+      <SettingsSwitch
+        checked={checked}
+        disabled={disabled}
+        label={label}
+        onChange={onChange}
+      />
+    </div>
+  );
+}
+
 export function ChatSettingsModal({
   open,
   onClose,
@@ -112,6 +198,9 @@ export function ChatSettingsModal({
   onResetConversation,
 }: ChatSettingsModalProps) {
   const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
+  const [syncSettings, setSyncSettings] = useState<FibeSyncSettings | null>(null);
+  const [syncSaving, setSyncSaving] = useState(false);
+  const [rawDrawerOpen, setRawDrawerOpen] = useState(false);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
   const selectedEffort = resolveEffort(currentEffort);
 
@@ -134,7 +223,39 @@ export function ChatSettingsModal({
     };
   }, [open, isStandalone]);
 
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    apiRequest(API_PATHS.FIBE_SYNC_SETTINGS)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: FibeSyncSettings | null) => {
+        if (!cancelled && data) setSyncSettings(data);
+      })
+      .catch(() => {
+        if (!cancelled) setSyncSettings(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
+
   if (!open) return null;
+
+  const updateSyncSetting = (key: keyof FibeSyncSettings, value: boolean) => {
+    if (!syncSettings) return;
+    const next = { ...syncSettings, [key]: value };
+    setSyncSettings(next);
+    setSyncSaving(true);
+    apiRequest(API_PATHS.FIBE_SYNC_SETTINGS, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ [key]: value }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('Failed to save sync setting'))))
+      .then((data: FibeSyncSettings) => setSyncSettings(data))
+      .catch(() => setSyncSettings(syncSettings))
+      .finally(() => setSyncSaving(false));
+  };
 
   const handleAuthClick = () => {
     onClose();
@@ -209,6 +330,37 @@ export function ChatSettingsModal({
               typeFilter={typeFilter}
               onTypeFilterChange={setTypeFilter}
             />
+          </div>
+          <div className="space-y-2.5 border-t border-border/30 pt-4">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fibe Sync</span>
+              {syncSaving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Saving sync settings" />}
+            </div>
+            <div className="grid gap-2 rounded-lg border border-border/40 bg-muted/15 p-2.5 sm:grid-cols-2">
+              {([
+                ['messages', 'Send messages to Fibe', <MessageSquareText key="messages" className="size-3.5" />],
+                ['activity', 'Send activity to Fibe', <Activity key="activity" className="size-3.5" />],
+                ['rawProviders', 'Send raw provider activity to Fibe', <DatabaseZap key="rawProviders" className="size-3.5" />],
+                ['rawProviderCapture', 'Intercept raw provider activity', <ShieldCheck key="rawProviderCapture" className="size-3.5" />],
+              ] as const).map(([key, label, icon]) => (
+                <FibeSyncRow
+                  key={key}
+                  label={label}
+                  icon={icon}
+                  checked={syncSettings?.[key] ?? false}
+                  disabled={!syncSettings}
+                  onChange={(checked) => updateSyncSetting(key, checked)}
+                />
+              ))}
+              <button
+                type="button"
+                onClick={() => setRawDrawerOpen(true)}
+                className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 sm:col-span-2"
+              >
+                <ServerCog className="size-4" />
+                View raw provider activity
+              </button>
+            </div>
           </div>
           {showModelSelector && onModelSelect && onModelInputChange && (
             <div className="space-y-2.5 border-t border-border/30 pt-4">
@@ -346,6 +498,15 @@ export function ChatSettingsModal({
           <p className="text-[11px] text-muted-foreground/70 pt-1 text-center">v{__APP_VERSION__}</p>
         </div>
       </div>
+      <RightDrawer
+        open={rawDrawerOpen}
+        onClose={() => setRawDrawerOpen(false)}
+        title="Raw Provider Activity"
+        icon={<ServerCog className="size-4" />}
+        width="min(92vw, 760px)"
+      >
+        <RawProviderActivityDrawerContent open={rawDrawerOpen} />
+      </RightDrawer>
     </>
   );
 }

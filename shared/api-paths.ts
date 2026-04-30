@@ -18,6 +18,8 @@ export const API_PATHS = {
   ACTIVITIES: '/api/activities',
   ACTIVITIES_BY_ENTRY: '/api/activities/by-entry',
   INIT_STATUS: '/api/init-status',
+  FIBE_SYNC_SETTINGS: '/api/fibe-sync-settings',
+  PROVIDER_TRAFFIC: '/api/provider-traffic',
   AGENT_SEND_MESSAGE: '/api/agent/send-message',
   PLAYROOMS_BROWSE: '/api/playrooms/browse',
   PLAYROOMS_LINK: '/api/playrooms/link',

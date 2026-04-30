@@ -6,6 +6,7 @@ describe('finishAgentStream', () => {
   let sent: Array<{ type: string; data?: Record<string, unknown> }>;
   let addedMessages: Array<{ role: string; text: string }>;
   let syncedMessages: string[];
+  let syncedActivity: string[];
   let usageSet: Array<{ id: string; usage: unknown }>;
   let currentActivityId: string | null;
   let activityById: Record<string, Record<string, unknown>>;
@@ -17,6 +18,7 @@ describe('finishAgentStream', () => {
     sent = [];
     addedMessages = [];
     syncedMessages = [];
+    syncedActivity = [];
     usageSet = [];
     currentActivityId = 'act-1';
     activityById = {
@@ -35,9 +37,11 @@ describe('finishAgentStream', () => {
       activityStore: {
         setUsage: (id: string, usage: unknown) => usageSet.push({ id, usage }),
         getById: (id: string) => activityById[id] ?? null,
+        all: () => Object.values(activityById),
       } as never,
       fibeSync: {
         syncMessages: (getContent: () => string) => { syncedMessages.push(getContent()); },
+        syncActivity: (getContent: () => string) => { syncedActivity.push(getContent()); },
       } as never,
       send: (type, data) => sent.push({ type, data }),
       getCurrentActivityId: () => currentActivityId,
@@ -112,5 +116,11 @@ describe('finishAgentStream', () => {
     const step = { id: 's1', title: 'Gen', status: 'processing' as const, timestamp: new Date() };
     finishAgentStream(deps, 'ok', 's1', step);
     expect(syncedMessages).toHaveLength(1);
+  });
+
+  test('syncs activity after finishing', () => {
+    const step = { id: 's1', title: 'Gen', status: 'processing' as const, timestamp: new Date() };
+    finishAgentStream(deps, 'ok', 's1', step);
+    expect(syncedActivity).toHaveLength(1);
   });
 });

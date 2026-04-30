@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
+import { FibeSyncSettingsStoreService } from './fibe-sync-settings-store.service';
 
 @Injectable()
 export class FibeSyncService {
@@ -9,7 +10,10 @@ export class FibeSyncService {
   private rawProvidersSyncTimer: ReturnType<typeof setTimeout> | null = null;
   private static readonly DEBOUNCE_MS = 500;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly settingsStore?: FibeSyncSettingsStoreService
+  ) {}
 
   syncMessages(getContent: () => string): void {
     if (this.messageSyncTimer) clearTimeout(this.messageSyncTimer);
@@ -51,7 +55,8 @@ export class FibeSyncService {
     type: 'messages' | 'activity' | 'raw_providers',
     content: string
   ): Promise<void> {
-    if (!this.config.isFibeSyncEnabled()) return;
+    const enabled = this.settingsStore?.isEnabled(type) ?? this.config.isFibeSyncEnabled();
+    if (!enabled) return;
 
     const apiUrl = this.config.getFibeApiUrl();
     const apiKey = this.config.getFibeApiKey();
