@@ -5,6 +5,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
+import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
 import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
@@ -544,6 +545,9 @@ export class OrchestratorService implements OnModuleInit {
         );
       } else {
         const message = raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
+        if (isProviderAuthFailureMessage(message)) {
+          this.isAuthenticated = false;
+        }
         this._send(WS_EVENT.ERROR, { message });
       }
     } finally {

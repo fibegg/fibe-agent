@@ -249,6 +249,26 @@ describe('OrchestratorService', () => {
     expect(typeof streamEnd?.data.model).toBe('string');
   });
 
+  test('provider authentication failures clear backend auth state and send clear error', async () => {
+    const orch = await createOrchestrator();
+    orch.isAuthenticated = true;
+    const message =
+      'Authentication failed for Claude Code: the API key or token is invalid. Check the configured Claude Code credentials, then reconnect or re-authenticate.';
+    const strategy = (orch as unknown as {
+      strategy: { executePromptStreaming: () => Promise<void> };
+    }).strategy;
+    strategy.executePromptStreaming = async () => {
+      throw new Error(message);
+    };
+
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    orch.outbound.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+
+    expect(orch.isAuthenticated).toBe(false);
+    expect(events.some((e) => e.type === WS_EVENT.ERROR && e.data.message === message)).toBe(true);
+  });
+
   test('handleClientMessage interrupt_agent when not processing does nothing', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string }> = [];
@@ -578,4 +598,3 @@ describe('OrchestratorService', () => {
     configSpy.mockRestore();
   });
 });
-

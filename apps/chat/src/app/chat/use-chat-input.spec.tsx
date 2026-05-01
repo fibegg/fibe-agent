@@ -255,7 +255,7 @@ describe('useChatInput', () => {
       vi.restoreAllMocks();
     });
 
-    it('restores focus to chat input on window blur when body is active element (iframe mode)', () => {
+    it('does NOT restore focus to chat input on ordinary iframe blur', () => {
       vi.useFakeTimers();
 
       // Must mock BEFORE rendering so the effect sees isEmbedded = true
@@ -281,7 +281,7 @@ describe('useChatInput', () => {
         vi.runAllTimers();
       });
 
-      expect(focusMock).toHaveBeenCalledOnce();
+      expect(focusMock).not.toHaveBeenCalled();
 
       vi.useRealTimers();
     });
@@ -319,7 +319,7 @@ describe('useChatInput', () => {
       vi.useRealTimers();
     });
 
-    it('restores focus on iframe blur during the post-send focus window even when activeElement is stale', () => {
+    it('restores focus on iframe blur during the post-send focus window when activeElement still points at chat input', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
@@ -331,14 +331,14 @@ describe('useChatInput', () => {
         useChatInput({ playgroundEntries: [], onSendRef })
       );
 
-      const focusMock = vi.fn();
-      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
-        focus: focusMock,
-      };
+      const input = document.createElement('div');
+      input.tabIndex = 0;
+      document.body.appendChild(input);
+      result.current.chatInputRef.current = input;
+      const focusMock = vi.spyOn(input, 'focus');
 
-      const btn = document.createElement('button');
-      document.body.appendChild(btn);
-      btn.focus();
+      input.focus();
+      focusMock.mockClear();
 
       act(() => result.current.focusInput({ persistent: true }));
       act(() => vi.advanceTimersByTime(0));
@@ -351,7 +351,135 @@ describe('useChatInput', () => {
 
       expect(focusMock).toHaveBeenCalled();
 
-      document.body.removeChild(btn);
+      document.body.removeChild(input);
+      vi.useRealTimers();
+    });
+
+    it('does NOT restore focus over another focused control during the post-send focus window', () => {
+      vi.useFakeTimers();
+
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      const windowFocus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const input = document.createElement('div');
+      input.tabIndex = 0;
+      document.body.appendChild(input);
+      result.current.chatInputRef.current = input;
+      const focusMock = vi.spyOn(input, 'focus');
+
+      act(() => result.current.focusInput({ persistent: true }));
+      act(() => vi.advanceTimersByTime(0));
+      focusMock.mockClear();
+      windowFocus.mockClear();
+
+      const tokenInput = document.createElement('input');
+      document.body.appendChild(tokenInput);
+      tokenInput.focus();
+
+      act(() => {
+        vi.advanceTimersByTime(25);
+        window.dispatchEvent(new Event('blur'));
+        vi.advanceTimersByTime(16);
+      });
+
+      expect(focusMock).not.toHaveBeenCalled();
+      expect(windowFocus).not.toHaveBeenCalled();
+
+      document.body.removeChild(tokenInput);
+      document.body.removeChild(input);
+      vi.useRealTimers();
+    });
+
+    it('releases chat focus and cancels pending focus retries when the parent requests focus', () => {
+      vi.useFakeTimers();
+
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      const windowFocus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const input = document.createElement('div');
+      input.tabIndex = 0;
+      input.contentEditable = 'true';
+      input.textContent = 'hello';
+      document.body.appendChild(input);
+      result.current.chatInputRef.current = input;
+      const focusMock = vi.spyOn(input, 'focus');
+      const blurMock = vi.spyOn(input, 'blur');
+
+      act(() => result.current.focusInput({ persistent: true }));
+      act(() => vi.advanceTimersByTime(0));
+      focusMock.mockClear();
+      blurMock.mockClear();
+      windowFocus.mockClear();
+
+      input.focus();
+      expect(document.activeElement).toBe(input);
+      focusMock.mockClear();
+
+      act(() => {
+        window.dispatchEvent(new MessageEvent('message', {
+          data: { type: 'fibe_parent_focus_requested' },
+        }));
+      });
+
+      expect(blurMock).toHaveBeenCalledOnce();
+      expect(document.activeElement).not.toBe(input);
+
+      act(() => vi.runAllTimers());
+
+      expect(focusMock).not.toHaveBeenCalled();
+      expect(windowFocus).not.toHaveBeenCalled();
+
+      document.body.removeChild(input);
+      vi.useRealTimers();
+    });
+
+    it('cancels pending blur recovery when the parent requests Rails focus', () => {
+      vi.useFakeTimers();
+
+      const mockParent = {} as Window;
+      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+
+      const onSendRef = { current: vi.fn() };
+      const { result } = renderHook(() =>
+        useChatInput({ playgroundEntries: [], onSendRef })
+      );
+
+      const input = document.createElement('div');
+      input.tabIndex = 0;
+      input.contentEditable = 'true';
+      document.body.appendChild(input);
+      result.current.chatInputRef.current = input;
+      const focusMock = vi.spyOn(input, 'focus');
+      const blurMock = vi.spyOn(input, 'blur');
+
+      input.focus();
+      focusMock.mockClear();
+
+      act(() => {
+        window.dispatchEvent(new Event('blur'));
+        window.dispatchEvent(new MessageEvent('message', {
+          data: { type: 'fibe_parent_focus_requested' },
+        }));
+        vi.runAllTimers();
+      });
+
+      expect(blurMock).toHaveBeenCalledOnce();
+      expect(focusMock).not.toHaveBeenCalled();
+
+      document.body.removeChild(input);
       vi.useRealTimers();
     });
 

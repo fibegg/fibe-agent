@@ -29,6 +29,14 @@ if (process.env.CLAUDE_FAKE_MODE === 'missing-session') {
   console.error('No conversation found with session ID: stale-session-id');
   process.exit(1);
 }
+if (process.env.CLAUDE_FAKE_MODE === 'auth-error-json') {
+  console.log(JSON.stringify({ type: 'error', error: { message: 'Invalid API key' } }));
+  process.exit(1);
+}
+if (process.env.CLAUDE_FAKE_MODE === 'auth-error-result') {
+  console.log(JSON.stringify({ type: 'result', subtype: 'error', result: 'Not authenticated. Please login.' }));
+  process.exit(0);
+}
 if (process.env.CLAUDE_FAKE_MODE === 'empty') {
   process.exit(0);
 }
@@ -395,6 +403,42 @@ describe('ClaudeCodeStrategy API token mode', () => {
       '--no-chrome',
     ]);
     expect(existsSync(join(workspaceDir, '.claude_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming reports Claude auth errors from stream-json stdout', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'bad-token';
+    process.env.CLAUDE_FAKE_MODE = 'auth-error-json';
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'auth-error-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined, { onTool: () => undefined })
+    ).rejects.toThrow('Authentication failed for Claude Code: the API key or token is invalid.');
+  });
+
+  test('executePromptStreaming reports Claude auth errors before generic empty-output errors', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.ANTHROPIC_API_KEY = 'bad-token';
+    process.env.CLAUDE_FAKE_MODE = 'auth-error-result';
+
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => join(CLAUDE_TEST_HOME, 'auth-empty-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined, { onTool: () => undefined })
+    ).rejects.toThrow('Authentication failed for Claude Code: the provider requires authentication.');
   });
 
   test('executePromptStreaming uses runtime effort option', async () => {

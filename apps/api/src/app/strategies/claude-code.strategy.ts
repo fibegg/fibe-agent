@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { resolveEffort } from '@shared/effort.constants';
+import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type { AgentRuntimeOptions, AuthConnection, ConversationDataDirProvider, LogoutConnection, ToolEvent } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
@@ -439,6 +440,12 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       let currentToolBlock: { name?: string; inputStr: string } | null = null;
       let hasEmittedOutput = false;
 
+      const appendError = (message: string | undefined) => {
+        const trimmed = message?.trim();
+        if (!trimmed) return;
+        errorResult += `${errorResult.trim() ? '\n' : ''}${trimmed}`;
+      };
+
       const applyUsage = (u: { input_tokens?: number; output_tokens?: number } | undefined) => {
         if (!u) return;
         const inT = typeof u.input_tokens === 'number' ? u.input_tokens : streamUsage?.inputTokens ?? 0;
@@ -453,6 +460,10 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           const obj = JSON.parse(line) as {
             type?: string;
             session_id?: string;
+            message?: string;
+            subtype?: string;
+            result?: string;
+            error?: string | { message?: string };
             event?: {
               type?: string;
               index?: number;
@@ -462,6 +473,22 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
               usage?: { input_tokens?: number; output_tokens?: number };
             };
           };
+          const topLevelError =
+            typeof obj.error === 'string'
+              ? obj.error
+              : typeof obj.error?.message === 'string'
+                ? obj.error.message
+                : typeof obj.message === 'string' && obj.type === 'error'
+                  ? obj.message
+                  : undefined;
+          if (topLevelError) {
+            appendError(topLevelError);
+            return;
+          }
+          if (obj.type === 'result' && /error|failed/i.test(obj.subtype ?? '') && typeof obj.result === 'string') {
+            appendError(obj.result);
+            return;
+          }
           if (!capturedSessionId && obj.session_id) {
             capturedSessionId = obj.session_id;
           }
@@ -562,6 +589,16 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
         }
+        const shouldInspectFailure = (code !== 0 && code !== null) || !hasEmittedOutput || Boolean(errorResult.trim());
+        if (shouldInspectFailure) {
+          const combinedErrorOutput = [errorResult, stdoutBuffer].filter((s) => s.trim()).join('\n');
+          const authError = detectProviderAuthFailure('Claude Code', combinedErrorOutput);
+          if (authError) {
+            this._hasSession = false;
+            reject(authError);
+            return;
+          }
+        }
         if (code !== 0) {
           if (missingSessionError(errorResult)) {
             this.clearStoredSession(workspaceDir);
@@ -584,7 +621,12 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           reject(new Error(fallbackError.trim() || `Process exited with code ${code}`));
         } else if (!hasEmittedOutput) {
           this.clearStoredSession(workspaceDir);
-          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+          reject(
+            new Error(
+              errorResult.trim() ||
+                'Agent process completed successfully but returned no output. Session not saved to prevent corruption.'
+            )
+          );
         } else {
           this._hasSession = true;
           if (capturedSessionId) {

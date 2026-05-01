@@ -488,6 +488,24 @@ describe('useChatWebSocket message handlers', () => {
     expect(result.current.errorMessage).toBe('test error');
   });
 
+  it('dismisses provider authentication failures back to unauthenticated state', async () => {
+    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'error',
+          message:
+            'Authentication failed for Claude Code: the API key or token is invalid. Check the configured Claude Code credentials, then reconnect or re-authenticate.',
+        }),
+      } as MessageEvent)
+    );
+    expect(result.current.state).toBe(CHAT_STATES.ERROR);
+    act(() => result.current.dismissError());
+    expect(result.current.state).toBe(CHAT_STATES.UNAUTHENTICATED);
+    expect(result.current.errorMessage).toBeNull();
+  });
+
   it('handles message events (assistant sets AUTHENTICATED)', async () => {
     const onMessage = vi.fn();
     const { result } = renderHook(() => useChatWebSocket(onMessage), { wrapper });

@@ -1,4 +1,5 @@
 import type { StoredActivityEntry } from '@shared/types';
+import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
 
 export type { StoredStoryEntry, StoredActivityEntry } from '@shared/types';
 export { WS_CLOSE } from '@shared/ws-constants';
@@ -58,6 +59,7 @@ export function truncateError(message: string | null, maxLen = ERROR_MESSAGE_MAX
 }
 
 export function isRetryableError(errorMessage: string | null): boolean {
+  if (isProviderAuthFailureMessage(errorMessage)) return false;
   return !!errorMessage && !ERROR_MESSAGES_NO_RETRY.has(errorMessage);
 }
 
@@ -102,4 +104,3 @@ export interface ServerMessage {
   /** Included in the conversation_reset event payload. */
   resetAt?: string;
 }
-

@@ -28,6 +28,7 @@
     "src/**/*.jsx",
     "../../shared/api-paths.ts",
     "../../shared/effort.constants.ts",
+    "../../shared/provider-auth-errors.ts",
     "../../shared/ws-constants.ts",
     "../../shared/types.ts"
   ]

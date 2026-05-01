@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
@@ -419,6 +420,15 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         if (this.streamInterrupted) {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
+        }
+        const shouldInspectFailure = (code !== 0 && code !== null) || !hasEmittedOutput || Boolean(errorResult.trim());
+        if (shouldInspectFailure) {
+          const authError = detectProviderAuthFailure('Gemini', [errorResult, stdoutBuffer].filter((s) => s.trim()).join('\n'));
+          if (authError) {
+            this._hasSession = false;
+            reject(authError);
+            return;
+          }
         }
         const modelNotFound =
           errorResult.includes('ModelNotFoundError') ||

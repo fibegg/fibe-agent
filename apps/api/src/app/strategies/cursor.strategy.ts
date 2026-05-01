@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type {
   AuthConnection,
   ConversationDataDirProvider,
@@ -459,10 +460,19 @@ export class CursorStrategy extends AbstractCLIStrategy {
           return;
         }
 
+        const shouldInspectFailure = code !== 0 || !jsonState.hasEmittedOutput || Boolean(errorResult.trim());
+        if (shouldInspectFailure) {
+          const authError = detectProviderAuthFailure('Cursor', errorResult);
+          if (authError) {
+            reject(authError);
+            return;
+          }
+        }
+
         if (code === 0) {
           if (!jsonState.hasEmittedOutput) {
             if (!existingSessionId) this.clearSessionId();
-            reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+            reject(new Error(errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
             return;
           }
           if (capturedSessionId) {

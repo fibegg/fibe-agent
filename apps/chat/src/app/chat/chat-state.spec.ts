@@ -72,6 +72,14 @@ describe('chat-state', () => {
     expect(isRetryableError('Your session was taken over by another client')).toBe(false);
   });
 
+  it('isRetryableError returns false for provider authentication failures', () => {
+    expect(
+      isRetryableError(
+        'Authentication failed for Claude Code: the API key or token is invalid. Check the configured Claude Code credentials, then reconnect or re-authenticate.'
+      )
+    ).toBe(false);
+  });
+
   it('isRetryableError returns true for other error messages', () => {
     expect(isRetryableError('Response timed out. The AI took too long to respond.')).toBe(true);
     expect(isRetryableError('An unexpected error occurred')).toBe(true);

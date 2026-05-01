@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
 import {
   clearToken,
   getAuthTokenForRequest,
@@ -321,9 +322,10 @@ export function useChatWebSocket(
   }, [navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
 
   const dismissError = useCallback(() => {
+    const shouldRequireAuth = isProviderAuthFailureMessage(errorMessage);
     setErrorMessage(null);
-    setState(CHAT_STATES.AUTHENTICATED);
-  }, []);
+    setState(shouldRequireAuth ? CHAT_STATES.UNAUTHENTICATED : CHAT_STATES.AUTHENTICATED);
+  }, [errorMessage]);
 
   const interruptAgent = useCallback(() => {
     send({ action: 'interrupt_agent' });

@@ -2,6 +2,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { getProxyEnv } from '../provider-traffic/types';
@@ -521,9 +522,17 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
         }
+        const shouldInspectFailure = (code !== 0 && code !== null) || !hasEmittedOutput || Boolean(errorResult.trim());
+        if (shouldInspectFailure) {
+          const authError = detectProviderAuthFailure('OpenCode', errorResult);
+          if (authError) {
+            reject(authError);
+            return;
+          }
+        }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
           this.clearStoredSession(workspaceDir);
-          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+          reject(new Error(errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code !== 0 && code !== null) {

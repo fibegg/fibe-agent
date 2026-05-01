@@ -11,6 +11,11 @@ interface FocusInputOptions {
   persistent?: boolean;
 }
 
+const POST_SEND_FOCUS_RECOVERY_MS = 250;
+const POST_SEND_FOCUS_RETRY_DELAYS_MS = [0, 25, 75, 150, 250];
+const PARENT_FOCUS_RELEASE_SUPPRESSION_MS = 1000;
+const PARENT_FOCUS_REQUEST_MESSAGE_TYPE = 'fibe_parent_focus_requested';
+
 function isEmbeddedFrame(): boolean {
   return typeof window !== 'undefined' && window !== window.parent;
 }
@@ -38,6 +43,8 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
   const chatInputRef = useRef<HTMLDivElement>(null);
   const focusTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const forceFocusUntilRef = useRef(0);
+  const suppressBlurRefocusUntilRef = useRef(0);
+  const blurRefocusRafRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
 
   const inputValue = inputState.value;
   const cursorOffset = inputState.cursor;
@@ -47,6 +54,20 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
     !mentionDropdownClosedAfterSelect &&
     !valueAfterAtMatchesEntry(inputValue, playgroundEntries);
 
+  const clearFocusTimeouts = useCallback(() => {
+    for (const timeoutId of focusTimeoutsRef.current) {
+      clearTimeout(timeoutId);
+    }
+    focusTimeoutsRef.current = [];
+  }, []);
+
+  const cancelBlurRefocus = useCallback(() => {
+    if (blurRefocusRafRef.current !== null) {
+      cancelAnimationFrame(blurRefocusRafRef.current);
+      blurRefocusRafRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!atMention.show) setMentionDropdownClosedAfterSelect(false);
   }, [atMention.show]);
@@ -54,6 +75,13 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
   const focusChatInput = useCallback((force = false) => {
     const el = chatInputRef.current;
     if (!el) return;
+    const active = document.activeElement;
+    const activeIsInsideInput = el instanceof HTMLElement && active instanceof Node && el.contains(active);
+    const canTakeFocus = !active || active === document.body || active === el || activeIsInsideInput;
+    if (!canTakeFocus) {
+      forceFocusUntilRef.current = 0;
+      return;
+    }
     if (force && isEmbeddedFrame()) {
       try {
         window.focus();
@@ -61,8 +89,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
         // Some embedded hosts disallow programmatic frame focus.
       }
     }
-    const active = document.activeElement;
-    if (force || !active || active === document.body || active === el) {
+    if (force || canTakeFocus) {
       el.focus({ preventScroll: true });
       if (!selectionIsInsideElement(el)) {
         restoreCaretAtEnd(el);
@@ -73,63 +100,88 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
   const focusInput = useCallback((options: FocusInputOptions = {}) => {
     const persistent = options.persistent === true;
     if (persistent) {
-      forceFocusUntilRef.current = Date.now() + 2000;
+      forceFocusUntilRef.current = Date.now() + POST_SEND_FOCUS_RECOVERY_MS;
     }
-    for (const timeoutId of focusTimeoutsRef.current) {
-      clearTimeout(timeoutId);
-    }
-    const delays = persistent ? [0, 25, 75, 150, 300, 600, 1000, 1500] : [50];
+    clearFocusTimeouts();
+    const delays = persistent ? POST_SEND_FOCUS_RETRY_DELAYS_MS : [50];
     focusTimeoutsRef.current = delays.map((delay) =>
       setTimeout(() => {
         const force = persistent && Date.now() <= forceFocusUntilRef.current;
         focusChatInput(force);
       }, delay)
     );
-  }, [focusChatInput]);
+  }, [clearFocusTimeouts, focusChatInput]);
 
   useEffect(() => {
     return () => {
-      for (const timeoutId of focusTimeoutsRef.current) {
-        clearTimeout(timeoutId);
-      }
-      focusTimeoutsRef.current = [];
+      clearFocusTimeouts();
     };
-  }, []);
+  }, [clearFocusTimeouts]);
+
+  useEffect(() => {
+    if (!isEmbeddedFrame()) return;
+
+    const releaseChatFocus = () => {
+      forceFocusUntilRef.current = 0;
+      suppressBlurRefocusUntilRef.current = Date.now() + PARENT_FOCUS_RELEASE_SUPPRESSION_MS;
+      clearFocusTimeouts();
+      cancelBlurRefocus();
+
+      const el = chatInputRef.current;
+      if (!el) return;
+
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active !== document.body) {
+        active.blur();
+      } else if (active instanceof Node && (active === el || el.contains(active))) {
+        el.blur();
+      }
+
+      if (selectionIsInsideElement(el)) {
+        window.getSelection()?.removeAllRanges();
+      }
+    };
+
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || typeof data !== 'object') return;
+      if (data.type !== PARENT_FOCUS_REQUEST_MESSAGE_TYPE) return;
+
+      releaseChatFocus();
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [cancelBlurRefocus, clearFocusTimeouts]);
 
   /**
-   * Iframe focus-recovery: when the parent window receives a postMessage from
-   * this iframe, the browser may shift `document` focus back to the parent,
-   * leaving the contenteditable input without a caret. We detect `window blur`
-   * (only fires when focus truly leaves this frame) and restore focus to the
-   * chat input — but only if nothing else inside the iframe intentionally took
-   * focus (e.g. a dropdown, button, or file picker).
-   *
-   * No-op in standalone (non-iframe) mode.
+   * Iframe focus recovery must be conservative: a blur often means the user is
+   * trying to use Rails chrome outside this frame. Only restore focus during
+   * the short post-send recovery window, and never after the parent explicitly
+   * requests focus for its own UI.
    */
   useEffect(() => {
     const isEmbedded = isEmbeddedFrame();
     if (!isEmbedded) return;
 
-    let rafId: ReturnType<typeof requestAnimationFrame> | null = null;
-
     const onWindowBlur = () => {
-      rafId = requestAnimationFrame(() => {
-        // After a send, the parent may briefly steal iframe focus even though
-        // document.activeElement still points at the contenteditable.
+      blurRefocusRafRef.current = requestAnimationFrame(() => {
+        blurRefocusRafRef.current = null;
+        if (Date.now() <= suppressBlurRefocusUntilRef.current) return;
+
         const force = Date.now() <= forceFocusUntilRef.current;
-        const active = document.activeElement;
-        if (force || !active || active === document.body) {
-          focusChatInput(force);
-        }
+        if (!force) return;
+
+        focusChatInput(true);
       });
     };
 
     window.addEventListener('blur', onWindowBlur);
     return () => {
       window.removeEventListener('blur', onWindowBlur);
-      if (rafId !== null) cancelAnimationFrame(rafId);
+      cancelBlurRefocus();
     };
-  }, [focusChatInput]);
+  }, [cancelBlurRefocus, focusChatInput]);
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
