@@ -7,6 +7,11 @@ import { MODEL_OPTION_SELECTED } from '../ui-classes';
 
 const DEFAULT_LABEL = 'Model (default)';
 const MOBILE_BREAKPOINT_PX = 640;
+const PANEL_GUTTER_PX = 8;
+const PANEL_MAX_HEIGHT_PX = 384;
+const PANEL_MIN_HEIGHT_PX = 160;
+const PANEL_MIN_WIDTH_PX = 220;
+const PANEL_MAX_WIDTH_PX = 340;
 
 const TRIGGER_CLASS_BASE =
   'flex items-center gap-1.5 min-w-0 h-8 px-2 sm:px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
@@ -28,16 +33,51 @@ function isMobileViewport(): boolean {
 }
 
 type PanelRect =
-  | { anchorBottom: false; top: number; left: number }
-  | { anchorBottom: true; bottom: number; left: number };
+  | { anchorBottom: false; top: number; left: number; width?: number; maxHeight: number }
+  | { anchorBottom: true; bottom: number; left: number; maxHeight: number };
 
-function computePanelRect(el: HTMLElement): PanelRect {
+function clampPanelHeight(value: number): number {
+  return Math.max(PANEL_MIN_HEIGHT_PX, Math.min(PANEL_MAX_HEIGHT_PX, value));
+}
+
+function computePanelRect(el: HTMLElement, placement: 'auto' | 'bottom'): PanelRect {
   const r = el.getBoundingClientRect();
-  if (isMobileViewport()) {
-    const vvHeight = window.visualViewport?.height ?? window.innerHeight;
-    return { anchorBottom: true, bottom: vvHeight - r.top + 4, left: 8 };
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const panelWidth = Math.min(
+    PANEL_MAX_WIDTH_PX,
+    Math.max(PANEL_MIN_WIDTH_PX, r.width),
+    viewportWidth - PANEL_GUTTER_PX * 2,
+  );
+
+  if (placement === 'bottom') {
+    return {
+      anchorBottom: false,
+      top: Math.min(r.bottom + 6, viewportHeight - PANEL_GUTTER_PX - PANEL_MIN_HEIGHT_PX),
+      left: Math.min(
+        Math.max(PANEL_GUTTER_PX, r.left),
+        Math.max(PANEL_GUTTER_PX, viewportWidth - panelWidth - PANEL_GUTTER_PX),
+      ),
+      width: panelWidth,
+      maxHeight: clampPanelHeight(viewportHeight - r.bottom - PANEL_GUTTER_PX - 6),
+    };
   }
-  return { anchorBottom: false, top: r.bottom + 6, left: r.left };
+
+  if (isMobileViewport()) {
+    return {
+      anchorBottom: true,
+      bottom: viewportHeight - r.top + 4,
+      left: PANEL_GUTTER_PX,
+      maxHeight: clampPanelHeight(r.top - PANEL_GUTTER_PX - 4),
+    };
+  }
+
+  return {
+    anchorBottom: false,
+    top: r.bottom + 6,
+    left: r.left,
+    maxHeight: clampPanelHeight(viewportHeight - r.bottom - PANEL_GUTTER_PX - 6),
+  };
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -52,6 +92,7 @@ interface ModelSelectorProps {
   onRefresh?: () => void;
   refreshing?: boolean;
   variant?: keyof typeof TRIGGER_CLASS_BY_VARIANT;
+  dropdownPlacement?: 'auto' | 'bottom';
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -66,6 +107,7 @@ export function ModelSelector({
   onRefresh,
   refreshing = false,
   variant = 'compact',
+  dropdownPlacement = 'auto',
 }: ModelSelectorProps) {
   const [open, setOpen] = useState(false);
   const [customValue, setCustomValue] = useState('');
@@ -98,7 +140,7 @@ export function ModelSelector({
     const el = containerRef.current;
     if (!el) return;
 
-    const update = () => setPanelRect(computePanelRect(el));
+    const update = () => setPanelRect(computePanelRect(el, dropdownPlacement));
     update();
 
     window.addEventListener('scroll', update, true);
@@ -110,7 +152,7 @@ export function ModelSelector({
       window.removeEventListener('resize', update);
       window.visualViewport?.removeEventListener('resize', update);
     };
-  }, [open]);
+  }, [open, dropdownPlacement]);
 
   // ── Close on outside tap/click ─────────────────────────────────────────────
 
@@ -173,7 +215,7 @@ export function ModelSelector({
   const panelStyle: React.CSSProperties = panelRect
     ? panelRect.anchorBottom
       ? { position: 'fixed', bottom: panelRect.bottom, left: panelRect.left, right: panelRect.left, maxWidth: 'calc(100vw - 16px)' }
-      : { position: 'fixed', top: panelRect.top, left: panelRect.left }
+      : { position: 'fixed', top: panelRect.top, left: panelRect.left, width: panelRect.width }
     : {};
 
   return (
@@ -199,7 +241,7 @@ export function ModelSelector({
           className={PANEL_CLASS}
           role="listbox"
           aria-label="Model options"
-          style={panelStyle}
+          style={{ ...panelStyle, maxHeight: panelRect.maxHeight }}
         >
           {customMode ? (
             <div className="p-2 border-b border-border/50">

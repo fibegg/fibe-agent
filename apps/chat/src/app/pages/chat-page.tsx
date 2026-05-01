@@ -73,6 +73,19 @@ const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output
 
 interface RuntimeConfigResponse {
   agentProviderLabel?: string | null;
+  simplicate?: boolean;
+}
+
+const SIMPLICATE_STORAGE_KEY = 'simplicate-mode';
+
+function readStoredSimplicateMode(): boolean | null {
+  try {
+    const value = localStorage.getItem(SIMPLICATE_STORAGE_KEY);
+    if (value === null) return null;
+    return value === 'true';
+  } catch {
+    return null;
+  }
 }
 
 export function ChatPage() {
@@ -120,6 +133,9 @@ export function ChatPage() {
   const pgSelector = usePlaygroundSelector();
   const [standaloneMode, setStandaloneMode] = useState(() => isStandaloneMode());
   const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
+  const [simplicateMode, setSimplicateMode] = useState(() => readStoredSimplicateMode() ?? false);
+  const [compactFileBrowserOpen, setCompactFileBrowserOpen] = useState(false);
+  const compactMode = !simplicateMode;
   const canShowDiff = playgroundStats.hasGitRepo;
 
   // ─── Local MCP tool state ─────────────────────────────────────────────────
@@ -198,6 +214,29 @@ export function ChatPage() {
     });
   }, []);
 
+  const handleSimplicateModeChange = useCallback((enabled: boolean) => {
+    setSimplicateMode(enabled);
+    setCompactFileBrowserOpen(false);
+    if (!enabled) {
+      setSidebarOpen(false);
+      setRightSidebarOpen(false);
+    }
+    try {
+      localStorage.setItem(SIMPLICATE_STORAGE_KEY, String(enabled));
+    } catch {
+      // localStorage can be unavailable in restrictive embed contexts.
+    }
+  }, [setRightSidebarOpen, setSidebarOpen]);
+
+  const openFileBrowser = useCallback(() => {
+    if (isMobile) {
+      setSidebarOpen(true);
+      return;
+    }
+    setCompactFileBrowserOpen(true);
+    setSidebarCollapsed(false);
+  }, [isMobile, setSidebarCollapsed, setSidebarOpen]);
+
   const leftResize = usePanelResize({
     initialWidth: SIDEBAR_WIDTH_PX,
     minWidth: SIDEBAR_MIN_WIDTH_PX,
@@ -238,6 +277,9 @@ export function ChatPage() {
       .then((config: RuntimeConfigResponse | null) => {
         if (cancelled) return;
         setAgentProviderLabel(config?.agentProviderLabel?.trim() || 'Claude');
+        if (readStoredSimplicateMode() === null) {
+          setSimplicateMode(config?.simplicate === true);
+        }
       })
       .catch(() => {
         if (!cancelled) setAgentProviderLabel('Claude');
@@ -638,16 +680,8 @@ export function ChatPage() {
             onStartAuth={startAuth}
             onReauthenticate={reauthenticate}
             onLogout={logout}
-            currentEffort={currentEffort}
-            onEffortSelect={handleEffortSelect}
-            showModelSelector={showModelSelector}
-            currentModel={currentModel}
-            modelOptions={modelOptions}
-            onModelSelect={handleModelSelect}
-            onModelInputChange={handleModelInputChange}
-            modelLocked={chatModelLocked}
-            onRefreshModels={refreshModelOptions}
-            refreshingModels={refreshingModels}
+            simplicateMode={simplicateMode}
+            onSimplicateModeChange={handleSimplicateModeChange}
             onResetConversation={
               state !== CHAT_STATES.AWAITING_RESPONSE
                 ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
@@ -715,10 +749,10 @@ export function ChatPage() {
         ) : null
       }
       leftPanel={
-        !isMobile ? (
+        !isMobile && (!compactMode || compactFileBrowserOpen) ? (
           <ChatLeftPanel
             hasAnyFiles={hasAnyFiles}
-            sidebarCollapsed={sidebarCollapsed}
+            sidebarCollapsed={compactMode ? false : sidebarCollapsed}
             width={leftResize.width}
             isDraggingResize={leftResize.isDragging}
             panelRef={leftResize.panelRef}
@@ -729,7 +763,13 @@ export function ChatPage() {
             playgroundStats={playgroundStats}
             agentStats={agentStats}
             onSettingsClick={openSettings}
-            onToggleCollapse={() => setSidebarCollapsed((v) => !v)}
+            onToggleCollapse={() => {
+              if (compactMode) {
+                setCompactFileBrowserOpen(false);
+                return;
+              }
+              setSidebarCollapsed((v) => !v);
+            }}
             onFileSelect={(entry) => setViewingFile(entry)}
             onResizeStart={leftResize.startResize}
             selectedPath={viewingFile?.path ?? null}
@@ -781,7 +821,7 @@ export function ChatPage() {
           onSearchChange={setSearchQuery}
           onReconnect={reconnect}
           onStartAuth={startAuth}
-          onOpenMenu={() => setSidebarOpen(true)}
+          onOpenMenu={compactMode ? openSettings : () => setSidebarOpen(true)}
           onOpenActivity={() => setRightSidebarOpen(true)}
           onToggleTerminal={toggleTerminal}
           terminalOpen={terminalOpen}
@@ -789,6 +829,15 @@ export function ChatPage() {
           diffOpen={diffOpen}
           onToggleCli={toggleCli}
           cliOpen={cliOpen}
+          currentEffort={currentEffort}
+          onEffortSelect={handleEffortSelect}
+          showModelSelector={showModelSelector}
+          modelOptions={modelOptions}
+          onModelSelect={handleModelSelect}
+          onModelInputChange={handleModelInputChange}
+          modelLocked={chatModelLocked}
+          onRefreshModels={refreshModelOptions}
+          refreshingModels={refreshingModels}
           playgroundEntries={pgSelector.entries}
           playgroundLoading={pgSelector.loading}
           playgroundError={pgSelector.error}
@@ -805,6 +854,9 @@ export function ChatPage() {
           onPlaygroundSmartMount={pgSelector.smartMount}
           tonyStarkMode={tonyStarkMode}
           onToggleTonyStarkMode={handleToggleTonyStarkMode}
+          simplicateMode={simplicateMode}
+          onSimplicateModeChange={handleSimplicateModeChange}
+          onOpenFileBrowser={openFileBrowser}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
@@ -827,7 +879,7 @@ export function ChatPage() {
                 lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastUserMessage : null}
                 scrollRef={scroll.scrollRef}
                 bothSidebarsCollapsed={
-                  !isMobile && sidebarCollapsed && rightSidebarCollapsed
+                  !isMobile && (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) && rightSidebarCollapsed
                 }
                 noOutputBody={NO_OUTPUT_MESSAGE}
                 onRetry={handleSendContinue}
@@ -981,7 +1033,7 @@ export function ChatPage() {
         <RightDrawer
           open={cliOpen}
           onClose={closeCli}
-          title="CLI Commands"
+          title="Commands"
           icon={<Command className="size-4" />}
           width="min(90vw, 520px)"
         >

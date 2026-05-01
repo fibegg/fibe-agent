@@ -63,6 +63,32 @@ describe('ModelSelector', () => {
     expect(screen.getByRole('option', { name: 'pro' })).toBeTruthy();
   });
 
+  it('can force the dropdown to open below the trigger with scrollable height', () => {
+    Object.defineProperty(window, 'innerHeight', { value: 500, configurable: true });
+    const options = Array.from({ length: 30 }, (_, index) => `model-${index}`);
+    render(
+      <ModelSelector
+        currentModel=""
+        options={options}
+        onSelect={vi.fn()}
+        onInputChange={vi.fn()}
+        visible
+        variant="settings"
+        dropdownPlacement="bottom"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
+
+    const listbox = screen.getByRole('listbox', { name: 'Model options' });
+    expect(listbox).toBeTruthy();
+    expect(listbox.style.position).toBe('fixed');
+    expect(listbox.style.top).toBeTruthy();
+    expect(listbox.style.bottom).toBe('');
+    expect(Number.parseFloat(listbox.style.maxHeight)).toBeLessThanOrEqual(384);
+    expect(listbox.querySelector('.overflow-auto')).toBeTruthy();
+  });
+
   it('calls onSelect with option when clicking unselected option', () => {
     const onSelect = vi.fn();
     render(

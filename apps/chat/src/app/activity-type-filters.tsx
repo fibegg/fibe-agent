@@ -10,6 +10,15 @@ export interface ActivityTypeFiltersProps {
 
 export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: ActivityTypeFiltersProps) {
   const isAllActive = typeFilter.length === 0;
+  const filters = [
+    { key: '__all', label: 'All', active: isAllActive },
+    ...ACTIVITY_TYPE_FILTERS.map((key) => ({
+      key,
+      label: getTypeFilterLabel(key),
+      active: typeFilter.includes(key),
+    })),
+  ];
+  const activeStates = filters.map((filter) => filter.active);
 
   const toggleFilter = (key: string) => {
     if (typeFilter.includes(key)) {
@@ -19,11 +28,20 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
     }
   };
 
-  const buttonClass = (active: boolean) =>
-    `h-8 shrink-0 rounded-md px-3 text-[11px] font-medium transition-colors ${
+  const activeRadiusClass = (index: number) => {
+    const previousActive = activeStates[index - 1] ?? false;
+    const nextActive = activeStates[index + 1] ?? false;
+    if (previousActive && nextActive) return 'rounded-none';
+    if (previousActive) return 'rounded-l-none rounded-r-md';
+    if (nextActive) return 'rounded-l-md rounded-r-none';
+    return 'rounded-md';
+  };
+
+  const buttonClass = (active: boolean, index: number) =>
+    `h-8 shrink-0 px-3 text-[11px] font-medium transition-colors ${
       active
-        ? 'bg-primary text-primary-foreground shadow-sm'
-        : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
+        ? `bg-primary text-primary-foreground shadow-none ${activeRadiusClass(index)}`
+        : 'rounded-md text-muted-foreground hover:bg-background/70 hover:text-foreground'
     }`;
 
   return (
@@ -37,22 +55,21 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
           type="button"
           onClick={() => onTypeFilterChange([])}
           aria-pressed={isAllActive}
-          className={buttonClass(isAllActive)}
+          className={buttonClass(isAllActive, 0)}
         >
           All
         </button>
-        {ACTIVITY_TYPE_FILTERS.map((filterKey) => {
-          const label = getTypeFilterLabel(filterKey);
-          const isActive = typeFilter.includes(filterKey);
+        {filters.slice(1).map((filter, offset) => {
+          const index = offset + 1;
           return (
             <button
-              key={filterKey}
+              key={filter.key}
               type="button"
-              onClick={() => toggleFilter(filterKey)}
-              aria-pressed={isActive}
-              className={buttonClass(isActive)}
+              onClick={() => toggleFilter(filter.key)}
+              aria-pressed={filter.active}
+              className={buttonClass(filter.active, index)}
             >
-              {label}
+              {filter.label}
             </button>
           );
         })}

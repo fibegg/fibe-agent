@@ -12,8 +12,8 @@ describe('parseYaml', () => {
   });
 
   it('parses boolean scalars', () => {
-    const result = parseYaml('gemmaRouterEnabled: true\nlockChatModel: false\n');
-    expect(result).toEqual({ gemmaRouterEnabled: true, lockChatModel: false });
+    const result = parseYaml('gemmaRouterEnabled: true\nlockChatModel: false\nsimplicate: true\n');
+    expect(result).toEqual({ gemmaRouterEnabled: true, lockChatModel: false, simplicate: true });
   });
 
   it('parses integer scalars', () => {
@@ -143,10 +143,11 @@ describe('loadFibeSettings', () => {
   });
 
   test('reads from FIBE_SETTINGS_JSON', () => {
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock', lockChatModel: true });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock', lockChatModel: true, simplicate: true });
     const result = loadFibeSettings();
     expect(result.agentProvider).toBe('mock');
     expect(result.lockChatModel).toBe(true);
+    expect(result.simplicate).toBe(true);
   });
 
   test('reads from local fibe.yml when it exists', () => {
@@ -184,7 +185,7 @@ describe('applyFibeSettings', () => {
     'AGENT_PROVIDER', 'AGENT_PASSWORD', 'AGENT_AUTH_MODE', 'MODEL_OPTIONS', 'DEFAULT_MODEL', 'CLAUDE_EFFORT',
     'USER_AVATAR_URL', 'USER_AVATAR_BASE64',
     'ASSISTANT_AVATAR_URL', 'ASSISTANT_AVATAR_BASE64',
-    'LOCK_CHAT_MODEL',
+    'LOCK_CHAT_MODEL', 'SIMPLICATE',
     'GEMMA_ROUTER_ENABLED', 'OLLAMA_URL', 'GEMMA_MODEL',
     'GEMMA_CONFIDENCE_THRESHOLD', 'GEMMA_TIMEOUT_MS',
     'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON',
@@ -222,6 +223,12 @@ describe('applyFibeSettings', () => {
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ lockChatModel: true });
     applyFibeSettings();
     expect(process.env.LOCK_CHAT_MODEL).toBe('true');
+  });
+
+  test('promotes simplicate to SIMPLICATE', () => {
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ simplicate: true });
+    applyFibeSettings();
+    expect(process.env.SIMPLICATE).toBe('true');
   });
 
   test('promotes avatar settings', () => {
@@ -283,10 +290,11 @@ describe('applyFibeSettings', () => {
   });
 
   test('reads YAML and applies env vars from it', () => {
-    writeFileSync(localYml, 'agentProvider: gemini\nlockChatModel: false\n');
+    writeFileSync(localYml, 'agentProvider: gemini\nlockChatModel: false\nsimplicate: true\n');
     applyFibeSettings();
     expect(process.env.AGENT_PROVIDER).toBe('gemini');
     expect(process.env.LOCK_CHAT_MODEL).toBe('false');
+    expect(process.env.SIMPLICATE).toBe('true');
   });
 
   test('promotes fibeSyncEnabled=true to FIBE_SYNC_ENABLED=true', () => {

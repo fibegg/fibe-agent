@@ -13,6 +13,7 @@ interface RuntimeConfig {
   assistantAvatarBase64: string | null;
   agentProvider: string | null;
   agentProviderLabel: string | null;
+  simplicate: boolean;
 }
 
 function providerLabel(provider: string | null): string | null {
@@ -39,6 +40,10 @@ function providerLabel(provider: string | null): string | null {
   }
 }
 
+function truthy(value: string | undefined): boolean {
+  return ['1', 'true', 'yes'].includes(value?.trim().toLowerCase() ?? '');
+}
+
 /** Extracted logic identical to RuntimeConfigController.getConfig */
 function getRuntimeConfig(): RuntimeConfig {
   const agentProvider = process.env.AGENT_PROVIDER?.trim() || null;
@@ -49,6 +54,7 @@ function getRuntimeConfig(): RuntimeConfig {
     assistantAvatarBase64: process.env.ASSISTANT_AVATAR_BASE64?.trim() || null,
     agentProvider,
     agentProviderLabel: providerLabel(agentProvider),
+    simplicate: truthy(process.env.SIMPLICATE),
   };
 }
 
@@ -61,11 +67,13 @@ describe('RuntimeConfigController — getConfig logic', () => {
     envBackup.ASSISTANT_AVATAR_URL = process.env.ASSISTANT_AVATAR_URL;
     envBackup.ASSISTANT_AVATAR_BASE64 = process.env.ASSISTANT_AVATAR_BASE64;
     envBackup.AGENT_PROVIDER = process.env.AGENT_PROVIDER;
+    envBackup.SIMPLICATE = process.env.SIMPLICATE;
     delete process.env.USER_AVATAR_URL;
     delete process.env.USER_AVATAR_BASE64;
     delete process.env.ASSISTANT_AVATAR_URL;
     delete process.env.ASSISTANT_AVATAR_BASE64;
     delete process.env.AGENT_PROVIDER;
+    delete process.env.SIMPLICATE;
   });
 
   afterEach(() => {
@@ -74,6 +82,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
     process.env.ASSISTANT_AVATAR_URL = envBackup.ASSISTANT_AVATAR_URL;
     process.env.ASSISTANT_AVATAR_BASE64 = envBackup.ASSISTANT_AVATAR_BASE64;
     process.env.AGENT_PROVIDER = envBackup.AGENT_PROVIDER;
+    process.env.SIMPLICATE = envBackup.SIMPLICATE;
   });
 
   test('returns all nulls when no env vars are set', () => {
@@ -84,6 +93,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
       assistantAvatarBase64: null,
       agentProvider: null,
       agentProviderLabel: null,
+      simplicate: false,
     });
   });
 
@@ -128,6 +138,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
     process.env.ASSISTANT_AVATAR_URL = 'https://bot.png';
     process.env.ASSISTANT_AVATAR_BASE64 = 'Ym90';
     process.env.AGENT_PROVIDER = 'claude-code';
+    process.env.SIMPLICATE = 'true';
     expect(getRuntimeConfig()).toEqual({
       userAvatarUrl: 'https://user.png',
       userAvatarBase64: 'dXNlcg==',
@@ -135,6 +146,7 @@ describe('RuntimeConfigController — getConfig logic', () => {
       assistantAvatarBase64: 'Ym90',
       agentProvider: 'claude-code',
       agentProviderLabel: 'Claude',
+      simplicate: true,
     });
   });
 
@@ -148,5 +160,15 @@ describe('RuntimeConfigController — getConfig logic', () => {
     process.env.AGENT_PROVIDER = '  gemini  ';
     expect(getRuntimeConfig().agentProvider).toBe('gemini');
     expect(getRuntimeConfig().agentProviderLabel).toBe('Gemini');
+  });
+
+  test('returns simplicate=true when SIMPLICATE is truthy', () => {
+    process.env.SIMPLICATE = '1';
+    expect(getRuntimeConfig().simplicate).toBe(true);
+  });
+
+  test('returns simplicate=false when SIMPLICATE is false', () => {
+    process.env.SIMPLICATE = 'false';
+    expect(getRuntimeConfig().simplicate).toBe(false);
   });
 });

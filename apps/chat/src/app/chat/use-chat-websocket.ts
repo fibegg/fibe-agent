@@ -20,6 +20,8 @@ import type { ToolOrFileEvent } from './thinking-types';
 
 import { useChatAuth, type AuthModalState } from './use-chat-auth';
 
+const AUTO_AUTH_SUCCESS_EVENT = 'fibe:auto-auth-success';
+
 export interface UseChatWebSocketResult {
   state: ChatState;
   agentMode: string;
@@ -282,6 +284,8 @@ export function useChatWebSocket(
     };
 
     ws.onclose = (event: CloseEvent) => {
+      if (wsRef.current !== ws) return;
+
       if (event.code === WS_CLOSE.UNAUTHORIZED) {
         clearToken();
         navigate('/login', { replace: true });
@@ -316,21 +320,6 @@ export function useChatWebSocket(
     };
   }, [navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
 
-  useEffect(() => {
-    connect();
-    return () => {
-      if (reconnectTimerRef.current) {
-        clearTimeout(reconnectTimerRef.current);
-      }
-      if (offlineTimerRef.current) {
-        clearTimeout(offlineTimerRef.current);
-      }
-      clearResponseTimer();
-      wsRef.current?.close();
-      wsRef.current = null;
-    };
-  }, [connect, clearResponseTimer]);
-
   const dismissError = useCallback(() => {
     setErrorMessage(null);
     setState(CHAT_STATES.AUTHENTICATED);
@@ -356,6 +345,25 @@ export function useChatWebSocket(
     setState(CHAT_STATES.INITIALIZING);
     connect();
   }, [connect, clearResponseTimer]);
+
+  useEffect(() => {
+    const handleAutoAuthSuccess = () => reconnect();
+    window.addEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
+
+    connect();
+    return () => {
+      window.removeEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+      }
+      if (offlineTimerRef.current) {
+        clearTimeout(offlineTimerRef.current);
+      }
+      clearResponseTimer();
+      wsRef.current?.close();
+      wsRef.current = null;
+    };
+  }, [connect, clearResponseTimer, reconnect]);
 
   return {
     state,

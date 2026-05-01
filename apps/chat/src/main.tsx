@@ -26,7 +26,7 @@ const basename = typeof window !== 'undefined' && window.__BASENAME__ ? window._
 root.render(
   <StrictMode>
     <IframeReadySignal />
-    <BrowserRouter basename={basename}>
+    <BrowserRouter basename={basename} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <App />
     </BrowserRouter>
   </StrictMode>,

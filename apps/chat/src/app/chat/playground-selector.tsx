@@ -5,6 +5,8 @@ import type { BrowseEntry } from './use-playground-selector';
 
 const TRIGGER_CLASS =
   'flex items-center justify-center size-8 rounded-lg border border-border bg-[var(--input-background)] text-foreground hover:border-fuchsia-500/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 transition-colors group';
+const MENU_TRIGGER_CLASS =
+  'flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 group';
 const PANEL_CLASS =
   'min-w-[220px] max-w-[320px] max-h-[420px] overflow-hidden rounded-lg border border-border bg-card shadow-lg z-[100] flex flex-col p-1';
 const ENTRY_CLASS_BASE =
@@ -37,6 +39,7 @@ interface PlaygroundSelectorProps {
   onLink: (path: string) => Promise<boolean>;
   onLinked?: () => void;
   visible?: boolean;
+  variant?: 'icon' | 'menu';
 }
 
 export function PlaygroundSelector({
@@ -49,6 +52,7 @@ export function PlaygroundSelector({
   onLink,
   onLinked,
   visible = true,
+  variant = 'icon',
 }: PlaygroundSelectorProps) {
   const [open, setOpen] = useState(false);
   const [panelRect, setPanelRect] = useState<PanelRect | null>(null);
@@ -121,18 +125,21 @@ export function PlaygroundSelector({
 
   if (!visible) return null;
 
+  const triggerLabel = variant === 'menu' ? 'Playgrounds' : 'Link Playground';
+
   return (
     <div ref={containerRef} className="relative block">
       <button
         type="button"
         onClick={handleToggle}
-        className={TRIGGER_CLASS}
+        className={variant === 'menu' ? MENU_TRIGGER_CLASS : TRIGGER_CLASS}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Link Playground"
-        title="Link Playground"
+        aria-label={triggerLabel}
+        title={triggerLabel}
       >
         <Sparkles className="size-4 shrink-0 text-fuchsia-400 group-hover:text-fuchsia-300 transition-colors" aria-hidden />
+        {variant === 'menu' && <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>}
       </button>
       {open &&
         panelRect &&

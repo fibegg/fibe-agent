@@ -76,6 +76,8 @@ export interface FibeSettings {
   assistantAvatarBase64?: string;
   /** When true the model selector is disabled. */
   lockChatModel?: boolean;
+  /** Controls the Simplicate switch. When true, the chat header uses the expanded multi-line layout. */
+  simplicate?: boolean;
 }
 
 // ─── YAML parser ─────────────────────────────────────────────────────────────
@@ -201,6 +203,7 @@ function promoteToEnv(s: FibeSettings): void {
   set('ASSISTANT_AVATAR_URL', s.assistantAvatarUrl);
   set('ASSISTANT_AVATAR_BASE64', s.assistantAvatarBase64);
   if (s.lockChatModel !== undefined) set('LOCK_CHAT_MODEL', bool(s.lockChatModel));
+  if (s.simplicate !== undefined) set('SIMPLICATE', bool(s.simplicate));
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

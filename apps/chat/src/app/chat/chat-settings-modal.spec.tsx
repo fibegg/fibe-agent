@@ -21,11 +21,6 @@ vi.mock('../activity-type-filters', () => ({
   ActivityTypeFilters: () => <div data-testid="activity-filters" />,
 }));
 
-vi.mock('./model-selector', () => ({
-  ModelSelector: ({ currentModel, visible }: { currentModel: string; visible: boolean }) =>
-    visible ? <div data-testid="model-selector">{currentModel}</div> : null,
-}));
-
 describe('ChatSettingsModal', () => {
   beforeEach(async () => {
     vi.stubGlobal('__APP_VERSION__', '1.0.0');
@@ -85,8 +80,8 @@ describe('ChatSettingsModal', () => {
     expect(screen.getByText('v1.0.0')).toBeTruthy();
   });
 
-  it('renders Claude effort controls and calls onEffortSelect', () => {
-    const onEffortSelect = vi.fn();
+  it('renders Simplicate switch and calls onSimplicateModeChange', () => {
+    const onSimplicateModeChange = vi.fn();
     render(
       <ChatSettingsModal
         open={true}
@@ -95,18 +90,18 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-        currentEffort="high"
-        onEffortSelect={onEffortSelect}
+        simplicateMode={false}
+        onSimplicateModeChange={onSimplicateModeChange}
       />
     );
 
-    expect(screen.getByRole('group', { name: /claude effort/i })).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'High' }).getAttribute('aria-pressed')).toBe('true');
-    fireEvent.click(screen.getByRole('button', { name: 'Low' }));
-    expect(onEffortSelect).toHaveBeenCalledWith('low');
+    const toggle = screen.getByRole('switch', { name: /simplicate/i });
+    expect(toggle.getAttribute('aria-checked')).toBe('false');
+    fireEvent.click(toggle);
+    expect(onSimplicateModeChange).toHaveBeenCalledWith(true);
   });
 
-  it('renders the model selector in settings when enabled', () => {
+  it('does not render model or effort controls in settings', () => {
     render(
       <ChatSettingsModal
         open={true}
@@ -115,16 +110,11 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-        showModelSelector={true}
-        currentModel="claude-sonnet"
-        modelOptions={['claude-sonnet']}
-        onModelSelect={vi.fn()}
-        onModelInputChange={vi.fn()}
       />
     );
 
-    expect(screen.getByText('Model')).toBeTruthy();
-    expect(screen.getByTestId('model-selector').textContent).toBe('claude-sonnet');
+    expect(screen.queryByText('Model')).toBeNull();
+    expect(screen.queryByText('Claude Effort')).toBeNull();
   });
 
   it('runs reset only after confirmation click', () => {

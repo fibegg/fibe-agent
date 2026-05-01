@@ -238,11 +238,10 @@ describe('postmessage-auth onMessage handler', () => {
     await Promise.resolve();
   });
 
-  it('ignores auto_auth when already authenticated', async () => {
+  it('ignores auto_auth when already authenticated with the same token', async () => {
     const fakeParent = {} as Window;
     vi.stubGlobal('parent', fakeParent);
-    // Pre-authenticate
-    localStorage.setItem('agent_password', 'existing_token');
+    localStorage.setItem('agent_password', 'secret');
 
     const mockFetch = vi.fn();
     vi.stubGlobal('fetch', mockFetch);
@@ -257,5 +256,30 @@ describe('postmessage-auth onMessage handler', () => {
 
     // Should not attempt login — already authenticated
     expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it('refreshes auto_auth when already authenticated with a stale token', async () => {
+    const fakeParent = {} as Window;
+    vi.stubGlobal('parent', fakeParent);
+    localStorage.setItem('agent_password', 'old_token');
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, token: 'secret' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const mod = await import('./postmessage-auth');
+    const onSuccess = vi.fn();
+    window.addEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
+
+    window.dispatchEvent(
+      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+    );
+
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(localStorage.getItem('agent_password')).toBe('secret'));
+    await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
+    window.removeEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
   });
 });

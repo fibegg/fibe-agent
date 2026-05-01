@@ -348,6 +348,7 @@ describe('ChatPage', () => {
   });
 
   it('renders File Explorer sidebar', () => {
+    localStorage.setItem('simplicate-mode', 'true');
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
   });

@@ -7,6 +7,7 @@ export interface RuntimeConfig {
   assistantAvatarBase64: string | null;
   agentProvider: string | null;
   agentProviderLabel: string | null;
+  simplicate: boolean;
 }
 
 function providerLabel(provider: string | null): string | null {
@@ -33,6 +34,10 @@ function providerLabel(provider: string | null): string | null {
   }
 }
 
+function truthy(value: string | undefined): boolean {
+  return ['1', 'true', 'yes'].includes(value?.trim().toLowerCase() ?? '');
+}
+
 @Controller()
 export class RuntimeConfigController {
   @Get('runtime-config')
@@ -45,6 +50,7 @@ export class RuntimeConfigController {
       assistantAvatarBase64: process.env.ASSISTANT_AVATAR_BASE64?.trim() || null,
       agentProvider,
       agentProviderLabel: providerLabel(agentProvider),
+      simplicate: truthy(process.env.SIMPLICATE),
     };
   }
 }

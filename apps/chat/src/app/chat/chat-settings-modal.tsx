@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import {
   Activity,
+  Check,
   DatabaseZap,
   Download,
   Key,
@@ -14,14 +15,12 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { EFFORT_LABELS, EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
 import { ThemeToggle } from '../theme-toggle';
 import { CHAT_STATES } from './chat-state';
 import type { ChatState } from './chat-state';
 import { shouldHideThemeSwitch } from '../embed-config';
-import { ModelSelector } from './model-selector';
 import {
   BUTTON_DESTRUCTIVE_GHOST,
   BUTTON_OUTLINE_ACCENT,
@@ -57,59 +56,79 @@ export interface ChatSettingsModalProps {
   onStartAuth: () => void;
   onReauthenticate: () => void;
   onLogout: () => void;
-  currentEffort?: string;
-  onEffortSelect?: (effort: string) => void;
-  showModelSelector?: boolean;
-  currentModel?: string;
-  modelOptions?: string[];
-  onModelSelect?: (model: string) => void;
-  onModelInputChange?: (value: string) => void;
-  modelLocked?: boolean;
-  onRefreshModels?: () => void;
-  refreshingModels?: boolean;
   onResetConversation?: () => void;
+  simplicateMode?: boolean;
+  onSimplicateModeChange?: (enabled: boolean) => void;
 }
 
 function ResetConversationButton({ onReset }: { onReset: () => void }) {
-  const [armed, setArmed] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const disarm = useCallback(() => {
+  const cancelConfirm = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    setArmed(false);
+    setConfirming(false);
   }, []);
 
-  const handleClick = useCallback(() => {
-    if (!armed) {
-      setArmed(true);
-      timerRef.current = setTimeout(disarm, 3000);
-      return;
-    }
-    disarm();
-    onReset();
-  }, [armed, disarm, onReset]);
+  const requestConfirm = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setConfirming(true);
+    timerRef.current = setTimeout(cancelConfirm, 8000);
+  }, [cancelConfirm]);
 
-  useEffect(() => disarm, [disarm]);
+  const confirmReset = useCallback(() => {
+    cancelConfirm();
+    onReset();
+  }, [cancelConfirm, onReset]);
+
+  useEffect(() => cancelConfirm, [cancelConfirm]);
+
+  if (confirming) {
+    return (
+      <div
+        className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-rose-500/50 bg-rose-500/10 px-3 py-2"
+        role="group"
+        aria-label="Confirm conversation reset"
+      >
+        <span className="min-w-0 truncate text-sm font-medium text-rose-200">Reset conversation?</span>
+        <button
+          type="button"
+          onClick={cancelConfirm}
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border/60 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+          aria-label="Cancel reset"
+        >
+          <X className="size-3.5" aria-hidden />
+          Cancel
+        </button>
+        <button
+          id="reset-conversation-confirm-btn"
+          type="button"
+          onClick={confirmReset}
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-rose-500 px-2.5 text-xs font-semibold text-white transition-colors hover:bg-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70"
+          aria-label="Confirm reset"
+        >
+          <Check className="size-3.5" aria-hidden />
+          Confirm
+        </button>
+      </div>
+    );
+  }
 
   return (
     <button
       id="reset-conversation-btn"
       type="button"
-      onClick={handleClick}
-      className={`flex h-9 w-full items-center justify-center gap-2 rounded-lg border px-3 text-sm font-medium transition-all ${
-        armed
-          ? 'animate-pulse border-rose-500/50 bg-rose-500/20 text-rose-300 hover:bg-rose-500/30'
-          : 'border-border/50 bg-muted/20 text-muted-foreground hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400'
-      }`}
-      title={armed ? 'Click again to confirm reset' : 'Reset conversation'}
-      aria-label={armed ? 'Confirm reset' : 'Reset conversation'}
-      aria-pressed={armed}
+      onClick={requestConfirm}
+      className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400"
+      title="Reset conversation"
+      aria-label="Reset conversation"
+      aria-expanded={false}
     >
       <RefreshCcw className="size-4" aria-hidden />
-      {armed ? 'Confirm reset' : 'Reset'}
+      Reset
     </button>
   );
 }
@@ -133,13 +152,13 @@ function SettingsSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full border p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${
-        checked ? 'border-primary/60 bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'border-border/70 bg-background/70'
+      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+        checked ? 'border-primary/60 bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'border-muted-foreground/50 bg-background/80'
       }`}
     >
       <span
-        className={`block size-5 rounded-full shadow-sm transition-transform ${
-          checked ? 'translate-x-5 bg-white' : 'translate-x-0 bg-muted-foreground/70'
+        className={`pointer-events-none absolute left-0.5 top-0.5 size-5 rounded-full border shadow-sm transition-transform ${
+          checked ? 'translate-x-5 border-white/70 bg-white' : 'translate-x-0 border-muted-foreground/50 bg-muted-foreground'
         }`}
       />
     </button>
@@ -185,24 +204,15 @@ export function ChatSettingsModal({
   onStartAuth,
   onReauthenticate,
   onLogout,
-  currentEffort = 'max',
-  onEffortSelect,
-  showModelSelector = false,
-  currentModel = '',
-  modelOptions = [],
-  onModelSelect,
-  onModelInputChange,
-  modelLocked = false,
-  onRefreshModels,
-  refreshingModels = false,
   onResetConversation,
+  simplicateMode = false,
+  onSimplicateModeChange,
 }: ChatSettingsModalProps) {
   const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
   const [syncSettings, setSyncSettings] = useState<FibeSyncSettings | null>(null);
   const [syncSaving, setSyncSaving] = useState(false);
   const [rawDrawerOpen, setRawDrawerOpen] = useState(false);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
-  const selectedEffort = resolveEffort(currentEffort);
 
   useEffect(() => {
     if (!open || !isStandalone) {
@@ -331,6 +341,19 @@ export function ChatSettingsModal({
               onTypeFilterChange={setTypeFilter}
             />
           </div>
+          {onSimplicateModeChange && (
+            <div className="space-y-2.5 border-t border-border/30 pt-4">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Interface</span>
+              <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
+                <span className="truncate text-sm font-medium text-foreground">Simplicate</span>
+                <SettingsSwitch
+                  checked={simplicateMode}
+                  label="Simplicate"
+                  onChange={onSimplicateModeChange}
+                />
+              </div>
+            </div>
+          )}
           <div className="space-y-2.5 border-t border-border/30 pt-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fibe Sync</span>
@@ -362,47 +385,6 @@ export function ChatSettingsModal({
               </button>
             </div>
           </div>
-          {showModelSelector && onModelSelect && onModelInputChange && (
-            <div className="space-y-2.5 border-t border-border/30 pt-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model</span>
-              <ModelSelector
-                currentModel={currentModel}
-                options={modelOptions}
-                onSelect={onModelSelect}
-                onInputChange={onModelInputChange}
-                visible={true}
-                modelLocked={modelLocked}
-                onRefresh={onRefreshModels}
-                refreshing={refreshingModels}
-                variant="settings"
-              />
-            </div>
-          )}
-          {onEffortSelect && (
-            <div className="space-y-2.5 border-t border-border/30 pt-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Claude Effort</span>
-              <div className="grid grid-cols-5 rounded-lg border border-border/50 bg-muted/20 p-1" role="group" aria-label="Claude effort">
-                {EFFORT_OPTIONS.map((effort) => {
-                  const active = effort === selectedEffort;
-                  return (
-                    <button
-                      key={effort}
-                      type="button"
-                      onClick={() => onEffortSelect(effort)}
-                      aria-pressed={active}
-                      className={`h-8 min-w-0 rounded-md px-1 text-[11px] font-medium transition-colors ${
-                        active
-                          ? 'bg-primary text-primary-foreground shadow-sm'
-                          : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'
-                      }`}
-                    >
-                      {EFFORT_LABELS[effort]}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
           {onResetConversation && state !== CHAT_STATES.AWAITING_RESPONSE && (
             <div className="space-y-2.5 border-t border-border/30 pt-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversation</span>

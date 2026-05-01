@@ -1,7 +1,11 @@
-import { Brain, Command, GitCompareArrows, Loader2, Menu, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
+import { EFFORT_LABELS, EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
 import { PlaygroundSelector } from './playground-selector';
+import { ModelSelector } from './model-selector';
 import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
 import { TypewriterText } from './typewriter-text';
@@ -38,6 +42,18 @@ export interface ChatHeaderProps {
   cliOpen?: boolean;
   tonyStarkMode?: boolean;
   onToggleTonyStarkMode?: () => void;
+  simplicateMode?: boolean;
+  onSimplicateModeChange?: (enabled: boolean) => void;
+  onOpenFileBrowser?: () => void;
+  currentEffort?: string;
+  onEffortSelect?: (effort: string) => void;
+  showModelSelector?: boolean;
+  modelOptions?: string[];
+  onModelSelect?: (model: string) => void;
+  onModelInputChange?: (value: string) => void;
+  modelLocked?: boolean;
+  onRefreshModels?: () => void;
+  refreshingModels?: boolean;
   // Playground selector
   playgroundEntries?: BrowseEntry[];
   playgroundLoading?: boolean;
@@ -86,9 +102,11 @@ const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
 function PlaygroundSelectorSlot({
   props,
   className,
+  variant = 'icon',
 }: {
   props: ChatHeaderProps;
   className?: string;
+  variant?: 'icon' | 'menu';
 }) {
   if (!props.onPlaygroundOpen || !props.onPlaygroundLink) {
     return null;
@@ -106,12 +124,13 @@ function PlaygroundSelectorSlot({
         onLink={props.onPlaygroundLink}
         onLinked={props.onPlaygroundLinked}
         visible={true}
+        variant={variant}
       />
     </div>
   );
 }
 
-/** CLI Commands toggle button, shared between the desktop top-row and the mobile search-row. */
+/** Commands toggle button, shared between the desktop top-row and the mobile search-row. */
 function CliButton({
   open,
   onToggle,
@@ -130,8 +149,8 @@ function CliButton({
           ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
           : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-300'
       }`}
-      title={open ? 'Close CLI commands' : 'Show CLI commands'}
-      aria-label={open ? 'Close CLI commands' : 'Show CLI commands'}
+      title={open ? 'Close commands' : 'Show commands'}
+      aria-label={open ? 'Close commands' : 'Show commands'}
       aria-pressed={open}
     >
       <Command className="size-4" />
@@ -195,6 +214,515 @@ function TerminalButton({
   );
 }
 
+const MORE_MENU_PANEL_ATTR = 'data-chat-header-more-menu';
+const PROVIDER_MODEL_PANEL_ATTR = 'data-provider-model-menu';
+const MORE_MENU_ITEM_CLASS =
+  'flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30';
+const MORE_MENU_ITEM_ACTIVE_CLASS = 'bg-violet-500/15 text-violet-300';
+
+type FloatingPanelRect = {
+  top: number;
+  left: number;
+  width: number;
+  maxHeight: number;
+};
+
+function computeFloatingPanelRect(anchor: HTMLElement, widthPx: number): FloatingPanelRect {
+  const rect = anchor.getBoundingClientRect();
+  const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+  const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+  const gutter = 8;
+  const width = Math.min(widthPx, viewportWidth - gutter * 2);
+  const left = Math.min(
+    Math.max(gutter, rect.left),
+    Math.max(gutter, viewportWidth - width - gutter),
+  );
+  const top = Math.min(rect.bottom + 8, Math.max(gutter, viewportHeight - gutter - 180));
+  return {
+    top,
+    left,
+    width,
+    maxHeight: Math.max(180, viewportHeight - top - gutter),
+  };
+}
+
+function SimplicateSwitch({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label="Simplicate"
+      onClick={() => onChange(!checked)}
+      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
+        checked ? 'border-violet-400/70 bg-violet-500' : 'border-muted-foreground/50 bg-background/80'
+      }`}
+    >
+      <span
+        className={`pointer-events-none absolute left-0.5 top-0.5 size-4 rounded-full border shadow-sm transition-transform ${
+          checked ? 'translate-x-4 border-white/70 bg-white' : 'translate-x-0 border-muted-foreground/50 bg-muted-foreground'
+        }`}
+      />
+    </button>
+  );
+}
+
+function EffortRange({
+  currentEffort,
+  onEffortSelect,
+}: {
+  currentEffort: string;
+  onEffortSelect: (effort: string) => void;
+}) {
+  const selectedEffort = resolveEffort(currentEffort);
+  const selectedIndex = Math.max(0, EFFORT_OPTIONS.indexOf(selectedEffort));
+  const selectedLabel = EFFORT_LABELS[selectedEffort];
+
+  const handleChange = (value: string) => {
+    const index = Math.max(0, Math.min(EFFORT_OPTIONS.length - 1, Number(value)));
+    onEffortSelect(EFFORT_OPTIONS[index]);
+  };
+
+  return (
+    <div className="space-y-2 rounded-lg border border-border/40 bg-background/35 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Effort</span>
+        <span className="text-xs font-medium text-foreground">{selectedLabel}</span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={EFFORT_OPTIONS.length - 1}
+        step={1}
+        value={selectedIndex}
+        onChange={(e) => handleChange(e.target.value)}
+        className="h-2 w-full cursor-pointer accent-violet-500"
+        aria-label="Effort"
+        aria-valuetext={selectedLabel}
+      />
+      <div className="grid grid-cols-5 gap-1 text-[10px] text-muted-foreground">
+        {EFFORT_OPTIONS.map((effort) => (
+          <span
+            key={effort}
+            className={`truncate text-center ${effort === selectedEffort ? 'font-medium text-violet-300' : ''}`}
+          >
+            {EFFORT_LABELS[effort]}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface ProviderModelMenuProps {
+  children: React.ReactNode;
+  triggerClassName: string;
+  panelLabel: string;
+  showModelSelector?: boolean;
+  currentModel?: string;
+  modelOptions?: string[];
+  onModelSelect?: (model: string) => void;
+  onModelInputChange?: (value: string) => void;
+  modelLocked?: boolean;
+  onRefreshModels?: () => void;
+  refreshingModels?: boolean;
+  currentEffort?: string;
+  onEffortSelect?: (effort: string) => void;
+}
+
+function ProviderModelMenu({
+  children,
+  triggerClassName,
+  panelLabel,
+  showModelSelector = false,
+  currentModel = '',
+  modelOptions = [],
+  onModelSelect,
+  onModelInputChange,
+  modelLocked = false,
+  onRefreshModels,
+  refreshingModels = false,
+  currentEffort = 'max',
+  onEffortSelect,
+}: ProviderModelMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [panelRect, setPanelRect] = useState<FloatingPanelRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const hasModelControls = showModelSelector && Boolean(onModelSelect && onModelInputChange);
+  const hasEffortControls = Boolean(onEffortSelect);
+  const hasControls = hasModelControls || hasEffortControls;
+
+  const updateRect = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    setPanelRect(computeFloatingPanelRect(trigger, 360));
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setPanelRect(null);
+      return;
+    }
+    updateRect();
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+    window.visualViewport?.addEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+      window.visualViewport?.removeEventListener('resize', updateRect);
+    };
+  }, [open, updateRect]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (triggerRef.current?.contains(target)) return;
+      if (target.closest(`[${PROVIDER_MODEL_PANEL_ATTR}]`)) return;
+      if (target.closest('[data-model-selector-panel]')) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  if (!hasControls) {
+    return <div className={triggerClassName}>{children}</div>;
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className={`${triggerClassName} rounded-md transition-colors hover:bg-violet-500/10 focus:outline-none focus:ring-2 focus:ring-violet-500/30`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={panelLabel}
+        title={panelLabel}
+      >
+        {children}
+      </button>
+      {open &&
+        panelRect &&
+        createPortal(
+          <div
+            data-provider-model-menu=""
+            role="dialog"
+            aria-label={panelLabel}
+            className="z-[100] flex flex-col gap-3 overflow-y-auto rounded-lg border border-border bg-card/95 p-3 shadow-xl shadow-black/30 backdrop-blur-xl"
+            style={{
+              position: 'fixed',
+              top: panelRect.top,
+              left: panelRect.left,
+              width: panelRect.width,
+              maxHeight: panelRect.maxHeight,
+            }}
+          >
+            {hasModelControls && onModelSelect && onModelInputChange && (
+              <div className="space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model</span>
+                <ModelSelector
+                  currentModel={currentModel}
+                  options={modelOptions}
+                  onSelect={onModelSelect}
+                  onInputChange={onModelInputChange}
+                  visible={true}
+                  modelLocked={modelLocked}
+                  onRefresh={onRefreshModels}
+                  refreshing={refreshingModels}
+                  variant="settings"
+                  dropdownPlacement="bottom"
+                />
+              </div>
+            )}
+            {onEffortSelect && (
+              <EffortRange currentEffort={currentEffort} onEffortSelect={onEffortSelect} />
+            )}
+          </div>,
+          document.body,
+        )}
+    </>
+  );
+}
+
+interface MoreActionsMenuProps {
+  playgroundProps: ChatHeaderProps;
+  searchQuery: string;
+  filteredMessagesCount: number;
+  onSearchChange: (value: string) => void;
+  statsLabel: string;
+  statsAriaLabel: string;
+  onStartAuth: () => void;
+  state: string;
+  onOpenFileBrowser?: () => void;
+  onToggleTerminal?: () => void;
+  terminalOpen: boolean;
+  onToggleDiff?: () => void;
+  diffOpen: boolean;
+  onToggleCli?: () => void;
+  cliOpen: boolean;
+  onToggleTonyStarkMode?: () => void;
+  simplicateMode: boolean;
+  onSimplicateModeChange?: (enabled: boolean) => void;
+}
+
+function MoreActionsMenu({
+  playgroundProps,
+  searchQuery,
+  filteredMessagesCount,
+  onSearchChange,
+  statsLabel,
+  statsAriaLabel,
+  onStartAuth,
+  state,
+  onOpenFileBrowser,
+  onToggleTerminal,
+  terminalOpen,
+  onToggleDiff,
+  diffOpen,
+  onToggleCli,
+  cliOpen,
+  onToggleTonyStarkMode,
+  simplicateMode,
+  onSimplicateModeChange,
+}: MoreActionsMenuProps) {
+  const [open, setOpen] = useState(false);
+  const [panelRect, setPanelRect] = useState<FloatingPanelRect | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  const updateRect = useCallback(() => {
+    const trigger = triggerRef.current;
+    if (!trigger) return;
+    const rect = computeFloatingPanelRect(trigger, 360);
+    const triggerRect = trigger.getBoundingClientRect();
+    setPanelRect({
+      ...rect,
+      left: Math.max(8, triggerRect.right - rect.width),
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!open) {
+      setPanelRect(null);
+      return;
+    }
+    updateRect();
+    window.addEventListener('scroll', updateRect, true);
+    window.addEventListener('resize', updateRect);
+    window.visualViewport?.addEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('scroll', updateRect, true);
+      window.removeEventListener('resize', updateRect);
+      window.visualViewport?.removeEventListener('resize', updateRect);
+    };
+  }, [open, updateRect]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (triggerRef.current?.contains(target)) return;
+      if (target.closest(`[${MORE_MENU_PANEL_ATTR}]`)) return;
+      if (target.closest('[data-playground-selector-panel]')) return;
+      setOpen(false);
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
+  const runAndClose = useCallback((fn: () => void) => {
+    fn();
+    setOpen(false);
+  }, []);
+
+  const canShowStartAuth = state === CHAT_STATES.UNAUTHENTICATED;
+
+  return (
+    <div className="shrink-0">
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:size-9"
+        title="More actions"
+        aria-label="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+      >
+        <Ellipsis className="size-5" aria-hidden />
+      </button>
+      {open &&
+        panelRect &&
+        createPortal(
+          <div
+            data-chat-header-more-menu=""
+            role="menu"
+            aria-label="Chat actions"
+            className="z-[100] flex flex-col overflow-hidden rounded-lg border border-border bg-card/95 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl"
+            style={{
+              position: 'fixed',
+              top: panelRect.top,
+              left: panelRect.left,
+              width: panelRect.width,
+              maxHeight: panelRect.maxHeight,
+            }}
+          >
+            <div className="min-h-0 overflow-y-auto">
+              {onToggleTonyStarkMode && (
+                <Link
+                  to="/stark"
+                  role="menuitem"
+                  onClick={() => setOpen(false)}
+                  className={MORE_MENU_ITEM_CLASS}
+                  title="Tony Stark"
+                >
+                  <StarkGlassesIcon className="size-4 shrink-0 text-cyan-400" />
+                  <span className="min-w-0 flex-1 truncate">Tony Stark</span>
+                </Link>
+              )}
+
+              <PlaygroundSelectorSlot props={playgroundProps} variant="menu" />
+
+              {onToggleTerminal && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runAndClose(onToggleTerminal)}
+                  className={`${MORE_MENU_ITEM_CLASS} ${terminalOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
+                >
+                  <TerminalSquare className="size-4 shrink-0 text-violet-300" />
+                  <span className="min-w-0 flex-1 truncate">Terminal</span>
+                </button>
+              )}
+
+              {onToggleCli && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runAndClose(onToggleCli)}
+                  className={`${MORE_MENU_ITEM_CLASS} ${cliOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
+                >
+                  <Command className="size-4 shrink-0 text-blue-300" />
+                  <span className="min-w-0 flex-1 truncate">Commands</span>
+                </button>
+              )}
+
+              {onOpenFileBrowser && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runAndClose(onOpenFileBrowser)}
+                  className={MORE_MENU_ITEM_CLASS}
+                >
+                  <FolderOpen className="size-4 shrink-0 text-amber-300" />
+                  <span className="min-w-0 flex-1 truncate">Files</span>
+                </button>
+              )}
+
+              {onToggleDiff && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runAndClose(onToggleDiff)}
+                  className={`${MORE_MENU_ITEM_CLASS} ${diffOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
+                >
+                  <GitCompareArrows className="size-4 shrink-0 text-emerald-300" />
+                  <span className="min-w-0 flex-1 truncate">Git diff</span>
+                </button>
+              )}
+
+              {canShowStartAuth && (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => runAndClose(onStartAuth)}
+                  className={MORE_MENU_ITEM_CLASS}
+                >
+                  <Sparkles className="size-4 shrink-0 text-violet-300" />
+                  <span className="min-w-0 flex-1 truncate">Start Auth</span>
+                </button>
+              )}
+
+              {onSimplicateModeChange && (
+                <div className="mt-1 border-t border-border/40 pt-1">
+                  <div className="flex h-9 items-center justify-between gap-3 rounded-md px-2.5 text-sm text-foreground">
+                    <span className="min-w-0 flex-1 truncate">Simplicate</span>
+                    <SimplicateSwitch
+                      checked={simplicateMode}
+                      onChange={onSimplicateModeChange}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="mt-1 border-t border-border/40 px-2.5 py-2">
+                <div
+                  className="text-xs font-medium tabular-nums text-muted-foreground"
+                  aria-label={statsAriaLabel}
+                  title={statsAriaLabel}
+                >
+                  {statsLabel}
+                </div>
+              </div>
+
+              <div className="border-t border-border/40 px-1 pt-2">
+                <div className="relative h-8">
+                  <Search className={SEARCH_ICON_POSITION} aria-hidden />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => onSearchChange(e.target.value)}
+                    placeholder="Search in conversation..."
+                    className={INPUT_SEARCH}
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => onSearchChange('')}
+                      className={CLEAR_BUTTON_POSITION}
+                      aria-label="Clear search"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  )}
+                </div>
+                {searchQuery && (
+                  <p className="px-1 pt-1.5 text-[10px] text-muted-foreground">
+                    Found {filteredMessagesCount} message{filteredMessagesCount !== 1 ? 's' : ''}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+    </div>
+  );
+}
+
 export function ChatHeader({
   isMobile,
   agentName,
@@ -224,6 +752,18 @@ export function ChatHeader({
   cliOpen = false,
   tonyStarkMode = false,
   onToggleTonyStarkMode,
+  simplicateMode = false,
+  onSimplicateModeChange,
+  onOpenFileBrowser,
+  currentEffort = 'max',
+  onEffortSelect,
+  showModelSelector = false,
+  modelOptions = [],
+  onModelSelect,
+  onModelInputChange,
+  modelLocked = false,
+  onRefreshModels,
+  refreshingModels = false,
   ...rest
 }: ChatHeaderProps) {
   const displayName = agentName || agentProviderLabel?.trim() || 'Claude';
@@ -258,8 +798,131 @@ export function ChatHeader({
     cliOpen,
     tonyStarkMode,
     onToggleTonyStarkMode,
+    simplicateMode,
+    onSimplicateModeChange,
+    onOpenFileBrowser,
+    currentEffort,
+    onEffortSelect,
+    showModelSelector,
+    modelOptions,
+    onModelSelect,
+    onModelInputChange,
+    modelLocked,
+    onRefreshModels,
+    refreshingModels,
     ...rest,
   };
+  const statusContent = state === CHAT_STATES.AWAITING_RESPONSE && agentMode
+    ? <TypewriterText text={agentMode} speed={40} />
+    : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
+    ? truncateError(errorMessage)
+    : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state;
+  const statusTextClass = state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass;
+  const statsLabel = useMemo(() => {
+    const parts = [
+      `${mobileSessionStats.totalActions}/${mobileSessionStats.completed}/${mobileSessionStats.processing}`,
+    ];
+    if (sessionTokenUsage) {
+      parts.push(`${formatCompactInteger(sessionTokenUsage.inputTokens)} in / ${formatCompactInteger(sessionTokenUsage.outputTokens)} out`);
+    }
+    if (sessionTimeMs > 0) {
+      parts.push(formatSessionDurationMs(sessionTimeMs));
+    }
+    return parts.join(' · ');
+  }, [mobileSessionStats.completed, mobileSessionStats.processing, mobileSessionStats.totalActions, sessionTimeMs, sessionTokenUsage]);
+  const statsAriaLabel = `${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} in / ${sessionTokenUsage.outputTokens} out` : ''}${sessionTimeMs > 0 ? ` / ${formatSessionDurationMs(sessionTimeMs)}` : ''}`;
+  const compactMode = !simplicateMode;
+  const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
+  const menuButtonLabel = compactMode ? 'Open settings' : 'Open menu';
+
+  if (compactMode) {
+    return (
+      <header
+        className="border-b border-border/30 bg-card/60 px-3 pb-2 backdrop-blur-xl shrink-0 sm:px-4"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))' }}
+      >
+        <div className="flex h-10 items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={onOpenMenu}
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent text-violet-500 transition-colors hover:bg-violet-500/10 active:scale-[0.98] sm:size-9"
+            aria-label={menuButtonLabel}
+            title={menuButtonLabel}
+          >
+            <Settings className="size-4 sm:size-5" />
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5 text-sm">
+              <ProviderModelMenu
+                triggerClassName="-ml-1 inline-flex min-w-0 max-w-[62vw] items-center gap-1.5 px-1 py-0.5 text-left sm:max-w-[360px]"
+                panelLabel="Change model and effort"
+                showModelSelector={showModelSelector}
+                currentModel={currentModel}
+                modelOptions={modelOptions}
+                onModelSelect={onModelSelect}
+                onModelInputChange={onModelInputChange}
+                modelLocked={modelLocked}
+                onRefreshModels={onRefreshModels}
+                refreshingModels={refreshingModels}
+                currentEffort={currentEffort}
+                onEffortSelect={onEffortSelect}
+              >
+                <span className="truncate font-semibold text-foreground" title={displayName}>{displayName}</span>
+                {modelLabel && (
+                  <>
+                    <span className="shrink-0 text-muted-foreground/60">·</span>
+                    <span
+                      className="min-w-0 truncate text-xs font-medium text-muted-foreground"
+                      title={`Model: ${modelLabel}`}
+                    >
+                      {modelLabel}
+                    </span>
+                  </>
+                )}
+              </ProviderModelMenu>
+              <span className="shrink-0 text-muted-foreground/60">·</span>
+              <span className={`min-w-0 truncate text-xs ${statusTextClass}`}>
+                {statusContent}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex shrink-0 items-center gap-1.5">
+            {canShowReconnect && (
+              <button
+                type="button"
+                onClick={onReconnect}
+                className="h-8 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-2.5 text-xs font-medium text-white shadow-lg shadow-violet-500/25 transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:h-9 sm:px-3"
+              >
+                Reconnect
+              </button>
+            )}
+            <MoreActionsMenu
+              playgroundProps={playgroundProps}
+              searchQuery={searchQuery}
+              filteredMessagesCount={filteredMessagesCount}
+              onSearchChange={onSearchChange}
+              statsLabel={statsLabel}
+              statsAriaLabel={statsAriaLabel}
+              onStartAuth={onStartAuth}
+              state={state}
+              onOpenFileBrowser={onOpenFileBrowser}
+              onToggleTerminal={onToggleTerminal}
+              terminalOpen={terminalOpen}
+              onToggleDiff={onToggleDiff}
+              diffOpen={diffOpen}
+              onToggleCli={onToggleCli}
+              cliOpen={cliOpen}
+              onToggleTonyStarkMode={onToggleTonyStarkMode}
+              simplicateMode={simplicateMode}
+              onSimplicateModeChange={onSimplicateModeChange}
+            />
+          </div>
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header
@@ -292,8 +955,21 @@ export function ChatHeader({
             </button>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="flex items-baseline gap-2 flex-wrap">
-              <h2 className="font-semibold text-sm text-foreground truncate" title={displayName}>{displayName}</h2>
+            <ProviderModelMenu
+              triggerClassName="-ml-1 inline-flex max-w-full min-w-0 items-baseline gap-2 px-1 py-0.5 text-left"
+              panelLabel="Change model and effort"
+              showModelSelector={showModelSelector}
+              currentModel={currentModel}
+              modelOptions={modelOptions}
+              onModelSelect={onModelSelect}
+              onModelInputChange={onModelInputChange}
+              modelLocked={modelLocked}
+              onRefreshModels={onRefreshModels}
+              refreshingModels={refreshingModels}
+              currentEffort={currentEffort}
+              onEffortSelect={onEffortSelect}
+            >
+              <span className="truncate text-sm font-semibold text-foreground" title={displayName}>{displayName}</span>
               {modelLabel && (
                 <span
                   className="max-w-28 truncate text-[11px] font-medium leading-none text-muted-foreground/70 sm:max-w-40"
@@ -302,14 +978,10 @@ export function ChatHeader({
                   {modelLabel}
                 </span>
               )}
-            </div>
+            </ProviderModelMenu>
             <div className="min-h-[14px] mt-0.5 flex items-center gap-2">
-              <p className={`text-[10px] sm:text-xs ${state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass}`}>
-                {state === CHAT_STATES.AWAITING_RESPONSE && agentMode
-                  ? <TypewriterText text={agentMode} speed={40} />
-                  : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
-                  ? truncateError(errorMessage)
-                  : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state}
+              <p className={`text-[10px] sm:text-xs ${statusTextClass}`}>
+                {statusContent}
               </p>
               {sessionTimeMs > 0 && (
                 <span
@@ -368,7 +1040,7 @@ export function ChatHeader({
               )}
             </button>
           )}
-          {(state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR) && (
+          {canShowReconnect && (
             <button
               type="button"
               onClick={onReconnect}
@@ -382,7 +1054,7 @@ export function ChatHeader({
             <Link
               to="/stark"
               className="p-1 md:p-1.5 rounded-full transition-all text-cyan-500/80 hover:text-cyan-300 hover:bg-cyan-500/10 group flex items-center justify-center transform hover:scale-105 active:scale-95"
-              title="Enter Tony Stark Mode"
+              title="Tony Stark"
             >
               <StarkGlassesIcon className="w-5 h-5 md:w-6 md:h-6 group-hover:drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] transition-all" />
             </Link>

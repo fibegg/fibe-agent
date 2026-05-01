@@ -1,4 +1,4 @@
-import { loginWithPassword, isAuthenticated } from './api-url';
+import { loginWithPassword, isAuthenticated, getAuthTokenForRequest } from './api-url';
 
 const AUTO_AUTH_TIMEOUT_MS = 3000;
 export const AUTO_AUTH_SUCCESS_EVENT = 'fibe:auto-auth-success';
@@ -57,8 +57,10 @@ function onMessage(event: MessageEvent): void {
   const password = data?.password;
   if (!data || data.action !== 'auto_auth' || typeof password !== 'string') return;
 
-  // Already authenticated (e.g. from a previous message in the retry loop)
-  if (isAuthenticated()) return;
+  // Already authenticated for this runtime (e.g. from a previous message in the retry loop).
+  // If the parent sends a different password, refresh the stored iframe token; otherwise
+  // an old token can keep reconnecting to /ws and /ws-terminal with 4001 closes.
+  if (isAuthenticated() && getAuthTokenForRequest() === password) return;
 
   // Prevent concurrent login attempts from the parent's retry loop
   if (authInFlight) return;

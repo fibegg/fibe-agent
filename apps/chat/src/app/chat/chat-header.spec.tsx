@@ -6,9 +6,16 @@ import { CHAT_STATES } from './chat-state';
 
 // Lightweight stub so PlaygroundSelector renders a recognisable element.
 vi.mock('./playground-selector', () => ({
-  PlaygroundSelector: ({ currentLink }: { currentLink: string | null }) => (
-    <div data-testid="playground-selector">{currentLink ?? 'no-link'}</div>
+  PlaygroundSelector: ({ currentLink, variant }: { currentLink: string | null; variant?: 'icon' | 'menu' }) => (
+    <button type="button" aria-label={variant === 'menu' ? 'Playgrounds' : 'Link Playground'} data-testid="playground-selector">
+      {variant === 'menu' ? 'Playgrounds' : currentLink ?? 'no-link'}
+    </button>
   ),
+}));
+
+vi.mock('./model-selector', () => ({
+  ModelSelector: ({ currentModel, visible }: { currentModel: string; visible: boolean }) =>
+    visible ? <div data-testid="model-selector">{currentModel}</div> : null,
 }));
 
 const PLAYGROUND_PROPS = {
@@ -35,6 +42,7 @@ const DEFAULT_PROPS = {
   onStartAuth: vi.fn(),
   onOpenMenu: vi.fn(),
   onOpenActivity: vi.fn(),
+  simplicateMode: true,
 };
 
 // ─── Core rendering ───────────────────────────────────────────────────────────
@@ -83,8 +91,11 @@ describe('ChatHeader', () => {
   // ─── Reconnect / Auth buttons ──────────────────────────────────────────────
 
   it('shows Reconnect button when state is AGENT_OFFLINE', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} />);
-    expect(screen.getByRole('button', { name: /reconnect/i })).toBeTruthy();
+    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} simplicateMode={false} />);
+    const reconnect = screen.getByRole('button', { name: /reconnect/i });
+    const moreActions = screen.getByRole('button', { name: /more actions/i });
+    expect(reconnect).toBeTruthy();
+    expect(reconnect.parentElement?.contains(moreActions)).toBe(true);
   });
 
   it('calls onReconnect when Reconnect button clicked', () => {
@@ -100,13 +111,13 @@ describe('ChatHeader', () => {
   });
 
   it('shows Start Auth button when state is UNAUTHENTICATED', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} />);
+    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} simplicateMode />);
     expect(screen.getByRole('button', { name: /start auth/i })).toBeTruthy();
   });
 
   it('calls onStartAuth when Start Auth clicked', () => {
     const onStartAuth = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} onStartAuth={onStartAuth} />);
+    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} onStartAuth={onStartAuth} simplicateMode />);
     fireEvent.click(screen.getByRole('button', { name: /start auth/i }));
     expect(onStartAuth).toHaveBeenCalled();
   });
@@ -294,22 +305,143 @@ describe('ChatHeader', () => {
     slots.forEach((s) => expect(s.textContent).toBe('my/project'));
   });
 
-  // ─── Tony Stark Mode ──────────────────────────────────────────────────────
+  // ─── Tony Stark ───────────────────────────────────────────────────────────
 
-  it('renders Tony Stark mode link when onToggleTonyStarkMode is provided', () => {
+  it('renders Tony Stark link when onToggleTonyStarkMode is provided', () => {
     render(
       <MemoryRouter>
         <ChatHeader {...DEFAULT_PROPS} onToggleTonyStarkMode={vi.fn()} tonyStarkMode={false} />
       </MemoryRouter>,
     );
-    const link = screen.getByTitle('Enter Tony Stark Mode');
+    const link = screen.getByTitle('Tony Stark');
     expect(link).toBeTruthy();
     expect(link.tagName).toBe('A'); // Because we use react-router-dom Link, in tests it renders as an anchor
     expect(link.getAttribute('href')).toBe('/stark');
   });
 
-  it('does not render Tony Stark mode link when onToggleTonyStarkMode is not provided', () => {
+  it('does not render Tony Stark link when onToggleTonyStarkMode is not provided', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
-    expect(screen.queryByTitle('Enter Tony Stark Mode')).toBeNull();
+    expect(screen.queryByTitle('Tony Stark')).toBeNull();
+  });
+
+  // ─── Simplicate mode ──────────────────────────────────────────────────────
+
+  it('renders compact header when Simplicate is off with settings gear and no inline search', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+        simplicateMode={false}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: /open settings/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /more actions/i })).toBeTruthy();
+    expect(screen.getByText('Claude')).toBeTruthy();
+    expect(screen.getByText('haiku')).toBeTruthy();
+    expect(screen.queryByPlaceholderText(/search in conversation/i)).toBeNull();
+  });
+
+  it('opens compact actions menu with displaced controls', () => {
+    render(
+      <MemoryRouter>
+        <ChatHeader
+          {...DEFAULT_PROPS}
+          {...PLAYGROUND_PROPS}
+          simplicateMode={false}
+          onToggleTonyStarkMode={vi.fn()}
+          onOpenFileBrowser={vi.fn()}
+          onToggleTerminal={vi.fn()}
+          onToggleCli={vi.fn()}
+          onSimplicateModeChange={vi.fn()}
+          mobileSessionStats={{ totalActions: 9, completed: 9, processing: 0 }}
+          sessionTokenUsage={{ inputTokens: 3000, outputTokens: 1200 }}
+          sessionTimeMs={22000}
+        />
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+
+    expect(screen.getByRole('menu', { name: /chat actions/i })).toBeTruthy();
+    expect(screen.getByText('Tony Stark')).toBeTruthy();
+    expect(screen.getByLabelText('Playgrounds')).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /terminal/i })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /commands/i })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: /files/i })).toBeTruthy();
+    expect(screen.getByRole('switch', { name: /simplicate/i }).getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByText(/9\/9\/0 · 3k in \/ 1\.2k out · 22s/i)).toBeTruthy();
+    expect(screen.getByPlaceholderText(/search in conversation/i)).toBeTruthy();
+  });
+
+  it('runs compact menu actions', () => {
+    const onToggleTerminal = vi.fn();
+    const onOpenFileBrowser = vi.fn();
+    const onSimplicateModeChange = vi.fn();
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        simplicateMode={false}
+        onToggleTerminal={onToggleTerminal}
+        onOpenFileBrowser={onOpenFileBrowser}
+        onSimplicateModeChange={onSimplicateModeChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /terminal/i }));
+    expect(onToggleTerminal).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /files/i }));
+    expect(onOpenFileBrowser).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('switch', { name: /simplicate/i }));
+    expect(onSimplicateModeChange).toHaveBeenCalledWith(true);
+  });
+
+  it('opens provider/model dropdown from standard header with model and effort controls', () => {
+    const onEffortSelect = vi.fn();
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+        currentEffort="high"
+        onEffortSelect={onEffortSelect}
+        showModelSelector
+        modelOptions={['haiku']}
+        onModelSelect={vi.fn()}
+        onModelInputChange={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /change model and effort/i }));
+
+    expect(screen.getByRole('dialog', { name: /change model and effort/i })).toBeTruthy();
+    expect(screen.getByTestId('model-selector').textContent).toBe('haiku');
+    const range = screen.getByRole('slider', { name: /effort/i }) as HTMLInputElement;
+    expect(range.value).toBe('2');
+    fireEvent.change(range, { target: { value: '0' } });
+    expect(onEffortSelect).toHaveBeenCalledWith('low');
+  });
+
+  it('opens provider/model dropdown from Simplicate header', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+        currentEffort="max"
+        onEffortSelect={vi.fn()}
+        simplicateMode
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /change model and effort/i }));
+    expect(screen.getByRole('dialog', { name: /change model and effort/i })).toBeTruthy();
+    expect(screen.getByRole('slider', { name: /effort/i })).toBeTruthy();
   });
 });
