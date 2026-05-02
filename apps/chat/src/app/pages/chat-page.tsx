@@ -853,6 +853,11 @@ export function ChatPage() {
           simplicateMode={simplicateMode}
           onSimplicateModeChange={handleSimplicateModeChange}
           onOpenFileBrowser={openFileBrowser}
+          onResetConversation={
+            state !== CHAT_STATES.AWAITING_RESPONSE
+              ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
+              : undefined
+          }
         />
         <ChatErrorBanner
           errorMessage={errorMessage}

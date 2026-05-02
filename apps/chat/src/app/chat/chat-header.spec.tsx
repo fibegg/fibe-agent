@@ -446,4 +446,50 @@ describe('ChatHeader', () => {
     expect(screen.getByRole('dialog', { name: /change model and effort/i })).toBeTruthy();
     expect(screen.getByRole('slider', { name: /effort/i })).toBeTruthy();
   });
+
+  // ─── Reset conversation ───────────────────────────────────────────────────
+
+  it('shows Reset conversation item in MoreActionsMenu when onResetConversation is provided', () => {
+    const onResetConversation = vi.fn();
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        simplicateMode={true}
+        onResetConversation={onResetConversation}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    expect(screen.getByRole('menuitem', { name: /reset conversation/i })).toBeTruthy();
+  });
+
+  it('calls onResetConversation and closes the menu when Reset is clicked', () => {
+    const onResetConversation = vi.fn();
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        simplicateMode={true}
+        onResetConversation={onResetConversation}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /reset conversation/i }));
+    expect(onResetConversation).toHaveBeenCalledTimes(1);
+    // Menu should close after clicking
+    expect(screen.queryByRole('menu', { name: /chat actions/i })).toBeNull();
+  });
+
+  it('does not show Reset conversation item when onResetConversation is not provided', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        simplicateMode={true}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    expect(screen.queryByRole('menuitem', { name: /reset conversation/i })).toBeNull();
+  });
 });
+

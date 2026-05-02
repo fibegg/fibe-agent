@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, RefreshCcw, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
 import { EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
@@ -72,6 +72,8 @@ export interface ChatHeaderProps {
   onPlaygroundLink?: (path: string) => Promise<boolean>;
   onPlaygroundLinked?: () => void;
   onPlaygroundSmartMount?: () => void;
+  /** When provided, shows a Reset button in the MoreActionsMenu. */
+  onResetConversation?: () => void;
 }
 
 const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -492,6 +494,7 @@ interface MoreActionsMenuProps {
   onToggleTonyStarkMode?: () => void;
   simplicateMode: boolean;
   onSimplicateModeChange?: (enabled: boolean) => void;
+  onResetConversation?: () => void;
 }
 
 function MoreActionsMenu({
@@ -513,6 +516,7 @@ function MoreActionsMenu({
   onToggleTonyStarkMode,
   simplicateMode,
   onSimplicateModeChange,
+  onResetConversation,
 }: MoreActionsMenuProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
@@ -679,6 +683,19 @@ function MoreActionsMenu({
                 </button>
               )}
 
+              {onResetConversation && (
+                <button
+                  type="button"
+                  id="chat-header-reset-conversation-btn"
+                  role="menuitem"
+                  onClick={() => runAndClose(onResetConversation)}
+                  className={`${MORE_MENU_ITEM_CLASS} text-rose-400/80 hover:bg-rose-500/10 hover:text-rose-300`}
+                >
+                  <RefreshCcw className="size-4 shrink-0" />
+                  <span className="min-w-0 flex-1 truncate">{t('settings.resetTitle')}</span>
+                </button>
+              )}
+
               {onSimplicateModeChange && (
                 <div className="mt-1 border-t border-border/40 pt-1">
                   <div className="flex h-9 items-center justify-between gap-3 rounded-md px-2.5 text-sm text-foreground">
@@ -785,6 +802,7 @@ export function ChatHeader({
   modelLocked = false,
   onRefreshModels,
   refreshingModels = false,
+  onResetConversation,
   ...rest
 }: ChatHeaderProps) {
   const t = useT();
@@ -941,6 +959,7 @@ export function ChatHeader({
               onToggleTonyStarkMode={onToggleTonyStarkMode}
               simplicateMode={simplicateMode}
               onSimplicateModeChange={onSimplicateModeChange}
+              onResetConversation={onResetConversation}
             />
           </div>
         </div>
