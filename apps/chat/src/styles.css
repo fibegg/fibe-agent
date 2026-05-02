@@ -480,3 +480,32 @@ body {
     linear-gradient(90deg, rgba(6, 182, 212, 0.1) 1px, transparent 1px);
   background-size: 40px 40px;
 }
+
+html[data-ui-effects="reduced"],
+html[data-ui-effects="reduced"] * {
+  scroll-behavior: auto !important;
+}
+
+html[data-ui-effects="reduced"] *,
+html[data-ui-effects="reduced"] *::before,
+html[data-ui-effects="reduced"] *::after {
+  animation: none !important;
+  transition: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-ui-effects="reduced"] .animate-float,
+html[data-ui-effects="reduced"] .animate-sparkle,
+html[data-ui-effects="reduced"] .animate-sidebar-pulse,
+html[data-ui-effects="reduced"] .animate-subtle-glow,
+html[data-ui-effects="reduced"] .animate-pulse-glow,
+html[data-ui-effects="reduced"] .animate-header-flame-out,
+html[data-ui-effects="reduced"] .animate-header-dust,
+html[data-ui-effects="reduced"] .animate-stark-scanline,
+html[data-ui-effects="reduced"] .arc-spinner::before,
+html[data-ui-effects="reduced"] .arc-spinner::after,
+html[data-ui-effects="reduced"] .arc-center {
+  filter: none !important;
+  box-shadow: none !important;
+}

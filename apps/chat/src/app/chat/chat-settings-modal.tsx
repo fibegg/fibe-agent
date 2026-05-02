@@ -34,6 +34,8 @@ import { RightDrawer } from '../right-drawer';
 import { RawProviderActivityDrawerContent } from './raw-provider-activity-drawer';
 import { LocaleSelector } from '../locale-selector';
 import { useT } from '../i18n';
+import { setUiEffectsEnabled } from '../ui-effects';
+import { useUiEffectsEnabled } from '../use-ui-effects';
 
 interface InitStatusResponse {
   state: 'disabled' | 'pending' | 'running' | 'done' | 'failed';
@@ -217,6 +219,7 @@ export function ChatSettingsModal({
   const [syncSaving, setSyncSaving] = useState(false);
   const [rawDrawerOpen, setRawDrawerOpen] = useState(false);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
+  const uiEffectsEnabled = useUiEffectsEnabled();
 
   useEffect(() => {
     if (!open || !isStandalone) {
@@ -346,9 +349,9 @@ export function ChatSettingsModal({
               onTypeFilterChange={setTypeFilter}
             />
           </div>
-          {onSimplicateModeChange && !simplicateMode && (
-            <div className="space-y-2.5 border-t border-border/30 pt-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.interface')}</span>
+          <div className="space-y-2.5 border-t border-border/30 pt-4">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.interface')}</span>
+            {onSimplicateModeChange && !simplicateMode && (
               <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
                 <span className="truncate text-sm font-medium text-foreground">{t('header.simplicate')}</span>
                 <SettingsSwitch
@@ -357,8 +360,19 @@ export function ChatSettingsModal({
                   onChange={onSimplicateModeChange}
                 />
               </div>
+            )}
+            <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
+              <span className="flex min-w-0 flex-col gap-0.5">
+                <span className="truncate text-sm font-medium text-foreground">{t('settings.uiEffects')}</span>
+                <span className="text-xs text-muted-foreground">{t('settings.uiEffectsDescription')}</span>
+              </span>
+              <SettingsSwitch
+                checked={uiEffectsEnabled}
+                label={t('settings.uiEffects')}
+                onChange={setUiEffectsEnabled}
+              />
             </div>
-          )}
+          </div>
           <div className="space-y-2.5 border-t border-border/30 pt-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.fibeSync')}</span>

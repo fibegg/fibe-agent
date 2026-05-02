@@ -5,10 +5,14 @@ import { CountUpNumber } from './count-up-number';
 describe('CountUpNumber', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-ui-effects');
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-ui-effects');
   });
 
   it('renders initial value in raw format', () => {
@@ -86,5 +90,19 @@ describe('CountUpNumber', () => {
     });
 
     expect(container.textContent).toBe('42');
+  });
+
+  it('renders value changes immediately when UI effects are disabled', () => {
+    localStorage.setItem('chat-ui-effects-enabled', 'false');
+    const rafSpy = vi.spyOn(window, 'requestAnimationFrame');
+    const { rerender, container } = render(<CountUpNumber value={0} format="raw" />);
+
+    act(() => {
+      rerender(<CountUpNumber value={100} format="raw" />);
+    });
+
+    expect(container.textContent).toBe('100');
+    expect(rafSpy).not.toHaveBeenCalled();
+    rafSpy.mockRestore();
   });
 });

@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import * as ReactDOM from 'react-dom/client';
 import { initTheme } from './app/theme';
+import { initUiEffects } from './app/ui-effects';
 import './app/postmessage-auth';
 import './app/keybind-forwarder';
 import { logConsoleBanner } from './app/console-banner';
@@ -9,6 +10,7 @@ import App from './app/app';
 import { IframeReadySignal } from './app/iframe-ready-signal';
 
 logConsoleBanner();
+initUiEffects();
 initTheme();
 
 declare global {

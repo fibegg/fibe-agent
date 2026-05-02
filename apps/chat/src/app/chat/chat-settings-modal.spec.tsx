@@ -32,12 +32,14 @@ describe('ChatSettingsModal', () => {
       json: async () => ({ state: 'done', output: 'ok' }),
     } as Response);
     localStorage.clear();
+    document.documentElement.removeAttribute('data-ui-effects');
   });
 
   afterEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
     localStorage.clear();
+    document.documentElement.removeAttribute('data-ui-effects');
   });
 
   it('renders nothing when open is false', () => {
@@ -118,6 +120,25 @@ describe('ChatSettingsModal', () => {
     );
 
     expect(screen.queryByRole('switch', { name: /simplicate/i })).toBeNull();
+  });
+
+  it('renders UI effects switch and persists reduced mode', () => {
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('switch', { name: /animations and visual effects/i });
+    expect(toggle.getAttribute('aria-checked')).toBe('true');
+    fireEvent.click(toggle);
+    expect(localStorage.getItem('chat-ui-effects-enabled')).toBe('false');
+    expect(document.documentElement.dataset.uiEffects).toBe('reduced');
   });
 
   it('does not render model or effort controls in settings', () => {

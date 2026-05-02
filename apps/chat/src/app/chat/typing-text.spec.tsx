@@ -1,8 +1,13 @@
-import { describe, it, expect } from 'vitest';
+import { beforeEach, describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TypingText } from './typing-text';
 
 describe('TypingText', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    document.documentElement.removeAttribute('data-ui-effects');
+  });
+
   it('renders wrapper with no visible text when text is empty and skipAnimation', () => {
     const { container } = render(<TypingText text="" skipAnimation />);
     const outer = container.querySelector('span');
@@ -31,5 +36,13 @@ describe('TypingText', () => {
     const { container } = render(<TypingText text="x" skipAnimation className="custom" />);
     const span = container.querySelector('span.custom');
     expect(span).toBeTruthy();
+  });
+
+  it('shows full text and hides the cursor when UI effects are disabled', () => {
+    localStorage.setItem('chat-ui-effects-enabled', 'false');
+    const { container } = render(<TypingText text="hello" showCursor />);
+
+    expect(screen.getByText('hello')).toBeTruthy();
+    expect(container.querySelector('.animate-typing-cursor')).toBeFalsy();
   });
 });

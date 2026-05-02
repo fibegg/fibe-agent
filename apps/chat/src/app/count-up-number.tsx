@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useUiEffectsEnabled } from './use-ui-effects';
 
 const ANIMATION_DURATION_MS = 400;
 
@@ -17,6 +18,7 @@ export function CountUpNumber({
   format?: 'compact' | 'raw';
   className?: string;
 }) {
+  const uiEffectsEnabled = useUiEffectsEnabled();
   const [display, setDisplay] = useState(value);
   const prevRef = useRef(value);
   const rafRef = useRef<number | null>(null);
@@ -25,6 +27,13 @@ export function CountUpNumber({
     const from = prevRef.current;
     const to = value;
     prevRef.current = value;
+
+    if (!uiEffectsEnabled) {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
+      setDisplay(to);
+      return;
+    }
 
     if (from === to) return;
 
@@ -48,7 +57,7 @@ export function CountUpNumber({
     return () => {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
     };
-  }, [value]);
+  }, [value, uiEffectsEnabled]);
 
   const text = format === 'compact' ? formatCompact(display) : String(display);
 

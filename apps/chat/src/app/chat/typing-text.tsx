@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useUiEffectsEnabled } from '../use-ui-effects';
 
 const DEFAULT_CHAR_MS = 24;
 
@@ -17,24 +18,26 @@ export function TypingText({
   showCursor = true,
   skipAnimation = false,
 }: TypingTextProps) {
-  const [visibleLength, setVisibleLength] = useState(skipAnimation ? text.length : 0);
+  const uiEffectsEnabled = useUiEffectsEnabled();
+  const shouldSkipAnimation = skipAnimation || !uiEffectsEnabled;
+  const [visibleLength, setVisibleLength] = useState(shouldSkipAnimation ? text.length : 0);
 
   useEffect(() => {
-    setVisibleLength(skipAnimation ? text.length : 0);
-  }, [text, skipAnimation]);
+    setVisibleLength(shouldSkipAnimation ? text.length : 0);
+  }, [text, shouldSkipAnimation]);
 
   useEffect(() => {
-    if (skipAnimation || visibleLength >= text.length) return;
+    if (shouldSkipAnimation || visibleLength >= text.length) return;
     const t = setTimeout(() => setVisibleLength((n) => n + 1), charMs);
     return () => clearTimeout(t);
-  }, [skipAnimation, text.length, visibleLength, charMs]);
+  }, [shouldSkipAnimation, text.length, visibleLength, charMs]);
 
   const visible = text.slice(0, visibleLength);
 
   return (
     <span className={className}>
       {visible}
-      {showCursor && (
+      {showCursor && uiEffectsEnabled && (
         <span
           className="inline-block w-2 h-4 ml-0.5 -mb-0.5 bg-violet-400 align-middle animate-typing-cursor"
           aria-hidden

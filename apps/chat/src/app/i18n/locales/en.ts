@@ -99,6 +99,8 @@ export const en = {
   'settings.title': 'Settings',
   'settings.activityFilter': 'Activity Filter',
   'settings.interface': 'Interface',
+  'settings.uiEffects': 'Animations and visual effects',
+  'settings.uiEffectsDescription': 'Disable on slow devices to keep the UI functional with less motion and blur.',
   'settings.fibeSync': 'Fibe Sync',
   'settings.sync.messages': 'Send messages to Fibe',
   'settings.sync.activity': 'Send activity to Fibe',

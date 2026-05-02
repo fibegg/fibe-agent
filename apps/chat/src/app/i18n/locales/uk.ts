@@ -101,6 +101,8 @@ export const uk: Record<TranslationKey, string> = {
   'settings.title': 'Налаштування',
   'settings.activityFilter': 'Фільтр активності',
   'settings.interface': 'Інтерфейс',
+  'settings.uiEffects': 'Анімації та візуальні ефекти',
+  'settings.uiEffectsDescription': 'Вимкніть на повільних пристроях, щоб лишити інтерфейс функціональним із меншим рухом і розмиттям.',
   'settings.fibeSync': 'Синхронізація з Файбом',
   'settings.sync.messages': 'Надсилати повідомлення у Файб',
   'settings.sync.activity': 'Надсилати активність у Файб',
