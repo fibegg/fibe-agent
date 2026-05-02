@@ -10,6 +10,8 @@ vi.mock('../api-url', () => ({
 }));
 
 vi.mock('../embed-config', () => ({
+  getLocaleSource: vi.fn().mockReturnValue('localStorage'),
+  shouldHideLocaleSelector: vi.fn().mockReturnValue(false),
   shouldHideThemeSwitch: vi.fn().mockReturnValue(false),
 }));
 
@@ -99,6 +101,23 @@ describe('ChatSettingsModal', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     fireEvent.click(toggle);
     expect(onSimplicateModeChange).toHaveBeenCalledWith(true);
+  });
+
+  it('hides Simplicate switch in settings when compact mode already exposes it in the actions menu', () => {
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+        simplicateMode
+        onSimplicateModeChange={vi.fn()}
+      />
+    );
+
+    expect(screen.queryByRole('switch', { name: /simplicate/i })).toBeNull();
   });
 
   it('does not render model or effort controls in settings', () => {

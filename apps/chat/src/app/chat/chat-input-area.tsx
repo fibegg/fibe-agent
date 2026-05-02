@@ -5,6 +5,7 @@ import { FileMentionDropdown } from './file-mention-dropdown';
 import { CHAT_STATES } from './chat-state';
 import type { PlaygroundEntryItem } from './use-playground-files';
 import { FileIcon } from '../file-icon';
+import { useT } from '../i18n';
 
 const ACCEPT_FILES =
   'image/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.json,.md,.rtf,application/pdf,text/plain,text/csv,application/json';
@@ -76,6 +77,7 @@ export function ChatInputArea({
   onVoiceToggle,
   maxPendingTotal,
 }: ChatInputAreaProps) {
+  const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isWorking = state === CHAT_STATES.AWAITING_RESPONSE;
   const isReady = state === CHAT_STATES.AUTHENTICATED;
@@ -99,7 +101,7 @@ export function ChatInputArea({
                   type="button"
                   onClick={onRemovePendingVoice}
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-90"
-                  aria-label="Remove voice"
+                  aria-label={t('chat.input.removeVoice')}
                 >
                   <X className="size-3" aria-hidden />
                 </button>
@@ -116,7 +118,7 @@ export function ChatInputArea({
                   type="button"
                   onClick={() => onRemovePendingImage(i)}
                   className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-90"
-                  aria-label="Remove image"
+                  aria-label={t('chat.input.removeImage')}
                 >
                   <X className="size-3" aria-hidden />
                 </button>
@@ -135,7 +137,7 @@ export function ChatInputArea({
                   type="button"
                   onClick={() => onRemovePendingAttachment(i)}
                   className="shrink-0 size-5 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-90"
-                  aria-label="Remove attachment"
+                  aria-label={t('chat.input.removeAttachment')}
                 >
                   <X className="size-3" aria-hidden />
                 </button>
@@ -162,14 +164,14 @@ export function ChatInputArea({
             onClick={() => fileInputRef.current?.click()}
             disabled={!canAttach}
             className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0 disabled:opacity-50"
-            title="Attach files"
-            aria-label="Attach files"
+            title={t('chat.input.attachFiles')}
+            aria-label={t('chat.input.attachFiles')}
           >
             <Paperclip className="size-3.5 sm:size-4" />
           </button>
           <div
             className="relative flex-1 min-w-0"
-            title={state === CHAT_STATES.AUTHENTICATED ? 'Type @ to link a file' : undefined}
+            title={state === CHAT_STATES.AUTHENTICATED ? t('chat.input.typeAt') : undefined}
           >
             <MentionInput
               inputRef={chatInputRef}
@@ -187,7 +189,7 @@ export function ChatInputArea({
             {voiceRecorder.isRecording && (
               <div className="absolute inset-0 z-10 flex items-center px-3 overflow-hidden pointer-events-none">
                 <span className="text-sm text-foreground/80 break-words line-clamp-1 italic">
-                  {voiceRecorder.liveText || "Listening..."}
+                  {voiceRecorder.liveText || t('chat.input.listening')}
                 </span>
               </div>
             )}
@@ -210,8 +212,8 @@ export function ChatInputArea({
                   ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-white'
                   : 'size-8 sm:size-9 text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
               }`}
-              title={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
-              aria-label={voiceRecorder.isRecording ? 'Stop recording' : 'Voice input'}
+              title={voiceRecorder.isRecording ? t('chat.input.stopRecording') : t('chat.input.voiceInput')}
+              aria-label={voiceRecorder.isRecording ? t('chat.input.stopRecording') : t('chat.input.voiceInput')}
             >
               {voiceRecorder.isRecording ? (
                 <>
@@ -237,8 +239,8 @@ export function ChatInputArea({
                 }}
                 disabled={!inputValue.trim()}
                 className="relative size-8 sm:size-9 rounded-md flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-30 transition-opacity"
-                aria-label="Queue message"
-                title="Queue message for agent"
+                aria-label={t('chat.input.queueMessage')}
+                title={t('chat.input.queueMessageTitle')}
               >
                 <Send className="size-3.5 sm:size-4" />
               </button>
@@ -246,7 +248,7 @@ export function ChatInputArea({
                 type="button"
                 onClick={onInterrupt}
                 className="size-8 sm:size-9 rounded-md flex items-center justify-center border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                aria-label="Stop"
+                aria-label={t('chat.input.stop')}
               >
                 <Square className="size-3.5 sm:size-4 fill-current" />
               </button>
@@ -261,7 +263,7 @@ export function ChatInputArea({
               }}
               disabled={!isReady}
               className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
-              aria-label="Send"
+              aria-label={t('chat.input.send')}
             >
               <Send className="size-3.5 sm:size-4" />
             </button>

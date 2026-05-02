@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { translate } from './i18n';
 
 interface Props {
   children: ReactNode;
@@ -26,7 +27,7 @@ export class AppErrorBoundary extends Component<Props, State> {
       if (this.props.fallback) return this.props.fallback;
       return (
         <div className="min-h-screen flex flex-col items-center justify-center gap-4 p-6 bg-background text-foreground">
-          <h1 className="text-xl font-semibold">Something went wrong</h1>
+          <h1 className="text-xl font-semibold">{translate('common.error')}</h1>
           <p className="text-sm text-muted-foreground max-w-md text-center">
             {this.state.error.message}
           </p>
@@ -35,7 +36,7 @@ export class AppErrorBoundary extends Component<Props, State> {
             onClick={() => this.setState({ hasError: false, error: null })}
             className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
           >
-            Retry
+            {translate('common.retry')}
           </button>
         </div>
       );

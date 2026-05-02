@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileIcon } from '../file-icon';
 import type { PlaygroundEntryItem } from './use-playground-files';
+import { useT } from '../i18n';
 
 const MAX_VISIBLE = 8;
 
@@ -19,6 +20,7 @@ export function FileMentionDropdown({
   onClose: () => void;
   anchorRef: React.RefObject<HTMLDivElement | null>;
 }) {
+  const t = useT();
   const [highlightIndex, setHighlightIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -101,11 +103,11 @@ export function FileMentionDropdown({
       ref={listRef}
       className="absolute left-0 right-0 bottom-full z-50 mb-1 max-h-56 overflow-y-auto rounded-lg border border-border bg-card py-1 shadow-lg"
       role="listbox"
-      aria-label="Link playground file"
+      aria-label={t('fileMention.linkFile')}
     >
       {slice.length === 0 ? (
         <div className="px-3 py-2 text-xs text-muted-foreground">
-          {entries.length === 0 ? 'No files or folders in playground' : 'No matching files or folders'}
+          {entries.length === 0 ? t('fileMention.empty') : t('fileMention.noMatches')}
         </div>
       ) : (
         slice.map((entry, i) => (
@@ -135,7 +137,7 @@ export function FileMentionDropdown({
       )}
       {hasMore && (
         <div className="border-t border-border px-3 py-1.5 text-[10px] text-muted-foreground">
-          +{filtered.length - MAX_VISIBLE} more — type to filter
+          {t('fileMention.more', { count: filtered.length - MAX_VISIBLE })}
         </div>
       )}
     </div>

@@ -32,6 +32,8 @@ vi.mock('../api-url', () => ({
 }));
 
 vi.mock('../embed-config', () => ({
+  getLocaleSource: vi.fn().mockReturnValue('localStorage'),
+  shouldHideLocaleSelector: vi.fn().mockReturnValue(false),
   shouldHideThemeSwitch: vi.fn(() => false),
 }));
 

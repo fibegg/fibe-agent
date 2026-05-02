@@ -1,7 +1,16 @@
 import {
-  getTypeFilterLabel,
   ACTIVITY_TYPE_FILTERS,
 } from './activity-review-utils';
+import { useT, type TranslationKey } from './i18n';
+
+const FILTER_LABEL_KEYS: Record<(typeof ACTIVITY_TYPE_FILTERS)[number], TranslationKey> = {
+  reasoning: 'activity.reasoning',
+  stream_start: 'activity.started',
+  step: 'activity.step',
+  tool_call: 'activity.command',
+  file_created: 'activity.file',
+  task_complete: 'activity.complete',
+};
 
 export interface ActivityTypeFiltersProps {
   typeFilter: string[];
@@ -9,12 +18,13 @@ export interface ActivityTypeFiltersProps {
 }
 
 export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: ActivityTypeFiltersProps) {
+  const t = useT();
   const isAllActive = typeFilter.length === 0;
   const filters = [
-    { key: '__all', label: 'All', active: isAllActive },
+    { key: '__all', label: t('activity.all'), active: isAllActive },
     ...ACTIVITY_TYPE_FILTERS.map((key) => ({
       key,
-      label: getTypeFilterLabel(key),
+      label: t(FILTER_LABEL_KEYS[key]),
       active: typeFilter.includes(key),
     })),
   ];
@@ -49,7 +59,7 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
       <div
         className="inline-flex min-w-full rounded-lg border border-border/50 bg-muted/20 p-1"
         role="group"
-        aria-label="Activity filter"
+        aria-label={t('activity.filter')}
       >
         <button
           type="button"
@@ -57,7 +67,7 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
           aria-pressed={isAllActive}
           className={buttonClass(isAllActive, 0)}
         >
-          All
+          {t('activity.all')}
         </button>
         {filters.slice(1).map((filter, offset) => {
           const index = offset + 1;

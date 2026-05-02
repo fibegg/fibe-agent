@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, MessageSquare, AlertTriangle, X } from 'lucide-react';
+import { useT } from '../../i18n';
 
 // ─── QuestionCard ─────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ export interface QuestionCardProps {
 }
 
 export function QuestionCard({ questionId, question, placeholder, onAnswer }: QuestionCardProps) {
+  const t = useT();
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -48,7 +50,7 @@ export function QuestionCard({ questionId, question, placeholder, onAnswer }: Qu
     <div
       className="my-3 flex gap-2 sm:gap-3"
       role="region"
-      aria-label="Agent question"
+      aria-label={t('localTools.question')}
       id={`question-card-${questionId}`}
     >
       <div className="flex-shrink-0 flex items-start">
@@ -62,7 +64,7 @@ export function QuestionCard({ questionId, question, placeholder, onAnswer }: Qu
           {submitted ? (
             <p className="text-xs text-muted-foreground italic flex items-center gap-1">
               <Check className="size-3" aria-hidden />
-              Submitted
+              {t('localTools.submitted')}
             </p>
           ) : (
             <div className="flex flex-col gap-2">
@@ -70,21 +72,21 @@ export function QuestionCard({ questionId, question, placeholder, onAnswer }: Qu
                 ref={inputRef}
                 id={`question-input-${questionId}`}
                 className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
-                placeholder={placeholder ?? 'Type your answer…'}
+                placeholder={placeholder ?? t('localTools.answerPlaceholder')}
                 rows={2}
                 value={answer}
                 onChange={(e) => setAnswer(e.target.value)}
                 onKeyDown={handleKeyDown}
-                aria-label="Your answer"
+                aria-label={t('localTools.yourAnswer')}
               />
               <button
                 type="button"
                 onClick={handleSubmit}
                 disabled={!answer.trim()}
                 className="self-end rounded-lg px-4 py-1.5 text-sm font-medium bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-400"
-                aria-label="Submit answer"
+                aria-label={t('localTools.submitAnswer')}
               >
-                Submit
+                {t('common.submit')}
               </button>
             </div>
           )}
@@ -107,10 +109,13 @@ export interface ConfirmCardProps {
 export function ConfirmCard({
   questionId,
   message,
-  confirmLabel = 'Yes',
-  cancelLabel = 'No',
+  confirmLabel,
+  cancelLabel,
   onConfirm,
 }: ConfirmCardProps) {
+  const t = useT();
+  const yesLabel = confirmLabel ?? t('localTools.yes');
+  const noLabel = cancelLabel ?? t('localTools.no');
   const [decided, setDecided] = useState<boolean | null>(null);
 
   const decide = useCallback(
@@ -126,7 +131,7 @@ export function ConfirmCard({
     <div
       className="my-3 flex gap-2 sm:gap-3"
       role="region"
-      aria-label="Agent confirmation"
+      aria-label={t('localTools.confirmation')}
       id={`confirm-card-${questionId}`}
     >
       <div className="flex-shrink-0 flex items-start">
@@ -140,7 +145,7 @@ export function ConfirmCard({
           {decided !== null ? (
             <p className="text-xs text-muted-foreground italic flex items-center gap-1">
               <Check className="size-3" aria-hidden />
-              {decided ? confirmLabel : cancelLabel}
+              {decided ? yesLabel : noLabel}
             </p>
           ) : (
             <div className="flex gap-2">
@@ -148,17 +153,17 @@ export function ConfirmCard({
                 type="button"
                 onClick={() => decide(true)}
                 className="rounded-lg px-4 py-1.5 text-sm font-medium bg-rose-500 text-white hover:bg-rose-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-400"
-                aria-label={confirmLabel}
+                aria-label={yesLabel}
               >
-                {confirmLabel}
+                {yesLabel}
               </button>
               <button
                 type="button"
                 onClick={() => decide(false)}
                 className="rounded-lg px-4 py-1.5 text-sm font-medium border border-border bg-background/60 text-foreground hover:bg-muted/60 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
-                aria-label={cancelLabel}
+                aria-label={noLabel}
               >
-                {cancelLabel}
+                {noLabel}
               </button>
             </div>
           )}
@@ -178,6 +183,7 @@ export interface ShowImageCardProps {
 }
 
 export function ShowImageCard({ url, base64, mimeType = 'image/png', caption }: ShowImageCardProps) {
+  const t = useT();
   const src = url ?? (base64 ? `data:${mimeType};base64,${base64}` : null);
   if (!src) return null;
 
@@ -188,7 +194,7 @@ export function ShowImageCard({ url, base64, mimeType = 'image/png', caption }: 
         <div className="rounded-2xl rounded-tl-sm border border-border bg-background/40 px-4 py-3 inline-flex flex-col gap-2 max-w-sm">
           <img
             src={src}
-            alt={caption ?? 'Agent image'}
+            alt={caption ?? t('localTools.agentImage')}
             className="max-w-full max-h-72 rounded-lg object-contain bg-black/10"
             loading="lazy"
           />
@@ -218,6 +224,7 @@ export interface NotifyToastProps {
 }
 
 export function NotifyToast({ id, message, level = 'info', onDismiss }: NotifyToastProps) {
+  const t = useT();
   const style = LEVEL_STYLES[level] ?? LEVEL_STYLES['info'];
 
   useEffect(() => {
@@ -237,7 +244,7 @@ export function NotifyToast({ id, message, level = 'info', onDismiss }: NotifyTo
         type="button"
         onClick={() => onDismiss(id)}
         className="flex-shrink-0 opacity-70 hover:opacity-100 transition-opacity"
-        aria-label="Dismiss notification"
+        aria-label={t('localTools.dismissNotification')}
       >
         <X className="size-3.5" aria-hidden />
       </button>
@@ -259,12 +266,13 @@ export interface NotifyToastContainerProps {
 }
 
 export function NotifyToastContainer({ toasts, onDismiss }: NotifyToastContainerProps) {
+  const t = useT();
   if (!toasts.length) return null;
 
   return (
     <div
       className="fixed bottom-24 right-4 z-50 flex flex-col gap-2 w-80 max-w-[calc(100vw-2rem)]"
-      aria-label="Notifications"
+      aria-label={t('common.notifications')}
     >
       {toasts.map((t) => (
         <NotifyToast

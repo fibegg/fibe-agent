@@ -1,12 +1,14 @@
 import { Sparkles } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { getThinkingLines } from './thinking-copy';
+import { getThinkingLineKeys } from './thinking-copy';
 import { useAvatarConfig } from '../avatar-config-context';
+import { useT } from '../i18n';
 
 const CYCLE_MS = 2400;
 
 export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | null }) {
-  const lines = getThinkingLines(lastUserMessage);
+  const t = useT();
+  const lines = getThinkingLineKeys(lastUserMessage).map((key) => t(key));
   const [index, setIndex] = useState(0);
 
   useEffect(() => {

@@ -2,10 +2,10 @@ import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, RefreshCw, Loader2 } from 'lucide-react';
 import { MODEL_OPTION_SELECTED } from '../ui-classes';
+import { useT } from '../i18n';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const DEFAULT_LABEL = 'Model (default)';
 const MOBILE_BREAKPOINT_PX = 640;
 const PANEL_GUTTER_PX = 8;
 const PANEL_MAX_HEIGHT_PX = 384;
@@ -109,6 +109,7 @@ export function ModelSelector({
   variant = 'compact',
   dropdownPlacement = 'auto',
 }: ModelSelectorProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [customValue, setCustomValue] = useState('');
   const [customMode, setCustomMode] = useState(false);
@@ -120,7 +121,8 @@ export function ModelSelector({
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const trimmed = currentModel.trim();
-  const displayLabel = trimmed || DEFAULT_LABEL;
+  const defaultLabel = t('modelSelector.default');
+  const displayLabel = trimmed || defaultLabel;
   const allOptions = trimmed && !options.includes(trimmed) ? [trimmed, ...options] : options;
   const triggerClass = `${TRIGGER_CLASS_BASE} ${TRIGGER_CLASS_BY_VARIANT[variant]}`;
 
@@ -187,7 +189,7 @@ export function ModelSelector({
   // ── Event handlers ─────────────────────────────────────────────────────────
 
   const handleSelect = (value: string) => {
-    onSelect(value === DEFAULT_LABEL ? '' : value);
+    onSelect(value === defaultLabel ? '' : value);
     setOpen(false);
     setCustomMode(false);
   };
@@ -206,7 +208,7 @@ export function ModelSelector({
 
   if (modelLocked) {
     return (
-      <div className={`${triggerClass} cursor-default opacity-90 border-border-subtle`} aria-label="Model in use">
+      <div className={`${triggerClass} cursor-default opacity-90 border-border-subtle`} aria-label={t('modelSelector.inUse')}>
         <span className="truncate">{displayLabel}</span>
       </div>
     );
@@ -226,7 +228,7 @@ export function ModelSelector({
         className={triggerClass}
         aria-haspopup="listbox"
         aria-expanded={open}
-        aria-label="Select model"
+        aria-label={t('modelSelector.select')}
       >
         <span className="truncate flex-1 text-left">{displayLabel}</span>
         <ChevronDown
@@ -240,7 +242,7 @@ export function ModelSelector({
           data-model-selector-panel
           className={PANEL_CLASS}
           role="listbox"
-          aria-label="Model options"
+          aria-label={t('modelSelector.options')}
           style={{ ...panelStyle, maxHeight: panelRect.maxHeight }}
         >
           {customMode ? (
@@ -255,9 +257,9 @@ export function ModelSelector({
                   if (e.key === 'Escape') { setCustomMode(false); setCustomValue(''); setOpen(false); }
                 }}
                 onBlur={handleCustomSubmit}
-                placeholder="Model name"
+                placeholder={t('modelSelector.name')}
                 className="w-full h-8 px-2.5 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-                aria-label="Custom model name"
+                aria-label={t('modelSelector.customName')}
               />
             </div>
           ) : (
@@ -272,9 +274,9 @@ export function ModelSelector({
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') { setSearchQuery(''); setOpen(false); }
                   }}
-                  placeholder="Search models…"
+                  placeholder={t('modelSelector.searchPlaceholder')}
                   className="flex-1 h-7 px-2 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
-                  aria-label="Search models"
+                  aria-label={t('modelSelector.search')}
                 />
                 {onRefresh && (
                   <button
@@ -282,8 +284,8 @@ export function ModelSelector({
                     onClick={(e) => { e.stopPropagation(); if (!refreshing) onRefresh(); }}
                     disabled={refreshing}
                     className="size-7 shrink-0 flex items-center justify-center rounded-md border border-border hover:bg-violet-500/10 hover:border-violet-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Refresh models from provider"
-                    aria-label="Refresh models"
+                    title={t('modelSelector.refreshFromProvider')}
+                    aria-label={t('modelSelector.refresh')}
                   >
                     {refreshing
                       ? <Loader2 className="size-3.5 animate-spin text-violet-400" aria-hidden />
@@ -299,14 +301,14 @@ export function ModelSelector({
                   type="button"
                   role="option"
                   aria-selected={!trimmed}
-                  onClick={() => handleSelect(DEFAULT_LABEL)}
+                  onClick={() => handleSelect(defaultLabel)}
                   className={`${OPTION_CLASS_BASE} ${!trimmed ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-violet-500/10'}`}
                 >
-                  {DEFAULT_LABEL}
+                  {defaultLabel}
                 </button>
                 {filteredOptions.length === 0 && query && (
                   <p className="px-3 py-3 text-xs text-muted-foreground text-center">
-                    No models match "{searchQuery.trim()}"
+                    {t('modelSelector.noMatches', { query: searchQuery.trim() })}
                   </p>
                 )}
                 {filteredOptions.map((opt) => (
@@ -328,7 +330,7 @@ export function ModelSelector({
                   onClick={() => setCustomMode(true)}
                   className={`${OPTION_CLASS_BASE} text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 border-t border-border/50 mt-1 pt-2`}
                 >
-                  Custom model...
+                  {t('modelSelector.custom')}
                 </button>
               </div>
             </>

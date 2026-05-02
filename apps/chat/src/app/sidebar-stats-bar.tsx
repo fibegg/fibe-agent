@@ -3,6 +3,7 @@ import { Brain, Loader2, Sparkles } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { CountUpNumber } from './count-up-number';
 import type { StoryEntry } from './agent-thinking-utils';
+import { useT } from './i18n';
 
 interface SessionStats {
   totalActions: number;
@@ -15,12 +16,6 @@ interface BrainClasses {
   brain: string;
   accent: string;
 }
-
-const STAT_TOOLTIPS = {
-  total: 'Total actions',
-  completed: 'Completed',
-  processing: 'Processing',
-} as const;
 
 const STAT_TOOLTIP_POPOVER_CLASS =
   'pointer-events-none absolute left-1/2 top-full z-50 mt-1 -translate-x-1/2 rounded px-2 py-1 text-[10px] font-medium bg-popover text-popover-foreground border border-border shadow-md opacity-0 transition-opacity duration-150 whitespace-nowrap group-hover/stat:opacity-100';
@@ -43,6 +38,12 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
   onRunCopy,
   sessionTokenUsage,
 }: SidebarStatsBarProps) {
+  const t = useT();
+  const statTooltips = {
+    total: t('header.totalActions'),
+    completed: t('header.completed'),
+    processing: t('header.processing'),
+  } as const;
   const brainButtonRef = useRef<HTMLDivElement>(null);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
   const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
@@ -72,7 +73,7 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
           type="button"
           onClick={handleCopy}
           className="relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
-          aria-label="Activity"
+          aria-label={t('activity.activity')}
           disabled={downloadAnimating}
         >
           {downloadAnimating ? (
@@ -110,46 +111,46 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
               transform: 'translate(-50%, 0)',
             }}
           >
-            Copied to clipboard
+            {t('activity.copiedToClipboard')}
           </span>,
           document.body
         )}
       {isEmpty ? (
         <p className="px-2 py-1.5 text-[11px] font-medium text-muted-foreground italic max-w-[200px] leading-none flex items-center">
-          These are not the droids you deepseek.
+          {t('activity.emptyStats')}
         </p>
       ) : (
         <p className="px-2 py-1.5 text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
           <span
             key={`total-${sessionStats.totalActions}`}
             className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
-            title={STAT_TOOLTIPS.total}
+            title={statTooltips.total}
           >
             <span className="text-foreground stat-tick"><CountUpNumber value={sessionStats.totalActions} format="raw" /></span>
             <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
-              {STAT_TOOLTIPS.total}
+              {statTooltips.total}
             </span>
           </span>
           <span className="text-muted-foreground/70">/</span>
           <span
             key={`completed-${sessionStats.completed}`}
             className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
-            title={STAT_TOOLTIPS.completed}
+            title={statTooltips.completed}
           >
             <span className="text-emerald-400 stat-tick"><CountUpNumber value={sessionStats.completed} format="raw" /></span>
             <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
-              {STAT_TOOLTIPS.completed}
+              {statTooltips.completed}
             </span>
           </span>
           <span className="text-muted-foreground/70">/</span>
           <span
             key={`processing-${sessionStats.processing}`}
             className="group/stat relative inline-block cursor-help rounded px-0.5 py-0.5 -my-0.5 -mx-0.5"
-            title={STAT_TOOLTIPS.processing}
+            title={statTooltips.processing}
           >
             <span className="text-cyan-400 stat-tick"><CountUpNumber value={sessionStats.processing} format="raw" /></span>
             <span className={STAT_TOOLTIP_POPOVER_CLASS} role="tooltip">
-              {STAT_TOOLTIPS.processing}
+              {statTooltips.processing}
             </span>
           </span>
           {sessionTokenUsage && (
@@ -157,9 +158,9 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
               <span className="text-muted-foreground/70">·</span>
               <span
                 className="text-violet-300/90"
-                title="Token usage (input / output)"
+                title={t('header.tokenUsage')}
               >
-                <CountUpNumber value={sessionTokenUsage.inputTokens} format="compact" /> in / <CountUpNumber value={sessionTokenUsage.outputTokens} format="compact" /> out
+                <CountUpNumber value={sessionTokenUsage.inputTokens} format="compact" /> {t('header.inputShort')} / <CountUpNumber value={sessionTokenUsage.outputTokens} format="compact" /> {t('header.outputShort')}
               </span>
             </>
           )}

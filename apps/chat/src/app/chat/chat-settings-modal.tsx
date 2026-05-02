@@ -32,6 +32,8 @@ import { ActivityTypeFilters } from '../activity-type-filters';
 import { usePersistedTypeFilter } from '../use-persisted-type-filter';
 import { RightDrawer } from '../right-drawer';
 import { RawProviderActivityDrawerContent } from './raw-provider-activity-drawer';
+import { LocaleSelector } from '../locale-selector';
+import { useT } from '../i18n';
 
 interface InitStatusResponse {
   state: 'disabled' | 'pending' | 'running' | 'done' | 'failed';
@@ -62,6 +64,7 @@ export interface ChatSettingsModalProps {
 }
 
 function ResetConversationButton({ onReset }: { onReset: () => void }) {
+  const t = useT();
   const [confirming, setConfirming] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -91,27 +94,27 @@ function ResetConversationButton({ onReset }: { onReset: () => void }) {
       <div
         className="grid w-full grid-cols-[1fr_auto_auto] items-center gap-2 rounded-lg border border-rose-500/50 bg-rose-500/10 px-3 py-2"
         role="group"
-        aria-label="Confirm conversation reset"
+        aria-label={t('settings.confirmReset')}
       >
-        <span className="min-w-0 truncate text-sm font-medium text-rose-200">Reset conversation?</span>
+        <span className="min-w-0 truncate text-sm font-medium text-rose-200">{t('settings.resetQuestion')}</span>
         <button
           type="button"
           onClick={cancelConfirm}
           className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border/60 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
-          aria-label="Cancel reset"
+          aria-label={t('settings.cancelReset')}
         >
           <X className="size-3.5" aria-hidden />
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           id="reset-conversation-confirm-btn"
           type="button"
           onClick={confirmReset}
           className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-rose-500 px-2.5 text-xs font-semibold text-white transition-colors hover:bg-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70"
-          aria-label="Confirm reset"
+          aria-label={t('settings.confirmReset')}
         >
           <Check className="size-3.5" aria-hidden />
-          Confirm
+          {t('common.confirm')}
         </button>
       </div>
     );
@@ -123,12 +126,12 @@ function ResetConversationButton({ onReset }: { onReset: () => void }) {
       type="button"
       onClick={requestConfirm}
       className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-border/50 bg-muted/20 px-3 text-sm font-medium text-muted-foreground transition-colors hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-400"
-      title="Reset conversation"
-      aria-label="Reset conversation"
+      title={t('settings.resetTitle')}
+      aria-label={t('settings.resetTitle')}
       aria-expanded={false}
     >
       <RefreshCcw className="size-4" aria-hidden />
-      Reset
+      {t('settings.reset')}
     </button>
   );
 }
@@ -208,6 +211,7 @@ export function ChatSettingsModal({
   simplicateMode = false,
   onSimplicateModeChange,
 }: ChatSettingsModalProps) {
+  const t = useT();
   const [initStatus, setInitStatus] = useState<InitStatusResponse | null>(null);
   const [syncSettings, setSyncSettings] = useState<FibeSyncSettings | null>(null);
   const [syncSaving, setSyncSaving] = useState(false);
@@ -294,7 +298,7 @@ export function ChatSettingsModal({
   };
 
   const handleDeleteData = () => {
-    if (!window.confirm('Are you absolutely sure you want to permanently delete all your conversation data? This action cannot be undone.')) {
+    if (!window.confirm(t('settings.deleteConfirm'))) {
       return;
     }
     apiRequest('/data-privacy', { method: 'DELETE' })
@@ -316,13 +320,13 @@ export function ChatSettingsModal({
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-border/40 shrink-0">
           <h2 id="settings-dialog-title" className="text-base font-semibold text-foreground tracking-[-0.01em]">
-            Settings
+            {t('settings.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className={SETTINGS_CLOSE_BUTTON}
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X className="size-4" />
           </button>
@@ -330,25 +334,26 @@ export function ChatSettingsModal({
         <div className="px-5 py-4 space-y-4 overflow-y-auto min-h-0">
           {!shouldHideThemeSwitch() && (
             <div className="flex items-center justify-between py-1">
-              <span className="text-sm font-medium text-foreground">Dark mode</span>
+              <span className="text-sm font-medium text-foreground">{t('theme.darkMode')}</span>
               <ThemeToggle />
             </div>
           )}
+          <LocaleSelector variant="row" />
           <div className="space-y-2.5">
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Activity Filter</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.activityFilter')}</span>
             <ActivityTypeFilters
               typeFilter={typeFilter}
               onTypeFilterChange={setTypeFilter}
             />
           </div>
-          {onSimplicateModeChange && (
+          {onSimplicateModeChange && !simplicateMode && (
             <div className="space-y-2.5 border-t border-border/30 pt-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Interface</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.interface')}</span>
               <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
-                <span className="truncate text-sm font-medium text-foreground">Simplicate</span>
+                <span className="truncate text-sm font-medium text-foreground">{t('header.simplicate')}</span>
                 <SettingsSwitch
                   checked={simplicateMode}
-                  label="Simplicate"
+                  label={t('header.simplicate')}
                   onChange={onSimplicateModeChange}
                 />
               </div>
@@ -356,15 +361,15 @@ export function ChatSettingsModal({
           )}
           <div className="space-y-2.5 border-t border-border/30 pt-4">
             <div className="flex items-center justify-between gap-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Fibe Sync</span>
-              {syncSaving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label="Saving sync settings" />}
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.fibeSync')}</span>
+              {syncSaving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label={t('common.saving')} />}
             </div>
             <div className="grid gap-2 rounded-lg border border-border/40 bg-muted/15 p-2.5 sm:grid-cols-2">
               {([
-                ['messages', 'Send messages to Fibe', <MessageSquareText key="messages" className="size-3.5" />],
-                ['activity', 'Send activity to Fibe', <Activity key="activity" className="size-3.5" />],
-                ['rawProviders', 'Send raw provider activity to Fibe', <DatabaseZap key="rawProviders" className="size-3.5" />],
-                ['rawProviderCapture', 'Intercept raw provider activity', <ShieldCheck key="rawProviderCapture" className="size-3.5" />],
+                ['messages', t('settings.sync.messages'), <MessageSquareText key="messages" className="size-3.5" />],
+                ['activity', t('settings.sync.activity'), <Activity key="activity" className="size-3.5" />],
+                ['rawProviders', t('settings.sync.rawProviders'), <DatabaseZap key="rawProviders" className="size-3.5" />],
+                ['rawProviderCapture', t('settings.sync.rawProviderCapture'), <ShieldCheck key="rawProviderCapture" className="size-3.5" />],
               ] as const).map(([key, label, icon]) => (
                 <FibeSyncRow
                   key={key}
@@ -381,19 +386,19 @@ export function ChatSettingsModal({
                 className="flex min-h-10 items-center justify-center gap-2 rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-sm font-medium text-primary transition-colors hover:bg-primary/15 sm:col-span-2"
               >
                 <ServerCog className="size-4" />
-                View raw provider activity
+                {t('settings.sync.viewRaw')}
               </button>
             </div>
           </div>
           {onResetConversation && state !== CHAT_STATES.AWAITING_RESPONSE && (
             <div className="space-y-2.5 border-t border-border/30 pt-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Conversation</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.conversation')}</span>
               <ResetConversationButton onReset={onResetConversation} />
             </div>
           )}
           {isStandalone && (
             <div className="space-y-2.5 border-t border-border/30 pt-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Data Privacy (GDPR/CCPA)</span>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.dataPrivacy')}</span>
               <div className="flex flex-col gap-2">
                 <button
                   type="button"
@@ -401,7 +406,7 @@ export function ChatSettingsModal({
                   className={BUTTON_OUTLINE_ACCENT}
                 >
                   <Download className="size-4" />
-                  Export My Data
+                  {t('settings.exportData')}
                 </button>
                 <button
                   type="button"
@@ -409,7 +414,7 @@ export function ChatSettingsModal({
                   className={BUTTON_DESTRUCTIVE_GHOST}
                 >
                   <Trash2 className="size-4" />
-                  Delete My Data
+                  {t('settings.deleteData')}
                 </button>
               </div>
             </div>
@@ -423,7 +428,7 @@ export function ChatSettingsModal({
                   className={BUTTON_OUTLINE_ACCENT}
                 >
                   <Key className="size-4" />
-                  {state === CHAT_STATES.UNAUTHENTICATED ? 'Start Auth' : 'Re-authenticate'}
+                  {state === CHAT_STATES.UNAUTHENTICATED ? t('header.startAuth') : t('settings.reauthenticate')}
                 </button>
               )}
               {(state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
@@ -433,7 +438,7 @@ export function ChatSettingsModal({
                   className={BUTTON_DESTRUCTIVE_GHOST}
                 >
                   <LogOut className="size-4" />
-                  Logout
+                  {t('settings.logout')}
                 </button>
               )}
             </div>
@@ -442,16 +447,16 @@ export function ChatSettingsModal({
             <div className="border-t border-border/30 pt-4 space-y-3">
               <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-2.5">
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="font-medium text-foreground">Post-init script</span>
+                  <span className="font-medium text-foreground">{t('settings.postInit')}</span>
                   {initStatus.state === 'running' && (
                     <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                   )}
                   <span className="text-muted-foreground">
-                    {initStatus.state === 'disabled' && 'Not configured'}
-                    {initStatus.state === 'pending' && 'Pending'}
-                    {initStatus.state === 'running' && 'Running…'}
-                    {initStatus.state === 'done' && 'Done'}
-                    {initStatus.state === 'failed' && 'Failed'}
+                    {initStatus.state === 'disabled' && t('settings.notConfigured')}
+                    {initStatus.state === 'pending' && t('settings.pending')}
+                    {initStatus.state === 'running' && t('settings.running')}
+                    {initStatus.state === 'done' && t('settings.done')}
+                    {initStatus.state === 'failed' && t('settings.failed')}
                   </span>
                 </div>
                 {(initStatus.error || (initStatus.output && initStatus.output.trim())) && (
@@ -464,9 +469,9 @@ export function ChatSettingsModal({
               </div>
               <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-2.5">
                 <div className="flex items-center gap-2 text-sm flex-wrap">
-                  <span className="font-medium text-foreground">SYSTEM_PROMPT</span>
+                  <span className="font-medium text-foreground">{t('settings.systemPrompt')}</span>
                   {!initStatus.systemPrompt && (
-                    <span className="text-muted-foreground">Not configured</span>
+                    <span className="text-muted-foreground">{t('settings.notConfigured')}</span>
                   )}
                 </div>
                 {initStatus.systemPrompt && (
@@ -483,7 +488,7 @@ export function ChatSettingsModal({
       <RightDrawer
         open={rawDrawerOpen}
         onClose={() => setRawDrawerOpen(false)}
-        title="Raw Provider Activity"
+        title={t('settings.rawProviderActivity')}
         icon={<ServerCog className="size-4" />}
         width="min(92vw, 760px)"
       >

@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from 'react';
 import { CountUpNumber } from './count-up-number';
 import {
   getActivityIcon,
-  getActivityLabel,
   getBlockVariant,
   type StoryEntry,
 } from './agent-thinking-utils';
@@ -33,6 +32,18 @@ import {
   TREE_NODE_SELECTED,
 } from './ui-classes';
 import { MAIN_CONTENT_MIN_WIDTH_PX, PANEL_HEADER_MIN_HEIGHT_PX } from './layout-constants';
+import { useT, type TranslationKey } from './i18n';
+
+function localizedActivityLabel(type: string, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if (type === 'stream_start') return t('activity.started');
+  if (type === 'reasoning_start' || type === 'reasoning_end' || type === 'reasoning') return t('activity.reasoning');
+  if (type === 'step') return t('activity.step');
+  if (type === 'file_created') return t('activity.file');
+  if (type === 'tool_call') return t('activity.command');
+  if (type === 'task_complete') return t('activity.complete');
+  if (type === 'info') return t('activity.info');
+  return t('activity.activity');
+}
 
 export function StoryListRow({
   story,
@@ -43,8 +54,9 @@ export function StoryListRow({
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const t = useT();
   const Icon = getActivityIcon(story.type);
-  const label = getActivityLabel(story.type);
+  const label = localizedActivityLabel(story.type, t);
   const iconColor = ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
   const summary =
     story.type === 'file_created'
@@ -52,7 +64,7 @@ export function StoryListRow({
       : story.type === 'tool_call'
         ? commandLabel(story)
         : story.type === 'reasoning_start' || story.type === 'reasoning_end'
-          ? (story.details ?? '').trim().slice(0, 60) || 'Reasoning'
+          ? (story.details ?? '').trim().slice(0, 60) || t('activity.reasoning')
           : (story.message?.trim() !== '{}' ? story.message?.slice(0, 60) : undefined) ?? label;
 
   return (
@@ -75,8 +87,9 @@ export function StoryDetail({
   story: StoryEntry;
   highlightQuery?: string;
 }) {
+  const t = useT();
   const Icon = getActivityIcon(story.type);
-  const label = getActivityLabel(story.type);
+  const label = localizedActivityLabel(story.type, t);
   const variant = getBlockVariant(story);
   const iconColor = ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
   const isSingleRow = SINGLE_ROW_TYPES.has(story.type);
@@ -189,6 +202,7 @@ function CommandGroupListRow({
   isAnySelected: boolean;
   onSelectFirst: () => void;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(false);
   const n = entries.length;
   const first = entries[0];
@@ -213,7 +227,7 @@ function CommandGroupListRow({
           : <ChevronRight className="size-3.5 shrink-0 text-violet-500" />}
         <Terminal className="size-3.5 shrink-0 text-violet-500" />
         <span className="flex-1 truncate text-left text-xs">
-          {n} commands
+          {t('activity.commandsCount', { count: n })}
         </span>
         <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>
           {formatRelativeTime(first.story.timestamp)}
@@ -326,6 +340,7 @@ export function ActivityStoryDetailPanel({
   completedStories = 0,
   isFollowing = false,
 }: ActivityStoryDetailPanelProps) {
+  const t = useT();
   const isWorking = brainState === 'working';
   const isComplete = brainState === 'complete';
   const brainColor = isWorking ? 'text-cyan-400' : isComplete ? 'text-emerald-400' : 'text-violet-400';
@@ -367,8 +382,8 @@ export function ActivityStoryDetailPanel({
               onClick={onCopyClick}
               disabled={copyAnimating}
               className="relative rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
-              title="Copy activity to clipboard"
-              aria-label="Copy activity to clipboard"
+              title={t('activity.copyToClipboard')}
+              aria-label={t('activity.copyToClipboard')}
             >
               {copyAnimating ? (
                 <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
@@ -406,31 +421,31 @@ export function ActivityStoryDetailPanel({
                   transform: 'translate(-50%, 0)',
                 }}
               >
-                Copied to clipboard
+                {t('activity.copiedToClipboard')}
               </span>,
               document.body
             )}
           <div className="flex flex-col min-w-0 flex-1 pl-3 gap-0.5">
             <h1 className="font-semibold text-sm text-foreground truncate min-w-0">
               {selectedStory
-                ? `${getActivityLabel(selectedStory.type)} · ${formatRelativeTime(selectedStory.timestamp)}`
-                : 'All activities'}
+                ? `${localizedActivityLabel(selectedStory.type, t)} · ${formatRelativeTime(selectedStory.timestamp)}`
+                : t('activity.allActivities')}
             </h1>
             {totalStories > 0 && (
               <p className="text-xs font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap">
                 <span className={`${statColor} transition-colors`}>
                   <CountUpNumber value={totalStories} format="raw" />
                 </span>
-                <span className="text-muted-foreground/60 text-[10px]"> total</span>
+                <span className="text-muted-foreground/60 text-[10px]"> {t('activity.total')}</span>
                 <span className="text-muted-foreground/40 mx-0.5">·</span>
                 <span className="text-emerald-400 transition-colors">
                   <CountUpNumber value={completedStories} format="raw" />
                 </span>
-                <span className="text-muted-foreground/60 text-[10px]"> done</span>
+                <span className="text-muted-foreground/60 text-[10px]"> {t('activity.done')}</span>
                 {isWorking && (
                   <>
                     <span className="text-muted-foreground/40 mx-0.5">·</span>
-                    <span className="text-cyan-400 text-[10px] animate-pulse">processing</span>
+                    <span className="text-cyan-400 text-[10px] animate-pulse">{t('header.processing').toLowerCase()}</span>
                   </>
                 )}
               </p>
@@ -443,16 +458,16 @@ export function ActivityStoryDetailPanel({
             type="text"
             value={detailSearchQuery}
             onChange={(e) => onDetailSearchChange(e.target.value)}
-            placeholder="Search in response..."
+            placeholder={t('activity.searchResponse')}
             className={INPUT_SEARCH}
-            aria-label="Search in response content"
+            aria-label={t('activity.searchResponseContent')}
           />
           {detailSearchQuery ? (
             <button
               type="button"
               onClick={() => onDetailSearchChange('')}
               className={CLEAR_BUTTON_POSITION}
-              aria-label="Clear search"
+              aria-label={t('header.clearSearch')}
             >
               <X className="size-3.5" />
             </button>
@@ -468,7 +483,7 @@ export function ActivityStoryDetailPanel({
                 <span className="relative inline-flex rounded-full size-2 bg-violet-500" />
               </span>
               <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
-                Latest Response
+                {t('activity.latestResponse')}
               </p>
             </div>
             <div className="max-h-[40vh] overflow-y-auto">
@@ -483,7 +498,7 @@ export function ActivityStoryDetailPanel({
             <StoryDetail story={selectedStory} highlightQuery={detailSearchQuery} />
           </div>
         ) : (
-          !liveResponseText && <p className="text-sm text-muted-foreground">Select a story from the list.</p>
+          !liveResponseText && <p className="text-sm text-muted-foreground">{t('activity.selectStory')}</p>
         )}
       </div>
     </main>

@@ -76,7 +76,7 @@ export interface FibeSettings {
   assistantAvatarBase64?: string;
   /** When true the model selector is disabled. */
   lockChatModel?: boolean;
-  /** Controls the Simplicate switch. When true, the chat header uses the expanded multi-line layout. */
+  /** Controls the Simplicate switch. When true, the chat header uses the compact layout. */
   simplicate?: boolean;
 }
 

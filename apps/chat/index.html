@@ -5,6 +5,19 @@
     <title>fibe — AI Agent</title>
     <base href="/" />
     <script>
+      (function () {
+        try {
+          var raw = new URLSearchParams(window.location.search).get('locale');
+          var locale = raw && String(raw).trim().toLowerCase().replace(/_/g, '-');
+          if (locale && !/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/.test(locale)) locale = null;
+          if (!locale) return;
+          window.__FIBE_BOOT_LOCALE__ = locale;
+          document.documentElement.lang = locale;
+          localStorage.setItem('chat-locale', locale);
+        } catch (_) {}
+      })();
+    </script>
+    <script>
       // Make external links open in the parent window when inside an iframe,
       // and in a new tab when in standalone mode.
       document.addEventListener('click', function(e) {

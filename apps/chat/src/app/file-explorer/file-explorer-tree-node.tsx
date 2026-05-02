@@ -4,6 +4,7 @@ import { FileIcon } from '../file-icon';
 import type { PlaygroundEntry } from './file-explorer-types';
 import type { FileAnimationType } from './file-explorer-tree-utils';
 import { TREE_NODE_BASE, TREE_NODE_SELECTED } from '../ui-classes';
+import { useT } from '../i18n';
 
 export const TreeNode = memo(function TreeNode({
   entry,
@@ -24,6 +25,7 @@ export const TreeNode = memo(function TreeNode({
   onToggle: (path: string) => void;
   onFileClick?: (entry: PlaygroundEntry) => void;
 }) {
+  const t = useT();
   const isDir = entry.type === 'directory';
   const hasChildren = isDir && (entry.children?.length ?? 0) > 0;
 
@@ -88,7 +90,7 @@ export const TreeNode = memo(function TreeNode({
                 isGitDeleted ? 'text-red-500 dark:text-red-400' :
                 'text-muted-foreground'
               }`}
-              title={`Git: ${entry.gitStatus}`}
+              title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
             >
               {isGitModified ? 'M' : isGitAddedOrUntracked ? 'U' : isGitDeleted ? 'D' : ''}
             </span>
@@ -96,7 +98,7 @@ export const TreeNode = memo(function TreeNode({
           {isDirty && (
             <span
               className="size-1.5 rounded-full bg-amber-400 shrink-0 animate-pulse"
-              title="Unsaved changes"
+              title={t('fileEditor.unsaved')}
             />
           )}
         </div>

@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import { loginWithPassword, isAuthenticated } from '../api-url';
 import { FibeLogo } from '../fibe-logo';
 import { AUTO_AUTH_SUCCESS_EVENT, waitForAutoAuth } from '../postmessage-auth';
+import { useT } from '../i18n';
 
 export function LoginPage() {
+  const t = useT();
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -43,7 +45,7 @@ export function LoginPage() {
       if (result.success) {
         navigate('/', { replace: true });
       } else {
-        setError(result.error ?? 'Authentication failed');
+        setError(result.error ?? t('login.authFailed'));
       }
     } finally {
       setLoading(false);
@@ -57,7 +59,7 @@ export function LoginPage() {
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <span className="text-sm text-violet-300/60">Connecting...</span>
+            <span className="text-sm text-violet-300/60">{t('login.connecting')}</span>
           </div>
         </div>
       </div>
@@ -111,14 +113,14 @@ export function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
             <div>
               <label htmlFor="password" className="block text-xs sm:text-sm text-violet-300/80 mb-2">
-                Playground Internal Password
+                {t('login.passwordLabel')}
               </label>
               <input
                 id="password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password to continue"
+                placeholder={t('login.passwordPlaceholder')}
                 className="w-full h-11 sm:h-12 px-4 rounded-xl text-sm bg-zinc-900/40 border border-violet-500/15 text-white placeholder:text-violet-300/25 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/20 transition-all duration-200"
                 disabled={loading}
               />
@@ -131,10 +133,10 @@ export function LoginPage() {
               {loading ? (
                 <div className="flex items-center justify-center gap-2">
                   <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span className="text-xs sm:text-sm">Authenticating...</span>
+                  <span className="text-xs sm:text-sm">{t('login.authenticating')}</span>
                 </div>
               ) : (
-                'Login'
+                t('login.login')
               )}
             </button>
           </form>

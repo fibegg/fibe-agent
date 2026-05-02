@@ -18,10 +18,12 @@ import {
 import { ThemeToggle } from '../theme-toggle';
 import { shouldHideThemeSwitch } from '../embed-config';
 import { CHAT_STATES } from '../chat/chat-state';
+import { useT } from '../i18n';
 
 export type { ActivityReviewData };
 
 export function ActivityReviewPage() {
+  const t = useT();
   const { activityId: routeActivityId, storyId: routeStoryId, activityStoryId } = useParams<{
     activityId?: string;
     storyId?: string;
@@ -63,7 +65,7 @@ export function ActivityReviewPage() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-violet-950/10">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-violet-400" />
-          <span className="text-sm text-muted-foreground">Loading activities…</span>
+          <span className="text-sm text-muted-foreground">{t('activity.loadingActivities')}</span>
         </div>
       </div>
     );
@@ -79,7 +81,7 @@ export function ActivityReviewPage() {
             className="text-sm text-violet-400 hover:text-violet-300 flex items-center gap-2"
           >
             <ArrowLeft className="size-4" />
-            Back to chat
+            {t('activity.backToChat')}
           </Link>
         </div>
       </div>
@@ -102,17 +104,17 @@ export function ActivityReviewPage() {
               <Link
                 to="/"
                 className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground shrink-0 rounded-md p-1 -m-1 hover:bg-violet-500/10 transition-colors"
-                aria-label="Back to chat"
+                aria-label={t('activity.backToChat')}
               >
                 <ArrowLeft className="size-4 shrink-0" />
-                <span className="hidden sm:inline">Back</span>
+                <span className="hidden sm:inline">{t('activity.back')}</span>
               </Link>
               <div className="flex items-center gap-1 ml-auto shrink-0">
                 <button
                   type="button"
                   className={BUTTON_ICON_ACCENT_SM}
-                  title="Settings"
-                  aria-label="Settings"
+                  title={t('settings.title')}
+                  aria-label={t('settings.title')}
                   onClick={() => setSettingsOpen(true)}
                 >
                   <Settings className="size-3.5 sm:size-4" />
@@ -126,16 +128,16 @@ export function ActivityReviewPage() {
                 type="text"
                 value={activitySearchQuery}
                 onChange={(e) => setActivitySearchQuery(e.target.value)}
-                placeholder="Search stories..."
+                placeholder={t('activity.searchStories')}
                 className={INPUT_SEARCH}
-                aria-label="Search stories"
+                aria-label={t('activity.searchStories')}
               />
               {activitySearchQuery ? (
                 <button
                   type="button"
                   onClick={() => setActivitySearchQuery('')}
                   className={CLEAR_BUTTON_POSITION}
-                  aria-label="Clear search"
+                  aria-label={t('header.clearSearch')}
                 >
                   <X className="size-3.5" />
                 </button>
@@ -169,8 +171,8 @@ export function ActivityReviewPage() {
                   <span className="relative inline-flex rounded-full size-2 bg-red-500/70" />
                 )}
               </span>
-              Follow activity
-              {isFollowing && <span className="text-[10px] text-emerald-400/80 italic">Live</span>}
+              {t('activity.follow')}
+              {isFollowing && <span className="text-[10px] text-emerald-400/80 italic">{t('activity.live')}</span>}
             </button>
           </div>
 
@@ -181,12 +183,12 @@ export function ActivityReviewPage() {
             isFollowing={isFollowing}
             emptyMessage={
               activityStories.length === 0
-                ? 'No stories yet.'
+                ? t('activity.noStoriesYet')
                 : activitySearchQuery.trim()
-                  ? 'No stories match your search.'
+                  ? t('activity.noStoriesSearch')
                   : typeFilter.length > 0
-                    ? 'No matching stories for the selected filters.'
-                    : 'No stories.'
+                    ? t('activity.noStoriesFilters')
+                    : t('activity.noStories')
             }
           />
         </aside>

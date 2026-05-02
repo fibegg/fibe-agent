@@ -36,6 +36,7 @@ import {
 import { renderMarkdown } from './markdown-cache';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
 import { estimateMessageHeight, estimateStreamingHeight, computeTightBubbleWidth } from './pretext-height';
+import { useI18n } from '../i18n';
 
 let prismLoaderPromise: Promise<typeof import('../file-explorer/prism-loader')> | null = null;
 
@@ -99,12 +100,7 @@ function schedulePrismHighlightForRoot(root: HTMLElement, shouldAbort: () => boo
 
 const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} chat-user-markdown-body [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0 [&_.markdown-body]:min-w-0 [&_pre]:block [&_pre]:w-full [&_pre]:min-w-0 [&_pre]:shrink-0 [&_pre]:basis-full [&_pre]:bg-background [&_pre]:text-foreground [&_pre]:border-border [&_pre_code]:text-foreground [&_pre]:mt-2`;
 
-const COPY_SUCCESS_LABEL = 'Copied';
 const COPY_SUCCESS_FEEDBACK_MS = 2000;
-
-function copyRawMessageTitle(visualVariant: 'user' | 'assistant'): string {
-  return visualVariant === 'user' ? 'Copy raw user message' : 'Copy raw assistant message';
-}
 
 const COPY_BUTTON_CLASS_USER =
   'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-violet-200/90 hover:text-violet-50 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-200/50';
@@ -118,6 +114,7 @@ function CopyRawMessageButton({
   rawText: string;
   visualVariant: 'user' | 'assistant';
 }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -147,15 +144,16 @@ function CopyRawMessageButton({
   const btnClass =
     visualVariant === 'user' ? COPY_BUTTON_CLASS_USER : COPY_BUTTON_CLASS_ASSISTANT;
 
-  const idleLabel = copyRawMessageTitle(visualVariant);
+  const idleLabel = visualVariant === 'user' ? t('message.copyRawUser') : t('message.copyRawAssistant');
+  const copiedLabel = t('common.copied');
 
   return (
     <button
       type="button"
       onClick={() => void handleClick()}
       className={btnClass}
-      title={copied ? COPY_SUCCESS_LABEL : idleLabel}
-      aria-label={copied ? COPY_SUCCESS_LABEL : idleLabel}
+      title={copied ? copiedLabel : idleLabel}
+      aria-label={copied ? copiedLabel : idleLabel}
     >
       {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
     </button>
@@ -270,33 +268,33 @@ function isResetSeparator(item: ChatListItem): item is ConversationResetSeparato
 }
 
 function ResetSeparatorRow({ resetAt }: { resetAt: string }) {
+  const { locale, t } = useI18n();
   const d = new Date(resetAt);
-  const label = d.toLocaleString(undefined, {
+  const label = d.toLocaleString(locale, {
     month: 'short',
     day: 'numeric',
     hour: 'numeric',
     minute: '2-digit',
   });
   return (
-    <div className="flex items-center gap-3 py-2 select-none" role="separator" aria-label={`Conversation reset on ${label}`}>
+    <div className="flex items-center gap-3 py-2 select-none" role="separator" aria-label={t('message.resetOn', { time: label })}>
       <div className="flex-1 h-px bg-border/40" />
       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/60 whitespace-nowrap">
         <RefreshCcw className="size-3 shrink-0" aria-hidden />
-        Agent doesn&rsquo;t remember anything before {label}
+        {t('message.resetBefore', { time: label })}
       </span>
       <div className="flex-1 h-px bg-border/40" />
     </div>
   );
 }
 
-function formatTime(iso: string): string {
+function formatTime(iso: string, locale: string): string {
   const d = new Date(iso);
-  let h = d.getHours();
-  const m = d.getMinutes();
-  const ampm = h >= 12 ? 'PM' : 'AM';
-  h = h % 12 || 12;
-  const mins = m < 10 ? `0${m}` : `${m}`;
-  return `${h}:${mins} ${ampm}`;
+  if (Number.isNaN(d.getTime())) return '';
+  return new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d);
 }
 
 function getUploadSrc(filename: string): string {
@@ -342,6 +340,7 @@ const MessageRow = memo(
     onPlay?: (id: string, text: string) => void;
     playingId?: string | null;
   }) {
+    const { locale, t } = useI18n();
     const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
 
     // Compute tight bubble width for plain short user messages.
@@ -409,11 +408,11 @@ const MessageRow = memo(
               )}
               <div className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center justify-between gap-2 min-h-[1.25rem]">
                 <p className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  {formatTime(msg.created_at)}
+                  {formatTime(msg.created_at, locale)}
                   {msg.queued && (
                     <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-400/20 border border-amber-400/30 text-violet-300 text-[10px] font-medium leading-none">
                       <Clock className="size-2.5" aria-hidden />
-                      Queued
+                      {t('message.queued')}
                     </span>
                   )}
                 </p>
@@ -430,16 +429,16 @@ const MessageRow = memo(
                   className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-background/80 hover:bg-background border border-border text-foreground"
                 >
                   <RotateCw className="size-3.5" aria-hidden />
-                  Retry
+                  {t('common.retry')}
                 </button>
               )}
               <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 min-h-[1.25rem]">
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                   <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    {formatTime(msg.created_at)}
+                    {formatTime(msg.created_at, locale)}
                     {msg.usage && (
                       <span className="tabular-nums">
-                        {formatCompactInteger(msg.usage.inputTokens)} in / {formatCompactInteger(msg.usage.outputTokens)} out
+                        {formatCompactInteger(msg.usage.inputTokens)} {t('header.inputShort')} / {formatCompactInteger(msg.usage.outputTokens)} {t('header.outputShort')}
                       </span>
                     )}
                   </p>
@@ -449,14 +448,14 @@ const MessageRow = memo(
                       type="button"
                       onClick={() => msg.id && onPlay(msg.id, msg.body)}
                       className={COPY_BUTTON_CLASS_ASSISTANT}
-                      title={playingId === msg.id ? "Stop voice" : "Read aloud"}
-                      aria-label={playingId === msg.id ? "Stop voice" : "Read aloud"}
+                      title={playingId === msg.id ? t('message.stopVoice') : t('message.readAloud')}
+                      aria-label={playingId === msg.id ? t('message.stopVoice') : t('message.readAloud')}
                     >
                       {playingId === msg.id ? <Square className="size-3.5" aria-hidden /> : <Play className="size-3.5" aria-hidden />}
                     </button>
                   )}
                 </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70" title={msg.model ? `Processed by ${msg.model}` : undefined}>
+                  <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70" title={msg.model ? t('message.processedBy', { model: msg.model }) : undefined}>
                   <Brain className="size-3 shrink-0" aria-hidden />
                   {msg.model ?? '—'}
                 </p>

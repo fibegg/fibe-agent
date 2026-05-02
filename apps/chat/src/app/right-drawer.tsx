@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { RIGHT_DRAWER_OVERLAY, RIGHT_DRAWER_PANEL } from './ui-classes';
+import { useT } from './i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,6 +47,7 @@ export function RightDrawer({
   width = 'min(85vw, 520px)',
   className = '',
 }: RightDrawerProps) {
+  const t = useT();
   const panelRef = useRef<HTMLDivElement | null>(null);
 
   // ── Escape key ──────────────────────────────────────────────────────────────
@@ -129,7 +131,7 @@ export function RightDrawer({
             type="button"
             onClick={onClose}
             className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors shrink-0 ml-2"
-            aria-label={`Close ${title}`}
+            aria-label={t('drawer.close', { title })}
           >
             <X className="size-4" />
           </button>

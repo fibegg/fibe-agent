@@ -4,6 +4,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 
 import { getWsUrl, getAuthTokenForRequest } from '../api-url';
+import { useT } from '../i18n';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -57,6 +58,7 @@ interface TerminalPanelProps {
 }
 
 export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps) {
+  const t = useT();
   const containerRef  = useRef<HTMLDivElement | null>(null);
   const termRef       = useRef<Terminal | null>(null);
   const fitAddonRef   = useRef<FitAddon | null>(null);
@@ -151,7 +153,7 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
         ref={containerRef}
         className="flex-1 min-h-0 overflow-hidden px-2 py-1"
         style={{ background: '#0d0d14' }}
-        aria-label="Terminal"
+        aria-label={t('header.terminal')}
       />
     </div>
   );

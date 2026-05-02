@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Copy, Loader2, RefreshCcw } from 'lucide-react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
+import { useT } from '../i18n';
 
 interface RawProviderRecord {
   id: string;
@@ -38,6 +39,7 @@ function formatJson(value: unknown): string {
 }
 
 function JsonSection({ title, value }: { title: string; value: string }) {
+  const t = useT();
   const [copied, setCopied] = useState(false);
 
   const copy = async () => {
@@ -60,11 +62,11 @@ function JsonSection({ title, value }: { title: string; value: string }) {
           onClick={() => void copy()}
           disabled={!value}
           className="inline-flex h-7 items-center gap-1.5 rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label={`Copy ${title.toLowerCase()}`}
-          title={`Copy ${title.toLowerCase()}`}
+          aria-label={t('settings.raw.copySection', { title: title.toLowerCase() })}
+          title={t('settings.raw.copySection', { title: title.toLowerCase() })}
         >
           {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
-          {copied ? 'Copied' : 'Copy'}
+          {copied ? t('common.copied') : t('common.copy')}
         </button>
       </div>
       <pre className="max-h-72 overflow-auto p-3 font-mono text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
@@ -75,6 +77,7 @@ function JsonSection({ title, value }: { title: string; value: string }) {
 }
 
 export function RawProviderActivityDrawerContent({ open }: { open: boolean }) {
+  const t = useT();
   const [records, setRecords] = useState<RawProviderRecord[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +91,7 @@ export function RawProviderActivityDrawerContent({ open }: { open: boolean }) {
       const data = (await res.json()) as RawProviderRecord[];
       setRecords(Array.isArray(data) ? data.slice().reverse() : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load raw provider activity');
+      setError(err instanceof Error ? err.message : t('settings.raw.failedLoad'));
     } finally {
       setLoading(false);
     }
@@ -99,21 +102,21 @@ export function RawProviderActivityDrawerContent({ open }: { open: boolean }) {
   }, [open]);
 
   const emptyMessage = useMemo(() => {
-    if (loading) return 'Loading raw provider activity...';
+    if (loading) return t('settings.raw.loading');
     if (error) return error;
-    return 'No raw provider activity captured.';
-  }, [error, loading]);
+    return t('settings.raw.empty');
+  }, [error, loading, t]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-background">
       <div className="flex items-center justify-between border-b border-border/40 px-4 py-3">
-        <span className="text-sm text-muted-foreground">{records.length} request-response pairs</span>
+        <span className="text-sm text-muted-foreground">{t('settings.raw.pairs', { count: records.length })}</span>
         <button
           type="button"
           onClick={() => void load()}
           className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-          aria-label="Refresh raw provider activity"
-          title="Refresh"
+          aria-label={t('settings.raw.refresh')}
+          title={t('settings.raw.refreshShort')}
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCcw className="size-4" />}
         </button>
@@ -145,8 +148,8 @@ export function RawProviderActivityDrawerContent({ open }: { open: boolean }) {
             </summary>
             <div className="space-y-3 border-t border-border/40 p-3">
               {record.error && <p className="text-sm text-destructive">{record.error}</p>}
-              <JsonSection title="Request" value={requestText} />
-              <JsonSection title="Response" value={responseText} />
+              <JsonSection title={t('settings.raw.request')} value={requestText} />
+              <JsonSection title={t('settings.raw.response')} value={responseText} />
             </div>
           </details>
           );

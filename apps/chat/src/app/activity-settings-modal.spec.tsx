@@ -8,6 +8,8 @@ vi.mock('./theme-toggle', () => ({
 }));
 
 vi.mock('./embed-config', () => ({
+  getLocaleSource: vi.fn().mockReturnValue('localStorage'),
+  shouldHideLocaleSelector: vi.fn().mockReturnValue(false),
   shouldHideThemeSwitch: vi.fn().mockReturnValue(false),
 }));
 

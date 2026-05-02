@@ -1,5 +1,6 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { translate } from './i18n';
 
 interface SidebarToggleProps {
   isCollapsed: boolean;
@@ -25,6 +26,7 @@ export function SidebarToggle({
 
   const isLeft = side === 'left';
   const positionClass = isLeft ? '-right-4' : '-left-4';
+  const tooltipLabel = isCollapsed ? translate('common.expand') : translate('common.collapse');
 
   return (
     <button
@@ -73,7 +75,7 @@ export function SidebarToggle({
         }}
         aria-hidden
       >
-        {isCollapsed ? 'Expand' : 'Collapse'}
+        {tooltipLabel}
         <div
           className="absolute top-1/2 -translate-y-1/2 w-0 h-0 border-4 border-transparent"
           style={{

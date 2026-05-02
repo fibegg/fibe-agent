@@ -32,12 +32,12 @@ import { FileDetailsDialog } from './file-viewer-panel';
 import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-tabs';
 import { useWorkspaceDrop } from './use-workspace-drop';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
+import { useT } from '../i18n';
 
 export type { PlaygroundEntry } from './file-explorer-types';
 
 const SIDEBAR_TITLE = 'Claude';
 const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
-const EMPTY_PLAYGROUND_MESSAGE = "You don't have any files in the playground.";
 
 const isControlledTree = (t: PlaygroundEntry[] | null | undefined): t is PlaygroundEntry[] =>
   Array.isArray(t);
@@ -91,6 +91,7 @@ export function FileExplorer({
   /** Active model shown as muted secondary text in the explorer header. */
   currentModel?: string;
 } = {}) {
+  const t = useT();
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -311,7 +312,7 @@ export function FileExplorer({
   });
   const activeDrop = effectiveTab === 'agent' ? agentDrop : playgroundDrop;
   const dropLabel =
-    effectiveTab === 'agent' ? 'Drop to add to AI workspace' : 'Drop to add to Playground';
+    effectiveTab === 'agent' ? t('fileExplorer.dropAgent') : t('fileExplorer.dropPlayground');
 
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -330,8 +331,8 @@ export function FileExplorer({
           <button
             type="button"
             className={`${BUTTON_ICON_ACCENT} size-9`}
-            title="Settings"
-            aria-label="Settings"
+            title={t('fileExplorer.settings')}
+            aria-label={t('fileExplorer.settings')}
             onClick={onSettingsClick}
           >
             <Settings className="size-4" />
@@ -357,7 +358,7 @@ export function FileExplorer({
                 {modelLabel && (
                   <span
                     className="max-w-28 truncate text-[10px] font-medium leading-none text-muted-foreground/70 sm:max-w-40 sm:text-[11px]"
-                    title={`Model: ${modelLabel}`}
+                    title={t('header.modelTitle', { model: modelLabel })}
                   >
                     {modelLabel}
                   </span>
@@ -370,8 +371,8 @@ export function FileExplorer({
             <button
               type="button"
               className={BUTTON_ICON_ACCENT_SM}
-              title="Settings"
-              aria-label="Settings"
+              title={t('fileExplorer.settings')}
+              aria-label={t('fileExplorer.settings')}
               onClick={onSettingsClick}
             >
               <Settings className="size-3.5 sm:size-4" />
@@ -382,7 +383,7 @@ export function FileExplorer({
                 type="button"
                 onClick={onClose}
                 className={`${BUTTON_ICON_MUTED} size-7 sm:size-8`}
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 <X className="size-3.5 sm:size-4" />
               </button>
@@ -395,7 +396,7 @@ export function FileExplorer({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search files..."
+            placeholder={t('fileExplorer.searchPlaceholder')}
             className={INPUT_SEARCH}
           />
           {searchQuery && (
@@ -403,7 +404,7 @@ export function FileExplorer({
               type="button"
               onClick={() => setSearchQuery('')}
               className={CLEAR_BUTTON_POSITION}
-              aria-label="Clear search"
+              aria-label={t('fileExplorer.clearSearch')}
             >
               <X className="size-3.5" />
             </button>
@@ -452,7 +453,7 @@ export function FileExplorer({
           {activeDrop.isDragOver && <DragDropOverlay label={dropLabel} />}
           {loadingState && tree.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              Loading…
+              {t('fileExplorer.loading')}
             </div>
           )}
           {error && (
@@ -460,12 +461,12 @@ export function FileExplorer({
           )}
           {!loadingState && !error && tree.length === 0 && (
             <div className="px-3 py-4 text-sm text-muted-foreground">
-              {EMPTY_PLAYGROUND_MESSAGE}
+              {t('fileExplorer.emptyPlayground')}
             </div>
           )}
           {!error && tree.length > 0 && filteredTree.length === 0 && (
             <div className="px-3 py-2 text-xs text-muted-foreground">
-              No matches for &quot;{searchQuery}&quot;
+              {t('fileExplorer.noMatches', { query: searchQuery })}
             </div>
           )}
           {!error && filteredTree.length > 0 && (
@@ -524,7 +525,7 @@ export function FileExplorer({
             onClick={onToggleCollapse}
             side="left"
             ariaLabel={
-              collapsed ? 'Expand file explorer' : 'Collapse file explorer'
+              collapsed ? t('fileExplorer.expand') : t('fileExplorer.collapse')
             }
           />
         </div>

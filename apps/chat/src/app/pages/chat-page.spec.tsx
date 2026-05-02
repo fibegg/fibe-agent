@@ -261,6 +261,8 @@ vi.mock('../chat/drag-drop-overlay', () => ({
 }));
 
 vi.mock('../embed-config', () => ({
+  getLocaleSource: vi.fn().mockReturnValue('localStorage'),
+  shouldHideLocaleSelector: vi.fn().mockReturnValue(false),
   shouldHideThemeSwitch: vi.fn().mockReturnValue(false),
   isStandaloneMode: vi.fn().mockReturnValue(true),
 }));
@@ -348,7 +350,7 @@ describe('ChatPage', () => {
   });
 
   it('renders File Explorer sidebar', () => {
-    localStorage.setItem('simplicate-mode', 'true');
+    localStorage.setItem('simplicate-mode', 'false');
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
   });

@@ -23,6 +23,7 @@ import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 import type { PlaygroundEntry } from './file-explorer-types';
 import type { EditorHandle } from './file-editor-cm';
 import { getLanguageLabel } from './file-editor-cm';
+import { useT } from '../i18n';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -44,28 +45,29 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
 // ─── Status Bar ───────────────────────────────────────────────────────────────
 
 function StatusBar({ language, lines, isDirty, isSaving }: { language: string; lines: number; isDirty: boolean; isSaving: boolean }) {
+  const t = useT();
   return (
     <div className="flex items-center justify-between gap-3 border-t border-border/50 bg-card/40 px-4 py-1.5 text-[10px] text-muted-foreground select-none">
       <div className="flex items-center gap-3">
         <span className="font-medium">{language}</span>
         <span>─</span>
-        <span>{lines} lines</span>
+        <span>{t('fileEditor.lines', { count: lines })}</span>
       </div>
       <div className="flex items-center gap-2">
         {isSaving && (
           <span className="flex items-center gap-1 text-violet-400">
             <Loader2 className="size-3 animate-spin" />
-            Saving…
+            {t('fileEditor.saving')}
           </span>
         )}
         {isDirty && !isSaving && (
           <span className="flex items-center gap-1 text-amber-400">
             <span className="size-1.5 rounded-full bg-amber-400 animate-pulse" />
-            Unsaved changes
+            {t('fileEditor.unsaved')}
           </span>
         )}
         {!isDirty && !isSaving && (
-          <span className="text-green-500/70">Saved</span>
+          <span className="text-green-500/70">{t('fileEditor.saved')}</span>
         )}
       </div>
     </div>
@@ -87,6 +89,7 @@ export function FileEditorPanel({
   apiBasePath?: string;
   onDirtyChange?: (path: string, isDirty: boolean) => void;
 }) {
+  const t = useT();
   const [originalContent, setOriginalContent] = useState<string | null>(null);
   const [liveContent, setLiveContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -128,8 +131,8 @@ export function FileEditorPanel({
     apiRequest(path, { signal: ac.signal })
       .then(async (res) => {
         if (!res.ok) {
-          if (res.status === 404) throw new Error('File not found');
-          throw new Error(res.status === 401 ? 'Unauthorized' : 'Failed to load file');
+          if (res.status === 404) throw new Error(t('fileEditor.fileNotFound'));
+          throw new Error(res.status === 401 ? t('fileEditor.unauthorized') : t('fileEditor.failedLoadFile'));
         }
         const data = (await res.json()) as { content?: string };
         const text = typeof data.content === 'string' ? data.content : '';
@@ -138,7 +141,7 @@ export function FileEditorPanel({
       })
       .catch((e) => {
         if ((e as Error).name !== 'AbortError') {
-          setFetchError(e instanceof Error ? e.message : 'Failed to load file');
+          setFetchError(e instanceof Error ? e.message : t('fileEditor.failedLoadFile'));
         }
       })
       .finally(() => {
@@ -146,7 +149,7 @@ export function FileEditorPanel({
       });
 
     return () => ac.abort();
-  }, [entry.path, apiBasePath]);
+  }, [entry.path, apiBasePath, t]);
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -231,17 +234,17 @@ export function FileEditorPanel({
         body: JSON.stringify({ path: entry.path, content }),
       });
 
-      if (!res.ok) throw new Error('Save failed');
+      if (!res.ok) throw new Error(t('fileEditor.saveFailed'));
 
       setOriginalContent(content);
       setLiveContent(content);
-      setToast({ message: 'File saved', type: 'success' });
+      setToast({ message: t('fileEditor.fileSaved'), type: 'success' });
     } catch {
-      setToast({ message: 'Failed to save file', type: 'error' });
+      setToast({ message: t('fileEditor.saveFailed'), type: 'error' });
     } finally {
       setIsSaving(false);
     }
-  }, [entry.path, liveContent, apiBasePath]);
+  }, [entry.path, liveContent, apiBasePath, t]);
 
   // ── Copy ───────────────────────────────────────────────────────────────────
   const handleCopy = useCallback(() => {
@@ -305,7 +308,7 @@ export function FileEditorPanel({
                           isGitDeleted ? 'text-red-500 dark:text-red-400' :
                           'text-muted-foreground'
                         }`}
-                        title={`Git: ${entry.gitStatus}`}
+                        title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
                       >
                         {isGitModified ? 'M' : isGitAddedOrUntracked ? 'U' : isGitDeleted ? 'D' : ''}
                       </span>
@@ -313,7 +316,7 @@ export function FileEditorPanel({
                     {isDirty && (
                       <span
                         className="size-2 rounded-full bg-amber-400 shrink-0 animate-pulse"
-                        title="Unsaved changes"
+                        title={t('fileEditor.unsaved')}
                       />
                     )}
                   </div>
@@ -331,24 +334,24 @@ export function FileEditorPanel({
                 onClick={() => void handleSave()}
                 disabled={!isDirty || isSaving}
                 className={`${BUTTON_GHOST_ACCENT} ${isDirty ? 'text-violet-400 hover:text-violet-300' : ''}`}
-                title="Save (Cmd+S)"
+                title={t('fileEditor.saveTitle')}
               >
                 {isSaving ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
                   <Save className="size-3" />
                 )}
-                Save
+                {t('fileEditor.save')}
               </button>
               {isDirty && (
                 <button
                   type="button"
                   onClick={handleDiscard}
                   className={BUTTON_GHOST_ACCENT}
-                  title="Discard changes"
+                  title={t('fileEditor.discardTitle')}
                 >
                   <RotateCcw className="size-3" />
-                  Discard
+                  {t('fileEditor.discard')}
                 </button>
               )}
               <button
@@ -356,26 +359,26 @@ export function FileEditorPanel({
                 onClick={handleCopy}
                 disabled={liveContent === null || loading}
                 className={BUTTON_GHOST_ACCENT}
-                title="Copy content"
+                title={t('fileEditor.copyTitle')}
               >
                 <Copy className="size-3" />
-                Copy
+                {t('common.copy')}
               </button>
               <button
                 type="button"
                 onClick={handleDownload}
                 disabled={liveContent === null || loading}
                 className={BUTTON_GHOST_ACCENT}
-                title="Download file"
+                title={t('fileEditor.downloadTitle')}
               >
                 <Download className="size-3" />
-                Download
+                {t('fileEditor.download')}
               </button>
               <button
                 type="button"
                 onClick={onClose}
                 className={`${BUTTON_ICON_MUTED} size-8`}
-                aria-label="Close"
+                aria-label={t('common.close')}
               >
                 <X className="size-4" />
               </button>
@@ -388,7 +391,7 @@ export function FileEditorPanel({
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-card z-10">
               <Loader2 className="size-4 animate-spin mr-2" />
-              Loading…
+              {t('common.loading')}
             </div>
           )}
           {fetchError && (
@@ -410,7 +413,7 @@ export function FileEditorPanel({
               {/* Empty file placeholder shown inside editor if content is empty */}
               {!loading && liveContent === '' && (
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[1]">
-                  <p className="text-sm text-muted-foreground">Empty file</p>
+                  <p className="text-sm text-muted-foreground">{t('fileEditor.empty')}</p>
                 </div>
               )}
             </div>
@@ -426,7 +429,7 @@ export function FileEditorPanel({
           )}
           {!loading && !fetchError && !editorReady && liveContent === '' && (
             <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
-              Empty file
+              {t('fileEditor.empty')}
             </div>
           )}
         </div>

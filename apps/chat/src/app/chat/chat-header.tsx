@@ -3,15 +3,18 @@ import { createPortal } from 'react-dom';
 import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
-import { EFFORT_LABELS, EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
+import { EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
 import { PlaygroundSelector } from './playground-selector';
 import { ModelSelector } from './model-selector';
 import type { BrowseEntry } from './use-playground-selector';
-import { CHAT_STATES, STATE_LABELS, truncateError } from './chat-state';
+import { CHAT_STATES, truncateError } from './chat-state';
+import { getChatStateLabel, type ChatState } from './chat-state';
 import { TypewriterText } from './typewriter-text';
 import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
 import { HEADER_FIRST_ROW, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
+import { LocaleSelector } from '../locale-selector';
+import { useT, type TranslationKey } from '../i18n';
 
 export interface ChatHeaderProps {
   isMobile: boolean;
@@ -140,6 +143,8 @@ function CliButton({
   onToggle: () => void;
   className: string;
 }) {
+  const t = useT();
+  const label = open ? t('header.commands') : t('header.commands');
   return (
     <button
       type="button"
@@ -149,8 +154,8 @@ function CliButton({
           ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
           : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-300'
       }`}
-      title={open ? 'Close commands' : 'Show commands'}
-      aria-label={open ? 'Close commands' : 'Show commands'}
+      title={label}
+      aria-label={label}
       aria-pressed={open}
     >
       <Command className="size-4" />
@@ -168,6 +173,8 @@ function DiffButton({
   onToggle: () => void;
   className: string;
 }) {
+  const t = useT();
+  const label = t('header.gitDiff');
   return (
     <button
       type="button"
@@ -177,8 +184,8 @@ function DiffButton({
           ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
           : 'text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-300'
       }`}
-      title={open ? 'Close diff' : 'Show playground diff'}
-      aria-label={open ? 'Close diff' : 'Show playground diff'}
+      title={label}
+      aria-label={label}
       aria-pressed={open}
     >
       <GitCompareArrows className="size-4" />
@@ -196,6 +203,8 @@ function TerminalButton({
   onToggle: () => void;
   className: string;
 }) {
+  const t = useT();
+  const label = open ? t('header.closeTerminal') : t('header.openTerminal');
   return (
     <button
       type="button"
@@ -205,8 +214,8 @@ function TerminalButton({
           ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
           : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
       }`}
-      title={open ? 'Close terminal' : 'Open terminal'}
-      aria-label={open ? 'Close terminal' : 'Open terminal'}
+      title={label}
+      aria-label={label}
       aria-pressed={open}
     >
       <TerminalSquare className="size-4" />
@@ -253,12 +262,13 @@ function SimplicateSwitch({
   checked: boolean;
   onChange: (checked: boolean) => void;
 }) {
+  const t = useT();
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      aria-label="Simplicate"
+      aria-label={t('header.simplicate')}
       onClick={() => onChange(!checked)}
       className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
         checked ? 'border-violet-400/70 bg-violet-500' : 'border-muted-foreground/50 bg-background/80'
@@ -280,9 +290,10 @@ function EffortRange({
   currentEffort: string;
   onEffortSelect: (effort: string) => void;
 }) {
+  const t = useT();
   const selectedEffort = resolveEffort(currentEffort);
   const selectedIndex = Math.max(0, EFFORT_OPTIONS.indexOf(selectedEffort));
-  const selectedLabel = EFFORT_LABELS[selectedEffort];
+  const selectedLabel = t(`effort.${selectedEffort}` as TranslationKey);
 
   const handleChange = (value: string) => {
     const index = Math.max(0, Math.min(EFFORT_OPTIONS.length - 1, Number(value)));
@@ -292,7 +303,7 @@ function EffortRange({
   return (
     <div className="space-y-2 rounded-lg border border-border/40 bg-background/35 p-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Effort</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('header.effort')}</span>
         <span className="text-xs font-medium text-foreground">{selectedLabel}</span>
       </div>
       <input
@@ -303,7 +314,7 @@ function EffortRange({
         value={selectedIndex}
         onChange={(e) => handleChange(e.target.value)}
         className="h-2 w-full cursor-pointer accent-violet-500"
-        aria-label="Effort"
+        aria-label={t('header.effort')}
         aria-valuetext={selectedLabel}
       />
       <div className="grid grid-cols-5 gap-1 text-[10px] text-muted-foreground">
@@ -312,7 +323,7 @@ function EffortRange({
             key={effort}
             className={`truncate text-center ${effort === selectedEffort ? 'font-medium text-violet-300' : ''}`}
           >
-            {EFFORT_LABELS[effort]}
+            {t(`effort.${effort}` as TranslationKey)}
           </span>
         ))}
       </div>
@@ -351,6 +362,7 @@ function ProviderModelMenu({
   currentEffort = 'max',
   onEffortSelect,
 }: ProviderModelMenuProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [panelRect, setPanelRect] = useState<FloatingPanelRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -436,7 +448,7 @@ function ProviderModelMenu({
           >
             {hasModelControls && onModelSelect && onModelInputChange && (
               <div className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Model</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('header.model')}</span>
                 <ModelSelector
                   currentModel={currentModel}
                   options={modelOptions}
@@ -502,6 +514,7 @@ function MoreActionsMenu({
   simplicateMode,
   onSimplicateModeChange,
 }: MoreActionsMenuProps) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const [panelRect, setPanelRect] = useState<FloatingPanelRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -567,8 +580,8 @@ function MoreActionsMenu({
         type="button"
         onClick={() => setOpen((value) => !value)}
         className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:size-9"
-        title="More actions"
-        aria-label="More actions"
+        title={t('header.moreActions')}
+        aria-label={t('header.moreActions')}
         aria-haspopup="menu"
         aria-expanded={open}
       >
@@ -580,7 +593,7 @@ function MoreActionsMenu({
           <div
             data-chat-header-more-menu=""
             role="menu"
-            aria-label="Chat actions"
+            aria-label={t('header.chatActions')}
             className="z-[100] flex flex-col overflow-hidden rounded-lg border border-border bg-card/95 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl"
             style={{
               position: 'fixed',
@@ -597,10 +610,10 @@ function MoreActionsMenu({
                   role="menuitem"
                   onClick={() => setOpen(false)}
                   className={MORE_MENU_ITEM_CLASS}
-                  title="Tony Stark"
+                  title={t('header.tonyStark')}
                 >
                   <StarkGlassesIcon className="size-4 shrink-0 text-cyan-400" />
-                  <span className="min-w-0 flex-1 truncate">Tony Stark</span>
+                  <span className="min-w-0 flex-1 truncate">{t('header.tonyStark')}</span>
                 </Link>
               )}
 
@@ -614,7 +627,7 @@ function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} ${terminalOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
                   <TerminalSquare className="size-4 shrink-0 text-violet-300" />
-                  <span className="min-w-0 flex-1 truncate">Terminal</span>
+                  <span className="min-w-0 flex-1 truncate">{t('header.terminal')}</span>
                 </button>
               )}
 
@@ -626,7 +639,7 @@ function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} ${cliOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
                   <Command className="size-4 shrink-0 text-blue-300" />
-                  <span className="min-w-0 flex-1 truncate">Commands</span>
+                  <span className="min-w-0 flex-1 truncate">{t('header.commands')}</span>
                 </button>
               )}
 
@@ -638,7 +651,7 @@ function MoreActionsMenu({
                   className={MORE_MENU_ITEM_CLASS}
                 >
                   <FolderOpen className="size-4 shrink-0 text-amber-300" />
-                  <span className="min-w-0 flex-1 truncate">Files</span>
+                  <span className="min-w-0 flex-1 truncate">{t('header.files')}</span>
                 </button>
               )}
 
@@ -650,7 +663,7 @@ function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} ${diffOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
                   <GitCompareArrows className="size-4 shrink-0 text-emerald-300" />
-                  <span className="min-w-0 flex-1 truncate">Git diff</span>
+                  <span className="min-w-0 flex-1 truncate">{t('header.gitDiff')}</span>
                 </button>
               )}
 
@@ -662,14 +675,14 @@ function MoreActionsMenu({
                   className={MORE_MENU_ITEM_CLASS}
                 >
                   <Sparkles className="size-4 shrink-0 text-violet-300" />
-                  <span className="min-w-0 flex-1 truncate">Start Auth</span>
+                  <span className="min-w-0 flex-1 truncate">{t('header.startAuth')}</span>
                 </button>
               )}
 
               {onSimplicateModeChange && (
                 <div className="mt-1 border-t border-border/40 pt-1">
                   <div className="flex h-9 items-center justify-between gap-3 rounded-md px-2.5 text-sm text-foreground">
-                    <span className="min-w-0 flex-1 truncate">Simplicate</span>
+                    <span className="min-w-0 flex-1 truncate">{t('header.simplicate')}</span>
                     <SimplicateSwitch
                       checked={simplicateMode}
                       onChange={onSimplicateModeChange}
@@ -688,6 +701,8 @@ function MoreActionsMenu({
                 </div>
               </div>
 
+              <LocaleSelector variant="menu" />
+
               <div className="border-t border-border/40 px-1 pt-2">
                 <div className="relative h-8">
                   <Search className={SEARCH_ICON_POSITION} aria-hidden />
@@ -695,7 +710,7 @@ function MoreActionsMenu({
                     type="text"
                     value={searchQuery}
                     onChange={(e) => onSearchChange(e.target.value)}
-                    placeholder="Search in conversation..."
+                    placeholder={t('header.searchPlaceholder')}
                     className={INPUT_SEARCH}
                   />
                   {searchQuery && (
@@ -703,7 +718,7 @@ function MoreActionsMenu({
                       type="button"
                       onClick={() => onSearchChange('')}
                       className={CLEAR_BUTTON_POSITION}
-                      aria-label="Clear search"
+                      aria-label={t('header.clearSearch')}
                     >
                       <X className="size-3.5" />
                     </button>
@@ -711,7 +726,9 @@ function MoreActionsMenu({
                 </div>
                 {searchQuery && (
                   <p className="px-1 pt-1.5 text-[10px] text-muted-foreground">
-                    Found {filteredMessagesCount} message{filteredMessagesCount !== 1 ? 's' : ''}
+                    {filteredMessagesCount === 1
+                      ? t('header.foundOne')
+                      : t('header.foundMany', { count: filteredMessagesCount })}
                   </p>
                 )}
               </div>
@@ -721,6 +738,10 @@ function MoreActionsMenu({
         )}
     </div>
   );
+}
+
+function isKnownChatState(state: string): state is ChatState {
+  return Object.values(CHAT_STATES).includes(state as ChatState);
 }
 
 export function ChatHeader({
@@ -766,6 +787,7 @@ export function ChatHeader({
   refreshingModels = false,
   ...rest
 }: ChatHeaderProps) {
+  const t = useT();
   const displayName = agentName || agentProviderLabel?.trim() || 'Claude';
   const modelLabel = currentModel?.trim() ?? '';
   // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
@@ -816,24 +838,26 @@ export function ChatHeader({
     ? <TypewriterText text={agentMode} speed={40} />
     : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
     ? truncateError(errorMessage)
-    : STATE_LABELS[state as keyof typeof STATE_LABELS] ?? state;
+    : isKnownChatState(state) ? getChatStateLabel(state, t) : state;
   const statusTextClass = state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass;
   const statsLabel = useMemo(() => {
     const parts = [
       `${mobileSessionStats.totalActions}/${mobileSessionStats.completed}/${mobileSessionStats.processing}`,
     ];
     if (sessionTokenUsage) {
-      parts.push(`${formatCompactInteger(sessionTokenUsage.inputTokens)} in / ${formatCompactInteger(sessionTokenUsage.outputTokens)} out`);
+        parts.push(
+          `${formatCompactInteger(sessionTokenUsage.inputTokens)} ${t('header.inputShort')} / ${formatCompactInteger(sessionTokenUsage.outputTokens)} ${t('header.outputShort')}`,
+        );
     }
     if (sessionTimeMs > 0) {
       parts.push(formatSessionDurationMs(sessionTimeMs));
     }
     return parts.join(' · ');
-  }, [mobileSessionStats.completed, mobileSessionStats.processing, mobileSessionStats.totalActions, sessionTimeMs, sessionTokenUsage]);
-  const statsAriaLabel = `${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} in / ${sessionTokenUsage.outputTokens} out` : ''}${sessionTimeMs > 0 ? ` / ${formatSessionDurationMs(sessionTimeMs)}` : ''}`;
-  const compactMode = !simplicateMode;
+  }, [mobileSessionStats.completed, mobileSessionStats.processing, mobileSessionStats.totalActions, sessionTimeMs, sessionTokenUsage, t]);
+  const statsAriaLabel = `${mobileSessionStats.totalActions} ${t('header.totalActions')} / ${mobileSessionStats.completed} ${t('header.completed')} / ${mobileSessionStats.processing} ${t('header.processing')}${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} ${t('header.inputShort')} / ${sessionTokenUsage.outputTokens} ${t('header.outputShort')}` : ''}${sessionTimeMs > 0 ? ` / ${formatSessionDurationMs(sessionTimeMs)}` : ''}`;
+  const compactMode = simplicateMode;
   const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
-  const menuButtonLabel = compactMode ? 'Open settings' : 'Open menu';
+  const menuButtonLabel = compactMode ? t('header.openSettings') : t('header.openMenu');
 
   if (compactMode) {
     return (
@@ -856,7 +880,7 @@ export function ChatHeader({
             <div className="flex min-w-0 items-center gap-1.5 text-sm">
               <ProviderModelMenu
                 triggerClassName="-ml-1 inline-flex min-w-0 max-w-[62vw] items-center gap-1.5 px-1 py-0.5 text-left sm:max-w-[360px]"
-                panelLabel="Change model and effort"
+                panelLabel={t('header.changeModelEffort')}
                 showModelSelector={showModelSelector}
                 currentModel={currentModel}
                 modelOptions={modelOptions}
@@ -874,7 +898,7 @@ export function ChatHeader({
                     <span className="shrink-0 text-muted-foreground/60">·</span>
                     <span
                       className="min-w-0 truncate text-xs font-medium text-muted-foreground"
-                      title={`Model: ${modelLabel}`}
+                      title={t('header.modelTitle', { model: modelLabel })}
                     >
                       {modelLabel}
                     </span>
@@ -895,7 +919,7 @@ export function ChatHeader({
                 onClick={onReconnect}
                 className="h-8 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-2.5 text-xs font-medium text-white shadow-lg shadow-violet-500/25 transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:h-9 sm:px-3"
               >
-                Reconnect
+                {t('header.reconnect')}
               </button>
             )}
             <MoreActionsMenu
@@ -949,7 +973,7 @@ export function ChatHeader({
               type="button"
               onClick={onOpenMenu}
               className="flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"
-              aria-label="Open menu"
+              aria-label={t('header.openMenu')}
             >
               <Menu className="size-4 sm:size-5 shrink-0" />
             </button>
@@ -957,7 +981,7 @@ export function ChatHeader({
           <div className="min-w-0 flex-1">
             <ProviderModelMenu
               triggerClassName="-ml-1 inline-flex max-w-full min-w-0 items-baseline gap-2 px-1 py-0.5 text-left"
-              panelLabel="Change model and effort"
+              panelLabel={t('header.changeModelEffort')}
               showModelSelector={showModelSelector}
               currentModel={currentModel}
               modelOptions={modelOptions}
@@ -973,7 +997,7 @@ export function ChatHeader({
               {modelLabel && (
                 <span
                   className="max-w-28 truncate text-[11px] font-medium leading-none text-muted-foreground/70 sm:max-w-40"
-                  title={`Model: ${modelLabel}`}
+                  title={t('header.modelTitle', { model: modelLabel })}
                 >
                   {modelLabel}
                 </span>
@@ -986,7 +1010,7 @@ export function ChatHeader({
               {sessionTimeMs > 0 && (
                 <span
                   className="text-[10px] sm:text-xs font-medium tabular-nums text-muted-foreground"
-                  title="Session time"
+                  title={t('header.sessionTime')}
                 >
                   {formatSessionDurationMs(sessionTimeMs)}
                 </span>
@@ -1000,24 +1024,24 @@ export function ChatHeader({
           {isMobile && (
             <p
               className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"
-              aria-label={`${mobileSessionStats.totalActions} total / ${mobileSessionStats.completed} completed / ${mobileSessionStats.processing} processing${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} in / ${sessionTokenUsage.outputTokens} out` : ''}`}
+              aria-label={statsAriaLabel}
             >
-              <span key={`m-total-${mobileSessionStats.totalActions}`} className="text-foreground mobile-stat-tick" title="Total actions">
+              <span key={`m-total-${mobileSessionStats.totalActions}`} className="text-foreground mobile-stat-tick" title={t('header.totalActions')}>
                 {mobileSessionStats.totalActions}
               </span>
               <span className="text-muted-foreground/70">/</span>
-              <span key={`m-done-${mobileSessionStats.completed}`} className="text-emerald-400 mobile-stat-tick" title="Completed">
+              <span key={`m-done-${mobileSessionStats.completed}`} className="text-emerald-400 mobile-stat-tick" title={t('header.completed')}>
                 {mobileSessionStats.completed}
               </span>
               <span className="text-muted-foreground/70">/</span>
-              <span key={`m-proc-${mobileSessionStats.processing}`} className="text-cyan-400 mobile-stat-tick" title="Processing">
+              <span key={`m-proc-${mobileSessionStats.processing}`} className="text-cyan-400 mobile-stat-tick" title={t('header.processing')}>
                 {mobileSessionStats.processing}
               </span>
               {sessionTokenUsage && (
                 <>
                   <span className="text-muted-foreground/70">·</span>
-                  <span className="text-violet-300/90" title="Token usage (input / output)">
-                    {formatCompactInteger(sessionTokenUsage.inputTokens)} in / {formatCompactInteger(sessionTokenUsage.outputTokens)} out
+                  <span className="text-violet-300/90" title={t('header.tokenUsage')}>
+                    {formatCompactInteger(sessionTokenUsage.inputTokens)} {t('header.inputShort')} / {formatCompactInteger(sessionTokenUsage.outputTokens)} {t('header.outputShort')}
                   </span>
                 </>
               )}
@@ -1029,8 +1053,8 @@ export function ChatHeader({
               style={{ display: 'none' }}
               onClick={onOpenActivity}
               className="size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"
-              title="Agent activity"
-              aria-label="Open agent activity"
+              title={t('header.agentActivity')}
+              aria-label={t('header.openAgentActivity')}
             >
               <Brain className={`size-8 ${mobileBrainClasses.brain} transition-colors`} />
               {state === CHAT_STATES.AWAITING_RESPONSE ? (
@@ -1046,7 +1070,7 @@ export function ChatHeader({
               onClick={onReconnect}
               className="px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
             >
-              Reconnect
+              {t('header.reconnect')}
             </button>
           )}
 
@@ -1054,7 +1078,7 @@ export function ChatHeader({
             <Link
               to="/stark"
               className="p-1 md:p-1.5 rounded-full transition-all text-cyan-500/80 hover:text-cyan-300 hover:bg-cyan-500/10 group flex items-center justify-center transform hover:scale-105 active:scale-95"
-              title="Tony Stark"
+              title={t('header.tonyStark')}
             >
               <StarkGlassesIcon className="w-5 h-5 md:w-6 md:h-6 group-hover:drop-shadow-[0_0_8px_rgba(6,182,212,0.8)] transition-all" />
             </Link>
@@ -1062,6 +1086,7 @@ export function ChatHeader({
 
           {/* Desktop-only: playground selector in top row */}
           <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
+          <LocaleSelector />
           {/* Desktop-only: diff button in top row */}
           {onToggleDiff && (
             <DiffButton open={diffOpen} onToggle={onToggleDiff} className="hidden sm:flex size-9" />
@@ -1080,7 +1105,7 @@ export function ChatHeader({
               onClick={onStartAuth}
               className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
             >
-              Start Auth
+              {t('header.startAuth')}
             </button>
           )}
         </div>
@@ -1098,7 +1123,7 @@ export function ChatHeader({
             type="text"
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Search in conversation..."
+            placeholder={t('header.searchPlaceholder')}
             className={INPUT_SEARCH}
           />
           {searchQuery && (
@@ -1106,7 +1131,7 @@ export function ChatHeader({
               type="button"
               onClick={() => onSearchChange('')}
               className={CLEAR_BUTTON_POSITION}
-              aria-label="Clear search"
+              aria-label={t('header.clearSearch')}
             >
               <X className="size-3.5" />
             </button>
@@ -1131,7 +1156,9 @@ export function ChatHeader({
 
       {searchQuery && (
         <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
-          Found {filteredMessagesCount} message{filteredMessagesCount !== 1 ? 's' : ''}
+          {filteredMessagesCount === 1
+            ? t('header.foundOne')
+            : t('header.foundMany', { count: filteredMessagesCount })}
         </p>
       )}
     </header>

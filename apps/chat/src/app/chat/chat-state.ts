@@ -1,5 +1,6 @@
 import type { StoredActivityEntry } from '@shared/types';
 import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
+import { translate, type TranslationKey } from '../i18n';
 
 export type { StoredStoryEntry, StoredActivityEntry } from '@shared/types';
 export { WS_CLOSE } from '@shared/ws-constants';
@@ -28,6 +29,17 @@ export const STATE_LABELS: Record<ChatState, string> = {
   [CHAT_STATES.ERROR]: 'Error occurred',
 };
 
+export const STATE_LABEL_KEYS: Record<ChatState, TranslationKey> = {
+  [CHAT_STATES.INITIALIZING]: 'chat.state.connecting',
+  [CHAT_STATES.AGENT_OFFLINE]: 'chat.state.agentOffline',
+  [CHAT_STATES.UNAUTHENTICATED]: 'chat.state.authRequired',
+  [CHAT_STATES.AUTH_PENDING]: 'chat.state.authPending',
+  [CHAT_STATES.AUTHENTICATED]: 'chat.state.ready',
+  [CHAT_STATES.AWAITING_RESPONSE]: 'chat.state.working',
+  [CHAT_STATES.LOGGING_OUT]: 'chat.state.loggingOut',
+  [CHAT_STATES.ERROR]: 'chat.state.error',
+};
+
 export const CHAT_INPUT_PLACEHOLDER = {
   AUTH_REQUIRED: 'Complete authentication to start chatting...',
   READY: 'Talk to fibe...',
@@ -35,9 +47,19 @@ export const CHAT_INPUT_PLACEHOLDER = {
 } as const;
 
 export function getChatInputPlaceholder(state: ChatState): string {
-  if (state === CHAT_STATES.AWAITING_RESPONSE) return CHAT_INPUT_PLACEHOLDER.WORKING;
-  if (state === CHAT_STATES.AUTHENTICATED) return CHAT_INPUT_PLACEHOLDER.READY;
-  return CHAT_INPUT_PLACEHOLDER.AUTH_REQUIRED;
+  if (state === CHAT_STATES.AWAITING_RESPONSE) return translate('chat.input.working');
+  if (state === CHAT_STATES.AUTHENTICATED) return translate('chat.input.ready');
+  return translate('chat.input.authRequired');
+}
+
+export function getChatInputPlaceholderWithT(state: ChatState, t: (key: TranslationKey) => string): string {
+  if (state === CHAT_STATES.AWAITING_RESPONSE) return t('chat.input.working');
+  if (state === CHAT_STATES.AUTHENTICATED) return t('chat.input.ready');
+  return t('chat.input.authRequired');
+}
+
+export function getChatStateLabel(state: ChatState, t: (key: TranslationKey) => string): string {
+  return t(STATE_LABEL_KEYS[state] ?? 'chat.state.error');
 }
 
 export const RESPONSE_TIMEOUT_MS = 600_000;

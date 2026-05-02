@@ -6,6 +6,7 @@ import {
   INPUT_ROUNDED,
   MODAL_OVERLAY_CENTER,
 } from '../ui-classes';
+import { useT } from '../i18n';
 
 interface AuthModalProps {
   open: boolean;
@@ -15,6 +16,7 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalProps) {
+  const t = useT();
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -24,10 +26,10 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   const showUrl = authModal.authUrl && !authModal.isManualToken;
   const isDeviceCode = Boolean(authModal.deviceCode && !authModal.isManualToken);
   const codeLabel = authModal.isManualToken
-    ? 'Paste API Key or Token'
+    ? t('auth.apiToken')
     : isDeviceCode
-      ? 'One-time device code'
-      : 'Paste authorization code';
+      ? t('auth.deviceCode')
+      : t('auth.authorizationCode');
   const codeValue = isDeviceCode ? (authModal.deviceCode ?? '') : code;
   const readOnly = isDeviceCode;
   const showSubmit = !isDeviceCode;
@@ -70,13 +72,13 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
             <span className="p-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
               <KeyIcon className="size-4 text-violet-400" />
             </span>
-            Connect to Provider
+            {t('auth.connect')}
           </h3>
           <button
             type="button"
             onClick={onClose}
             className={`${BUTTON_ICON_MUTED} size-8`}
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             &times;
           </button>
@@ -85,7 +87,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           {showUrl && (
             <div className="space-y-2">
               <p className="text-xs sm:text-sm text-muted-foreground">
-                Please follow the link below to authorize the fibe agent.
+                {t('auth.description')}
               </p>
               <a
                 href={authModal.authUrl ?? '#'}
@@ -94,7 +96,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 className={`${BUTTON_PRIMARY_ROUNDED} inline-flex`}
               >
                 <ExternalIcon className="size-3.5" />
-                Open Authentication URL
+                {t('auth.openUrl')}
               </a>
             </div>
           )}
@@ -107,7 +109,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
             </label>
             {authModal.isManualToken && (
               <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
-                Enter your provider API key (e.g. ANTHROPIC_API_KEY, GEMINI_API_KEY) or OAuth token.
+                {t('auth.manualHelp')}
               </p>
             )}
             <div className="relative">
@@ -118,7 +120,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 readOnly={readOnly}
                 onChange={(e) => setCode(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={authModal.isManualToken ? 'sk-...' : 'Paste code here...'}
+                placeholder={authModal.isManualToken ? t('auth.tokenPlaceholder') : t('auth.codePlaceholder')}
                 className={INPUT_ROUNDED}
                 autoComplete="off"
                 autoFocus
@@ -128,9 +130,9 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                   type="button"
                   onClick={handleCopyDeviceCode}
                   className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
-                  title="Copy device code"
+                  title={t('auth.copyDeviceCode')}
                 >
-                  {copied ? '✓ Copied' : 'Copy'}
+                  {copied ? `✓ ${t('common.copied')}` : t('common.copy')}
                 </button>
               )}
             </div>
@@ -144,10 +146,10 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                 {submitting ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Connecting…
+                    {t('auth.connecting')}
                   </span>
                 ) : (
-                  'Submit'
+                  t('common.submit')
                 )}
               </button>
             )}

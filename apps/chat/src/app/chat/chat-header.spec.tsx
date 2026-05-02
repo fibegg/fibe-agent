@@ -42,7 +42,7 @@ const DEFAULT_PROPS = {
   onStartAuth: vi.fn(),
   onOpenMenu: vi.fn(),
   onOpenActivity: vi.fn(),
-  simplicateMode: true,
+  simplicateMode: false,
 };
 
 // ─── Core rendering ───────────────────────────────────────────────────────────
@@ -91,7 +91,7 @@ describe('ChatHeader', () => {
   // ─── Reconnect / Auth buttons ──────────────────────────────────────────────
 
   it('shows Reconnect button when state is AGENT_OFFLINE', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} simplicateMode={false} />);
+    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} simplicateMode />);
     const reconnect = screen.getByRole('button', { name: /reconnect/i });
     const moreActions = screen.getByRole('button', { name: /more actions/i });
     expect(reconnect).toBeTruthy();
@@ -112,13 +112,15 @@ describe('ChatHeader', () => {
 
   it('shows Start Auth button when state is UNAUTHENTICATED', () => {
     render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} simplicateMode />);
-    expect(screen.getByRole('button', { name: /start auth/i })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    expect(screen.getByRole('menuitem', { name: /start auth/i })).toBeTruthy();
   });
 
   it('calls onStartAuth when Start Auth clicked', () => {
     const onStartAuth = vi.fn();
     render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} onStartAuth={onStartAuth} simplicateMode />);
-    fireEvent.click(screen.getByRole('button', { name: /start auth/i }));
+    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: /start auth/i }));
     expect(onStartAuth).toHaveBeenCalled();
   });
 
@@ -326,13 +328,13 @@ describe('ChatHeader', () => {
 
   // ─── Simplicate mode ──────────────────────────────────────────────────────
 
-  it('renders compact header when Simplicate is off with settings gear and no inline search', () => {
+  it('renders compact header when Simplicate is on with settings gear and no inline search', () => {
     render(
       <ChatHeader
         {...DEFAULT_PROPS}
         agentProviderLabel="Claude"
         currentModel="haiku"
-        simplicateMode={false}
+        simplicateMode
       />,
     );
 
@@ -349,7 +351,7 @@ describe('ChatHeader', () => {
         <ChatHeader
           {...DEFAULT_PROPS}
           {...PLAYGROUND_PROPS}
-          simplicateMode={false}
+          simplicateMode
           onToggleTonyStarkMode={vi.fn()}
           onOpenFileBrowser={vi.fn()}
           onToggleTerminal={vi.fn()}
@@ -370,7 +372,7 @@ describe('ChatHeader', () => {
     expect(screen.getByRole('menuitem', { name: /terminal/i })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /commands/i })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /files/i })).toBeTruthy();
-    expect(screen.getByRole('switch', { name: /simplicate/i }).getAttribute('aria-checked')).toBe('false');
+    expect(screen.getByRole('switch', { name: /simplicate/i }).getAttribute('aria-checked')).toBe('true');
     expect(screen.getByText(/9\/9\/0 · 3k in \/ 1\.2k out · 22s/i)).toBeTruthy();
     expect(screen.getByPlaceholderText(/search in conversation/i)).toBeTruthy();
   });
@@ -382,7 +384,7 @@ describe('ChatHeader', () => {
     render(
       <ChatHeader
         {...DEFAULT_PROPS}
-        simplicateMode={false}
+        simplicateMode
         onToggleTerminal={onToggleTerminal}
         onOpenFileBrowser={onOpenFileBrowser}
         onSimplicateModeChange={onSimplicateModeChange}
@@ -399,7 +401,7 @@ describe('ChatHeader', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
     fireEvent.click(screen.getByRole('switch', { name: /simplicate/i }));
-    expect(onSimplicateModeChange).toHaveBeenCalledWith(true);
+    expect(onSimplicateModeChange).toHaveBeenCalledWith(false);
   });
 
   it('opens provider/model dropdown from standard header with model and effort controls', () => {

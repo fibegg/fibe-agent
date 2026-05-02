@@ -1,5 +1,6 @@
 import { FolderOpen, Cpu } from 'lucide-react';
 import { CountUpNumber } from '../count-up-number';
+import { useT, type TranslationKey } from '../i18n';
 
 export type FileTab = 'playground' | 'agent';
 
@@ -15,9 +16,9 @@ interface FileExplorerTabsProps {
   agentStats?: TabStats;
 }
 
-const TABS: { id: FileTab; label: string; Icon: typeof FolderOpen }[] = [
-  { id: 'playground', label: 'Playground', Icon: FolderOpen },
-  { id: 'agent', label: 'AI', Icon: Cpu },
+const TABS: { id: FileTab; labelKey: TranslationKey; Icon: typeof FolderOpen }[] = [
+  { id: 'playground', labelKey: 'fileExplorer.playgroundTab', Icon: FolderOpen },
+  { id: 'agent', labelKey: 'fileExplorer.aiTab', Icon: Cpu },
 ];
 
 export function FileExplorerTabs({
@@ -26,6 +27,7 @@ export function FileExplorerTabs({
   playgroundStats,
   agentStats,
 }: FileExplorerTabsProps) {
+  const t = useT();
   const statsMap: Record<FileTab, TabStats | undefined> = {
     playground: playgroundStats,
     agent: agentStats,
@@ -55,7 +57,7 @@ export function FileExplorerTabs({
             role="tab"
           >
             <tab.Icon className="size-3.5 shrink-0" />
-            <span>{tab.label}</span>
+            <span>{t(tab.labelKey)}</span>
             {hasStats && (
               <span className={`text-[9px] font-medium tabular-nums ${isActive ? 'text-muted-foreground' : 'text-muted-foreground/60'}`}>
                 <CountUpNumber value={s.fileCount} format="raw" />

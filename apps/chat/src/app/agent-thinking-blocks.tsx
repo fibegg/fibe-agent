@@ -26,6 +26,8 @@ import {
   FLEX_ROW_CENTER,
   FLEX_ROW_CENTER_WRAP,
 } from './ui-classes';
+import { useT, type TranslationKey } from './i18n';
+import { translate } from './i18n';
 
 export type { StoryEntry } from './agent-thinking-utils';
 
@@ -34,6 +36,17 @@ export type SessionActivityEntry = {
   created_at: string;
   story: StoryEntry[];
 };
+
+function localizedActivityLabel(type: string, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+  if (type === 'stream_start') return t('activity.started');
+  if (type === 'reasoning_start' || type === 'reasoning_end' || type === 'reasoning') return t('activity.reasoning');
+  if (type === 'step') return t('activity.step');
+  if (type === 'file_created') return t('activity.file');
+  if (type === 'tool_call') return t('activity.command');
+  if (type === 'task_complete') return t('activity.complete');
+  if (type === 'info') return t('activity.info');
+  return t('activity.activity');
+}
 
 const COMMAND_GROUP_MIN = 3;
 export type StoryEntryWithActivityId = StoryEntry & { _activityId?: string };
@@ -80,16 +93,16 @@ export function commandLabel(entry: StoryEntry): string {
 export function activityHoverContent(item: DisplayItem): string {
   if (item.kind === 'command_group') {
     const labels = item.entries.map((e) => commandLabel(e)).filter(Boolean);
-    if (labels.length === 0) return 'Commands';
+    if (labels.length === 0) return translate('header.commands');
     return labels.map((l) => `$ ${l}`).join('\n');
   }
   const e = item.entry;
-  if (e.type === 'tool_call') return `$ ${commandLabel(e) || 'Command'}`;
-  if (e.type === 'file_created') return e.path ?? e.message ?? 'File';
-  if (e.type === 'reasoning_start' || e.type === 'reasoning_end') return (e.details ?? '').trim() || 'Reasoning';
-  if (e.type === 'stream_start') return 'Started';
-  if (e.type === 'step') return e.message || e.details || 'Step';
-  if (e.type === 'task_complete') return 'Task complete';
+  if (e.type === 'tool_call') return `$ ${commandLabel(e) || translate('activity.command')}`;
+  if (e.type === 'file_created') return e.path ?? e.message ?? translate('activity.file');
+  if (e.type === 'reasoning_start' || e.type === 'reasoning_end') return (e.details ?? '').trim() || translate('activity.reasoning');
+  if (e.type === 'stream_start') return translate('activity.started');
+  if (e.type === 'step') return e.message || e.details || translate('activity.step');
+  if (e.type === 'task_complete') return translate('activity.taskComplete');
   return e.message || e.details || getActivityLabel(e.type);
 }
 
@@ -161,8 +174,9 @@ export const ActivityBlock = memo(function ActivityBlock({
   lastStreamStartId?: string | null;
   isInCurrentRun?: boolean;
 }) {
+  const t = useT();
   const Icon = getActivityIcon(entry.type);
-  const label = getActivityLabel(entry.type);
+  const label = localizedActivityLabel(entry.type, t);
   const variant = getBlockVariant(entry);
   const isCommandBlock = entry.type === 'tool_call' && entry.command;
   const isThinkingBlock =
@@ -218,8 +232,8 @@ export const ActivityBlock = memo(function ActivityBlock({
               />
             </span>
           ) : isStreamStartThinking ? (
-            <p className={`${ACTIVITY_LABEL} truncate`} title="Thinking...">
-              Thinking...
+            <p className={`${ACTIVITY_LABEL} truncate`} title={t('activity.thinking')}>
+              {t('activity.thinking')}
             </p>
           ) : (
             <p className={`${ACTIVITY_LABEL} truncate`} title={singleRowText}>
@@ -278,6 +292,7 @@ export const CommandGroupBlock = memo(function CommandGroupBlock({
   activityId?: string;
   onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
 }) {
+  const t = useT();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const n = entries.length;
   const isClickable = !!(activityId && onActivityClick);
@@ -300,7 +315,7 @@ export const CommandGroupBlock = memo(function CommandGroupBlock({
           )}
           <Terminal className="size-4 shrink-0 text-amber-500" />
           <p className={ACTIVITY_LABEL}>
-            {n} command{n !== 1 ? 's' : ''}
+            {t('activity.commandsCount', { count: n })}
           </p>
         </div>
         <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(entries[0].timestamp)}</span>

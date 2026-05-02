@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { GitCompareArrows, RefreshCw, FileText, FilePlus, FileMinus, FileQuestion } from 'lucide-react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
+import { useT, type TranslationKey } from '../i18n';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -23,11 +24,11 @@ interface DiffResult {
 /** Returns a human-readable label + colour token for a status letter pair. */
 function fileStatusInfo(index: string, worktree: string) {
   const combined = `${index}${worktree}`.replace(/ /g, '');
-  if (combined.includes('?')) return { label: 'untracked', color: 'text-amber-400', Icon: FileQuestion };
-  if (combined.includes('A')) return { label: 'added',     color: 'text-emerald-400', Icon: FilePlus };
-  if (combined.includes('D')) return { label: 'deleted',   color: 'text-red-400',     Icon: FileMinus };
-  if (combined.includes('R')) return { label: 'renamed',   color: 'text-blue-400',    Icon: FileText };
-  return                                { label: 'modified', color: 'text-violet-400',  Icon: FileText };
+  if (combined.includes('?')) return { labelKey: 'diff.status.untracked' as const, color: 'text-amber-400', Icon: FileQuestion };
+  if (combined.includes('A')) return { labelKey: 'diff.status.added' as const,     color: 'text-emerald-400', Icon: FilePlus };
+  if (combined.includes('D')) return { labelKey: 'diff.status.deleted' as const,   color: 'text-red-400',     Icon: FileMinus };
+  if (combined.includes('R')) return { labelKey: 'diff.status.renamed' as const,   color: 'text-blue-400',    Icon: FileText };
+  return                                { labelKey: 'diff.status.modified' as const, color: 'text-violet-400',  Icon: FileText };
 }
 
 /**
@@ -84,6 +85,7 @@ const POLL_MS = 5000;
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export function DiffPanel() {
+  const t = useT();
   const [result, setResult] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -102,11 +104,11 @@ export function DiffPanel() {
       setResult(data);
     } catch (e) {
       if ((e as Error).name === 'AbortError') return;
-      setError(e instanceof Error ? e.message : 'Failed to load diff');
+      setError(e instanceof Error ? e.message : t('diff.failedLoad'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   // Initial fetch
   useEffect(() => {
@@ -133,7 +135,7 @@ export function DiffPanel() {
           </span>
           {result && (
             <span className="text-[10px] text-muted-foreground/40">
-              · {result.files.length} file{result.files.length !== 1 ? 's' : ''} changed
+              · {t('diff.filesChanged', { count: result.files.length })}
             </span>
           )}
         </div>
@@ -142,11 +144,11 @@ export function DiffPanel() {
           onClick={() => { void fetchDiff(); }}
           disabled={loading}
           className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
-          aria-label="Refresh diff"
-          title="Refresh"
+          aria-label={t('diff.refreshDiff')}
+          title={t('diff.refresh')}
         >
           <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} aria-hidden />
-          <span>Refresh</span>
+          <span>{t('diff.refresh')}</span>
         </button>
       </div>
 
@@ -154,7 +156,7 @@ export function DiffPanel() {
       {!loading && result && !result.isGitRepo && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground/50 px-6 text-center">
           <GitCompareArrows className="size-8 opacity-30" />
-          <p className="text-xs">Playground is not inside a git repository.</p>
+          <p className="text-xs">{t('diff.notGitRepo')}</p>
         </div>
       )}
 
@@ -169,7 +171,7 @@ export function DiffPanel() {
       {!loading && !error && result?.isGitRepo && !result.hasDiff && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground/40 px-6 text-center">
           <GitCompareArrows className="size-8 opacity-20" />
-          <p className="text-xs">No changes — working tree is clean.</p>
+          <p className="text-xs">{t('diff.noChanges')}</p>
         </div>
       )}
 
@@ -177,7 +179,8 @@ export function DiffPanel() {
       {result?.files && result.files.length > 0 && (
         <div className="shrink-0 border-b border-violet-500/10 bg-[#0d0d14]/80 px-3 py-1.5 flex flex-col gap-0.5 max-h-36 overflow-y-auto">
           {result.files.map((f) => {
-            const { label, color, Icon } = fileStatusInfo(f.index, f.worktree);
+            const { labelKey, color, Icon } = fileStatusInfo(f.index, f.worktree);
+            const label = t(labelKey satisfies TranslationKey);
             return (
               <div key={f.path} className="flex items-center gap-2 min-w-0">
                 <Icon className={`size-3 shrink-0 ${color}`} aria-hidden />

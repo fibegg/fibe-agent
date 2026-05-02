@@ -3,6 +3,8 @@ import { ThemeToggle } from './theme-toggle';
 import { shouldHideThemeSwitch } from './embed-config';
 import { MODAL_CARD, MODAL_OVERLAY_DARK, SETTINGS_CLOSE_BUTTON } from './ui-classes';
 import { ActivityTypeFilters } from './activity-type-filters';
+import { LocaleSelector } from './locale-selector';
+import { useT } from './i18n';
 
 export interface ActivitySettingsModalProps {
   open: boolean;
@@ -12,6 +14,7 @@ export interface ActivitySettingsModalProps {
 }
 
 export function ActivitySettingsModal({ open, onClose, typeFilter, onTypeFilterChange }: ActivitySettingsModalProps) {
+  const t = useT();
   if (!open) return null;
 
   return (
@@ -26,13 +29,13 @@ export function ActivitySettingsModal({ open, onClose, typeFilter, onTypeFilterC
       >
         <div className="flex items-center justify-between p-4 border-b border-border/50">
           <h2 id="activity-settings-dialog-title" className="text-lg font-semibold text-foreground">
-            Settings
+            {t('settings.title')}
           </h2>
           <button
             type="button"
             onClick={onClose}
             className={SETTINGS_CLOSE_BUTTON}
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X className="size-4" />
           </button>
@@ -40,7 +43,7 @@ export function ActivitySettingsModal({ open, onClose, typeFilter, onTypeFilterC
         <div className="p-4 space-y-3">
           {onTypeFilterChange && (
             <div className="space-y-2">
-              <span className="text-sm font-medium text-foreground">Activity Filter</span>
+              <span className="text-sm font-medium text-foreground">{t('settings.activityFilter')}</span>
               <ActivityTypeFilters
                 typeFilter={typeFilter ?? []}
                 onTypeFilterChange={onTypeFilterChange}
@@ -49,10 +52,11 @@ export function ActivitySettingsModal({ open, onClose, typeFilter, onTypeFilterC
           )}
           {!shouldHideThemeSwitch() && (
             <div className="flex items-center justify-between py-2">
-              <span className="text-sm font-medium text-foreground">Dark mode</span>
+              <span className="text-sm font-medium text-foreground">{t('theme.darkMode')}</span>
               <ThemeToggle />
             </div>
           )}
+          <LocaleSelector variant="row" />
           <p className="text-xs text-muted-foreground pt-2">v{__APP_VERSION__}</p>
         </div>
       </div>

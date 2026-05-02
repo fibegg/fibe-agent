@@ -30,18 +30,13 @@ import { SidebarStatsBar } from './sidebar-stats-bar';
 import { SidebarReasoningPanel } from './sidebar-reasoning-panel';
 import { SidebarActivityTooltip } from './sidebar-activity-tooltip';
 import { PanelResizeHandle } from './panel-resize-handle';
+import { useT } from './i18n';
 export type { StoryEntry, SessionActivityEntry } from './agent-thinking-blocks';
 
 const ACTIVITY_ESTIMATE_HEIGHT = 32;
 const ACTIVITY_GAP = 8;
 const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
 const REASONING_MAX_HEIGHT_RATIO = 0.75;
-
-const STAT_TOOLTIPS = {
-  total: 'Total actions',
-  completed: 'Completed',
-  processing: 'Processing',
-} as const;
 
 const ACTIVITY_DOT_COLOR: Record<string, string> = {
   stream_start: 'bg-blue-500',
@@ -114,6 +109,12 @@ export function AgentThinkingSidebar({
   onResizeStart,
   onActivityClick,
 }: AgentThinkingSidebarProps) {
+  const t = useT();
+  const statTooltips = {
+    total: t('header.totalActions'),
+    completed: t('header.completed'),
+    processing: t('header.processing'),
+  } as const;
   const latestActivityId =
     sessionActivity.length > 0 ? sessionActivity[sessionActivity.length - 1].id : undefined;
   const thinkingScrollRef = useRef<HTMLDivElement>(null);
@@ -298,12 +299,12 @@ export function AgentThinkingSidebar({
         ...(isDraggingResize ? { transition: 'none' } : {}),
       }}
     >
-      <SidebarToggle
+        <SidebarToggle
         isCollapsed={isCollapsed}
         onClick={onToggle}
         side="right"
         ariaLabel={
-          isCollapsed ? 'Expand thinking panel' : 'Collapse thinking panel'
+          isCollapsed ? t('activity.expandThinking') : t('activity.collapseThinking')
         }
       />
       {!isCollapsed && !mobileOverlay && onResizeStart && (
@@ -351,16 +352,16 @@ export function AgentThinkingSidebar({
                 type="text"
                 value={activitySearchQuery}
                 onChange={(e) => setActivitySearchQuery(e.target.value)}
-                placeholder="Search activity..."
+                placeholder={t('activity.searchActivity')}
                 className={INPUT_SEARCH}
-                aria-label="Search activity"
+                aria-label={t('activity.searchActivity')}
               />
               {activitySearchQuery ? (
                 <button
                   type="button"
                   onClick={() => setActivitySearchQuery('')}
                   className={CLEAR_BUTTON_POSITION}
-                  aria-label="Clear search"
+                  aria-label={t('header.clearSearch')}
                 >
                   <X className="size-3.5" />
                 </button>
@@ -373,7 +374,7 @@ export function AgentThinkingSidebar({
             onClick={() => void runCopyWithAnimation()}
             disabled={downloadAnimating}
             className="flex flex-col items-center gap-1.5 w-full rounded-md hover:bg-muted/50 transition-colors cursor-pointer border-0 bg-transparent p-0"
-            aria-label="Copy activity to clipboard"
+            aria-label={t('activity.copyToClipboard')}
           >
             <div className="relative shrink-0" style={{ display: 'none' }}>
               <Brain className={`size-5 ${brainClasses.brain} transition-colors`} />
@@ -389,15 +390,15 @@ export function AgentThinkingSidebar({
             </div>
             <div
               className="grid grid-cols-1 gap-px text-[10px] font-medium tabular-nums text-center text-muted-foreground [&>*]:bg-muted/30 [&>*]:rounded [&>*]:py-0.5 [&>*]:min-w-0"
-              aria-label="Total / Completed / Processing"
+              aria-label={t('activity.totalCompletedProcessing')}
             >
-              <span key={`total-${sessionStats.totalActions}`} className="text-foreground stat-tick" title={STAT_TOOLTIPS.total}>
+              <span key={`total-${sessionStats.totalActions}`} className="text-foreground stat-tick" title={statTooltips.total}>
                 {sessionStats.totalActions}
               </span>
-              <span key={`completed-${sessionStats.completed}`} className="text-emerald-400 stat-tick" title={STAT_TOOLTIPS.completed}>
+              <span key={`completed-${sessionStats.completed}`} className="text-emerald-400 stat-tick" title={statTooltips.completed}>
                 {sessionStats.completed}
               </span>
-              <span key={`processing-${sessionStats.processing}`} className="text-cyan-400 stat-tick" title={STAT_TOOLTIPS.processing}>
+              <span key={`processing-${sessionStats.processing}`} className="text-cyan-400 stat-tick" title={statTooltips.processing}>
                 {sessionStats.processing}
               </span>
             </div>
@@ -408,12 +409,12 @@ export function AgentThinkingSidebar({
       {isCollapsed && displayList.length > 0 && (() => {
         const taskCompleteEntry: DisplayItem = {
           kind: 'entry',
-          entry: { id: 'task-complete', type: 'task_complete', message: 'Task complete', timestamp: '' },
+          entry: { id: 'task-complete', type: 'task_complete', message: t('activity.taskComplete'), timestamp: '' },
         };
         const collapsedChainList =
           !isStreaming && displayList.length > 0 ? [...displayList, taskCompleteEntry] : displayList;
         return (
-        <div className="flex-1 min-h-0 overflow-y-auto min-w-0" aria-label="Activity summary">
+        <div className="flex-1 min-h-0 overflow-y-auto min-w-0" aria-label={t('activity.summary')}>
           <div className="p-3 flex flex-col items-center gap-0">
           {collapsedChainList.map((item, i) => {
             const variant = item.kind === 'entry' ? getBlockVariant(item.entry) : 'tool_call';
@@ -467,14 +468,14 @@ export function AgentThinkingSidebar({
               !displayThinkingText &&
               !isStreaming && (
                 <p className="py-2 text-xs text-muted-foreground">
-                  Activity will appear here when the agent responds.
+                  {t('activity.empty')}
                 </p>
               )}
             {filteredStoryItems.length === 0 &&
               fullStoryItems.length > 0 &&
               activitySearchQuery.trim() && (
                 <p className="py-2 text-xs text-muted-foreground">
-                  No activity matches &quot;{activitySearchQuery.trim()}&quot;.
+                  {t('activity.noMatchesQuery', { query: activitySearchQuery.trim() })}
                 </p>
               )}
             {displayList.length > 0 && virtualItems ? (
@@ -557,9 +558,9 @@ export function AgentThinkingSidebar({
               >
                 <div className={`${FLEX_ROW_CENTER} min-w-0 flex-1 truncate`}>
                   <CheckCircle2 className="size-4 shrink-0 text-green-500" />
-                  <p className={`${ACTIVITY_LABEL} truncate`}>Task complete</p>
+                  <p className={`${ACTIVITY_LABEL} truncate`}>{t('activity.taskComplete')}</p>
                 </div>
-                <span className={ACTIVITY_TIMESTAMP}>just now</span>
+                <span className={ACTIVITY_TIMESTAMP}>{t('activity.justNow')}</span>
               </div>
             )}
             <div ref={activityEndRef} className="h-0 shrink-0" aria-hidden />

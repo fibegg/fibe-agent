@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getStoredTheme, isDark, toggleTheme as doToggle } from './theme';
 import { BUTTON_ICON_ACCENT_SM } from './ui-classes';
+import { useT } from './i18n';
 
 export function ThemeToggle() {
+  const t = useT();
   const [dark, setDark] = useState(
     () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
   );
@@ -28,7 +30,7 @@ export function ThemeToggle() {
       type="button"
       onClick={handleClick}
       className={BUTTON_ICON_ACCENT_SM}
-      aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={dark ? t('theme.light') : t('theme.dark')}
     >
       {dark ? (
         <SunIcon className="size-3.5 sm:size-4" />

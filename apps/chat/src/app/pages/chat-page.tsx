@@ -26,7 +26,7 @@ import { API_PATHS } from '@shared/api-paths';
 import type { FileTab } from '../file-explorer/file-explorer-tabs';
 import { ChatLeftPanel } from './chat-left-panel';
 import { ChatRightPanel } from './chat-right-panel';
-import { CHAT_STATES, getChatInputPlaceholder } from '../chat/chat-state';
+import { CHAT_STATES, getChatInputPlaceholderWithT } from '../chat/chat-state';
 import type { ServerMessage } from '../chat/chat-state';
 import { apiRequest, isAuthenticated, isChatModelLocked } from '../api-url';
 import { consumeGreeting } from '../postmessage-greeting';
@@ -64,12 +64,11 @@ import {
 } from '../chat/components/local-tool-cards';
 import { CliDrawerContent } from '../chat/components/cli-drawer';
 import { Command } from 'lucide-react';
+import { useT } from '../i18n';
 
 const LazyFileViewerPanel = lazy(() => import('../file-explorer/file-viewer-panel').then((m) => ({ default: m.FileViewerPanel })));
 const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel })));
 const LazyDiffPanel = lazy(() => import('../diff/diff-panel').then((m) => ({ default: m.DiffPanel })));
-
-const NO_OUTPUT_MESSAGE = 'Process completed successfully but returned no output.';
 
 interface RuntimeConfigResponse {
   agentProviderLabel?: string | null;
@@ -89,6 +88,7 @@ function readStoredSimplicateMode(): boolean | null {
 }
 
 export function ChatPage() {
+  const t = useT();
   const navigate = useNavigate();
   const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => undefined);
   const handleSendRef = useRef<() => void>(() => undefined);
@@ -135,7 +135,7 @@ export function ChatPage() {
   const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
   const [simplicateMode, setSimplicateMode] = useState(() => readStoredSimplicateMode() ?? false);
   const [compactFileBrowserOpen, setCompactFileBrowserOpen] = useState(false);
-  const compactMode = !simplicateMode;
+  const compactMode = simplicateMode;
   const canShowDiff = playgroundStats.hasGitRepo;
 
   // ─── Local MCP tool state ─────────────────────────────────────────────────
@@ -363,7 +363,7 @@ export function ChatPage() {
 
   const onStreamEndCallback = useCallback(
     (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string, streamModel?: string | null) => {
-      const text = finalText?.trim() || NO_OUTPUT_MESSAGE;
+      const text = finalText?.trim() || t('chat.noOutput');
       const log = activityLogRef.current;
       const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
         id,
@@ -390,7 +390,7 @@ export function ChatPage() {
       setLastSentMessage(null);
       refetchPlaygrounds();
     },
-    [setMessages, refetchPlaygrounds, activityLogRef]
+    [setMessages, refetchPlaygrounds, activityLogRef, t]
   );
 
   const {
@@ -585,15 +585,15 @@ export function ChatPage() {
   const handleSendContinue = useCallback(() => {
     send({
       action: 'send_chat_message',
-      text: 'Continue',
+      text: t('chat.continue'),
     });
     setMessages((prev) => [
       ...prev,
-      { role: 'user', body: 'Continue', created_at: new Date().toISOString(), optimistic: true },
+      { role: 'user', body: t('chat.continue'), created_at: new Date().toISOString(), optimistic: true },
     ]);
-    setLastSentMessage('Continue');
+    setLastSentMessage(t('chat.continue'));
     scroll.markJustSent();
-  }, [send, scroll, setMessages]);
+  }, [send, scroll, setMessages, t]);
 
   const handleRetryFromError = useCallback(() => {
     dismissError();
@@ -725,7 +725,7 @@ export function ChatPage() {
           <RightDrawer
             open={rightSidebarOpen}
             onClose={() => setRightSidebarOpen(false)}
-            title="Activity"
+            title={t('activity.activity')}
           >
             <AgentThinkingSidebar
               isCollapsed={false}
@@ -877,7 +877,7 @@ export function ChatPage() {
                 bothSidebarsCollapsed={
                   !isMobile && (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) && rightSidebarCollapsed
                 }
-                noOutputBody={NO_OUTPUT_MESSAGE}
+                noOutputBody={t('chat.noOutput')}
                 onRetry={handleSendContinue}
               />
               <div ref={scroll.endRef} />
@@ -930,10 +930,10 @@ export function ChatPage() {
               type="button"
               onClick={() => scroll.scrollToBottom('smooth')}
               className="absolute bottom-4 right-4 sm:right-6 md:right-8 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-card/95 border border-border shadow-lg text-sm font-medium text-foreground hover:bg-violet-500/10 hover:border-violet-500/30 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2 focus:ring-offset-background transition-colors"
-              aria-label="Jump to latest messages"
+              aria-label={t('header.jumpLatest')}
             >
               <ChevronDown className="size-4 shrink-0" aria-hidden />
-              <span>Latest</span>
+              <span>{t('header.latest')}</span>
             </button>
           )}
         </div>
@@ -941,14 +941,14 @@ export function ChatPage() {
           <Suspense fallback={
             <div className="absolute inset-0 z-10 flex items-center justify-center bg-background rounded-xl border border-border">
               <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
-              <span className="text-sm text-muted-foreground">Loading editor…</span>
+              <span className="text-sm text-muted-foreground">{t('common.loading')}</span>
             </div>
           }>
             <div
               className="absolute inset-0 z-10 flex flex-col min-h-0 bg-background"
               role="dialog"
               aria-modal="true"
-              aria-label="File viewer"
+              aria-label={t('header.files')}
             >
               <LazyFileViewerPanel
                 entry={viewingFile!}
@@ -968,7 +968,7 @@ export function ChatPage() {
           onCursorChange={(c) => setInputState((prev) => ({ ...prev, cursor: c }))}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          placeholder={getChatInputPlaceholder(state)}
+          placeholder={getChatInputPlaceholderWithT(state, t)}
           chatInputRef={chatInputRef}
           mentionOpen={mentionOpen}
           atMentionQuery={atMention.query}
@@ -994,7 +994,7 @@ export function ChatPage() {
         <RightDrawer
           open={terminalOpen}
           onClose={closeTerminal}
-          title="Shell"
+          title={t('drawer.shell')}
           icon={<TerminalSquare />}
           width="min(90vw, 680px)"
           className="font-mono"
@@ -1002,7 +1002,7 @@ export function ChatPage() {
           <Suspense fallback={
             <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
               <Loader2 className="size-5 animate-spin text-violet-400 mr-2" />
-              <span className="text-sm text-muted-foreground">Starting terminal…</span>
+              <span className="text-sm text-muted-foreground">{t('drawer.startingTerminal')}</span>
             </div>
           }>
             <LazyTerminalPanel />
@@ -1011,7 +1011,7 @@ export function ChatPage() {
         <RightDrawer
           open={canShowDiff && diffOpen}
           onClose={closeDiff}
-          title="Playground Diff"
+          title={t('drawer.playgroundDiff')}
           icon={<GitCompareArrows className="size-4" />}
           width="min(90vw, 720px)"
           className="font-mono"
@@ -1019,7 +1019,7 @@ export function ChatPage() {
           <Suspense fallback={
             <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
               <Loader2 className="size-5 animate-spin text-emerald-400 mr-2" />
-              <span className="text-sm text-muted-foreground">Loading diff…</span>
+              <span className="text-sm text-muted-foreground">{t('drawer.loadingDiff')}</span>
             </div>
           }>
             {diffOpen && <LazyDiffPanel />}
@@ -1028,7 +1028,7 @@ export function ChatPage() {
         <RightDrawer
           open={cliOpen}
           onClose={closeCli}
-          title="Commands"
+          title={t('header.commands')}
           icon={<Command className="size-4" />}
           width="min(90vw, 520px)"
         >

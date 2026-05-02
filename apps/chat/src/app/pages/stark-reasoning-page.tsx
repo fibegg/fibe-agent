@@ -6,6 +6,8 @@ import { commandLabel, highlightText, reasoningBodyWithHighlights } from '../act
 import { useEffect, useRef, useState } from 'react';
 import { CountUpNumber } from '../count-up-number';
 import { getActivityLabel, type StoryEntry } from '../agent-thinking-utils';
+import { LocaleSelector } from '../locale-selector';
+import { useT } from '../i18n';
 
 function StarkArcReactor() {
   return (
@@ -16,6 +18,7 @@ function StarkArcReactor() {
 }
 
 function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQuery: string; index: number }) {
+  const t = useT();
   const isThinkingBlock = story.type === 'reasoning_start' && (story.details ?? '').trim().length > 0;
   const isSingleRow = ['file_created', 'tool_call', 'step'].includes(story.type);
   const label = getActivityLabel(story.type);
@@ -40,7 +43,12 @@ function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQ
           </span>
         </div>
         <div className="flex items-center gap-1.5 opacity-70">
-          <button onClick={() => setIsMinimized(!isMinimized)} className="hover:text-cyan-200 text-cyan-500 transition-colors">
+          <button
+            type="button"
+            onClick={() => setIsMinimized(!isMinimized)}
+            className="hover:text-cyan-200 text-cyan-500 transition-colors"
+            aria-label={isMinimized ? t('stark.maximize') : t('stark.minimize')}
+          >
             {isMinimized ? <Maximize2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
           </button>
           <div className="hover:text-red-400 text-cyan-500 transition-colors cursor-pointer">
@@ -53,7 +61,7 @@ function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQ
         <div className="p-3 overflow-y-auto custom-scrollbar flex-1 min-h-0">
           <div className="flex justify-between items-center mb-2 pb-1 border-b border-cyan-500/20">
             <span className="text-cyan-600 font-mono text-[9px]">{formatRelativeTime(story.timestamp)}</span>
-            {story.type === 'tool_call' && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 rounded">EXEC</span>}
+            {story.type === 'tool_call' && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 rounded">{t('stark.exec')}</span>}
           </div>
 
           {isSingleRow ? (
@@ -84,6 +92,7 @@ function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQ
 }
 
 export function StarkReasoningPage({ inline }: { inline?: boolean }) {
+  const t = useT();
   const { activityId, storyId } = useParams();
   const {
     activityStories,
@@ -127,41 +136,42 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                   <div className="p-1.5 border border-cyan-800 rounded group-hover:border-cyan-400 group-hover:bg-cyan-900/50 transition-all">
                     <ArrowLeft className="w-4 h-4" />
                   </div>
-                  <span className="text-xs tracking-widest uppercase font-bold">TERMINATE</span>
+                  <span className="text-xs tracking-widest uppercase font-bold">{t('stark.terminate')}</span>
                 </Link>
                 <div className="h-4 w-px bg-cyan-800"></div>
               </>
             )}
             <div className="flex flex-col">
               <span className="text-cyan-300 text-[10px] uppercase tracking-[0.2em] font-semibold">
-                TONY STARK MODE
+                {t('stark.mode')}
               </span>
               <span className="text-cyan-600 text-[9px] uppercase tracking-widest">
-                System Active // {activityId ?? 'GLOBAL_MONITOR'}
+                {t('stark.systemActive', { target: activityId ?? t('stark.globalMonitor') })}
               </span>
             </div>
           </div>
           
           <div className="flex items-center gap-6">
             <div className="flex items-center gap-3 bg-cyan-950/50 border border-cyan-800/50 rounded p-1.5 backdrop-blur hidden sm:flex">
-              <span className="text-cyan-500 text-[9px] uppercase tracking-widest ml-1 opacity-70">Query:</span>
+              <span className="text-cyan-500 text-[9px] uppercase tracking-widest ml-1 opacity-70">{t('stark.query')}</span>
               <input 
                 type="text" 
                 value={detailSearchQuery}
                 onChange={e => setDetailSearchQuery(e.target.value)}
-                placeholder="DEFINE PARAMETERS..."
+                placeholder={t('stark.placeholder')}
                 className="bg-transparent border-none text-cyan-300 text-[10px] uppercase font-mono w-40 focus:outline-none placeholder:text-cyan-800"
               />
             </div>
+            <LocaleSelector />
             {brainState === 'working' ? (
               <StarkArcReactor />
             ) : (
               <div className="flex flex-col items-end">
                 <span className="text-emerald-400 text-[10px] tracking-widest uppercase animate-pulse">
-                  Idle // Standby
+                  {t('stark.idle')}
                 </span>
                 <span className="text-cyan-700 text-[9px] tracking-[0.2em] mt-0.5">
-                  <CountUpNumber value={activityStories.length} /> LOGS
+                  <CountUpNumber value={activityStories.length} /> {t('stark.logs')}
                 </span>
               </div>
             )}
@@ -172,7 +182,7 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
           <div className="flex-1 flex flex-col items-center justify-center">
             <StarkArcReactor />
             <span className="text-cyan-500 text-xs font-mono uppercase tracking-[0.3em] mt-6 animate-pulse">
-              INITIALIZING NEURAL NETWORKS...
+              {t('stark.initializing')}
             </span>
           </div>
         ) : (
@@ -186,7 +196,7 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                       <span className="relative inline-flex rounded-full size-2 bg-emerald-500" />
                     </span>
                     <p className="text-emerald-400 text-xs font-mono font-bold tracking-[0.2em] uppercase">
-                      ACTIVE PROCESSING WINDOW
+                      {t('stark.activeProcessing')}
                     </p>
                   </div>
                   <div className="bg-emerald-950/30 p-3 border-l-2 border-emerald-500 max-h-[30vh] overflow-y-auto custom-scrollbar">
