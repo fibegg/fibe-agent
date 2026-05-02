@@ -108,7 +108,7 @@ describe('PlayroomBrowserService', () => {
 
 
 
-    test('runs fibe local-playgrounds link when target exists', async () => {
+    test('runs fibe local playgrounds link when target exists', async () => {
       mkdirSync(join(rootDir, 'playgrounds', 'project'), { recursive: true });
       mockExecFileAsync.mockResolvedValueOnce({ stdout: 'Linked' });
 

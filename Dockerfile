@@ -224,7 +224,7 @@ COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
-    && /usr/local/bin/fibe local-playgrounds --help >/dev/null
+    && /usr/local/bin/fibe local playgrounds --help >/dev/null
 
 FROM runtime-base
 
