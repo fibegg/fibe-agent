@@ -157,6 +157,15 @@ function initFrameLocaleListener(): void {
   scheduleFrameLocaleRequests();
 }
 
+export function resetI18nFrameLocaleForTest(): void {
+  frameLocaleReceived = false;
+  clearFrameLocaleRequestTimers();
+  if (typeof window !== 'undefined' && window.__locale_listener) {
+    window.removeEventListener('message', window.__locale_listener);
+    delete window.__locale_listener;
+  }
+}
+
 const defaultContext: I18nContextValue = {
   locale: getInitialLocale(),
   setLocale: setStoredLocale,

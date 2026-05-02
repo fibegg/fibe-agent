@@ -2,11 +2,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LOCALE_OPTIONS, isSetLocaleMessage, localeLabel, translate } from './i18n';
 
 describe('i18n', () => {
-  afterEach(() => {
-    if (window.__locale_listener) {
-      window.removeEventListener('message', window.__locale_listener);
-      delete window.__locale_listener;
-    }
+  afterEach(async () => {
+    const { resetI18nFrameLocaleForTest } = await import('./i18n');
+    resetI18nFrameLocaleForTest();
     localStorage.clear();
     document.documentElement.lang = '';
     delete window.__FIBE_BOOT_LOCALE__;
