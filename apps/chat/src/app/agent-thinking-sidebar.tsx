@@ -31,6 +31,8 @@ import { SidebarReasoningPanel } from './sidebar-reasoning-panel';
 import { SidebarActivityTooltip } from './sidebar-activity-tooltip';
 import { PanelResizeHandle } from './panel-resize-handle';
 import { useT } from './i18n';
+import { copyTextToClipboard, safeScrollIntoView } from './browser-compat';
+import type { PanelResizeStartEvent } from './use-panel-resize';
 export type { StoryEntry, SessionActivityEntry } from './agent-thinking-blocks';
 
 const ACTIVITY_ESTIMATE_HEIGHT = 32;
@@ -87,7 +89,7 @@ interface AgentThinkingSidebarProps {
   width?: number;
   isDraggingResize?: boolean;
   panelRef?: React.RefObject<HTMLDivElement | null>;
-  onResizeStart?: (e: React.PointerEvent) => void;
+  onResizeStart?: (e: PanelResizeStartEvent) => void;
   onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
 }
 
@@ -196,11 +198,9 @@ export function AgentThinkingSidebar({
       scrolledReasoningOnOpenRef.current = false;
       return;
     }
-    if (typeof thinkingScrollRef.current?.scrollIntoView === 'function') {
-      if (isStreaming || !scrolledReasoningOnOpenRef.current) {
-        thinkingScrollRef.current.scrollIntoView({ behavior: isStreaming ? 'smooth' : 'auto' });
-        scrolledReasoningOnOpenRef.current = true;
-      }
+    if (thinkingScrollRef.current && (isStreaming || !scrolledReasoningOnOpenRef.current)) {
+      safeScrollIntoView(thinkingScrollRef.current, { behavior: isStreaming ? 'smooth' : 'auto' });
+      scrolledReasoningOnOpenRef.current = true;
     }
   }, [isStreaming, displayThinkingText]);
 
@@ -222,8 +222,8 @@ export function AgentThinkingSidebar({
       hasThinking,
       streaming,
     };
-    if (activityGrew && typeof activityEndRef.current?.scrollIntoView === 'function') {
-      activityEndRef.current.scrollIntoView({ behavior: isInitialLoad ? 'auto' : 'smooth' });
+    if (activityGrew) {
+      safeScrollIntoView(activityEndRef.current, { behavior: isInitialLoad ? 'auto' : 'smooth' });
     }
   }, [fullStoryItems.length, sessionActivity.length, displayThinkingText, isStreaming]);
 
@@ -241,9 +241,7 @@ export function AgentThinkingSidebar({
       if (s && s.scrollHeight !== lastScrollHeight) {
         lastScrollHeight = s.scrollHeight;
         const endEl = activityEndRef.current;
-        if (endEl && typeof endEl.scrollIntoView === 'function') {
-          endEl.scrollIntoView({ behavior: 'auto' });
-        }
+        safeScrollIntoView(endEl, { behavior: 'auto' });
       }
       frames++;
       if (frames < 30) {
@@ -280,7 +278,7 @@ export function AgentThinkingSidebar({
     };
     const text = JSON.stringify(payload, null, 2);
     try {
-      await navigator.clipboard.writeText(text);
+      await copyTextToClipboard(text);
     } finally {
       setTimeout(() => setDownloadAnimating(false), 2200);
     }

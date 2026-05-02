@@ -29,6 +29,7 @@ function chatEnvDefine() {
 const devServerPort = envNumber('VITE_PORT', 3100);
 const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true';
 const pollingInterval = envNumber('CHOKIDAR_INTERVAL', 1000);
+const ES2020_BROWSER_TARGETS = ['es2020', 'chrome86', 'edge86', 'firefox90', 'safari15.6'] as const;
 
 export default defineConfig(() => ({
   base: '',
@@ -38,8 +39,14 @@ export default defineConfig(() => ({
   },
   root: import.meta.dirname,
   cacheDir: '../../node_modules/.vite/apps/chat',
+  esbuild: {
+    target: [...ES2020_BROWSER_TARGETS],
+  },
   optimizeDeps: {
     include: ['@huggingface/transformers'],
+    esbuildOptions: {
+      target: [...ES2020_BROWSER_TARGETS],
+    },
   },
   server: {
     port: devServerPort,
@@ -64,6 +71,7 @@ export default defineConfig(() => ({
   //  plugins: [],
   // },
   build: {
+    target: [...ES2020_BROWSER_TARGETS],
     outDir: './dist',
     emptyOutDir: true,
     reportCompressedSize: true,

@@ -3,6 +3,7 @@ import { Check, Copy, Loader2, RefreshCcw } from 'lucide-react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
 import { useT } from '../i18n';
+import { copyTextToClipboard } from '../browser-compat';
 
 interface RawProviderRecord {
   id: string;
@@ -44,11 +45,10 @@ function JsonSection({ title, value }: { title: string; value: string }) {
 
   const copy = async () => {
     if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
+    if (await copyTextToClipboard(value)) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1600);
-    } catch {
+    } else {
       setCopied(false);
     }
   };

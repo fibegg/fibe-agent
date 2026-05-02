@@ -119,8 +119,14 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
         } catch { /* ignore */ }
       }, 50);
     };
-    const ro = new ResizeObserver(doResize);
-    ro.observe(container);
+    const ro = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(doResize);
+    if (ro) {
+      ro.observe(container);
+    } else {
+      window.addEventListener('resize', doResize);
+    }
 
     // On mobile: refit when virtual keyboard appears/disappears
     const vv = window.visualViewport;
@@ -128,7 +134,8 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
 
     return () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
-      ro.disconnect();
+      ro?.disconnect();
+      if (!ro) window.removeEventListener('resize', doResize);
       if (vv) vv.removeEventListener('resize', doResize);
       onDataDisposable.dispose();
       ws.close();

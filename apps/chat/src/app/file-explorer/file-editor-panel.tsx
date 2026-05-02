@@ -24,6 +24,7 @@ import type { PlaygroundEntry } from './file-explorer-types';
 import type { EditorHandle } from './file-editor-cm';
 import { getLanguageLabel } from './file-editor-cm';
 import { useT } from '../i18n';
+import { copyTextToClipboard } from '../browser-compat';
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -249,7 +250,7 @@ export function FileEditorPanel({
   // ── Copy ───────────────────────────────────────────────────────────────────
   const handleCopy = useCallback(() => {
     const content = editorHandleRef.current?.getContent() ?? liveContent;
-    if (content !== null) void navigator.clipboard.writeText(content);
+    if (content !== null) void copyTextToClipboard(content);
   }, [liveContent]);
 
   // ── Download ───────────────────────────────────────────────────────────────

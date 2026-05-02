@@ -13,13 +13,15 @@ export interface UsePanelResizeResult {
   /** React-state width — use for the initial inline style only. */
   width: number;
   isDragging: boolean;
-  startResize: (e: React.PointerEvent) => void;
+  startResize: (e: PanelResizeStartEvent) => void;
   /**
    * Attach this ref to the panel's root DOM element.
    * During drag the hook mutates `style.width` directly — no React re-renders.
    */
   panelRef: React.RefObject<HTMLDivElement | null>;
 }
+
+export type PanelResizeStartEvent = React.PointerEvent | React.MouseEvent | React.TouchEvent;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -42,6 +44,18 @@ function persistWidth(storageKey: string, width: number): void {
   } catch {
     /* ignore */
   }
+}
+
+function clientXFromEvent(event: PanelResizeStartEvent | MouseEvent | PointerEvent | TouchEvent): number | null {
+  if ('touches' in event && event.touches.length > 0) return event.touches[0]?.clientX ?? null;
+  if ('changedTouches' in event && event.changedTouches.length > 0) return event.changedTouches[0]?.clientX ?? null;
+  return 'clientX' in event ? event.clientX : null;
+}
+
+function resizeEventType(event: PanelResizeStartEvent): 'pointer' | 'mouse' | 'touch' {
+  if ('touches' in event) return 'touch';
+  if (typeof window !== 'undefined' && 'PointerEvent' in window) return 'pointer';
+  return 'mouse';
 }
 
 export function usePanelResize({
@@ -67,12 +81,15 @@ export function usePanelResize({
   }, [width]);
 
   const startResize = useCallback(
-    (e: React.PointerEvent) => {
+    (e: PanelResizeStartEvent) => {
       e.preventDefault();
 
-      const startX = e.clientX;
+      const startX = clientXFromEvent(e);
+      if (startX === null) return;
+
       const startWidth = widthRef.current;
       const el = panelRef.current;
+      const eventType = resizeEventType(e);
 
       // Disable transition immediately via inline style — bypasses the CSS class
       if (el) {
@@ -83,8 +100,11 @@ export function usePanelResize({
       // One React state update to disable CSS transitions and show cursor
       setIsDragging(true);
 
-      const onMove = (event: PointerEvent) => {
-        const delta = event.clientX - startX;
+      const onMove = (event: Event) => {
+        const clientX = clientXFromEvent(event as MouseEvent | PointerEvent | TouchEvent);
+        if (clientX === null) return;
+        event.preventDefault();
+        const delta = clientX - startX;
         const next = clamp(
           startWidth + (side === 'left' ? delta : -delta),
           minWidth,
@@ -98,8 +118,9 @@ export function usePanelResize({
         }
       };
 
-      const onUp = (event: PointerEvent) => {
-        const delta = event.clientX - startX;
+      const onUp = (event: Event) => {
+        const clientX = clientXFromEvent(event as MouseEvent | PointerEvent | TouchEvent) ?? startX;
+        const delta = clientX - startX;
         const finalWidth = clamp(
           startWidth + (side === 'left' ? delta : -delta),
           minWidth,
@@ -118,12 +139,30 @@ export function usePanelResize({
         persistWidth(storageKey, finalWidth);
         setIsDragging(false);
 
-        document.removeEventListener('pointermove', onMove);
-        document.removeEventListener('pointerup', onUp);
+        removeDocumentListeners();
       };
 
-      document.addEventListener('pointermove', onMove);
-      document.addEventListener('pointerup', onUp);
+      const removeDocumentListeners = () => {
+        document.removeEventListener('pointermove', onMove);
+        document.removeEventListener('pointerup', onUp);
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.removeEventListener('touchmove', onMove);
+        document.removeEventListener('touchend', onUp);
+        document.removeEventListener('touchcancel', onUp);
+      };
+
+      if (eventType === 'pointer') {
+        document.addEventListener('pointermove', onMove);
+        document.addEventListener('pointerup', onUp);
+      } else if (eventType === 'touch') {
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
+        document.addEventListener('touchcancel', onUp);
+      } else {
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+      }
     },
     [minWidth, maxWidth, storageKey, side]
   );

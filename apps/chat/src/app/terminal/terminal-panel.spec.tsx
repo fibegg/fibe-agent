@@ -195,4 +195,16 @@ describe('TerminalPanel', () => {
     onDataCb?.('ls\r');
     expect(latest().send).not.toHaveBeenCalled();
   });
+
+  it('uses window resize events when ResizeObserver is unavailable', () => {
+    vi.stubGlobal('ResizeObserver', undefined);
+    const addEventListener = vi.spyOn(window, 'addEventListener');
+    const removeEventListener = vi.spyOn(window, 'removeEventListener');
+
+    const { unmount } = render(<TerminalPanel onClose={vi.fn()} />);
+
+    expect(addEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    unmount();
+    expect(removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+  });
 });

@@ -55,6 +55,7 @@ import { MODAL_OVERLAY_DARK, MOBILE_SHEET_PANEL } from '../ui-classes';
 import { useTerminalPanel } from '../terminal/use-terminal-panel';
 import { useDiffPanel } from '../diff/use-diff-panel';
 import { RightDrawer } from '../right-drawer';
+import { makeClientId } from '../browser-compat';
 import {
   QuestionCard,
   ConfirmCard,
@@ -170,7 +171,7 @@ export function ChatPage() {
         ...prev,
         {
           kind: 'image',
-          key: crypto.randomUUID(),
+          key: makeClientId('local-tool-image'),
           url: data.url ?? undefined,
           base64: data.base64 ?? undefined,
           mimeType: data.mimeType,
@@ -180,7 +181,7 @@ export function ChatPage() {
     } else if (data.type === 'notify' && data.message) {
       setToasts((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), message: data.message!, level: data.level ?? 'info' },
+        { id: makeClientId('toast'), message: data.message!, level: data.level ?? 'info' },
       ]);
     }
   }, []);

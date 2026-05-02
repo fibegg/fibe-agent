@@ -3,6 +3,7 @@ import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explor
 import type { FileTab, TabStats } from '../file-explorer/file-explorer-tabs';
 import { SIDEBAR_COLLAPSED_WIDTH_PX } from '../layout-constants';
 import { PanelResizeHandle } from '../panel-resize-handle';
+import type { PanelResizeStartEvent } from '../use-panel-resize';
 
 interface ChatLeftPanelProps {
   hasAnyFiles: boolean;
@@ -19,7 +20,7 @@ interface ChatLeftPanelProps {
   onSettingsClick: () => void;
   onToggleCollapse: () => void;
   onFileSelect: (entry: PlaygroundEntry) => void;
-  onResizeStart: (e: React.PointerEvent) => void;
+  onResizeStart: (e: PanelResizeStartEvent) => void;
   selectedPath: string | null;
   dirtyPaths: Set<string>;
   onPlaygroundUploaded?: () => void;

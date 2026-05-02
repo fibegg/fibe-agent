@@ -4,6 +4,7 @@ import { AgentThinkingSidebar } from '../agent-thinking-sidebar';
 import { getActivityPath } from '../activity-path';
 import type { StoryEntry, SessionActivityEntry } from '../agent-thinking-blocks';
 import type { ThinkingStep } from '../chat/thinking-types';
+import type { PanelResizeStartEvent } from '../use-panel-resize';
 
 interface ChatRightPanelProps {
   rightSidebarCollapsed: boolean;
@@ -19,7 +20,7 @@ interface ChatRightPanelProps {
   width: number;
   isDraggingResize?: boolean;
   panelRef: React.RefObject<HTMLDivElement | null>;
-  onResizeStart: (e: React.PointerEvent) => void;
+  onResizeStart: (e: PanelResizeStartEvent) => void;
 }
 
 export const ChatRightPanel = memo(function ChatRightPanel({

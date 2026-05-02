@@ -33,6 +33,7 @@ import {
 } from './ui-classes';
 import { MAIN_CONTENT_MIN_WIDTH_PX, PANEL_HEADER_MIN_HEIGHT_PX } from './layout-constants';
 import { useT, type TranslationKey } from './i18n';
+import { safeScrollIntoView } from './browser-compat';
 
 function localizedActivityLabel(type: string, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
   if (type === 'stream_start') return t('activity.started');
@@ -351,7 +352,7 @@ export function ActivityStoryDetailPanel({
   // When following, scroll latest-response block into view whenever the text updates
   useEffect(() => {
     if (!isFollowing || !liveResponseText) return;
-    liveResponseRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    safeScrollIntoView(liveResponseRef.current, { behavior: 'smooth', block: 'nearest' });
   }, [isFollowing, liveResponseText]);
   return (
     <main

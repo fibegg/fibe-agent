@@ -5,6 +5,7 @@ import { API_PATHS } from '@shared/api-paths';
 import { filterVisibleStoryItems, getActivityLabel, type StoryEntry } from './agent-thinking-utils';
 import { getCopyableActivityText } from './activity-review-utils';
 import { usePersistedTypeFilter } from './use-persisted-type-filter';
+import { copyTextToClipboard } from './browser-compat';
 
 const ACTIVITY_POLL_INTERVAL_MS = 4000;
 // How long to hold 'complete' (emerald) state before going back to idle — same as chat sidebar
@@ -247,14 +248,15 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     setCopyAnimating(true);
     const text = getCopyableActivityText(storyItems);
     try {
-      await navigator.clipboard.writeText(text);
-      const rect = brainButtonRef.current?.getBoundingClientRect();
-      if (rect) {
-        setCopyTooltipAnchor({ centerX: rect.left + rect.width / 2, bottom: rect.bottom });
+      if (await copyTextToClipboard(text)) {
+        const rect = brainButtonRef.current?.getBoundingClientRect();
+        if (rect) {
+          setCopyTooltipAnchor({ centerX: rect.left + rect.width / 2, bottom: rect.bottom });
+        }
+        setTimeout(() => {
+          setCopyTooltipAnchor(null);
+        }, 2500);
       }
-      setTimeout(() => {
-        setCopyTooltipAnchor(null);
-      }, 2500);
     } finally {
       setTimeout(() => setCopyAnimating(false), 2200);
     }

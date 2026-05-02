@@ -37,6 +37,7 @@ import { renderMarkdown } from './markdown-cache';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
 import { estimateMessageHeight, estimateStreamingHeight, computeTightBubbleWidth } from './pretext-height';
 import { useI18n } from '../i18n';
+import { copyTextToClipboard } from '../browser-compat';
 
 let prismLoaderPromise: Promise<typeof import('../file-explorer/prism-loader')> | null = null;
 
@@ -129,12 +130,11 @@ function CopyRawMessageButton({
 
   const handleClick = useCallback(async () => {
     if (!rawText) return;
-    try {
-      await navigator.clipboard.writeText(rawText);
+    if (await copyTextToClipboard(rawText)) {
       setCopied(true);
       clearTimer();
       timeoutRef.current = setTimeout(() => setCopied(false), COPY_SUCCESS_FEEDBACK_MS);
-    } catch {
+    } else {
       setCopied(false);
     }
   }, [rawText, clearTimer]);

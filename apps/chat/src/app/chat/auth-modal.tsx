@@ -7,6 +7,7 @@ import {
   MODAL_OVERLAY_CENTER,
 } from '../ui-classes';
 import { useT } from '../i18n';
+import { copyTextToClipboard } from '../browser-compat';
 
 interface AuthModalProps {
   open: boolean;
@@ -53,11 +54,10 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   const handleCopyDeviceCode = async () => {
     const text = authModal.deviceCode ?? '';
     if (!text) return;
-    try {
-      await navigator.clipboard.writeText(text);
+    if (await copyTextToClipboard(text)) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch { /* clipboard unavailable */ }
+    }
   };
 
   return (

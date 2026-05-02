@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { safeScrollIntoView } from '../browser-compat';
 
 export const SCROLL_AT_BOTTOM_THRESHOLD_PX = 80;
 
@@ -35,7 +36,7 @@ export function useScrollToBottom(whenToScroll: unknown) {
   }, []);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
-    endRef.current?.scrollIntoView({ behavior });
+    safeScrollIntoView(endRef.current, { behavior });
     userWasAtBottomRef.current = true;
     setIsAtBottom(true);
   }, []);
@@ -46,7 +47,7 @@ export function useScrollToBottom(whenToScroll: unknown) {
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (cancelled) return;
-        endRef.current?.scrollIntoView({ behavior: 'smooth' });
+        safeScrollIntoView(endRef.current, { behavior: 'smooth' });
         userJustSentRef.current = false;
         userWasAtBottomRef.current = true;
         setIsAtBottom(true);

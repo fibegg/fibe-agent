@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { FileIcon } from '../file-icon';
 import type { PlaygroundEntryItem } from './use-playground-files';
 import { useT } from '../i18n';
+import { safeScrollIntoView } from '../browser-compat';
 
 const MAX_VISIBLE = 8;
 
@@ -57,7 +58,7 @@ export function FileMentionDropdown({
     const el = listRef.current;
     if (!el) return;
     const child = el.children[highlightIndex] as HTMLElement | undefined;
-    child?.scrollIntoView({ block: 'nearest' });
+    safeScrollIntoView(child, { block: 'nearest' });
   }, [highlightIndex, open]);
 
   useEffect(() => {

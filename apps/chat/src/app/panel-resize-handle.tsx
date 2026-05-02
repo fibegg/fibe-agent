@@ -1,10 +1,14 @@
-import type { PointerEvent as ReactPointerEvent } from 'react';
+import type { PanelResizeStartEvent } from './use-panel-resize';
 
 interface PanelResizeHandleProps {
   side: 'left' | 'right';
   isDragging?: boolean;
-  onPointerDown: (e: ReactPointerEvent<HTMLDivElement>) => void;
+  onPointerDown: (e: PanelResizeStartEvent) => void;
   ariaLabel?: string;
+}
+
+function supportsPointerEvents(): boolean {
+  return typeof window !== 'undefined' && 'PointerEvent' in window;
 }
 
 /**
@@ -21,6 +25,10 @@ export function PanelResizeHandle({
   const label =
     ariaLabel ??
     (side === 'left' ? 'Resize left panel' : 'Resize right panel');
+  const handleLegacyResizeStart = (event: PanelResizeStartEvent) => {
+    if (supportsPointerEvents()) return;
+    onPointerDown(event);
+  };
 
   return (
     <div
@@ -28,6 +36,8 @@ export function PanelResizeHandle({
       aria-orientation="vertical"
       aria-label={label}
       onPointerDown={onPointerDown}
+      onMouseDown={handleLegacyResizeStart}
+      onTouchStart={handleLegacyResizeStart}
       data-dragging={isDragging ? 'true' : undefined}
       style={{
         position: 'absolute',

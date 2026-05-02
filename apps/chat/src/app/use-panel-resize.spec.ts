@@ -21,6 +21,15 @@ function makePointerEvent(type: string, clientX: number): Event {
   return new PointerEventStub(type, { clientX });
 }
 
+function makeTouchEvent(type: string, clientX: number): Event {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'touches', {
+    value: type === 'touchend' || type === 'touchcancel' ? [] : [{ clientX }],
+  });
+  Object.defineProperty(event, 'changedTouches', { value: [{ clientX }] });
+  return event;
+}
+
 describe('usePanelResize', () => {
   beforeEach(() => {
     vi.stubGlobal('PointerEvent', PointerEventStub);
@@ -272,5 +281,62 @@ describe('usePanelResize', () => {
         document.dispatchEvent(makePointerEvent('pointermove', 250));
       });
     }).not.toThrow();
+  });
+
+  it('resizes with mouse events when PointerEvent is unavailable', () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+    });
+    const { result } = renderHook(() => usePanelResize(OPTIONS));
+    const el = document.createElement('div');
+    (result.current.panelRef as React.MutableRefObject<HTMLDivElement>).current = el;
+
+    act(() => {
+      result.current.startResize({
+        preventDefault: vi.fn(),
+        clientX: 200,
+      } as unknown as React.MouseEvent);
+    });
+
+    act(() => {
+      document.dispatchEvent(new MouseEvent('mousemove', { clientX: 250 }));
+    });
+    expect(el.style.width).toBe('330px');
+
+    act(() => {
+      document.dispatchEvent(new MouseEvent('mouseup', { clientX: 300 }));
+    });
+    expect(result.current.width).toBe(380);
+  });
+
+  it('resizes with touch events when PointerEvent is unavailable', () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn().mockReturnValue(null),
+      setItem: vi.fn(),
+    });
+    const { result } = renderHook(() => usePanelResize(OPTIONS));
+    const el = document.createElement('div');
+    (result.current.panelRef as React.MutableRefObject<HTMLDivElement>).current = el;
+
+    act(() => {
+      result.current.startResize({
+        preventDefault: vi.fn(),
+        touches: [{ clientX: 200 }],
+        changedTouches: [],
+      } as unknown as React.TouchEvent);
+    });
+
+    act(() => {
+      document.dispatchEvent(makeTouchEvent('touchmove', 250));
+    });
+    expect(el.style.width).toBe('330px');
+
+    act(() => {
+      document.dispatchEvent(makeTouchEvent('touchend', 300));
+    });
+    expect(result.current.width).toBe(380);
   });
 });

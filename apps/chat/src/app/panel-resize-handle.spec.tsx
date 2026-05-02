@@ -1,8 +1,12 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { PanelResizeHandle } from './panel-resize-handle';
 
 describe('PanelResizeHandle', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('renders with role separator and aria-orientation vertical', () => {
     render(
       <PanelResizeHandle side="left" onPointerDown={vi.fn()} />
@@ -34,6 +38,21 @@ describe('PanelResizeHandle', () => {
     render(<PanelResizeHandle side="left" onPointerDown={onPointerDown} />);
     fireEvent.pointerDown(screen.getByRole('separator'));
     expect(onPointerDown).toHaveBeenCalledTimes(1);
+  });
+
+  it('calls resize start on mouse down when PointerEvent is unavailable', () => {
+    const onPointerDown = vi.fn();
+    render(<PanelResizeHandle side="left" onPointerDown={onPointerDown} />);
+    fireEvent.mouseDown(screen.getByRole('separator'));
+    expect(onPointerDown).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores legacy mouse down when PointerEvent is available', () => {
+    vi.stubGlobal('PointerEvent', class PointerEventStub extends MouseEvent {});
+    const onPointerDown = vi.fn();
+    render(<PanelResizeHandle side="left" onPointerDown={onPointerDown} />);
+    fireEvent.mouseDown(screen.getByRole('separator'));
+    expect(onPointerDown).not.toHaveBeenCalled();
   });
 
   it('sets data-dragging attribute when isDragging=true', () => {
