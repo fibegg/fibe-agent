@@ -60,8 +60,8 @@
 # Default: false
 # lockChatModel: true
 
-# Start with Simplicate switched on, using the expanded multi-line chat header.
-# Users can still toggle it from the Settings modal.
+# Start with Simplicate switched on, using the compact chat header.
+# Users can still toggle it from the actions menu.
 # Default: false
 # simplicate: true
 
