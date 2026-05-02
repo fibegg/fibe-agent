@@ -22,6 +22,7 @@ import { EffortStoreService } from './effort-store/effort-store.service';
 import { ModelOptionsController } from './model-options/model-options.controller';
 import { OrchestratorService } from './orchestrator/orchestrator.service';
 import { ChatPromptContextService } from './orchestrator/chat-prompt-context.service';
+import { SessionRegistryService } from './orchestrator/session-registry.service';
 import { StrategyRegistryService } from './strategies/strategy-registry.service';
 import { UploadsController } from './uploads/uploads.controller';
 import { UploadsService } from './uploads/uploads.service';
@@ -88,6 +89,7 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     EffortStoreService,
     StrategyRegistryService,
     OrchestratorService,
+    SessionRegistryService,
     ChatPromptContextService,
     UploadsService,
     PlaygroundsService,
