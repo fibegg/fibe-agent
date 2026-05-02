@@ -408,7 +408,6 @@ export function ChatPage() {
     errorMessage,
     authModal,
     sessionActivity,
-    queuedCount,
     send,
     reconnect,
     startAuth,
@@ -605,18 +604,15 @@ export function ChatPage() {
     handleSendRef.current = handleSend;
   }, [handleSend]);
 
-  // Clear queued badges when queuedCount drops from >0 to 0 (new session started)
-  const prevQueuedCountRef = useRef(0);
+  // Clear queued badges when streaming stops (e.g. session interrupted and restarted)
   useEffect(() => {
-    const wasPositive = prevQueuedCountRef.current > 0;
-    prevQueuedCountRef.current = queuedCount;
-    if (wasPositive && queuedCount === 0) {
+    if (state !== CHAT_STATES.AWAITING_RESPONSE) {
       setMessages((prev) => {
         if (!prev.some((m) => !('kind' in m) && m.queued)) return prev;
         return prev.map((m) => (!('kind' in m) && m.queued ? { ...m, queued: false } : m));
       });
     }
-  }, [queuedCount, setMessages]);
+  }, [state, setMessages]);
 
   const handleVoiceToggle = useCallback(async () => {
     if (voiceRecorderRef.current.isRecording || localSttRef.current.isTranscribing) {
@@ -994,7 +990,6 @@ export function ChatPage() {
           onInterrupt={interruptAgent}
           onVoiceToggle={handleVoiceToggle}
           maxPendingTotal={MAX_PENDING_TOTAL}
-          queuedCount={queuedCount}
         />
         <RightDrawer
           open={terminalOpen}

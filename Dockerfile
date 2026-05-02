@@ -195,7 +195,6 @@ RUN mkdir -p /etc/security/limits.d \
 
 # ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
-    && touch /app/data/STEERING.md \
     && chown -R node:node /app/data /app/playground /home/node/.cache
 
 USER node

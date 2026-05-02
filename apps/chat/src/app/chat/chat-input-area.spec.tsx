@@ -228,17 +228,6 @@ describe('ChatInputArea', () => {
     expect(onVoiceToggle).toHaveBeenCalled();
   });
 
-  it('shows queued badge when queuedCount > 0', () => {
-    render(
-      <ChatInputArea
-        {...BASE_PROPS}
-        state={CHAT_STATES.AWAITING_RESPONSE}
-        inputValue="hello"
-        queuedCount={3}
-      />
-    );
-    expect(screen.getByText('3')).toBeTruthy();
-  });
 
   it('input is disabled when state is not AUTHENTICATED or AWAITING_RESPONSE', () => {
     render(<ChatInputArea {...BASE_PROPS} state={CHAT_STATES.UNAUTHENTICATED} />);

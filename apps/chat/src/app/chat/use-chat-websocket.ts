@@ -29,7 +29,6 @@ export interface UseChatWebSocketResult {
   errorMessage: string | null;
   authModal: AuthModalState;
   sessionActivity: StoredActivityEntry[];
-  queuedCount: number;
   send: (msg: Record<string, unknown>) => void;
   reconnect: () => void;
   startAuth: () => void;
@@ -70,7 +69,6 @@ export function useChatWebSocket(
   const [agentMode, setAgentMode] = useState<string>('Exploring...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
-  const [queuedCount, setQueuedCount] = useState(0);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -264,7 +262,6 @@ export function useChatWebSocket(
       model_updated: (d) => onMessageRef.current?.(d),
       effort_updated: (d) => onMessageRef.current?.(d),
       playground_changed: () => onPlaygroundChangedRef.current?.(),
-      queue_updated: (d) => setQueuedCount(typeof d.count === 'number' ? d.count : 0),
       agent_mode_updated: (d) => {
         if (d.mode) setAgentMode(d.mode);
       },
@@ -373,7 +370,6 @@ export function useChatWebSocket(
     errorMessage,
     authModal,
     sessionActivity,
-    queuedCount,
     send,
     reconnect,
     startAuth,

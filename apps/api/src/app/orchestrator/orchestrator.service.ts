@@ -14,8 +14,6 @@ import {
   type StoredStoryEntry,
 } from '../message-store/message-store.service';
 import { FibeSyncService } from '../fibe-sync/fibe-sync.service';
-
-import { SteeringService } from '../steering/steering.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
@@ -74,7 +72,6 @@ export class OrchestratorService implements OnModuleInit {
     private readonly uploadsService: UploadsService,
     private readonly fibeSync: FibeSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
-    private readonly steering: SteeringService,
     private readonly gemmaRouter: GemmaRouterService,
     private readonly agentModeStore: AgentModeStoreService,
     private readonly localMcp: LocalMcpService,
@@ -106,11 +103,6 @@ export class OrchestratorService implements OnModuleInit {
         }
       }
     }
-
-    // Subscribe to queue count variations from steering service
-    this.steering.count$.subscribe((count) => {
-      this._send(WS_EVENT.QUEUE_UPDATED, { count });
-    });
 
     // Forward local MCP tool WS events (ask_user_prompt, confirm_action_prompt, etc.) to the chat UI
     this.localMcp.outbound$.subscribe((event) => {
@@ -279,7 +271,6 @@ export class OrchestratorService implements OnModuleInit {
     this._send(WS_EVENT.ACTIVITY_SNAPSHOT, {
       activity: this.activityStore.all(),
     });
-    this._send(WS_EVENT.QUEUE_UPDATED, { count: this.steering.count });
     this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
   }
 
@@ -352,7 +343,6 @@ export class OrchestratorService implements OnModuleInit {
       return { accepted: false, error: ERROR_CODE.AGENT_BUSY };
     }
     this.isProcessing = true;
-    await this.steering.resetQueue();
     // count$ handles QUEUE_UPDATED organically but this helps the API send immediately
     const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(text, images, undefined, undefined, attachmentFilenames);
@@ -568,7 +558,6 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
     this.isProcessing = true;
-    await this.steering.resetQueue();
     // the count$ stream will emit QUEUE_UPDATED automatically, but doing it here ensures immediate UI feedback
     const { text: _t, imageUrls, audioFilename, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(
@@ -583,7 +572,6 @@ export class OrchestratorService implements OnModuleInit {
 
   private async handleQueueMessage(text: string): Promise<void> {
     if (!text.trim()) return;
-    await this.steering.enqueue(text);
     const userMessage = this.messageStore.add('user', text);
     await this.messageStore.flush();
     this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);

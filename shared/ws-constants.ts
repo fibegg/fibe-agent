@@ -47,7 +47,6 @@ export const WS_EVENT = {
   ACTIVITY_APPENDED: 'activity_appended',
   ACTIVITY_UPDATED: 'activity_updated',
   PLAYGROUND_CHANGED: 'playground_changed',
-  QUEUE_UPDATED: 'queue_updated',
   AGENT_MODE_UPDATED: 'agent_mode_updated',
   /** Agent is asking the operator a question — display an inline input card. */
   ASK_USER_PROMPT: 'ask_user_prompt',

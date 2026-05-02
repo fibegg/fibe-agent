@@ -583,11 +583,7 @@ describe('useChatWebSocket message handlers', () => {
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'activity_updated', entry: { id: '3', val: 'new' } }) } as MessageEvent));
     expect(result.current.sessionActivity).toEqual([{ id: '2', val: 'updated' }, { id: '3', val: 'new' }]);
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'queue_updated', count: 5 }) } as MessageEvent));
-    expect(result.current.queuedCount).toBe(5);
-    
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'queue_updated', count: null }) } as MessageEvent));
-    expect(result.current.queuedCount).toBe(0);
+    // Removed queue_updated logic
 
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'playground_changed' }) } as MessageEvent));
     expect(onPlaygroundChanged).toHaveBeenCalled();
@@ -762,7 +758,7 @@ describe('useChatWebSocket message handlers', () => {
       messageHandler?.({ data: JSON.stringify({ type: 'file_created', name: 'file' }) } as MessageEvent);
       messageHandler?.({ data: JSON.stringify({ type: 'file_created' }) } as MessageEvent); // branch: d.name ?? ''
       messageHandler?.({ data: JSON.stringify({ type: 'activity_snapshot', activity: [{ id: '1' }] }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'queue_updated' }) } as MessageEvent);
+      // Removed queue_updated test
       messageHandler?.({ data: JSON.stringify({ type: 'stream_end' }) } as MessageEvent);
       messageHandler?.({ data: JSON.stringify({ type: 'activity_appended', entry: { id: '2' } }) } as MessageEvent);
       messageHandler?.({ data: JSON.stringify({ type: 'activity_appended' }) } as MessageEvent); // no entry branch

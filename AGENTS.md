@@ -280,13 +280,7 @@ Provider sessions (e.g. `--continue` for Claude, `--resume` for Gemini, Codex/Op
 
 ## Steering
 
-The **SteeringService** exposes a `STEERING.md` file in `DATA_DIR` that the agent CLI reads during a run. This enables real-time mid-run guidance without interrupting the agent.
-
-- **Enqueue:** queued messages (from `queue_message` WS action) are written as dated list entries into `STEERING.md`.
-- **Reset:** the file is cleared at the start of every new agent run.
-- **File watching:** `SteeringService` watches the file (with a 100ms debounce) and emits `queue_updated` over WebSocket whenever the entry count changes.
-- **Health check:** every 5 seconds, the service verifies the watcher is alive and the file exists (the agent may delete it). It recreates both if needed.
-- **Lock:** writes use a directory-based lock (`STEERING.md.lock`) with a 30-second staleness timeout for crash recovery.
+The agent framework supports **Native Interrupt Steering**. Instead of relying on a file system queue, steering occurs natively per CLI tool. When a user queues a message while the agent is processing, the orchestrator delegates to the agent strategy's `steerAgent()` method, which interrupts the running process via a signal. The strategy then incorporates the interrupted context and pending messages directly into the next prompt or natively via the CLI's resume flags.
 
 ---
 
@@ -695,7 +689,6 @@ flowchart LR
 | `playgrounds` | `app/playgrounds/` | File tree watcher, REST, playroom browser + linker |
 | `uploads` | `app/uploads/` | Multipart upload validation + file serving |
 | `terminal` | `app/terminal/` | `node-pty` shell sessions over `/ws-terminal` |
-| `steering` | `app/steering/` | `STEERING.md` queue, file watcher, lock management |
 | `fibe-sync` | `app/fibe-sync/` | Syncs conversation state to the Fibe platform |
 | `github-token-refresh` | `app/github-token-refresh/` | Refreshes GitHub OAuth tokens for Codex |
 | `init-status` | `app/init-status/` | Tracks `POST_INIT_SCRIPT` execution state |

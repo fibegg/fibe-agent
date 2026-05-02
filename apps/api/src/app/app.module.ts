@@ -35,7 +35,6 @@ import { FibeSyncService } from './fibe-sync/fibe-sync.service';
 import { FibeSyncSettingsController } from './fibe-sync/fibe-sync-settings.controller';
 import { FibeSyncSettingsStoreService } from './fibe-sync/fibe-sync-settings-store.service';
 import { GithubTokenRefreshService } from './github-token-refresh/github-token-refresh.service';
-import { SteeringService } from './steering/steering.service';
 import { AgentFilesController } from './agent-files/agent-files.controller';
 import { AgentFilesService } from './agent-files/agent-files.service';
 import { AgentFilesWatcherService } from './agent-files/agent-files-watcher.service';
@@ -99,7 +98,6 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     FibeSyncService,
     FibeSyncSettingsStoreService,
     GithubTokenRefreshService,
-    SteeringService,
     TerminalService,
     ProviderTrafficStoreService,
     ProxyService,

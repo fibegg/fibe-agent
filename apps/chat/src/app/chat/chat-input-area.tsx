@@ -44,7 +44,6 @@ export interface ChatInputAreaProps {
   onInterrupt: () => void;
   onVoiceToggle: () => void;
   maxPendingTotal: number;
-  queuedCount?: number;
 }
 
 export function ChatInputArea({
@@ -76,7 +75,6 @@ export function ChatInputArea({
   onInterrupt,
   onVoiceToggle,
   maxPendingTotal,
-  queuedCount = 0,
 }: ChatInputAreaProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isWorking = state === CHAT_STATES.AWAITING_RESPONSE;
@@ -243,11 +241,6 @@ export function ChatInputArea({
                 title="Queue message for agent"
               >
                 <Send className="size-3.5 sm:size-4" />
-                {queuedCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-violet-400 text-[10px] font-bold text-white flex items-center justify-center leading-none">
-                    {queuedCount}
-                  </span>
-                )}
               </button>
               <button
                 type="button"

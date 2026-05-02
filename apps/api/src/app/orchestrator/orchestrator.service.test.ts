@@ -11,7 +11,7 @@ import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
-import { SteeringService } from '../steering/steering.service';
+import { ChatPromptContextService } from './chat-prompt-context.service';
 import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import type { LocalMcpService } from '../local-mcp/local-mcp.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
@@ -19,18 +19,18 @@ import { AGENT_MODES } from '@shared/agent-mode.constants';
 
 describe('OrchestratorService', () => {
   let dataDir: string;
-  let lastSteering: SteeringService | undefined;
+  let lastActivityStore: ActivityStoreService | undefined;
   const envBackup = process.env.AGENT_PROVIDER;
 
   beforeEach(() => {
-    lastSteering = undefined;
+    lastActivityStore = undefined;
     dataDir = mkdtempSync(join(tmpdir(), 'orch-'));
     process.env.AGENT_PROVIDER = 'mock';
   });
 
   afterEach(async () => {
     process.env.AGENT_PROVIDER = envBackup;
-    await lastSteering?.awaitPendingWrites();
+    await lastActivityStore?.flush();
     await new Promise((r) => setTimeout(r, 50));
     rmSync(dataDir, { recursive: true, force: true });
   });
@@ -59,6 +59,7 @@ describe('OrchestratorService', () => {
       isFibeHydrateEnabled: () => false,
     };
     const activityStore = new ActivityStoreService(config as never);
+    lastActivityStore = activityStore;
     const messageStore = new MessageStoreService(config as never);
     const modelStore = new ModelStoreService(config as never);
     const effortStore = new EffortStoreService(config as never);
@@ -69,7 +70,7 @@ describe('OrchestratorService', () => {
       syncActivity: (getContent: () => string) => { void getContent(); },
       hydrate: async () => null,
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
-    const chatPromptContext = {
+    const chatContext = {
       buildFullPrompt: async (
         text: string,
         _imageUrls: string[],
@@ -82,9 +83,6 @@ describe('OrchestratorService', () => {
     const gemmaRouter = {
       analyze: async () => ({ action: { type: 'DELEGATE_TO_AGENT', tools: [], confidence: 0 }, skipped: true }),
     } as unknown as GemmaRouterService;
-    const steering = new SteeringService(config as never);
-    lastSteering = steering;
-    steering.onModuleInit();
     const agentModeStore = new AgentModeStoreService(config as never);
     const stub = localMcp ?? makeLocalMcpStub().service;
     const orch = new OrchestratorService(
@@ -96,8 +94,7 @@ describe('OrchestratorService', () => {
       strategyRegistry,
       uploadsService,
       fibeSync,
-      chatPromptContext,
-      steering,
+      chatContext,
       gemmaRouter,
       agentModeStore,
       stub,
@@ -114,20 +111,18 @@ describe('OrchestratorService', () => {
     expect(orch.isProcessing).toBe(false);
   }
 
-  test('handleClientConnected sends auth_status, activity_snapshot, queue_updated, and agent_mode_updated', async () => {
+  test('handleClientConnected sends auth_status, activity_snapshot, and agent_mode_updated', async () => {
     const orch = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     orch.outbound.subscribe((ev) => events.push(ev));
     orch.handleClientConnected();
-    expect(events.length).toBe(4);
+    expect(events.length).toBe(3);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
     expect(events[1].type).toBe(WS_EVENT.ACTIVITY_SNAPSHOT);
     expect(events[1].data.activity).toBeDefined();
-    expect(events[2].type).toBe(WS_EVENT.QUEUE_UPDATED);
-    expect(events[2].data.count).toBeDefined();
-    expect(events[3].type).toBe(WS_EVENT.AGENT_MODE_UPDATED);
-    expect(events[3].data.mode).toBeDefined();
+    expect(events[2].type).toBe(WS_EVENT.AGENT_MODE_UPDATED);
+    expect(events[2].data.mode).toBeDefined();
   });
 
   test('handleClientMessage get_model sends model_updated', async () => {
@@ -299,13 +294,11 @@ describe('OrchestratorService', () => {
     // While processing, send another message — should be queued
     await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'queued msg' });
     await promise;
-    const queueEvents = events.filter((e) => e.type === WS_EVENT.QUEUE_UPDATED);
-    expect(queueEvents.length).toBeGreaterThanOrEqual(1);
     const msgEvents = events.filter((e) => e.type === WS_EVENT.MESSAGE);
     expect(msgEvents.some((e) => (e.data as Record<string, unknown>).body === 'queued msg')).toBe(true);
   });
 
-  test('queue_message action queues and emits message + queue_updated', async () => {
+  test('queue_message action queues and emits message', async () => {
     const orch = await createOrchestrator();
     orch.isAuthenticated = true;
     orch.isProcessing = true;
@@ -313,24 +306,6 @@ describe('OrchestratorService', () => {
     orch.outbound.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage({ action: WS_ACTION.QUEUE_MESSAGE, text: 'steer this way' });
     expect(events.some((e) => e.type === WS_EVENT.MESSAGE)).toBe(true);
-    expect(events.some((e) => e.type === WS_EVENT.QUEUE_UPDATED && (e.data as Record<string, unknown>).count === 1)).toBe(true);
-  });
-
-  test('queue resets when a new streaming session starts', async () => {
-    const orch = await createOrchestrator();
-    orch.isAuthenticated = true;
-    
-    // Enqueue a message to ensure count > 0 before starting a session
-    await orch.handleClientMessage({ action: WS_ACTION.QUEUE_MESSAGE, text: 'go' });
-    
-    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
-    orch.outbound.subscribe((ev) => events.push(ev));
-    
-    await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'go' });
-    
-    // At stream start, queue_updated with count 0 should be emitted
-    const queueResetEvent = events.find((e) => e.type === WS_EVENT.QUEUE_UPDATED && e.data.count === 0);
-    expect(queueResetEvent).toBeDefined();
   });
 
   test('sendMessageFromApi returns AGENT_BUSY when isProcessing', async () => {

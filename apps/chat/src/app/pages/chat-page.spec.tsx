@@ -37,7 +37,7 @@ vi.mock('../chat/use-chat-websocket', () => ({
     errorMessage: null,
     authModal: { authUrl: null, deviceCode: null, isManualToken: false },
     sessionActivity: [],
-    queuedCount: 0,
+
     send: vi.fn(),
     reconnect: vi.fn(),
     startAuth: vi.fn(),
