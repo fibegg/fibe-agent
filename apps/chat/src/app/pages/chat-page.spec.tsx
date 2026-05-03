@@ -242,6 +242,10 @@ vi.mock('../chat/use-conversations', () => ({
   getActiveConversationId: vi.fn().mockReturnValue('default'),
 }));
 
+vi.mock('../chat/conversation-sidebar', () => ({
+  ConversationSidebar: () => <div data-testid="conversation-sidebar" />,
+}));
+
 vi.mock('../file-explorer/file-viewer-panel', () => ({
   FileViewerPanel: () => <div data-testid="file-viewer-panel" />,
 }));

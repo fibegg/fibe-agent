@@ -6,6 +6,7 @@ import { MessageList, type MessageListHandle, type ConversationResetSeparator, t
 import { WS_ACTION } from '@shared/ws-constants';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useConversations } from '../chat/use-conversations';
+import { ConversationSidebar } from '../chat/conversation-sidebar';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { usePlaygroundSelector } from '../chat/use-playground-selector';
@@ -710,28 +711,42 @@ export function ChatPage() {
               aria-hidden
               onClick={closeMobileSidebar}
             />
-            <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20`}>
-              <FileExplorer
-                tree={playgroundTree}
-                agentTree={agentFileTree as PlaygroundEntry[]}
-                activeTab={activeFileTab}
-                onTabChange={setActiveFileTab}
-                agentFileApiPath="agent-files/file"
-                playgroundStats={playgroundStats}
-                agentStats={agentStats}
-                onSettingsClick={openSettings}
-                onClose={closeMobileSidebar}
-                onFileSelect={(entry) => {
-                  setViewingFile(entry);
-                  closeMobileSidebar();
-                }}
-                selectedPath={viewingFile?.path ?? null}
-                dirtyPaths={pageDirtyPaths}
-                onPlaygroundUploaded={refetchPlaygrounds}
-                onAgentUploaded={refetchPlaygrounds}
-                agentProviderLabel={agentProviderLabel}
-                currentModel={currentModel}
-              />
+            <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 flex flex-col`}>
+              <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+                <FileExplorer
+                  tree={playgroundTree}
+                  agentTree={agentFileTree as PlaygroundEntry[]}
+                  activeTab={activeFileTab}
+                  onTabChange={setActiveFileTab}
+                  agentFileApiPath="agent-files/file"
+                  playgroundStats={playgroundStats}
+                  agentStats={agentStats}
+                  onSettingsClick={openSettings}
+                  onClose={closeMobileSidebar}
+                  onFileSelect={(entry) => {
+                    setViewingFile(entry);
+                    closeMobileSidebar();
+                  }}
+                  selectedPath={viewingFile?.path ?? null}
+                  dirtyPaths={pageDirtyPaths}
+                  onPlaygroundUploaded={refetchPlaygrounds}
+                  onAgentUploaded={refetchPlaygrounds}
+                  agentProviderLabel={agentProviderLabel}
+                  currentModel={currentModel}
+                />
+              </div>
+              {/* Conversations — always visible at bottom on mobile too */}
+              <div className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col" style={{ height: '40%', minHeight: 200 }}>
+                <ConversationSidebar
+                  conversations={conversations}
+                  activeId={activeConversationId}
+                  loading={conversationsLoading}
+                  onSelect={(id) => { switchConversation(id); reconnect(); closeMobileSidebar(); }}
+                  onCreate={async () => { await createConversation(); reconnect(); }}
+                  onRename={renameConversation}
+                  onDelete={deleteConversation}
+                />
+              </div>
             </div>
           </>
         ) : null

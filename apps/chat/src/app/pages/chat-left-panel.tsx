@@ -69,26 +69,28 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onConversationRename,
   onConversationDelete,
 }: ChatLeftPanelProps) {
-  // File explorer collapses to icon rail when no files or explicitly collapsed
-  const isCollapsed = !hasAnyFiles || sidebarCollapsed;
-  // Conversations are always visible as long as the panel itself isn't icon-only
-  // (i.e. when the user has explicitly collapsed to icon rail we hide them too —
-  // there is no room).  When there are no files but the user hasn't collapsed,
-  // conversations take the full panel height so progress is always trackable.
-  const showConversations = !sidebarCollapsed && conversations !== undefined && onConversationSelect;
+  // Icon rail when user explicitly collapsed OR when there are no files and also
+  // no conversations to show (edge case: conversations prop not provided).
+  const isCollapsed = sidebarCollapsed || (!hasAnyFiles && !conversations);
+
+  // Conversations are shown as long as the panel isn't in collapsed icon-rail mode
+  // and the necessary props are wired up. When there are no files, conversations
+  // take the full height so progress is always trackable.
+  const showConversations = !isCollapsed && conversations !== undefined && !!onConversationSelect;
+
+  const panelWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : width;
 
   return (
     <div
       ref={panelRef}
       className={`flex min-h-0 flex-shrink-0 flex-col overflow-visible${isDraggingResize ? '' : ' transition-[width] duration-300 ease-out'}`}
-      style={{
-        width: isCollapsed && !showConversations ? SIDEBAR_COLLAPSED_WIDTH_PX : width,
-      }}
+      style={{ width: panelWidth }}
     >
-      <aside className="flex min-h-0 flex-1 flex-col overflow-hidden relative">
-        {/* File explorer — only rendered when there are files */}
-        {hasAnyFiles && (
-          <div className={`flex flex-col overflow-hidden ${showConversations ? 'flex-1' : 'flex-1'}`}>
+      {/* overflow-visible is required so the PanelResizeHandle (absolute, right: 0) renders correctly */}
+      <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative border-r border-border/20">
+        {/* File explorer — takes available space above conversations */}
+        {(hasAnyFiles || isCollapsed) && (
+          <div className="flex flex-1 flex-col overflow-hidden min-h-0">
             <FileExplorer
               tree={playgroundTree}
               agentTree={agentFileTree}
@@ -111,30 +113,9 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
           </div>
         )}
 
-        {/* No-file collapsed icon rail (settings + toggle) */}
-        {!hasAnyFiles && !showConversations && (
-          <FileExplorer
-            tree={playgroundTree}
-            agentTree={agentFileTree}
-            activeTab={activeFileTab}
-            onTabChange={onTabChange}
-            agentFileApiPath="agent-files/file"
-            playgroundStats={playgroundStats}
-            agentStats={agentStats}
-            collapsed
-            onSettingsClick={onSettingsClick}
-            onToggleCollapse={onToggleCollapse}
-            onFileSelect={onFileSelect}
-            selectedPath={selectedPath}
-            dirtyPaths={dirtyPaths}
-            onPlaygroundUploaded={onPlaygroundUploaded}
-            onAgentUploaded={onAgentUploaded}
-            agentProviderLabel={agentProviderLabel}
-            currentModel={currentModel}
-          />
-        )}
-
-        {/* Conversations — always in the bottom half so progress is always visible */}
+        {/* Conversations — pinned to the bottom half of the panel.
+            When there are no files they take the full height so the
+            user can always track progress without needing a playground. */}
         {showConversations && (
           <div
             className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
@@ -152,6 +133,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
           </div>
         )}
 
+        {/* Resize handle — must be inside overflow-visible aside */}
         {!isCollapsed && (
           <PanelResizeHandle
             side="left"
