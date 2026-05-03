@@ -8,7 +8,8 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downl
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends python3 make g++ curl ca-certificates && rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends python3 make g++ curl ca-certificates && rm -rf /var/lib/apt/lists/*
 
 FROM cli-base AS cli
 
@@ -49,7 +50,8 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downl
 # node-pty requires native compilation; install build tools + node-gyp
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         python3 make g++ \
     && rm -rf /var/lib/apt/lists/* \
     && npm install -g node-gyp
@@ -92,7 +94,8 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downl
 # Unconditional packages — cached across all provider variants
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
     jq less tree wget zip unzip openssh-client \
     python3 python3-venv python-is-python3 \
@@ -125,7 +128,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list && \
-    apt-get update && apt-get install -y --no-install-recommends gh && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh && \
     rm -rf /var/lib/apt/lists/*
 
 # Official GitHub MCP server. `mcp-github` is kept as a compatibility wrapper
@@ -186,7 +190,8 @@ RUN --mount=type=cache,target=/root/.npm \
 # System libraries required by Chromium.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    npx -y playwright install-deps chromium
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
+    DEBIAN_FRONTEND=noninteractive npx -y playwright install-deps chromium
 
 # ---- FIX FILE DESCRIPTOR LIMITS ----
 # Ensures su/sudo sessions inherit high nofile — prevents EMFILE in dev mode
@@ -234,7 +239,8 @@ ARG AGENT_PROVIDER=gemini
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    apt-get update && apt-get install -y --no-install-recommends \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     dbus gnome-keyring libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*; \
     fi
