@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatHeader } from './chat-header';
@@ -490,6 +490,70 @@ describe('ChatHeader', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
     expect(screen.queryByRole('menuitem', { name: /reset conversation/i })).toBeNull();
+  });
+
+  describe('simplicate header keyboard tracking', () => {
+    function setVisualViewport(offsetTop: number) {
+      Object.defineProperty(window, 'visualViewport', {
+        configurable: true,
+        writable: true,
+        value: {
+          offsetTop,
+          height: 400,
+          width: window.innerWidth,
+          scale: 1,
+          addEventListener: () => undefined,
+          removeEventListener: () => undefined,
+          dispatchEvent: () => false,
+        },
+      });
+    }
+
+    afterEach(() => {
+      Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: undefined });
+    });
+
+    it('translates the simplicate header by visualViewport.offsetTop on mobile', () => {
+      setVisualViewport(120);
+      const { container } = render(
+        <ChatHeader
+          {...DEFAULT_PROPS}
+          isMobile={true}
+          simplicateMode={true}
+        />,
+      );
+      const header = container.querySelector('header');
+      expect(header).toBeTruthy();
+      expect(header?.style.transform).toBe('translateY(120px)');
+    });
+
+    it('does not translate the simplicate header when visualViewport.offsetTop is 0', () => {
+      setVisualViewport(0);
+      const { container } = render(
+        <ChatHeader
+          {...DEFAULT_PROPS}
+          isMobile={true}
+          simplicateMode={true}
+        />,
+      );
+      const header = container.querySelector('header');
+      expect(header?.style.transform).toBe('');
+    });
+
+    it('does not translate the non-simplicate header even when visualViewport.offsetTop is set', () => {
+      setVisualViewport(120);
+      const { container } = render(
+        <MemoryRouter>
+          <ChatHeader
+            {...DEFAULT_PROPS}
+            isMobile={true}
+            simplicateMode={false}
+          />
+        </MemoryRouter>,
+      );
+      const header = container.querySelector('header');
+      expect(header?.style.transform).toBe('');
+    });
   });
 });
 

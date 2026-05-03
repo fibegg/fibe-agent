@@ -3,6 +3,27 @@ import { renderHook, act } from '@testing-library/react';
 import { useChatInput } from './use-chat-input';
 
 describe('useChatInput', () => {
+  function setCoarsePointer(matches: boolean) {
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      configurable: true,
+      value: (query: string) => ({
+        matches: query === '(pointer: coarse)' ? matches : false,
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+  }
+
+  afterEach(() => {
+    setCoarsePointer(false);
+  });
+
   it('returns empty inputValue and cursorOffset initially', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
@@ -58,7 +79,20 @@ describe('useChatInput', () => {
     expect(onSendRef.current).not.toHaveBeenCalled();
   });
 
-  it('handleKeyDown calls onSendRef on Enter in mobile-sized layouts', () => {
+  it('handleKeyDown does not send on Enter when pointer is coarse (mobile virtual keyboard)', () => {
+    setCoarsePointer(true);
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    expect(onSendRef.current).not.toHaveBeenCalled();
+    expect(e.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('handleKeyDown still sends on Enter when pointer is fine (desktop)', () => {
+    setCoarsePointer(false);
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
       useChatInput({ playgroundEntries: [], onSendRef })
@@ -67,6 +101,22 @@ describe('useChatInput', () => {
     act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
     expect(onSendRef.current).toHaveBeenCalledOnce();
     expect(e.preventDefault).toHaveBeenCalledOnce();
+  });
+
+  it('handleKeyDown does not send while IME composition is active', () => {
+    const onSendRef = { current: vi.fn() };
+    const { result } = renderHook(() =>
+      useChatInput({ playgroundEntries: [], onSendRef })
+    );
+    const e = {
+      key: 'Enter',
+      shiftKey: false,
+      nativeEvent: { isComposing: true },
+      preventDefault: vi.fn(),
+    };
+    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    expect(onSendRef.current).not.toHaveBeenCalled();
+    expect(e.preventDefault).not.toHaveBeenCalled();
   });
 
   it('handleKeyDown calls onSendRef on Enter in iframe mode', () => {

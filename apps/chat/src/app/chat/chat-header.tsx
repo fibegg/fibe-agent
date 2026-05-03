@@ -876,12 +876,33 @@ export function ChatHeader({
   const compactMode = simplicateMode;
   const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
   const menuButtonLabel = compactMode ? t('header.openSettings') : t('header.openMenu');
+  const simplicateHeaderRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!isMobile || !compactMode) return;
+    const el = simplicateHeaderRef.current;
+    if (!el) return;
+    const update = () => {
+      const offsetTop = window.visualViewport?.offsetTop ?? 0;
+      el.style.transform = offsetTop ? `translateY(${offsetTop}px)` : '';
+    };
+    update();
+    const vv = window.visualViewport;
+    vv?.addEventListener('scroll', update);
+    vv?.addEventListener('resize', update);
+    return () => {
+      vv?.removeEventListener('scroll', update);
+      vv?.removeEventListener('resize', update);
+      if (el) el.style.transform = '';
+    };
+  }, [isMobile, compactMode]);
 
   if (compactMode) {
     return (
       <header
-        className="border-b border-border/30 bg-card/60 px-3 pb-2 backdrop-blur-xl shrink-0 sm:px-4"
-        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))' }}
+        ref={simplicateHeaderRef}
+        className="border-b border-border/30 bg-card/60 px-3 pb-2 backdrop-blur-xl shrink-0 sm:px-4 relative z-30"
+        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))', willChange: 'transform' }}
       >
         <div className="flex h-10 items-center justify-between gap-2">
           <button

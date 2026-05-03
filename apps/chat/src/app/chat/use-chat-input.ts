@@ -20,6 +20,10 @@ function isEmbeddedFrame(): boolean {
   return typeof window !== 'undefined' && window !== window.parent;
 }
 
+function isCoarsePointer(): boolean {
+  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+}
+
 function selectionIsInsideElement(el: HTMLElement): boolean {
   if (!(el instanceof HTMLElement)) return false;
   const sel = window.getSelection();
@@ -185,8 +189,10 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      if (e.nativeEvent?.isComposing) return;
       if (e.key === 'Enter' && !e.shiftKey) {
         if (mentionOpen || e.defaultPrevented) return;
+        if (isCoarsePointer()) return;
         e.preventDefault();
         onSendRef.current();
         focusInput({ persistent: true });
