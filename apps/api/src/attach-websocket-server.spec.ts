@@ -11,6 +11,7 @@ import type { IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
 import { WebSocketServer } from 'ws';
 import { attachWebSocketServer } from './attach-websocket-server';
+import { Subject } from 'rxjs';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -43,16 +44,32 @@ const ws = (stub: ReturnType<typeof makeWsStub>) =>
 
 // ─── Service stubs ────────────────────────────────────────────────────────────
 
-const outbound = new EventEmitter();
 const orchestrator = {
-  outbound: { subscribe: (cb: (ev: { type: string; data: unknown }) => void) => outbound.on('event', cb) },
   handleClientConnected: mock(() => undefined),
   handleClientMessage:   mock(async () => undefined),
 } as unknown as import('./app/orchestrator/orchestrator.service').OrchestratorService;
 
-const playgroundChanged$ = new EventEmitter();
+const mockCtxOutbound = new Subject<{ type: string; data: Record<string, unknown> }>();
+const mockCtx = {
+  sessionId: 'test-session',
+  isAuthenticated: false,
+  isProcessing: false,
+  outbound$: mockCtxOutbound,
+  send: mock(() => undefined),
+  destroy: mock(() => undefined),
+} as unknown as import('./app/orchestrator/session-context').SessionContext;
+
+const mockSessionRegistry = {
+  all: () => [],
+  create: mock(() => mockCtx),
+  destroy: mock(() => undefined),
+  broadcast: mock(() => undefined),
+} as unknown as import('./app/orchestrator/session-registry.service').SessionRegistryService;
+
+const playgroundChanged$ = { subscribe: mock(() => ({ unsubscribe: () => undefined })) };
+
 const playgroundWatcher = {
-  playgroundChanged$: { subscribe: (cb: () => void) => playgroundChanged$.on('change', cb) },
+  playgroundChanged$: playgroundChanged$,
 } as unknown as import('./app/playgrounds/playground-watcher.service').PlaygroundWatcherService;
 
 let mockPtyProcess: { onData: MockFn; onExit: MockFn };
@@ -83,14 +100,14 @@ describe('attachWebSocketServer — upgrade dispatcher', () => {
   it('returns a WebSocketServer instance', () => {
     const server = new EventEmitter();
     const result = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
     );
     expect(result).toBeInstanceOf(WebSocketServer);
   });
 
   it('destroys sockets for unknown paths', () => {
     const server = new EventEmitter();
-    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService);
+    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService);
 
     const socket = makeSocket();
     server.emit('upgrade', makeReq('/unknown'), socket, Buffer.alloc(0));
@@ -100,7 +117,7 @@ describe('attachWebSocketServer — upgrade dispatcher', () => {
 
   it('does not destroy socket for /ws path', () => {
     const server = new EventEmitter();
-    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService);
+    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService);
 
     const socket = makeSocket();
     try { server.emit('upgrade', makeReq('/ws'), socket, Buffer.alloc(0)); } catch { /* fake socket */ }
@@ -110,7 +127,7 @@ describe('attachWebSocketServer — upgrade dispatcher', () => {
 
   it('does not destroy socket for /ws-terminal path', () => {
     const server = new EventEmitter();
-    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService);
+    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService);
 
     const socket = makeSocket();
     try { server.emit('upgrade', makeReq('/ws-terminal'), socket, Buffer.alloc(0)); } catch { /* fake socket */ }
@@ -125,7 +142,7 @@ describe('attachWebSocketServer — chat auth guard', () => {
   it('closes with 4001 when password is set and token is wrong', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig('secret'), orchestrator, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig('secret'), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
     );
 
     const stub = makeWsStub();
@@ -138,7 +155,7 @@ describe('attachWebSocketServer — chat auth guard', () => {
   it('allows connection when token matches', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig('secret'), orchestrator, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig('secret'), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
     );
 
     const stub = makeWsStub();
@@ -150,7 +167,7 @@ describe('attachWebSocketServer — chat auth guard', () => {
   it('allows connection when no password is configured', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
     );
 
     const stub = makeWsStub();
@@ -163,26 +180,44 @@ describe('attachWebSocketServer — chat auth guard', () => {
 // ─── Chat WS — session takeover ───────────────────────────────────────────────
 
 describe('attachWebSocketServer — session takeover', () => {
-  it('closes previous client with 4002 when a 6th client connects', () => {
+  it('calls sessionRegistry.destroy on the oldest session when limit is reached', () => {
     const server = new EventEmitter();
+    // Create a local registry mock that tracks sessions so all() returns them
+    const localSessions: Array<{ sessionId: string; outbound$: Subject<{ type: string; data: Record<string, unknown> }>; destroy: ReturnType<typeof mock> }> = [];
+    let sessionCounter = 0;
+    const localRegistry = {
+      all: () => localSessions,
+      create: mock(() => {
+        const ctx = {
+          sessionId: `session-${sessionCounter++}`,
+          isAuthenticated: false,
+          isProcessing: false,
+          outbound$: new Subject<{ type: string; data: Record<string, unknown> }>(),
+          send: mock(() => undefined),
+          destroy: mock(() => undefined),
+        };
+        localSessions.push(ctx);
+        return ctx;
+      }),
+      destroy: mock((id: string) => {
+        const idx = localSessions.findIndex((s) => s.sessionId === id);
+        if (idx >= 0) localSessions.splice(idx, 1);
+      }),
+      broadcast: mock(() => undefined),
+    } as unknown as typeof mockSessionRegistry;
+
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, localRegistry, playgroundWatcher, terminalService,
     );
 
-    const ws1 = makeWsStub();
+    // Connect 5 clients
+    for (let i = 0; i < 5; i++) wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    expect(localSessions).toHaveLength(5);
+    const oldestId = localSessions[0].sessionId;
 
-    wss.emit('connection', ws1, makeReq('/ws'));
+    // 6th connection should evict the oldest
     wss.emit('connection', makeWsStub(), makeReq('/ws'));
-    wss.emit('connection', makeWsStub(), makeReq('/ws'));
-    wss.emit('connection', makeWsStub(), makeReq('/ws'));
-    wss.emit('connection', makeWsStub(), makeReq('/ws'));
-
-    // 6th connection triggers the drop of the oldest (ws1)
-    const ws6 = makeWsStub();
-    wss.emit('connection', ws6, makeReq('/ws'));
-
-    expect(ws(ws1).close).toHaveBeenCalledTimes(1);
-    expect(ws(ws1).close.mock.calls[0][0]).toBe(4002); // SESSION_TAKEN_OVER
+    expect(localRegistry.destroy).toHaveBeenCalledWith(oldestId);
   });
 });
 

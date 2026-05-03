@@ -3,9 +3,9 @@ import type { IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { RawData } from 'ws';
-import { randomUUID } from 'node:crypto';
 import { ConfigService } from './app/config/config.service';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
+import { SessionRegistryService } from './app/orchestrator/session-registry.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
 import { TerminalService } from './app/terminal/terminal.service';
 import { WS_CLOSE, WS_EVENT } from '@shared/ws-constants';
@@ -40,44 +40,50 @@ function rejectIfUnauthorized(ws: WebSocket, req: IncomingMessage, requiredPassw
   return false;
 }
 
+const MAX_CONNECTIONS = 5;
+const MESSAGE_LIMIT = 60;
+
 function attachChatWs(
   wss: WebSocketServer,
   config: ConfigService,
   orchestrator: OrchestratorService,
+  sessionRegistry: SessionRegistryService,
   playgroundWatcher: PlaygroundWatcherService,
 ): void {
-  const activeClients = new Set<WebSocket>();
-
-  const broadcastToClients = (type: string, data: Record<string, unknown> = {}): void => {
-    const payload = JSON.stringify({ type, ...data });
-    for (const client of activeClients) {
-      if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
-      }
-    }
-  };
-
-  orchestrator.outbound.subscribe((ev) => broadcastToClients(ev.type, ev.data as Record<string, unknown>));
-  playgroundWatcher.playgroundChanged$.subscribe(() => broadcastToClients(WS_EVENT.PLAYGROUND_CHANGED, {}));
+  // Broadcast playground changes to all active sessions
+  playgroundWatcher.playgroundChanged$.subscribe(() =>
+    sessionRegistry.broadcast(WS_EVENT.PLAYGROUND_CHANGED, {})
+  );
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     if (rejectIfUnauthorized(ws, req, config.getAgentPassword())) return;
 
-    // Limit to 5 concurrent connections by dropping the oldest
-    if (activeClients.size >= 5) {
-      const oldestClient = activeClients.values().next().value;
-      if (oldestClient) {
-        oldestClient.close(WS_CLOSE.SESSION_TAKEN_OVER, 'Maximum number of connections reached (5). Oldest session closed.');
-        activeClients.delete(oldestClient);
-      }
+    // Enforce max connections by evicting the oldest session
+    const allSessions = sessionRegistry.all();
+    if (allSessions.length >= MAX_CONNECTIONS) {
+      const oldest = allSessions[0];
+      logWs({ event: 'disconnect', closeCode: WS_CLOSE.SESSION_TAKEN_OVER, error: 'Max connections reached — oldest session evicted' });
+      // Close the WS for the oldest session — the 'close' handler below will destroy it
+      // We need to find the WS for that session; simplest is to just send a close frame
+      // Since we track sessions by sessionId, we close via the registry
+      sessionRegistry.destroy(oldest.sessionId);
     }
 
-    activeClients.add(ws);
-    orchestrator.handleClientConnected();
+    // Create an isolated session for this connection
+    const ctx = sessionRegistry.create();
     logWs({ event: 'connect' });
 
+    // Wire per-session events → this specific WS client
+    const sub = ctx.outbound$.subscribe((ev) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: ev.type, ...ev.data }));
+      }
+    });
+
+    // Notify the new session of current state
+    orchestrator.handleClientConnected(ctx);
+
     let messageCount = 0;
-    const MESSAGE_LIMIT = 60;
     const resetInterval = setInterval(() => { messageCount = 0; }, 60_000);
 
     ws.on('message', (raw: RawData) => {
@@ -89,7 +95,7 @@ function attachChatWs(
       try {
         const msg = JSON.parse(raw.toString()) as ClientMessage;
         logWs({ event: 'action', action: msg.action });
-        void orchestrator.handleClientMessage(msg);
+        void orchestrator.handleClientMessage(ctx, msg);
       } catch {
         // ignore invalid JSON
       }
@@ -97,7 +103,8 @@ function attachChatWs(
 
     ws.on('close', (code?: number) => {
       clearInterval(resetInterval);
-      activeClients.delete(ws);
+      sub.unsubscribe();
+      sessionRegistry.destroy(ctx.sessionId);
       logWs({ event: 'disconnect', closeCode: code });
     });
 
@@ -112,6 +119,8 @@ function attachTerminalWs(
   config: ConfigService,
   terminalService: TerminalService,
 ): void {
+  const { randomUUID } = require('node:crypto') as typeof import('node:crypto');
+
   terminalWss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     if (rejectIfUnauthorized(ws, req, config.getAgentPassword())) return;
 
@@ -129,7 +138,7 @@ function attachTerminalWs(
 
     let outputBuffer = '';
     let flushTimeout: ReturnType<typeof setTimeout> | null = null;
-    
+
     ptyProcess.onData((data) => {
       outputBuffer += data;
       if (!flushTimeout) {
@@ -175,18 +184,14 @@ function attachTerminalWs(
 
 /**
  * Attaches two WebSocket servers to the Fastify HTTP server:
- *   /ws          — main chat + orchestrator channel
+ *   /ws          — main chat + orchestrator channel (multi-session)
  *   /ws-terminal — PTY terminal sessions
- *
- * Both use `noServer: true` so they share a single manual `upgrade` dispatcher.
- * This avoids the "two upgrade listeners competing for the same socket" bug that
- * causes immediate code-1006 disconnections when two `WebSocketServer` instances
- * are bound to the same `http.Server`.
  */
 export function attachWebSocketServer(
   fastify: FastifyInstance,
   config: ConfigService,
   orchestrator: OrchestratorService,
+  sessionRegistry: SessionRegistryService,
   playgroundWatcher: PlaygroundWatcherService,
   terminalService: TerminalService,
 ): WebSocketServer {
@@ -195,8 +200,6 @@ export function attachWebSocketServer(
   const wss = new WebSocketServer({ noServer: true });
   const terminalWss = new WebSocketServer({ noServer: true });
 
-  // Single upgrade dispatcher — routes by exact pathname so both servers
-  // get exactly the sockets they own; no cross-destruction.
   server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
     const { pathname } = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
     if (pathname === '/ws-terminal') {
@@ -208,7 +211,7 @@ export function attachWebSocketServer(
     }
   });
 
-  attachChatWs(wss, config, orchestrator, playgroundWatcher);
+  attachChatWs(wss, config, orchestrator, sessionRegistry, playgroundWatcher);
   attachTerminalWs(terminalWss, config, terminalService);
 
   return wss;

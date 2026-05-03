@@ -6,7 +6,6 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
-import { Subject } from 'rxjs';
 import { ConfigService } from '../config/config.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import {
@@ -19,14 +18,12 @@ import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { UploadsService } from '../uploads/uploads.service';
 import type {
-  AgentStrategy,
   AuthConnection,
   LogoutConnection,
   ThinkingStep,
   TokenUsage,
 } from '../strategies/strategy.types';
 import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
-import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
   AUTH_STATUS as AUTH_STATUS_VAL,
   ERROR_CODE,
@@ -43,6 +40,8 @@ import { createStreamingCallbacks } from './orchestrator-streaming-callbacks';
 import { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import { GemmaMcpToolsService } from '../gemma-router/gemma-mcp-tools.service';
 import { LocalMcpService } from '../local-mcp/local-mcp.service';
+import { SessionContext } from './session-context';
+import { SessionRegistryService } from './session-registry.service';
 
 export interface OutboundEvent {
   type: string;
@@ -52,14 +51,10 @@ export interface OutboundEvent {
 @Injectable()
 export class OrchestratorService implements OnModuleInit {
   private readonly logger = new Logger(OrchestratorService.name);
-  private readonly strategy: AgentStrategy;
-  isAuthenticated = false;
-  isProcessing = false;
-  private readonly outbound$ = new Subject<OutboundEvent>();
-  private cachedSystemPromptFromFile: string | null = null;
-  private currentActivityId: string | null = null;
-  private reasoningTextAccumulated = '';
-  private lastStreamUsage: TokenUsage | undefined = undefined;
+  /** Shared auth state — if provider is authed, all sessions benefit. */
+  private sharedIsAuthenticated = false;
+  /** Cached system prompt shared across all sessions. */
+  private sharedSystemPromptFromFile: string | null = null;
 
   constructor(
     private readonly activityStore: ActivityStoreService,
@@ -67,7 +62,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly modelStore: ModelStoreService,
     private readonly effortStore: EffortStoreService,
     private readonly config: ConfigService,
-    private readonly strategyRegistry: StrategyRegistryService,
+    private readonly sessionRegistry: SessionRegistryService,
     private readonly uploadsService: UploadsService,
     private readonly fibeSync: FibeSyncService,
     private readonly chatPromptContext: ChatPromptContextService,
@@ -76,7 +71,6 @@ export class OrchestratorService implements OnModuleInit {
     private readonly agentModeStore: AgentModeStoreService,
     private readonly localMcp: LocalMcpService,
   ) {
-    this.strategy = this.strategyRegistry.resolveStrategy();
   }
 
   async onModuleInit(): Promise<void> {
@@ -97,7 +91,7 @@ export class OrchestratorService implements OnModuleInit {
       const builtinPath = join(process.cwd(), 'dist', 'assets', 'SYSTEM_PROMPT.md');
       if (existsSync(builtinPath)) {
         try {
-          this.cachedSystemPromptFromFile = await readFile(builtinPath, 'utf8');
+          this.sharedSystemPromptFromFile = await readFile(builtinPath, 'utf8');
         } catch {
           this.logger.warn('Failed to read built-in system prompt file');
         }
@@ -106,7 +100,7 @@ export class OrchestratorService implements OnModuleInit {
 
     // Forward local MCP tool WS events (ask_user_prompt, confirm_action_prompt, etc.) to the chat UI
     this.localMcp.outbound$.subscribe((event) => {
-      this._send(event.type, event.data);
+      this.sessionRegistry.broadcast(event.type, event.data as Record<string, unknown>);
     });
 
     // Register mode accessors so local tools can read/write the agent mode
@@ -148,29 +142,26 @@ export class OrchestratorService implements OnModuleInit {
     }
   }
 
-  get outbound(): Subject<OutboundEvent> {
-    return this.outbound$;
-  }
+  /** Backward-compat: shared authentication flag for REST endpoint */
+  get isAuthenticated(): boolean { return this.sharedIsAuthenticated; }
+  set isAuthenticated(v: boolean) { this.sharedIsAuthenticated = v; }
+  /** Backward-compat: true if ANY session is processing */
+  get isProcessing(): boolean { return this.sessionRegistry.all().some(s => s.isProcessing); }
+  get messages(): MessageStoreService { return this.messageStore; }
+  ensureStrategySettings(): void { /* no-op in multi-session mode */ }
 
-  get messages(): MessageStoreService {
-    return this.messageStore;
-  }
 
-  private _send(type: string, data: Record<string, unknown> = {}): void {
-    this.outbound$.next({ type, data });
-  }
-
-  private finishStreamDeps(): FinishAgentStreamDeps {
+  private finishStreamDeps(ctx: SessionContext): FinishAgentStreamDeps {
     return {
       messageStore: this.messageStore,
       modelStore: this.modelStore,
       activityStore: this.activityStore,
       fibeSync: this.fibeSync,
       send: (type: string, data?: Record<string, unknown>) =>
-        this._send(type, data ?? {}),
-      getCurrentActivityId: () => this.currentActivityId,
+        ctx.send(type, data ?? {}),
+      getCurrentActivityId: () => ctx.currentActivityId,
       clearLastStreamUsage: () => {
-        this.lastStreamUsage = undefined;
+        ctx.lastStreamUsage = undefined;
       },
     };
   }
@@ -184,9 +175,6 @@ export class OrchestratorService implements OnModuleInit {
     ]);
   }
 
-  ensureStrategySettings(): void {
-    this.strategy.ensureSettings?.();
-  }
 
   /**
    * Validate, persist, and broadcast a new agent mode.
@@ -195,12 +183,12 @@ export class OrchestratorService implements OnModuleInit {
   setAgentMode(mode: string): AgentModeValue | null {
     const resolved = this.agentModeStore.set(mode);
     if (!resolved) return null;
-    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: resolved });
+    this.sessionRegistry.broadcast(WS_EVENT.AGENT_MODE_UPDATED, { mode: resolved });
     return resolved;
   }
 
 
-  async handleClientMessage(msg: {
+  async handleClientMessage(ctx: SessionContext, msg: {
     action: string;
     code?: string;
     text?: string;
@@ -214,17 +202,18 @@ export class OrchestratorService implements OnModuleInit {
     story?: Array<{ id: string; type: string; message: string; timestamp: string; details?: string }>;
   }): Promise<void> {
     const handlers: Record<string, () => Promise<void> | void> = {
-      [WS_ACTION.CHECK_AUTH_STATUS]: () => this.checkAndSendAuthStatus(),
-      [WS_ACTION.INITIATE_AUTH]: () => this.handleInitiateAuth(),
-      [WS_ACTION.SUBMIT_AUTH_CODE]: () => this.handleSubmitAuthCode(msg.code ?? ''),
-      [WS_ACTION.CANCEL_AUTH]: () => this.handleCancelAuth(),
-      [WS_ACTION.REAUTHENTICATE]: () => this.handleReauthenticate(),
-      [WS_ACTION.LOGOUT]: () => this.handleLogout(),
+      [WS_ACTION.CHECK_AUTH_STATUS]: () => this.checkAndSendAuthStatus(ctx),
+      [WS_ACTION.INITIATE_AUTH]: () => this.handleInitiateAuth(ctx),
+      [WS_ACTION.SUBMIT_AUTH_CODE]: () => this.handleSubmitAuthCode(ctx, msg.code ?? ''),
+      [WS_ACTION.CANCEL_AUTH]: () => this.handleCancelAuth(ctx),
+      [WS_ACTION.REAUTHENTICATE]: () => this.handleReauthenticate(ctx),
+      [WS_ACTION.LOGOUT]: () => this.handleLogout(ctx),
       [WS_ACTION.SEND_CHAT_MESSAGE]: async () => {
-        if (this.isProcessing) {
-          await this.handleQueueMessage(msg.text ?? '');
+        if (ctx.isProcessing) {
+          await this.handleQueueMessage(ctx, msg.text ?? '');
         } else {
           await this.handleChatMessage(
+            ctx,
             msg.text ?? '',
             msg.images,
             msg.audio,
@@ -233,14 +222,14 @@ export class OrchestratorService implements OnModuleInit {
           );
         }
       },
-      [WS_ACTION.QUEUE_MESSAGE]: () => this.handleQueueMessage(msg.text ?? ''),
-      [WS_ACTION.SUBMIT_STORY]: () => this.handleSubmitStory(msg.story ?? []),
-      [WS_ACTION.GET_MODEL]: () => this.handleGetModel(),
-      [WS_ACTION.SET_MODEL]: () => this.handleSetModel(msg.model ?? ''),
-      [WS_ACTION.GET_EFFORT]: () => this.handleGetEffort(),
-      [WS_ACTION.SET_EFFORT]: () => this.handleSetEffort(msg.effort ?? ''),
+      [WS_ACTION.QUEUE_MESSAGE]: () => this.handleQueueMessage(ctx, msg.text ?? ''),
+      [WS_ACTION.SUBMIT_STORY]: () => this.handleSubmitStory(ctx, msg.story ?? []),
+      [WS_ACTION.GET_MODEL]: () => this.handleGetModel(ctx),
+      [WS_ACTION.SET_MODEL]: () => this.handleSetModel(ctx, msg.model ?? ''),
+      [WS_ACTION.GET_EFFORT]: () => this.handleGetEffort(ctx),
+      [WS_ACTION.SET_EFFORT]: () => this.handleSetEffort(ctx, msg.effort ?? ''),
       [WS_ACTION.INTERRUPT_AGENT]: () => {
-        if (this.isProcessing) this.strategy.interruptAgent?.();
+        if (ctx.isProcessing) ctx.strategy.interruptAgent?.();
       },
       [WS_ACTION.SET_AGENT_MODE]: () => this.handleSetAgentMode(msg.mode ?? ''),
       [WS_ACTION.ANSWER_USER_QUESTION]: () =>
@@ -253,7 +242,7 @@ export class OrchestratorService implements OnModuleInit {
           (msg as { questionId?: string; confirmed?: boolean }).questionId ?? '',
           !!(msg as { confirmed?: boolean }).confirmed,
         ),
-      [WS_ACTION.RESET_CONVERSATION]: () => this.handleResetConversation(),
+      [WS_ACTION.RESET_CONVERSATION]: () => this.handleResetConversation(ctx),
     };
 
     const handler = handlers[msg.action];
@@ -264,71 +253,69 @@ export class OrchestratorService implements OnModuleInit {
     }
   }
 
-  handleClientConnected(): void {
-    this._send(WS_EVENT.AUTH_STATUS, {
-      status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: this.isProcessing,
+  handleClientConnected(ctx: SessionContext): void {
+    ctx.isAuthenticated = this.sharedIsAuthenticated;
+    ctx.cachedSystemPromptFromFile = this.sharedSystemPromptFromFile;
+    ctx.send(WS_EVENT.AUTH_STATUS, {
+      status: ctx.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
+      isProcessing: ctx.isProcessing,
     });
-    this._send(WS_EVENT.ACTIVITY_SNAPSHOT, {
-      activity: this.activityStore.all(),
-    });
-    this._send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
+    ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.activityStore.all() });
+    ctx.send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
   }
 
-  private async checkAndSendAuthStatus(): Promise<void> {
-    this.isAuthenticated = await this.strategy.checkAuthStatus();
-    this._send(WS_EVENT.AUTH_STATUS, {
-      status: this.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: this.isProcessing,
+  private async checkAndSendAuthStatus(ctx: SessionContext): Promise<void> {
+    const authenticated = await ctx.strategy.checkAuthStatus();
+    this.sharedIsAuthenticated = authenticated;
+    for (const s of this.sessionRegistry.all()) s.isAuthenticated = authenticated;
+    ctx.send(WS_EVENT.AUTH_STATUS, {
+      status: authenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
+      isProcessing: ctx.isProcessing,
     });
   }
 
-  private async handleInitiateAuth(): Promise<void> {
-    const currentlyAuthenticated = await this.strategy.checkAuthStatus();
+  private async handleInitiateAuth(ctx: SessionContext): Promise<void> {
+    const currentlyAuthenticated = await ctx.strategy.checkAuthStatus();
     if (currentlyAuthenticated) {
-      this.isAuthenticated = true;
-      this._send(WS_EVENT.AUTH_SUCCESS);
+      this.setAllSessionsAuthenticated(true);
+      this.sessionRegistry.broadcast(WS_EVENT.AUTH_SUCCESS);
     } else {
-      const connection = this.createAuthConnection();
-      this.strategy.executeAuth(connection);
+      const connection = this.createAuthConnection(ctx);
+      ctx.strategy.executeAuth(connection);
     }
   }
 
-  private handleSubmitAuthCode(code: string): void {
-    this.strategy.submitAuthCode(code);
+  private handleSubmitAuthCode(ctx: SessionContext, code: string): void {
+    ctx.strategy.submitAuthCode(code);
   }
 
-  private handleCancelAuth(): void {
-    this.strategy.cancelAuth();
-    this.isAuthenticated = false;
-    this._send(WS_EVENT.AUTH_STATUS, {
-      status: AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: this.isProcessing,
-    });
+  private handleCancelAuth(ctx: SessionContext): void {
+    ctx.strategy.cancelAuth();
+    this.setAllSessionsAuthenticated(false);
+    ctx.send(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, isProcessing: ctx.isProcessing });
   }
 
-  private async handleReauthenticate(): Promise<void> {
-    this.strategy.cancelAuth();
-    this.strategy.clearCredentials();
-    this.isAuthenticated = false;
-    this._send(WS_EVENT.AUTH_STATUS, {
-      status: AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: this.isProcessing,
-    });
-    const connection = this.createAuthConnection();
-    this.strategy.executeAuth(connection);
+  private async handleReauthenticate(ctx: SessionContext): Promise<void> {
+    ctx.strategy.cancelAuth();
+    ctx.strategy.clearCredentials();
+    this.setAllSessionsAuthenticated(false);
+    ctx.send(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, isProcessing: ctx.isProcessing });
+    const connection = this.createAuthConnection(ctx);
+    ctx.strategy.executeAuth(connection);
   }
 
-  private handleLogout(): void {
-    this.strategy.cancelAuth();
-    this.isAuthenticated = false;
-    this.isProcessing = false;
-    this._send(WS_EVENT.AUTH_STATUS, {
-      status: AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: false,
-    });
-    const connection = this.createLogoutConnection();
-    this.strategy.executeLogout(connection);
+  private handleLogout(ctx: SessionContext): void {
+    ctx.strategy.cancelAuth();
+    this.setAllSessionsAuthenticated(false);
+    for (const s of this.sessionRegistry.all()) s.isProcessing = false;
+    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, isProcessing: false });
+    const connection = this.createLogoutConnection(ctx);
+    ctx.strategy.executeLogout(connection);
+  }
+
+  private setAllSessionsAuthenticated(authenticated: boolean): void {
+    this.sharedIsAuthenticated = authenticated;
+    for (const s of this.sessionRegistry.all()) s.isAuthenticated = authenticated;
   }
 
   async sendMessageFromApi(
@@ -336,24 +323,26 @@ export class OrchestratorService implements OnModuleInit {
     images?: string[],
     attachmentFilenames?: string[]
   ): Promise<{ accepted: boolean; messageId?: string; error?: string }> {
-    await this.checkAndSendAuthStatus();
-    if (!this.isAuthenticated) {
-      return { accepted: false, error: ERROR_CODE.NEED_AUTH };
+    const sessions = this.sessionRegistry.all();
+    const ctx = sessions.find((s) => !s.isProcessing);
+    if (!ctx) {
+      return sessions.length === 0
+        ? { accepted: false, error: ERROR_CODE.NEED_AUTH }
+        : { accepted: false, error: ERROR_CODE.AGENT_BUSY };
     }
-    if (this.isProcessing) {
-      return { accepted: false, error: ERROR_CODE.AGENT_BUSY };
-    }
-    this.isProcessing = true;
-    // count$ handles QUEUE_UPDATED organically but this helps the API send immediately
+    await this.checkAndSendAuthStatus(ctx);
+    if (!ctx.isAuthenticated) return { accepted: false, error: ERROR_CODE.NEED_AUTH };
+    ctx.isProcessing = true;
     const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } =
-      await this.addUserMessageAndEmit(text, images, undefined, undefined, attachmentFilenames);
-    void this.runAgentResponse(_text, urls, af, att).catch((err) =>
+      await this.addUserMessageAndEmit(ctx, text, images, undefined, undefined, attachmentFilenames);
+    void this.runAgentResponse(ctx, _text, urls, af, att).catch((err) =>
       this.logger.warn('REST send-message agent run failed', err)
     );
     return { accepted: true, messageId };
   }
 
   private async addUserMessageAndEmit(
+    ctx: SessionContext,
     text: string,
     images?: string[],
     audio?: string,
@@ -390,7 +379,7 @@ export class OrchestratorService implements OnModuleInit {
       imageUrls.length ? imageUrls : undefined
     );
     await this.messageStore.flush();
-    this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
+    this.sessionRegistry.broadcast(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
     return {
       messageId: userMessage.id,
       text,
@@ -401,6 +390,7 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private async runAgentResponse(
+    ctx: SessionContext,
     text: string,
     imageUrls: string[],
     audioFilename: string | null,
@@ -419,12 +409,12 @@ export class OrchestratorService implements OnModuleInit {
       const configSystemPrompt = this.config.getSystemPrompt();
       if (configSystemPrompt) {
         systemPrompt = configSystemPrompt;
-      } else if (this.cachedSystemPromptFromFile !== null) {
-        systemPrompt = this.cachedSystemPromptFromFile;
+      } else if (ctx.cachedSystemPromptFromFile !== null) {
+        systemPrompt = ctx.cachedSystemPromptFromFile;
       }
       // Only inject prompt-level history for strategies without native session support.
       // Strategies like Claude Code use --resume which restores full context natively.
-      const historyMessages = this.strategy.hasNativeSessionSupport?.()
+      const historyMessages = ctx.strategy.hasNativeSessionSupport?.()
         ? undefined
         : (() => {
             const allMessages = this.messageStore.all();
@@ -446,7 +436,7 @@ export class OrchestratorService implements OnModuleInit {
           if (!gemmaResult.skipped && gemmaResult.action) {
             const action = gemmaResult.action;
             if (action.type === 'EXECUTE_CLI') {
-              await this.executeCliDirectly(action.command, syntheticStepId, syntheticStep);
+              await this.executeCliDirectly(ctx, action.command, syntheticStepId, syntheticStep);
               return; // Short-circuit Big LLM
             } else if (action.type === 'DELEGATE_TO_AGENT') {
               if (action.confidence >= this.config.getGemmaConfidenceThreshold()) {
@@ -476,7 +466,7 @@ export class OrchestratorService implements OnModuleInit {
       );
       const model = this.modelStore.get();
       const effort = this.effortStore.get();
-      this._send(WS_EVENT.STREAM_START, { model });
+      ctx.send(WS_EVENT.STREAM_START, { model });
       const streamStartEntry: StoredStoryEntry = {
         id: randomUUID(),
         type: 'stream_start',
@@ -485,145 +475,132 @@ export class OrchestratorService implements OnModuleInit {
         details: model ? `Model: ${model}` : undefined,
       };
       const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
-      this.currentActivityId = currentActivity.id;
-      this.reasoningTextAccumulated = '';
-      this._send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
-      this._send(WS_EVENT.THINKING_STEP, {
+      ctx.currentActivityId = currentActivity.id;
+      ctx.reasoningTextAccumulated = '';
+      ctx.send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
+      ctx.send(WS_EVENT.THINKING_STEP, {
         id: syntheticStep.id,
         title: syntheticStep.title,
         status: syntheticStep.status,
         details: syntheticStep.details,
         timestamp: syntheticStep.timestamp.toISOString(),
       });
-      this.lastStreamUsage = undefined;
+      ctx.lastStreamUsage = undefined;
       const streamDeps = {
         send: (type: string, data?: Record<string, unknown>) =>
-          this._send(type, data ?? {}),
+          ctx.send(type, data ?? {}),
         activityStore: this.activityStore,
-        getCurrentActivityId: () => this.currentActivityId,
-        getReasoningText: () => this.reasoningTextAccumulated,
+        getCurrentActivityId: () => ctx.currentActivityId,
+        getReasoningText: () => ctx.reasoningTextAccumulated,
         appendReasoningText: (t: string) => {
-          this.reasoningTextAccumulated += t;
+          ctx.reasoningTextAccumulated += t;
         },
         clearReasoningText: () => {
-          this.reasoningTextAccumulated = '';
+          ctx.reasoningTextAccumulated = '';
         },
         setLastStreamUsage: (u: TokenUsage | undefined) => {
-          this.lastStreamUsage = u;
+          ctx.lastStreamUsage = u;
         },
       };
       const callbacks = createStreamingCallbacks(streamDeps);
-      await this.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
+      await ctx.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
-        this._send(WS_EVENT.STREAM_CHUNK, { text: chunk });
+        ctx.send(WS_EVENT.STREAM_CHUNK, { text: chunk });
       }, callbacks, systemPrompt || undefined, { effort });
       finishAgentStream(
-        this.finishStreamDeps(),
+        this.finishStreamDeps(ctx),
         accumulated,
         syntheticStepId,
         syntheticStep,
-        this.lastStreamUsage
+        ctx.lastStreamUsage
       );
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       if (raw === INTERRUPTED_MESSAGE) {
         finishAgentStream(
-          this.finishStreamDeps(),
+          this.finishStreamDeps(ctx),
           accumulated,
           syntheticStepId,
           syntheticStep,
-          this.lastStreamUsage
+          ctx.lastStreamUsage
         );
       } else {
         const message = raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
         if (isProviderAuthFailureMessage(message)) {
           this.isAuthenticated = false;
         }
-        this._send(WS_EVENT.ERROR, { message });
+        ctx.send(WS_EVENT.ERROR, { message });
       }
     } finally {
       await this.flushStores();
-      this.isProcessing = false;
+      ctx.isProcessing = false;
     }
   }
 
   private async handleChatMessage(
+    ctx: SessionContext,
     text: string,
     images?: string[],
     audio?: string,
     audioFilenameFromClient?: string,
     attachmentFilenames?: string[]
   ): Promise<void> {
-    if (!this.isAuthenticated) {
-      this._send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
+    if (!ctx.isAuthenticated) {
+      ctx.send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
       return;
     }
-    this.isProcessing = true;
-    // the count$ stream will emit QUEUE_UPDATED automatically, but doing it here ensures immediate UI feedback
+    ctx.isProcessing = true;
     const { text: _t, imageUrls, audioFilename, attachmentFilenames: att } =
-      await this.addUserMessageAndEmit(
-        text,
-        images,
-        audio,
-        audioFilenameFromClient,
-        attachmentFilenames
-      );
-    await this.runAgentResponse(_t, imageUrls, audioFilename, att);
+      await this.addUserMessageAndEmit(ctx, text, images, audio, audioFilenameFromClient, attachmentFilenames);
+    await this.runAgentResponse(ctx, _t, imageUrls, audioFilename, att);
   }
 
-  private async handleQueueMessage(text: string): Promise<void> {
+  private async handleQueueMessage(ctx: SessionContext, text: string): Promise<void> {
     if (!text.trim()) return;
     const userMessage = this.messageStore.add('user', text);
     await this.messageStore.flush();
-    this._send(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
+    this.sessionRegistry.broadcast(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
     void this.fibeSync.syncMessages(() => JSON.stringify(this.messageStore.all()));
-    
-    if (this.strategy.steerAgent) {
-      this.strategy.steerAgent(text);
-    }
+    if (ctx.strategy.steerAgent) ctx.strategy.steerAgent(text);
   }
 
-  private createAuthConnection(): AuthConnection {
+  private createAuthConnection(ctx: SessionContext): AuthConnection {
     return {
-      sendAuthUrlGenerated: (url) => this._send(WS_EVENT.AUTH_URL_GENERATED, { url }),
-      sendDeviceCode: (code) => this._send(WS_EVENT.AUTH_DEVICE_CODE, { code }),
-      sendAuthManualToken: () => this._send(WS_EVENT.AUTH_MANUAL_TOKEN),
+      sendAuthUrlGenerated: (url) => ctx.send(WS_EVENT.AUTH_URL_GENERATED, { url }),
+      sendDeviceCode: (code) => ctx.send(WS_EVENT.AUTH_DEVICE_CODE, { code }),
+      sendAuthManualToken: () => ctx.send(WS_EVENT.AUTH_MANUAL_TOKEN),
       sendAuthSuccess: () => {
-        this.isAuthenticated = true;
-        this._send(WS_EVENT.AUTH_SUCCESS);
+        this.setAllSessionsAuthenticated(true);
+        this.sessionRegistry.broadcast(WS_EVENT.AUTH_SUCCESS);
       },
       sendAuthStatus: (status) =>
-        this._send(WS_EVENT.AUTH_STATUS, { status, isProcessing: this.isProcessing }),
-      sendError: (message) => this._send(WS_EVENT.ERROR, { message }),
+        ctx.send(WS_EVENT.AUTH_STATUS, { status, isProcessing: ctx.isProcessing }),
+      sendError: (message) => ctx.send(WS_EVENT.ERROR, { message }),
     };
   }
 
-  private createLogoutConnection(): LogoutConnection {
+  private createLogoutConnection(ctx: SessionContext): LogoutConnection {
     return {
-      sendLogoutOutput: (text) => this._send(WS_EVENT.LOGOUT_OUTPUT, { text }),
+      sendLogoutOutput: (text) => ctx.send(WS_EVENT.LOGOUT_OUTPUT, { text }),
       sendLogoutSuccess: () => {
-        this.isAuthenticated = false;
-        this._send(WS_EVENT.LOGOUT_SUCCESS);
+        this.setAllSessionsAuthenticated(false);
+        this.sessionRegistry.broadcast(WS_EVENT.LOGOUT_SUCCESS);
       },
-      sendError: (message) => this._send(WS_EVENT.ERROR, { message }),
+      sendError: (message) => ctx.send(WS_EVENT.ERROR, { message }),
     };
   }
 
-  private async handleSubmitStory(story: StoredStoryEntry[]): Promise<void> {
-    if (this.currentActivityId) {
-      const entry = this.activityStore.getById(this.currentActivityId);
+  private async handleSubmitStory(ctx: SessionContext, story: StoredStoryEntry[]): Promise<void> {
+    if (ctx.currentActivityId) {
+      const entry = this.activityStore.getById(ctx.currentActivityId);
       const backendStory = entry?.story ?? [];
       const useClientStory = story.length > backendStory.length;
       const storyToUse = useClientStory ? story : backendStory;
-      if (useClientStory && entry) {
-        this.activityStore.replaceStory(this.currentActivityId, story);
-      }
-      this.messageStore.finalizeLastAssistant(storyToUse, this.currentActivityId);
-      const finalEntry = this.activityStore.getById(this.currentActivityId);
-      if (finalEntry) {
-        this._send(WS_EVENT.ACTIVITY_UPDATED, { entry: finalEntry });
-      }
-      this.currentActivityId = null;
+      if (useClientStory && entry) this.activityStore.replaceStory(ctx.currentActivityId, story);
+      this.messageStore.finalizeLastAssistant(storyToUse, ctx.currentActivityId);
+      const finalEntry = this.activityStore.getById(ctx.currentActivityId);
+      if (finalEntry) this.sessionRegistry.broadcast(WS_EVENT.ACTIVITY_UPDATED, { entry: finalEntry });
+      ctx.currentActivityId = null;
     } else {
       // If currentActivityId is null, this might be a duplicate submission from a second tab.
       // Instead of appending a new activity, we just update the last assistant message's story if it exists.
@@ -653,24 +630,24 @@ export class OrchestratorService implements OnModuleInit {
     ]);
   }
 
-  private handleGetModel(): void {
-    this._send(WS_EVENT.MODEL_UPDATED, { model: this.modelStore.get() });
+  private handleGetModel(ctx: SessionContext): void {
+    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.modelStore.get() });
   }
 
-  private async handleSetModel(model: string): Promise<void> {
+  private async handleSetModel(ctx: SessionContext, model: string): Promise<void> {
     const value = this.modelStore.set(model);
     await this.modelStore.flush();
-    this._send(WS_EVENT.MODEL_UPDATED, { model: value });
+    this.sessionRegistry.broadcast(WS_EVENT.MODEL_UPDATED, { model: value });
   }
 
-  private handleGetEffort(): void {
-    this._send(WS_EVENT.EFFORT_UPDATED, { effort: this.effortStore.get() });
+  private handleGetEffort(ctx: SessionContext): void {
+    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effortStore.get() });
   }
 
-  private async handleSetEffort(effort: string): Promise<void> {
+  private async handleSetEffort(ctx: SessionContext, effort: string): Promise<void> {
     const value = this.effortStore.set(effort);
     await this.effortStore.flush();
-    this._send(WS_EVENT.EFFORT_UPDATED, { effort: value });
+    this.sessionRegistry.broadcast(WS_EVENT.EFFORT_UPDATED, { effort: value });
   }
 
   private handleAnswerUserQuestion(questionId: string, answer: string): void {
@@ -692,9 +669,9 @@ export class OrchestratorService implements OnModuleInit {
    * Reset the conversation: archive messages, clear stores, notify all connected clients.
    * Refused while the agent is actively processing a request.
    */
-  private async handleResetConversation(): Promise<void> {
-    if (this.isProcessing) {
-      this._send(WS_EVENT.ERROR, { message: 'Cannot reset while the agent is processing a request.' });
+  private async handleResetConversation(ctx: SessionContext): Promise<void> {
+    if (ctx.isProcessing) {
+      ctx.send(WS_EVENT.ERROR, { message: 'Cannot reset while the agent is processing a request.' });
       return;
     }
     const resetAt = new Date().toISOString();
@@ -702,13 +679,13 @@ export class OrchestratorService implements OnModuleInit {
     this.activityStore.clear();
     await this.flushStores();
     this.logger.log(`Conversation reset at ${resetAt}`);
-    this._send(WS_EVENT.CONVERSATION_RESET, { resetAt });
+    this.sessionRegistry.broadcast(WS_EVENT.CONVERSATION_RESET, { resetAt });
   }
 
-  private async executeCliDirectly(command: string, syntheticStepId: string, syntheticStep: ThinkingStep): Promise<void> {
+  private async executeCliDirectly(ctx: SessionContext, command: string, syntheticStepId: string, syntheticStep: ThinkingStep): Promise<void> {
     this.logger.log(`[GemmaRouter] executing CLI directly: ${command}`);
     const model = 'CLI Router';
-    this._send(WS_EVENT.STREAM_START, { model });
+    ctx.send(WS_EVENT.STREAM_START, { model });
     const streamStartEntry: StoredStoryEntry = {
       id: randomUUID(),
       type: 'stream_start',
@@ -717,24 +694,24 @@ export class OrchestratorService implements OnModuleInit {
       details: `Model: ${model}`,
     };
     const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
-    this.currentActivityId = currentActivity.id;
-    this._send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
+    ctx.currentActivityId = currentActivity.id;
+    ctx.send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
     
     const execAsync = promisify(exec);
     let cliOut = `> ${command}\n\n`;
-    this._send(WS_EVENT.STREAM_CHUNK, { text: cliOut });
+    ctx.send(WS_EVENT.STREAM_CHUNK, { text: cliOut });
     
     try {
       const envPath = `${process.env['DATA_DIR'] || '/app/data'}/.fibe/bin:/usr/local/bin:${process.env.PATH || ''}`;
       const { stdout, stderr } = await execAsync(command, { env: { ...process.env, PATH: envPath } });
       const output = stdout || stderr || 'Command executed successfully with no output.';
       cliOut += output;
-      this._send(WS_EVENT.STREAM_CHUNK, { text: output });
+      ctx.send(WS_EVENT.STREAM_CHUNK, { text: output });
     } catch (e) {
       const errText = e instanceof Error ? e.message : String(e);
       cliOut += `Error: ${errText}`;
-      this._send(WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
+      ctx.send(WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
     }
-    finishAgentStream(this.finishStreamDeps(), cliOut, syntheticStepId, syntheticStep, undefined);
+    finishAgentStream(this.finishStreamDeps(ctx), cliOut, syntheticStepId, syntheticStep, undefined);
   }
 }

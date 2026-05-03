@@ -15,6 +15,7 @@ import { ConfigService } from './app/config/config.service';
 import { getCorsOrigin, getFrameAncestors } from './cors-frame.config';
 import { GlobalHttpExceptionFilter } from './app/http-exception.filter';
 import { OrchestratorService } from './app/orchestrator/orchestrator.service';
+import { SessionRegistryService } from './app/orchestrator/session-registry.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
 import { attachWebSocketServer } from './attach-websocket-server';
 import { ContainerLoggerService, logRequest } from './container-logger';
@@ -110,13 +111,14 @@ async function bootstrap() {
 
   const config = app.get(ConfigService);
   const orchestrator = app.get(OrchestratorService);
+  const sessionRegistry = app.get(SessionRegistryService);
   if (injected) {
     orchestrator.isAuthenticated = true;
     orchestrator.ensureStrategySettings();
   }
   const playgroundWatcher = app.get(PlaygroundWatcherService);
   const terminalService = app.get(TerminalService);
-  attachWebSocketServer(fastify, config, orchestrator, playgroundWatcher, terminalService);
+  attachWebSocketServer(fastify, config, orchestrator, sessionRegistry, playgroundWatcher, terminalService);
   logger.log('WebSocket server listening on paths /ws and /ws-terminal');
 
   const postInitScript = config.getPostInitScript();
