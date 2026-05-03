@@ -395,7 +395,8 @@ describe('OrchestratorService', () => {
     expect(orch.isAuthenticated).toBe(false);
     expect(ctx.isProcessing).toBe(false);
     const authStatus = events.find((e) => e.type === WS_EVENT.AUTH_STATUS);
-    expect(authStatus?.data.isProcessing).toBe(false);
+    // Logout broadcasts anyProcessing=false to all sessions
+    expect(authStatus?.data.anyProcessing).toBe(false);
   });
 
   test('handleClientMessage submit_auth_code passes code to strategy', async () => {

@@ -59,6 +59,8 @@ export const WS_EVENT = {
   SET_TITLE: 'set_title',
   /** Conversation was reset — all clients should clear their message list and show a separator. */
   CONVERSATION_RESET: 'conversation_reset',
+  /** Emitted to all sessions whenever a client connects or disconnects — carries active session count. */
+  SESSIONS_UPDATED: 'sessions_updated',
 } as const;
 
 export const AUTH_STATUS = {

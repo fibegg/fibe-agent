@@ -29,6 +29,10 @@ export interface UseChatWebSocketResult {
   errorMessage: string | null;
   authModal: AuthModalState;
   sessionActivity: StoredActivityEntry[];
+  /** Number of currently connected browser tabs/sessions. */
+  sessionCount: number;
+  /** True if any connected session's agent is currently processing a request. */
+  anyProcessing: boolean;
   send: (msg: Record<string, unknown>) => void;
   reconnect: () => void;
   startAuth: () => void;
@@ -69,6 +73,8 @@ export function useChatWebSocket(
   const [agentMode, setAgentMode] = useState<string>('Exploring...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
+  const [sessionCount, setSessionCount] = useState<number>(1);
+  const [anyProcessing, setAnyProcessing] = useState<boolean>(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -269,6 +275,10 @@ export function useChatWebSocket(
       confirm_action_prompt: (d) => onLocalToolEventRef.current?.(d),
       show_image: (d) => onLocalToolEventRef.current?.(d),
       notify: (d) => onLocalToolEventRef.current?.(d),
+      sessions_updated: (d) => {
+        if (typeof d.count === 'number') setSessionCount(d.count);
+        if (typeof d.anyProcessing === 'boolean') setAnyProcessing(d.anyProcessing);
+      },
       conversation_reset: (d) => onConversationResetRef.current?.(typeof d.resetAt === 'string' ? d.resetAt : new Date().toISOString()),
     };
 
@@ -370,6 +380,8 @@ export function useChatWebSocket(
     errorMessage,
     authModal,
     sessionActivity,
+    sessionCount,
+    anyProcessing,
     send,
     reconnect,
     startAuth,

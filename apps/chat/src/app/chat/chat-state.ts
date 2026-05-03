@@ -125,4 +125,6 @@ export interface ServerMessage {
   level?: string;
   /** Included in the conversation_reset event payload. */
   resetAt?: string;
+  /** True if any active session is currently processing a request (sessions_updated event). */
+  anyProcessing?: boolean;
 }

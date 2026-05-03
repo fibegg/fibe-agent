@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { SessionContext } from './session-context';
 import type { OutboundEvent } from './orchestrator.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
+import { WS_EVENT } from '@shared/ws-constants';
 
 /**
  * Manages the lifecycle of per-connection SessionContexts.
@@ -11,6 +12,7 @@ import { StrategyRegistryService } from '../strategies/strategy-registry.service
  * - `destroy()` is called when the client disconnects.
  * - `broadcast()` pushes an event to ALL live sessions (used for shared-state changes
  *   like model/effort updates, auth status, conversation resets).
+ * - `broadcastProcessingState()` pushes anyProcessing flag + session count to all.
  */
 @Injectable()
 export class SessionRegistryService {
@@ -29,6 +31,7 @@ export class SessionRegistryService {
     const ctx = new SessionContext(sessionId, strategy);
     this.sessions.set(sessionId, ctx);
     this.logger.log(`Session created: ${sessionId} (total: ${this.sessions.size})`);
+    this.broadcastSessionCount();
     return ctx;
   }
 
@@ -55,6 +58,7 @@ export class SessionRegistryService {
     ctx.destroy();
     this.sessions.delete(sessionId);
     this.logger.log(`Session destroyed: ${sessionId} (total: ${this.sessions.size})`);
+    this.broadcastSessionCount();
   }
 
   /**
@@ -66,5 +70,25 @@ export class SessionRegistryService {
     for (const ctx of this.sessions.values()) {
       ctx.outbound$.next(event);
     }
+  }
+
+  /**
+   * Push auth_status to every session with the current anyProcessing flag.
+   * Called when any session's isProcessing changes so all UIs stay in sync.
+   */
+  broadcastAuthStatus(
+    status: string,
+    extraData: Record<string, unknown> = {}
+  ): void {
+    const anyProcessing = [...this.sessions.values()].some((s) => s.isProcessing);
+    this.broadcast('auth_status', { status, anyProcessing, ...extraData });
+  }
+
+  /**
+   * Send the current session count to all connected clients.
+   * Each client can display "N tabs open" or similar.
+   */
+  private broadcastSessionCount(): void {
+    this.broadcast(WS_EVENT.SESSIONS_UPDATED, { count: this.sessions.size });
   }
 }

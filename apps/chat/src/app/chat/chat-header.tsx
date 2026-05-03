@@ -74,6 +74,10 @@ export interface ChatHeaderProps {
   onPlaygroundSmartMount?: () => void;
   /** When provided, shows a Reset button in the MoreActionsMenu. */
   onResetConversation?: () => void;
+  /** Number of currently connected WS sessions (browser tabs). */
+  sessionCount?: number;
+  /** True if any connected session's agent is processing a request right now. */
+  anyProcessing?: boolean;
 }
 
 const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -803,6 +807,8 @@ export function ChatHeader({
   onRefreshModels,
   refreshingModels = false,
   onResetConversation,
+  sessionCount = 1,
+  anyProcessing = false,
   ...rest
 }: ChatHeaderProps) {
   const t = useT();
@@ -948,6 +954,21 @@ export function ChatHeader({
               <span className={`min-w-0 truncate text-xs ${statusTextClass}`}>
                 {statusContent}
               </span>
+              {/* Multi-session indicators */}
+              {anyProcessing && state !== CHAT_STATES.AWAITING_RESPONSE && (
+                <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20 animate-pulse">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                  busy in another tab
+                </span>
+              )}
+              {sessionCount > 1 && (
+                <span
+                  className="shrink-0 flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400 border border-violet-500/20"
+                  title={`${sessionCount} browser tabs connected`}
+                >
+                  {sessionCount} tabs
+                </span>
+              )}
             </div>
           </div>
 

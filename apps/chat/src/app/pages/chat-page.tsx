@@ -409,6 +409,8 @@ export function ChatPage() {
     errorMessage,
     authModal,
     sessionActivity,
+    sessionCount,
+    anyProcessing,
     send,
     reconnect,
     startAuth,
@@ -680,7 +682,7 @@ export function ChatPage() {
             simplicateMode={simplicateMode}
             onSimplicateModeChange={handleSimplicateModeChange}
             onResetConversation={
-              state !== CHAT_STATES.AWAITING_RESPONSE
+              !anyProcessing
                 ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
                 : undefined
             }
@@ -855,10 +857,12 @@ export function ChatPage() {
           onSimplicateModeChange={handleSimplicateModeChange}
           onOpenFileBrowser={openFileBrowser}
           onResetConversation={
-            state !== CHAT_STATES.AWAITING_RESPONSE
+            !anyProcessing
               ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
               : undefined
           }
+          sessionCount={sessionCount}
+          anyProcessing={anyProcessing}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}

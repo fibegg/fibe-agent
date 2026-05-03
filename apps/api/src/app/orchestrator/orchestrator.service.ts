@@ -256,9 +256,11 @@ export class OrchestratorService implements OnModuleInit {
   handleClientConnected(ctx: SessionContext): void {
     ctx.isAuthenticated = this.sharedIsAuthenticated;
     ctx.cachedSystemPromptFromFile = this.sharedSystemPromptFromFile;
+    const anyProcessing = this.sessionRegistry.all().some((s) => s.isProcessing);
     ctx.send(WS_EVENT.AUTH_STATUS, {
       status: ctx.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
       isProcessing: ctx.isProcessing,
+      anyProcessing,
     });
     ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.activityStore.all() });
     ctx.send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
@@ -268,9 +270,10 @@ export class OrchestratorService implements OnModuleInit {
     const authenticated = await ctx.strategy.checkAuthStatus();
     this.sharedIsAuthenticated = authenticated;
     for (const s of this.sessionRegistry.all()) s.isAuthenticated = authenticated;
-    ctx.send(WS_EVENT.AUTH_STATUS, {
+    const anyProcessing = this.sessionRegistry.all().some((s) => s.isProcessing);
+    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, {
       status: authenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: ctx.isProcessing,
+      anyProcessing,
     });
   }
 
@@ -292,14 +295,14 @@ export class OrchestratorService implements OnModuleInit {
   private handleCancelAuth(ctx: SessionContext): void {
     ctx.strategy.cancelAuth();
     this.setAllSessionsAuthenticated(false);
-    ctx.send(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, isProcessing: ctx.isProcessing });
+    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, anyProcessing: false });
   }
 
   private async handleReauthenticate(ctx: SessionContext): Promise<void> {
     ctx.strategy.cancelAuth();
     ctx.strategy.clearCredentials();
     this.setAllSessionsAuthenticated(false);
-    ctx.send(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, isProcessing: ctx.isProcessing });
+    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, anyProcessing: false });
     const connection = this.createAuthConnection(ctx);
     ctx.strategy.executeAuth(connection);
   }
@@ -308,7 +311,7 @@ export class OrchestratorService implements OnModuleInit {
     ctx.strategy.cancelAuth();
     this.setAllSessionsAuthenticated(false);
     for (const s of this.sessionRegistry.all()) s.isProcessing = false;
-    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, isProcessing: false });
+    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, anyProcessing: false });
     const connection = this.createLogoutConnection(ctx);
     ctx.strategy.executeLogout(connection);
   }
@@ -534,6 +537,11 @@ export class OrchestratorService implements OnModuleInit {
     } finally {
       await this.flushStores();
       ctx.isProcessing = false;
+      // Notify all sessions that no agent is running anymore (anyProcessing may now be false)
+      this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
+        count: this.sessionRegistry.size,
+        anyProcessing: this.sessionRegistry.all().some((s) => s.isProcessing),
+      });
     }
   }
 
@@ -550,6 +558,11 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
     ctx.isProcessing = true;
+    // Notify all sessions that an agent is now running (anyProcessing = true)
+    this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
+      count: this.sessionRegistry.size,
+      anyProcessing: true,
+    });
     const { text: _t, imageUrls, audioFilename, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(ctx, text, images, audio, audioFilenameFromClient, attachmentFilenames);
     await this.runAgentResponse(ctx, _t, imageUrls, audioFilename, att);
@@ -670,7 +683,8 @@ export class OrchestratorService implements OnModuleInit {
    * Refused while the agent is actively processing a request.
    */
   private async handleResetConversation(ctx: SessionContext): Promise<void> {
-    if (ctx.isProcessing) {
+    // Refuse if ANY session is actively processing (any tab's agent is running)
+    if (this.sessionRegistry.all().some((s) => s.isProcessing)) {
       ctx.send(WS_EVENT.ERROR, { message: 'Cannot reset while the agent is processing a request.' });
       return;
     }
