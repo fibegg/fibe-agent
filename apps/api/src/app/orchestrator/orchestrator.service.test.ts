@@ -11,8 +11,8 @@ import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { UploadsService } from '../uploads/uploads.service';
-import { ChatPromptContextService } from './chat-prompt-context.service';
 import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
+import type { GemmaMcpToolsService } from '../gemma-router/gemma-mcp-tools.service';
 import type { LocalMcpService } from '../local-mcp/local-mcp.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
 import { AGENT_MODES } from '@shared/agent-mode.constants';
@@ -29,7 +29,11 @@ describe('OrchestratorService', () => {
   });
 
   afterEach(async () => {
-    process.env.AGENT_PROVIDER = envBackup;
+    if (envBackup === undefined) {
+      delete process.env.AGENT_PROVIDER;
+    } else {
+      process.env.AGENT_PROVIDER = envBackup;
+    }
     await lastActivityStore?.flush();
     await new Promise((r) => setTimeout(r, 50));
     rmSync(dataDir, { recursive: true, force: true });
@@ -83,6 +87,10 @@ describe('OrchestratorService', () => {
     const gemmaRouter = {
       analyze: async () => ({ action: { type: 'DELEGATE_TO_AGENT', tools: [], confidence: 0 }, skipped: true }),
     } as unknown as GemmaRouterService;
+    const gemmaMcpTools = {
+      refresh: async () => undefined,
+      getTools: () => [],
+    } as unknown as GemmaMcpToolsService;
     const agentModeStore = new AgentModeStoreService(config as never);
     const stub = localMcp ?? makeLocalMcpStub().service;
     const orch = new OrchestratorService(
@@ -96,6 +104,7 @@ describe('OrchestratorService', () => {
       fibeSync,
       chatContext,
       gemmaRouter,
+      gemmaMcpTools,
       agentModeStore,
       stub,
     );
@@ -552,14 +561,14 @@ describe('OrchestratorService', () => {
 
     // Force gemmaRouter to return an EXECUTE_CLI action
     const configSpy = spyOn(orch['config'], 'isGemmaRouterEnabled').mockReturnValue(true);
-    orch['mcpToolsCache'] = [{ name: 'fibe', description: 'desc' }];
+    orch['gemmaMcpTools'].getTools = () => [{ name: 'fibe', description: 'desc' }];
     orch['gemmaRouter'].analyze = async () => ({
       skipped: false,
       action: { type: 'EXECUTE_CLI', command: 'echo hello_from_cli' },
     });
 
     const events: { type: string; data: Record<string, unknown> }[] = [];
-    orch.outbound.subscribe((e) => events.push(e as any));
+    orch.outbound.subscribe((e) => events.push(e as { type: string; data: Record<string, unknown> }));
 
     await orch.handleClientMessage({ action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hello CLI' });
 

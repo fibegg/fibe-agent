@@ -43,9 +43,6 @@ export class SessionContext {
   /** Cached system-prompt file contents (same for all sessions, but cheaply replicated). */
   cachedSystemPromptFromFile: string | null = null;
 
-  /** MCP tool list cache — fetched once per session at startup. */
-  mcpToolsCache: Array<{ name: string; description: string }> | null = null;
-
   constructor(sessionId: string, strategy: AgentStrategy) {
     this.sessionId = sessionId;
     this.strategy = strategy;

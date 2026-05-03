@@ -45,6 +45,7 @@ import { ProxyService } from './provider-traffic/proxy.service';
 import { ProviderTrafficController } from './provider-traffic/provider-traffic.controller';
 import { ProviderTrafficStoreService } from './provider-traffic/provider-traffic-store.service';
 import { GemmaRouterService } from './gemma-router/gemma-router.service';
+import { GemmaMcpToolsService } from './gemma-router/gemma-mcp-tools.service';
 import { AgentModeController } from './agent-mode/agent-mode.controller';
 import { AgentModeStoreService } from './agent-mode/agent-mode.store.service';
 import { LocalMcpModule } from './local-mcp/local-mcp.module';
@@ -104,6 +105,7 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     ProviderTrafficStoreService,
     ProxyService,
     GemmaRouterService,
+    GemmaMcpToolsService,
     AgentModeStoreService,
   ],
 })

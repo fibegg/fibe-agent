@@ -89,6 +89,5 @@ describe('SessionContext', () => {
     expect(ctx.reasoningTextAccumulated).toBe('');
     expect(ctx.lastStreamUsage).toBeUndefined();
     expect(ctx.cachedSystemPromptFromFile).toBeNull();
-    expect(ctx.mcpToolsCache).toBeNull();
   });
 });
