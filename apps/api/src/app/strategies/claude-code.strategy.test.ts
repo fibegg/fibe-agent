@@ -3,6 +3,7 @@ import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync }
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeCodeStrategy, toolUseToEvent } from './claude-code.strategy';
+import { _resetResolveClaudeCache } from './resolve-claude';
 
 const CLAUDE_TEST_HOME = join(tmpdir(), `claude-test-home-${process.pid}`);
 
@@ -150,8 +151,10 @@ describe('ClaudeCodeStrategy API token mode', () => {
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
+    _resetResolveClaudeCache();
     savedEnv.HOME = process.env.HOME;
     savedEnv.PATH = process.env.PATH;
+    savedEnv.CLAUDE_PATH = process.env.CLAUDE_PATH;
     savedEnv.SESSION_DIR = process.env.SESSION_DIR;
     savedEnv.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
     savedEnv.XDG_DATA_HOME = process.env.XDG_DATA_HOME;
@@ -175,8 +178,11 @@ describe('ClaudeCodeStrategy API token mode', () => {
   });
 
   afterEach(() => {
+    _resetResolveClaudeCache();
     process.env.HOME = savedEnv.HOME;
     process.env.PATH = savedEnv.PATH;
+    if (savedEnv.CLAUDE_PATH === undefined) delete process.env.CLAUDE_PATH;
+    else process.env.CLAUDE_PATH = savedEnv.CLAUDE_PATH;
     if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
     else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
     if (savedEnv.XDG_CONFIG_HOME === undefined) delete process.env.XDG_CONFIG_HOME;
@@ -372,7 +378,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.CLAUDE_FAKE_MODE = 'missing-session';
 
@@ -409,7 +415,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'bad-token';
     process.env.CLAUDE_FAKE_MODE = 'auth-error-json';
 
@@ -427,7 +433,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'bad-token';
     process.env.CLAUDE_FAKE_MODE = 'auth-error-result';
 
@@ -445,7 +451,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
     const argsPath = join(CLAUDE_TEST_HOME, 'claude-runtime-effort-args.json');
@@ -468,7 +474,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
     const argsPath = join(CLAUDE_TEST_HOME, 'claude-stream-json-output-args.json');
@@ -501,7 +507,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
 
     const argsPath = join(CLAUDE_TEST_HOME, 'claude-pending-steering-args.json');
@@ -526,7 +532,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     const fibeHome = join(CLAUDE_TEST_HOME, 'persisted-agent-data');
     process.env.HOME = fibeHome;
@@ -564,7 +570,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
     writeFakeClaude(join(fakeBinDir, 'claude'));
-    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
     process.env.HOME = '/home/node';
     const sessionDir = join(CLAUDE_TEST_HOME, 'legacy-agent-data', '.claude');

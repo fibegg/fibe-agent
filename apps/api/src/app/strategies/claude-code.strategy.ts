@@ -7,6 +7,7 @@ import type { AgentRuntimeOptions, AuthConnection, ConversationDataDirProvider, 
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
+import { resolveClaude, getEnrichedPath } from './resolve-claude';
 
 const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
 
@@ -203,6 +204,9 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       ...this.getProxyEnv(),
       HOME: getClaudeHomeDir(),
       ...getClaudeXdgEnv(),
+      // Enrich PATH so child processes (node scripts, claude binary itself)
+      // can be resolved even in restricted shells that don't load .zshrc / nvm.
+      PATH: getEnrichedPath(process.env.PATH ?? ''),
       ...extraEnv,
     };
   }
@@ -254,7 +258,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
     if (token) {
       envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
     }
-    const logoutProcess = spawn('claude', ['auth', 'logout'], {
+    const logoutProcess = spawn(resolveClaude(), ['auth', 'logout'], {
       env: this.getClaudeProcessEnv(envOverrides),
       shell: false,
     });
@@ -301,7 +305,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
       }
       
-      const checkProcess = spawn('claude', ['auth', 'status'], {
+      const checkProcess = spawn(resolveClaude(), ['auth', 'status'], {
         env: this.getClaudeProcessEnv(envOverrides),
         shell: false,
       });
@@ -424,7 +428,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
       }
 
-      const claudeProcess = spawn('claude', args, {
+      const claudeProcess = spawn(resolveClaude(), args, {
         env: this.getClaudeProcessEnv(envOverrides),
         cwd: workspaceDir,
         shell: false,
