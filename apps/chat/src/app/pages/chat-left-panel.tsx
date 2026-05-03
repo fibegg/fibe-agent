@@ -29,7 +29,7 @@ interface ChatLeftPanelProps {
   onAgentUploaded?: () => void;
   agentProviderLabel?: string;
   currentModel?: string;
-  // Conversation sidebar
+  // Conversation sidebar — always shown when panel is open
   conversations?: ConversationMeta[];
   conversationsLoading?: boolean;
   activeConversationId?: string;
@@ -69,19 +69,77 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onConversationRename,
   onConversationDelete,
 }: ChatLeftPanelProps) {
+  // File explorer collapses to icon rail when no files or explicitly collapsed
   const isCollapsed = !hasAnyFiles || sidebarCollapsed;
+  // Conversations are always visible as long as the panel itself isn't icon-only
+  // (i.e. when the user has explicitly collapsed to icon rail we hide them too —
+  // there is no room).  When there are no files but the user hasn't collapsed,
+  // conversations take the full panel height so progress is always trackable.
+  const showConversations = !sidebarCollapsed && conversations !== undefined && onConversationSelect;
+
   return (
     <div
       ref={panelRef}
       className={`flex min-h-0 flex-shrink-0 flex-col overflow-visible${isDraggingResize ? '' : ' transition-[width] duration-300 ease-out'}`}
       style={{
-        width: isCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : width,
+        width: isCollapsed && !showConversations ? SIDEBAR_COLLAPSED_WIDTH_PX : width,
       }}
     >
-      <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
-        {/* Conversation list — shown above file explorer when not collapsed */}
-        {!isCollapsed && conversations !== undefined && onConversationSelect && (
-          <div className="shrink-0 border-b border-border/30" style={{ maxHeight: '40%', overflowY: 'auto' }}>
+      <aside className="flex min-h-0 flex-1 flex-col overflow-hidden relative">
+        {/* File explorer — only rendered when there are files */}
+        {hasAnyFiles && (
+          <div className={`flex flex-col overflow-hidden ${showConversations ? 'flex-1' : 'flex-1'}`}>
+            <FileExplorer
+              tree={playgroundTree}
+              agentTree={agentFileTree}
+              activeTab={activeFileTab}
+              onTabChange={onTabChange}
+              agentFileApiPath="agent-files/file"
+              playgroundStats={playgroundStats}
+              agentStats={agentStats}
+              collapsed={isCollapsed}
+              onSettingsClick={onSettingsClick}
+              onToggleCollapse={onToggleCollapse}
+              onFileSelect={onFileSelect}
+              selectedPath={selectedPath}
+              dirtyPaths={dirtyPaths}
+              onPlaygroundUploaded={onPlaygroundUploaded}
+              onAgentUploaded={onAgentUploaded}
+              agentProviderLabel={agentProviderLabel}
+              currentModel={currentModel}
+            />
+          </div>
+        )}
+
+        {/* No-file collapsed icon rail (settings + toggle) */}
+        {!hasAnyFiles && !showConversations && (
+          <FileExplorer
+            tree={playgroundTree}
+            agentTree={agentFileTree}
+            activeTab={activeFileTab}
+            onTabChange={onTabChange}
+            agentFileApiPath="agent-files/file"
+            playgroundStats={playgroundStats}
+            agentStats={agentStats}
+            collapsed
+            onSettingsClick={onSettingsClick}
+            onToggleCollapse={onToggleCollapse}
+            onFileSelect={onFileSelect}
+            selectedPath={selectedPath}
+            dirtyPaths={dirtyPaths}
+            onPlaygroundUploaded={onPlaygroundUploaded}
+            onAgentUploaded={onAgentUploaded}
+            agentProviderLabel={agentProviderLabel}
+            currentModel={currentModel}
+          />
+        )}
+
+        {/* Conversations — always in the bottom half so progress is always visible */}
+        {showConversations && (
+          <div
+            className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
+            style={{ height: hasAnyFiles ? '45%' : '100%', minHeight: 180 }}
+          >
             <ConversationSidebar
               conversations={conversations}
               activeId={activeConversationId}
@@ -93,25 +151,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
             />
           </div>
         )}
-        <FileExplorer
-          tree={playgroundTree}
-          agentTree={agentFileTree}
-          activeTab={activeFileTab}
-          onTabChange={onTabChange}
-          agentFileApiPath="agent-files/file"
-          playgroundStats={playgroundStats}
-          agentStats={agentStats}
-          collapsed={isCollapsed}
-          onSettingsClick={onSettingsClick}
-          onToggleCollapse={onToggleCollapse}
-          onFileSelect={onFileSelect}
-          selectedPath={selectedPath}
-          dirtyPaths={dirtyPaths}
-          onPlaygroundUploaded={onPlaygroundUploaded}
-          onAgentUploaded={onAgentUploaded}
-          agentProviderLabel={agentProviderLabel}
-          currentModel={currentModel}
-        />
+
         {!isCollapsed && (
           <PanelResizeHandle
             side="left"

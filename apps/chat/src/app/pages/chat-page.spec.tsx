@@ -228,6 +228,20 @@ vi.mock('../file-explorer/file-explorer', () => ({
   FileExplorer: () => <div data-testid="file-explorer" />,
 }));
 
+vi.mock('../chat/use-conversations', () => ({
+  useConversations: vi.fn().mockReturnValue({
+    conversations: undefined,
+    loading: false,
+    activeId: 'default',
+    create: vi.fn().mockResolvedValue('default'),
+    rename: vi.fn(),
+    remove: vi.fn(),
+    switchTo: vi.fn(),
+    refresh: vi.fn(),
+  }),
+  getActiveConversationId: vi.fn().mockReturnValue('default'),
+}));
+
 vi.mock('../file-explorer/file-viewer-panel', () => ({
   FileViewerPanel: () => <div data-testid="file-viewer-panel" />,
 }));

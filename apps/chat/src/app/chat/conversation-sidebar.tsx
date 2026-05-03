@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { MessageSquare, Plus, Trash2, Edit3, Check, X } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search } from 'lucide-react';
 import type { ConversationMeta } from './use-conversations';
 
 interface ConversationSidebarProps {
@@ -124,10 +124,19 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onRename,
   onDelete,
 }: ConversationSidebarProps) {
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const filtered = searchQuery.trim()
+    ? conversations.filter((c) =>
+        c.title.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : conversations;
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header + New Chat */}
-      <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30 shrink-0">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
           Conversations
         </span>
@@ -135,11 +144,38 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           onClick={onCreate}
           className="flex items-center gap-1 rounded-md bg-violet-500/15 border border-violet-500/25 px-2 py-1 text-[10px] font-medium text-violet-400 hover:bg-violet-500/25 transition-colors"
           title="New chat"
+          id="conversation-sidebar-new-btn"
         >
           <Plus className="h-3 w-3" />
           New
         </button>
       </div>
+
+      {/* Search */}
+      {conversations.length > 0 && (
+        <div className="px-2 pt-2 shrink-0">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/40 pointer-events-none" />
+            <input
+              ref={searchRef}
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search…"
+              className="w-full rounded-md bg-muted/40 border border-border/20 pl-6 pr-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-1 focus:ring-violet-500/30 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                aria-label="Clear search"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* List */}
       <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-0.5">
@@ -148,12 +184,28 @@ export const ConversationSidebar = memo(function ConversationSidebar({
             <span className="text-xs text-muted-foreground/50 animate-pulse">Loading…</span>
           </div>
         ) : conversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 px-4 text-center">
+            <div className="rounded-full bg-violet-500/10 border border-violet-500/20 p-3">
+              <MessageSquare className="h-5 w-5 text-violet-400/60" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-foreground/70">No conversations yet</p>
+              <p className="text-[10px] text-muted-foreground/50 mt-0.5">Create one to get started</p>
+            </div>
+            <button
+              onClick={onCreate}
+              className="flex items-center gap-1.5 rounded-md bg-violet-500/20 border border-violet-500/30 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-500/30 transition-colors"
+            >
+              <Plus className="h-3 w-3" />
+              New conversation
+            </button>
+          </div>
+        ) : filtered.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <MessageSquare className="h-6 w-6 text-muted-foreground/30" />
-            <span className="text-xs text-muted-foreground/50">No chats yet</span>
+            <span className="text-xs text-muted-foreground/50">No matches</span>
           </div>
         ) : (
-          conversations.map((conv) => (
+          filtered.map((conv) => (
             <ConversationItem
               key={conv.id}
               conv={conv}

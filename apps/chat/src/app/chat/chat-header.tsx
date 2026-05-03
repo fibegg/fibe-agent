@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, RefreshCcw, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, MessageSquare, RefreshCcw, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
 import { EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
@@ -78,6 +78,9 @@ export interface ChatHeaderProps {
   sessionCount?: number;
   /** True if any connected session's agent is processing a request right now. */
   anyProcessing?: boolean;
+  /** Toggle the conversations drawer in the main chat column. */
+  onToggleConversations?: () => void;
+  conversationsOpen?: boolean;
 }
 
 const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -809,6 +812,8 @@ export function ChatHeader({
   onResetConversation,
   sessionCount = 1,
   anyProcessing = false,
+  onToggleConversations,
+  conversationsOpen = false,
   ...rest
 }: ChatHeaderProps) {
   const t = useT();
@@ -1148,6 +1153,24 @@ export function ChatHeader({
           {/* Desktop-only: playground selector in top row */}
           <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
           <LocaleSelector />
+          {/* Desktop-only: conversations toggle */}
+          {onToggleConversations && (
+            <button
+              type="button"
+              onClick={onToggleConversations}
+              className={`hidden sm:flex size-9 rounded-md items-center justify-center transition-colors shrink-0 ${
+                conversationsOpen
+                  ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
+                  : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+              }`}
+              title="Conversations"
+              aria-label="Toggle conversations"
+              aria-pressed={conversationsOpen}
+              id="chat-header-conversations-btn"
+            >
+              <MessageSquare className="size-4" />
+            </button>
+          )}
           {/* Desktop-only: diff button in top row */}
           {onToggleDiff && (
             <DiffButton open={diffOpen} onToggle={onToggleDiff} className="hidden sm:flex size-9" />
