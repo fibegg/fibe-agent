@@ -94,6 +94,15 @@ describe('OrchestratorService', () => {
     } as unknown as import('../gemma-router/gemma-mcp-tools.service').GemmaMcpToolsService;
     const agentModeStore = new AgentModeStoreService(config as never);
     const stub = localMcp ?? makeLocalMcpStub().service;
+    // Mock ConversationManagerService — returns the same stores for any conversationId
+    const conversationManager = {
+      getOrCreate: (_id: string) => ({ messageStore, activityStore }),
+      touch: (_id: string) => undefined,
+      list: () => [],
+      create: () => ({ id: 'test', title: 'New chat', createdAt: '', lastMessageAt: '' }),
+      setTitle: () => true,
+      delete: () => true,
+    } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -108,6 +117,7 @@ describe('OrchestratorService', () => {
       gemmaMcpTools,
       agentModeStore,
       stub,
+      conversationManager,
     );
     await orch.onModuleInit();
     const ctx = sessionRegistry.create();

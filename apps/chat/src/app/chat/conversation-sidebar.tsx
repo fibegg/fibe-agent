@@ -1,0 +1,170 @@
+import { memo, useCallback, useRef, useState } from 'react';
+import { MessageSquare, Plus, Trash2, Edit3, Check, X } from 'lucide-react';
+import type { ConversationMeta } from './use-conversations';
+
+interface ConversationSidebarProps {
+  conversations: ConversationMeta[];
+  activeId: string;
+  loading: boolean;
+  onSelect: (id: string) => void;
+  onCreate: () => void;
+  onRename: (id: string, title: string) => void;
+  onDelete: (id: string) => void;
+}
+
+function timeAgo(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return `${d}d ago`;
+}
+
+const ConversationItem = memo(function ConversationItem({
+  conv,
+  isActive,
+  onSelect,
+  onRename,
+  onDelete,
+}: {
+  conv: ConversationMeta;
+  isActive: boolean;
+  onSelect: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(conv.title);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const startEdit = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDraft(conv.title);
+    setEditing(true);
+    setTimeout(() => inputRef.current?.select(), 50);
+  }, [conv.title]);
+
+  const commitEdit = useCallback(() => {
+    const trimmed = draft.trim();
+    if (trimmed && trimmed !== conv.title) onRename(trimmed);
+    setEditing(false);
+  }, [draft, conv.title, onRename]);
+
+  const cancelEdit = useCallback(() => {
+    setDraft(conv.title);
+    setEditing(false);
+  }, [conv.title]);
+
+  return (
+    <div
+      onClick={onSelect}
+      className={`group relative flex items-start gap-2.5 rounded-lg px-3 py-2.5 cursor-pointer transition-all duration-150
+        ${isActive
+          ? 'bg-violet-500/15 border border-violet-500/30 text-foreground'
+          : 'hover:bg-muted/50 border border-transparent text-muted-foreground hover:text-foreground'
+        }`}
+    >
+      <MessageSquare className={`mt-0.5 shrink-0 h-3.5 w-3.5 ${isActive ? 'text-violet-400' : 'text-muted-foreground/50'}`} />
+      <div className="min-w-0 flex-1">
+        {editing ? (
+          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+            <input
+              ref={inputRef}
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') cancelEdit(); }}
+              className="w-full rounded bg-background/80 px-1.5 py-0.5 text-xs text-foreground outline-none ring-1 ring-violet-500/40"
+              autoFocus
+            />
+            <button onClick={commitEdit} className="shrink-0 text-green-400 hover:text-green-300 transition-colors">
+              <Check className="h-3 w-3" />
+            </button>
+            <button onClick={cancelEdit} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+              <X className="h-3 w-3" />
+            </button>
+          </div>
+        ) : (
+          <p className="truncate text-xs font-medium leading-tight">{conv.title}</p>
+        )}
+        <p className="mt-0.5 text-[10px] text-muted-foreground/50">{timeAgo(conv.lastMessageAt)}</p>
+      </div>
+
+      {/* Action buttons — visible on hover / active */}
+      {!editing && (
+        <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden items-center gap-1 group-hover:flex">
+          <button
+            onClick={startEdit}
+            className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+            title="Rename"
+          >
+            <Edit3 className="h-3 w-3" />
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            className="rounded p-0.5 text-muted-foreground/60 hover:text-red-400 transition-colors"
+            title="Delete"
+          >
+            <Trash2 className="h-3 w-3" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+});
+
+export const ConversationSidebar = memo(function ConversationSidebar({
+  conversations,
+  activeId,
+  loading,
+  onSelect,
+  onCreate,
+  onRename,
+  onDelete,
+}: ConversationSidebarProps) {
+  return (
+    <div className="flex flex-col h-full min-h-0">
+      {/* Header + New Chat */}
+      <div className="flex items-center justify-between px-3 py-2 border-b border-border/30">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+          Conversations
+        </span>
+        <button
+          onClick={onCreate}
+          className="flex items-center gap-1 rounded-md bg-violet-500/15 border border-violet-500/25 px-2 py-1 text-[10px] font-medium text-violet-400 hover:bg-violet-500/25 transition-colors"
+          title="New chat"
+        >
+          <Plus className="h-3 w-3" />
+          New
+        </button>
+      </div>
+
+      {/* List */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-0.5">
+        {loading ? (
+          <div className="flex items-center justify-center py-8">
+            <span className="text-xs text-muted-foreground/50 animate-pulse">Loading…</span>
+          </div>
+        ) : conversations.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 gap-2">
+            <MessageSquare className="h-6 w-6 text-muted-foreground/30" />
+            <span className="text-xs text-muted-foreground/50">No chats yet</span>
+          </div>
+        ) : (
+          conversations.map((conv) => (
+            <ConversationItem
+              key={conv.id}
+              conv={conv}
+              isActive={conv.id === activeId}
+              onSelect={() => onSelect(conv.id)}
+              onRename={(title) => onRename(conv.id, title)}
+              onDelete={() => onDelete(conv.id)}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  );
+});

@@ -49,6 +49,8 @@ import { GemmaMcpToolsService } from './gemma-router/gemma-mcp-tools.service';
 import { AgentModeController } from './agent-mode/agent-mode.controller';
 import { AgentModeStoreService } from './agent-mode/agent-mode.store.service';
 import { LocalMcpModule } from './local-mcp/local-mcp.module';
+import { ConversationManagerService } from './conversation/conversation-manager.service';
+import { ConversationsController } from './conversation/conversations.controller';
 
 @Module({
   imports: [
@@ -76,6 +78,7 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     FibeSyncSettingsController,
     ProviderTrafficController,
     AgentModeController,
+    ConversationsController,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
@@ -107,6 +110,7 @@ import { LocalMcpModule } from './local-mcp/local-mcp.module';
     GemmaRouterService,
     GemmaMcpToolsService,
     AgentModeStoreService,
+    ConversationManagerService,
   ],
 })
 export class AppModule {}

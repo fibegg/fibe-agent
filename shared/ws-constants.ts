@@ -61,6 +61,8 @@ export const WS_EVENT = {
   CONVERSATION_RESET: 'conversation_reset',
   /** Emitted to all sessions whenever a client connects or disconnects — carries active session count. */
   SESSIONS_UPDATED: 'sessions_updated',
+  /** Sent to a client right after WS connect to identify which conversation this session is for. */
+  CONVERSATION_ID: 'conversation_id',
 } as const;
 
 export const AUTH_STATUS = {

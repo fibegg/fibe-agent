@@ -42,6 +42,7 @@ import { GemmaMcpToolsService } from '../gemma-router/gemma-mcp-tools.service';
 import { LocalMcpService } from '../local-mcp/local-mcp.service';
 import { SessionContext } from './session-context';
 import { SessionRegistryService } from './session-registry.service';
+import { ConversationManagerService } from '../conversation/conversation-manager.service';
 
 export interface OutboundEvent {
   type: string;
@@ -70,6 +71,7 @@ export class OrchestratorService implements OnModuleInit {
     private readonly gemmaMcpTools: GemmaMcpToolsService,
     private readonly agentModeStore: AgentModeStoreService,
     private readonly localMcp: LocalMcpService,
+    private readonly conversationManager: ConversationManagerService,
   ) {
   }
 
@@ -147,15 +149,27 @@ export class OrchestratorService implements OnModuleInit {
   set isAuthenticated(v: boolean) { this.sharedIsAuthenticated = v; }
   /** Backward-compat: true if ANY session is processing */
   get isProcessing(): boolean { return this.sessionRegistry.all().some(s => s.isProcessing); }
+  /** Backward-compat: default conversation message store (used by REST /messages endpoint). */
   get messages(): MessageStoreService { return this.messageStore; }
   ensureStrategySettings(): void { /* no-op in multi-session mode */ }
 
+  /**
+   * Returns per-conversation MessageStore + ActivityStore for the given session.
+   * Falls back to the legacy singleton stores for the 'default' conversation so
+   * existing single-conversation installs are unaffected.
+   */
+  private stores(ctx: SessionContext): { messageStore: MessageStoreService; activityStore: ActivityStoreService } {
+    const { messageStore, activityStore } = this.conversationManager.getOrCreate(ctx.conversationId);
+    return { messageStore, activityStore };
+  }
+
 
   private finishStreamDeps(ctx: SessionContext): FinishAgentStreamDeps {
+    const { messageStore: fMsg, activityStore: fAct } = this.stores(ctx);
     return {
-      messageStore: this.messageStore,
+      messageStore: fMsg,
       modelStore: this.modelStore,
-      activityStore: this.activityStore,
+      activityStore: fAct,
       fibeSync: this.fibeSync,
       send: (type: string, data?: Record<string, unknown>) =>
         ctx.send(type, data ?? {}),
@@ -166,10 +180,11 @@ export class OrchestratorService implements OnModuleInit {
     };
   }
 
-  private async flushStores(): Promise<void> {
+  private async flushStores(ctx?: SessionContext): Promise<void> {
+    const convStores = ctx ? this.stores(ctx) : null;
     await Promise.all([
-      this.messageStore.flush(),
-      this.activityStore.flush(),
+      convStores ? convStores.messageStore.flush() : this.messageStore.flush(),
+      convStores ? convStores.activityStore.flush() : this.activityStore.flush(),
       this.modelStore.flush(),
       this.effortStore.flush(),
     ]);
@@ -262,7 +277,7 @@ export class OrchestratorService implements OnModuleInit {
       isProcessing: ctx.isProcessing,
       anyProcessing,
     });
-    ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.activityStore.all() });
+    ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.stores(ctx).activityStore.all() });
     ctx.send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
   }
 
@@ -376,13 +391,15 @@ export class OrchestratorService implements OnModuleInit {
         this.logger.warn('Failed to save voice recording, skipping');
       }
     }
-    const userMessage = this.messageStore.add(
+    const { messageStore: ctxMsgStore } = this.stores(ctx);
+    const userMessage = ctxMsgStore.add(
       'user',
       text,
       imageUrls.length ? imageUrls : undefined
     );
-    await this.messageStore.flush();
+    await ctxMsgStore.flush();
     this.sessionRegistry.broadcast(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
+    this.conversationManager.touch(ctx.conversationId);
     return {
       messageId: userMessage.id,
       text,
@@ -420,7 +437,7 @@ export class OrchestratorService implements OnModuleInit {
       const historyMessages = ctx.strategy.hasNativeSessionSupport?.()
         ? undefined
         : (() => {
-            const allMessages = this.messageStore.all();
+            const allMessages = this.stores(ctx).messageStore.all();
             return allMessages.length > 1
               ? allMessages.slice(0, -1).map((m) => ({ role: m.role, body: m.body }))
               : undefined;
@@ -477,7 +494,8 @@ export class OrchestratorService implements OnModuleInit {
         timestamp: new Date().toISOString(),
         details: model ? `Model: ${model}` : undefined,
       };
-      const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
+      const { activityStore: rAct } = this.stores(ctx);
+      const currentActivity = rAct.createWithEntry(streamStartEntry);
       ctx.currentActivityId = currentActivity.id;
       ctx.reasoningTextAccumulated = '';
       ctx.send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
@@ -492,7 +510,7 @@ export class OrchestratorService implements OnModuleInit {
       const streamDeps = {
         send: (type: string, data?: Record<string, unknown>) =>
           ctx.send(type, data ?? {}),
-        activityStore: this.activityStore,
+        activityStore: rAct,
         getCurrentActivityId: () => ctx.currentActivityId,
         getReasoningText: () => ctx.reasoningTextAccumulated,
         appendReasoningText: (t: string) => {
@@ -535,7 +553,7 @@ export class OrchestratorService implements OnModuleInit {
         ctx.send(WS_EVENT.ERROR, { message });
       }
     } finally {
-      await this.flushStores();
+      await this.flushStores(ctx);
       ctx.isProcessing = false;
       // Notify all sessions that no agent is running anymore (anyProcessing may now be false)
       this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
@@ -570,10 +588,12 @@ export class OrchestratorService implements OnModuleInit {
 
   private async handleQueueMessage(ctx: SessionContext, text: string): Promise<void> {
     if (!text.trim()) return;
-    const userMessage = this.messageStore.add('user', text);
-    await this.messageStore.flush();
+    const { messageStore: qMsgStore } = this.stores(ctx);
+    const userMessage = qMsgStore.add('user', text);
+    await qMsgStore.flush();
     this.sessionRegistry.broadcast(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
-    void this.fibeSync.syncMessages(() => JSON.stringify(this.messageStore.all()));
+    this.conversationManager.touch(ctx.conversationId);
+    void this.fibeSync.syncMessages(() => JSON.stringify(qMsgStore.all()));
     if (ctx.strategy.steerAgent) ctx.strategy.steerAgent(text);
   }
 
@@ -604,43 +624,37 @@ export class OrchestratorService implements OnModuleInit {
   }
 
   private async handleSubmitStory(ctx: SessionContext, story: StoredStoryEntry[]): Promise<void> {
+    const { messageStore: sMsg, activityStore: sAct } = this.stores(ctx);
     if (ctx.currentActivityId) {
-      const entry = this.activityStore.getById(ctx.currentActivityId);
+      const entry = sAct.getById(ctx.currentActivityId);
       const backendStory = entry?.story ?? [];
       const useClientStory = story.length > backendStory.length;
       const storyToUse = useClientStory ? story : backendStory;
-      if (useClientStory && entry) this.activityStore.replaceStory(ctx.currentActivityId, story);
-      this.messageStore.finalizeLastAssistant(storyToUse, ctx.currentActivityId);
-      const finalEntry = this.activityStore.getById(ctx.currentActivityId);
+      if (useClientStory && entry) sAct.replaceStory(ctx.currentActivityId, story);
+      sMsg.finalizeLastAssistant(storyToUse, ctx.currentActivityId);
+      const finalEntry = sAct.getById(ctx.currentActivityId);
       if (finalEntry) this.sessionRegistry.broadcast(WS_EVENT.ACTIVITY_UPDATED, { entry: finalEntry });
       ctx.currentActivityId = null;
     } else {
       // If currentActivityId is null, this might be a duplicate submission from a second tab.
       // Instead of appending a new activity, we just update the last assistant message's story if it exists.
       this.logger.debug('Received submit_story but currentActivityId is null (possible duplicate from another tab).');
-      const allMessages = this.messageStore.all();
+      const allMessages = sMsg.all();
       const lastMsg = allMessages[allMessages.length - 1];
       if (lastMsg && lastMsg.role === 'assistant') {
          const backendStory = lastMsg.story ?? [];
          const useClientStory = story.length > backendStory.length;
          if (useClientStory) {
-            this.messageStore.finalizeLastAssistant(story, lastMsg.activityId);
+            sMsg.finalizeLastAssistant(story, lastMsg.activityId);
             if (lastMsg.activityId) {
-               this.activityStore.replaceStory(lastMsg.activityId, story);
+               sAct.replaceStory(lastMsg.activityId, story);
             }
          }
       }
     }
-    void this.fibeSync.syncMessages(() =>
-      JSON.stringify(this.messageStore.all())
-    );
-    void this.fibeSync.syncActivity(() =>
-      JSON.stringify(this.activityStore.all())
-    );
-    await Promise.all([
-      this.messageStore.flush(),
-      this.activityStore.flush(),
-    ]);
+    void this.fibeSync.syncMessages(() => JSON.stringify(sMsg.all()));
+    void this.fibeSync.syncActivity(() => JSON.stringify(sAct.all()));
+    await Promise.all([sMsg.flush(), sAct.flush()]);
   }
 
   private handleGetModel(ctx: SessionContext): void {
@@ -689,10 +703,11 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
     const resetAt = new Date().toISOString();
-    this.messageStore.reset();
-    this.activityStore.clear();
-    await this.flushStores();
-    this.logger.log(`Conversation reset at ${resetAt}`);
+    const { messageStore: rMsg, activityStore: rAct } = this.stores(ctx);
+    rMsg.reset();
+    rAct.clear();
+    await this.flushStores(ctx);
+    this.logger.log(`Conversation reset at ${resetAt} (conversation: ${ctx.conversationId})`);
     this.sessionRegistry.broadcast(WS_EVENT.CONVERSATION_RESET, { resetAt });
   }
 
@@ -707,7 +722,8 @@ export class OrchestratorService implements OnModuleInit {
       timestamp: new Date().toISOString(),
       details: `Model: ${model}`,
     };
-    const currentActivity = this.activityStore.createWithEntry(streamStartEntry);
+    const { activityStore: cliAct } = this.stores(ctx);
+    const currentActivity = cliAct.createWithEntry(streamStartEntry);
     ctx.currentActivityId = currentActivity.id;
     ctx.send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
     

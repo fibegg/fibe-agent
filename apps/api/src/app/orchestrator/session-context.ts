@@ -43,9 +43,13 @@ export class SessionContext {
   /** Cached system-prompt file contents (same for all sessions, but cheaply replicated). */
   cachedSystemPromptFromFile: string | null = null;
 
-  constructor(sessionId: string, strategy: AgentStrategy) {
+  /** The conversation this session is bound to. Defaults to 'default' (legacy). */
+  conversationId: string;
+
+  constructor(sessionId: string, strategy: AgentStrategy, conversationId = 'default') {
     this.sessionId = sessionId;
     this.strategy = strategy;
+    this.conversationId = conversationId;
   }
 
   /** Emit an outbound event to this session's subscriber (the WS client). */

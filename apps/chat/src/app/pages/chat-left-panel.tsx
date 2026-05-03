@@ -4,6 +4,8 @@ import type { FileTab, TabStats } from '../file-explorer/file-explorer-tabs';
 import { SIDEBAR_COLLAPSED_WIDTH_PX } from '../layout-constants';
 import { PanelResizeHandle } from '../panel-resize-handle';
 import type { PanelResizeStartEvent } from '../use-panel-resize';
+import { ConversationSidebar } from '../chat/conversation-sidebar';
+import type { ConversationMeta } from '../chat/use-conversations';
 
 interface ChatLeftPanelProps {
   hasAnyFiles: boolean;
@@ -27,6 +29,14 @@ interface ChatLeftPanelProps {
   onAgentUploaded?: () => void;
   agentProviderLabel?: string;
   currentModel?: string;
+  // Conversation sidebar
+  conversations?: ConversationMeta[];
+  conversationsLoading?: boolean;
+  activeConversationId?: string;
+  onConversationSelect?: (id: string) => void;
+  onConversationCreate?: () => void;
+  onConversationRename?: (id: string, title: string) => void;
+  onConversationDelete?: (id: string) => void;
 }
 
 export const ChatLeftPanel = memo(function ChatLeftPanel({
@@ -51,6 +61,13 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onAgentUploaded,
   agentProviderLabel,
   currentModel,
+  conversations,
+  conversationsLoading = false,
+  activeConversationId = 'default',
+  onConversationSelect,
+  onConversationCreate,
+  onConversationRename,
+  onConversationDelete,
 }: ChatLeftPanelProps) {
   const isCollapsed = !hasAnyFiles || sidebarCollapsed;
   return (
@@ -62,6 +79,20 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
       }}
     >
       <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative">
+        {/* Conversation list — shown above file explorer when not collapsed */}
+        {!isCollapsed && conversations !== undefined && onConversationSelect && (
+          <div className="shrink-0 border-b border-border/30" style={{ maxHeight: '40%', overflowY: 'auto' }}>
+            <ConversationSidebar
+              conversations={conversations}
+              activeId={activeConversationId}
+              loading={conversationsLoading}
+              onSelect={onConversationSelect}
+              onCreate={onConversationCreate ?? (() => undefined)}
+              onRename={onConversationRename ?? (() => undefined)}
+              onDelete={onConversationDelete ?? (() => undefined)}
+            />
+          </div>
+        )}
         <FileExplorer
           tree={playgroundTree}
           agentTree={agentFileTree}

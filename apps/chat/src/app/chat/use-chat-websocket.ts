@@ -66,7 +66,9 @@ export function useChatWebSocket(
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void,
   onLocalToolEvent?: (data: ServerMessage) => void,
-  onConversationReset?: (resetAt: string) => void
+  onConversationReset?: (resetAt: string) => void,
+  /** Which conversation to bind this WS session to. Defaults to 'default'. */
+  conversationId = 'default',
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -142,9 +144,10 @@ export function useChatWebSocket(
 
     const token = getAuthTokenForRequest();
     const wsBase = getWsUrl();
+    const cParam = conversationId !== 'default' ? `&c=${encodeURIComponent(conversationId)}` : '';
     const url = token
-      ? `${wsBase}/ws?token=${encodeURIComponent(token)}`
-      : `${wsBase}/ws`;
+      ? `${wsBase}/ws?token=${encodeURIComponent(token)}${cParam}`
+      : `${wsBase}/ws${cParam ? `?${cParam.slice(1)}` : ''}`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
@@ -279,6 +282,8 @@ export function useChatWebSocket(
         if (typeof d.count === 'number') setSessionCount(d.count);
         if (typeof d.anyProcessing === 'boolean') setAnyProcessing(d.anyProcessing);
       },
+      // Server confirms which conversation this session is bound to
+      conversation_id: (_d) => { /* acknowledged */ },
       conversation_reset: (d) => onConversationResetRef.current?.(typeof d.resetAt === 'string' ? d.resetAt : new Date().toISOString()),
     };
 

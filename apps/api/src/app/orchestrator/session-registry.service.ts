@@ -24,13 +24,14 @@ export class SessionRegistryService {
   /**
    * Create a new isolated session context for an incoming WS connection.
    * Each session gets its own AgentStrategy instance (= its own Claude process slot).
+   * Pass conversationId to bind this session to a specific conversation thread.
    */
-  create(): SessionContext {
+  create(conversationId = 'default'): SessionContext {
     const sessionId = randomUUID();
     const strategy = this.strategyRegistry.resolveStrategy();
-    const ctx = new SessionContext(sessionId, strategy);
+    const ctx = new SessionContext(sessionId, strategy, conversationId);
     this.sessions.set(sessionId, ctx);
-    this.logger.log(`Session created: ${sessionId} (total: ${this.sessions.size})`);
+    this.logger.log(`Session created: ${sessionId} conversation:${conversationId} (total: ${this.sessions.size})`);
     this.broadcastSessionCount();
     return ctx;
   }

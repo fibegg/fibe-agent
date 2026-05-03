@@ -29,6 +29,13 @@ function extractToken(req: IncomingMessage): string | null {
   return url.searchParams.get('token');
 }
 
+/** Extract the conversation ID from the ?c= query param. Falls back to 'default'. */
+function extractConversationId(req: IncomingMessage): string {
+  const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
+  const c = url.searchParams.get('c')?.trim();
+  return c || 'default';
+}
+
 /** Return true and close with 4001 if the required password is set but doesn't match. */
 function rejectIfUnauthorized(ws: WebSocket, req: IncomingMessage, requiredPassword: string | undefined): boolean {
   if (!requiredPassword) return false;
@@ -69,9 +76,15 @@ function attachChatWs(
       sessionRegistry.destroy(oldest.sessionId);
     }
 
-    // Create an isolated session for this connection
-    const ctx = sessionRegistry.create();
+    // Create an isolated session for this connection, bound to the requested conversation
+    const conversationId = extractConversationId(req);
+    const ctx = sessionRegistry.create(conversationId);
     logWs({ event: 'connect' });
+
+    // Tell the client which conversation it's in right away
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'conversation_id', conversationId }));
+    }
 
     // Wire per-session events → this specific WS client
     const sub = ctx.outbound$.subscribe((ev) => {

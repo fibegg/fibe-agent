@@ -5,6 +5,7 @@ import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type MessageListHandle, type ConversationResetSeparator, type ChatMessage } from '../chat/message-list';
 import { WS_ACTION } from '@shared/ws-constants';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
+import { useConversations } from '../chat/use-conversations';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { usePlaygroundSelector } from '../chat/use-playground-selector';
@@ -403,6 +404,17 @@ export function ChatPage() {
 
   const scroll = useScrollToBottom([messages, streamingText]);
 
+  // ── Conversation management ────────────────────────────────────────────────
+  const {
+    conversations,
+    loading: conversationsLoading,
+    activeId: activeConversationId,
+    create: createConversation,
+    rename: renameConversation,
+    remove: deleteConversation,
+    switchTo: switchConversation,
+  } = useConversations();
+
   const {
     state,
     agentMode,
@@ -428,7 +440,8 @@ export function ChatPage() {
     thinkingCallbacks,
     refetchPlaygrounds,
     handleLocalToolEvent,
-    handleConversationReset
+    handleConversationReset,
+    activeConversationId,
   );
 
   useEffect(() => {
@@ -777,6 +790,13 @@ export function ChatPage() {
             onAgentUploaded={refetchPlaygrounds}
             agentProviderLabel={agentProviderLabel}
             currentModel={currentModel}
+            conversations={conversations}
+            conversationsLoading={conversationsLoading}
+            activeConversationId={activeConversationId}
+            onConversationSelect={(id) => { switchConversation(id); reconnect(); }}
+            onConversationCreate={async () => { await createConversation(); reconnect(); }}
+            onConversationRename={renameConversation}
+            onConversationDelete={deleteConversation}
           />
         ) : null
       }
