@@ -21,6 +21,24 @@ describe('ChatPromptContextService', () => {
     expect(result).toContain('image(s)');
     expect(result).toContain('/path/img1');
     expect(result).toContain('hi');
+    // Must use actual newlines, not escaped literal \\n strings
+    expect(result).not.toContain('\\n');
+    expect(result.includes('\n')).toBe(true);
+  });
+
+  test('buildFullPrompt image context indents OCR multi-line text with real newlines', async () => {
+    const ocrText = 'line one\nline two\nline three';
+    const uploads = {
+      getPath: (f: string) => (f === 'img1' ? '/path/img1' : null),
+      extractImageInfo: async (f: string) => (f === 'img1' ? { text: ocrText, width: 50, height: 50, format: 'png' } : null),
+    };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    const result = await service.buildFullPrompt('test', ['img1'], null, undefined);
+    expect(result).toContain('line one');
+    expect(result).toContain('line two');
+    expect(result).toContain('line three');
+    expect(result).not.toContain('\\n');
   });
 
   test('buildFullPrompt includes voice context when audioFilename has path', async () => {

@@ -92,13 +92,13 @@ export class ChatPromptContextService {
           infoStr += `  Metadata: ${meta}\n`;
         }
         if (info.text) {
-          infoStr += `  Extracted Text:\n  ---\n  ${info.text.split('\\n').join('\\n  ')}\n  ---\n`;
+          infoStr += `  Extracted Text:\n  ---\n  ${info.text.split('\n').join('\n  ')}\n  ---\n`;
         }
       }
       strings.push(infoStr);
     }
     return strings.length
-      ? `\\n\\nThe user attached ${strings.length} image(s). Full paths and extracted local data (for reference):\\n${strings.join('\\n')}\\n`
+      ? `\n\nThe user attached ${strings.length} image(s). Full paths and extracted local data (for reference):\n${strings.join('\n')}\n`
       : '';
   }
 
