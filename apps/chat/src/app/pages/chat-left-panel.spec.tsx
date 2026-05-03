@@ -14,6 +14,12 @@ vi.mock('../chat/conversation-sidebar', () => ({
   ConversationSidebar: () => <div data-testid="conversation-sidebar" />,
 }));
 
+vi.mock('../sidebar-toggle', () => ({
+  SidebarToggle: ({ isCollapsed }: { isCollapsed: boolean }) => (
+    <button data-testid="sidebar-toggle" data-collapsed={String(isCollapsed)} />
+  ),
+}));
+
 const baseProps = {
   hasAnyFiles: true,
   sidebarCollapsed: false,
@@ -70,13 +76,24 @@ describe('ChatLeftPanel', () => {
     expect(screen.getByTestId('file-explorer').getAttribute('data-collapsed')).toBe('true');
   });
 
-  it('renders resize handle when expanded and has files', () => {
-    const { container } = render(
+  it('renders SidebarToggle centered over full panel when expanded and has files', () => {
+    render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} hasAnyFiles={true} sidebarCollapsed={false} />
       </MemoryRouter>
     );
-    expect(container.querySelector('[role="separator"]')).toBeTruthy();
+    const toggle = screen.getByTestId('sidebar-toggle');
+    expect(toggle).toBeTruthy();
+    expect(toggle.getAttribute('data-collapsed')).toBe('false');
+  });
+
+  it('renders SidebarToggle in collapsed state when sidebarCollapsed=true', () => {
+    render(
+      <MemoryRouter>
+        <ChatLeftPanel {...baseProps} sidebarCollapsed={true} />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('sidebar-toggle').getAttribute('data-collapsed')).toBe('true');
   });
 
   it('does not render resize handle when explicitly collapsed', () => {
