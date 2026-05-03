@@ -88,6 +88,19 @@ describe('PlayroomBrowserService', () => {
       expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local-playgrounds', 'list']);
     });
 
+    test('keeps static-only playgrounds visible from CLI list output', async () => {
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: `static-site--24|static-site\nsource-app--23|source-app\n`
+      });
+
+      const entries = await service.browse('');
+
+      expect(entries).toEqual([
+        { name: 'static-site', path: 'static-site--24', type: 'directory' },
+        { name: 'source-app', path: 'source-app--23', type: 'directory' },
+      ]);
+    });
+
     test('throws NotFoundException on execution failure', async () => {
       mockExecFileAsync.mockRejectedValueOnce(new Error('Script failed'));
 

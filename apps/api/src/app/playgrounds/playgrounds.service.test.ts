@@ -383,6 +383,27 @@ describe('PlaygroundsService', () => {
     expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe('/opt/fibe/playgrounds');
   });
 
+  test('getUrls accepts a static-only playground as the current selection', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getMarqueeRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => 'static-site--24' };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'web|web.example.test\n' });
+
+    const urls = await service.getUrls();
+
+    expect(urls).toEqual(['web|web.example.test']);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+      '--output',
+      'table',
+      'local-playgrounds',
+      'urls',
+      'static-site--24',
+    ]);
+  });
+
   test('getUrls lists playgrounds and combines urls when no current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
