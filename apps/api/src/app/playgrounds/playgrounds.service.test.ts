@@ -359,7 +359,7 @@ describe('PlaygroundsService', () => {
     expect(files[0].path).toContain('deep.txt');
   });
 
-  test('getUrls uses local-playgrounds urls when a current link exists', async () => {
+  test('getUrls uses local playgrounds urls when a current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
       getMarqueeRoot: () => '/opt/fibe',
@@ -376,7 +376,8 @@ describe('PlaygroundsService', () => {
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
       '--output',
       'table',
-      'local-playgrounds',
+      'local',
+      'playgrounds',
       'urls',
       'project',
     ]);
@@ -398,7 +399,8 @@ describe('PlaygroundsService', () => {
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
       '--output',
       'table',
-      'local-playgrounds',
+      'local',
+      'playgrounds',
       'urls',
       'static-site--24',
     ]);
@@ -420,12 +422,12 @@ describe('PlaygroundsService', () => {
 
     expect(urls).toEqual(['web|web1.example.test', 'api|api2.example.test']);
     expect(mockExecFileAsync).toHaveBeenCalledTimes(3);
-    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local-playgrounds', 'list']);
-    expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'table', 'local-playgrounds', 'urls', 'pg1']);
-    expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'table', 'local-playgrounds', 'urls', 'pg2']);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'list']);
+    expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'urls', 'pg1']);
+    expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'urls', 'pg2']);
   });
 
-  test('getUrls returns empty array on local-playgrounds failure', async () => {
+  test('getUrls returns empty array on local playgrounds failure', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
       getMarqueeRoot: () => '/opt/fibe',

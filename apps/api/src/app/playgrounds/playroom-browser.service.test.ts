@@ -85,7 +85,7 @@ describe('PlayroomBrowserService', () => {
 
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
       expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
-      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local-playgrounds', 'list']);
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'list']);
     });
 
     test('keeps static-only playgrounds visible from CLI list output', async () => {
@@ -134,7 +134,8 @@ describe('PlayroomBrowserService', () => {
       expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
         '--output',
         'table',
-        'local-playgrounds',
+        'local',
+        'playgrounds',
         'link',
         'project',
         '--link-dir',

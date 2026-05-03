@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 import type { ConfigService } from '../config/config.service';
 
 const execFileAsync = promisify(execFile);
-const BASE_ARGS = ['--output', 'table', 'local-playgrounds'] as const;
+const BASE_ARGS = ['--output', 'table', 'local','playgrounds'] as const;
 
 export async function runLocalPlaygroundsCli(
   config: ConfigService,
