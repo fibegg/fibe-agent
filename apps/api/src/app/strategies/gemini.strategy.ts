@@ -1,22 +1,32 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
+import { ProviderConversationPaths } from './provider-conversation-paths';
 
 const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
 const SESSION_MARKER_FILE = '.gemini_session';
+const GEMINI_RESUME_LATEST = 'latest';
 const MISSING_SESSION_ERROR_PATTERNS = [
   /No conversation found with session ID:/i,
   /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
   /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
 ];
+
+interface GeminiSessionFile {
+  sessionId: string;
+  filePath: string;
+  lastUpdatedMs: number;
+  mtimeMs: number;
+  content: string;
+}
 
 /**
  * Gemini CLI resolves its config dir as `${homedir()}/.gemini`, where
@@ -71,11 +81,11 @@ const GEMINI_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
 export function buildGeminiArgs(
   effectivePrompt: string,
   model: string,
-  hasSession: boolean
+  sessionId: string | null
 ): string[] {
   return [
     ...getModelArgsList(model),
-    ...(hasSession ? ['--resume'] : []),
+    ...(sessionId ? ['--resume', sessionId] : []),
     `-p=${effectivePrompt}`,
     ...buildProviderArgs(GEMINI_PROVIDER_ARGS_CONFIG),
   ];
@@ -86,32 +96,161 @@ function missingSessionError(message: string): boolean {
 }
 
 export class GeminiStrategy extends AbstractCLIStrategy {
-  private _hasSession = false;
   private _apiToken: string | null = null;
+  private readonly paths: ProviderConversationPaths;
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     super(GeminiStrategy.name, useApiTokenMode, conversationDataDir);
+    this.paths = new ProviderConversationPaths({
+      conversationDataDir,
+      workspaceSubdir: GEMINI_WORKSPACE_SUBDIR,
+      fallbackWorkspaceDir: join(process.cwd(), 'playground'),
+      sessionMarkerFile: SESSION_MARKER_FILE,
+    });
   }
 
   private getGeminiWorkspaceDir(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), GEMINI_WORKSPACE_SUBDIR);
-    }
-    return join(process.cwd(), 'playground');
+    return this.paths.getWorkspaceDir();
   }
 
   getWorkingDir(): string {
     return this.getGeminiWorkspaceDir();
   }
 
-  private clearStoredSession(workspaceDir: string): void {
-    this._hasSession = false;
-    if (!this.conversationDataDir) return;
+  prepareWorkingDir(): void {
+    this.paths.prepareWorkspace();
+  }
+
+  private readStoredSession(): string | null {
+    const stored = this.paths.readSessionMarker();
+    if (stored) return stored;
     try {
-      rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true });
+      // Older builds wrote an empty marker in the workspace and resumed the
+      // latest Gemini session implicitly. Keep that only for default/legacy
+      // compatibility; UUID conversations must have an explicit Gemini UUID.
+      if (this.shouldReadLegacyWorkspaceMarker() && existsSync(this.paths.getLegacyWorkspaceMarkerPath())) {
+        return GEMINI_RESUME_LATEST;
+      }
     } catch {
-      /* ignore cleanup errors */
+      /* ignore legacy marker read errors */
     }
+    return null;
+  }
+
+  private shouldReadLegacyWorkspaceMarker(): boolean {
+    const provider = this.conversationDataDir;
+    if (!provider) return true;
+    if (provider.getConversationId?.() === 'default') return true;
+    const defaultDir = provider.getDefaultConversationDataDir?.();
+    return Boolean(defaultDir && defaultDir === provider.getConversationDataDir());
+  }
+
+  private writeStoredSession(sessionId: string): void {
+    this.paths.writeSessionMarker(sessionId);
+  }
+
+  private clearStoredSession(): void {
+    this.paths.clearSessionMarker();
+  }
+
+  private getGeminiTmpDir(): string {
+    return join(getGeminiConfigDir(), 'tmp');
+  }
+
+  private normalizeProjectPath(path: string): string {
+    let normalized = resolve(path);
+    try {
+      normalized = realpathSync.native(normalized);
+    } catch {
+      /* path may not exist yet; keep resolved form */
+    }
+    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+  }
+
+  private readProjectSessions(workspaceDir: string): GeminiSessionFile[] {
+    const tmpDir = this.getGeminiTmpDir();
+    if (!existsSync(tmpDir)) return [];
+    const expectedRoot = this.normalizeProjectPath(workspaceDir);
+    const sessions: GeminiSessionFile[] = [];
+    let projectEntries: import('node:fs').Dirent[];
+    try {
+      projectEntries = readdirSync(tmpDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    for (const entry of projectEntries) {
+      if (!entry.isDirectory()) continue;
+      const projectDir = join(tmpDir, entry.name);
+      const projectRootPath = join(projectDir, '.project_root');
+      let owner = '';
+      try {
+        if (!existsSync(projectRootPath)) continue;
+        owner = readFileSync(projectRootPath, 'utf8').trim();
+      } catch {
+        continue;
+      }
+      if (this.normalizeProjectPath(owner) !== expectedRoot) continue;
+
+      const chatsDir = join(projectDir, 'chats');
+      let chatFiles: import('node:fs').Dirent[];
+      try {
+        chatFiles = readdirSync(chatsDir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const file of chatFiles) {
+        if (!file.isFile() || !file.name.startsWith('session-') || !file.name.endsWith('.json')) continue;
+        const filePath = join(chatsDir, file.name);
+        const parsed = this.readGeminiSessionFile(filePath);
+        if (parsed) sessions.push(parsed);
+      }
+    }
+    return sessions;
+  }
+
+  private readGeminiSessionFile(filePath: string): GeminiSessionFile | null {
+    try {
+      const content = readFileSync(filePath, 'utf8');
+      const parsed = JSON.parse(content) as Record<string, unknown>;
+      const sessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId.trim() : '';
+      if (!sessionId) return null;
+      const lastUpdated = typeof parsed.lastUpdated === 'string' ? Date.parse(parsed.lastUpdated) : Number.NaN;
+      const mtimeMs = statSync(filePath).mtimeMs;
+      return {
+        sessionId,
+        filePath,
+        lastUpdatedMs: Number.isFinite(lastUpdated) ? lastUpdated : mtimeMs,
+        mtimeMs,
+        content,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private captureSessionIdAfterRun(
+    workspaceDir: string,
+    knownSessionIds: Set<string>,
+    startedAtMs: number,
+    promptNeedle: string
+  ): string | null {
+    const cutoffMs = startedAtMs - 5_000;
+    const sessions = this.readProjectSessions(workspaceDir)
+      .filter((session) =>
+        !knownSessionIds.has(session.sessionId)
+        || session.lastUpdatedMs >= cutoffMs
+        || session.mtimeMs >= cutoffMs
+      )
+      .sort((a, b) => Math.max(b.lastUpdatedMs, b.mtimeMs) - Math.max(a.lastUpdatedMs, a.mtimeMs));
+    if (sessions.length === 0) return null;
+
+    const trimmedNeedle = promptNeedle.trim().slice(0, 512);
+    if (trimmedNeedle) {
+      const matching = sessions.find((session) => session.content.includes(trimmedNeedle));
+      if (matching) return matching.sessionId;
+    }
+    return sessions[0].sessionId;
   }
 
   ensureSettings(): void {
@@ -140,7 +279,6 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     if (this.useApiTokenMode) {
       const token = this.getApiToken();
       if (token && token.trim()) {
-        this._hasSession = true;
         this.currentConnection.sendAuthSuccess();
       } else {
         this.currentConnection.sendAuthManualToken();
@@ -199,7 +337,6 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     if (this.useApiTokenMode) {
       if (trimmed) {
         this._apiToken = trimmed;
-        this._hasSession = true;
         this.currentConnection?.sendAuthSuccess();
       } else {
         this.currentConnection?.sendAuthStatus('unauthenticated');
@@ -213,7 +350,6 @@ export class GeminiStrategy extends AbstractCLIStrategy {
 
   clearCredentials(): void {
     this._apiToken = null;
-    this._hasSession = false;
     const credentialFiles = ['oauth_creds.json', 'credentials.json', '.credentials.json'];
     const geminiConfigDir = getGeminiConfigDir();
     for (const file of credentialFiles) {
@@ -252,13 +388,11 @@ export class GeminiStrategy extends AbstractCLIStrategy {
 
     logoutProcess.on('close', () => {
       this.clearCredentials();
-      this._hasSession = false;
       connection.sendLogoutSuccess();
     });
 
     logoutProcess.on('error', () => {
       this.clearCredentials();
-      this._hasSession = false;
       connection.sendLogoutSuccess();
     });
   }
@@ -348,12 +482,8 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         this.ensureSettings();
       }
       const workspaceDir = this.getGeminiWorkspaceDir();
-      if (!existsSync(workspaceDir)) {
-        mkdirSync(workspaceDir, { recursive: true });
-      }
-      if (this.conversationDataDir) {
-        this._hasSession = existsSync(join(workspaceDir, SESSION_MARKER_FILE));
-      }
+      this.prepareWorkingDir();
+      const storedSessionId = this.readStoredSession();
 
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
@@ -361,7 +491,9 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
       }
       const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
-      const geminiArgs = buildGeminiArgs(effectivePrompt, model, this._hasSession);
+      const knownSessionIds = new Set(this.readProjectSessions(workspaceDir).map((session) => session.sessionId));
+      const startedAtMs = Date.now();
+      const geminiArgs = buildGeminiArgs(effectivePrompt, model, storedSessionId);
 
       const env: NodeJS.ProcessEnv = getGeminiProcessEnv(this.getProxyEnv());
       if (this.useApiTokenMode) {
@@ -425,7 +557,6 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         if (shouldInspectFailure) {
           const authError = detectProviderAuthFailure('Gemini', [errorResult, stdoutBuffer].filter((s) => s.trim()).join('\n'));
           if (authError) {
-            this._hasSession = false;
             reject(authError);
             return;
           }
@@ -450,21 +581,21 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           return;
         }
         if (code !== 0 && missingSessionError(errorResult)) {
-          this.clearStoredSession(workspaceDir);
+          this.clearStoredSession();
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
-          this.clearStoredSession(workspaceDir);
+          this.clearStoredSession();
           reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code === 0 || code === null) {
-          this._hasSession = true;
-          if (this.conversationDataDir) {
-            try {
-              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), '');
-            } catch {
-              /* ignore */
-            }
+          const capturedSessionId = storedSessionId && storedSessionId !== GEMINI_RESUME_LATEST
+            ? storedSessionId
+            : this.captureSessionIdAfterRun(workspaceDir, knownSessionIds, startedAtMs, finalPrompt);
+          if (capturedSessionId) {
+            this.writeStoredSession(capturedSessionId);
+          } else {
+            this.logger.warn('Gemini completed but no session UUID was found; next turn will use Fibe history injection.');
           }
           resolve();
         } else {
@@ -486,6 +617,15 @@ export class GeminiStrategy extends AbstractCLIStrategy {
   }
 
   hasNativeSessionSupport(): boolean {
-    return true;
+    return this.readStoredSession() !== null;
+  }
+
+  override steerAgent(message: string): void {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    // Gemini CLI headless mode has no supported in-flight steering boundary.
+    // Preserve the operator message and let the orchestrator's queued empty turn
+    // deliver it as the next prompt instead of interrupting the current run.
+    this.pendingSteerMessages.push(trimmed);
   }
 }

@@ -520,6 +520,68 @@ export function ChatPage() {
   }, [createConversation, setSearchQuery]);
 
   useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      const data = event.data;
+      if (!data || data.type !== 'fibe_focus_message_by_timestamp') return;
+
+      const timestamp = typeof data.timestamp === 'string' ? data.timestamp : '';
+      if (!Number.isFinite(Date.parse(timestamp))) return;
+
+      const requestedConversationId = typeof data.conversationId === 'string' && data.conversationId.trim()
+        ? data.conversationId.trim()
+        : activeConversationIdRef.current;
+      const knownConversations = conversationsRef.current;
+      if (knownConversations.length > 0 && !knownConversations.some((c) => c.id === requestedConversationId)) return;
+
+      setSearchQuery('');
+      setViewingFile(null);
+      setPendingTimestampFocus({
+        timestamp,
+        conversationId: requestedConversationId,
+        requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+      });
+      if (requestedConversationId !== activeConversationIdRef.current) {
+        switchConversation(requestedConversationId);
+      }
+    };
+
+    window.addEventListener('message', onMessage);
+    return () => window.removeEventListener('message', onMessage);
+  }, [setSearchQuery, switchConversation]);
+
+  useEffect(() => {
+    if (!pendingTimestampFocus) return;
+
+    const conversationKnown = conversations.some((c) => c.id === pendingTimestampFocus.conversationId);
+    if (!conversationsLoading && conversations.length > 0 && !conversationKnown) {
+      setPendingTimestampFocus(null);
+      return;
+    }
+
+    if (activeConversationId !== pendingTimestampFocus.conversationId) {
+      switchConversation(pendingTimestampFocus.conversationId);
+      return;
+    }
+
+    if (messagesLoadError) {
+      setPendingTimestampFocus(null);
+      return;
+    }
+    if (!messagesLoaded) return;
+
+    messageListRef.current?.scrollToTimestamp(pendingTimestampFocus.timestamp);
+    setPendingTimestampFocus(null);
+  }, [
+    activeConversationId,
+    conversations,
+    conversationsLoading,
+    messagesLoaded,
+    messagesLoadError,
+    pendingTimestampFocus,
+    switchConversation,
+  ]);
+
+  useEffect(() => {
     const notifyParent = () => {
       try {
         window.parent.postMessage({ type: 'agent_status_update', isWorking: state === CHAT_STATES.AWAITING_RESPONSE }, '*');

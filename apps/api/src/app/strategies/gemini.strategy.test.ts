@@ -7,6 +7,8 @@ import { GeminiStrategy, buildGeminiArgs } from './gemini.strategy';
 function writeFakeGemini(path: string): void {
   writeFileSync(path, `#!/usr/bin/env node
 const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
 const args = process.argv.slice(2);
 if (process.env.GEMINI_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.GEMINI_FAKE_ARGS_PATH, JSON.stringify(args));
@@ -17,6 +19,37 @@ if (process.env.GEMINI_FAKE_ENV_PATH) {
     NO_BROWSER: process.env.NO_BROWSER,
   }));
 }
+function geminiConfigDir() {
+  if (process.env.SESSION_DIR) return process.env.SESSION_DIR;
+  if (process.env.GEMINI_CLI_HOME) return path.join(process.env.GEMINI_CLI_HOME, '.gemini');
+  return path.join(os.homedir(), '.gemini');
+}
+function sessionIdFromArgs() {
+  const index = args.indexOf('--resume');
+  if (index >= 0 && args[index + 1] && args[index + 1] !== 'latest') return args[index + 1];
+  return process.env.GEMINI_FAKE_SESSION_ID || '11111111-2222-4333-8444-555555555555';
+}
+function promptFromArgs() {
+  const promptArg = args.find((arg) => arg.startsWith('-p='));
+  return promptArg ? promptArg.slice(3) : '';
+}
+function writeSessionFile() {
+  if (process.env.GEMINI_FAKE_SKIP_SESSION_WRITE === '1') return;
+  const sessionId = sessionIdFromArgs();
+  const configDir = geminiConfigDir();
+  const projectDir = path.join(configDir, 'tmp', 'gemini-workspace');
+  const chatsDir = path.join(projectDir, 'chats');
+  fs.mkdirSync(chatsDir, { recursive: true });
+  fs.writeFileSync(path.join(projectDir, '.project_root'), path.resolve(process.cwd()));
+  fs.writeFileSync(path.join(chatsDir, 'session-2026-05-04T08-00-' + sessionId.slice(0, 8) + '.json'), JSON.stringify({
+    sessionId,
+    projectHash: 'fake',
+    startTime: '2026-05-04T08:00:00.000Z',
+    lastUpdated: new Date().toISOString(),
+    messages: [{ type: 'user', content: promptFromArgs() }, { type: 'gemini', content: 'fake response' }],
+    kind: 'main'
+  }, null, 2));
+}
 if (process.env.GEMINI_FAKE_MODE === 'missing-session') {
   console.error('No conversation found with session ID: stale-gemini-session');
   process.exit(1);
@@ -24,6 +57,7 @@ if (process.env.GEMINI_FAKE_MODE === 'missing-session') {
 if (process.env.GEMINI_FAKE_MODE === 'empty') {
   process.exit(0);
 }
+writeSessionFile();
 console.log(process.env.GEMINI_FAKE_MESSAGE || 'fake response');
 `, { mode: 0o755 });
   chmodSync(path, 0o755);
@@ -211,13 +245,13 @@ describe('GeminiStrategy API token mode', () => {
 
 describe('buildGeminiArgs', () => {
   test('passes the prompt via the -p=value equals form so yargs binds it to -p', () => {
-    const args = buildGeminiArgs('hello world', 'gemini-2.5-pro', false);
+    const args = buildGeminiArgs('hello world', 'gemini-2.5-pro', null);
     expect(args).toEqual(['-m', 'gemini-2.5-pro', '-p=hello world', '--yolo']);
   });
 
   test('keeps -p bound to the value when the prompt starts with a dash (markdown bullet)', () => {
     const dashPrompt = '- bullet from system prompt\n[SYSCHECK]';
-    const args = buildGeminiArgs(dashPrompt, 'gemini-2.5-pro', false);
+    const args = buildGeminiArgs(dashPrompt, 'gemini-2.5-pro', null);
     const promptArg = args.find((a) => a.startsWith('-p='));
     expect(promptArg).toBeDefined();
     expect(promptArg).toBe(`-p=${dashPrompt}`);
@@ -225,14 +259,15 @@ describe('buildGeminiArgs', () => {
   });
 
   test('includes --resume when hasSession is true', () => {
-    const args = buildGeminiArgs('continue', 'gemini-2.5-pro', true);
+    const args = buildGeminiArgs('continue', 'gemini-2.5-pro', '11111111-2222-4333-8444-555555555555');
     expect(args).toContain('--resume');
+    expect(args).toContain('11111111-2222-4333-8444-555555555555');
     expect(args.find((a) => a.startsWith('-p='))).toBe('-p=continue');
   });
 
   test('omits -m when model is empty or the literal string "undefined"', () => {
-    expect(buildGeminiArgs('hi', '', false)).toEqual(['-p=hi', '--yolo']);
-    expect(buildGeminiArgs('hi', 'undefined', false)).toEqual(['-p=hi', '--yolo']);
+    expect(buildGeminiArgs('hi', '', null)).toEqual(['-p=hi', '--yolo']);
+    expect(buildGeminiArgs('hi', 'undefined', null)).toEqual(['-p=hi', '--yolo']);
   });
 });
 describe('GeminiStrategy session recovery', () => {
@@ -246,6 +281,8 @@ describe('GeminiStrategy session recovery', () => {
     savedEnv.GEMINI_FAKE_ENV_PATH = process.env.GEMINI_FAKE_ENV_PATH;
     savedEnv.GEMINI_FAKE_MODE = process.env.GEMINI_FAKE_MODE;
     savedEnv.GEMINI_FAKE_MESSAGE = process.env.GEMINI_FAKE_MESSAGE;
+    savedEnv.GEMINI_FAKE_SESSION_ID = process.env.GEMINI_FAKE_SESSION_ID;
+    savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE = process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
     savedEnv.GEMINI_CLI_HOME = process.env.GEMINI_CLI_HOME;
     savedEnv.NO_BROWSER = process.env.NO_BROWSER;
     savedEnv.SESSION_DIR = process.env.SESSION_DIR;
@@ -260,6 +297,8 @@ describe('GeminiStrategy session recovery', () => {
     delete process.env.GEMINI_FAKE_ENV_PATH;
     delete process.env.GEMINI_FAKE_MODE;
     delete process.env.GEMINI_FAKE_MESSAGE;
+    delete process.env.GEMINI_FAKE_SESSION_ID;
+    delete process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
     delete process.env.GEMINI_CLI_HOME;
     delete process.env.NO_BROWSER;
     delete process.env.SESSION_DIR;
@@ -278,6 +317,10 @@ describe('GeminiStrategy session recovery', () => {
     else process.env.GEMINI_FAKE_MODE = savedEnv.GEMINI_FAKE_MODE;
     if (savedEnv.GEMINI_FAKE_MESSAGE === undefined) delete process.env.GEMINI_FAKE_MESSAGE;
     else process.env.GEMINI_FAKE_MESSAGE = savedEnv.GEMINI_FAKE_MESSAGE;
+    if (savedEnv.GEMINI_FAKE_SESSION_ID === undefined) delete process.env.GEMINI_FAKE_SESSION_ID;
+    else process.env.GEMINI_FAKE_SESSION_ID = savedEnv.GEMINI_FAKE_SESSION_ID;
+    if (savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE === undefined) delete process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    else process.env.GEMINI_FAKE_SKIP_SESSION_WRITE = savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE;
     if (savedEnv.GEMINI_CLI_HOME === undefined) delete process.env.GEMINI_CLI_HOME;
     else process.env.GEMINI_CLI_HOME = savedEnv.GEMINI_CLI_HOME;
     if (savedEnv.NO_BROWSER === undefined) delete process.env.NO_BROWSER;
@@ -293,9 +336,8 @@ describe('GeminiStrategy session recovery', () => {
     process.env.GEMINI_FAKE_MODE = 'missing-session';
 
     const convDir = join(testHome, 'missing-session-conv');
-    const workspaceDir = join(convDir, 'gemini_workspace');
-    mkdirSync(workspaceDir, { recursive: true });
-    writeFileSync(join(workspaceDir, '.gemini_session'), '');
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.gemini_session'), 'stale-gemini-session');
 
     const strategy = new GeminiStrategy(true, {
       getConversationDataDir: () => convDir,
@@ -309,10 +351,92 @@ describe('GeminiStrategy session recovery', () => {
       '-m',
       'gemini-2.5-pro',
       '--resume',
+      'stale-gemini-session',
       '-p=continue',
       '--yolo',
     ]);
-    expect(existsSync(join(workspaceDir, '.gemini_session'))).toBe(false);
+    expect(existsSync(join(convDir, '.gemini_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming stores Gemini session UUID per conversation and uses shared workspace', async () => {
+    const argsPath = join(testHome, 'gemini-args.json');
+    process.env.GEMINI_FAKE_ARGS_PATH = argsPath;
+    process.env.GEMINI_CLI_HOME = join(testHome, 'gemini-home');
+    process.env.GEMINI_FAKE_SESSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
+
+    const defaultDir = join(testHome, 'agent-data');
+    const convDir = join(defaultDir, 'conversations', 'chat-a');
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => defaultDir,
+      getConversationId: () => 'chat-a',
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    expect(strategy.getWorkingDir()).toBe(join(defaultDir, 'gemini_workspace'));
+    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '-m',
+      'gemini-2.5-pro',
+      '-p=hello',
+      '--yolo',
+    ]);
+
+    await expect(strategy.executePromptStreaming('again', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '-m',
+      'gemini-2.5-pro',
+      '--resume',
+      'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      '-p=again',
+      '--yolo',
+    ]);
+  });
+
+  test('new UUID conversations do not inherit a legacy workspace latest marker', async () => {
+    const argsPath = join(testHome, 'gemini-legacy-marker-args.json');
+    process.env.GEMINI_FAKE_ARGS_PATH = argsPath;
+    process.env.GEMINI_CLI_HOME = join(testHome, 'gemini-home');
+
+    const defaultDir = join(testHome, 'agent-data');
+    const convDir = join(defaultDir, 'conversations', 'chat-b');
+    const sharedWorkspace = join(defaultDir, 'gemini_workspace');
+    mkdirSync(sharedWorkspace, { recursive: true });
+    writeFileSync(join(sharedWorkspace, '.gemini_session'), '');
+
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => defaultDir,
+      getConversationId: () => 'chat-b',
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('fresh', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
+      '-m',
+      'gemini-2.5-pro',
+      '-p=fresh',
+      '--yolo',
+    ]);
+  });
+
+  test('steerAgent queues Gemini input for the next turn instead of interrupting', async () => {
+    const argsPath = join(testHome, 'gemini-steer-args.json');
+    process.env.GEMINI_FAKE_ARGS_PATH = argsPath;
+    process.env.GEMINI_CLI_HOME = join(testHome, 'gemini-home');
+
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'steer-conv'),
+      getDefaultConversationDataDir: () => join(testHome, 'agent-data'),
+      getConversationId: () => 'steer-conv',
+      getEncryptionKey: () => undefined,
+    });
+
+    strategy.steerAgent('operator note');
+    await expect(strategy.executePromptStreaming('continue', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    const args = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
+    expect(args.find((arg) => arg.startsWith('-p='))).toBe('-p=[Operator Interruption]\noperator note\n\ncontinue');
   });
 
   test('executePromptStreaming preserves Rails-provided Gemini env', async () => {
