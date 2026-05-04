@@ -167,6 +167,7 @@ vi.mock('../chat/use-chat-activity-log', () => ({
       onStreamStartData: vi.fn(),
     },
     resetForNewStream: vi.fn(),
+    resetActivityState: vi.fn(),
     setActivityLog: vi.fn(),
     setReasoningText: vi.fn(),
     setThinkingSteps: vi.fn(),

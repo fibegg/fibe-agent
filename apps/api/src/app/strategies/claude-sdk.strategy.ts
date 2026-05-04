@@ -158,10 +158,10 @@ function usageFromObject(
 
 function assistantText(message: SDKMessage): string | null {
   if (message.type !== 'assistant') return null;
-  const blocks = message.message.content;
+  const blocks = message.message.content as Array<{ type: string; text?: string }>;
   const text = blocks
-    .filter((block): block is Extract<typeof block, { type: 'text' }> => block.type === 'text')
-    .map((block) => block.text)
+    .filter((block) => block.type === 'text')
+    .map((block) => block.text ?? '')
     .join('');
   return text || null;
 }
