@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type {
   AuthConnection,
+  AgentRuntimeOptions,
   ConversationDataDirProvider,
   LogoutConnection,
   StreamingCallbacks,
@@ -14,6 +15,8 @@ import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
+import { JsonLineRpcProcess, type JsonLineRpcMessage } from './json-line-rpc-process';
+import { ProviderConversationPaths } from './provider-conversation-paths';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
 
@@ -22,6 +25,8 @@ const SESSION_MARKER_FILE = '.codex_session';
 const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 const RESPONSE_PREVIEW_MAX = 200;
+const CODEX_APP_SERVER_REQUEST_TIMEOUT_MS = 120_000;
+const CODEX_APP_SERVER_TURN_TIMEOUT_MS = 60 * 60 * 1000;
 const MISSING_SESSION_ERROR_PATTERNS = [
   /No conversation found with session ID:/i,
   /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
@@ -41,6 +46,8 @@ const CODEX_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
     '--color': 'never',
   },
 };
+
+const CODEX_REASONING_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
 
 function getCodexHome(): string {
   return process.env.CODEX_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
@@ -73,6 +80,25 @@ const stripAnsi = (s: string) => s.replace(ANSI_RE, '');
 
 function missingSessionError(message: string): boolean {
   return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
+}
+
+function useAppServerTransport(): boolean {
+  const explicitTransport = (process.env.CODEX_AGENT_TRANSPORT ?? '').trim().toLowerCase();
+  if (explicitTransport === 'exec' || explicitTransport === 'cli') return false;
+  if (explicitTransport === 'app-server' || explicitTransport === 'appserver') return true;
+
+  const explicitFlag = (process.env.CODEX_USE_APP_SERVER ?? '').trim().toLowerCase();
+  if (['0', 'false', 'no'].includes(explicitFlag)) return false;
+  return true;
+}
+
+function normalizeEffort(effort?: string): string | null {
+  if (!effort) return null;
+  return CODEX_REASONING_EFFORTS.has(effort) ? effort : null;
+}
+
+function codexUserInput(text: string): Array<{ type: 'text'; text: string; text_elements: [] }> {
+  return [{ type: 'text', text, text_elements: [] }];
 }
 
 /* ------------------------------------------------------------------ */
@@ -114,6 +140,54 @@ export interface CodexExecJsonHandlers {
   onTool?: (event: ToolEvent) => void;
   onUsage?: (usage: TokenUsage) => void;
   onThreadId?: (threadId: string) => void;
+}
+
+interface CodexThread {
+  id: string;
+}
+
+interface CodexThreadResponse {
+  thread: CodexThread;
+}
+
+interface CodexTurnResponse {
+  turn: {
+    id: string;
+    status?: string;
+    error?: { message?: string } | null;
+  };
+}
+
+interface CodexAppServerTurnState {
+  threadId: string;
+  turnId: string;
+  onChunk: (chunk: string) => void;
+  callbacks?: StreamingCallbacks;
+  resolve: () => void;
+  reject: (error: Error) => void;
+  errorResult: string;
+  reasoningOpen: boolean;
+  hasVisibleOutput: boolean;
+  completed: boolean;
+  assistantTextByItemId: Map<string, string>;
+}
+
+interface CodexThreadItem {
+  id?: string;
+  type?: string;
+  text?: string;
+  command?: string;
+  aggregatedOutput?: string | null;
+  changes?: Array<{ path?: string; kind?: string; type?: string }>;
+  server?: string;
+  tool?: string;
+  namespace?: string | null;
+  arguments?: unknown;
+  status?: string;
+  error?: unknown;
+  result?: unknown;
+  summary?: string[];
+  content?: string[];
 }
 
 /**
@@ -281,49 +355,45 @@ export function handleCodexExecJsonLine(
 /* ------------------------------------------------------------------ */
 
 export class OpenaiCodexStrategy extends AbstractCLIStrategy {
+  private readonly paths: ProviderConversationPaths;
+  private appServer: JsonLineRpcProcess | null = null;
+  private appServerTurn: CodexAppServerTurnState | null = null;
+  private pendingAppServerNotifications: JsonLineRpcMessage[] = [];
+  private activeAppServerThreadId: string | null = null;
+  private activeAppServerTurnId: string | null = null;
 
   constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
     super(OpenaiCodexStrategy.name, useApiTokenMode, conversationDataDir);
+    this.paths = new ProviderConversationPaths({
+      conversationDataDir,
+      workspaceSubdir: CODEX_WORKSPACE_SUBDIR,
+      fallbackWorkspaceDir: join(process.cwd(), CODEX_WORKSPACE_SUBDIR),
+      sessionMarkerFile: SESSION_MARKER_FILE,
+    });
   }
 
   private getCodexHomeForSession(): string {
     return getCodexHome();
   }
 
-  private getSessionMarkerPath(): string {
-    return join(this.getWorkingDir(), SESSION_MARKER_FILE);
-  }
-
   private readSessionId(): string | null {
-    try {
-      const markerPath = this.getSessionMarkerPath();
-      if (!existsSync(markerPath)) return null;
-      return readFileSync(markerPath, 'utf8').trim() || null;
-    } catch {
-      return null;
-    }
+    return this.paths.readSessionMarker();
   }
 
   private writeSessionId(sessionId: string): void {
-    const workspaceDir = this.getWorkingDir();
-    if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
-    writeFileSync(this.getSessionMarkerPath(), sessionId, { mode: 0o600 });
+    this.paths.writeSessionMarker(sessionId);
   }
 
   private clearSessionId(): void {
-    try {
-      const markerPath = this.getSessionMarkerPath();
-      if (existsSync(markerPath)) unlinkSync(markerPath);
-    } catch {
-      /* ignore cleanup errors */
-    }
+    this.paths.clearSessionMarker();
   }
 
   getWorkingDir(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CODEX_WORKSPACE_SUBDIR);
-    }
-    return join(process.cwd(), CODEX_WORKSPACE_SUBDIR);
+    return this.paths.getWorkspaceDir();
+  }
+
+  prepareWorkingDir(): void {
+    this.paths.prepareWorkspace();
   }
 
   getModelArgs(model: string): string[] {
@@ -483,7 +553,51 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
 
 
 
+  override interruptAgent(): void {
+    this.streamInterrupted = true;
+    const threadId = this.activeAppServerThreadId;
+    const turnId = this.activeAppServerTurnId;
+    if (this.appServer && threadId && turnId) {
+      void this.appServer.request('turn/interrupt', { threadId, turnId }, 5_000).catch(() => undefined);
+    }
+    this.shutdownAppServer();
+    this.currentStreamProcess?.kill();
+  }
+
+  override steerAgent(message: string): void {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    const threadId = this.activeAppServerThreadId;
+    const expectedTurnId = this.activeAppServerTurnId;
+    if (this.appServer && threadId && expectedTurnId) {
+      void this.appServer.request(
+        'turn/steer',
+        { threadId, expectedTurnId, input: codexUserInput(trimmed) },
+        CODEX_APP_SERVER_REQUEST_TIMEOUT_MS,
+      ).catch((err) => {
+        this.logger.warn(`Codex app-server steer failed; queueing for next turn: ${err}`);
+        this.pendingSteerMessages.push(trimmed);
+      });
+      return;
+    }
+    this.pendingSteerMessages.push(trimmed);
+  }
+
   executePromptStreaming(
+    prompt: string,
+    model: string,
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
+  ): Promise<void> {
+    if (useAppServerTransport()) {
+      return this.executePromptStreamingAppServer(prompt, model, onChunk, callbacks, systemPrompt, runtimeOptions);
+    }
+    return this.executePromptStreamingExec(prompt, model, onChunk, callbacks, systemPrompt);
+  }
+
+  private executePromptStreamingExec(
     prompt: string,
     model: string,
     onChunk: (chunk: string) => void,
@@ -495,7 +609,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       if (this.useApiTokenMode) this.ensureSettings();
 
       const playgroundDir = this.getWorkingDir();
-      if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
+      this.prepareWorkingDir();
 
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
@@ -589,5 +703,355 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         reject(err);
       });
     });
+  }
+
+  private async executePromptStreamingAppServer(
+    prompt: string,
+    model: string,
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
+  ): Promise<void> {
+    this.streamInterrupted = false;
+    if (this.useApiTokenMode) this.ensureSettings();
+    this.prepareWorkingDir();
+
+    const pendingMessages = this.consumePendingMessages();
+    let finalPrompt = prompt;
+    if (pendingMessages) {
+      finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
+    }
+    const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
+    const existingSessionId = this.readSessionId();
+    const appServer = this.createAppServer();
+    this.appServer = appServer;
+
+    const unsubscribe = appServer.onNotification((message) => this.handleAppServerNotification(message));
+    let capturedThreadId: string | null = null;
+    try {
+      await this.initializeAppServer(appServer);
+      const threadId = existingSessionId
+        ? await this.resumeAppServerThread(appServer, existingSessionId, model)
+        : await this.startAppServerThread(appServer, model);
+      capturedThreadId = threadId;
+      this.activeAppServerThreadId = threadId;
+
+      await this.runAppServerTurn(appServer, threadId, effectivePrompt, model, onChunk, callbacks, runtimeOptions);
+      if (capturedThreadId) this.writeSessionId(capturedThreadId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const authError = detectProviderAuthFailure('OpenAI Codex', message);
+      if (authError) throw authError;
+      if (existingSessionId && missingSessionError(message)) this.clearSessionId();
+      if (!existingSessionId && capturedThreadId) this.clearSessionId();
+      throw err;
+    } finally {
+      unsubscribe();
+      this.appServerTurn = null;
+      this.pendingAppServerNotifications = [];
+      this.activeAppServerThreadId = null;
+      this.activeAppServerTurnId = null;
+      this.shutdownAppServer();
+    }
+  }
+
+  private createAppServer(): JsonLineRpcProcess {
+    return new JsonLineRpcProcess(
+      getCodexCommand(),
+      ['app-server', '--listen', 'stdio://'],
+      {
+        env: { ...process.env, ...this.getProxyEnv(), CODEX_HOME: this.getCodexHomeForSession() },
+        cwd: this.getWorkingDir(),
+        logger: this.logger,
+        requestTimeoutMs: CODEX_APP_SERVER_REQUEST_TIMEOUT_MS,
+      },
+    );
+  }
+
+  private async initializeAppServer(appServer: JsonLineRpcProcess): Promise<void> {
+    await appServer.request('initialize', {
+      clientInfo: { name: 'fibe-agent', title: 'Fibe Agent', version: '1' },
+      capabilities: { experimentalApi: true },
+    });
+    appServer.notify('initialized');
+  }
+
+  private async startAppServerThread(appServer: JsonLineRpcProcess, model: string): Promise<string> {
+    const response = await appServer.request<CodexThreadResponse>('thread/start', {
+      ...this.appServerThreadParams(model),
+      experimentalRawEvents: false,
+    });
+    return response.thread.id;
+  }
+
+  private async resumeAppServerThread(appServer: JsonLineRpcProcess, threadId: string, model: string): Promise<string> {
+    const response = await appServer.request<CodexThreadResponse>('thread/resume', {
+      ...this.appServerThreadParams(model),
+      threadId,
+      excludeTurns: true,
+    });
+    return response.thread.id;
+  }
+
+  private appServerThreadParams(model: string): Record<string, unknown> {
+    return {
+      model: model || null,
+      cwd: this.getWorkingDir(),
+      approvalPolicy: 'never',
+      sandbox: 'danger-full-access',
+      persistExtendedHistory: true,
+    };
+  }
+
+  private async runAppServerTurn(
+    appServer: JsonLineRpcProcess,
+    threadId: string,
+    prompt: string,
+    model: string,
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
+    runtimeOptions?: AgentRuntimeOptions,
+  ): Promise<void> {
+    const turnResponse = await appServer.request<CodexTurnResponse>('turn/start', {
+      threadId,
+      input: codexUserInput(prompt),
+      cwd: this.getWorkingDir(),
+      model: model || null,
+      effort: normalizeEffort(runtimeOptions?.effort),
+    });
+    const turnId = turnResponse.turn.id;
+    this.activeAppServerTurnId = turnId;
+
+    await new Promise<void>((resolve, reject) => {
+      let unsubscribeClose: () => void = () => undefined;
+      const timer = setTimeout(() => {
+        unsubscribeClose();
+        reject(new Error('Timed out waiting for Codex app-server turn completion'));
+      }, CODEX_APP_SERVER_TURN_TIMEOUT_MS);
+      timer.unref?.();
+      const state: CodexAppServerTurnState = {
+        threadId,
+        turnId,
+        onChunk,
+        callbacks,
+        resolve: () => {
+          unsubscribeClose();
+          clearTimeout(timer);
+          resolve();
+        },
+        reject: (error) => {
+          unsubscribeClose();
+          clearTimeout(timer);
+          reject(error);
+        },
+        errorResult: '',
+        reasoningOpen: false,
+        hasVisibleOutput: false,
+        completed: false,
+        assistantTextByItemId: new Map(),
+      };
+      this.appServerTurn = state;
+      unsubscribeClose = appServer.onClose((error) => {
+        if (state.completed) return;
+        state.completed = true;
+        state.reject(this.streamInterrupted ? new Error(INTERRUPTED_MESSAGE) : error);
+      });
+      const pending = this.pendingAppServerNotifications.splice(0);
+      for (const message of pending) this.handleAppServerNotification(message);
+    });
+  }
+
+  private handleAppServerNotification(message: JsonLineRpcMessage): void {
+    const method = message.method ?? '';
+    const params = (message.params ?? {}) as Record<string, unknown>;
+    const turn = this.appServerTurn;
+    if (!turn) {
+      this.pendingAppServerNotifications.push(message);
+      return;
+    }
+
+    const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
+    const turnId = typeof params.turnId === 'string' ? params.turnId : undefined;
+    if (threadId && threadId !== turn.threadId) return;
+    if (turnId && turnId !== turn.turnId) return;
+
+    switch (method) {
+      case 'turn/started':
+        this.openAppServerReasoning(turn);
+        return;
+      case 'item/agentMessage/delta':
+        this.closeAppServerReasoning(turn);
+        this.emitAppServerAssistantDelta(turn, params);
+        return;
+      case 'item/reasoning/textDelta':
+      case 'item/reasoning/summaryTextDelta':
+      case 'item/plan/delta':
+      case 'command/exec/outputDelta':
+      case 'item/commandExecution/outputDelta':
+      case 'item/fileChange/outputDelta':
+        this.openAppServerReasoning(turn);
+        this.emitAppServerReasoning(turn, typeof params.delta === 'string' ? params.delta : '');
+        return;
+      case 'item/started':
+      case 'item/completed':
+        this.handleAppServerItem(turn, params, method === 'item/completed');
+        return;
+      case 'thread/tokenUsage/updated':
+        this.handleAppServerUsage(turn, params);
+        return;
+      case 'error':
+        this.handleAppServerError(turn, params);
+        return;
+      case 'turn/completed':
+        this.handleAppServerTurnCompleted(turn, params);
+        return;
+      default:
+        return;
+    }
+  }
+
+  private handleAppServerItem(turn: CodexAppServerTurnState, params: Record<string, unknown>, completed: boolean): void {
+    const item = params.item as CodexThreadItem | undefined;
+    if (!item?.type) return;
+
+    if (item.type === 'agentMessage' && completed && item.text) {
+      const emitted = item.id ? turn.assistantTextByItemId.get(item.id) ?? '' : '';
+      const delta = item.text.startsWith(emitted) ? item.text.slice(emitted.length) : item.text;
+      if (delta) {
+        this.closeAppServerReasoning(turn);
+        turn.hasVisibleOutput = true;
+        turn.onChunk(delta);
+        if (item.id) turn.assistantTextByItemId.set(item.id, item.text);
+      }
+      return;
+    }
+
+    if (item.type === 'reasoning') {
+      this.openAppServerReasoning(turn);
+      for (const text of [...(item.summary ?? []), ...(item.content ?? [])]) {
+        this.emitAppServerReasoning(turn, text);
+      }
+      return;
+    }
+
+    if (item.type === 'plan' && item.text) {
+      this.openAppServerReasoning(turn);
+      this.emitAppServerReasoning(turn, item.text);
+      return;
+    }
+
+    if (item.type === 'commandExecution') {
+      if (item.command) {
+        this.openAppServerReasoning(turn);
+        this.emitAppServerReasoning(turn, `$ ${item.command}\n`);
+      }
+      turn.callbacks?.onTool?.({
+        kind: 'tool_call',
+        name: 'command',
+        command: item.command,
+        summary: item.aggregatedOutput?.slice(0, RESPONSE_PREVIEW_MAX),
+        details: JSON.stringify(item),
+      });
+      return;
+    }
+
+    if (item.type === 'fileChange') {
+      for (const change of item.changes ?? []) {
+        if (!change.path) continue;
+        const fileName = change.path.split(/[/\\]/).pop() ?? 'file';
+        turn.callbacks?.onTool?.({
+          kind: 'file_created',
+          name: fileName,
+          path: change.path,
+          summary: change.kind ?? change.type,
+          details: JSON.stringify(change),
+        });
+      }
+      return;
+    }
+
+    if (item.type === 'mcpToolCall' || item.type === 'dynamicToolCall') {
+      turn.callbacks?.onTool?.({
+        kind: 'tool_call',
+        name: item.tool ?? 'tool',
+        summary: item.status,
+        details: JSON.stringify(item),
+      });
+    }
+  }
+
+  private emitAppServerAssistantDelta(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+    const delta = typeof params.delta === 'string' ? params.delta : '';
+    if (!delta) return;
+    const itemId = typeof params.itemId === 'string' ? params.itemId : undefined;
+    if (itemId) {
+      turn.assistantTextByItemId.set(itemId, (turn.assistantTextByItemId.get(itemId) ?? '') + delta);
+    }
+    turn.hasVisibleOutput = true;
+    turn.onChunk(delta);
+  }
+
+  private handleAppServerUsage(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+    const tokenUsage = params.tokenUsage as { last?: { inputTokens?: number; outputTokens?: number } } | undefined;
+    if (!tokenUsage?.last) return;
+    turn.callbacks?.onUsage?.({
+      inputTokens: tokenUsage.last.inputTokens ?? 0,
+      outputTokens: tokenUsage.last.outputTokens ?? 0,
+    });
+  }
+
+  private handleAppServerError(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+    const error = params.error as { message?: string } | undefined;
+    const message = error?.message ?? 'Codex app-server turn failed';
+    turn.errorResult += message;
+    if (params.willRetry === false) {
+      this.closeAppServerReasoning(turn);
+      turn.completed = true;
+      turn.reject(new Error(message));
+    }
+  }
+
+  private handleAppServerTurnCompleted(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+    if (turn.completed) return;
+    const completedTurn = params.turn as { status?: string; error?: { message?: string } | null } | undefined;
+    this.closeAppServerReasoning(turn);
+    turn.completed = true;
+
+    if (this.streamInterrupted || completedTurn?.status === 'interrupted') {
+      turn.reject(new Error(INTERRUPTED_MESSAGE));
+      return;
+    }
+    if (completedTurn?.status === 'failed') {
+      turn.reject(new Error(completedTurn.error?.message ?? (turn.errorResult.trim() || 'Codex app-server turn failed')));
+      return;
+    }
+    if (!turn.hasVisibleOutput) {
+      turn.reject(new Error(turn.errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved.'));
+      return;
+    }
+    turn.resolve();
+  }
+
+  private openAppServerReasoning(turn: CodexAppServerTurnState): void {
+    if (turn.reasoningOpen) return;
+    turn.reasoningOpen = true;
+    turn.callbacks?.onReasoningStart?.();
+  }
+
+  private emitAppServerReasoning(turn: CodexAppServerTurnState, text: string): void {
+    if (!text) return;
+    turn.callbacks?.onReasoningChunk?.(text);
+  }
+
+  private closeAppServerReasoning(turn: CodexAppServerTurnState): void {
+    if (!turn.reasoningOpen) return;
+    turn.callbacks?.onReasoningEnd?.();
+    turn.reasoningOpen = false;
+  }
+
+  private shutdownAppServer(): void {
+    this.appServer?.close();
+    this.appServer = null;
   }
 }

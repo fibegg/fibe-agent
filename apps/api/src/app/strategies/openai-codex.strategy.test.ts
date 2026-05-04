@@ -64,6 +64,9 @@ const args = process.argv.slice(2);
 if (process.env.CODEX_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.CODEX_FAKE_ARGS_PATH, JSON.stringify(args));
 }
+if (process.env.CODEX_FAKE_CWD_PATH) {
+  fs.writeFileSync(process.env.CODEX_FAKE_CWD_PATH, process.cwd());
+}
 if (process.env.CODEX_FAKE_ENV_PATH) {
   fs.writeFileSync(process.env.CODEX_FAKE_ENV_PATH, JSON.stringify({
     CODEX_HOME: process.env.CODEX_HOME,
@@ -89,6 +92,138 @@ console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_messag
 console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 2 } }));
 `, { mode: 0o755 });
   chmodSync(path, 0o755);
+}
+
+function writeFakeCodexAppServer(path: string): void {
+  writeFileSync(path, `#!/usr/bin/env node
+const fs = require('node:fs');
+const readline = require('node:readline');
+
+const requestsPath = process.env.CODEX_FAKE_REQUESTS_PATH;
+const threadId = process.env.CODEX_FAKE_THREAD_ID || 'thread-app';
+const turnId = process.env.CODEX_FAKE_TURN_ID || 'turn-app';
+const delay = Number(process.env.CODEX_FAKE_TURN_DELAY_MS || '0');
+const message = process.env.CODEX_FAKE_MESSAGE || 'app response';
+
+function record(message) {
+  if (requestsPath) fs.appendFileSync(requestsPath, JSON.stringify(message) + '\\n');
+}
+
+function respond(id, result) {
+  process.stdout.write(JSON.stringify({ id, result }) + '\\n');
+}
+
+function notify(method, params) {
+  process.stdout.write(JSON.stringify({ method, params }) + '\\n');
+}
+
+function completeTurn(activeThreadId) {
+  notify('thread/tokenUsage/updated', {
+    threadId: activeThreadId,
+    turnId,
+    tokenUsage: { last: { inputTokens: 3, outputTokens: 4 } },
+  });
+  notify('turn/completed', {
+    threadId: activeThreadId,
+    turn: { id: turnId, items: [], status: 'completed', error: null },
+  });
+}
+
+readline.createInterface({ input: process.stdin }).on('line', (line) => {
+  if (!line.trim()) return;
+  const msg = JSON.parse(line);
+  record(msg);
+
+  if (msg.method === 'initialize') {
+    respond(msg.id, {
+      userAgent: 'fake-codex-app-server',
+      codexHome: process.env.CODEX_HOME || '',
+      platformFamily: 'unix',
+      platformOs: 'linux',
+    });
+    return;
+  }
+
+  if (msg.method === 'initialized') return;
+
+  if (msg.method === 'thread/start') {
+    respond(msg.id, {
+      thread: {
+        id: threadId,
+        status: { type: 'idle' },
+        cwd: msg.params.cwd,
+        turns: [],
+      },
+    });
+    notify('thread/started', {
+      thread: {
+        id: threadId,
+        status: { type: 'idle' },
+        cwd: msg.params.cwd,
+        turns: [],
+      },
+    });
+    return;
+  }
+
+  if (msg.method === 'thread/resume') {
+    respond(msg.id, {
+      thread: {
+        id: msg.params.threadId,
+        status: { type: 'idle' },
+        cwd: msg.params.cwd,
+        turns: [],
+      },
+    });
+    return;
+  }
+
+  if (msg.method === 'turn/start') {
+    respond(msg.id, {
+      turn: { id: turnId, items: [], status: 'inProgress', error: null },
+    });
+    notify('turn/started', {
+      threadId: msg.params.threadId,
+      turn: { id: turnId, items: [], status: 'inProgress', error: null },
+    });
+    notify('item/agentMessage/delta', {
+      threadId: msg.params.threadId,
+      turnId,
+      itemId: 'assistant-1',
+      delta: message,
+    });
+    setTimeout(() => completeTurn(msg.params.threadId), delay);
+    return;
+  }
+
+  if (msg.method === 'turn/steer') {
+    respond(msg.id, { turnId });
+    return;
+  }
+
+  if (msg.method === 'turn/interrupt') {
+    respond(msg.id, {});
+    process.exit(0);
+  }
+});
+`, { mode: 0o755 });
+  chmodSync(path, 0o755);
+}
+
+async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
+  const started = Date.now();
+  while (!predicate()) {
+    if (Date.now() - started > timeoutMs) throw new Error('Timed out waiting for condition');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+function readJsonl(path: string): Array<Record<string, unknown>> {
+  return readFileSync(path, 'utf8')
+    .trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
 /* ================================================ */
@@ -511,14 +646,21 @@ describe('OpenaiCodexStrategy', () => {
     savedEnv.OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     savedEnv.CODEX_HOME = process.env.CODEX_HOME;
     savedEnv.CODEX_BIN = process.env.CODEX_BIN;
+    savedEnv.CODEX_AGENT_TRANSPORT = process.env.CODEX_AGENT_TRANSPORT;
+    savedEnv.CODEX_USE_APP_SERVER = process.env.CODEX_USE_APP_SERVER;
     savedEnv.CODEX_FAKE_ARGS_PATH = process.env.CODEX_FAKE_ARGS_PATH;
+    savedEnv.CODEX_FAKE_CWD_PATH = process.env.CODEX_FAKE_CWD_PATH;
     savedEnv.CODEX_FAKE_ENV_PATH = process.env.CODEX_FAKE_ENV_PATH;
+    savedEnv.CODEX_FAKE_REQUESTS_PATH = process.env.CODEX_FAKE_REQUESTS_PATH;
     savedEnv.CODEX_FAKE_MODE = process.env.CODEX_FAKE_MODE;
     savedEnv.CODEX_FAKE_THREAD_ID = process.env.CODEX_FAKE_THREAD_ID;
+    savedEnv.CODEX_FAKE_TURN_ID = process.env.CODEX_FAKE_TURN_ID;
+    savedEnv.CODEX_FAKE_TURN_DELAY_MS = process.env.CODEX_FAKE_TURN_DELAY_MS;
     savedEnv.CODEX_FAKE_EMIT_THREAD = process.env.CODEX_FAKE_EMIT_THREAD;
     savedEnv.CODEX_FAKE_MESSAGE = process.env.CODEX_FAKE_MESSAGE;
     process.env.HOME = TEST_HOME;
     process.env.SESSION_DIR = join(TEST_HOME, '.codex');
+    process.env.CODEX_AGENT_TRANSPORT = 'exec';
     delete process.env.CODEX_HOME;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
@@ -536,14 +678,26 @@ describe('OpenaiCodexStrategy', () => {
     else process.env.CODEX_HOME = savedEnv.CODEX_HOME;
     if (savedEnv.CODEX_BIN === undefined) delete process.env.CODEX_BIN;
     else process.env.CODEX_BIN = savedEnv.CODEX_BIN;
+    if (savedEnv.CODEX_AGENT_TRANSPORT === undefined) delete process.env.CODEX_AGENT_TRANSPORT;
+    else process.env.CODEX_AGENT_TRANSPORT = savedEnv.CODEX_AGENT_TRANSPORT;
+    if (savedEnv.CODEX_USE_APP_SERVER === undefined) delete process.env.CODEX_USE_APP_SERVER;
+    else process.env.CODEX_USE_APP_SERVER = savedEnv.CODEX_USE_APP_SERVER;
     if (savedEnv.CODEX_FAKE_ARGS_PATH === undefined) delete process.env.CODEX_FAKE_ARGS_PATH;
     else process.env.CODEX_FAKE_ARGS_PATH = savedEnv.CODEX_FAKE_ARGS_PATH;
+    if (savedEnv.CODEX_FAKE_CWD_PATH === undefined) delete process.env.CODEX_FAKE_CWD_PATH;
+    else process.env.CODEX_FAKE_CWD_PATH = savedEnv.CODEX_FAKE_CWD_PATH;
     if (savedEnv.CODEX_FAKE_ENV_PATH === undefined) delete process.env.CODEX_FAKE_ENV_PATH;
     else process.env.CODEX_FAKE_ENV_PATH = savedEnv.CODEX_FAKE_ENV_PATH;
+    if (savedEnv.CODEX_FAKE_REQUESTS_PATH === undefined) delete process.env.CODEX_FAKE_REQUESTS_PATH;
+    else process.env.CODEX_FAKE_REQUESTS_PATH = savedEnv.CODEX_FAKE_REQUESTS_PATH;
     if (savedEnv.CODEX_FAKE_MODE === undefined) delete process.env.CODEX_FAKE_MODE;
     else process.env.CODEX_FAKE_MODE = savedEnv.CODEX_FAKE_MODE;
     if (savedEnv.CODEX_FAKE_THREAD_ID === undefined) delete process.env.CODEX_FAKE_THREAD_ID;
     else process.env.CODEX_FAKE_THREAD_ID = savedEnv.CODEX_FAKE_THREAD_ID;
+    if (savedEnv.CODEX_FAKE_TURN_ID === undefined) delete process.env.CODEX_FAKE_TURN_ID;
+    else process.env.CODEX_FAKE_TURN_ID = savedEnv.CODEX_FAKE_TURN_ID;
+    if (savedEnv.CODEX_FAKE_TURN_DELAY_MS === undefined) delete process.env.CODEX_FAKE_TURN_DELAY_MS;
+    else process.env.CODEX_FAKE_TURN_DELAY_MS = savedEnv.CODEX_FAKE_TURN_DELAY_MS;
     if (savedEnv.CODEX_FAKE_EMIT_THREAD === undefined) delete process.env.CODEX_FAKE_EMIT_THREAD;
     else process.env.CODEX_FAKE_EMIT_THREAD = savedEnv.CODEX_FAKE_EMIT_THREAD;
     if (savedEnv.CODEX_FAKE_MESSAGE === undefined) delete process.env.CODEX_FAKE_MESSAGE;
@@ -723,6 +877,18 @@ describe('OpenaiCodexStrategy', () => {
     expect(strategy.getWorkingDir()).toBe(join(convDir, 'codex_workspace'));
   });
 
+  test('getWorkingDir uses shared default workspace when provider exposes default data dir', () => {
+    const defaultDir = join(TEST_HOME, 'default-data');
+    const convDir = join(TEST_HOME, 'conversations', 'conv-a');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => defaultDir,
+      getConversationId: () => 'conv-a',
+      getEncryptionKey: () => undefined,
+    });
+    expect(strategy.getWorkingDir()).toBe(join(defaultDir, 'codex_workspace'));
+  });
+
   test('hasNativeSessionSupport is true only when a Codex session marker exists', () => {
     const convDir = join(TEST_HOME, 'native-support-conv');
     const strategy = new OpenaiCodexStrategy(false, {
@@ -732,9 +898,8 @@ describe('OpenaiCodexStrategy', () => {
 
     expect(strategy.hasNativeSessionSupport()).toBe(false);
 
-    const markerDir = join(convDir, 'codex_workspace');
-    mkdirSync(markerDir, { recursive: true });
-    writeFileSync(join(markerDir, '.codex_session'), 'thread-abc');
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.codex_session'), 'thread-abc');
 
     expect(strategy.hasNativeSessionSupport()).toBe(true);
   });
@@ -767,7 +932,7 @@ describe('OpenaiCodexStrategy', () => {
       '--',
       'hello',
     ]);
-    expect(readFileSync(join(convDir, 'codex_workspace', '.codex_session'), 'utf8')).toBe('thread-new');
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-new');
     expect(chunks).toEqual(['fake response']);
     expect(strategy.hasNativeSessionSupport()).toBe(true);
   });
@@ -802,9 +967,8 @@ describe('OpenaiCodexStrategy', () => {
     process.env.CODEX_FAKE_EMIT_THREAD = 'false';
 
     const convDir = join(TEST_HOME, 'resume-session-conv');
-    const markerDir = join(convDir, 'codex_workspace');
-    mkdirSync(markerDir, { recursive: true });
-    writeFileSync(join(markerDir, '.codex_session'), 'thread-existing');
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.codex_session'), 'thread-existing');
 
     const strategy = new OpenaiCodexStrategy(false, {
       getConversationDataDir: () => convDir,
@@ -826,7 +990,7 @@ describe('OpenaiCodexStrategy', () => {
       '--',
       'continue',
     ]);
-    expect(readFileSync(join(markerDir, '.codex_session'), 'utf8')).toBe('thread-existing');
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-existing');
   });
 
   test('executePromptStreaming places `--` before a dash-prefixed prompt so Codex arg parsing does not treat it as a flag', async () => {
@@ -868,7 +1032,7 @@ describe('OpenaiCodexStrategy', () => {
     await expect(strategy.executePromptStreaming('hello', '', () => undefined)).rejects.toThrow(
       'Agent process completed successfully but returned no output'
     );
-    expect(existsSync(join(convDir, 'codex_workspace', '.codex_session'))).toBe(false);
+    expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
   });
   test('executePromptStreaming clears stale session marker when Codex reports missing conversation', async () => {
     const fakeCodexPath = join(TEST_HOME, 'fake-codex');
@@ -880,9 +1044,8 @@ describe('OpenaiCodexStrategy', () => {
     process.env.CODEX_FAKE_THREAD_ID = 'stale-thread-id';
 
     const convDir = join(TEST_HOME, 'missing-session-conv');
-    const markerDir = join(convDir, 'codex_workspace');
-    mkdirSync(markerDir, { recursive: true });
-    writeFileSync(join(markerDir, '.codex_session'), 'stale-thread-id');
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.codex_session'), 'stale-thread-id');
 
     const strategy = new OpenaiCodexStrategy(false, {
       getConversationDataDir: () => convDir,
@@ -905,6 +1068,104 @@ describe('OpenaiCodexStrategy', () => {
       '--',
       'continue',
     ]);
-    expect(existsSync(join(markerDir, '.codex_session'))).toBe(false);
+    expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker', async () => {
+    process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    const requestsPath = join(TEST_HOME, 'codex-app-requests.jsonl');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+    process.env.CODEX_FAKE_THREAD_ID = 'thread-app-new';
+    process.env.CODEX_FAKE_MESSAGE = 'from app server';
+
+    const defaultDir = join(TEST_HOME, 'default-data');
+    const convDir = join(TEST_HOME, 'conversations', 'app-new');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => defaultDir,
+      getConversationId: () => 'app-new',
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+    const usage: Array<{ inputTokens: number; outputTokens: number }> = [];
+
+    await strategy.executePromptStreaming(
+      'hello',
+      'gpt-5.4',
+      (chunk) => chunks.push(chunk),
+      { onUsage: (u) => usage.push(u) },
+      undefined,
+      { effort: 'high' },
+    );
+
+    const requests = readJsonl(requestsPath);
+    const threadStart = requests.find((request) => request.method === 'thread/start') as { params: Record<string, unknown> };
+    const turnStart = requests.find((request) => request.method === 'turn/start') as { params: Record<string, unknown> };
+
+    expect(threadStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
+    expect(turnStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
+    expect(turnStart.params.effort).toBe('high');
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-app-new');
+    expect(existsSync(join(defaultDir, 'codex_workspace'))).toBe(true);
+    expect(chunks).toEqual(['from app server']);
+    expect(usage).toEqual([{ inputTokens: 3, outputTokens: 4 }]);
+  });
+
+  test('executePromptStreaming resumes Codex app-server thread from conversation marker', async () => {
+    process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    const requestsPath = join(TEST_HOME, 'codex-app-resume-requests.jsonl');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+
+    const convDir = join(TEST_HOME, 'conversations', 'app-resume');
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.codex_session'), 'thread-existing-app');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'app-resume',
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined);
+
+    const requests = readJsonl(requestsPath);
+    const resume = requests.find((request) => request.method === 'thread/resume') as { params: Record<string, unknown> };
+    expect(resume.params.threadId).toBe('thread-existing-app');
+    expect(requests.some((request) => request.method === 'thread/start')).toBe(false);
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-existing-app');
+  });
+
+  test('steerAgent sends turn/steer to active Codex app-server turn', async () => {
+    process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    const requestsPath = join(TEST_HOME, 'codex-app-steer-requests.jsonl');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+    process.env.CODEX_FAKE_TURN_DELAY_MS = '120';
+
+    const convDir = join(TEST_HOME, 'conversations', 'app-steer');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'app-steer',
+      getEncryptionKey: () => undefined,
+    });
+
+    const promise = strategy.executePromptStreaming('hello', 'gpt-5.4', () => undefined);
+    await waitFor(() => existsSync(requestsPath) && readJsonl(requestsPath).some((request) => request.method === 'turn/start'));
+    strategy.steerAgent('adjust course');
+    await promise;
+
+    const steer = readJsonl(requestsPath).find((request) => request.method === 'turn/steer') as { params: Record<string, unknown> };
+    expect(steer.params.threadId).toBe('thread-app');
+    expect(steer.params.expectedTurnId).toBe('turn-app');
+    expect(steer.params.input).toEqual([{ type: 'text', text: 'adjust course', text_elements: [] }]);
   });
 });
