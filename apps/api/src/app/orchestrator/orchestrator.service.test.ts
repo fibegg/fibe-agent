@@ -77,6 +77,14 @@ describe('OrchestratorService', () => {
       create: () => ({ id: 'test', title: 'New chat', createdAt: '', lastMessageAt: '' }),
       setTitle: () => true,
       delete: () => true,
+      // Per-conversation model/effort — return null so global stores are used
+      getConversationModel: (_id: string) => null,
+      setConversationModel: (_id: string, _model: string) => true,
+      getConversationEffort: (_id: string) => null,
+      setConversationEffort: (_id: string, _effort: string) => true,
+      // Claude session marker
+      getClaudeSessionMarker: (_id: string) => null,
+      setClaudeSessionMarker: (_id: string, _sessionId: string | null) => true,
     } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
     const strategyRegistry = { resolveStrategy: () => ({ checkAuthStatus: async () => true, executeAuth: () => undefined, submitAuthCode: () => undefined, cancelAuth: () => undefined, clearCredentials: () => undefined, executeLogout: () => undefined, executePromptStreaming: async (_p: string, _m: string, onChunk: (c: string) => void) => { onChunk('test response'); }, ensureSettings: () => undefined, interruptAgent: () => undefined, hasNativeSessionSupport: () => true, steerAgent: undefined }) } as unknown as import('../strategies/strategy-registry.service').StrategyRegistryService;
     const sessionRegistry = new SessionRegistryService(strategyRegistry as never, conversationManager);
@@ -140,13 +148,16 @@ describe('OrchestratorService', () => {
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     orch.handleClientConnected(ctx);
-    expect(events.length).toBe(3);
+    // Now sends 5 events: auth_status, activity_snapshot, agent_mode_updated, model_updated, effort_updated
+    expect(events.length).toBe(5);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.status).toBe(AUTH_STATUS.UNAUTHENTICATED);
     expect(events[1].type).toBe(WS_EVENT.ACTIVITY_SNAPSHOT);
     expect(events[1].data.activity).toBeDefined();
     expect(events[2].type).toBe(WS_EVENT.AGENT_MODE_UPDATED);
     expect(events[2].data.mode).toBeDefined();
+    expect(events[3].type).toBe(WS_EVENT.MODEL_UPDATED);
+    expect(events[4].type).toBe(WS_EVENT.EFFORT_UPDATED);
   });
 
   test('handleClientMessage get_model sends model_updated', async () => {
@@ -164,6 +175,7 @@ describe('OrchestratorService', () => {
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.SET_MODEL, model: 'gemini-2' });
+    // broadcastToConversation sends to conversation sessions; ctx is in 'default' conversation
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.MODEL_UPDATED);
     expect(events[0].data.model).toBe('gemini-2');
@@ -184,6 +196,7 @@ describe('OrchestratorService', () => {
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.SET_EFFORT, effort: 'high' });
+    // broadcastToConversation sends to conversation sessions; ctx is in 'default' conversation
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.EFFORT_UPDATED);
     expect(events[0].data.effort).toBe('high');

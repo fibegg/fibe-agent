@@ -289,7 +289,11 @@ export class OrchestratorService implements OnModuleInit {
     });
     ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.stores(ctx).activityStore.all() });
     ctx.send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
+    // Send conversation-specific model and effort so the UI reflects per-thread settings on connect.
+    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel(ctx) });
+    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort(ctx) });
   }
+
 
   private async checkAndSendAuthStatus(ctx: SessionContext): Promise<void> {
     const authenticated = await ctx.strategy.checkAuthStatus();
@@ -518,8 +522,8 @@ export class OrchestratorService implements OnModuleInit {
         attachmentFilenames,
         historyMessages,
       );
-      const model = this.modelStore.get();
-      const effort = this.effortStore.get();
+      const model = this.effectiveModel(ctx);
+      const effort = this.effectiveEffort(ctx);
       // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_START, { model });
       const streamStartEntry: StoredStoryEntry = {
@@ -736,24 +740,43 @@ export class OrchestratorService implements OnModuleInit {
     await Promise.all([sMsg.flush(), sAct.flush()]);
   }
 
+  // ── Per-conversation model / effort helpers ─────────────────────────
+
+  /** Conversation-level model takes priority over the global ModelStoreService. */
+  private effectiveModel(ctx: SessionContext): string {
+    return this.conversationManager.getConversationModel(ctx.conversationId)
+      ?? this.modelStore.get();
+  }
+
+  /** Conversation-level effort takes priority over the global EffortStoreService. */
+  private effectiveEffort(ctx: SessionContext): string {
+    return this.conversationManager.getConversationEffort(ctx.conversationId)
+      ?? this.effortStore.get();
+  }
+
   private handleGetModel(ctx: SessionContext): void {
-    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.modelStore.get() });
+    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel(ctx) });
   }
 
   private async handleSetModel(ctx: SessionContext, model: string): Promise<void> {
     const value = this.modelStore.set(model);
     await this.modelStore.flush();
-    this.sessionRegistry.broadcast(WS_EVENT.MODEL_UPDATED, { model: value });
+    // Persist per-conversation so each thread tracks its own model.
+    this.conversationManager.setConversationModel(ctx.conversationId, value);
+    // Only broadcast to this conversation’s sessions, not every open tab.
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.MODEL_UPDATED, { model: value });
   }
 
   private handleGetEffort(ctx: SessionContext): void {
-    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effortStore.get() });
+    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort(ctx) });
   }
 
   private async handleSetEffort(ctx: SessionContext, effort: string): Promise<void> {
     const value = this.effortStore.set(effort);
     await this.effortStore.flush();
-    this.sessionRegistry.broadcast(WS_EVENT.EFFORT_UPDATED, { effort: value });
+    // Persist per-conversation effort.
+    this.conversationManager.setConversationEffort(ctx.conversationId, value);
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.EFFORT_UPDATED, { effort: value });
   }
 
   private handleAnswerUserQuestion(questionId: string, answer: string): void {

@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -57,14 +57,77 @@ describe('ConversationManagerService', () => {
     const manager = createManager();
     const meta = manager.create('To be deleted');
     const convDir = join(dataDir, 'conversations', meta.id);
-    // Directory was created by createBundle()
     expect(existsSync(convDir)).toBe(true);
 
     const ok = manager.delete(meta.id);
     expect(ok).toBe(true);
-    // Directory should be gone
     expect(existsSync(convDir)).toBe(false);
-    // Not in the list anymore
     expect(manager.list().find((m) => m.id === meta.id)).toBeUndefined();
+  });
+
+  // ── Per-conversation model / effort ──────────────────────────────────────
+
+  test('getConversationModel returns null when not set', () => {
+    const manager = createManager();
+    const { id } = manager.create('test');
+    expect(manager.getConversationModel(id)).toBeNull();
+  });
+
+  test('setConversationModel persists and is readable', () => {
+    const manager = createManager();
+    const { id } = manager.create('test');
+
+    expect(manager.setConversationModel(id, 'claude-opus-4-5')).toBe(true);
+    expect(manager.getConversationModel(id)).toBe('claude-opus-4-5');
+
+    // Persisted to index — a fresh manager load should see it
+    const manager2 = createManager();
+    expect(manager2.getConversationModel(id)).toBe('claude-opus-4-5');
+  });
+
+  test('setConversationModel with empty string clears the override', () => {
+    const manager = createManager();
+    const { id } = manager.create('test');
+    manager.setConversationModel(id, 'some-model');
+    manager.setConversationModel(id, '');
+    expect(manager.getConversationModel(id)).toBeNull();
+  });
+
+  test('setConversationEffort persists and is readable', () => {
+    const manager = createManager();
+    const { id } = manager.create('test');
+
+    expect(manager.setConversationEffort(id, 'high')).toBe(true);
+    expect(manager.getConversationEffort(id)).toBe('high');
+  });
+
+  // ── Claude session marker ─────────────────────────────────────────────────
+
+  test('getClaudeSessionMarker returns null when no marker exists', () => {
+    const manager = createManager();
+    const { id } = manager.create('claude-test');
+    expect(manager.getClaudeSessionMarker(id)).toBeNull();
+  });
+
+  test('setClaudeSessionMarker writes marker and getClaudeSessionMarker reads it', () => {
+    const manager = createManager();
+    const { id } = manager.create('claude-test');
+    const sessionId = 'abc-123-native-session';
+
+    expect(manager.setClaudeSessionMarker(id, sessionId)).toBe(true);
+    expect(manager.getClaudeSessionMarker(id)).toBe(sessionId);
+
+    // Verify the file is on disk in the expected location
+    const markerPath = join(dataDir, 'conversations', id, 'claude_workspace', '.claude_session');
+    expect(existsSync(markerPath)).toBe(true);
+    expect(readFileSync(markerPath, 'utf8').trim()).toBe(sessionId);
+  });
+
+  test('setClaudeSessionMarker(null) clears an existing marker', () => {
+    const manager = createManager();
+    const { id } = manager.create('claude-test');
+    manager.setClaudeSessionMarker(id, 'some-session');
+    manager.setClaudeSessionMarker(id, null);
+    expect(manager.getClaudeSessionMarker(id)).toBeNull();
   });
 });

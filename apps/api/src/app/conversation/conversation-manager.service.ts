@@ -18,6 +18,10 @@ export interface ConversationMeta {
   title: string;
   createdAt: string;
   lastMessageAt: string;
+  /** Per-conversation model override (takes priority over global ModelStoreService). */
+  model?: string;
+  /** Per-conversation effort override (takes priority over global EffortStoreService). */
+  effort?: string;
 }
 
 export const DEFAULT_CONVERSATION_ID = 'default';
@@ -135,6 +139,70 @@ export class ConversationManagerService {
     this.flushIndex();
   }
 
+  /** Get the per-conversation model override (null = use global). */
+  getConversationModel(id: string): string | null {
+    return this.bundles.get(id)?.meta.model ?? null;
+  }
+
+  /** Set the per-conversation model. Pass empty string to clear. */
+  setConversationModel(id: string, model: string): boolean {
+    const bundle = this.bundles.get(id);
+    if (!bundle) return false;
+    bundle.meta.model = model.trim() || undefined;
+    this.flushIndex();
+    return true;
+  }
+
+  /** Get the per-conversation effort override (null = use global). */
+  getConversationEffort(id: string): string | null {
+    return this.bundles.get(id)?.meta.effort ?? null;
+  }
+
+  /** Set the per-conversation effort. Pass empty string to clear. */
+  setConversationEffort(id: string, effort: string): boolean {
+    const bundle = this.bundles.get(id);
+    if (!bundle) return false;
+    bundle.meta.effort = effort.trim() || undefined;
+    this.flushIndex();
+    return true;
+  }
+
+  /**
+   * Read the Claude native session ID stored in the conversation's
+   * claude_workspace directory.  Returns null when no session marker exists.
+   */
+  getClaudeSessionMarker(id: string): string | null {
+    const markerPath = join(this.claudeWorkspaceDir(id), '.claude_session');
+    if (!existsSync(markerPath)) return null;
+    try {
+      const stored = readFileSync(markerPath, 'utf8').trim();
+      return stored || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Write (or clear when sessionId is null/empty) the Claude session marker.
+   * This allows importing existing native Claude sessions into a conversation.
+   */
+  setClaudeSessionMarker(id: string, sessionId: string | null): boolean {
+    const workspaceDir = this.claudeWorkspaceDir(id);
+    const markerPath = join(workspaceDir, '.claude_session');
+    try {
+      if (sessionId?.trim()) {
+        mkdirSync(workspaceDir, { recursive: true });
+        writeFileSync(markerPath, sessionId.trim());
+      } else {
+        if (existsSync(markerPath)) rmSync(markerPath, { force: true });
+      }
+      return true;
+    } catch (err) {
+      this.logger.warn(`Failed to update Claude session marker for ${id}: ${err}`);
+      return false;
+    }
+  }
+
   /** Delete a conversation (metadata + in-memory; files removed from disk). */
   delete(id: string): boolean {
     if (id === DEFAULT_CONVERSATION_ID) return false;
@@ -160,6 +228,11 @@ export class ConversationManagerService {
     // single-conversation installs are unaffected.
     if (id === DEFAULT_CONVERSATION_ID) return this.config.getConversationDataDir();
     return join(this.conversationsDir, id);
+  }
+
+  /** Path to the claude_workspace sub-directory for a conversation. */
+  private claudeWorkspaceDir(id: string): string {
+    return join(this.convDir(id), 'claude_workspace');
   }
 
   private createBundle(id: string, meta?: ConversationMeta): ConversationBundle {
