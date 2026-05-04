@@ -1,6 +1,12 @@
 import { memo, useCallback, useRef, useState } from 'react';
 import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search } from 'lucide-react';
 import type { ConversationMeta } from './use-conversations';
+import {
+  INPUT_SEARCH,
+  SEARCH_ICON_POSITION,
+  CLEAR_BUTTON_POSITION,
+  SEARCH_ROW_WRAPPER,
+} from '../ui-classes';
 
 interface ConversationSidebarProps {
   conversations: ConversationMeta[];
@@ -154,24 +160,23 @@ export const ConversationSidebar = memo(function ConversationSidebar({
       {/* Search */}
       {conversations.length > 0 && (
         <div className="px-2 pt-2 shrink-0">
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground/40 pointer-events-none" />
+          <div className={SEARCH_ROW_WRAPPER}>
+            <Search className={SEARCH_ICON_POSITION} aria-hidden />
             <input
               ref={searchRef}
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search…"
-              className="w-full rounded-md bg-background/80 border border-border/30 pl-6 pr-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-1 focus:ring-violet-500/30 transition-all appearance-none"
-              style={{ colorScheme: 'dark' }}
+              className={INPUT_SEARCH}
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors"
+                className={CLEAR_BUTTON_POSITION}
                 aria-label="Clear search"
               >
-                <X className="h-3 w-3" />
+                <X className="size-3.5" />
               </button>
             )}
           </div>
