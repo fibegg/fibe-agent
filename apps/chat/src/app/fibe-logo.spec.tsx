@@ -7,9 +7,9 @@ describe('FibeLogo', () => {
     expect(screen.getByRole('img')).toBeTruthy();
   });
 
-  it('sets src to /fibe.png', () => {
+  it('sets src to /phoenix.png', () => {
     render(<FibeLogo />);
-    expect(screen.getByRole('img').getAttribute('src')).toBe('/fibe.png');
+    expect(screen.getByRole('img').getAttribute('src')).toBe('/phoenix.png');
   });
 
   it('sets alt to Fibe Logo', () => {

@@ -68,6 +68,7 @@ export function LoginPage() {
 
   return (
     <div className="w-full h-full min-h-screen flex items-center justify-center bg-gradient-to-br from-zinc-950 via-zinc-900 to-violet-950 relative overflow-hidden">
+      {/* Ambient background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-[linear-gradient(rgba(124,58,237,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(124,58,237,0.04)_1px,transparent_1px)] bg-[size:50px_50px] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_50%,black,transparent)]" />
         {[0, 1, 2].map((i) => (
@@ -98,56 +99,52 @@ export function LoginPage() {
         ))}
       </div>
 
-      <div className="relative z-10 w-full max-w-md px-4">
-        <div className="bg-zinc-800/30 backdrop-blur-3xl border border-violet-400/15 rounded-2xl shadow-[0_0_60px_rgba(124,58,237,0.12)] p-6 sm:p-8">
-          <div className="flex justify-center mb-4 sm:mb-6">
-            <FibeLogo className="size-16 sm:size-20 object-contain" />
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 rounded-md bg-destructive/10 text-destructive text-sm border border-destructive/20">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
-            <div>
-              <label htmlFor="password" className="block text-xs sm:text-sm text-violet-300/80 mb-2">
-                {t('login.passwordLabel')}
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={t('login.passwordPlaceholder')}
-                className="w-full h-11 sm:h-12 px-4 rounded-xl text-sm bg-zinc-900/40 border border-violet-500/15 text-white placeholder:text-violet-300/25 focus:outline-none focus:border-violet-500/40 focus:ring-2 focus:ring-violet-500/20 transition-all duration-200"
-                disabled={loading}
-              />
-            </div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 sm:h-12 text-sm font-medium tracking-[0.04em] rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/40 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-            >
-              {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  <span className="text-xs sm:text-sm">{t('login.authenticating')}</span>
-                </div>
-              ) : (
-                t('login.login')
-              )}
-            </button>
-          </form>
-
-          <div className="mt-4 sm:mt-6 text-center">
-            <p className="text-[10px] sm:text-xs text-violet-300/40">
-              v{__APP_VERSION__}
-            </p>
-          </div>
+      {/* Form — floats directly on the background, no card box */}
+      <div className="relative z-10 w-full max-w-sm px-6 flex flex-col items-center gap-6">
+        {/* Logo */}
+        <div className="flex flex-col items-center gap-3">
+          <FibeLogo className="size-20 sm:size-24 object-contain drop-shadow-[0_0_32px_rgba(167,139,250,0.4)]" />
         </div>
-        <div className="absolute inset-0 bg-gradient-to-t from-violet-600/20 to-transparent blur-3xl -z-10 scale-150" />
+
+        {error && (
+          <div className="w-full p-3 rounded-xl bg-destructive/10 text-destructive text-sm border border-destructive/20 text-center">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="w-full space-y-3">
+          <div>
+            <label htmlFor="password" className="block text-xs text-violet-300/60 mb-2 text-center tracking-wide uppercase">
+              {t('login.passwordLabel')}
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={t('login.passwordPlaceholder')}
+              className="w-full h-12 px-4 rounded-xl text-sm bg-zinc-900/60 border border-violet-500/20 text-white placeholder:text-violet-300/25 focus:outline-none focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 transition-all duration-200 backdrop-blur-sm text-center"
+              disabled={loading}
+              autoFocus
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full h-12 text-sm font-medium tracking-[0.04em] rounded-xl bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg shadow-violet-500/25 transition-all duration-300 hover:shadow-violet-500/40 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          >
+            {loading ? (
+              <div className="flex items-center justify-center gap-2">
+                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <span>{t('login.authenticating')}</span>
+              </div>
+            ) : (
+              t('login.login')
+            )}
+          </button>
+        </form>
+
+        <p className="text-[10px] text-violet-300/30">v{__APP_VERSION__}</p>
       </div>
     </div>
   );

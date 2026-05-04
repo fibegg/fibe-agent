@@ -1,4 +1,4 @@
-const FIBE_LOGO_SRC = '/fibe.png';
+const FIBE_LOGO_SRC = '/phoenix.png';
 
 export function FibeLogo({ className = '' }: { className?: string }) {
   return (

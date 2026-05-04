@@ -1,5 +1,5 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search, Link2 } from 'lucide-react';
 import type { ConversationMeta } from './use-conversations';
 import {
   INPUT_SEARCH,
@@ -44,6 +44,7 @@ const ConversationItem = memo(function ConversationItem({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(conv.title);
+  const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const startEdit = useCallback((e: React.MouseEvent) => {
@@ -63,6 +64,21 @@ const ConversationItem = memo(function ConversationItem({
     setDraft(conv.title);
     setEditing(false);
   }, [conv.title]);
+
+  const handleShare = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const url = new URL(window.location.href);
+    url.searchParams.set('c', conv.id);
+    const shareUrl = url.toString();
+    if (navigator.share) {
+      void navigator.share({ title: conv.title, url: shareUrl }).catch(() => { /* user cancelled */ });
+    } else {
+      void navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      });
+    }
+  }, [conv.id, conv.title]);
 
   return (
     <div
@@ -101,6 +117,15 @@ const ConversationItem = memo(function ConversationItem({
       {/* Action buttons — visible on hover / active */}
       {!editing && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden items-center gap-1 group-hover:flex">
+          <button
+            onClick={handleShare}
+            className="rounded p-0.5 text-muted-foreground/60 hover:text-violet-400 transition-colors"
+            title={copied ? 'Copied!' : 'Share link'}
+          >
+            {copied
+              ? <Check className="h-3 w-3 text-green-400" />
+              : <Link2 className="h-3 w-3" />}
+          </button>
           <button
             onClick={startEdit}
             className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
