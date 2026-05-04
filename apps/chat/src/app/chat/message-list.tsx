@@ -108,6 +108,15 @@ const COPY_BUTTON_CLASS_USER =
 const COPY_BUTTON_CLASS_ASSISTANT =
   'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
 
+function messageAnchorId(msg: ChatMessage, index: number): string {
+  return `chat-message-${stringHash32(msg.id ?? `${msg.created_at}-${msg.role}-${index}`)}`;
+}
+
+function messageTimeMs(msg: ChatMessage): number | null {
+  const time = Date.parse(msg.created_at);
+  return Number.isFinite(time) ? time : null;
+}
+
 function CopyRawMessageButton({
   rawText,
   visualVariant,
@@ -332,6 +341,8 @@ const MessageRow = memo(
     onPlay,
     playingId,
     conversationId,
+    anchorId,
+    isFocused,
   }: {
     msg: ChatMessage;
     maxWidthClass?: string;
@@ -342,6 +353,8 @@ const MessageRow = memo(
     onPlay?: (id: string, text: string) => void;
     playingId?: string | null;
     conversationId?: string;
+    anchorId: string;
+    isFocused?: boolean;
   }) {
     const { locale, t } = useI18n();
     const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
@@ -359,7 +372,11 @@ const MessageRow = memo(
 
     return (
     <div
-      className={`flex gap-2 sm:gap-3 md:gap-4 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}
+      id={anchorId}
+      data-message-id={msg.id}
+      data-message-created-at={msg.created_at}
+      data-conversation-id={conversationId}
+      className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-violet-500/10 shadow-[0_0_0_2px_rgba(139,92,246,0.35)]' : ''}`}
     >
       <div className="flex-shrink-0">
         {msg.role === 'user' ? (
@@ -479,7 +496,9 @@ const MessageRow = memo(
       prev.onRetry !== next.onRetry ||
       prev.isNoOutput !== next.isNoOutput ||
       prev.onPlay !== next.onPlay ||
-      prev.playingId !== next.playingId
+      prev.playingId !== next.playingId ||
+      prev.anchorId !== next.anchorId ||
+      prev.isFocused !== next.isFocused
     ) {
       return false;
     }
@@ -490,6 +509,7 @@ const MessageRow = memo(
 
 export interface MessageListHandle {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
+  scrollToTimestamp: (timestamp: string) => boolean;
 }
 
 export interface MessageListProps {
@@ -527,6 +547,8 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
 
   const localTts = useLocalTts();
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [focusedAnchorId, setFocusedAnchorId] = useState<string | null>(null);
+  const focusClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Keep a ref so the stable wrapper below never captures a stale closure.
   const playingIdRef = useRef(playingId);
@@ -580,11 +602,61 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     [lastIndex, virtualizer]
   );
 
+  const scrollToTimestamp = useCallback((timestamp: string): boolean => {
+    const targetTime = Date.parse(timestamp);
+    if (!Number.isFinite(targetTime) || messages.length === 0) return false;
+
+    let beforeIndex = -1;
+    let beforeTime = Number.NEGATIVE_INFINITY;
+    let nearestIndex = -1;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+
+    messages.forEach((item, index) => {
+      if (isResetSeparator(item)) return;
+      const time = messageTimeMs(item);
+      if (time === null) return;
+      if (time <= targetTime && time >= beforeTime) {
+        beforeIndex = index;
+        beforeTime = time;
+      }
+      const distance = Math.abs(time - targetTime);
+      if (distance < nearestDistance) {
+        nearestIndex = index;
+        nearestDistance = distance;
+      }
+    });
+
+    const index = beforeIndex >= 0 ? beforeIndex : nearestIndex;
+    if (index < 0) return false;
+
+    const item = messages[index];
+    if (isResetSeparator(item)) return false;
+    const anchorId = messageAnchorId(item, index);
+    setFocusedAnchorId(anchorId);
+    if (focusClearTimerRef.current) clearTimeout(focusClearTimerRef.current);
+    focusClearTimerRef.current = setTimeout(() => setFocusedAnchorId((current) => current === anchorId ? null : current), 3200);
+
+    if (scrollRef?.current) {
+      virtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
+    } else {
+      requestAnimationFrame(() => {
+        document.getElementById(anchorId)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+    }
+    return true;
+  }, [messages, scrollRef, virtualizer]);
+
   useImperativeHandle(
     ref,
-    () => ({ scrollToBottom }),
-    [scrollToBottom]
+    () => ({ scrollToBottom, scrollToTimestamp }),
+    [scrollToBottom, scrollToTimestamp]
   );
+
+  useEffect(() => {
+    return () => {
+      if (focusClearTimerRef.current) clearTimeout(focusClearTimerRef.current);
+    };
+  }, []);
 
   const hasScrolledToBottomOnMountRef = useRef(false);
   useEffect(() => {
@@ -625,6 +697,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
           );
         }
         const rowKey = item.id ?? `msg-${virtualRow.index}-${item.created_at}-${item.role}`;
+        const anchorId = messageAnchorId(item, virtualRow.index);
         return (
           <div
             key={rowKey}
@@ -645,6 +718,8 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               onPlay={handlePlay}
               playingId={playingId}
               conversationId={conversationId}
+              anchorId={anchorId}
+              isFocused={focusedAnchorId === anchorId}
             />
           </div>
         );
@@ -656,6 +731,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
         if (isResetSeparator(item)) {
           return <ResetSeparatorRow key={`reset-${item.resetAt}-${i}`} resetAt={item.resetAt} />;
         }
+        const anchorId = messageAnchorId(item, i);
         return (
           <MessageRow
             key={item.id ?? `msg-${i}-${item.created_at}-${item.role}`}
@@ -667,6 +743,8 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
             onPlay={handlePlay}
             playingId={playingId}
             conversationId={conversationId}
+            anchorId={anchorId}
+            isFocused={focusedAnchorId === anchorId}
           />
         );
       })}

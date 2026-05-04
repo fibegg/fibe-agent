@@ -78,6 +78,12 @@ interface RuntimeConfigResponse {
   simplicate?: boolean;
 }
 
+interface PendingTimestampFocus {
+  timestamp: string;
+  conversationId: string;
+  requestId?: string;
+}
+
 const SIMPLICATE_STORAGE_KEY = 'simplicate-mode';
 
 function readStoredSimplicateMode(): boolean | null {
@@ -320,6 +326,19 @@ export function ChatPage() {
     }
   }, [canShowDiff, diffOpen, closeDiff]);
 
+  useEffect(() => {
+    const conversation = conversations.find((c) => c.id === activeConversationId);
+    try {
+      window.parent.postMessage({
+        type: 'fibe_conversation_changed',
+        conversationId: activeConversationId,
+        title: conversation?.title ?? activeConversationId,
+      }, '*');
+    } catch {
+      // Parent may be unavailable outside the Rails iframe.
+    }
+  }, [activeConversationId, conversations]);
+
   const {
     activityLog,
     activityLogRef,
@@ -341,6 +360,12 @@ export function ChatPage() {
     focusInput,
   } = useChatInput({ playgroundEntries, onSendRef: handleSendRef });
   const messageListRef = useRef<MessageListHandle | null>(null);
+  const activeConversationIdRef = useRef(activeConversationId);
+  const conversationsRef = useRef(conversations);
+  const [pendingTimestampFocus, setPendingTimestampFocus] = useState<PendingTimestampFocus | null>(null);
+
+  useEffect(() => { activeConversationIdRef.current = activeConversationId; }, [activeConversationId]);
+  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
 
   useEffect(() => {
     if (!authenticated) {

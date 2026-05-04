@@ -1,17 +1,28 @@
-
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
-import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
+import type {
+  AgentRuntimeOptions,
+  AuthConnection,
+  ConversationDataDirProvider,
+  LogoutConnection,
+  StreamingCallbacks,
+  TokenUsage,
+  ToolEvent,
+} from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
-import { getProxyEnv } from '../provider-traffic/types';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
+import { AbstractCLIStrategy } from './abstract-cli.strategy';
+import { HttpAppServerProcess } from './http-app-server-process';
+import { ProviderConversationPaths } from './provider-conversation-paths';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
 const SESSION_MARKER_FILE = '.opencode_session';
 const OPENCODE_CONFIG_FILE = 'opencode.json';
+const OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS = 120_000;
+const OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 60 * 60 * 1000;
 const MISSING_SESSION_ERROR_PATTERNS = [
   /No conversation found with session ID:/i,
   /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
@@ -59,6 +70,10 @@ const OPENCODE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   },
 };
 
+const OPENCODE_SESSION_PERMISSION_ALLOW_ALL = [
+  { permission: '*', pattern: '*', action: 'allow' },
+];
+
 /**
  * Build opencode CLI `run` args. The `'--'` separator forces the prompt to be
  * treated as a positional even when it starts with `-` (e.g. a system prompt
@@ -95,31 +110,156 @@ function missingSessionError(message: string): boolean {
   return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
-import { AbstractCLIStrategy } from './abstract-cli.strategy';
+function useAppServerTransport(): boolean {
+  const explicitTransport = (process.env.OPENCODE_AGENT_TRANSPORT ?? '').trim().toLowerCase();
+  if (explicitTransport === 'run' || explicitTransport === 'cli') return false;
+  if (explicitTransport === 'app-server' || explicitTransport === 'appserver') return true;
+
+  const explicitFlag = (process.env.OPENCODE_USE_APP_SERVER ?? '').trim().toLowerCase();
+  if (['0', 'false', 'no'].includes(explicitFlag)) return false;
+  return true;
+}
+
+function parseOpencodeModel(model: string): { providerID: string; modelID: string } | undefined {
+  if (!model || model === 'undefined') return undefined;
+  const slash = model.indexOf('/');
+  if (slash <= 0 || slash === model.length - 1) return undefined;
+  return {
+    providerID: model.slice(0, slash),
+    modelID: model.slice(slash + 1),
+  };
+}
+
+function normalizeVariant(effort?: string): string | undefined {
+  const normalized = effort?.trim();
+  return normalized || undefined;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === 'string') return error;
+  if (error && typeof error === 'object') {
+    const maybeData = error as { data?: unknown; message?: unknown; name?: unknown };
+    if (typeof maybeData.message === 'string') return maybeData.message;
+    if (typeof maybeData.name === 'string') return maybeData.name;
+    if (maybeData.data && typeof maybeData.data === 'object') {
+      const data = maybeData.data as { message?: unknown };
+      if (typeof data.message === 'string') return data.message;
+    }
+  }
+  return JSON.stringify(error);
+}
+
+interface OpenCodeSession {
+  id: string;
+  title?: string;
+}
+
+interface OpenCodeMessage {
+  id: string;
+  sessionID: string;
+  role: 'user' | 'assistant';
+  tokens?: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
+  error?: unknown;
+}
+
+interface OpenCodePart {
+  id: string;
+  sessionID: string;
+  messageID: string;
+  type: string;
+  text?: string;
+  tool?: string;
+  callID?: string;
+  state?: {
+    status?: string;
+    input?: unknown;
+    output?: unknown;
+    error?: unknown;
+    title?: string;
+    metadata?: unknown;
+  };
+  tokens?: {
+    input?: number;
+    output?: number;
+    total?: number;
+  };
+}
+
+interface OpenCodeMessageResponse {
+  info: OpenCodeMessage;
+  parts: OpenCodePart[];
+}
+
+interface OpenCodeEvent {
+  type?: string;
+  properties?: {
+    sessionID?: string;
+    messageID?: string;
+    partID?: string;
+    field?: string;
+    delta?: string;
+    part?: OpenCodePart;
+    info?: OpenCodeMessage | OpenCodeSession;
+    error?: unknown;
+  };
+}
+
+interface OpenCodeEventState {
+  sessionId: string;
+  onChunk: (chunk: string) => void;
+  callbacks?: StreamingCallbacks;
+  errorResult: string;
+  reasoningOpen: boolean;
+  hasVisibleOutput: boolean;
+  textByPartId: Map<string, string>;
+  partTypeById: Map<string, string>;
+  emittedToolStateByPartId: Map<string, string>;
+}
 
 export class OpencodeStrategy extends AbstractCLIStrategy {
+  private readonly paths: ProviderConversationPaths;
+  private appServer: HttpAppServerProcess | null = null;
+  private activeAppServerSessionId: string | null = null;
+  private activeSseAbort: AbortController | null = null;
+  private activePromptAbort: AbortController | null = null;
+
   constructor(conversationDataDir?: ConversationDataDirProvider) {
     super(OpencodeStrategy.name, false, conversationDataDir);
+    this.paths = new ProviderConversationPaths({
+      conversationDataDir,
+      workspaceSubdir: OPENCODE_WORKSPACE_SUBDIR,
+      fallbackWorkspaceDir: PLAYGROUND_DIR,
+      sessionMarkerFile: SESSION_MARKER_FILE,
+    });
   }
 
   private getOpencodeWorkspaceDir(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), OPENCODE_WORKSPACE_SUBDIR);
-    }
-    return PLAYGROUND_DIR;
+    return this.paths.getWorkspaceDir();
   }
 
   getWorkingDir(): string {
     return this.getOpencodeWorkspaceDir();
   }
 
-  private clearStoredSession(workspaceDir: string): void {
-    if (!this.conversationDataDir) return;
-    try {
-      rmSync(join(workspaceDir, SESSION_MARKER_FILE), { force: true });
-    } catch {
-      /* ignore cleanup errors */
-    }
+  prepareWorkingDir(): void {
+    this.paths.prepareWorkspace();
+  }
+
+  private readStoredSession(): string | null {
+    return this.paths.readSessionMarker();
+  }
+
+  private writeStoredSession(sessionId: string): void {
+    this.paths.writeSessionMarker(sessionId);
+  }
+
+  private clearStoredSession(): void {
+    this.paths.clearSessionMarker();
   }
 
   /**
@@ -265,22 +405,32 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     });
   }
 
-  listModels(): Promise<string[]> {
-    return new Promise((resolve) => {
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-        ...getProxyEnv(),
-        ...OpencodeStrategy.YOLO_ENV,
-      };
-      OpencodeStrategy.applyYoloConfigContent(env);
-      const storedKey = this.getStoredApiKey();
-      if (storedKey) {
-        for (const varName of API_KEY_ENV_VARS) {
-          if (!env[varName]?.trim()) {
-            env[varName] = storedKey;
-          }
+  private buildOpencodeEnv(): NodeJS.ProcessEnv {
+    const env: NodeJS.ProcessEnv = {
+      ...process.env,
+      ...this.getProxyEnv(),
+      ...OpencodeStrategy.YOLO_ENV,
+    };
+    OpencodeStrategy.applyYoloConfigContent(env);
+    const storedKey = this.getStoredApiKey();
+
+    if (storedKey) {
+      for (const varName of API_KEY_ENV_VARS) {
+        if (!env[varName]?.trim()) {
+          env[varName] = storedKey;
         }
       }
+      if (!env['OPENAI_API_BASE']?.trim()) {
+        env['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1';
+      }
+    }
+
+    return env;
+  }
+
+  listModels(): Promise<string[]> {
+    return new Promise((resolve) => {
+      const env = this.buildOpencodeEnv();
 
       let stdout = '';
       const proc = spawn('opencode', ['models'], {
@@ -317,7 +467,28 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
   override interruptAgent(): void {
     this.streamInterrupted = true;
+    this.activeSseAbort?.abort();
+    this.activePromptAbort?.abort();
+    const appServer = this.appServer;
+    const sessionId = this.activeAppServerSessionId;
+    if (appServer && sessionId) {
+      void appServer.json(`/session/${encodeURIComponent(sessionId)}/abort`, {
+        method: 'POST',
+        query: this.appServerQuery(),
+        timeoutMs: 5_000,
+      }).catch(() => undefined);
+    } else {
+      this.shutdownAppServer();
+    }
     this.currentStreamProcess?.kill();
+  }
+
+  override steerAgent(message: string): void {
+    const trimmed = message.trim();
+    if (!trimmed) return;
+    // OpenCode serve does not expose Codex-style turn steering. Preserve the
+    // user intent and let the orchestrator's queued empty turn deliver it next.
+    this.pendingSteerMessages.push(trimmed);
   }
 
   /**
@@ -340,23 +511,33 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     prompt: string,
     model: string,
     onChunk: (chunk: string) => void,
-    callbacks?: import('./strategy.types').StreamingCallbacks,
+    callbacks?: StreamingCallbacks,
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
+  ): Promise<void> {
+    if (useAppServerTransport()) {
+      return this.executePromptStreamingAppServer(prompt, model, onChunk, callbacks, systemPrompt, runtimeOptions);
+    }
+    return this.executePromptStreamingRun(prompt, model, onChunk, callbacks, systemPrompt);
+  }
+
+  private executePromptStreamingRun(
+    prompt: string,
+    model: string,
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
     systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
       const workspaceDir = this.getOpencodeWorkspaceDir();
-      if (!existsSync(workspaceDir)) {
-        mkdirSync(workspaceDir, { recursive: true });
-      }
+      this.prepareWorkingDir();
 
       // Write permissive opencode.json so external_directory, bash, edit
       // etc. are all auto-approved (yolo mode)
       this.ensureYoloConfig(workspaceDir);
 
-      const hasSession = this.conversationDataDir
-        ? existsSync(join(workspaceDir, SESSION_MARKER_FILE))
-        : false;
+      const hasSession = this.readStoredSession() !== null;
 
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
@@ -371,27 +552,8 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       // Merge in YOLO_ENV to ensure non-interactive execution.
       // If a manual key was stored via the auth modal, inject it into
       // all common env vars so opencode can use any provider.
-      const env: NodeJS.ProcessEnv = {
-        ...process.env,
-        ...getProxyEnv(),
-        ...OpencodeStrategy.YOLO_ENV,
-      };
-      OpencodeStrategy.applyYoloConfigContent(env);
+      const env = this.buildOpencodeEnv();
       const storedKey = this.getStoredApiKey();
-
-      if (storedKey) {
-        // Only set env vars that are NOT already set — env takes priority
-        for (const varName of API_KEY_ENV_VARS) {
-          if (!env[varName]?.trim()) {
-            env[varName] = storedKey;
-          }
-        }
-        // Default to OpenRouter base URL when using stored key
-        // (unless user already configured a custom base)
-        if (!env['OPENAI_API_BASE']?.trim()) {
-          env['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1';
-        }
-      }
 
       if (!hasEnvApiKey() && !storedKey) {
         reject(new Error('Not authenticated. Please provide an API key first.'));
@@ -531,23 +693,17 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
           }
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {
-          this.clearStoredSession(workspaceDir);
+          this.clearStoredSession();
           reject(new Error(errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
           return;
         }
         if (code !== 0 && code !== null) {
           if (missingSessionError(errorResult)) {
-            this.clearStoredSession(workspaceDir);
+            this.clearStoredSession();
           }
           reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
         } else {
-          if (this.conversationDataDir) {
-            try {
-              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), '');
-            } catch {
-              /* ignore */
-            }
-          }
+          this.writeStoredSession('legacy');
           resolve();
         }
       });
@@ -558,6 +714,383 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         reject(err);
       });
     });
+  }
+
+  private async executePromptStreamingAppServer(
+    prompt: string,
+    model: string,
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions
+  ): Promise<void> {
+    this.streamInterrupted = false;
+    this.prepareWorkingDir();
+    const workspaceDir = this.getWorkingDir();
+    this.ensureYoloConfig(workspaceDir);
+
+    const storedKey = this.getStoredApiKey();
+    if (!hasEnvApiKey() && !storedKey) {
+      throw new Error('Not authenticated. Please provide an API key first.');
+    }
+
+    const pendingMessages = this.consumePendingMessages();
+    let finalPrompt = prompt;
+    if (pendingMessages) {
+      finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
+    }
+
+    const appServer = this.createAppServer();
+    this.appServer = appServer;
+    const state: OpenCodeEventState = {
+      sessionId: '',
+      onChunk,
+      callbacks,
+      errorResult: '',
+      reasoningOpen: false,
+      hasVisibleOutput: false,
+      textByPartId: new Map(),
+      partTypeById: new Map(),
+      emittedToolStateByPartId: new Map(),
+    };
+
+    let eventStream: { stop: () => void; done: Promise<void> } | null = null;
+    let existingSessionId = this.readStoredSession();
+    try {
+      await appServer.start();
+      eventStream = await this.openAppServerEventStream(appServer, state);
+      const sessionId = await this.ensureAppServerSession(appServer, existingSessionId);
+      state.sessionId = sessionId;
+      this.activeAppServerSessionId = sessionId;
+
+      const response = await this.postAppServerMessage(
+        appServer,
+        sessionId,
+        finalPrompt,
+        model,
+        systemPrompt,
+        runtimeOptions,
+      );
+      for (const part of response.parts ?? []) this.handleOpenCodePart(state, part);
+      this.handleOpenCodeMessageInfo(state, response.info);
+      this.endReasoning(state);
+
+      if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
+      if (state.errorResult.trim()) {
+        const authError = detectProviderAuthFailure('OpenCode', state.errorResult);
+        if (authError) throw authError;
+      }
+      if (!state.hasVisibleOutput) {
+        this.clearStoredSession();
+        throw new Error(state.errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.');
+      }
+      this.writeStoredSession(sessionId);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const authError = detectProviderAuthFailure('OpenCode', message);
+      if (authError) throw authError;
+      if (existingSessionId && missingSessionError(message)) {
+        this.clearStoredSession();
+        existingSessionId = null;
+      }
+      throw err;
+    } finally {
+      eventStream?.stop();
+      await eventStream?.done.catch(() => undefined);
+      this.activeSseAbort = null;
+      this.activePromptAbort = null;
+      this.activeAppServerSessionId = null;
+      this.shutdownAppServer();
+    }
+  }
+
+  private createAppServer(): HttpAppServerProcess {
+    return new HttpAppServerProcess(
+      'opencode',
+      (port) => [
+        'serve',
+        '--hostname',
+        '127.0.0.1',
+        '--port',
+        String(port),
+        '--log-level',
+        'ERROR',
+      ],
+      {
+        env: this.buildOpencodeEnv(),
+        cwd: this.getWorkingDir(),
+        logger: this.logger,
+        healthPath: '/global/health',
+        startupTimeoutMs: 20_000,
+        requestTimeoutMs: OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS,
+      },
+    );
+  }
+
+  private appServerQuery(): Record<string, string> {
+    return { directory: this.getWorkingDir() };
+  }
+
+  private async ensureAppServerSession(appServer: HttpAppServerProcess, existingSessionId: string | null): Promise<string> {
+    if (existingSessionId?.startsWith('ses_')) {
+      try {
+        const session = await appServer.json<OpenCodeSession>(
+          `/session/${encodeURIComponent(existingSessionId)}`,
+          { query: this.appServerQuery() },
+        );
+        return session.id;
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        if (!missingSessionError(message) && !message.includes('404')) throw err;
+        this.clearStoredSession();
+        throw err;
+      }
+    }
+
+    const session = await appServer.json<OpenCodeSession>('/session', {
+      method: 'POST',
+      query: this.appServerQuery(),
+      body: {
+        title: `Fibe ${this.conversationDataDir?.getConversationId?.() ?? 'conversation'}`,
+        permission: OPENCODE_SESSION_PERMISSION_ALLOW_ALL,
+      },
+    });
+    this.writeStoredSession(session.id);
+    return session.id;
+  }
+
+  private async postAppServerMessage(
+    appServer: HttpAppServerProcess,
+    sessionId: string,
+    prompt: string,
+    model: string,
+    systemPrompt?: string,
+    runtimeOptions?: AgentRuntimeOptions,
+  ): Promise<OpenCodeMessageResponse> {
+    const controller = new AbortController();
+    this.activePromptAbort = controller;
+    const resolvedModel = this.resolveModelForApi(model);
+    const body: Record<string, unknown> = {
+      parts: [{ type: 'text', text: prompt }],
+    };
+    const parsedModel = parseOpencodeModel(resolvedModel);
+    if (parsedModel) body.model = parsedModel;
+    if (systemPrompt) body.system = systemPrompt;
+    const variant = normalizeVariant(runtimeOptions?.effort);
+    if (variant) body.variant = variant;
+
+    return await appServer.json<OpenCodeMessageResponse>(
+      `/session/${encodeURIComponent(sessionId)}/message`,
+      {
+        method: 'POST',
+        query: this.appServerQuery(),
+        body,
+        signal: controller.signal,
+        timeoutMs: OPENCODE_APP_SERVER_TURN_TIMEOUT_MS,
+      },
+    );
+  }
+
+  private resolveModelForApi(model: string): string {
+    const args = this.getModelArgs(model);
+    const modelIndex = args.indexOf('--model');
+    if (modelIndex >= 0 && args[modelIndex + 1]) return args[modelIndex + 1];
+    return model;
+  }
+
+  private async openAppServerEventStream(
+    appServer: HttpAppServerProcess,
+    state: OpenCodeEventState,
+  ): Promise<{ stop: () => void; done: Promise<void> }> {
+    const controller = new AbortController();
+    this.activeSseAbort = controller;
+    const res = await fetch(appServer.url('/event', this.appServerQuery()), {
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`OpenCode event stream failed with ${res.status}`);
+    }
+
+    const done = this.consumeAppServerEvents(res, state, controller.signal).catch((err) => {
+      if (!controller.signal.aborted) {
+        this.logger.warn(`OpenCode event stream ended unexpectedly: ${err}`);
+      }
+    });
+
+    return {
+      stop: () => controller.abort(),
+      done,
+    };
+  }
+
+  private async consumeAppServerEvents(
+    response: Response,
+    state: OpenCodeEventState,
+    signal: AbortSignal,
+  ): Promise<void> {
+    const reader = response.body?.getReader();
+    if (!reader) return;
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (!signal.aborted) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        this.handleOpenCodeEvent(state, trimmed.slice('data:'.length).trim());
+      }
+    }
+  }
+
+  private handleOpenCodeEvent(state: OpenCodeEventState, data: string): void {
+    if (!data) return;
+    let event: OpenCodeEvent;
+    try {
+      event = JSON.parse(data) as OpenCodeEvent;
+    } catch {
+      return;
+    }
+    const props = event.properties ?? {};
+
+    switch (event.type) {
+      case 'message.updated':
+        this.handleOpenCodeMessageInfo(state, props.info as OpenCodeMessage | undefined);
+        break;
+      case 'message.part.updated':
+        if (props.part) this.handleOpenCodePart(state, props.part);
+        break;
+      case 'message.part.delta':
+        this.handleOpenCodePartDelta(state, props);
+        break;
+      case 'session.error':
+        if (props.sessionID === state.sessionId && props.error) {
+          const msg = errorMessage(props.error);
+          state.errorResult += msg;
+          state.onChunk(`⚠️ ${msg}`);
+        }
+        break;
+      case 'session.idle':
+        if (props.sessionID === state.sessionId) this.endReasoning(state);
+        break;
+      default:
+        break;
+    }
+  }
+
+  private handleOpenCodeMessageInfo(state: OpenCodeEventState, info?: OpenCodeMessage): void {
+    if (!info || info.sessionID !== state.sessionId) return;
+    if (info.error) {
+      const msg = errorMessage(info.error);
+      state.errorResult += msg;
+      state.onChunk(`⚠️ ${msg}`);
+    }
+    if (info.role === 'assistant' && info.tokens && state.callbacks?.onUsage) {
+      state.callbacks.onUsage(this.tokensFrom(info.tokens));
+    }
+  }
+
+  private handleOpenCodePart(state: OpenCodeEventState, part: OpenCodePart): void {
+    if (part.sessionID !== state.sessionId) return;
+    state.partTypeById.set(part.id, part.type);
+
+    switch (part.type) {
+      case 'text':
+        this.emitPartTextDelta(state, part, 'assistant');
+        break;
+      case 'reasoning':
+        this.emitPartTextDelta(state, part, 'reasoning');
+        break;
+      case 'tool':
+        this.emitToolPart(state, part);
+        break;
+      case 'step-start':
+        this.startReasoning(state);
+        state.hasVisibleOutput = true;
+        break;
+      case 'step-finish':
+        if (part.tokens && state.callbacks?.onUsage) {
+          state.callbacks.onUsage(this.tokensFrom(part.tokens));
+        }
+        this.endReasoning(state);
+        state.hasVisibleOutput = true;
+        break;
+      default:
+        break;
+    }
+  }
+
+  private handleOpenCodePartDelta(
+    state: OpenCodeEventState,
+    props: NonNullable<OpenCodeEvent['properties']>,
+  ): void {
+    if (props.sessionID !== state.sessionId || props.field !== 'text' || !props.partID || !props.delta) return;
+    const partType = state.partTypeById.get(props.partID);
+    state.textByPartId.set(props.partID, (state.textByPartId.get(props.partID) ?? '') + props.delta);
+    state.hasVisibleOutput = true;
+    if (partType === 'reasoning') {
+      this.startReasoning(state);
+      state.callbacks?.onReasoningChunk?.(props.delta);
+    } else {
+      state.onChunk(props.delta);
+    }
+  }
+
+  private emitPartTextDelta(state: OpenCodeEventState, part: OpenCodePart, target: 'assistant' | 'reasoning'): void {
+    const text = part.text ?? '';
+    const previous = state.textByPartId.get(part.id) ?? '';
+    const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
+    state.textByPartId.set(part.id, text);
+    if (!delta) return;
+    state.hasVisibleOutput = true;
+    if (target === 'reasoning') {
+      this.startReasoning(state);
+      state.callbacks?.onReasoningChunk?.(delta);
+    } else {
+      state.onChunk(delta);
+    }
+  }
+
+  private emitToolPart(state: OpenCodeEventState, part: OpenCodePart): void {
+    const serialized = JSON.stringify(part.state ?? part);
+    if (state.emittedToolStateByPartId.get(part.id) === serialized) return;
+    state.emittedToolStateByPartId.set(part.id, serialized);
+    state.hasVisibleOutput = true;
+    const toolEvent: ToolEvent = {
+      kind: 'tool_call',
+      name: part.tool ?? part.state?.title ?? 'tool',
+      summary: part.state?.title ?? part.state?.status,
+      details: JSON.stringify(part),
+    };
+    state.callbacks?.onTool?.(toolEvent);
+  }
+
+  private startReasoning(state: OpenCodeEventState): void {
+    if (state.reasoningOpen) return;
+    state.reasoningOpen = true;
+    state.callbacks?.onReasoningStart?.();
+  }
+
+  private endReasoning(state: OpenCodeEventState): void {
+    if (!state.reasoningOpen) return;
+    state.reasoningOpen = false;
+    state.callbacks?.onReasoningEnd?.();
+  }
+
+  private tokensFrom(tokens: NonNullable<OpenCodeMessage['tokens']>): TokenUsage {
+    return {
+      inputTokens: tokens.input ?? 0,
+      outputTokens: tokens.output ?? 0,
+    };
+  }
+
+  private shutdownAppServer(): void {
+    this.appServer?.close();
+    this.appServer = null;
   }
 
   hasNativeSessionSupport(): boolean {
