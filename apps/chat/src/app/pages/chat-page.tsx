@@ -97,7 +97,17 @@ export function ChatPage() {
   const handleSendRef = useRef<() => void>(() => undefined);
 
   const authenticated = isAuthenticated();
-  const { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, refreshModelOptions, agentProvider } = useChatInitialData(authenticated);
+  const {
+    conversations,
+    loading: conversationsLoading,
+    activeId: activeConversationId,
+    create: createConversation,
+    rename: renameConversation,
+    remove: deleteConversation,
+    switchTo: switchConversation,
+  } = useConversations();
+  const { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, refreshModelOptions, agentProvider } =
+    useChatInitialData(authenticated, activeConversationId);
 
   const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, stats: playgroundStats, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
@@ -306,6 +316,7 @@ export function ChatPage() {
     reasoningText,
     thinkingCallbacks,
     resetForNewStream,
+    resetActivityState,
   } = useChatActivityLog(refetchPlaygrounds);
   const {
     inputValue,
@@ -401,20 +412,10 @@ export function ChatPage() {
     handleStreamStart,
     handleStreamChunk,
     handleStreamEnd,
+    handleStreamAbort,
   } = useChatStreaming({ onStreamEndCallback, resetForNewStream });
 
   const scroll = useScrollToBottom([messages, streamingText]);
-
-  // ── Conversation management ────────────────────────────────────────────────
-  const {
-    conversations,
-    loading: conversationsLoading,
-    activeId: activeConversationId,
-    create: createConversation,
-    rename: renameConversation,
-    remove: deleteConversation,
-    switchTo: switchConversation,
-  } = useConversations();
 
   const {
     state,
@@ -443,11 +444,19 @@ export function ChatPage() {
     handleLocalToolEvent,
     handleConversationReset,
     activeConversationId,
+    handleStreamAbort,
   );
 
   useEffect(() => {
     sendRef.current = send;
   }, [send]);
+
+  useEffect(() => {
+    handleStreamAbort();
+    resetActivityState();
+    setLastSentMessage(null);
+    setLocalToolItems([]);
+  }, [activeConversationId, handleStreamAbort, resetActivityState]);
 
   useEffect(() => {
     const notifyParent = () => {
@@ -462,25 +471,29 @@ export function ChatPage() {
     return () => clearInterval(interval);
   }, [state]);
 
-  // Auto-send initial greeting when chat is authenticated with empty history
+  // Parent-provided greetings belong to the conversation active on mount.
+  const initialGreetingConversationIdRef = useRef(activeConversationId);
+  // Auto-send initial greeting when chat is authenticated with empty history.
   const greetingSentRef = useRef(false);
   useEffect(() => {
     if (greetingSentRef.current) return;
     if (state !== CHAT_STATES.AUTHENTICATED) return;
     if (!messagesLoaded) return; // Wait for history fetch to complete
-    if (messages.length > 0) return; // Has existing conversation
+    if (activeConversationId !== initialGreetingConversationIdRef.current) return;
 
     const greeting = consumeGreeting();
     if (!greeting) return;
 
     greetingSentRef.current = true;
+    if (messages.length > 0) return; // Has existing conversation; discard stale greeting.
+
     send({ action: 'send_chat_message', text: greeting });
     setMessages((prev) => [
       ...prev,
       { role: 'user', body: greeting, created_at: new Date().toISOString(), optimistic: true },
     ]);
     scroll.markJustSent();
-  }, [state, messagesLoaded, messages, send, setMessages, scroll]);
+  }, [activeConversationId, state, messagesLoaded, messages, send, setMessages, scroll]);
 
   const {
     pendingImages,
@@ -741,8 +754,8 @@ export function ChatPage() {
                   conversations={conversations}
                   activeId={activeConversationId}
                   loading={conversationsLoading}
-                  onSelect={(id) => { switchConversation(id); reconnect(); closeMobileSidebar(); }}
-                  onCreate={async () => { await createConversation(); reconnect(); }}
+                  onSelect={(id) => { switchConversation(id); closeMobileSidebar(); }}
+                  onCreate={async () => { await createConversation(); }}
                   onRename={renameConversation}
                   onDelete={deleteConversation}
                 />
@@ -808,8 +821,8 @@ export function ChatPage() {
             conversations={conversations}
             conversationsLoading={conversationsLoading}
             activeConversationId={activeConversationId}
-            onConversationSelect={(id) => { switchConversation(id); reconnect(); }}
-            onConversationCreate={async () => { await createConversation(); reconnect(); }}
+            onConversationSelect={(id) => { switchConversation(id); }}
+            onConversationCreate={async () => { await createConversation(); }}
             onConversationRename={renameConversation}
             onConversationDelete={deleteConversation}
           />

@@ -1,11 +1,16 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatPage } from './chat-page';
 import { isAuthenticated } from '../api-url';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { useChatLayout } from '../chat/use-chat-layout';
+import { useChatInitialData } from '../chat/use-chat-initial-data';
+import { useChatWebSocket } from '../chat/use-chat-websocket';
+import { useConversations } from '../chat/use-conversations';
+import { consumeGreeting } from '../postmessage-greeting';
+import { CHAT_STATES } from '../chat/chat-state';
 
 
 vi.mock('../chat/use-local-stt', () => ({
@@ -55,10 +60,15 @@ vi.mock('../chat/use-chat-initial-data', () => ({
   useChatInitialData: vi.fn().mockReturnValue({
     messages: [],
     setMessages: vi.fn(),
+    messagesLoaded: true,
     modelOptions: ['claude-3'],
     refreshingModels: false,
     refreshModelOptions: vi.fn(),
   }),
+}));
+
+vi.mock('../postmessage-greeting', () => ({
+  consumeGreeting: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('../chat/use-playground-files', () => ({
@@ -386,6 +396,69 @@ describe('ChatPage', () => {
     // Just verify the page renders correctly
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('chat-header')).toBeTruthy();
+  });
+
+  it('does not carry a pending initial greeting into a newly selected conversation', async () => {
+    const send = vi.fn();
+    const setMessages = vi.fn();
+    let activeId = 'default';
+    let messages = [{ role: 'user', body: 'existing', created_at: '2026-01-01' }];
+
+    vi.mocked(consumeGreeting).mockReturnValue('OK');
+    vi.mocked(useConversations).mockImplementation(() => ({
+      conversations: [],
+      loading: false,
+      activeId,
+      create: vi.fn().mockResolvedValue('thread-new'),
+      rename: vi.fn(),
+      remove: vi.fn(),
+      switchTo: vi.fn(),
+      refresh: vi.fn(),
+    }));
+    vi.mocked(useChatInitialData).mockImplementation(() => ({
+      messages,
+      setMessages,
+      messagesLoaded: true,
+      modelOptions: ['claude-3'],
+      refreshingModels: false,
+      refreshModelOptions: vi.fn(),
+      loadMessages: vi.fn(),
+      agentProvider: 'claude-code',
+    }));
+    vi.mocked(useChatWebSocket).mockReturnValue({
+      state: CHAT_STATES.AUTHENTICATED,
+      agentMode: 'Ready',
+      errorMessage: null,
+      authModal: { authUrl: null, deviceCode: null, isManualToken: false },
+      sessionActivity: [],
+      sessionCount: 1,
+      anyProcessing: false,
+      send,
+      reconnect: vi.fn(),
+      startAuth: vi.fn(),
+      cancelAuth: vi.fn(),
+      submitAuthCode: vi.fn(),
+      reauthenticate: vi.fn(),
+      logout: vi.fn(),
+      dismissError: vi.fn(),
+      interruptAgent: vi.fn(),
+      setState: vi.fn(),
+      setErrorMessage: vi.fn(),
+      setAuthModal: vi.fn(),
+    });
+
+    const { rerender } = render(<ChatPage />, { wrapper });
+    await waitFor(() => {
+      expect(consumeGreeting).toHaveBeenCalledTimes(1);
+    });
+    expect(send).not.toHaveBeenCalled();
+
+    activeId = 'thread-new';
+    messages = [];
+    rerender(<ChatPage />);
+
+    expect(consumeGreeting).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
   });
 
   it('renders without crashing with no messages', async () => {

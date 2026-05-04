@@ -61,8 +61,10 @@ const mockCtx = {
 
 const mockSessionRegistry = {
   all: () => [],
+  connected: () => [],
   create: mock(() => mockCtx),
   destroy: mock(() => undefined),
+  detach: mock(() => undefined),
   broadcast: mock(() => undefined),
 } as unknown as import('./app/orchestrator/session-registry.service').SessionRegistryService;
 
@@ -175,6 +177,38 @@ describe('attachWebSocketServer — chat auth guard', () => {
 
     expect(ws(stub).close).not.toHaveBeenCalled();
   });
+
+  it('binds chat sessions to the conversation_id query param', () => {
+    const server = new EventEmitter();
+    let createdConversationId: string | undefined;
+    const localRegistry = {
+      all: () => [],
+      connected: () => [],
+      create: mock((conversationId: string) => {
+        createdConversationId = conversationId;
+        return {
+          ...mockCtx,
+          sessionId: 'thread-session',
+          outbound$: new Subject<{ type: string; data: Record<string, unknown> }>(),
+        };
+      }),
+      destroy: mock(() => undefined),
+      detach: mock(() => undefined),
+      broadcast: mock(() => undefined),
+    } as unknown as typeof mockSessionRegistry;
+
+    const wss = attachWebSocketServer(
+      makeFastify(server), makeConfig(), orchestrator, localRegistry, playgroundWatcher, terminalService,
+    );
+
+    const stub = makeWsStub();
+    wss.emit('connection', stub, makeReq('/ws?conversation_id=thread-123'));
+
+    expect(createdConversationId).toBe('thread-123');
+    expect(ws(stub).send).toHaveBeenCalledWith(
+      JSON.stringify({ type: 'conversation_id', conversationId: 'thread-123' }),
+    );
+  });
 });
 
 // ─── Chat WS — session takeover ───────────────────────────────────────────────
@@ -187,6 +221,7 @@ describe('attachWebSocketServer — session takeover', () => {
     let sessionCounter = 0;
     const localRegistry = {
       all: () => localSessions,
+      connected: () => localSessions,
       create: mock(() => {
         const ctx = {
           sessionId: `session-${sessionCounter++}`,
@@ -200,6 +235,10 @@ describe('attachWebSocketServer — session takeover', () => {
         return ctx;
       }),
       destroy: mock((id: string) => {
+        const idx = localSessions.findIndex((s) => s.sessionId === id);
+        if (idx >= 0) localSessions.splice(idx, 1);
+      }),
+      detach: mock((id: string) => {
         const idx = localSessions.findIndex((s) => s.sessionId === id);
         if (idx >= 0) localSessions.splice(idx, 1);
       }),

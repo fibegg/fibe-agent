@@ -32,7 +32,10 @@ function extractToken(req: IncomingMessage): string | null {
 /** Extract the conversation ID from the ?c= query param. Falls back to 'default'. */
 function extractConversationId(req: IncomingMessage): string {
   const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
-  const c = url.searchParams.get('c')?.trim();
+  const c = (
+    url.searchParams.get('conversation_id') ??
+    url.searchParams.get('c')
+  )?.trim();
   return c || 'default';
 }
 
@@ -66,7 +69,7 @@ function attachChatWs(
     if (rejectIfUnauthorized(ws, req, config.getAgentPassword())) return;
 
     // Enforce max connections by evicting the oldest session
-    const allSessions = sessionRegistry.all();
+    const allSessions = sessionRegistry.connected();
     if (allSessions.length >= MAX_CONNECTIONS) {
       const oldest = allSessions[0];
       logWs({ event: 'disconnect', closeCode: WS_CLOSE.SESSION_TAKEN_OVER, error: 'Max connections reached — oldest session evicted' });
@@ -117,7 +120,7 @@ function attachChatWs(
     ws.on('close', (code?: number) => {
       clearInterval(resetInterval);
       sub.unsubscribe();
-      sessionRegistry.destroy(ctx.sessionId);
+      sessionRegistry.detach(ctx.sessionId);
       logWs({ event: 'disconnect', closeCode: code });
     });
 

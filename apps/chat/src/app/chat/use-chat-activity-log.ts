@@ -136,6 +136,14 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
     ]);
   }, [setActivityLogSync]);
 
+  const resetActivityState = useCallback(() => {
+    setReasoningText('');
+    setThinkingSteps([]);
+    reasoningTextRef.current = '';
+    thinkingEntryIdRef.current = null;
+    setActivityLogSync([]);
+  }, [setActivityLogSync]);
+
   return {
     activityLog,
     activityLogRef,
@@ -146,5 +154,6 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
     setThinkingSteps,
     thinkingCallbacks,
     resetForNewStream,
+    resetActivityState,
   };
 }

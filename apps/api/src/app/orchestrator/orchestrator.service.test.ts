@@ -16,6 +16,7 @@ import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import type { LocalMcpService } from '../local-mcp/local-mcp.service';
 import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
 import { AGENT_MODES } from '@shared/agent-mode.constants';
+import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
 
 describe('OrchestratorService', () => {
   let dataDir: string;
@@ -67,8 +68,18 @@ describe('OrchestratorService', () => {
     const messageStore = new MessageStoreService(config as never);
     const modelStore = new ModelStoreService(config as never);
     const effortStore = new EffortStoreService(config as never);
+    // Mock ConversationManagerService — returns the same stores for any conversationId
+    const conversationManager = {
+      getOrCreate: (_id: string) => ({ messageStore, activityStore }),
+      dataDirProvider: (_id: string) => ({ getConversationDataDir: () => dataDir }),
+      touch: (_id: string) => undefined,
+      list: () => [],
+      create: () => ({ id: 'test', title: 'New chat', createdAt: '', lastMessageAt: '' }),
+      setTitle: () => true,
+      delete: () => true,
+    } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
     const strategyRegistry = { resolveStrategy: () => ({ checkAuthStatus: async () => true, executeAuth: () => undefined, submitAuthCode: () => undefined, cancelAuth: () => undefined, clearCredentials: () => undefined, executeLogout: () => undefined, executePromptStreaming: async (_p: string, _m: string, onChunk: (c: string) => void) => { onChunk('test response'); }, ensureSettings: () => undefined, interruptAgent: () => undefined, hasNativeSessionSupport: () => true, steerAgent: undefined }) } as unknown as import('../strategies/strategy-registry.service').StrategyRegistryService;
-    const sessionRegistry = new SessionRegistryService(strategyRegistry as never);
+    const sessionRegistry = new SessionRegistryService(strategyRegistry as never, conversationManager);
     const uploadsService = new UploadsService(config as never);
     const fibeSync = {
       syncMessages: (getContent: () => string) => { void getContent(); },
@@ -94,15 +105,6 @@ describe('OrchestratorService', () => {
     } as unknown as import('../gemma-router/gemma-mcp-tools.service').GemmaMcpToolsService;
     const agentModeStore = new AgentModeStoreService(config as never);
     const stub = localMcp ?? makeLocalMcpStub().service;
-    // Mock ConversationManagerService — returns the same stores for any conversationId
-    const conversationManager = {
-      getOrCreate: (_id: string) => ({ messageStore, activityStore }),
-      touch: (_id: string) => undefined,
-      list: () => [],
-      create: () => ({ id: 'test', title: 'New chat', createdAt: '', lastMessageAt: '' }),
-      setTitle: () => true,
-      delete: () => true,
-    } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
     const orch = new OrchestratorService(
       activityStore,
       messageStore,
@@ -199,10 +201,19 @@ describe('OrchestratorService', () => {
   test('handleClientMessage check_auth_status sends auth_status', async () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    const second = sessionRegistry.create('thread-b');
+    const secondEvents: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.isProcessing = true;
     ctx.outbound$.subscribe((ev) => events.push(ev));
+    second.outbound$.subscribe((ev) => secondEvents.push(ev));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.CHECK_AUTH_STATUS });
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
+    expect(events[0].data.isProcessing).toBe(true);
+    expect(events[0].data.anyProcessing).toBe(true);
+    expect(secondEvents).toHaveLength(1);
+    expect(secondEvents[0].data.isProcessing).toBe(false);
+    expect(secondEvents[0].data.anyProcessing).toBe(true);
   });
 
   test('handleClientMessage send_chat_message with audioFilename streams response', async () => {
@@ -282,6 +293,15 @@ describe('OrchestratorService', () => {
 
     expect(orch.isAuthenticated).toBe(false);
     expect(events.some((e) => e.type === WS_EVENT.ERROR && e.data.message === message)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(false);
+    expect(
+      events.some(
+        (e) =>
+          e.type === WS_EVENT.THINKING_STEP &&
+          e.data.status === 'complete' &&
+          e.data.details === message
+      )
+    ).toBe(true);
   });
 
   test('handleClientMessage interrupt_agent when not processing does nothing', async () => {
@@ -303,6 +323,23 @@ describe('OrchestratorService', () => {
     expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
     expect(ctx.isProcessing).toBe(false);
+  });
+
+  test('interrupted run without accumulated output does not store no-output assistant', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async () => {
+      throw new Error(INTERRUPTED_MESSAGE);
+    });
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe((ev) => events.push(ev));
+
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(false);
+    expect(events.some((e) => e.type === WS_EVENT.ERROR && e.data.message === 'Interrupted before producing output.')).toBe(true);
+    expect(orch.messages.all().filter((m) => m.role === 'assistant')).toEqual([]);
   });
 
   test('send_chat_message while processing queues the message instead of blocking', async () => {

@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
-import { ClaudeCodeStrategy } from './claude-code.strategy';
+import { ClaudeSdkStrategy } from './claude-sdk.strategy';
 import { CursorStrategy } from './cursor.strategy';
 import { GeminiStrategy } from './gemini.strategy';
 import { MockStrategy } from './mock.strategy';
 import { OpencodeStrategy } from './opencode.strategy';
 import { OpenaiCodexStrategy } from './openai-codex.strategy';
-import type { AgentStrategy } from './strategy.types';
+import type { AgentStrategy, ConversationDataDirProvider } from './strategy.types';
 
 const PROVIDER_NAMES = [
   'mock',
@@ -38,7 +38,7 @@ function resolveAuthMode(): AuthMode {
 export class StrategyRegistryService {
   constructor(private readonly config: ConfigService) {}
 
-  resolveStrategy(): AgentStrategy {
+  resolveStrategy(conversationDataDir: ConversationDataDirProvider = this.config): AgentStrategy {
     const providerName =
       (process.env.AGENT_PROVIDER as ProviderName | undefined) ?? DEFAULT_PROVIDER;
     const authMode = resolveAuthMode();
@@ -48,17 +48,17 @@ export class StrategyRegistryService {
       case 'mock':
         return new MockStrategy(this.config);
       case 'gemini':
-        return new GeminiStrategy(useApiToken, this.config);
+        return new GeminiStrategy(useApiToken, conversationDataDir);
       case 'claude-code':
-        return new ClaudeCodeStrategy(useApiToken, this.config);
+        return new ClaudeSdkStrategy(useApiToken, conversationDataDir);
       case 'cursor':
-        return new CursorStrategy(useApiToken, this.config);
+        return new CursorStrategy(useApiToken, conversationDataDir);
       case 'openai':
       case 'openai-codex':
-        return new OpenaiCodexStrategy(useApiToken, this.config);
+        return new OpenaiCodexStrategy(useApiToken, conversationDataDir);
       case 'opencode':
       case 'opencodex':
-        return new OpencodeStrategy(this.config);
+        return new OpencodeStrategy(conversationDataDir);
       default:
         throw new Error(
           `Unknown AGENT_PROVIDER: '${providerName}'. Available: ${PROVIDER_NAMES.join(', ')}`

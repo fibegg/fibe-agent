@@ -410,7 +410,11 @@ describe('useChatWebSocket message handlers', () => {
   );
 
   it('handles auth_status authenticated (processing and not processing)', async () => {
-    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    const onStreamAbort = vi.fn();
+    const { result } = renderHook(() =>
+      useChatWebSocket(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'default', onStreamAbort),
+      { wrapper }
+    );
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
     // Not processing
@@ -418,6 +422,7 @@ describe('useChatWebSocket message handlers', () => {
       messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: false }) } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
+    expect(onStreamAbort).toHaveBeenCalled();
 
     // Processing
     act(() => {
@@ -454,6 +459,121 @@ describe('useChatWebSocket message handlers', () => {
     expect(wsSendMock).toHaveBeenCalledWith(JSON.stringify({ action: 'initiate_auth' }));
   });
 
+  it('ignores messages from a superseded websocket after conversation switch', async () => {
+    const sockets: Array<{
+      readyState: number;
+      send: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+      _onmessage?: (e: MessageEvent) => void;
+      _onopen?: () => void;
+    }> = [];
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWebSocket {
+        static OPEN = 1;
+        readyState = 1;
+        send = vi.fn();
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+        constructor() {
+          sockets.push(this as unknown as (typeof sockets)[number]);
+        }
+        set onmessage(handler: (e: MessageEvent) => void) {
+          (this as unknown as (typeof sockets)[number])._onmessage = handler;
+        }
+        set onopen(handler: () => void) {
+          (this as unknown as (typeof sockets)[number])._onopen = handler;
+        }
+      }
+    );
+    const onStreamStart = vi.fn();
+    const { result, rerender } = renderHook(
+      ({ conversationId }) => useChatWebSocket(
+        undefined,
+        undefined,
+        onStreamStart,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        conversationId,
+      ),
+      { wrapper, initialProps: { conversationId: 'thread-a' } },
+    );
+
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(sockets).toHaveLength(1);
+
+    rerender({ conversationId: 'thread-b' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    expect(sockets).toHaveLength(2);
+
+    act(() => {
+      sockets[0]._onmessage?.({ data: JSON.stringify({ type: 'stream_start' }) } as MessageEvent);
+    });
+
+    expect(onStreamStart).not.toHaveBeenCalled();
+    expect(result.current.state).not.toBe(CHAT_STATES.AWAITING_RESPONSE);
+  });
+
+  it('drops queued outbound messages when switching conversations', async () => {
+    const sockets: Array<{
+      readyState: number;
+      send: ReturnType<typeof vi.fn>;
+      close: ReturnType<typeof vi.fn>;
+      _onopen?: () => void;
+    }> = [];
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWebSocket {
+        static OPEN = 1;
+        readyState = 0;
+        send = vi.fn();
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+        constructor() {
+          sockets.push(this as unknown as (typeof sockets)[number]);
+        }
+        set onopen(handler: () => void) {
+          (this as unknown as (typeof sockets)[number])._onopen = handler;
+        }
+      }
+    );
+    const { result, rerender } = renderHook(
+      ({ conversationId }) => useChatWebSocket(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        conversationId,
+      ),
+      { wrapper, initialProps: { conversationId: 'thread-a' } },
+    );
+
+    act(() => {
+      result.current.send({ action: 'send_chat_message', text: 'belongs to thread-a' });
+    });
+
+    rerender({ conversationId: 'thread-b' });
+    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    sockets[1].readyState = 1;
+
+    act(() => {
+      sockets[1]._onopen?.();
+    });
+
+    expect(sockets[1].send).not.toHaveBeenCalledWith(
+      JSON.stringify({ action: 'send_chat_message', text: 'belongs to thread-a' }),
+    );
+  });
+
   it('handles auth_url_generated, auth_device_code, auth_manual_token, auth_success', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
@@ -481,11 +601,18 @@ describe('useChatWebSocket message handlers', () => {
   });
 
   it('handles error events', async () => {
-    const { result } = renderHook(() => useChatWebSocket(), { wrapper });
+    const onStreamAbort = vi.fn();
+    const onStreamEnd = vi.fn();
+    const { result } = renderHook(() =>
+      useChatWebSocket(undefined, undefined, undefined, onStreamEnd, undefined, undefined, undefined, undefined, 'default', onStreamAbort),
+      { wrapper }
+    );
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'test error' }) } as MessageEvent));
     expect(result.current.state).toBe(CHAT_STATES.ERROR);
     expect(result.current.errorMessage).toBe('test error');
+    expect(onStreamAbort).toHaveBeenCalled();
+    expect(onStreamEnd).not.toHaveBeenCalled();
   });
 
   it('dismisses provider authentication failures back to unauthenticated state', async () => {
@@ -714,6 +841,35 @@ describe('useChatWebSocket message handlers', () => {
     expect(capturedUrl).toContain('token=mock-token');
   });
 
+  it('connects with conversation_id for non-default conversations', () => {
+    let capturedUrl = '';
+    vi.stubGlobal('WebSocket', class MockWS {
+      constructor(url: string) {
+        capturedUrl = url;
+      }
+      close = vi.fn();
+      addEventListener = vi.fn();
+      removeEventListener = vi.fn();
+    });
+
+    renderHook(
+      () => useChatWebSocket(
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        'thread-123',
+      ),
+      { wrapper },
+    );
+
+    expect(capturedUrl).toBe('ws://test/ws?conversation_id=thread-123');
+  });
+
   it('handles optional chaining and state fallbacks gracefully', () => {
     let messageHandler: any;
     let closeHandler: any;
@@ -784,11 +940,11 @@ describe('useChatWebSocket message handlers', () => {
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
 
-    // Test AWAITING_RESPONSE state fallback
+    // Server auth status is authoritative on reconnect and clears stale awaiting state.
     act(() => {
       messageHandler?.({ data: JSON.stringify({ type: 'stream_start' }) } as MessageEvent);
       messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: false }) } as MessageEvent);
     });
-    expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
+    expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
   });
 });

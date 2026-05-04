@@ -23,6 +23,12 @@ export class SessionContext {
   /** Whether this session's agent is currently running a prompt. */
   isProcessing = false;
 
+  /** Whether a browser WebSocket is still attached to this runtime session. */
+  isClientConnected = true;
+
+  /** Set when the browser disconnects while the agent is still running. */
+  destroyWhenIdle = false;
+
   /**
    * Per-session event stream. The WS layer subscribes to this so each client
    * only receives events for its own session.

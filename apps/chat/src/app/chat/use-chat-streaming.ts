@@ -76,10 +76,22 @@ export function useChatStreaming({
     [onStreamEndCallback]
   );
 
+  const handleStreamAbort = useCallback(() => {
+    if (timeoutIdRef.current !== null) {
+      cancelAnimationFrame(timeoutIdRef.current);
+      timeoutIdRef.current = null;
+    }
+    streamBufferRef.current = '';
+    finalTextRef.current = '';
+    streamModelRef.current = null;
+    setStreamingText('');
+  }, []);
+
   return {
     streamingText,
     handleStreamStart,
     handleStreamChunk,
     handleStreamEnd,
+    handleStreamAbort,
   };
 }

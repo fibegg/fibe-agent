@@ -11,6 +11,7 @@ describe('finishAgentStream', () => {
   let currentActivityId: string | null;
   let activityById: Record<string, Record<string, unknown>>;
   let lastStreamUsageCleared: boolean;
+  let reasoningCleared: boolean;
 
   let deps: FinishAgentStreamDeps;
 
@@ -25,6 +26,7 @@ describe('finishAgentStream', () => {
       'act-1': { id: 'act-1', story: [] },
     };
     lastStreamUsageCleared = false;
+    reasoningCleared = false;
 
     deps = {
       messageStore: {
@@ -46,6 +48,7 @@ describe('finishAgentStream', () => {
       send: (type, data) => sent.push({ type, data }),
       getCurrentActivityId: () => currentActivityId,
       clearLastStreamUsage: () => { lastStreamUsageCleared = true; },
+      clearReasoningText: () => { reasoningCleared = true; },
     };
   });
 
@@ -110,6 +113,12 @@ describe('finishAgentStream', () => {
     const step = { id: 's1', title: 'Gen', status: 'processing' as const, timestamp: new Date() };
     finishAgentStream(deps, 'ok', 's1', step);
     expect(lastStreamUsageCleared).toBe(true);
+  });
+
+  test('clears transient reasoning state', () => {
+    const step = { id: 's1', title: 'Gen', status: 'processing' as const, timestamp: new Date() };
+    finishAgentStream(deps, 'ok', 's1', step);
+    expect(reasoningCleared).toBe(true);
   });
 
   test('syncs messages after adding', () => {

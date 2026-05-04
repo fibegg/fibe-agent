@@ -20,4 +20,11 @@ describe('AppModule', () => {
     expect(controller).toContain("@Controller('local-tool-call')");
     expect(controller).not.toContain("@Controller('api/local-tool-call')");
   });
+
+  test('does not duplicate the global API prefix on the conversations route', () => {
+    const controller = readSource('./conversation/conversations.controller.ts');
+
+    expect(controller).toContain("@Controller('conversations')");
+    expect(controller).not.toContain("@Controller('api/conversations')");
+  });
 });

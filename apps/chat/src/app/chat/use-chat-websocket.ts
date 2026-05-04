@@ -69,6 +69,7 @@ export function useChatWebSocket(
   onConversationReset?: (resetAt: string) => void,
   /** Which conversation to bind this WS session to. Defaults to 'default'. */
   conversationId = 'default',
+  onStreamAbort?: () => void,
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -91,6 +92,7 @@ export function useChatWebSocket(
   const onPlaygroundChangedRef = useRef(onPlaygroundChanged);
   const onLocalToolEventRef = useRef(onLocalToolEvent);
   const onConversationResetRef = useRef(onConversationReset);
+  const onStreamAbortRef = useRef(onStreamAbort);
   thinkingRef.current = thinkingCallbacks;
   onMessageRef.current = onMessage;
   onStreamChunkRef.current = onStreamChunk;
@@ -99,6 +101,7 @@ export function useChatWebSocket(
   onPlaygroundChangedRef.current = onPlaygroundChanged;
   onLocalToolEventRef.current = onLocalToolEvent;
   onConversationResetRef.current = onConversationReset;
+  onStreamAbortRef.current = onStreamAbort;
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -142,16 +145,18 @@ export function useChatWebSocket(
       return;
     }
 
-    const token = getAuthTokenForRequest();
     const wsBase = getWsUrl();
-    const cParam = conversationId !== 'default' ? `&c=${encodeURIComponent(conversationId)}` : '';
-    const url = token
-      ? `${wsBase}/ws?token=${encodeURIComponent(token)}${cParam}`
-      : `${wsBase}/ws${cParam ? `?${cParam.slice(1)}` : ''}`;
+    const params = new URLSearchParams();
+    const token = getAuthTokenForRequest();
+    if (token) params.set('token', token);
+    if (conversationId !== 'default') params.set('conversation_id', conversationId);
+    const query = params.toString();
+    const url = query ? `${wsBase}/ws?${query}` : `${wsBase}/ws`;
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      if (wsRef.current !== ws) return;
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -183,7 +188,9 @@ export function useChatWebSocket(
             setState(CHAT_STATES.AWAITING_RESPONSE);
             startResponseTimer();
           } else {
-            setState((s) => (s !== CHAT_STATES.AWAITING_RESPONSE ? CHAT_STATES.AUTHENTICATED : s));
+            clearResponseTimer();
+            onStreamAbortRef.current?.();
+            setState(CHAT_STATES.AUTHENTICATED);
           }
         } else {
           setState((s) => (s !== CHAT_STATES.AUTH_PENDING ? CHAT_STATES.UNAUTHENTICATED : s));
@@ -210,7 +217,7 @@ export function useChatWebSocket(
         clearResponseTimer();
         setErrorMessage(d.message ?? 'An unexpected error occurred');
         setState(CHAT_STATES.ERROR);
-        onStreamEndRef.current?.();
+        onStreamAbortRef.current?.();
       },
       message: (d) => {
         clearResponseTimer();
@@ -288,6 +295,7 @@ export function useChatWebSocket(
     };
 
     ws.onmessage = (event: MessageEvent) => {
+      if (wsRef.current !== ws) return;
       try {
         const data = JSON.parse(event.data as string) as ServerMessage;
         handlers[data.type]?.(data);
@@ -316,6 +324,8 @@ export function useChatWebSocket(
       }
       if (!offlineTimerRef.current) {
         offlineTimerRef.current = setTimeout(() => {
+          clearResponseTimer();
+          onStreamAbortRef.current?.();
           setState(CHAT_STATES.AGENT_OFFLINE);
           offlineTimerRef.current = null;
         }, 3000);
@@ -331,7 +341,7 @@ export function useChatWebSocket(
     ws.onerror = () => {
       /* ignore */
     };
-  }, [navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
+  }, [conversationId, navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
 
   const dismissError = useCallback(() => {
     const shouldRequireAuth = isProviderAuthFailureMessage(errorMessage);
@@ -359,6 +369,15 @@ export function useChatWebSocket(
     setState(CHAT_STATES.INITIALIZING);
     connect();
   }, [connect, clearResponseTimer]);
+
+  useEffect(() => {
+    messageQueueRef.current = [];
+    setSessionActivity([]);
+    setErrorMessage(null);
+    clearResponseTimer();
+    onStreamAbortRef.current?.();
+    setState(CHAT_STATES.INITIALIZING);
+  }, [conversationId, clearResponseTimer]);
 
   useEffect(() => {
     const handleAutoAuthSuccess = () => reconnect();

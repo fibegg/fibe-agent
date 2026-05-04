@@ -22,6 +22,7 @@ describe('useChatActivityLog', () => {
     const { result } = renderHook(() => useChatActivityLog(vi.fn()));
     expect(typeof result.current.thinkingCallbacks).toBe('object');
     expect(typeof result.current.resetForNewStream).toBe('function');
+    expect(typeof result.current.resetActivityState).toBe('function');
     expect(typeof result.current.thinkingCallbacks.onReasoningStart).toBe('function');
     expect(typeof result.current.thinkingCallbacks.onReasoningChunk).toBe('function');
     expect(typeof result.current.thinkingCallbacks.onReasoningEnd).toBe('function');
@@ -43,6 +44,27 @@ describe('useChatActivityLog', () => {
     const { result } = renderHook(() => useChatActivityLog(vi.fn()));
     act(() => { result.current.resetForNewStream({ model: 'claude-3' }); });
     expect(result.current.activityLog[0].details).toContain('claude-3');
+  });
+
+  it('resetActivityState clears live activity and reasoning state', () => {
+    const { result } = renderHook(() => useChatActivityLog(vi.fn()));
+    act(() => {
+      result.current.resetForNewStream({ model: 'claude-3' });
+      result.current.thinkingCallbacks.onReasoningStart();
+      result.current.thinkingCallbacks.onReasoningChunk('thinking');
+      result.current.thinkingCallbacks.onThinkingStep({
+        id: 'step-1',
+        title: 'Generating',
+        status: 'processing',
+        timestamp: new Date(),
+      });
+    });
+
+    act(() => { result.current.resetActivityState(); });
+
+    expect(result.current.activityLog).toEqual([]);
+    expect(result.current.thinkingSteps).toEqual([]);
+    expect(result.current.reasoningText).toBe('');
   });
 
   it('onReasoningStart adds reasoning_start activity entry', () => {

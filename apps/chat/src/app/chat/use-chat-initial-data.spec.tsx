@@ -41,6 +41,25 @@ describe('useChatInitialData', () => {
     });
   });
 
+  it('fetches conversation-scoped messages for non-default conversations', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ role: 'user', body: 'thread body', created_at: '2026-01-01' }],
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
+
+    const { result } = renderHook(() => useChatInitialData(true, 'thread-123'), { wrapper });
+
+    await waitFor(() => {
+      expect(mockApiRequest).toHaveBeenCalledWith('/api/conversations/thread-123/messages', undefined);
+    });
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(1);
+    });
+  });
+
   it('when not authenticated does not fetch', () => {
     const { result } = renderHook(() => useChatInitialData(false), { wrapper });
     expect(mockApiRequest).not.toHaveBeenCalled();
@@ -59,6 +78,39 @@ describe('useChatInitialData', () => {
       const first = result.current.messages[0];
       expect(!('kind' in first) && first.body).toBe('hi');
     });
+  });
+
+  it('keeps cached conversation messages when a reload fails', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => [{ role: 'user', body: 'persisted', created_at: '2026-01-01' }],
+      })
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
+
+    const { result } = renderHook(() => useChatInitialData(true, 'thread-1'), { wrapper });
+    await waitFor(() => {
+      expect(result.current.messages).toHaveLength(1);
+    });
+
+    act(() => {
+      result.current.setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', body: 'local response', created_at: '2026-01-01' },
+      ] as ChatListItem[]);
+    });
+    expect(result.current.messages).toHaveLength(2);
+
+    mockApiRequest.mockRejectedValueOnce(new Error('network'));
+
+    await act(async () => {
+      await result.current.loadMessages();
+    });
+
+    expect(result.current.messages).toHaveLength(2);
+    const second = result.current.messages[1];
+    expect(!('kind' in second) && second.body).toBe('local response');
   });
 
   it('refreshModelOptions calls POST and updates modelOptions', async () => {

@@ -14,6 +14,7 @@ export interface FinishAgentStreamDeps {
   send: (type: string, data?: Record<string, unknown>) => void;
   getCurrentActivityId: () => string | null;
   clearLastStreamUsage: () => void;
+  clearReasoningText: () => void;
 }
 
 export function finishAgentStream(
@@ -46,4 +47,5 @@ export function finishAgentStream(
   }
   void deps.fibeSync.syncActivity(() => JSON.stringify(deps.activityStore.all()));
   deps.clearLastStreamUsage();
+  deps.clearReasoningText();
 }

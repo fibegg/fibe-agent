@@ -1,7 +1,7 @@
 import { describe, test, expect, afterEach } from 'bun:test';
 import { StrategyRegistryService } from './strategy-registry.service';
 import { MockStrategy } from './mock.strategy';
-import { ClaudeCodeStrategy } from './claude-code.strategy';
+import { ClaudeSdkStrategy } from './claude-sdk.strategy';
 import { CursorStrategy } from './cursor.strategy';
 import { GeminiStrategy } from './gemini.strategy';
 import { OpenaiCodexStrategy } from './openai-codex.strategy';
@@ -24,10 +24,10 @@ describe('StrategyRegistryService', () => {
     expect(service.resolveStrategy()).toBeInstanceOf(MockStrategy);
   });
 
-  test('resolveStrategy returns ClaudeCodeStrategy when AGENT_PROVIDER not set', () => {
+  test('resolveStrategy returns ClaudeSdkStrategy when AGENT_PROVIDER not set', () => {
     delete process.env.AGENT_PROVIDER;
     const service = new StrategyRegistryService(mockConfig as never);
-    expect(service.resolveStrategy()).toBeInstanceOf(ClaudeCodeStrategy);
+    expect(service.resolveStrategy()).toBeInstanceOf(ClaudeSdkStrategy);
   });
 
   test('resolveStrategy throws for unknown provider', () => {

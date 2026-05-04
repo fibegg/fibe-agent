@@ -20,6 +20,7 @@ interface UseConversationsResult {
 }
 
 const ACTIVE_CONV_KEY = 'fibe:activeConversationId';
+const DEFAULT_CONVERSATION_ID = 'default';
 
 export function getActiveConversationId(): string {
   return localStorage.getItem(ACTIVE_CONV_KEY) || 'default';
@@ -44,11 +45,12 @@ export function useConversations(): UseConversationsResult {
     try {
       const res = await apiRequest('/api/conversations');
       if (!res.ok || !mountedRef.current) return;
-      const data = await res.json() as ConversationMeta[];
+      const parsed = await res.json() as ConversationMeta[];
+      const data = Array.isArray(parsed) ? parsed : [];
       setConversations(data);
       // If stored activeId no longer exists, fall back to first or 'default'
-      if (data.length > 0 && !data.some((c) => c.id === getActiveConversationId())) {
-        const fallback = data[0].id;
+      if (!data.some((c) => c.id === getActiveConversationId())) {
+        const fallback = data.find((c) => c.id === DEFAULT_CONVERSATION_ID)?.id ?? data[0]?.id ?? DEFAULT_CONVERSATION_ID;
         setActiveConversationId(fallback);
         setActiveId(fallback);
       }
@@ -88,7 +90,7 @@ export function useConversations(): UseConversationsResult {
     // If deleting active, switch to newest remaining
     if (id === getActiveConversationId()) {
       const remaining = conversations.filter((c) => c.id !== id);
-      const next = remaining[0]?.id ?? 'default';
+      const next = remaining.find((c) => c.id === DEFAULT_CONVERSATION_ID)?.id ?? remaining[0]?.id ?? DEFAULT_CONVERSATION_ID;
       setActiveConversationId(next);
       setActiveId(next);
     }

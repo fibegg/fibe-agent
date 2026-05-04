@@ -1,32 +1,62 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api-url';
-import { API_PATHS } from '@shared/api-paths';
+import { API_PATHS, API_PATH_CONVERSATION_MESSAGES } from '@shared/api-paths';
 import type { ChatListItem } from './message-list';
 
-export function useChatInitialData(authenticated: boolean) {
+function messagesPathForConversation(conversationId: string): string {
+  return conversationId === 'default'
+    ? API_PATHS.MESSAGES
+    : API_PATH_CONVERSATION_MESSAGES(conversationId);
+}
+
+export function useChatInitialData(authenticated: boolean, conversationId = 'default') {
   const navigate = useNavigate();
-  const [messages, setMessages] = useState<ChatListItem[]>([]);
+  const [messages, setMessagesState] = useState<ChatListItem[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [refreshingModels, setRefreshingModels] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
   const [agentProvider, setAgentProvider] = useState<string | null>(null);
+  const loadSeqRef = useRef(0);
+  const messageCacheRef = useRef(new Map<string, ChatListItem[]>());
+
+  const setMessages = useCallback((value: SetStateAction<ChatListItem[]>) => {
+    setMessagesState((prev) => {
+      const next = typeof value === 'function'
+        ? (value as (prevState: ChatListItem[]) => ChatListItem[])(prev)
+        : value;
+      messageCacheRef.current.set(conversationId, next);
+      return next;
+    });
+  }, [conversationId]);
 
   const loadMessages = useCallback(async () => {
+    const loadSeq = loadSeqRef.current + 1;
+    loadSeqRef.current = loadSeq;
+    setMessagesState(messageCacheRef.current.get(conversationId) ?? []);
+    setMessagesLoaded(false);
+
     try {
-      const res = await apiRequest(API_PATHS.MESSAGES);
+      const res = await apiRequest(messagesPathForConversation(conversationId));
       if (res.status === 401) {
         navigate('/login', { replace: true });
         return;
       }
+      if (!res.ok) {
+        throw new Error(`Failed to load messages: ${res.status}`);
+      }
       const data = (await res.json()) as ChatListItem[];
-      setMessages(Array.isArray(data) ? data : []);
+      if (loadSeq !== loadSeqRef.current) return;
+      const next = Array.isArray(data) ? data : [];
+      messageCacheRef.current.set(conversationId, next);
+      setMessagesState(next);
       setMessagesLoaded(true);
     } catch {
-      setMessages([]);
+      if (loadSeq !== loadSeqRef.current) return;
+      setMessagesState(messageCacheRef.current.get(conversationId) ?? []);
       setMessagesLoaded(true);
     }
-  }, [navigate]);
+  }, [conversationId, navigate]);
 
   const loadModelOptions = useCallback(async () => {
     try {

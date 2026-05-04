@@ -8,8 +8,9 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
-import { MessageStoreService } from '../message-store/message-store.service';
-import { ActivityStoreService } from '../activity-store/activity-store.service';
+import { MessageStoreService, type StoredMessage } from '../message-store/message-store.service';
+import { ActivityStoreService, type StoredActivityEntry } from '../activity-store/activity-store.service';
+import type { ConversationDataDirProvider } from '../strategies/strategy.types';
 
 export interface ConversationMeta {
   id: string;
@@ -18,7 +19,10 @@ export interface ConversationMeta {
   lastMessageAt: string;
 }
 
-interface ConversationBundle {
+export const DEFAULT_CONVERSATION_ID = 'default';
+export const DEFAULT_CONVERSATION_TITLE = 'INBOX';
+
+export interface ConversationBundle {
   meta: ConversationMeta;
   messageStore: MessageStoreService;
   activityStore: ActivityStoreService;
@@ -60,6 +64,7 @@ export class ConversationManagerService {
     this.indexPath = join(this.conversationsDir, 'index.json');
     mkdirSync(this.conversationsDir, { recursive: true });
     this.loadIndex();
+    this.ensureDefaultConversation();
   }
 
   /** List all conversations sorted by lastMessageAt desc. */
@@ -79,8 +84,21 @@ export class ConversationManagerService {
    * If id is 'default', uses the legacy single-conversation dir.
    */
   getOrCreate(id: string): ConversationBundle {
-    if (this.bundles.has(id)) return this.bundles.get(id)!;
+    const existing = this.bundles.get(id);
+    if (existing) return existing;
     return this.createBundle(id);
+  }
+
+  messages(id: string): StoredMessage[] {
+    return this.getOrCreate(id).messageStore.all();
+  }
+
+  activities(id: string): StoredActivityEntry[] {
+    return this.getOrCreate(id).activityStore.all();
+  }
+
+  dataDirProvider(id: string): ConversationDataDirProvider {
+    return { getConversationDataDir: () => this.convDir(id) };
   }
 
   /** Create a brand-new conversation, persist, and return its meta. */
@@ -100,6 +118,7 @@ export class ConversationManagerService {
 
   /** Update the title of an existing conversation. */
   setTitle(id: string, title: string): boolean {
+    if (id === DEFAULT_CONVERSATION_ID) return false;
     const bundle = this.bundles.get(id);
     if (!bundle) return false;
     bundle.meta.title = title;
@@ -117,6 +136,7 @@ export class ConversationManagerService {
 
   /** Delete a conversation (metadata + in-memory; files remain on disk for recovery). */
   delete(id: string): boolean {
+    if (id === DEFAULT_CONVERSATION_ID) return false;
     if (!this.bundles.has(id)) return false;
     this.bundles.delete(id);
     this.flushIndex();
@@ -129,7 +149,7 @@ export class ConversationManagerService {
   private convDir(id: string): string {
     // 'default' uses the legacy getConversationDataDir() path so existing
     // single-conversation installs are unaffected.
-    if (id === 'default') return this.config.getConversationDataDir();
+    if (id === DEFAULT_CONVERSATION_ID) return this.config.getConversationDataDir();
     return join(this.conversationsDir, id);
   }
 
@@ -144,7 +164,7 @@ export class ConversationManagerService {
     const now = new Date().toISOString();
     const resolvedMeta: ConversationMeta = meta ?? {
       id,
-      title: 'New chat',
+      title: id === DEFAULT_CONVERSATION_ID ? DEFAULT_CONVERSATION_TITLE : 'New chat',
       createdAt: now,
       lastMessageAt: now,
     };
@@ -168,6 +188,24 @@ export class ConversationManagerService {
     } catch {
       this.logger.warn('Failed to parse conversations index, starting fresh');
     }
+  }
+
+  private ensureDefaultConversation(): void {
+    const existing = this.bundles.get(DEFAULT_CONVERSATION_ID);
+    if (existing) {
+      if (existing.meta.title !== DEFAULT_CONVERSATION_TITLE) {
+        existing.meta.title = DEFAULT_CONVERSATION_TITLE;
+        this.flushIndex();
+      }
+      return;
+    }
+    const now = new Date().toISOString();
+    this.createBundle(DEFAULT_CONVERSATION_ID, {
+      id: DEFAULT_CONVERSATION_ID,
+      title: DEFAULT_CONVERSATION_TITLE,
+      createdAt: now,
+      lastMessageAt: now,
+    });
   }
 
   private flushIndex(): void {

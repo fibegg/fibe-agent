@@ -177,6 +177,9 @@ export class OrchestratorService implements OnModuleInit {
       clearLastStreamUsage: () => {
         ctx.lastStreamUsage = undefined;
       },
+      clearReasoningText: () => {
+        ctx.reasoningTextAccumulated = '';
+      },
     };
   }
 
@@ -226,6 +229,8 @@ export class OrchestratorService implements OnModuleInit {
       [WS_ACTION.SEND_CHAT_MESSAGE]: async () => {
         if (ctx.isProcessing) {
           await this.handleQueueMessage(ctx, msg.text ?? '');
+        } else if (this.sessionRegistry.isConversationProcessing(ctx.conversationId, ctx.sessionId)) {
+          ctx.send(WS_EVENT.ERROR, { message: ERROR_CODE.AGENT_BUSY });
         } else {
           await this.handleChatMessage(
             ctx,
@@ -272,9 +277,11 @@ export class OrchestratorService implements OnModuleInit {
     ctx.isAuthenticated = this.sharedIsAuthenticated;
     ctx.cachedSystemPromptFromFile = this.sharedSystemPromptFromFile;
     const anyProcessing = this.sessionRegistry.all().some((s) => s.isProcessing);
+    const isConversationProcessing =
+      ctx.isProcessing || this.sessionRegistry.isConversationProcessing(ctx.conversationId, ctx.sessionId);
     ctx.send(WS_EVENT.AUTH_STATUS, {
       status: ctx.isAuthenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
-      isProcessing: ctx.isProcessing,
+      isProcessing: isConversationProcessing,
       anyProcessing,
     });
     ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.stores(ctx).activityStore.all() });
@@ -286,10 +293,15 @@ export class OrchestratorService implements OnModuleInit {
     this.sharedIsAuthenticated = authenticated;
     for (const s of this.sessionRegistry.all()) s.isAuthenticated = authenticated;
     const anyProcessing = this.sessionRegistry.all().some((s) => s.isProcessing);
-    this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, {
-      status: authenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
-      anyProcessing,
-    });
+    for (const s of this.sessionRegistry.all()) {
+      const isConversationProcessing =
+        s.isProcessing || this.sessionRegistry.isConversationProcessing(s.conversationId, s.sessionId);
+      s.send(WS_EVENT.AUTH_STATUS, {
+        status: authenticated ? AUTH_STATUS_VAL.AUTHENTICATED : AUTH_STATUS_VAL.UNAUTHENTICATED,
+        isProcessing: isConversationProcessing,
+        anyProcessing,
+      });
+    }
   }
 
   private async handleInitiateAuth(ctx: SessionContext): Promise<void> {
@@ -398,7 +410,11 @@ export class OrchestratorService implements OnModuleInit {
       imageUrls.length ? imageUrls : undefined
     );
     await ctxMsgStore.flush();
-    this.sessionRegistry.broadcast(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
+    this.sessionRegistry.broadcastToConversation(
+      ctx.conversationId,
+      WS_EVENT.MESSAGE,
+      userMessage as unknown as Record<string, unknown>,
+    );
     this.conversationManager.touch(ctx.conversationId);
     return {
       messageId: userMessage.id,
@@ -538,18 +554,48 @@ export class OrchestratorService implements OnModuleInit {
     } catch (err) {
       const raw = err instanceof Error ? err.message : String(err);
       if (raw === INTERRUPTED_MESSAGE) {
-        finishAgentStream(
-          this.finishStreamDeps(ctx),
-          accumulated,
-          syntheticStepId,
-          syntheticStep,
-          ctx.lastStreamUsage
-        );
+        if (accumulated.trim()) {
+          finishAgentStream(
+            this.finishStreamDeps(ctx),
+            accumulated,
+            syntheticStepId,
+            syntheticStep,
+            ctx.lastStreamUsage
+          );
+        } else {
+          ctx.send(WS_EVENT.THINKING_STEP, {
+            id: syntheticStep.id,
+            title: syntheticStep.title,
+            status: 'complete',
+            details: 'Interrupted before producing output.',
+            timestamp: new Date().toISOString(),
+          });
+          if (ctx.reasoningTextAccumulated) {
+            ctx.send(WS_EVENT.REASONING_END, {});
+            ctx.reasoningTextAccumulated = '';
+          }
+          ctx.currentActivityId = null;
+          ctx.lastStreamUsage = undefined;
+          ctx.send(WS_EVENT.ERROR, { message: 'Interrupted before producing output.' });
+        }
       } else {
         const message = raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
         if (isProviderAuthFailureMessage(message)) {
           this.isAuthenticated = false;
         }
+        ctx.send(WS_EVENT.THINKING_STEP, {
+          id: syntheticStep.id,
+          title: syntheticStep.title,
+          status: 'complete',
+          details: message,
+          timestamp: new Date().toISOString(),
+        });
+        if (ctx.reasoningTextAccumulated) {
+          ctx.send(WS_EVENT.REASONING_END, {});
+          ctx.reasoningTextAccumulated = '';
+        }
+        ctx.currentActivityId = null;
+        ctx.lastStreamUsage = undefined;
         ctx.send(WS_EVENT.ERROR, { message });
       }
     } finally {
@@ -560,6 +606,7 @@ export class OrchestratorService implements OnModuleInit {
         count: this.sessionRegistry.size,
         anyProcessing: this.sessionRegistry.all().some((s) => s.isProcessing),
       });
+      this.sessionRegistry.destroyIfDetachedAndIdle(ctx.sessionId);
     }
   }
 
@@ -591,7 +638,11 @@ export class OrchestratorService implements OnModuleInit {
     const { messageStore: qMsgStore } = this.stores(ctx);
     const userMessage = qMsgStore.add('user', text);
     await qMsgStore.flush();
-    this.sessionRegistry.broadcast(WS_EVENT.MESSAGE, userMessage as unknown as Record<string, unknown>);
+    this.sessionRegistry.broadcastToConversation(
+      ctx.conversationId,
+      WS_EVENT.MESSAGE,
+      userMessage as unknown as Record<string, unknown>,
+    );
     this.conversationManager.touch(ctx.conversationId);
     void this.fibeSync.syncMessages(() => JSON.stringify(qMsgStore.all()));
     if (ctx.strategy.steerAgent) ctx.strategy.steerAgent(text);
@@ -633,7 +684,13 @@ export class OrchestratorService implements OnModuleInit {
       if (useClientStory && entry) sAct.replaceStory(ctx.currentActivityId, story);
       sMsg.finalizeLastAssistant(storyToUse, ctx.currentActivityId);
       const finalEntry = sAct.getById(ctx.currentActivityId);
-      if (finalEntry) this.sessionRegistry.broadcast(WS_EVENT.ACTIVITY_UPDATED, { entry: finalEntry });
+      if (finalEntry) {
+        this.sessionRegistry.broadcastToConversation(
+          ctx.conversationId,
+          WS_EVENT.ACTIVITY_UPDATED,
+          { entry: finalEntry },
+        );
+      }
       ctx.currentActivityId = null;
     } else {
       // If currentActivityId is null, this might be a duplicate submission from a second tab.
@@ -708,7 +765,7 @@ export class OrchestratorService implements OnModuleInit {
     rAct.clear();
     await this.flushStores(ctx);
     this.logger.log(`Conversation reset at ${resetAt} (conversation: ${ctx.conversationId})`);
-    this.sessionRegistry.broadcast(WS_EVENT.CONVERSATION_RESET, { resetAt });
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.CONVERSATION_RESET, { resetAt });
   }
 
   private async executeCliDirectly(ctx: SessionContext, command: string, syntheticStepId: string, syntheticStep: ThinkingStep): Promise<void> {

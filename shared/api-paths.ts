@@ -28,3 +28,9 @@ export const API_PATHS = {
 
 export const API_PATH_UPLOADS_BY_FILENAME = (filename: string) =>
   `${API_PATHS.UPLOADS}/${encodeURIComponent(filename)}`;
+
+export const API_PATH_CONVERSATION_MESSAGES = (conversationId: string) =>
+  `/api/conversations/${encodeURIComponent(conversationId)}/messages`;
+
+export const API_PATH_CONVERSATION_ACTIVITIES = (conversationId: string) =>
+  `/api/conversations/${encodeURIComponent(conversationId)}/activities`;

@@ -163,6 +163,25 @@ describe('useChatStreaming', () => {
     expect(resetForNewStream).toHaveBeenCalled();
   });
 
+  it('handleStreamAbort clears pending text without calling stream end callback', () => {
+    const onStreamEndCallback = vi.fn();
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(42 as unknown as ReturnType<typeof requestAnimationFrame>);
+    const cancelRafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame');
+    const { result } = renderHook(() =>
+      useChatStreaming({ onStreamEndCallback, resetForNewStream: vi.fn() })
+    );
+
+    act(() => {
+      result.current.handleStreamStart({ model: 'claude-3' });
+      result.current.handleStreamChunk('Partial');
+      result.current.handleStreamAbort();
+    });
+
+    expect(cancelRafSpy).toHaveBeenCalled();
+    expect(result.current.streamingText).toBe('');
+    expect(onStreamEndCallback).not.toHaveBeenCalled();
+  });
+
   it('cleans up rAF on unmount', () => {
     vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(99 as unknown as ReturnType<typeof requestAnimationFrame>);
     const cancelRafSpy = vi.spyOn(globalThis, 'cancelAnimationFrame');

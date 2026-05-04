@@ -23,13 +23,21 @@ function makeStrategyRegistry(): StrategyRegistryService {
   } as unknown as StrategyRegistryService;
 }
 
+function makeConversationManager() {
+  return {
+    dataDirProvider: (id: string) => ({
+      getConversationDataDir: () => `/tmp/fibe-agent/${id}`,
+    }),
+  } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
+}
+
 describe('SessionRegistryService', () => {
   let registry: SessionRegistryService;
   let strategyRegistry: StrategyRegistryService;
 
   beforeEach(() => {
     strategyRegistry = makeStrategyRegistry();
-    registry = new SessionRegistryService(strategyRegistry);
+    registry = new SessionRegistryService(strategyRegistry, makeConversationManager());
   });
 
   it('starts with zero sessions', () => {
@@ -53,6 +61,28 @@ describe('SessionRegistryService', () => {
     registry.create();
     registry.create();
     expect(strategyRegistry.resolveStrategy).toHaveBeenCalledTimes(2);
+  });
+
+  it('create() passes a conversation-specific data-dir provider to the strategy', () => {
+    registry.create('thread-a');
+
+    const provider = (
+      strategyRegistry.resolveStrategy as unknown as {
+        mock: { calls: Array<[{ getConversationDataDir(): string }]> };
+      }
+    ).mock.calls[0][0];
+    expect(provider?.getConversationDataDir()).toBe('/tmp/fibe-agent/thread-a');
+  });
+
+  it('isConversationProcessing reports active work for a conversation', () => {
+    const active = registry.create('thread-a');
+    const idle = registry.create('thread-b');
+    active.isProcessing = true;
+
+    expect(registry.isConversationProcessing('thread-a')).toBe(true);
+    expect(registry.isConversationProcessing('thread-b')).toBe(false);
+    expect(registry.isConversationProcessing('thread-a', active.sessionId)).toBe(false);
+    expect(idle.isProcessing).toBe(false);
   });
 
   it('get() returns the session by ID', () => {
@@ -83,6 +113,55 @@ describe('SessionRegistryService', () => {
     const ctx = registry.create();
     const destroySpy = vi.spyOn(ctx, 'destroy');
     registry.destroy(ctx.sessionId);
+    expect(destroySpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('detach() keeps a processing session alive and marks it for idle cleanup', () => {
+    const ctx = registry.create('thread-a');
+    const interruptSpy = vi.spyOn(ctx.strategy, 'interruptAgent');
+    ctx.isProcessing = true;
+
+    registry.detach(ctx.sessionId);
+
+    expect(registry.get(ctx.sessionId)).toBe(ctx);
+    expect(registry.size).toBe(0);
+    expect(ctx.isClientConnected).toBe(false);
+    expect(ctx.destroyWhenIdle).toBe(true);
+    expect(registry.isConversationProcessing('thread-a')).toBe(true);
+    expect(interruptSpy).not.toHaveBeenCalled();
+  });
+
+  it('destroyIfDetachedAndIdle removes detached sessions after processing finishes', () => {
+    const ctx = registry.create();
+    ctx.isProcessing = true;
+    registry.detach(ctx.sessionId);
+
+    ctx.isProcessing = false;
+    registry.destroyIfDetachedAndIdle(ctx.sessionId);
+
+    expect(registry.get(ctx.sessionId)).toBeUndefined();
+  });
+
+  it('create() reattaches a detached processing session for the same conversation', () => {
+    const ctx = registry.create('thread-a');
+    ctx.isProcessing = true;
+    registry.detach(ctx.sessionId);
+
+    const reattached = registry.create('thread-a');
+
+    expect(reattached).toBe(ctx);
+    expect(ctx.isClientConnected).toBe(true);
+    expect(ctx.destroyWhenIdle).toBe(false);
+    expect(strategyRegistry.resolveStrategy).toHaveBeenCalledTimes(1);
+  });
+
+  it('detach() destroys idle sessions immediately', () => {
+    const ctx = registry.create();
+    const destroySpy = vi.spyOn(ctx, 'destroy');
+
+    registry.detach(ctx.sessionId);
+
+    expect(registry.get(ctx.sessionId)).toBeUndefined();
     expect(destroySpy).toHaveBeenCalledTimes(1);
   });
 
@@ -127,6 +206,20 @@ describe('SessionRegistryService', () => {
     registry.broadcast('ping');
 
     expect(events[0]?.data).toEqual({});
+  });
+
+  it('broadcastToConversation emits only to matching conversations', () => {
+    const a = registry.create('thread-a');
+    const b = registry.create('thread-b');
+    const eventsA: unknown[] = [];
+    const eventsB: unknown[] = [];
+    a.outbound$.subscribe((e) => eventsA.push(e));
+    b.outbound$.subscribe((e) => eventsB.push(e));
+
+    registry.broadcastToConversation('thread-a', 'message', { body: 'hello' });
+
+    expect(eventsA).toEqual([{ type: 'message', data: { conversationId: 'thread-a', body: 'hello' } }]);
+    expect(eventsB).toEqual([]);
   });
 
   it('each created session has an independent outbound$ stream', () => {
