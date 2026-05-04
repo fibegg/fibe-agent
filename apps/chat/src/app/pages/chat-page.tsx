@@ -917,6 +917,10 @@ export function ChatPage() {
           }
           sessionCount={sessionCount}
           anyProcessing={anyProcessing}
+          conversations={compactMode ? conversations : undefined}
+          activeConversationId={compactMode ? activeConversationId : undefined}
+          onConversationSelect={compactMode ? switchConversation : undefined}
+          onConversationCreate={compactMode ? async () => { await createConversation(); } : undefined}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}

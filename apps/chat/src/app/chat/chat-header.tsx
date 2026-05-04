@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Brain, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, MessageSquare, RefreshCcw, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, ChevronDown, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, MessageSquare, Plus, RefreshCcw, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
 import { EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
@@ -81,6 +81,11 @@ export interface ChatHeaderProps {
   /** Toggle the conversations drawer in the main chat column. */
   onToggleConversations?: () => void;
   conversationsOpen?: boolean;
+  /** Conversations for the compact-mode inline picker. */
+  conversations?: import('./use-conversations').ConversationMeta[];
+  activeConversationId?: string;
+  onConversationSelect?: (id: string) => void;
+  onConversationCreate?: () => Promise<void>;
 }
 
 const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -768,6 +773,113 @@ function isKnownChatState(state: string): state is ChatState {
   return Object.values(CHAT_STATES).includes(state as ChatState);
 }
 
+/** Small inline conversation switcher shown in the simplicate (compact) header. */
+function CompactConversationPicker({
+  conversations,
+  activeId,
+  onSelect,
+  onCreate,
+}: {
+  conversations: import('./use-conversations').ConversationMeta[];
+  activeId: string;
+  onSelect: (id: string) => void;
+  onCreate?: () => Promise<void>;
+}) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+
+  const activeConv = conversations.find((c) => c.id === activeId);
+  const label = activeConv?.title ?? 'Conversations';
+
+  const openPicker = useCallback(() => {
+    const el = triggerRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setRect({ top: r.bottom + 4, left: r.left, width: Math.max(200, r.width) });
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      if (triggerRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
+    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    document.addEventListener('mousedown', close);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [open]);
+
+  const handleSelect = useCallback((id: string) => {
+    onSelect(id);
+    setOpen(false);
+  }, [onSelect]);
+
+  const handleCreate = useCallback(async () => {
+    setOpen(false);
+    await onCreate?.();
+  }, [onCreate]);
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={open ? () => setOpen(false) : openPicker}
+        className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300 transition-colors max-w-[120px]"
+        title={label}
+      >
+        <MessageSquare className="size-3 shrink-0 text-violet-400" />
+        <span className="truncate">{label}</span>
+        <ChevronDown className={`size-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <span className="shrink-0 text-muted-foreground/40">·</span>
+      {open && rect && createPortal(
+        <div
+          className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card/95 shadow-xl shadow-black/30 backdrop-blur-xl py-1"
+          style={{ top: rect.top, left: rect.left, width: rect.width }}
+        >
+          <div className="max-h-60 overflow-y-auto">
+            {conversations.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => handleSelect(c.id)}
+                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
+                  c.id === activeId
+                    ? 'bg-violet-500/15 text-violet-300'
+                    : 'text-foreground hover:bg-muted/50'
+                }`}
+              >
+                <MessageSquare className="size-3 shrink-0 text-muted-foreground/60" />
+                <span className="min-w-0 flex-1 truncate font-medium">{c.title}</span>
+              </button>
+            ))}
+          </div>
+          {onCreate && (
+            <div className="border-t border-border/40 px-1 pt-1">
+              <button
+                type="button"
+                onClick={handleCreate}
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 transition-colors"
+              >
+                <Plus className="size-3.5 shrink-0" />
+                <span>New chat</span>
+              </button>
+            </div>
+          )}
+        </div>,
+        document.body,
+      )}
+    </>
+  );
+}
+
 export function ChatHeader({
   isMobile,
   agentName,
@@ -814,6 +926,10 @@ export function ChatHeader({
   anyProcessing = false,
   onToggleConversations,
   conversationsOpen = false,
+  conversations,
+  activeConversationId,
+  onConversationSelect,
+  onConversationCreate,
   ...rest
 }: ChatHeaderProps) {
   const t = useT();
@@ -928,6 +1044,15 @@ export function ChatHeader({
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5 text-sm">
+              {/* Compact conversation picker — only in simplicate mode when conversations exist */}
+              {conversations && conversations.length > 0 && onConversationSelect && (
+                <CompactConversationPicker
+                  conversations={conversations}
+                  activeId={activeConversationId ?? ''}
+                  onSelect={onConversationSelect}
+                  onCreate={onConversationCreate}
+                />
+              )}
               <ProviderModelMenu
                 triggerClassName="-ml-1 inline-flex min-w-0 max-w-[62vw] items-center gap-1.5 px-1 py-0.5 text-left sm:max-w-[360px]"
                 panelLabel={t('header.changeModelEffort')}
