@@ -703,7 +703,7 @@ Important distinction:
 - file browser/workspace: shared
 - messages/activity/uploads/session markers: conversation-scoped
 
-## Rails Sync Contract
+## Fibe Sync Contract
 
 Fibe-agent sync should send an explicit `conversation_id`.
 
@@ -711,20 +711,20 @@ Rules:
 
 - Missing legacy sync means `default`.
 - API/system sends without `conversationId` target `inbox`.
-- Rails mirror records should exist for `default`, `inbox`, and UUID
+- Fibe mirror records should exist for `default`, `inbox`, and UUID
   conversations.
-- Existing Rails rows should be backfilled to `default`, not `inbox`.
+- Existing Fibe records should be backfilled to `default`, not `inbox`.
 
-Rails schema contract:
+Fibe mirror contract:
 
-- `agent_conversations` mirror table.
+- `agent_conversations` mirror records.
 - Unique key: `[agent_id, client_id]`.
 - `agent_messages.agent_conversation_id`.
 - `agent_activities.agent_conversation_id`.
 - `agent_raw_providers.agent_conversation_id`.
 - Sync upserts scoped by `[agent_id, agent_conversation_id, client_id]`.
 
-Rails is observability/history. Fibe-agent remains the runtime owner of thread
+Fibe is observability/history. Fibe-agent remains the runtime owner of thread
 creation, switching, provider context, and live UI behavior.
 
 ## Provider Session IDs And Fibe UUIDs
@@ -882,12 +882,12 @@ UI:
 - Queue is the default action when active conversation is processing.
 - Steer is explicit.
 
-Rails/sync:
+Fibe sync:
 
 - fibe-agent sends `conversation_id` with messages/activity/raw-provider sync.
 - Missing legacy sync maps to `default`.
-- Rails backfills old rows to `default`.
-- Rails groups Scrolls/history by `agent_conversation_id`.
+- Fibe backfills old records to `default`.
+- Fibe groups Scrolls/history by `agent_conversation_id`.
 
 ## Operational Debug Notes
 
@@ -1029,15 +1029,15 @@ Planned:
 - Keep marker files as compatibility shims or migration inputs.
 - Expose provider session metadata in debug endpoints.
 
-### Rails Conversation Sync Hardening
+### Fibe Conversation Sync Hardening
 
 Planned:
 
 - Ensure every sync payload includes `conversation_id`.
-- Add Rails API coverage for messages/activity/raw providers by conversation.
+- Add Fibe API coverage for messages/activity/raw providers by conversation.
 - Add Scrolls grouping and filters by conversation.
 - Add SDK/CLI flags for conversation list/get/send.
-- Distinguish `default` and `inbox` clearly in Rails mirror records.
+- Distinguish `default` and `inbox` clearly in Fibe mirror records.
 
 ### Shared Workspace Concurrency Controls
 
@@ -1096,4 +1096,3 @@ Planned:
 - Verify messages/activity/raw traffic stay separate.
 - Verify refresh does not resubmit syscheck.
 - Verify delete while processing aborts and cleans only conversation state.
-
