@@ -15,24 +15,24 @@ export class FibeSyncService {
     @Optional() private readonly settingsStore?: FibeSyncSettingsStoreService
   ) {}
 
-  syncMessages(getContent: () => string): void {
+  syncMessages(getContent: () => string, conversationId?: string): void {
     if (this.messageSyncTimer) clearTimeout(this.messageSyncTimer);
     this.messageSyncTimer = setTimeout(() => {
       this.messageSyncTimer = null;
       try {
-        void this.sync('messages', getContent());
+        void this.sync('messages', getContent(), conversationId);
       } catch (err) {
         this.logger.error(`Error resolving messages content for sync: ${err}`);
       }
     }, FibeSyncService.DEBOUNCE_MS);
   }
 
-  syncActivity(getContent: () => string): void {
+  syncActivity(getContent: () => string, conversationId?: string): void {
     if (this.activitySyncTimer) clearTimeout(this.activitySyncTimer);
     this.activitySyncTimer = setTimeout(() => {
       this.activitySyncTimer = null;
       try {
-        void this.sync('activity', getContent());
+        void this.sync('activity', getContent(), conversationId);
       } catch (err) {
         this.logger.error(`Error resolving activity content for sync: ${err}`);
       }
@@ -53,7 +53,8 @@ export class FibeSyncService {
 
   private async sync(
     type: 'messages' | 'activity' | 'raw_providers',
-    content: string
+    content: string,
+    conversationId?: string
   ): Promise<void> {
     const enabled = this.settingsStore?.isEnabled(type) ?? this.config.isFibeSyncEnabled();
     if (!enabled) return;
@@ -64,7 +65,13 @@ export class FibeSyncService {
 
     if (!apiUrl || !apiKey || !agentId) return;
 
-    const url = `${apiUrl}/api/agents/${agentId}/${type}`;
+    // Namespace the sync key by conversationId so each thread syncs independently.
+    // 'default' conversation keeps the legacy key for backward compatibility.
+    const syncKey =
+      conversationId && conversationId !== 'default'
+        ? `${type}_${conversationId}`
+        : type;
+    const url = `${apiUrl}/api/agents/${agentId}/${syncKey}`;
 
     try {
       const res = await fetch(url, {

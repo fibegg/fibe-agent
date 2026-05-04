@@ -8,6 +8,7 @@ import { OrchestratorService } from './app/orchestrator/orchestrator.service';
 import { SessionRegistryService } from './app/orchestrator/session-registry.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
 import { TerminalService } from './app/terminal/terminal.service';
+import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from './app/conversation/conversation-manager.service';
 import { WS_CLOSE, WS_EVENT } from '@shared/ws-constants';
 import { logWs } from './container-logger';
 
@@ -59,6 +60,7 @@ function attachChatWs(
   orchestrator: OrchestratorService,
   sessionRegistry: SessionRegistryService,
   playgroundWatcher: PlaygroundWatcherService,
+  conversationManager: ConversationManagerService,
 ): void {
   // Broadcast playground changes to all active sessions
   playgroundWatcher.playgroundChanged$.subscribe(() =>
@@ -79,8 +81,15 @@ function attachChatWs(
       sessionRegistry.destroy(oldest.sessionId);
     }
 
-    // Create an isolated session for this connection, bound to the requested conversation
+    // Validate conversation_id: reject connections to non-existent conversations
     const conversationId = extractConversationId(req);
+    if (conversationId !== DEFAULT_CONVERSATION_ID && !conversationManager.get(conversationId)) {
+      logWs({ event: 'disconnect', closeCode: 4004, error: `Unknown conversation_id: ${conversationId}` });
+      ws.close(4004, 'Unknown conversation');
+      return;
+    }
+
+    // Create an isolated session for this connection, bound to the requested conversation
     const ctx = sessionRegistry.create(conversationId);
     logWs({ event: 'connect' });
 
@@ -210,6 +219,7 @@ export function attachWebSocketServer(
   sessionRegistry: SessionRegistryService,
   playgroundWatcher: PlaygroundWatcherService,
   terminalService: TerminalService,
+  conversationManager: ConversationManagerService,
 ): WebSocketServer {
   const server = (fastify as { server: import('http').Server }).server;
 
@@ -227,7 +237,7 @@ export function attachWebSocketServer(
     }
   });
 
-  attachChatWs(wss, config, orchestrator, sessionRegistry, playgroundWatcher);
+  attachChatWs(wss, config, orchestrator, sessionRegistry, playgroundWatcher, conversationManager);
   attachTerminalWs(terminalWss, config, terminalService);
 
   return wss;

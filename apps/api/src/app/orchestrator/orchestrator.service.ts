@@ -166,13 +166,15 @@ export class OrchestratorService implements OnModuleInit {
 
   private finishStreamDeps(ctx: SessionContext): FinishAgentStreamDeps {
     const { messageStore: fMsg, activityStore: fAct } = this.stores(ctx);
+    // Fan-out stream-completion events to all tabs watching this conversation.
+    const bcast = (type: string, data?: Record<string, unknown>) =>
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, type, data ?? {});
     return {
       messageStore: fMsg,
       modelStore: this.modelStore,
       activityStore: fAct,
       fibeSync: this.fibeSync,
-      send: (type: string, data?: Record<string, unknown>) =>
-        ctx.send(type, data ?? {}),
+      send: bcast,
       getCurrentActivityId: () => ctx.currentActivityId,
       clearLastStreamUsage: () => {
         ctx.lastStreamUsage = undefined;
@@ -180,6 +182,7 @@ export class OrchestratorService implements OnModuleInit {
       clearReasoningText: () => {
         ctx.reasoningTextAccumulated = '';
       },
+      conversationId: ctx.conversationId,
     };
   }
 
@@ -350,15 +353,30 @@ export class OrchestratorService implements OnModuleInit {
 
   async sendMessageFromApi(
     text: string,
+    conversationId?: string,
     images?: string[],
     attachmentFilenames?: string[]
   ): Promise<{ accepted: boolean; messageId?: string; error?: string }> {
     const sessions = this.sessionRegistry.all();
-    const ctx = sessions.find((s) => !s.isProcessing);
+    // Prefer a session already bound to the requested conversation.
+    // Fall back to any idle session (legacy behaviour when no conversationId given).
+    const ctx = conversationId
+      ? (sessions.find((s) => s.conversationId === conversationId && !s.isProcessing)
+         ?? sessions.find((s) => !s.isProcessing))
+      : sessions.find((s) => !s.isProcessing);
     if (!ctx) {
       return sessions.length === 0
         ? { accepted: false, error: ERROR_CODE.NEED_AUTH }
         : { accepted: false, error: ERROR_CODE.AGENT_BUSY };
+    }
+    // If a specific conversationId was given but the available session is bound to
+    // a different one, retarget the session to the requested conversation.
+    if (conversationId && ctx.conversationId !== conversationId) {
+      const bundle = this.conversationManager.get(conversationId);
+      if (!bundle) {
+        return { accepted: false, error: 'Conversation not found' };
+      }
+      ctx.conversationId = conversationId;
     }
     await this.checkAndSendAuthStatus(ctx);
     if (!ctx.isAuthenticated) return { accepted: false, error: ERROR_CODE.NEED_AUTH };
@@ -502,7 +520,8 @@ export class OrchestratorService implements OnModuleInit {
       );
       const model = this.modelStore.get();
       const effort = this.effortStore.get();
-      ctx.send(WS_EVENT.STREAM_START, { model });
+      // Broadcast stream-start to all tabs in this conversation
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_START, { model });
       const streamStartEntry: StoredStoryEntry = {
         id: randomUUID(),
         type: 'stream_start',
@@ -514,8 +533,8 @@ export class OrchestratorService implements OnModuleInit {
       const currentActivity = rAct.createWithEntry(streamStartEntry);
       ctx.currentActivityId = currentActivity.id;
       ctx.reasoningTextAccumulated = '';
-      ctx.send(WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
-      ctx.send(WS_EVENT.THINKING_STEP, {
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.ACTIVITY_APPENDED, { entry: currentActivity });
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.THINKING_STEP, {
         id: syntheticStep.id,
         title: syntheticStep.title,
         status: syntheticStep.status,
@@ -523,9 +542,11 @@ export class OrchestratorService implements OnModuleInit {
         timestamp: syntheticStep.timestamp.toISOString(),
       });
       ctx.lastStreamUsage = undefined;
+      // Helper to fan-out per-stream events to all tabs watching this conversation
+      const bcastConv = (type: string, data?: Record<string, unknown>) =>
+        this.sessionRegistry.broadcastToConversation(ctx.conversationId, type, data ?? {});
       const streamDeps = {
-        send: (type: string, data?: Record<string, unknown>) =>
-          ctx.send(type, data ?? {}),
+        send: bcastConv,
         activityStore: rAct,
         getCurrentActivityId: () => ctx.currentActivityId,
         getReasoningText: () => ctx.reasoningTextAccumulated,
@@ -542,7 +563,8 @@ export class OrchestratorService implements OnModuleInit {
       const callbacks = createStreamingCallbacks(streamDeps);
       await ctx.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
         accumulated += chunk;
-        ctx.send(WS_EVENT.STREAM_CHUNK, { text: chunk });
+        // Fan-out stream chunks to every tab watching this conversation
+        this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: chunk });
       }, callbacks, systemPrompt || undefined, { effort });
       finishAgentStream(
         this.finishStreamDeps(ctx),
@@ -644,7 +666,7 @@ export class OrchestratorService implements OnModuleInit {
       userMessage as unknown as Record<string, unknown>,
     );
     this.conversationManager.touch(ctx.conversationId);
-    void this.fibeSync.syncMessages(() => JSON.stringify(qMsgStore.all()));
+    void this.fibeSync.syncMessages(() => JSON.stringify(qMsgStore.all()), ctx.conversationId);
     if (ctx.strategy.steerAgent) ctx.strategy.steerAgent(text);
   }
 
@@ -709,8 +731,8 @@ export class OrchestratorService implements OnModuleInit {
          }
       }
     }
-    void this.fibeSync.syncMessages(() => JSON.stringify(sMsg.all()));
-    void this.fibeSync.syncActivity(() => JSON.stringify(sAct.all()));
+    void this.fibeSync.syncMessages(() => JSON.stringify(sMsg.all()), ctx.conversationId);
+    void this.fibeSync.syncActivity(() => JSON.stringify(sAct.all()), ctx.conversationId);
     await Promise.all([sMsg.flush(), sAct.flush()]);
   }
 

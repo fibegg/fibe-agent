@@ -15,6 +15,7 @@ export interface FinishAgentStreamDeps {
   getCurrentActivityId: () => string | null;
   clearLastStreamUsage: () => void;
   clearReasoningText: () => void;
+  conversationId?: string;
 }
 
 export function finishAgentStream(
@@ -28,7 +29,7 @@ export function finishAgentStream(
   const storedModel = (deps.modelStore.get() || '').trim();
   const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
   deps.messageStore.add('assistant', finalText, undefined, model);
-  void deps.fibeSync.syncMessages(() => JSON.stringify(deps.messageStore.all()));
+  void deps.fibeSync.syncMessages(() => JSON.stringify(deps.messageStore.all()), deps.conversationId);
   deps.send(WS_EVENT.THINKING_STEP, {
     id: stepId,
     title: step.title,
@@ -45,7 +46,7 @@ export function finishAgentStream(
       deps.send(WS_EVENT.ACTIVITY_UPDATED, { entry });
     }
   }
-  void deps.fibeSync.syncActivity(() => JSON.stringify(deps.activityStore.all()));
+  void deps.fibeSync.syncActivity(() => JSON.stringify(deps.activityStore.all()), deps.conversationId);
   deps.clearLastStreamUsage();
   deps.clearReasoningText();
 }

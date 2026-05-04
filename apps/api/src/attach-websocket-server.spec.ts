@@ -84,6 +84,11 @@ function makeConfig(password?: string) {
   } as unknown as import('./app/config/config.service').ConfigService;
 }
 
+/** Default conversation manager stub — knows only about 'default'. */
+const mockConversationManager = {
+  get: (id: string) => id === 'default' ? {} : undefined,
+} as unknown as import('./app/conversation/conversation-manager.service').ConversationManagerService;
+
 // ─── Setup ────────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -102,14 +107,14 @@ describe('attachWebSocketServer — upgrade dispatcher', () => {
   it('returns a WebSocketServer instance', () => {
     const server = new EventEmitter();
     const result = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager,
     );
     expect(result).toBeInstanceOf(WebSocketServer);
   });
 
   it('destroys sockets for unknown paths', () => {
     const server = new EventEmitter();
-    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService);
+    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager);
 
     const socket = makeSocket();
     server.emit('upgrade', makeReq('/unknown'), socket, Buffer.alloc(0));
@@ -119,7 +124,7 @@ describe('attachWebSocketServer — upgrade dispatcher', () => {
 
   it('does not destroy socket for /ws path', () => {
     const server = new EventEmitter();
-    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService);
+    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager);
 
     const socket = makeSocket();
     try { server.emit('upgrade', makeReq('/ws'), socket, Buffer.alloc(0)); } catch { /* fake socket */ }
@@ -129,7 +134,7 @@ describe('attachWebSocketServer — upgrade dispatcher', () => {
 
   it('does not destroy socket for /ws-terminal path', () => {
     const server = new EventEmitter();
-    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService);
+    attachWebSocketServer(makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager);
 
     const socket = makeSocket();
     try { server.emit('upgrade', makeReq('/ws-terminal'), socket, Buffer.alloc(0)); } catch { /* fake socket */ }
@@ -144,7 +149,7 @@ describe('attachWebSocketServer — chat auth guard', () => {
   it('closes with 4001 when password is set and token is wrong', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig('secret'), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig('secret'), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager,
     );
 
     const stub = makeWsStub();
@@ -157,7 +162,7 @@ describe('attachWebSocketServer — chat auth guard', () => {
   it('allows connection when token matches', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig('secret'), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig('secret'), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager,
     );
 
     const stub = makeWsStub();
@@ -169,7 +174,7 @@ describe('attachWebSocketServer — chat auth guard', () => {
   it('allows connection when no password is configured', () => {
     const server = new EventEmitter();
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, mockSessionRegistry, playgroundWatcher, terminalService, mockConversationManager,
     );
 
     const stub = makeWsStub();
@@ -197,8 +202,13 @@ describe('attachWebSocketServer — chat auth guard', () => {
       broadcast: mock(() => undefined),
     } as unknown as typeof mockSessionRegistry;
 
+    // Manager that knows about thread-123 so WS doesn't reject with 4004
+    const localConvManager = {
+      get: (id: string) => (id === 'default' || id === 'thread-123') ? {} : undefined,
+    } as unknown as typeof mockConversationManager;
+
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, localRegistry, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, localRegistry, playgroundWatcher, terminalService, localConvManager,
     );
 
     const stub = makeWsStub();
@@ -246,7 +256,7 @@ describe('attachWebSocketServer — session takeover', () => {
     } as unknown as typeof mockSessionRegistry;
 
     const wss = attachWebSocketServer(
-      makeFastify(server), makeConfig(), orchestrator, localRegistry, playgroundWatcher, terminalService,
+      makeFastify(server), makeConfig(), orchestrator, localRegistry, playgroundWatcher, terminalService, mockConversationManager,
     );
 
     // Connect 5 clients

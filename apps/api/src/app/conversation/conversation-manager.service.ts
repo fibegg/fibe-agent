@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from 'node:fs';
 import { join } from 'node:path';
@@ -134,12 +135,20 @@ export class ConversationManagerService {
     this.flushIndex();
   }
 
-  /** Delete a conversation (metadata + in-memory; files remain on disk for recovery). */
+  /** Delete a conversation (metadata + in-memory; files removed from disk). */
   delete(id: string): boolean {
     if (id === DEFAULT_CONVERSATION_ID) return false;
     if (!this.bundles.has(id)) return false;
     this.bundles.delete(id);
     this.flushIndex();
+    // Remove workspace files from disk so Claude sessions can't be accidentally resumed
+    // and disk space is reclaimed. Files can always be recovered from backup if needed.
+    const dir = this.convDir(id);
+    try {
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    } catch (err) {
+      this.logger.warn(`Failed to remove conversation dir ${dir}: ${err}`);
+    }
     this.logger.log(`Conversation deleted: ${id}`);
     return true;
   }

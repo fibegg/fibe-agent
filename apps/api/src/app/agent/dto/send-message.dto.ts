@@ -5,6 +5,10 @@ export class SendMessageDto {
   text!: string;
 
   @IsOptional()
+  @IsString()
+  conversationId?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   images?: string[];

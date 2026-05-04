@@ -23,6 +23,7 @@ import { loadInjectedCredentials } from './credential-injector';
 import { writeRuntimeFiles } from './runtime-files-writer';
 import { runPostInitOnce } from './post-init-runner';
 import { TerminalService } from './app/terminal/terminal.service';
+import { ConversationManagerService } from './app/conversation/conversation-manager.service';
 
 // Must be called before any service reads process.env
 loadDevEnv();
@@ -118,7 +119,8 @@ async function bootstrap() {
   }
   const playgroundWatcher = app.get(PlaygroundWatcherService);
   const terminalService = app.get(TerminalService);
-  attachWebSocketServer(fastify, config, orchestrator, sessionRegistry, playgroundWatcher, terminalService);
+  const conversationManager = app.get(ConversationManagerService);
+  attachWebSocketServer(fastify, config, orchestrator, sessionRegistry, playgroundWatcher, terminalService, conversationManager);
   logger.log('WebSocket server listening on paths /ws and /ws-terminal');
 
   const postInitScript = config.getPostInitScript();

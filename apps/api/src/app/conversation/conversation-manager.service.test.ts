@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -51,5 +51,20 @@ describe('ConversationManagerService', () => {
 
     expect(manager.setTitle(DEFAULT_CONVERSATION_ID, 'Renamed')).toBe(false);
     expect(manager.get(DEFAULT_CONVERSATION_ID)?.meta.title).toBe(DEFAULT_CONVERSATION_TITLE);
+  });
+
+  test('delete() removes the conversation directory from disk', () => {
+    const manager = createManager();
+    const meta = manager.create('To be deleted');
+    const convDir = join(dataDir, 'conversations', meta.id);
+    // Directory was created by createBundle()
+    expect(existsSync(convDir)).toBe(true);
+
+    const ok = manager.delete(meta.id);
+    expect(ok).toBe(true);
+    // Directory should be gone
+    expect(existsSync(convDir)).toBe(false);
+    // Not in the list anymore
+    expect(manager.list().find((m) => m.id === meta.id)).toBeUndefined();
   });
 });

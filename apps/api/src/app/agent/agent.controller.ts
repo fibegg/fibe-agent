@@ -42,6 +42,7 @@ export class AgentController {
     }
     const result = await this.orchestrator.sendMessageFromApi(
       text,
+      body.conversationId,
       body.images,
       body.attachmentFilenames
     );
