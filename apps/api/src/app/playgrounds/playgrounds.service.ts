@@ -2,7 +2,7 @@ import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { PlayroomBrowserService } from './playroom-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
@@ -56,6 +56,8 @@ function parseCliLines(stdout: string): string[] {
 
 @Injectable()
 export class PlaygroundsService {
+  private readonly logger = new Logger(PlaygroundsService.name);
+
   constructor(
     private readonly config: ConfigService,
     private readonly playroomBrowser: PlayroomBrowserService,
@@ -133,9 +135,12 @@ export class PlaygroundsService {
 
       return urls;
     } catch (err: unknown) {
-      console.error('ERROR IN GETURLS:', err);
-      if (err instanceof Error && err.stack) {
-        console.error(err.stack);
+      const message = err instanceof Error ? err.message : String(err);
+      // "does not exist" is expected in local dev when no playgrounds dir is configured.
+      if (message.includes('does not exist') || message.includes('ENOENT')) {
+        this.logger.debug(`getUrls: playgrounds CLI unavailable — ${message.split('\n')[0]}`);
+      } else {
+        this.logger.warn(`getUrls: unexpected error — ${message.split('\n')[0]}`);
       }
       return [];
     }
