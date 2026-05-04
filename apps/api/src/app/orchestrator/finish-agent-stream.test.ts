@@ -132,4 +132,25 @@ describe('finishAgentStream', () => {
     finishAgentStream(deps, 'ok', 's1', step);
     expect(syncedActivity).toHaveLength(1);
   });
+
+  test('passes conversationId to syncMessages and syncActivity for namespace isolation', () => {
+    const convSyncedMessages: string[] = [];
+    const convSyncedActivity: string[] = [];
+    const convDeps: FinishAgentStreamDeps = {
+      ...deps,
+      fibeSync: {
+        syncMessages: (_getContent: () => string, conversationId?: string) => {
+          convSyncedMessages.push(conversationId ?? '');
+        },
+        syncActivity: (_getContent: () => string, conversationId?: string) => {
+          convSyncedActivity.push(conversationId ?? '');
+        },
+      } as never,
+      conversationId: 'conv-xyz',
+    };
+    const step = { id: 's1', title: 'Gen', status: 'processing' as const, timestamp: new Date() };
+    finishAgentStream(convDeps, 'hello', 's1', step);
+    expect(convSyncedMessages).toEqual(['conv-xyz']);
+    expect(convSyncedActivity).toEqual(['conv-xyz']);
+  });
 });

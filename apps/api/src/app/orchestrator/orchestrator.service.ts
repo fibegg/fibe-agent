@@ -361,23 +361,16 @@ export class OrchestratorService implements OnModuleInit {
     images?: string[],
     attachmentFilenames?: string[]
   ): Promise<{ accepted: boolean; messageId?: string; error?: string }> {
-    const sessions = this.sessionRegistry.all();
-    // Prefer a session already bound to the requested conversation.
-    // Fall back to any idle session (legacy behaviour when no conversationId given).
-    const ctx = conversationId
-      ? (sessions.find((s) => s.conversationId === conversationId && !s.isProcessing)
-         ?? sessions.find((s) => !s.isProcessing))
-      : sessions.find((s) => !s.isProcessing);
+    const ctx = this.findIdleSession(conversationId);
     if (!ctx) {
+      const sessions = this.sessionRegistry.all();
       return sessions.length === 0
         ? { accepted: false, error: ERROR_CODE.NEED_AUTH }
         : { accepted: false, error: ERROR_CODE.AGENT_BUSY };
     }
-    // If a specific conversationId was given but the available session is bound to
-    // a different one, retarget the session to the requested conversation.
+    // Retarget the session when it belongs to a different conversation.
     if (conversationId && ctx.conversationId !== conversationId) {
-      const bundle = this.conversationManager.get(conversationId);
-      if (!bundle) {
+      if (!this.conversationManager.get(conversationId)) {
         return { accepted: false, error: 'Conversation not found' };
       }
       ctx.conversationId = conversationId;
@@ -392,6 +385,22 @@ export class OrchestratorService implements OnModuleInit {
     );
     return { accepted: true, messageId };
   }
+
+  /**
+   * Find an idle session. When a conversationId is supplied, a session already
+   * bound to that conversation is preferred to maintain context continuity.
+   */
+  private findIdleSession(conversationId?: string): SessionContext | undefined {
+    const sessions = this.sessionRegistry.all();
+    if (conversationId) {
+      return (
+        sessions.find((s) => s.conversationId === conversationId && !s.isProcessing) ??
+        sessions.find((s) => !s.isProcessing)
+      );
+    }
+    return sessions.find((s) => !s.isProcessing);
+  }
+
 
   private async addUserMessageAndEmit(
     ctx: SessionContext,

@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, P
 import {
   ConversationManagerService,
   DEFAULT_CONVERSATION_ID,
+  type ConversationBundle,
   type ConversationMeta,
 } from './conversation-manager.service';
 import { enrichMessagesWithActivityUsage } from '../messages/enrich-messages-with-usage';
@@ -9,6 +10,8 @@ import { enrichMessagesWithActivityUsage } from '../messages/enrich-messages-wit
 @Controller('conversations')
 export class ConversationsController {
   constructor(private readonly convManager: ConversationManagerService) {}
+
+  // ── Core CRUD ─────────────────────────────────────────────────────────────
 
   /** List all conversations sorted by lastMessageAt desc. */
   @Get()
@@ -22,29 +25,6 @@ export class ConversationsController {
     return this.convManager.create(body?.title);
   }
 
-  /** Load messages for one conversation. */
-  @Get(':id/messages')
-  messages(@Param('id') id: string) {
-    const bundle = id === DEFAULT_CONVERSATION_ID
-      ? this.convManager.getOrCreate(id)
-      : this.convManager.get(id);
-    if (!bundle) throw new NotFoundException('Conversation not found');
-    return enrichMessagesWithActivityUsage(
-      bundle.messageStore.all(),
-      bundle.activityStore.all(),
-    );
-  }
-
-  /** Load activities for one conversation. */
-  @Get(':id/activities')
-  activities(@Param('id') id: string) {
-    const bundle = id === DEFAULT_CONVERSATION_ID
-      ? this.convManager.getOrCreate(id)
-      : this.convManager.get(id);
-    if (!bundle) throw new NotFoundException('Conversation not found');
-    return bundle.activityStore.all();
-  }
-
   /** Rename a conversation. */
   @Patch(':id/title')
   setTitle(
@@ -54,10 +34,28 @@ export class ConversationsController {
     return { ok: this.convManager.setTitle(id, body.title) };
   }
 
-  /** Delete a conversation. */
+  /** Delete a conversation and its workspace from disk. */
   @Delete(':id')
   delete(@Param('id') id: string): { ok: boolean } {
     return { ok: this.convManager.delete(id) };
+  }
+
+  // ── Messages & activities ─────────────────────────────────────────────────
+
+  /** Load messages for one conversation (enriched with activity usage). */
+  @Get(':id/messages')
+  messages(@Param('id') id: string) {
+    const bundle = this.requireBundle(id);
+    return enrichMessagesWithActivityUsage(
+      bundle.messageStore.all(),
+      bundle.activityStore.all(),
+    );
+  }
+
+  /** Load activity log for one conversation. */
+  @Get(':id/activities')
+  activities(@Param('id') id: string) {
+    return this.requireBundle(id).activityStore.all();
   }
 
   // ── Per-conversation model / effort ───────────────────────────────────────
@@ -68,7 +66,7 @@ export class ConversationsController {
     return { model: this.convManager.getConversationModel(id) };
   }
 
-  /** Set the per-conversation model override. Send empty string to clear. */
+  /** Set the per-conversation model override. Empty string clears it. */
   @Put(':id/model')
   setModel(
     @Param('id') id: string,
@@ -83,7 +81,7 @@ export class ConversationsController {
     return { effort: this.convManager.getConversationEffort(id) };
   }
 
-  /** Set the per-conversation effort override. Send empty string to clear. */
+  /** Set the per-conversation effort override. Empty string clears it. */
   @Put(':id/effort')
   setEffort(
     @Param('id') id: string,
@@ -96,7 +94,7 @@ export class ConversationsController {
 
   /**
    * Get the Claude native session ID bound to this conversation.
-   * Returns null when no session marker exists (next turn will start fresh).
+   * Returns null when no marker exists (next turn will start a fresh session).
    */
   @Get(':id/claude-session')
   getClaudeSession(@Param('id') id: string): { sessionId: string | null } {
@@ -104,8 +102,7 @@ export class ConversationsController {
   }
 
   /**
-   * Import / override the Claude native session ID for this conversation.
-   * Useful when the user wants to resume an existing Claude CLI session.
+   * Set / import a Claude native session ID.
    * The session ID is the UUID emitted by `claude` as `session_id`.
    */
   @Put(':id/claude-session')
@@ -116,13 +113,20 @@ export class ConversationsController {
     return { ok: this.convManager.setClaudeSessionMarker(id, body.sessionId) };
   }
 
-  /**
-   * Clear the Claude session marker so the next agent turn starts a new session.
-   * The previous session remains in Claude's storage and can be re-imported later.
-   */
+  /** Clear the session marker so the next agent turn starts a fresh session. */
   @Delete(':id/claude-session')
   clearClaudeSession(@Param('id') id: string): { ok: boolean } {
     return { ok: this.convManager.setClaudeSessionMarker(id, null) };
   }
-}
 
+  // ── Private helpers ───────────────────────────────────────────────────────
+
+  /** Resolve a ConversationBundle by id, throwing 404 when unknown. */
+  private requireBundle(id: string): ConversationBundle {
+    const bundle = id === DEFAULT_CONVERSATION_ID
+      ? this.convManager.getOrCreate(id)
+      : this.convManager.get(id);
+    if (!bundle) throw new NotFoundException('Conversation not found');
+    return bundle;
+  }
+}
