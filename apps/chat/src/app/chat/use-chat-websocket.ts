@@ -70,6 +70,7 @@ export function useChatWebSocket(
   /** Which conversation to bind this WS session to. Defaults to 'default'. */
   conversationId = 'default',
   onStreamAbort?: () => void,
+  onConversationDeleted?: (conversationId: string) => void,
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -92,6 +93,7 @@ export function useChatWebSocket(
   const onPlaygroundChangedRef = useRef(onPlaygroundChanged);
   const onLocalToolEventRef = useRef(onLocalToolEvent);
   const onConversationResetRef = useRef(onConversationReset);
+  const onConversationDeletedRef = useRef(onConversationDeleted);
   const onStreamAbortRef = useRef(onStreamAbort);
   thinkingRef.current = thinkingCallbacks;
   onMessageRef.current = onMessage;
@@ -101,6 +103,7 @@ export function useChatWebSocket(
   onPlaygroundChangedRef.current = onPlaygroundChanged;
   onLocalToolEventRef.current = onLocalToolEvent;
   onConversationResetRef.current = onConversationReset;
+  onConversationDeletedRef.current = onConversationDeleted;
   onStreamAbortRef.current = onStreamAbort;
 
   const clearResponseTimer = useCallback(() => {
@@ -292,6 +295,7 @@ export function useChatWebSocket(
       // Server confirms which conversation this session is bound to
       conversation_id: (_d) => { /* acknowledged */ },
       conversation_reset: (d) => onConversationResetRef.current?.(typeof d.resetAt === 'string' ? d.resetAt : new Date().toISOString()),
+      conversation_deleted: (d) => onConversationDeletedRef.current?.(typeof d.id === 'string' ? d.id : conversationId),
     };
 
     ws.onmessage = (event: MessageEvent) => {

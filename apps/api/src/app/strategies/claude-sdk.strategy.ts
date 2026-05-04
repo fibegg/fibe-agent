@@ -30,6 +30,7 @@ const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const SESSION_MARKER_FILE = '.claude_session';
 const CLAUDE_SDK_CLIENT_APP = 'fibe-agent/claude-sdk';
 const SDK_INTERRUPTED_ERROR_NAME = 'AbortError';
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   defaultArgs: {},
@@ -91,6 +92,29 @@ function parseMcpServers(path: string): Record<string, McpServerConfig> | undefi
     /* ignore malformed MCP config; Claude will still load user/project settings */
   }
   return undefined;
+}
+
+function localMcpServer(conversationId?: string): McpServerConfig {
+  const localServerPath = join(__dirname, '..', 'local-mcp', 'local-mcp.server.js');
+  const env: Record<string, string> = {
+    PORT: process.env['PORT'] ?? '3000',
+  };
+  if (process.env['AGENT_PASSWORD']) env.AGENT_PASSWORD = process.env['AGENT_PASSWORD'];
+  if (conversationId) env.CONVERSATION_ID = conversationId;
+
+  return {
+    type: 'stdio',
+    command: process.execPath,
+    args: [localServerPath],
+    env,
+  };
+}
+
+function mcpServersForConversation(workspaceDir: string, conversationId?: string): Record<string, McpServerConfig> {
+  return {
+    ...(parseMcpServers(join(workspaceDir, '.mcp.json')) ?? {}),
+    'fibe-local': localMcpServer(conversationId),
+  };
 }
 
 function providerTokensToExtraArgs(tokens: string[]): Record<string, string | null> {
@@ -213,6 +237,7 @@ interface ClaudeSdkConversationRecord {
   query: ClaudeSdkQuery;
   input: AsyncMessageQueue<SDKUserMessage>;
   iterator: AsyncIterator<SDKMessage>;
+  recordKey: string;
   workspaceDir: string;
   sessionId: string | null;
   busy: boolean;
@@ -239,14 +264,28 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   }
 
   private getClaudeWorkspaceDir(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CLAUDE_WORKSPACE_SUBDIR);
-    }
+    const sharedDataDir =
+      this.conversationDataDir?.getDefaultConversationDataDir?.() ??
+      this.conversationDataDir?.getConversationDataDir();
+    if (sharedDataDir) return join(sharedDataDir, CLAUDE_WORKSPACE_SUBDIR);
     return PLAYGROUND_DIR;
+  }
+
+  private getClaudeStateDir(): string | null {
+    return this.conversationDataDir?.getConversationDataDir() ?? null;
+  }
+
+  private getRecordKey(workspaceDir: string): string {
+    return this.conversationDataDir?.getConversationId?.() ?? workspaceDir;
   }
 
   getWorkingDir(): string {
     return this.getClaudeWorkspaceDir();
+  }
+
+  prepareWorkingDir(): void {
+    const workspaceDir = this.getClaudeWorkspaceDir();
+    if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
   }
 
   private getEnvToken(): string | null {
@@ -399,7 +438,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   ): Promise<void> {
     this.streamInterrupted = false;
     const workspaceDir = this.getClaudeWorkspaceDir();
-    if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
+    this.prepareWorkingDir();
 
     const record = await this.getOrCreateRecord(workspaceDir, model, systemPrompt, runtimeOptions);
     if (record.busy) {
@@ -471,7 +510,8 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     systemPrompt: string | undefined,
     runtimeOptions: AgentRuntimeOptions | undefined
   ): Promise<ClaudeSdkConversationRecord> {
-    const existing = ClaudeSdkStrategy.records.get(workspaceDir);
+    const recordKey = this.getRecordKey(workspaceDir);
+    const existing = ClaudeSdkStrategy.records.get(recordKey);
     if (existing && !existing.closed) {
       if (!existing.busy && model.trim()) {
         await existing.query.setModel(model.trim()).catch(() => undefined);
@@ -485,7 +525,12 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     const envOverrides: Record<string, string> = claudeProcessDefaults();
     if (token) envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
     const markerSessionId = this.readSessionMarker(workspaceDir);
-    const mcpServers = parseMcpServers(join(workspaceDir, '.mcp.json'));
+    const fibeConversationId = this.conversationDataDir?.getConversationId?.();
+    const fibeSessionId =
+      !markerSessionId && fibeConversationId && UUID_RE.test(fibeConversationId)
+        ? fibeConversationId
+        : undefined;
+    const mcpServers = mcpServersForConversation(workspaceDir, fibeConversationId);
     const options: ClaudeSdkOptions = {
       cwd: workspaceDir,
       env: this.getClaudeProcessEnv(envOverrides),
@@ -499,6 +544,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       extraArgs: providerTokensToExtraArgs(buildProviderArgs(CLAUDE_PROVIDER_ARGS_CONFIG)),
       ...(mcpServers ? { mcpServers } : {}),
       ...(markerSessionId ? { resume: markerSessionId } : {}),
+      ...(fibeSessionId ? { sessionId: fibeSessionId } : {}),
       ...(systemPrompt
         ? { systemPrompt: { type: 'preset', preset: 'claude_code', append: systemPrompt.trim() } }
         : {}),
@@ -509,12 +555,13 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       query: sdkQuery,
       input,
       iterator: sdkQuery[Symbol.asyncIterator](),
+      recordKey,
       workspaceDir,
-      sessionId: markerSessionId,
+      sessionId: markerSessionId ?? fibeSessionId ?? null,
       busy: false,
       closed: false,
     };
-    ClaudeSdkStrategy.records.set(workspaceDir, record);
+    ClaudeSdkStrategy.records.set(recordKey, record);
     return record;
   }
 
@@ -654,19 +701,37 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
 
   private readSessionMarker(workspaceDir: string): string | null {
     if (!this.conversationDataDir) return null;
-    const markerPath = join(workspaceDir, SESSION_MARKER_FILE);
-    if (!existsSync(markerPath)) return null;
-    const stored = readFileSync(markerPath, 'utf8').trim();
-    return stored || null;
+    const markerPath = this.getSessionMarkerPath();
+    const stored = markerPath ? this.readMarkerFile(markerPath) : null;
+    if (stored) return stored;
+
+    const stateDir = this.getClaudeStateDir();
+    const defaultDir = this.conversationDataDir.getDefaultConversationDataDir?.();
+    if (stateDir && defaultDir && stateDir !== defaultDir) return null;
+    return this.readMarkerFile(join(workspaceDir, SESSION_MARKER_FILE));
   }
 
   private writeSessionMarker(workspaceDir: string, sessionId: string): void {
     if (!this.conversationDataDir) return;
+    const markerPath = this.getSessionMarkerPath() ?? join(workspaceDir, SESSION_MARKER_FILE);
     try {
-      writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), sessionId);
+      writeFileSync(markerPath, sessionId);
     } catch {
       /* ignore */
     }
+  }
+
+  private getSessionMarkerPath(): string | null {
+    const stateDir = this.getClaudeStateDir();
+    if (!stateDir) return null;
+    if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+    return join(stateDir, SESSION_MARKER_FILE);
+  }
+
+  private readMarkerFile(path: string): string | null {
+    if (!existsSync(path)) return null;
+    const stored = readFileSync(path, 'utf8').trim();
+    return stored || null;
   }
 
   private closeRecord(record: ClaudeSdkConversationRecord): void {
@@ -674,7 +739,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     record.closed = true;
     record.input.close();
     record.query.close();
-    ClaudeSdkStrategy.records.delete(record.workspaceDir);
+    ClaudeSdkStrategy.records.delete(record.recordKey);
   }
 
   private closeAllSdkRecords(): void {

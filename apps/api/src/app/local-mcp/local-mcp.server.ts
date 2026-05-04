@@ -29,6 +29,7 @@ import { LOCAL_TOOL } from './local-mcp-types';
 const API_PORT = process.env['PORT'] ?? '3000';
 const TOOL_CALL_URL = `http://localhost:${API_PORT}/api/local-tool-call`;
 const AGENT_PASSWORD = process.env['AGENT_PASSWORD'] ?? '';
+const CONVERSATION_ID = process.env['CONVERSATION_ID'] ?? '';
 
 // ─── JSON-RPC helpers ────────────────────────────────────────────────────────
 
@@ -181,7 +182,12 @@ async function callLocalApi(
   const res = await fetch(TOOL_CALL_URL, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ requestId, tool, args }),
+    body: JSON.stringify({
+      requestId,
+      tool,
+      args,
+      ...(CONVERSATION_ID ? { conversationId: CONVERSATION_ID } : {}),
+    }),
   });
 
   if (!res.ok) {

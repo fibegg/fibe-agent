@@ -44,6 +44,8 @@ export const uk: Record<TranslationKey, string> = {
   'chat.input.stopRecording': 'Зупинити запис',
   'chat.input.queueMessage': 'Додати повідомлення в чергу',
   'chat.input.queueMessageTitle': 'Додати повідомлення агенту в чергу',
+  'chat.input.steerMessage': 'Скерувати повідомлення',
+  'chat.input.steerMessageTitle': 'Скерувати поточний запуск агента',
   'chat.input.stop': 'Зупинити',
   'chat.input.send': 'Надіслати',
   'chat.noOutput': 'Процес завершився успішно, але не повернув результат.',
@@ -256,6 +258,7 @@ export const uk: Record<TranslationKey, string> = {
 
   'fileExplorer.title': 'Claude',
   'fileExplorer.emptyPlayground': 'У майданчику немає файлів.',
+  'fileExplorer.emptyAgent': 'Робоча область ШІ порожня.',
   'fileExplorer.searchPlaceholder': 'Пошук файлів...',
   'fileExplorer.clearSearch': 'Очистити пошук',
   'fileExplorer.settings': 'Налаштування',

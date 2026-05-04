@@ -1,7 +1,8 @@
 import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve, relative, basename } from 'node:path';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
+import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from '../conversation/conversation-manager.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 
@@ -13,32 +14,52 @@ export interface AgentFileEntry {
   children?: AgentFileEntry[];
 }
 
+export interface AgentWorkspaceStats {
+  fileCount: number;
+  totalLines: number;
+  workspaceAvailable: boolean;
+}
+
 const HIDDEN_PREFIX = '.';
 
 
 @Injectable()
 export class AgentFilesService {
-  constructor(private readonly strategyRegistry: StrategyRegistryService) {}
+  constructor(
+    private readonly strategyRegistry: StrategyRegistryService,
+    @Optional() private readonly conversationManager?: ConversationManagerService,
+  ) {}
 
-  getAgentWorkingDir(): string | null {
-    const strategy = this.strategyRegistry.resolveStrategy();
+  getAgentWorkingDir(conversationId = DEFAULT_CONVERSATION_ID): string | null {
+    if (this.conversationManager && !this.conversationManager.get(conversationId)) {
+      return null;
+    }
+    const strategy = this.conversationManager
+      ? this.strategyRegistry.resolveStrategy(this.conversationManager.dataDirProvider(conversationId))
+      : this.strategyRegistry.resolveStrategy();
+    try {
+      strategy.prepareWorkingDir?.();
+    } catch {
+      /* Best-effort workspace preparation. */
+    }
     return strategy.getWorkingDir?.() ?? null;
   }
 
-  async getTree(): Promise<AgentFileEntry[]> {
-    const dir = this.getAgentWorkingDir();
+  async getTree(conversationId = DEFAULT_CONVERSATION_ID): Promise<AgentFileEntry[]> {
+    const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return [];
     const settings = await loadFibeSettings(dir);
     const ig = await loadGitignore(dir);
     return this.readDir(dir, '', ig, settings);
   }
 
-  async getStats(): Promise<{ fileCount: number; totalLines: number }> {
-    const dir = this.getAgentWorkingDir();
-    if (!dir) return { fileCount: 0, totalLines: 0 };
+  async getStats(conversationId = DEFAULT_CONVERSATION_ID): Promise<AgentWorkspaceStats> {
+    const dir = this.getAgentWorkingDir(conversationId);
+    if (!dir) return { fileCount: 0, totalLines: 0, workspaceAvailable: false };
     const settings = await loadFibeSettings(dir);
     const ig = await loadGitignore(dir);
-    return this.countStats(dir, ig, settings);
+    const stats = await this.countStats(dir, ig, settings);
+    return { ...stats, workspaceAvailable: true };
   }
 
   private async countStats(absPath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings): Promise<{ fileCount: number; totalLines: number }> {
@@ -73,8 +94,8 @@ export class AgentFilesService {
     return { fileCount, totalLines };
   }
 
-  async getFileContent(relativePath: string): Promise<string> {
-    const dir = this.getAgentWorkingDir();
+  async getFileContent(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+    const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) throw new NotFoundException('No agent working directory');
     const settings = await loadFibeSettings(dir);
     const base = resolve(dir);
@@ -96,8 +117,8 @@ export class AgentFilesService {
     return readFile(absPath, 'utf-8');
   }
 
-  async uploadFile(relativeDir: string, filename: string, buffer: Buffer): Promise<string> {
-    const dir = this.getAgentWorkingDir();
+  async uploadFile(relativeDir: string, filename: string, buffer: Buffer, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+    const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) throw new NotFoundException('No agent working directory');
     const base = resolve(dir);
     const settings = await loadFibeSettings(base);

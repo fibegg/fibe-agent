@@ -63,13 +63,14 @@ export function resolveProvider(hostname: string): ProviderName {
  * Returns env vars that route a spawned CLI through the MITM proxy.
  * Returns an empty object when the proxy is not active.
  */
-export function getProxyEnv(): Record<string, string> {
+export function getProxyEnv(conversationId?: string): Record<string, string> {
   const port = process.env['__FIBE_PROXY_PORT'];
   const caPath = process.env['__FIBE_PROXY_CA_PATH'];
   if (!port) return {};
+  const authPrefix = conversationId ? `${encodeURIComponent(conversationId)}@` : '';
   const env: Record<string, string> = {
-    HTTPS_PROXY: `http://127.0.0.1:${port}`,
-    HTTP_PROXY: `http://127.0.0.1:${port}`,
+    HTTPS_PROXY: `http://${authPrefix}127.0.0.1:${port}`,
+    HTTP_PROXY: `http://${authPrefix}127.0.0.1:${port}`,
   };
   if (caPath) {
     env['NODE_EXTRA_CA_CERTS'] = caPath;

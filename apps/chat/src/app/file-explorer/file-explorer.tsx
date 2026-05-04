@@ -55,6 +55,8 @@ export function FileExplorer({
   activeTab,
   onTabChange,
   agentFileApiPath,
+  agentFileUploadApiPath,
+  agentWorkspaceAvailable,
   playgroundStats,
   agentStats,
   dirtyPaths: dirtyPathsProp,
@@ -76,6 +78,8 @@ export function FileExplorer({
   activeTab?: FileTab;
   onTabChange?: (tab: FileTab) => void;
   agentFileApiPath?: string;
+  agentFileUploadApiPath?: string;
+  agentWorkspaceAvailable?: boolean;
   playgroundStats?: TabStats;
   agentStats?: TabStats;
   /** Externally-controlled dirty paths (from parent managing the editor inline) */
@@ -110,11 +114,12 @@ export function FileExplorer({
   const playgroundTree = controlled ? treeProp : internalTree;
   const agentTree = controlledAgent ? agentTreeProp : [];
   const loadingState = controlled ? false : loading;
+  const hasAgentWorkspace = agentWorkspaceAvailable === true || agentTree.length > 0;
 
-  const showTabs = playgroundTree.length > 0 && agentTree.length > 0;
+  const showTabs = playgroundTree.length > 0 && hasAgentWorkspace;
   const effectiveTab: FileTab =
     showTabs && activeTab ? activeTab
-    : agentTree.length > 0 && playgroundTree.length === 0 ? 'agent'
+    : hasAgentWorkspace && playgroundTree.length === 0 ? 'agent'
     : 'playground';
   const tree = effectiveTab === 'agent' ? agentTree : playgroundTree;
   const agentFileContentApiPath = useMemo(() => {
@@ -306,7 +311,7 @@ export function FileExplorer({
     disabled: effectiveTab !== 'playground',
   });
   const agentDrop = useWorkspaceDrop({
-    uploadUrl: API_PATHS.AGENT_FILES_UPLOAD,
+    uploadUrl: agentFileUploadApiPath ?? API_PATHS.AGENT_FILES_UPLOAD,
     onUploaded: onAgentUploaded,
     disabled: effectiveTab !== 'agent',
   });
@@ -461,7 +466,7 @@ export function FileExplorer({
           )}
           {!loadingState && !error && tree.length === 0 && (
             <div className="px-3 py-4 text-sm text-muted-foreground">
-              {t('fileExplorer.emptyPlayground')}
+              {effectiveTab === 'agent' ? t('fileExplorer.emptyAgent') : t('fileExplorer.emptyPlayground')}
             </div>
           )}
           {!error && tree.length > 0 && filteredTree.length === 0 && (
@@ -517,7 +522,7 @@ export function FileExplorer({
 
   return (
     <>
-      {onToggleCollapse && collapsed !== undefined && (playgroundTree.length > 0 || agentTree.length > 0) ? (
+      {onToggleCollapse && collapsed !== undefined && (playgroundTree.length > 0 || hasAgentWorkspace) ? (
         <div className="relative h-full flex flex-col min-h-0 flex-1">
           {content}
           <SidebarToggle

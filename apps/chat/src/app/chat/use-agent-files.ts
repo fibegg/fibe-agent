@@ -23,10 +23,11 @@ function flattenEntries(entries: AgentFileEntry[]): AgentFileEntry[] {
   return out;
 }
 
-export function useAgentFiles(): {
+export function useAgentFiles(conversationId = 'default'): {
   tree: AgentFileEntry[];
   loading: boolean;
   hasFiles: boolean;
+  workspaceAvailable: boolean;
   stats: { fileCount: number; totalLines: number };
   error: string | null;
   refetch: () => Promise<void>;
@@ -35,14 +36,22 @@ export function useAgentFiles(): {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{ fileCount: number; totalLines: number }>({ fileCount: 0, totalLines: 0 });
+  const [workspaceAvailable, setWorkspaceAvailable] = useState(false);
 
   const hasFiles = useMemo(() => flattenEntries(tree).length > 0, [tree]);
+
+  useEffect(() => {
+    setTree([]);
+    setStats({ fileCount: 0, totalLines: 0 });
+    setWorkspaceAvailable(false);
+    setError(null);
+  }, [conversationId]);
 
   const refetch = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiRequest(API_PATHS.AGENT_FILES);
+      const res = await apiRequest(`${API_PATHS.AGENT_FILES}?conversationId=${encodeURIComponent(conversationId)}`);
       if (res.status === 401) {
         setTree([]);
         return;
@@ -56,7 +65,7 @@ export function useAgentFiles(): {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [conversationId]);
 
   useEffect(() => {
     void refetch();
@@ -78,13 +87,14 @@ export function useAgentFiles(): {
   // Stats fetching
   const fetchStats = useCallback(async () => {
     try {
-      const res = await apiRequest(API_PATHS.AGENT_FILES_STATS);
+      const res = await apiRequest(`${API_PATHS.AGENT_FILES_STATS}?conversationId=${encodeURIComponent(conversationId)}`);
       if (res.ok) {
-        const data = await res.json() as { fileCount: number; totalLines: number };
-        setStats(data);
+        const data = await res.json() as { fileCount: number; totalLines: number; workspaceAvailable?: boolean };
+        setStats({ fileCount: data.fileCount, totalLines: data.totalLines });
+        setWorkspaceAvailable(data.workspaceAvailable === true);
       }
     } catch { /* ignore */ }
-  }, []);
+  }, [conversationId]);
 
   useEffect(() => {
     void fetchStats();
@@ -105,5 +115,5 @@ export function useAgentFiles(): {
     return () => document.removeEventListener('visibilitychange', onVisibility);
   }, []);
 
-  return { tree, loading, hasFiles, stats, error, refetch };
+  return { tree, loading, hasFiles, workspaceAvailable, stats, error, refetch };
 }

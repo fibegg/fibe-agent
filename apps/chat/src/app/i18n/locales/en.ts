@@ -42,6 +42,8 @@ export const en = {
   'chat.input.stopRecording': 'Stop recording',
   'chat.input.queueMessage': 'Queue message',
   'chat.input.queueMessageTitle': 'Queue message for agent',
+  'chat.input.steerMessage': 'Steer message',
+  'chat.input.steerMessageTitle': 'Steer current agent run',
   'chat.input.stop': 'Stop',
   'chat.input.send': 'Send',
   'chat.noOutput': 'Process completed successfully but returned no output.',
@@ -254,6 +256,7 @@ export const en = {
 
   'fileExplorer.title': 'Claude',
   'fileExplorer.emptyPlayground': "You don't have any files in the playground.",
+  'fileExplorer.emptyAgent': 'AI workspace is empty.',
   'fileExplorer.searchPlaceholder': 'Search files...',
   'fileExplorer.clearSearch': 'Clear search',
   'fileExplorer.settings': 'Settings',

@@ -46,6 +46,7 @@ const ConversationItem = memo(function ConversationItem({
   const [draft, setDraft] = useState(conv.title);
   const [copied, setCopied] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isProtected = conv.id === 'default' || conv.id === 'inbox';
 
   const startEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -89,7 +90,12 @@ const ConversationItem = memo(function ConversationItem({
           : 'hover:bg-muted/50 border border-transparent text-muted-foreground hover:text-foreground'
         }`}
     >
-      <MessageSquare className={`mt-0.5 shrink-0 h-3.5 w-3.5 ${isActive ? 'text-violet-400' : 'text-muted-foreground/50'}`} />
+      <div className="relative mt-0.5 shrink-0">
+        <MessageSquare className={`h-3.5 w-3.5 ${isActive ? 'text-violet-400' : 'text-muted-foreground/50'}`} />
+        {conv.isProcessing && (
+          <span className="absolute -right-1 -top-1 size-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.75)]" />
+        )}
+      </div>
       <div className="min-w-0 flex-1">
         {editing ? (
           <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
@@ -126,20 +132,24 @@ const ConversationItem = memo(function ConversationItem({
               ? <Check className="h-3 w-3 text-green-400" />
               : <Link2 className="h-3 w-3" />}
           </button>
-          <button
-            onClick={startEdit}
-            className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
-            title="Rename"
-          >
-            <Edit3 className="h-3 w-3" />
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onDelete(); }}
-            className="rounded p-0.5 text-muted-foreground/60 hover:text-red-400 transition-colors"
-            title="Delete"
-          >
-            <Trash2 className="h-3 w-3" />
-          </button>
+          {!isProtected && (
+            <>
+              <button
+                onClick={startEdit}
+                className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
+                title="Rename"
+              >
+                <Edit3 className="h-3 w-3" />
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="rounded p-0.5 text-muted-foreground/60 hover:text-red-400 transition-colors"
+                title="Delete"
+              >
+                <Trash2 className="h-3 w-3" />
+              </button>
+            </>
+          )}
         </div>
       )}
     </div>

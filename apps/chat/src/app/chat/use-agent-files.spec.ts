@@ -139,6 +139,36 @@ describe('useAgentFiles', () => {
     expect(result.current.stats.fileCount).toBe(5);
   });
 
+  it('exposes workspace availability from stats', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
+      .mockResolvedValue({ ok: true, json: async () => ({ fileCount: 0, totalLines: 0, workspaceAvailable: true }) });
+
+    const { result } = renderHook(() => useAgentFiles('thread-a'));
+    await flushAll();
+
+    expect(result.current.hasFiles).toBe(false);
+    expect(result.current.workspaceAvailable).toBe(true);
+  });
+
+  it('resets workspace availability when switching conversations', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ fileCount: 0, totalLines: 0, workspaceAvailable: true }) })
+      .mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+
+    const { result, rerender } = renderHook(
+      ({ conversationId }) => useAgentFiles(conversationId),
+      { initialProps: { conversationId: 'thread-a' } },
+    );
+    await flushAll();
+    expect(result.current.workspaceAvailable).toBe(true);
+
+    rerender({ conversationId: 'thread-b' });
+
+    expect(result.current.workspaceAvailable).toBe(false);
+  });
+
   it('handles stats fetch failure gracefully', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })

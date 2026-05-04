@@ -39,12 +39,12 @@ export class FibeSyncService {
     }, FibeSyncService.DEBOUNCE_MS);
   }
 
-  syncRawProviders(getContent: () => string): void {
+  syncRawProviders(getContent: () => string, conversationId?: string): void {
     if (this.rawProvidersSyncTimer) clearTimeout(this.rawProvidersSyncTimer);
     this.rawProvidersSyncTimer = setTimeout(() => {
       this.rawProvidersSyncTimer = null;
       try {
-        void this.sync('raw_providers', getContent());
+        void this.sync('raw_providers', getContent(), conversationId);
       } catch (err) {
         this.logger.error(`Error resolving raw_providers content for sync: ${err}`);
       }
@@ -65,13 +65,7 @@ export class FibeSyncService {
 
     if (!apiUrl || !apiKey || !agentId) return;
 
-    // Namespace the sync key by conversationId so each thread syncs independently.
-    // 'default' conversation keeps the legacy key for backward compatibility.
-    const syncKey =
-      conversationId && conversationId !== 'default'
-        ? `${type}_${conversationId}`
-        : type;
-    const url = `${apiUrl}/api/agents/${agentId}/${syncKey}`;
+    const url = `${apiUrl}/api/agents/${agentId}/${type}`;
 
     try {
       const res = await fetch(url, {
@@ -80,7 +74,10 @@ export class FibeSyncService {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({
+          content,
+          conversation_id: conversationId || 'default',
+        }),
       });
 
       if (!res.ok) {

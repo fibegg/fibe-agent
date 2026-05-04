@@ -40,9 +40,12 @@ import { createStreamingCallbacks } from './orchestrator-streaming-callbacks';
 import { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import { GemmaMcpToolsService } from '../gemma-router/gemma-mcp-tools.service';
 import { LocalMcpService } from '../local-mcp/local-mcp.service';
-import { SessionContext } from './session-context';
+import { SessionContext, type BusyPolicy, type QueuedAgentTurn } from './session-context';
 import { SessionRegistryService } from './session-registry.service';
-import { ConversationManagerService } from '../conversation/conversation-manager.service';
+import {
+  ConversationManagerService,
+  INBOX_CONVERSATION_ID,
+} from '../conversation/conversation-manager.service';
 
 export interface OutboundEvent {
   type: string;
@@ -102,7 +105,13 @@ export class OrchestratorService implements OnModuleInit {
 
     // Forward local MCP tool WS events (ask_user_prompt, confirm_action_prompt, etc.) to the chat UI
     this.localMcp.outbound$.subscribe((event) => {
-      this.sessionRegistry.broadcast(event.type, event.data as Record<string, unknown>);
+      const data = event.data as Record<string, unknown>;
+      const conversationId = typeof data.conversationId === 'string' ? data.conversationId : null;
+      if (conversationId) {
+        this.sessionRegistry.broadcastToConversation(conversationId, event.type, data);
+      } else {
+        this.sessionRegistry.broadcast(event.type, data);
+      }
     });
 
     // Register mode accessors so local tools can read/write the agent mode
@@ -220,6 +229,7 @@ export class OrchestratorService implements OnModuleInit {
     audio?: string;
     audioFilename?: string;
     attachmentFilenames?: string[];
+    busyPolicy?: BusyPolicy;
     story?: Array<{ id: string; type: string; message: string; timestamp: string; details?: string }>;
   }): Promise<void> {
     const handlers: Record<string, () => Promise<void> | void> = {
@@ -230,10 +240,16 @@ export class OrchestratorService implements OnModuleInit {
       [WS_ACTION.REAUTHENTICATE]: () => this.handleReauthenticate(ctx),
       [WS_ACTION.LOGOUT]: () => this.handleLogout(ctx),
       [WS_ACTION.SEND_CHAT_MESSAGE]: async () => {
-        if (ctx.isProcessing) {
-          await this.handleQueueMessage(ctx, msg.text ?? '');
-        } else if (this.sessionRegistry.isConversationProcessing(ctx.conversationId, ctx.sessionId)) {
-          ctx.send(WS_EVENT.ERROR, { message: ERROR_CODE.AGENT_BUSY });
+        const processing = this.sessionRegistry.processingForConversation(ctx.conversationId);
+        if (processing) {
+          await this.handleBusyMessage(processing, ctx, {
+            text: msg.text ?? '',
+            images: msg.images,
+            audio: msg.audio,
+            audioFilename: msg.audioFilename,
+            attachmentFilenames: msg.attachmentFilenames,
+            busyPolicy: msg.busyPolicy ?? 'queue',
+          });
         } else {
           await this.handleChatMessage(
             ctx,
@@ -245,7 +261,16 @@ export class OrchestratorService implements OnModuleInit {
           );
         }
       },
-      [WS_ACTION.QUEUE_MESSAGE]: () => this.handleQueueMessage(ctx, msg.text ?? ''),
+      [WS_ACTION.QUEUE_MESSAGE]: () => this.handleBusyMessage(
+        this.sessionRegistry.processingForConversation(ctx.conversationId) ?? ctx,
+        ctx,
+        { text: msg.text ?? '', busyPolicy: 'queue' },
+      ),
+      [WS_ACTION.STEER_MESSAGE]: () => this.handleBusyMessage(
+        this.sessionRegistry.processingForConversation(ctx.conversationId) ?? ctx,
+        ctx,
+        { text: msg.text ?? '', busyPolicy: 'steer' },
+      ),
       [WS_ACTION.SUBMIT_STORY]: () => this.handleSubmitStory(ctx, msg.story ?? []),
       [WS_ACTION.GET_MODEL]: () => this.handleGetModel(ctx),
       [WS_ACTION.SET_MODEL]: () => this.handleSetModel(ctx, msg.model ?? ''),
@@ -289,9 +314,8 @@ export class OrchestratorService implements OnModuleInit {
     });
     ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, { activity: this.stores(ctx).activityStore.all() });
     ctx.send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
-    // Send conversation-specific model and effort so the UI reflects per-thread settings on connect.
-    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel(ctx) });
-    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort(ctx) });
+    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel() });
+    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort() });
   }
 
 
@@ -359,30 +383,36 @@ export class OrchestratorService implements OnModuleInit {
     text: string,
     conversationId?: string,
     images?: string[],
-    attachmentFilenames?: string[]
-  ): Promise<{ accepted: boolean; messageId?: string; error?: string }> {
-    const ctx = this.findIdleSession(conversationId);
-    if (!ctx) {
-      const sessions = this.sessionRegistry.all();
-      return sessions.length === 0
-        ? { accepted: false, error: ERROR_CODE.NEED_AUTH }
-        : { accepted: false, error: ERROR_CODE.AGENT_BUSY };
+    attachmentFilenames?: string[],
+    busyPolicy: BusyPolicy = 'reject',
+  ): Promise<{ accepted: boolean; messageId?: string; error?: string; resolvedPolicy?: string }> {
+    const targetConversationId = (conversationId?.trim() || INBOX_CONVERSATION_ID);
+    if (!this.conversationManager.get(targetConversationId)) {
+      return { accepted: false, error: 'Conversation not found' };
     }
-    // Retarget the session when it belongs to a different conversation.
-    if (conversationId && ctx.conversationId !== conversationId) {
-      if (!this.conversationManager.get(conversationId)) {
-        return { accepted: false, error: 'Conversation not found' };
-      }
-      ctx.conversationId = conversationId;
+
+    const processing = this.sessionRegistry.processingForConversation(targetConversationId);
+    if (processing) {
+      return this.acceptBusyMessage(processing, processing, {
+        text,
+        images,
+        attachmentFilenames,
+        busyPolicy,
+      });
+    }
+
+    let ctx = this.findIdleSession(targetConversationId);
+    if (!ctx) {
+      ctx = this.sessionRegistry.create(targetConversationId, false);
     }
     await this.checkAndSendAuthStatus(ctx);
     if (!ctx.isAuthenticated) return { accepted: false, error: ERROR_CODE.NEED_AUTH };
     ctx.isProcessing = true;
     const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(ctx, text, images, undefined, undefined, attachmentFilenames);
-    void this.runAgentResponse(ctx, _text, urls, af, att).catch((err) =>
-      this.logger.warn('REST send-message agent run failed', err)
-    );
+    void this.runAgentResponse(ctx, _text, urls, af, att)
+      .then(() => this.drainQueuedTurns(ctx))
+      .catch((err) => this.logger.warn('REST send-message agent run failed', err));
     return { accepted: true, messageId };
   }
 
@@ -392,12 +422,7 @@ export class OrchestratorService implements OnModuleInit {
    */
   private findIdleSession(conversationId?: string): SessionContext | undefined {
     const sessions = this.sessionRegistry.all();
-    if (conversationId) {
-      return (
-        sessions.find((s) => s.conversationId === conversationId && !s.isProcessing) ??
-        sessions.find((s) => !s.isProcessing)
-      );
-    }
+    if (conversationId) return sessions.find((s) => s.conversationId === conversationId && !s.isProcessing);
     return sessions.find((s) => !s.isProcessing);
   }
 
@@ -420,7 +445,7 @@ export class OrchestratorService implements OnModuleInit {
     if (images?.length) {
       for (const dataUrl of images) {
         try {
-          imageUrls.push(await this.uploadsService.saveImage(dataUrl));
+          imageUrls.push(await this.uploadsService.saveImage(dataUrl, ctx.conversationId));
         } catch {
           this.logger.warn('Failed to save one image, skipping');
         }
@@ -429,7 +454,7 @@ export class OrchestratorService implements OnModuleInit {
     let audioFilename: string | null = audioFilenameFromClient ?? null;
     if (!audioFilename && audio) {
       try {
-        audioFilename = await this.uploadsService.saveAudio(audio);
+        audioFilename = await this.uploadsService.saveAudio(audio, ctx.conversationId);
       } catch {
         this.logger.warn('Failed to save voice recording, skipping');
       }
@@ -530,9 +555,10 @@ export class OrchestratorService implements OnModuleInit {
         audioFilename,
         attachmentFilenames,
         historyMessages,
+        ctx.conversationId,
       );
-      const model = this.effectiveModel(ctx);
-      const effort = this.effectiveEffort(ctx);
+      const model = this.effectiveModel();
+      const effort = this.effectiveEffort();
       // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_START, { model });
       const streamStartEntry: StoredStoryEntry = {
@@ -666,21 +692,109 @@ export class OrchestratorService implements OnModuleInit {
     const { text: _t, imageUrls, audioFilename, attachmentFilenames: att } =
       await this.addUserMessageAndEmit(ctx, text, images, audio, audioFilenameFromClient, attachmentFilenames);
     await this.runAgentResponse(ctx, _t, imageUrls, audioFilename, att);
+    await this.drainQueuedTurns(ctx);
   }
 
-  private async handleQueueMessage(ctx: SessionContext, text: string): Promise<void> {
-    if (!text.trim()) return;
-    const { messageStore: qMsgStore } = this.stores(ctx);
-    const userMessage = qMsgStore.add('user', text);
-    await qMsgStore.flush();
-    this.sessionRegistry.broadcastToConversation(
-      ctx.conversationId,
-      WS_EVENT.MESSAGE,
-      userMessage as unknown as Record<string, unknown>,
+  private async handleBusyMessage(
+    processingCtx: SessionContext,
+    requesterCtx: SessionContext,
+    payload: {
+      text: string;
+      images?: string[];
+      audio?: string;
+      audioFilename?: string;
+      attachmentFilenames?: string[];
+      busyPolicy?: BusyPolicy;
+    },
+  ): Promise<void> {
+    const result = await this.acceptBusyMessage(processingCtx, requesterCtx, payload);
+    if (!result.accepted) {
+      requesterCtx.send(WS_EVENT.ERROR, { message: result.error ?? ERROR_CODE.AGENT_BUSY });
+    }
+  }
+
+  private async acceptBusyMessage(
+    processingCtx: SessionContext,
+    requesterCtx: SessionContext,
+    payload: {
+      text: string;
+      images?: string[];
+      audio?: string;
+      audioFilename?: string;
+      attachmentFilenames?: string[];
+      busyPolicy?: BusyPolicy;
+    },
+  ): Promise<{ accepted: boolean; messageId?: string; error?: string; resolvedPolicy?: string }> {
+    const text = payload.text.trim();
+    if (!text) return { accepted: false, error: 'text is required and must be non-empty' };
+
+    const policy = this.normalizeBusyPolicy(payload.busyPolicy);
+    if (!processingCtx.isProcessing) {
+      if (requesterCtx !== processingCtx) requesterCtx.conversationId = processingCtx.conversationId;
+      await this.handleChatMessage(
+        processingCtx,
+        text,
+        payload.images,
+        payload.audio,
+        payload.audioFilename,
+        payload.attachmentFilenames,
+      );
+      return { accepted: true, resolvedPolicy: 'started' };
+    }
+
+    if (policy === 'reject') {
+      return { accepted: false, error: ERROR_CODE.AGENT_BUSY };
+    }
+
+    const saved = await this.addUserMessageAndEmit(
+      processingCtx,
+      text,
+      payload.images,
+      payload.audio,
+      payload.audioFilename,
+      payload.attachmentFilenames,
     );
-    this.conversationManager.touch(ctx.conversationId);
-    void this.fibeSync.syncMessages(() => JSON.stringify(qMsgStore.all()), ctx.conversationId);
-    if (ctx.strategy.steerAgent) ctx.strategy.steerAgent(text);
+
+    let resolvedPolicy: Exclude<BusyPolicy, 'reject'> = 'queue';
+    let queuedText = saved.text;
+    if (policy === 'steer' && processingCtx.strategy.steerAgent) {
+      processingCtx.strategy.steerAgent(saved.text);
+      queuedText = '';
+      resolvedPolicy = 'steer';
+    }
+
+    processingCtx.queuedTurns.push({
+      text: queuedText,
+      imageUrls: saved.imageUrls,
+      audioFilename: saved.audioFilename,
+      attachmentFilenames: saved.attachmentFilenames,
+      policy: resolvedPolicy,
+    });
+    return { accepted: true, messageId: saved.messageId, resolvedPolicy };
+  }
+
+  private async drainQueuedTurns(ctx: SessionContext): Promise<void> {
+    while (!ctx.isProcessing && ctx.queuedTurns.length > 0) {
+      const next = ctx.queuedTurns.shift() as QueuedAgentTurn;
+      ctx.isProcessing = true;
+      this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
+        count: this.sessionRegistry.size,
+        anyProcessing: true,
+      });
+      await this.runAgentResponse(
+        ctx,
+        next.text,
+        next.imageUrls,
+        next.audioFilename,
+        next.attachmentFilenames,
+      );
+    }
+  }
+
+  private normalizeBusyPolicy(policy: BusyPolicy | undefined): BusyPolicy {
+    return policy === 'reject' || policy === 'steer' || policy === 'queue'
+      ? policy
+      : 'reject';
   }
 
   private createAuthConnection(ctx: SessionContext): AuthConnection {
@@ -749,43 +863,34 @@ export class OrchestratorService implements OnModuleInit {
     await Promise.all([sMsg.flush(), sAct.flush()]);
   }
 
-  // ── Per-conversation model / effort helpers ─────────────────────────
+  // ── Global model / effort helpers ───────────────────────────────────
 
-  /** Conversation-level model takes priority over the global ModelStoreService. */
-  private effectiveModel(ctx: SessionContext): string {
-    return this.conversationManager.getConversationModel(ctx.conversationId)
-      ?? this.modelStore.get();
+  private effectiveModel(): string {
+    return this.modelStore.get();
   }
 
-  /** Conversation-level effort takes priority over the global EffortStoreService. */
-  private effectiveEffort(ctx: SessionContext): string {
-    return this.conversationManager.getConversationEffort(ctx.conversationId)
-      ?? this.effortStore.get();
+  private effectiveEffort(): string {
+    return this.effortStore.get();
   }
 
   private handleGetModel(ctx: SessionContext): void {
-    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel(ctx) });
+    ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel() });
   }
 
   private async handleSetModel(ctx: SessionContext, model: string): Promise<void> {
     const value = this.modelStore.set(model);
     await this.modelStore.flush();
-    // Persist per-conversation so each thread tracks its own model.
-    this.conversationManager.setConversationModel(ctx.conversationId, value);
-    // Only broadcast to this conversation’s sessions, not every open tab.
-    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.MODEL_UPDATED, { model: value });
+    this.sessionRegistry.broadcast(WS_EVENT.MODEL_UPDATED, { model: value });
   }
 
   private handleGetEffort(ctx: SessionContext): void {
-    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort(ctx) });
+    ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort() });
   }
 
   private async handleSetEffort(ctx: SessionContext, effort: string): Promise<void> {
     const value = this.effortStore.set(effort);
     await this.effortStore.flush();
-    // Persist per-conversation effort.
-    this.conversationManager.setConversationEffort(ctx.conversationId, value);
-    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.EFFORT_UPDATED, { effort: value });
+    this.sessionRegistry.broadcast(WS_EVENT.EFFORT_UPDATED, { effort: value });
   }
 
   private handleAnswerUserQuestion(questionId: string, answer: string): void {

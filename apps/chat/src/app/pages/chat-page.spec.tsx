@@ -9,6 +9,7 @@ import { useChatLayout } from '../chat/use-chat-layout';
 import { useChatInitialData } from '../chat/use-chat-initial-data';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useConversations } from '../chat/use-conversations';
+import { useAgentFiles } from '../chat/use-agent-files';
 import { consumeGreeting } from '../postmessage-greeting';
 import { CHAT_STATES } from '../chat/chat-state';
 
@@ -86,6 +87,7 @@ vi.mock('../chat/use-agent-files', () => ({
   useAgentFiles: vi.fn().mockReturnValue({
     tree: [],
     hasFiles: false,
+    workspaceAvailable: false,
     loading: false,
     stats: { fileCount: 0, totalLines: 0 },
     error: null,
@@ -330,6 +332,39 @@ describe('ChatPage', () => {
 
     // Re-assert mocks cleared by vi.clearAllMocks()
     vi.mocked(isAuthenticated).mockReturnValue(true);
+    vi.mocked(consumeGreeting).mockReturnValue(null);
+    vi.mocked(useConversations).mockReturnValue({
+      conversations: [],
+      loading: false,
+      activeId: 'default',
+      create: vi.fn().mockResolvedValue('thread-new'),
+      rename: vi.fn(),
+      autoTitle: vi.fn(),
+      remove: vi.fn(),
+      switchTo: vi.fn(),
+      refresh: vi.fn(),
+    });
+    vi.mocked(useChatWebSocket).mockReturnValue({
+      state: CHAT_STATES.AUTHENTICATED,
+      agentMode: 'Ready',
+      errorMessage: null,
+      authModal: { authUrl: null, deviceCode: null, isManualToken: false },
+      sessionActivity: [],
+      sessionCount: 1,
+      anyProcessing: false,
+      send: vi.fn(),
+      reconnect: vi.fn(),
+      startAuth: vi.fn(),
+      cancelAuth: vi.fn(),
+      submitAuthCode: vi.fn(),
+      reauthenticate: vi.fn(),
+      logout: vi.fn(),
+      dismissError: vi.fn(),
+      interruptAgent: vi.fn(),
+      setState: vi.fn(),
+      setErrorMessage: vi.fn(),
+      setAuthModal: vi.fn(),
+    });
     vi.mocked(useScrollToBottom).mockReturnValue({
       scrollRef: { current: null },
       endRef: { current: null },
@@ -338,7 +373,7 @@ describe('ChatPage', () => {
       scrollToBottom: mockScrollToBottom,
       markJustSent: vi.fn(),
     });
-    vi.mocked(useChatLayout).mockReturnValue({
+  vi.mocked(useChatLayout).mockReturnValue({
       isMobile: false,
       sidebarOpen: false,
       setSidebarOpen: vi.fn(),
@@ -354,6 +389,26 @@ describe('ChatPage', () => {
       setSearchQuery: vi.fn(),
       closeMobileSidebar: vi.fn(),
       closeSettings: vi.fn(),
+    });
+    vi.mocked(useChatInitialData).mockReturnValue({
+      messages: [],
+      setMessages: vi.fn(),
+      messagesLoaded: true,
+      messagesLoadError: false,
+      modelOptions: ['claude-3'],
+      refreshingModels: false,
+      refreshModelOptions: vi.fn(),
+      loadMessages: vi.fn(),
+      agentProvider: 'claude-code',
+    });
+    vi.mocked(useAgentFiles).mockReturnValue({
+      tree: [],
+      hasFiles: false,
+      workspaceAvailable: false,
+      loading: false,
+      stats: { fileCount: 0, totalLines: 0 },
+      error: null,
+      refetch: vi.fn(),
     });
   });
 
@@ -381,8 +436,28 @@ describe('ChatPage', () => {
 
   it('renders File Explorer sidebar', () => {
     localStorage.setItem('simplicate-mode', 'false');
+    vi.mocked(useAgentFiles).mockReturnValue({
+      tree: [{ path: 'app.ts', name: 'app.ts', type: 'file' }],
+      hasFiles: true,
+      workspaceAvailable: true,
+      loading: false,
+      stats: { fileCount: 1, totalLines: 10 },
+      error: null,
+      refetch: vi.fn(),
+    });
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
+  });
+
+  it('shows a desktop expand arrow for the compact file browser', () => {
+    localStorage.setItem('simplicate-mode', 'true');
+    render(<ChatPage />, { wrapper });
+
+    const expand = screen.getByRole('button', { name: /expand file explorer/i });
+    expect(expand).toBeTruthy();
+    fireEvent.click(expand);
+
+    expect(screen.getByTestId('conversation-sidebar')).toBeTruthy();
   });
 
   it('redirects to login when not authenticated (returns null)', () => {
@@ -422,6 +497,7 @@ describe('ChatPage', () => {
       messages,
       setMessages,
       messagesLoaded: true,
+      messagesLoadError: false,
       modelOptions: ['claude-3'],
       refreshingModels: false,
       refreshModelOptions: vi.fn(),
@@ -461,6 +537,51 @@ describe('ChatPage', () => {
     rerender(<ChatPage />);
 
     expect(consumeGreeting).toHaveBeenCalledTimes(1);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('does not send an initial greeting when message history failed to load', async () => {
+    const send = vi.fn();
+    vi.mocked(consumeGreeting).mockReturnValue('OK');
+    vi.mocked(useChatInitialData).mockReturnValue({
+      messages: [],
+      setMessages: vi.fn(),
+      messagesLoaded: true,
+      messagesLoadError: true,
+      modelOptions: ['claude-3'],
+      refreshingModels: false,
+      refreshModelOptions: vi.fn(),
+      loadMessages: vi.fn(),
+      agentProvider: 'claude-code',
+    });
+    vi.mocked(useChatWebSocket).mockReturnValue({
+      state: CHAT_STATES.AUTHENTICATED,
+      agentMode: 'Ready',
+      errorMessage: null,
+      authModal: { authUrl: null, deviceCode: null, isManualToken: false },
+      sessionActivity: [],
+      sessionCount: 1,
+      anyProcessing: false,
+      send,
+      reconnect: vi.fn(),
+      startAuth: vi.fn(),
+      cancelAuth: vi.fn(),
+      submitAuthCode: vi.fn(),
+      reauthenticate: vi.fn(),
+      logout: vi.fn(),
+      dismissError: vi.fn(),
+      interruptAgent: vi.fn(),
+      setState: vi.fn(),
+      setErrorMessage: vi.fn(),
+      setAuthModal: vi.fn(),
+    });
+
+    render(<ChatPage />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-header')).toBeTruthy();
+    });
+    expect(consumeGreeting).not.toHaveBeenCalled();
     expect(send).not.toHaveBeenCalled();
   });
 

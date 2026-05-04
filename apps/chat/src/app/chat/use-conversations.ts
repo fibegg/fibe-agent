@@ -6,6 +6,11 @@ export interface ConversationMeta {
   title: string;
   createdAt: string;
   lastMessageAt: string;
+  readonly?: boolean;
+  system?: boolean;
+  hiddenWhenEmpty?: boolean;
+  messageCount?: number;
+  isProcessing?: boolean;
 }
 
 interface UseConversationsResult {
@@ -28,17 +33,30 @@ const URL_PARAM = 'c';
 const AUTO_TITLE_MAX_LEN = 60;
 
 export function getActiveConversationId(): string {
-  return localStorage.getItem(ACTIVE_CONV_KEY) || 'default';
+  return readUrlConversationId() ?? readStoredConversationId() ?? DEFAULT_CONVERSATION_ID;
+}
+
+function readStoredConversationId(): string | null {
+  try {
+    return localStorage.getItem(ACTIVE_CONV_KEY) || null;
+  } catch {
+    return null;
+  }
 }
 
 function setActiveConversationId(id: string): void {
-  localStorage.setItem(ACTIVE_CONV_KEY, id);
+  try {
+    localStorage.setItem(ACTIVE_CONV_KEY, id);
+  } catch {
+    // ignore in SSR/test environments
+  }
 }
 
 /** Read ?c= from the current URL, returns null if absent. */
 function readUrlConversationId(): string | null {
   try {
-    return new URLSearchParams(window.location.search).get(URL_PARAM);
+    const id = new URLSearchParams(window.location.search).get(URL_PARAM)?.trim();
+    return id || null;
   } catch {
     return null;
   }
@@ -69,11 +87,18 @@ function deriveTitle(text: string): string {
 export function useConversations(): UseConversationsResult {
   const [conversations, setConversations] = useState<ConversationMeta[]>([]);
   const [loading, setLoading] = useState(true);
-  // Initialise from URL param first, then localStorage
-  const [activeId, setActiveId] = useState<string>(() => readUrlConversationId() ?? getActiveConversationId());
+  const [activeId, setActiveId] = useState<string>(() => getActiveConversationId());
+  const activeIdRef = useRef(activeId);
   const mountedRef = useRef(true);
   /** Track which conversations have already been auto-titled this session. */
   const autoTitledRef = useRef(new Set<string>());
+
+  const applyActiveConversation = useCallback((id: string): void => {
+    activeIdRef.current = id;
+    setActiveConversationId(id);
+    pushUrlConversationId(id);
+    setActiveId(id);
+  }, []);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -88,21 +113,29 @@ export function useConversations(): UseConversationsResult {
       const data = Array.isArray(parsed) ? parsed : [];
       setConversations(data);
       // Validate current active ID — URL param may point to a non-existent conversation
-      const currentId = getActiveConversationId();
+      const currentId = activeIdRef.current || getActiveConversationId();
       if (!data.some((c) => c.id === currentId)) {
         const fallback = data.find((c) => c.id === DEFAULT_CONVERSATION_ID)?.id ?? data[0]?.id ?? DEFAULT_CONVERSATION_ID;
-        setActiveConversationId(fallback);
-        pushUrlConversationId(fallback);
-        setActiveId(fallback);
+        applyActiveConversation(fallback);
+      } else {
+        applyActiveConversation(currentId);
       }
     } catch {
       // ignore fetch errors
     } finally {
       if (mountedRef.current) setLoading(false);
     }
-  }, []);
+  }, [applyActiveConversation]);
 
   useEffect(() => { void refresh(); }, [refresh]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      applyActiveConversation(getActiveConversationId());
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [applyActiveConversation]);
 
   const create = useCallback(async (): Promise<string> => {
     const res = await apiRequest('/api/conversations', {
@@ -111,12 +144,10 @@ export function useConversations(): UseConversationsResult {
       body: JSON.stringify({ title: DEFAULT_TITLE }),
     });
     const conv = await res.json() as ConversationMeta;
-    setActiveConversationId(conv.id);
-    pushUrlConversationId(conv.id);
-    setActiveId(conv.id);
+    applyActiveConversation(conv.id);
     await refresh();
     return conv.id;
-  }, [refresh]);
+  }, [applyActiveConversation, refresh]);
 
   const rename = useCallback(async (id: string, title: string): Promise<void> => {
     await apiRequest(`/api/conversations/${id}/title`, {
@@ -153,21 +184,15 @@ export function useConversations(): UseConversationsResult {
     await apiRequest(`/api/conversations/${id}`, { method: 'DELETE' });
     autoTitledRef.current.delete(id);
     // If deleting active, switch to newest remaining
-    if (id === getActiveConversationId()) {
-      const remaining = conversations.filter((c) => c.id !== id);
-      const next = remaining.find((c) => c.id === DEFAULT_CONVERSATION_ID)?.id ?? remaining[0]?.id ?? DEFAULT_CONVERSATION_ID;
-      setActiveConversationId(next);
-      pushUrlConversationId(next);
-      setActiveId(next);
+    if (id === activeIdRef.current) {
+      applyActiveConversation(DEFAULT_CONVERSATION_ID);
     }
     await refresh();
-  }, [conversations, refresh]);
+  }, [applyActiveConversation, refresh]);
 
   const switchTo = useCallback((id: string): void => {
-    setActiveConversationId(id);
-    pushUrlConversationId(id);
-    setActiveId(id);
-  }, []);
+    applyActiveConversation(id);
+  }, [applyActiveConversation]);
 
   return { conversations, loading, activeId, create, rename, autoTitle, remove, switchTo, refresh };
 }

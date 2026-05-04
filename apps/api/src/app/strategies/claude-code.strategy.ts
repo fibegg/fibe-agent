@@ -78,6 +78,37 @@ const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   },
 };
 
+function parseMcpServers(path: string): Record<string, unknown> {
+  if (!existsSync(path)) return {};
+  try {
+    const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
+      mcpServers?: Record<string, unknown>;
+    };
+    if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
+      return parsed.mcpServers;
+    }
+  } catch {
+    /* ignore malformed MCP config */
+  }
+  return {};
+}
+
+function localMcpServer(conversationId?: string): Record<string, unknown> {
+  const localServerPath = join(__dirname, '..', 'local-mcp', 'local-mcp.server.js');
+  const env: Record<string, string> = {
+    PORT: process.env['PORT'] ?? '3000',
+  };
+  if (process.env['AGENT_PASSWORD']) env.AGENT_PASSWORD = process.env['AGENT_PASSWORD'];
+  if (conversationId) env.CONVERSATION_ID = conversationId;
+
+  return {
+    type: 'stdio',
+    command: process.execPath,
+    args: [localServerPath],
+    env,
+  };
+}
+
 function isStringArray(v: unknown): v is string[] {
   return Array.isArray(v) && v.every((x) => typeof x === 'string');
 }
@@ -155,14 +186,24 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
   }
 
   private getClaudeWorkspaceDir(): string {
-    if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CLAUDE_WORKSPACE_SUBDIR);
-    }
+    const sharedDataDir =
+      this.conversationDataDir?.getDefaultConversationDataDir?.() ??
+      this.conversationDataDir?.getConversationDataDir();
+    if (sharedDataDir) return join(sharedDataDir, CLAUDE_WORKSPACE_SUBDIR);
     return PLAYGROUND_DIR;
+  }
+
+  private getClaudeStateDir(): string | null {
+    return this.conversationDataDir?.getConversationDataDir() ?? null;
   }
 
   getWorkingDir(): string {
     return this.getClaudeWorkspaceDir();
+  }
+
+  prepareWorkingDir(): void {
+    const workspaceDir = this.getClaudeWorkspaceDir();
+    if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
   }
 
   private clearStoredSession(workspaceDir?: string): void {
@@ -170,7 +211,11 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
     this._sessionId = null;
     if (!this.conversationDataDir) return;
     try {
-      rmSync(join(workspaceDir ?? this.getClaudeWorkspaceDir(), SESSION_MARKER_FILE), { force: true });
+      const markerPath = this.getSessionMarkerPath();
+      if (markerPath) rmSync(markerPath, { force: true });
+      if (this.shouldReadLegacyWorkspaceMarker()) {
+        rmSync(join(workspaceDir ?? this.getClaudeWorkspaceDir(), SESSION_MARKER_FILE), { force: true });
+      }
     } catch {
       /* ignore cleanup errors */
     }
@@ -372,14 +417,11 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
       const workspaceDir = this.getClaudeWorkspaceDir();
-      if (!existsSync(workspaceDir)) {
-        mkdirSync(workspaceDir, { recursive: true });
-      }
+      this.prepareWorkingDir();
       if (this.conversationDataDir) {
-        const markerPath = join(workspaceDir, SESSION_MARKER_FILE);
-        if (existsSync(markerPath)) {
-          const stored = readFileSync(markerPath, 'utf8').trim();
-          this._sessionId = stored || null;
+        const stored = this.readSessionMarker(workspaceDir);
+        if (stored) {
+          this._sessionId = stored;
           this._hasSession = true;
         }
       }
@@ -389,7 +431,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
       const systemPromptFlag = '--append-system-prompt'
 
       const useStreamJson = !!callbacks;
-      const mcpConfigPath = join(workspaceDir, '.mcp.json');
+      const mcpConfigPath = this.writeConversationRuntimeMcpConfig(workspaceDir);
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
       if (pendingMessages) {
@@ -405,7 +447,7 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
         '-p',
         '--effort', resolveEffort(runtimeOptions?.effort ?? process.env.CLAUDE_EFFORT),
         finalPrompt,
-        ...(existsSync(mcpConfigPath) ? ['--mcp-config', mcpConfigPath] : []),
+        ...(mcpConfigPath && existsSync(mcpConfigPath) ? ['--mcp-config', mcpConfigPath] : []),
         ...(systemPrompt ? [systemPromptFlag, systemPrompt.trim()] : []),
         ...(useStreamJson
           ? [
@@ -638,7 +680,8 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
           }
           if (this.conversationDataDir) {
             try {
-              writeFileSync(join(workspaceDir, SESSION_MARKER_FILE), this._sessionId ?? '');
+              const markerPath = this.getSessionMarkerPath();
+              if (markerPath) writeFileSync(markerPath, this._sessionId ?? '');
             } catch {
               /* ignore */
             }
@@ -667,5 +710,53 @@ export class ClaudeCodeStrategy extends AbstractCLIStrategy {
 
   hasNativeSessionSupport(): boolean {
     return true;
+  }
+
+  private readSessionMarker(workspaceDir: string): string | null {
+    const markerPath = this.getSessionMarkerPath();
+    const stored = markerPath ? this.readMarkerFile(markerPath) : null;
+    if (stored) return stored;
+    if (!this.shouldReadLegacyWorkspaceMarker()) return null;
+    return this.readMarkerFile(join(workspaceDir, SESSION_MARKER_FILE));
+  }
+
+  private getSessionMarkerPath(): string | null {
+    const stateDir = this.getClaudeStateDir();
+    if (!stateDir) return null;
+    if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+    return join(stateDir, SESSION_MARKER_FILE);
+  }
+
+  private readMarkerFile(path: string): string | null {
+    if (!existsSync(path)) return null;
+    const stored = readFileSync(path, 'utf8').trim();
+    return stored || null;
+  }
+
+  private shouldReadLegacyWorkspaceMarker(): boolean {
+    const stateDir = this.getClaudeStateDir();
+    const defaultDir = this.conversationDataDir?.getDefaultConversationDataDir?.();
+    return !stateDir || !defaultDir || stateDir === defaultDir;
+  }
+
+  private writeConversationRuntimeMcpConfig(workspaceDir: string): string | null {
+    const stateDir = this.getClaudeStateDir();
+    if (!stateDir) {
+      const projectConfigPath = join(workspaceDir, '.mcp.json');
+      return existsSync(projectConfigPath) ? projectConfigPath : null;
+    }
+
+    const mcpConfigPath = join(stateDir, '.mcp.runtime.json');
+    const mcpServers = {
+      ...parseMcpServers(join(workspaceDir, '.mcp.json')),
+      'fibe-local': localMcpServer(this.conversationDataDir?.getConversationId?.()),
+    };
+    try {
+      if (!existsSync(stateDir)) mkdirSync(stateDir, { recursive: true });
+      writeFileSync(mcpConfigPath, JSON.stringify({ mcpServers }, null, 2), 'utf8');
+      return mcpConfigPath;
+    } catch {
+      return null;
+    }
   }
 }

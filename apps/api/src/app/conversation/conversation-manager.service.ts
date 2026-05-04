@@ -18,19 +18,28 @@ export interface ConversationMeta {
   title: string;
   createdAt: string;
   lastMessageAt: string;
-  /** Per-conversation model override (takes priority over global ModelStoreService). */
-  model?: string;
-  /** Per-conversation effort override (takes priority over global EffortStoreService). */
-  effort?: string;
+  readonly?: boolean;
+  system?: boolean;
+  hiddenWhenEmpty?: boolean;
+  messageCount?: number;
+  isProcessing?: boolean;
 }
 
 export const DEFAULT_CONVERSATION_ID = 'default';
-export const DEFAULT_CONVERSATION_TITLE = 'INBOX';
+export const DEFAULT_CONVERSATION_TITLE = 'Default';
+export const INBOX_CONVERSATION_ID = 'inbox';
+export const INBOX_CONVERSATION_TITLE = 'INBOX';
 
 export interface ConversationBundle {
   meta: ConversationMeta;
   messageStore: MessageStoreService;
   activityStore: ActivityStoreService;
+}
+
+interface ConversationTombstone {
+  id: string;
+  dir: string;
+  tombstonedAt: string;
 }
 
 /**
@@ -63,19 +72,24 @@ export class ConversationManagerService {
   private readonly bundles = new Map<string, ConversationBundle>();
   private readonly conversationsDir: string;
   private readonly indexPath: string;
+  private readonly tombstonesPath: string;
+  private cleanupRetryTimer?: NodeJS.Timeout;
 
   constructor(private readonly config: ConfigService) {
     this.conversationsDir = join(config.getDataDir(), 'conversations');
     this.indexPath = join(this.conversationsDir, 'index.json');
+    this.tombstonesPath = join(this.conversationsDir, 'tombstones.json');
     mkdirSync(this.conversationsDir, { recursive: true });
     this.loadIndex();
     this.ensureDefaultConversation();
+    if (this.retryTombstonedCleanup() > 0) this.scheduleTombstoneRetry();
   }
 
-  /** List all conversations sorted by lastMessageAt desc. */
+  /** List visible conversations sorted by lastMessageAt desc. */
   list(): ConversationMeta[] {
     return [...this.bundles.values()]
-      .map((b) => b.meta)
+      .map((b) => this.enrichedMeta(b))
+      .filter((meta) => !meta.hiddenWhenEmpty || (meta.messageCount ?? 0) > 0)
       .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
   }
 
@@ -95,15 +109,23 @@ export class ConversationManagerService {
   }
 
   messages(id: string): StoredMessage[] {
-    return this.getOrCreate(id).messageStore.all();
+    return this.requireExistingOrDefault(id).messageStore.all();
   }
 
   activities(id: string): StoredActivityEntry[] {
-    return this.getOrCreate(id).activityStore.all();
+    return this.requireExistingOrDefault(id).activityStore.all();
   }
 
   dataDirProvider(id: string): ConversationDataDirProvider {
-    return { getConversationDataDir: () => this.convDir(id) };
+    return {
+      getConversationDataDir: () => this.convDir(id),
+      getDefaultConversationDataDir: () => this.config.getConversationDataDir(),
+      getConversationId: () => id,
+    };
+  }
+
+  dataDirFor(id: string): string {
+    return this.convDir(id);
   }
 
   /** Create a brand-new conversation, persist, and return its meta. */
@@ -115,15 +137,18 @@ export class ConversationManagerService {
       title: title ?? 'New chat',
       createdAt: now,
       lastMessageAt: now,
+      readonly: false,
+      system: false,
+      hiddenWhenEmpty: false,
     };
-    this.createBundle(id, meta);
+    const bundle = this.createBundle(id, meta);
     this.logger.log(`Conversation created: ${id}`);
-    return meta;
+    return this.enrichedMeta(bundle);
   }
 
   /** Update the title of an existing conversation. */
   setTitle(id: string, title: string): boolean {
-    if (id === DEFAULT_CONVERSATION_ID) return false;
+    if (this.isProtected(id)) return false;
     const bundle = this.bundles.get(id);
     if (!bundle) return false;
     bundle.meta.title = title;
@@ -139,47 +164,13 @@ export class ConversationManagerService {
     this.flushIndex();
   }
 
-  /** Get the per-conversation model override (null = use global). */
-  getConversationModel(id: string): string | null {
-    return this.bundles.get(id)?.meta.model ?? null;
-  }
-
-  /** Set the per-conversation model. Pass empty string to clear. */
-  setConversationModel(id: string, model: string): boolean {
-    const bundle = this.bundles.get(id);
-    if (!bundle) return false;
-    bundle.meta.model = model.trim() || undefined;
-    this.flushIndex();
-    return true;
-  }
-
-  /** Get the per-conversation effort override (null = use global). */
-  getConversationEffort(id: string): string | null {
-    return this.bundles.get(id)?.meta.effort ?? null;
-  }
-
-  /** Set the per-conversation effort. Pass empty string to clear. */
-  setConversationEffort(id: string, effort: string): boolean {
-    const bundle = this.bundles.get(id);
-    if (!bundle) return false;
-    bundle.meta.effort = effort.trim() || undefined;
-    this.flushIndex();
-    return true;
-  }
-
   /**
-   * Read the Claude native session ID stored in the conversation's
-   * claude_workspace directory.  Returns null when no session marker exists.
+   * Read the Claude native session ID stored in the conversation state dir.
+   * The default conversation also falls back to the legacy workspace marker.
    */
   getClaudeSessionMarker(id: string): string | null {
-    const markerPath = join(this.claudeWorkspaceDir(id), '.claude_session');
-    if (!existsSync(markerPath)) return null;
-    try {
-      const stored = readFileSync(markerPath, 'utf8').trim();
-      return stored || null;
-    } catch {
-      return null;
-    }
+    return this.readSessionMarker(join(this.convDir(id), '.claude_session'))
+      ?? (id === DEFAULT_CONVERSATION_ID ? this.readSessionMarker(join(this.claudeWorkspaceDir(id), '.claude_session')) : null);
   }
 
   /**
@@ -187,14 +178,18 @@ export class ConversationManagerService {
    * This allows importing existing native Claude sessions into a conversation.
    */
   setClaudeSessionMarker(id: string, sessionId: string | null): boolean {
-    const workspaceDir = this.claudeWorkspaceDir(id);
-    const markerPath = join(workspaceDir, '.claude_session');
+    const dir = this.convDir(id);
+    const markerPath = join(dir, '.claude_session');
     try {
       if (sessionId?.trim()) {
-        mkdirSync(workspaceDir, { recursive: true });
+        mkdirSync(dir, { recursive: true });
         writeFileSync(markerPath, sessionId.trim());
       } else {
         if (existsSync(markerPath)) rmSync(markerPath, { force: true });
+        if (id === DEFAULT_CONVERSATION_ID) {
+          const legacyPath = join(this.claudeWorkspaceDir(id), '.claude_session');
+          if (existsSync(legacyPath)) rmSync(legacyPath, { force: true });
+        }
       }
       return true;
     } catch (err) {
@@ -205,18 +200,12 @@ export class ConversationManagerService {
 
   /** Delete a conversation (metadata + in-memory; files removed from disk). */
   delete(id: string): boolean {
-    if (id === DEFAULT_CONVERSATION_ID) return false;
+    if (this.isProtected(id)) return false;
     if (!this.bundles.has(id)) return false;
     this.bundles.delete(id);
     this.flushIndex();
-    // Remove workspace files from disk so Claude sessions can't be accidentally resumed
-    // and disk space is reclaimed. Files can always be recovered from backup if needed.
     const dir = this.convDir(id);
-    try {
-      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
-    } catch (err) {
-      this.logger.warn(`Failed to remove conversation dir ${dir}: ${err}`);
-    }
+    if (!this.removeConversationDir(id, dir)) this.markTombstoned(id, dir);
     this.logger.log(`Conversation deleted: ${id}`);
     return true;
   }
@@ -235,6 +224,16 @@ export class ConversationManagerService {
     return join(this.convDir(id), 'claude_workspace');
   }
 
+  private readSessionMarker(path: string): string | null {
+    if (!existsSync(path)) return null;
+    try {
+      const stored = readFileSync(path, 'utf8').trim();
+      return stored || null;
+    } catch {
+      return null;
+    }
+  }
+
   private createBundle(id: string, meta?: ConversationMeta): ConversationBundle {
     const dir = this.convDir(id);
     mkdirSync(dir, { recursive: true });
@@ -246,10 +245,11 @@ export class ConversationManagerService {
     const now = new Date().toISOString();
     const resolvedMeta: ConversationMeta = meta ?? {
       id,
-      title: id === DEFAULT_CONVERSATION_ID ? DEFAULT_CONVERSATION_TITLE : 'New chat',
+      title: this.defaultTitleFor(id),
       createdAt: now,
       lastMessageAt: now,
     };
+    this.applySystemFlags(resolvedMeta);
 
     const bundle: ConversationBundle = { meta: resolvedMeta, messageStore, activityStore };
     this.bundles.set(id, bundle);
@@ -264,6 +264,7 @@ export class ConversationManagerService {
       const metas: ConversationMeta[] = JSON.parse(raw);
       for (const meta of metas) {
         if (!this.bundles.has(meta.id)) {
+          this.applySystemFlags(meta);
           this.createBundle(meta.id, meta);
         }
       }
@@ -273,29 +274,151 @@ export class ConversationManagerService {
   }
 
   private ensureDefaultConversation(): void {
-    const existing = this.bundles.get(DEFAULT_CONVERSATION_ID);
+    this.ensureSystemConversation(DEFAULT_CONVERSATION_ID, DEFAULT_CONVERSATION_TITLE);
+    this.ensureSystemConversation(INBOX_CONVERSATION_ID, INBOX_CONVERSATION_TITLE);
+  }
+
+  private ensureSystemConversation(id: string, title: string): void {
+    const existing = this.bundles.get(id);
     if (existing) {
-      if (existing.meta.title !== DEFAULT_CONVERSATION_TITLE) {
-        existing.meta.title = DEFAULT_CONVERSATION_TITLE;
+      if (existing.meta.title !== title) {
+        existing.meta.title = title;
         this.flushIndex();
       }
+      this.applySystemFlags(existing.meta);
       return;
     }
     const now = new Date().toISOString();
-    this.createBundle(DEFAULT_CONVERSATION_ID, {
-      id: DEFAULT_CONVERSATION_ID,
-      title: DEFAULT_CONVERSATION_TITLE,
+    this.createBundle(id, {
+      id,
+      title,
       createdAt: now,
       lastMessageAt: now,
     });
   }
 
+  private requireExistingOrDefault(id: string): ConversationBundle {
+    if (id === DEFAULT_CONVERSATION_ID || id === INBOX_CONVERSATION_ID) {
+      return this.getOrCreate(id);
+    }
+    const bundle = this.get(id);
+    if (!bundle) throw new Error(`Conversation not found: ${id}`);
+    return bundle;
+  }
+
+  private enrichedMeta(bundle: ConversationBundle): ConversationMeta {
+    this.applySystemFlags(bundle.meta);
+    return {
+      ...bundle.meta,
+      messageCount: bundle.messageStore.all().length,
+    };
+  }
+
+  private applySystemFlags(meta: ConversationMeta): void {
+    if (meta.id === DEFAULT_CONVERSATION_ID) {
+      meta.title = DEFAULT_CONVERSATION_TITLE;
+      meta.readonly = false;
+      meta.system = false;
+      meta.hiddenWhenEmpty = false;
+      return;
+    }
+    if (meta.id === INBOX_CONVERSATION_ID) {
+      meta.title = INBOX_CONVERSATION_TITLE;
+      meta.readonly = true;
+      meta.system = true;
+      meta.hiddenWhenEmpty = true;
+      return;
+    }
+    meta.readonly = false;
+    meta.system = false;
+    meta.hiddenWhenEmpty = false;
+  }
+
+  private defaultTitleFor(id: string): string {
+    if (id === DEFAULT_CONVERSATION_ID) return DEFAULT_CONVERSATION_TITLE;
+    if (id === INBOX_CONVERSATION_ID) return INBOX_CONVERSATION_TITLE;
+    return 'New chat';
+  }
+
+  private isProtected(id: string): boolean {
+    return id === DEFAULT_CONVERSATION_ID || id === INBOX_CONVERSATION_ID;
+  }
+
   private flushIndex(): void {
     try {
-      const metas = [...this.bundles.values()].map((b) => b.meta);
+      const metas = [...this.bundles.values()].map((b) => {
+        const { messageCount: _messageCount, isProcessing: _isProcessing, ...meta } = b.meta;
+        return meta;
+      });
       writeFileSync(this.indexPath, JSON.stringify(metas, null, 2), 'utf8');
     } catch (err) {
       this.logger.warn('Failed to flush conversations index', err);
+    }
+  }
+
+  private removeConversationDir(id: string, dir: string): boolean {
+    try {
+      if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+      return !existsSync(dir);
+    } catch (err) {
+      this.logger.warn(`Failed to remove conversation dir ${dir} for ${id}: ${err}`);
+      return false;
+    }
+  }
+
+  private markTombstoned(id: string, dir: string): void {
+    const tombstones = this.readTombstones();
+    const existing = tombstones.find((entry) => entry.id === id);
+    if (existing) {
+      existing.dir = dir;
+      existing.tombstonedAt = new Date().toISOString();
+    } else {
+      tombstones.push({ id, dir, tombstonedAt: new Date().toISOString() });
+    }
+    this.writeTombstones(tombstones);
+    this.scheduleTombstoneRetry();
+  }
+
+  private retryTombstonedCleanup(): number {
+    const remaining = this.readTombstones().filter((entry) => !this.removeConversationDir(entry.id, entry.dir));
+    this.writeTombstones(remaining);
+    return remaining.length;
+  }
+
+  private scheduleTombstoneRetry(): void {
+    if (this.cleanupRetryTimer) return;
+    this.cleanupRetryTimer = setTimeout(() => {
+      this.cleanupRetryTimer = undefined;
+      if (this.retryTombstonedCleanup() > 0) this.scheduleTombstoneRetry();
+    }, 30_000);
+    this.cleanupRetryTimer.unref?.();
+  }
+
+  private readTombstones(): ConversationTombstone[] {
+    if (!existsSync(this.tombstonesPath)) return [];
+    try {
+      const parsed = JSON.parse(readFileSync(this.tombstonesPath, 'utf8'));
+      if (!Array.isArray(parsed)) return [];
+      return parsed.filter((entry): entry is ConversationTombstone => (
+        typeof entry?.id === 'string'
+        && typeof entry.dir === 'string'
+        && typeof entry.tombstonedAt === 'string'
+      ));
+    } catch (err) {
+      this.logger.warn(`Failed to read conversation tombstones: ${err}`);
+      return [];
+    }
+  }
+
+  private writeTombstones(tombstones: ConversationTombstone[]): void {
+    try {
+      if (tombstones.length === 0) {
+        if (existsSync(this.tombstonesPath)) rmSync(this.tombstonesPath, { force: true });
+        return;
+      }
+      writeFileSync(this.tombstonesPath, JSON.stringify(tombstones, null, 2), 'utf8');
+    } catch (err) {
+      this.logger.warn(`Failed to write conversation tombstones: ${err}`);
     }
   }
 }

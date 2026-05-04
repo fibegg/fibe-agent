@@ -1,22 +1,37 @@
-import { Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post, Put } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import {
   ConversationManagerService,
   DEFAULT_CONVERSATION_ID,
+  INBOX_CONVERSATION_ID,
   type ConversationBundle,
   type ConversationMeta,
 } from './conversation-manager.service';
 import { enrichMessagesWithActivityUsage } from '../messages/enrich-messages-with-usage';
+import { SessionRegistryService } from '../orchestrator/session-registry.service';
+import { OrchestratorService } from '../orchestrator/orchestrator.service';
+import { SendMessageDto } from '../agent/dto/send-message.dto';
+import { handleSendMessage } from '../agent/agent-send-message.handler';
+import { WS_EVENT } from '@shared/ws-constants';
+import { ProviderTrafficStoreService } from '../provider-traffic/provider-traffic-store.service';
 
 @Controller('conversations')
 export class ConversationsController {
-  constructor(private readonly convManager: ConversationManagerService) {}
+  constructor(
+    private readonly convManager: ConversationManagerService,
+    private readonly sessionRegistry: SessionRegistryService,
+    private readonly orchestrator: OrchestratorService,
+    private readonly providerTrafficStore: ProviderTrafficStoreService,
+  ) {}
 
   // ── Core CRUD ─────────────────────────────────────────────────────────────
 
   /** List all conversations sorted by lastMessageAt desc. */
   @Get()
   list(): ConversationMeta[] {
-    return this.convManager.list();
+    return this.convManager.list().map((meta) => ({
+      ...meta,
+      isProcessing: this.sessionRegistry.isConversationProcessing(meta.id),
+    }));
   }
 
   /** Create a new conversation. */
@@ -34,9 +49,31 @@ export class ConversationsController {
     return { ok: this.convManager.setTitle(id, body.title) };
   }
 
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() body: { title?: string },
+  ): { ok: boolean } {
+    if (!this.convManager.get(id)) {
+      throw new NotFoundException('Conversation not found');
+    }
+    if (typeof body.title === 'string') {
+      return { ok: this.convManager.setTitle(id, body.title) };
+    }
+    return { ok: true };
+  }
+
   /** Delete a conversation and its workspace from disk. */
   @Delete(':id')
   delete(@Param('id') id: string): { ok: boolean } {
+    if (id === DEFAULT_CONVERSATION_ID || id === INBOX_CONVERSATION_ID) {
+      return { ok: false };
+    }
+    if (!this.convManager.get(id)) {
+      throw new NotFoundException('Conversation not found');
+    }
+    this.sessionRegistry.broadcast(WS_EVENT.CONVERSATION_DELETED, { id });
+    this.sessionRegistry.destroyConversation(id);
     return { ok: this.convManager.delete(id) };
   }
 
@@ -58,65 +95,30 @@ export class ConversationsController {
     return this.requireBundle(id).activityStore.all();
   }
 
-  // ── Per-conversation model / effort ───────────────────────────────────────
-
-  /** Get the per-conversation model override (null = inherit global). */
-  @Get(':id/model')
-  getModel(@Param('id') id: string): { model: string | null } {
-    return { model: this.convManager.getConversationModel(id) };
+  @Get(':id/provider-traffic')
+  providerTraffic(@Param('id') id: string) {
+    this.requireBundle(id);
+    return this.providerTrafficStore.all(id);
   }
 
-  /** Set the per-conversation model override. Empty string clears it. */
-  @Put(':id/model')
-  setModel(
+  @Post(':id/agent/send-message')
+  async sendMessage(
     @Param('id') id: string,
-    @Body() body: { model: string },
-  ): { ok: boolean } {
-    return { ok: this.convManager.setConversationModel(id, body.model ?? '') };
-  }
-
-  /** Get the per-conversation effort override (null = inherit global). */
-  @Get(':id/effort')
-  getEffort(@Param('id') id: string): { effort: string | null } {
-    return { effort: this.convManager.getConversationEffort(id) };
-  }
-
-  /** Set the per-conversation effort override. Empty string clears it. */
-  @Put(':id/effort')
-  setEffort(
-    @Param('id') id: string,
-    @Body() body: { effort: string },
-  ): { ok: boolean } {
-    return { ok: this.convManager.setConversationEffort(id, body.effort ?? '') };
-  }
-
-  // ── Claude native session import ──────────────────────────────────────────
-
-  /**
-   * Get the Claude native session ID bound to this conversation.
-   * Returns null when no marker exists (next turn will start a fresh session).
-   */
-  @Get(':id/claude-session')
-  getClaudeSession(@Param('id') id: string): { sessionId: string | null } {
-    return { sessionId: this.convManager.getClaudeSessionMarker(id) };
-  }
-
-  /**
-   * Set / import a Claude native session ID.
-   * The session ID is the UUID emitted by `claude` as `session_id`.
-   */
-  @Put(':id/claude-session')
-  setClaudeSession(
-    @Param('id') id: string,
-    @Body() body: { sessionId: string },
-  ): { ok: boolean } {
-    return { ok: this.convManager.setClaudeSessionMarker(id, body.sessionId) };
-  }
-
-  /** Clear the session marker so the next agent turn starts a fresh session. */
-  @Delete(':id/claude-session')
-  clearClaudeSession(@Param('id') id: string): { ok: boolean } {
-    return { ok: this.convManager.setClaudeSessionMarker(id, null) };
+    @Body() body: SendMessageDto,
+  ): Promise<{ accepted: true; messageId: string; resolvedPolicy?: string }> {
+    this.requireBundle(id);
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (!text) {
+      throw new BadRequestException('text is required and must be non-empty');
+    }
+    const result = await this.orchestrator.sendMessageFromApi(
+      text,
+      id,
+      body.images,
+      body.attachmentFilenames,
+      body.busyPolicy,
+    );
+    return handleSendMessage(result);
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────
@@ -124,6 +126,7 @@ export class ConversationsController {
   /** Resolve a ConversationBundle by id, throwing 404 when unknown. */
   private requireBundle(id: string): ConversationBundle {
     const bundle = id === DEFAULT_CONVERSATION_ID
+      || id === INBOX_CONVERSATION_ID
       ? this.convManager.getOrCreate(id)
       : this.convManager.get(id);
     if (!bundle) throw new NotFoundException('Conversation not found');

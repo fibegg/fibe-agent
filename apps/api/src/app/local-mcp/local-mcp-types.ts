@@ -7,6 +7,7 @@ export interface LocalToolCallRequest {
   requestId: string;
   tool: string;
   args: Record<string, unknown>;
+  conversationId?: string;
 }
 
 export interface LocalToolCallResponse {

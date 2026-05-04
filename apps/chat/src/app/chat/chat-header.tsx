@@ -787,6 +787,7 @@ function CompactConversationPicker({
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
@@ -803,7 +804,9 @@ function CompactConversationPicker({
   useEffect(() => {
     if (!open) return;
     const close = (e: MouseEvent) => {
-      if (triggerRef.current?.contains(e.target as Node)) return;
+      const target = e.target as Node;
+      if (triggerRef.current?.contains(target)) return;
+      if (menuRef.current?.contains(target)) return;
       setOpen(false);
     };
     const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
@@ -831,6 +834,7 @@ function CompactConversationPicker({
         ref={triggerRef}
         type="button"
         onClick={open ? () => setOpen(false) : openPicker}
+        aria-label="Switch conversation"
         className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300 transition-colors max-w-[120px]"
         title={label}
       >
@@ -841,6 +845,9 @@ function CompactConversationPicker({
       <span className="shrink-0 text-muted-foreground/40">·</span>
       {open && rect && createPortal(
         <div
+          ref={menuRef}
+          role="menu"
+          aria-label="Conversations"
           className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card/95 shadow-xl shadow-black/30 backdrop-blur-xl py-1"
           style={{ top: rect.top, left: rect.left, width: rect.width }}
         >
@@ -849,6 +856,7 @@ function CompactConversationPicker({
               <button
                 key={c.id}
                 type="button"
+                role="menuitem"
                 onClick={() => handleSelect(c.id)}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
                   c.id === activeId
@@ -865,6 +873,7 @@ function CompactConversationPicker({
             <div className="border-t border-border/40 px-1 pt-1">
               <button
                 type="button"
+                role="menuitem"
                 onClick={handleCreate}
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 transition-colors"
               >

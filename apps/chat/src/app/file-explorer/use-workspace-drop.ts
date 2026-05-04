@@ -38,15 +38,15 @@ export function useWorkspaceDrop({
 
   const uploadFiles = useCallback(
     async (files: File[]) => {
-      const url = targetDir
-        ? `${uploadUrl}?dir=${encodeURIComponent(targetDir)}`
-        : uploadUrl;
+      const url = new URL(uploadUrl, window.location.origin);
+      if (targetDir) url.searchParams.set('dir', targetDir);
+      const requestUrl = `${url.pathname}${url.search}`;
 
       const results = await Promise.allSettled(
         files.map(async (file) => {
           const formData = new FormData();
           formData.append('file', file, file.name);
-          const res = await apiRequest(url, { method: 'POST', body: formData });
+          const res = await apiRequest(requestUrl, { method: 'POST', body: formData });
           if (!res.ok) {
             console.error(`Workspace upload failed for ${file.name}: ${res.status}`);
           }

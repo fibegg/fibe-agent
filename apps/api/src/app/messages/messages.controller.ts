@@ -1,22 +1,21 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
-import { ActivityStoreService } from '../activity-store/activity-store.service';
-import { MessageStoreService } from '../message-store/message-store.service';
 import { enrichMessagesWithActivityUsage } from './enrich-messages-with-usage';
+import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from '../conversation/conversation-manager.service';
 
 @Controller()
 @UseGuards(AgentAuthGuard)
 export class MessagesController {
   constructor(
-    private readonly messageStore: MessageStoreService,
-    private readonly activityStore: ActivityStoreService,
+    private readonly conversationManager: ConversationManagerService,
   ) {}
 
   @Get('messages')
   getAll() {
+    const bundle = this.conversationManager.getOrCreate(DEFAULT_CONVERSATION_ID);
     return enrichMessagesWithActivityUsage(
-      this.messageStore.all(),
-      this.activityStore.all()
+      bundle.messageStore.all(),
+      bundle.activityStore.all()
     );
   }
 }

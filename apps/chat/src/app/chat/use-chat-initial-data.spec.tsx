@@ -111,6 +111,20 @@ describe('useChatInitialData', () => {
     expect(result.current.messages).toHaveLength(2);
     const second = result.current.messages[1];
     expect(!('kind' in second) && second.body).toBe('local response');
+    expect(result.current.messagesLoadError).toBe(true);
+  });
+
+  it('exposes whether the latest message history load failed', async () => {
+    mockApiRequest
+      .mockRejectedValueOnce(new Error('network'))
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
+
+    const { result } = renderHook(() => useChatInitialData(true, 'thread-1'), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.messagesLoaded).toBe(true);
+    });
+    expect(result.current.messagesLoadError).toBe(true);
   });
 
   it('refreshModelOptions calls POST and updates modelOptions', async () => {

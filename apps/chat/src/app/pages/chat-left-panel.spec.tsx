@@ -6,7 +6,11 @@ import { ChatLeftPanel } from './chat-left-panel';
 // Mock the heavy child components
 vi.mock('../file-explorer/file-explorer', () => ({
   FileExplorer: (props: Record<string, unknown>) => (
-    <div data-testid="file-explorer" data-collapsed={String(props.collapsed)} />
+    <div
+      data-testid="file-explorer"
+      data-collapsed={String(props.collapsed)}
+      data-agent-workspace={String(props.agentWorkspaceAvailable)}
+    />
   ),
 }));
 
@@ -55,6 +59,15 @@ describe('ChatLeftPanel', () => {
       </MemoryRouter>
     );
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
+  });
+
+  it('passes agent workspace availability into FileExplorer', () => {
+    render(
+      <MemoryRouter>
+        <ChatLeftPanel {...baseProps} agentWorkspaceAvailable />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('file-explorer').getAttribute('data-agent-workspace')).toBe('true');
   });
 
   it('passes collapsed=true when sidebarCollapsed is true', () => {

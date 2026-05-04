@@ -8,7 +8,7 @@ import { INTERCEPTED_DOMAINS, type CapturedProviderRequest } from './types';
 
 export interface ConnectProxyOptions {
   certManager: CertificateManager;
-  onCapturedRequest: (record: CapturedProviderRequest) => void;
+  onCapturedRequest: (record: CapturedProviderRequest, conversationId?: string) => void;
   maxBodySize?: number;
   redactBodies?: boolean;
 }
@@ -79,10 +79,24 @@ export class ConnectProxy {
       return;
     }
 
+    const conversationId = this.extractConversationId(req);
     if (INTERCEPTED_DOMAINS.has(hostname)) {
-      this.handleInterceptedConnect(hostname, port, clientSocket, head);
+      this.handleInterceptedConnect(hostname, port, clientSocket, head, conversationId);
     } else {
       this.handlePassthroughConnect(hostname, port, clientSocket, head);
+    }
+  }
+
+  private extractConversationId(req: IncomingMessage): string | undefined {
+    const header = req.headers['proxy-authorization'];
+    const raw = Array.isArray(header) ? header[0] : header;
+    if (!raw?.startsWith('Basic ')) return undefined;
+    try {
+      const decoded = Buffer.from(raw.slice('Basic '.length), 'base64').toString('utf8');
+      const username = decoded.split(':', 1)[0]?.trim();
+      return username || undefined;
+    } catch {
+      return undefined;
     }
   }
 
@@ -93,15 +107,21 @@ export class ConnectProxy {
     hostname: string,
     port: number,
     clientSocket: Socket,
-    head: Buffer
+    head: Buffer,
+    conversationId?: string,
   ): void {
     // Tell client the tunnel is established
     clientSocket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
 
-    const recorder = new TrafficRecorder(hostname, port, this.options.onCapturedRequest, {
+    const recorder = new TrafficRecorder(
+      hostname,
+      port,
+      (record) => this.options.onCapturedRequest(record, conversationId),
+      {
       maxBodySize: this.options.maxBodySize,
       redactBodies: this.options.redactBodies,
-    });
+      },
+    );
 
     const leafCert = this.options.certManager.getLeafCert(hostname);
 

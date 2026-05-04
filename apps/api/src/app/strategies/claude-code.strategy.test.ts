@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeCodeStrategy, toolUseToEvent } from './claude-code.strategy';
@@ -13,6 +13,9 @@ const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (process.env.CLAUDE_FAKE_ARGS_PATH) {
   fs.writeFileSync(process.env.CLAUDE_FAKE_ARGS_PATH, JSON.stringify(args));
+}
+if (process.env.CLAUDE_FAKE_CWD_PATH) {
+  fs.writeFileSync(process.env.CLAUDE_FAKE_CWD_PATH, process.cwd());
 }
 if (process.env.CLAUDE_FAKE_ENV_PATH) {
   fs.writeFileSync(process.env.CLAUDE_FAKE_ENV_PATH, JSON.stringify({
@@ -164,6 +167,7 @@ describe('ClaudeCodeStrategy API token mode', () => {
     savedEnv.DISPLAY = process.env.DISPLAY;
     savedEnv.CLAUDE_FAKE_MODE = process.env.CLAUDE_FAKE_MODE;
     savedEnv.CLAUDE_FAKE_ARGS_PATH = process.env.CLAUDE_FAKE_ARGS_PATH;
+    savedEnv.CLAUDE_FAKE_CWD_PATH = process.env.CLAUDE_FAKE_CWD_PATH;
     savedEnv.CLAUDE_FAKE_ENV_PATH = process.env.CLAUDE_FAKE_ENV_PATH;
     savedEnv.CLAUDE_FAKE_SESSION_ID = process.env.CLAUDE_FAKE_SESSION_ID;
     savedEnv.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
@@ -201,6 +205,8 @@ describe('ClaudeCodeStrategy API token mode', () => {
     else process.env.CLAUDE_FAKE_MODE = savedEnv.CLAUDE_FAKE_MODE;
     if (savedEnv.CLAUDE_FAKE_ARGS_PATH === undefined) delete process.env.CLAUDE_FAKE_ARGS_PATH;
     else process.env.CLAUDE_FAKE_ARGS_PATH = savedEnv.CLAUDE_FAKE_ARGS_PATH;
+    if (savedEnv.CLAUDE_FAKE_CWD_PATH === undefined) delete process.env.CLAUDE_FAKE_CWD_PATH;
+    else process.env.CLAUDE_FAKE_CWD_PATH = savedEnv.CLAUDE_FAKE_CWD_PATH;
     if (savedEnv.CLAUDE_FAKE_ENV_PATH === undefined) delete process.env.CLAUDE_FAKE_ENV_PATH;
     else process.env.CLAUDE_FAKE_ENV_PATH = savedEnv.CLAUDE_FAKE_ENV_PATH;
     if (savedEnv.CLAUDE_FAKE_SESSION_ID === undefined) delete process.env.CLAUDE_FAKE_SESSION_ID;
@@ -405,9 +411,53 @@ describe('ClaudeCodeStrategy API token mode', () => {
       '--effort',
       'max',
       'continue',
+      '--mcp-config',
+      join(convDir, '.mcp.runtime.json'),
       '--dangerously-skip-permissions',
       '--no-chrome',
     ]);
+    expect(existsSync(join(workspaceDir, '.claude_session'))).toBe(false);
+    expect(existsSync(join(convDir, '.claude_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming uses shared workspace with per-conversation session and MCP state', async () => {
+    const fakeBinDir = join(CLAUDE_TEST_HOME, 'fake-bin-shared');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeClaude(join(fakeBinDir, 'claude'));
+    process.env.CLAUDE_PATH = join(fakeBinDir, 'claude');
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
+
+    const argsPath = join(CLAUDE_TEST_HOME, 'claude-shared-args.json');
+    const cwdPath = join(CLAUDE_TEST_HOME, 'claude-shared-cwd.txt');
+    process.env.CLAUDE_FAKE_ARGS_PATH = argsPath;
+    process.env.CLAUDE_FAKE_CWD_PATH = cwdPath;
+
+    const defaultDir = join(CLAUDE_TEST_HOME, 'shared-default-data');
+    const convDir = join(CLAUDE_TEST_HOME, 'shared-thread-data');
+    const workspaceDir = join(defaultDir, 'claude_workspace');
+    mkdirSync(workspaceDir, { recursive: true });
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.claude_session'), 'thread-session-id');
+
+    const conversationId = '1f44de7a-2dfb-4767-8a99-c0fae4530fab';
+    const strategy = new ClaudeCodeStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => defaultDir,
+      getConversationId: () => conversationId,
+    });
+
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined, { onTool: () => undefined })
+    ).resolves.toBeUndefined();
+
+    const args = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
+    expect(readFileSync(cwdPath, 'utf8')).toBe(realpathSync(workspaceDir));
+    expect(args).toContain('--resume');
+    expect(args[args.indexOf('--resume') + 1]).toBe('thread-session-id');
+    expect(args).toContain('--mcp-config');
+    expect(args[args.indexOf('--mcp-config') + 1]).toBe(join(convDir, '.mcp.runtime.json'));
+    expect(JSON.parse(readFileSync(join(convDir, '.mcp.runtime.json'), 'utf8')).mcpServers['fibe-local'].env.CONVERSATION_ID).toBe(conversationId);
+    expect(readFileSync(join(convDir, '.claude_session'), 'utf8')).toBe('session-new');
     expect(existsSync(join(workspaceDir, '.claude_session'))).toBe(false);
   });
 

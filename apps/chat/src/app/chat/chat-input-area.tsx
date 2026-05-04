@@ -1,4 +1,4 @@
-import { Mic, Paperclip, Send, Square, X } from 'lucide-react';
+import { CornerDownRight, Mic, Paperclip, Send, Square, X } from 'lucide-react';
 import { useRef } from 'react';
 import { MentionInput } from './mention-input';
 import { FileMentionDropdown } from './file-mention-dropdown';
@@ -41,6 +41,7 @@ export interface ChatInputAreaProps {
   onRemovePendingVoice: () => void;
   onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onSend: () => void;
+  onSteer?: () => void;
   onRequestInputFocus: () => void;
   onInterrupt: () => void;
   onVoiceToggle: () => void;
@@ -72,6 +73,7 @@ export function ChatInputArea({
   onRemovePendingVoice,
   onFileChange,
   onSend,
+  onSteer,
   onRequestInputFocus,
   onInterrupt,
   onVoiceToggle,
@@ -243,6 +245,20 @@ export function ChatInputArea({
                 title={t('chat.input.queueMessageTitle')}
               >
                 <Send className="size-3.5 sm:size-4" />
+              </button>
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => {
+                  onSteer?.();
+                  onRequestInputFocus();
+                }}
+                disabled={!inputValue.trim()}
+                className="relative size-8 sm:size-9 rounded-md flex items-center justify-center border border-violet-500/40 bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 disabled:opacity-30 transition-opacity"
+                aria-label={t('chat.input.steerMessage')}
+                title={t('chat.input.steerMessageTitle')}
+              >
+                <CornerDownRight className="size-3.5 sm:size-4" />
               </button>
               <button
                 type="button"

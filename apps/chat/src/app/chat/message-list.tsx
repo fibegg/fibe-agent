@@ -297,10 +297,11 @@ function formatTime(iso: string, locale: string): string {
   }).format(d);
 }
 
-function getUploadSrc(filename: string): string {
-  const path = buildApiUrl(API_PATH_UPLOADS_BY_FILENAME(filename));
+function getUploadSrc(filename: string, conversationId = 'default'): string {
+  const base = API_PATH_UPLOADS_BY_FILENAME(filename);
+  const path = buildApiUrl(`${base}?conversationId=${encodeURIComponent(conversationId)}`);
   const token = getAuthTokenForRequest();
-  return token ? `${path}?token=${encodeURIComponent(token)}` : path;
+  return token ? `${path}&token=${encodeURIComponent(token)}` : path;
 }
 
 const ROW_GAP = 28;
@@ -330,6 +331,7 @@ const MessageRow = memo(
     containerWidthPx,
     onPlay,
     playingId,
+    conversationId,
   }: {
     msg: ChatMessage;
     maxWidthClass?: string;
@@ -339,6 +341,7 @@ const MessageRow = memo(
     containerWidthPx?: number;
     onPlay?: (id: string, text: string) => void;
     playingId?: string | null;
+    conversationId?: string;
   }) {
     const { locale, t } = useI18n();
     const { userAvatarUrl, assistantAvatarUrl } = useAvatarConfig();
@@ -394,7 +397,7 @@ const MessageRow = memo(
                     {msg.imageUrls.map((filename) => (
                       <img
                         key={filename}
-                        src={getUploadSrc(filename)}
+                        src={getUploadSrc(filename, conversationId)}
                         alt=""
                         loading="lazy"
                         className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
@@ -498,6 +501,7 @@ export interface MessageListProps {
   bothSidebarsCollapsed?: boolean;
   noOutputBody?: string;
   onRetry?: () => void;
+  conversationId?: string;
 }
 
 export const MessageList = forwardRef<MessageListHandle | null, MessageListProps>(function MessageList(
@@ -510,6 +514,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     bothSidebarsCollapsed,
     noOutputBody,
     onRetry,
+    conversationId,
   },
   ref
 ) {
@@ -639,6 +644,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               containerWidthPx={containerWidthPx}
               onPlay={handlePlay}
               playingId={playingId}
+              conversationId={conversationId}
             />
           </div>
         );
@@ -660,6 +666,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
             containerWidthPx={containerWidthPx}
             onPlay={handlePlay}
             playingId={playingId}
+            conversationId={conversationId}
           />
         );
       })}

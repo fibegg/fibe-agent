@@ -30,7 +30,7 @@ export class SessionRegistryService {
    * Each session gets its own AgentStrategy instance (= its own Claude process slot).
    * Pass conversationId to bind this session to a specific conversation thread.
    */
-  create(conversationId = 'default'): SessionContext {
+  create(conversationId = 'default', clientConnected = true): SessionContext {
     const detached = [...this.sessions.values()].find(
       (s) => s.conversationId === conversationId && !s.isClientConnected && s.isProcessing,
     );
@@ -47,6 +47,7 @@ export class SessionRegistryService {
       this.conversationManager.dataDirProvider(conversationId),
     );
     const ctx = new SessionContext(sessionId, strategy, conversationId);
+    ctx.isClientConnected = clientConnected;
     this.sessions.set(sessionId, ctx);
     this.logger.log(`Session created: ${sessionId} conversation:${conversationId} (total: ${this.sessions.size})`);
     this.broadcastSessionCount();
@@ -66,6 +67,12 @@ export class SessionRegistryService {
   /** Sessions that still have a browser WebSocket attached. */
   connected(): SessionContext[] {
     return this.all().filter((s) => s.isClientConnected);
+  }
+
+  processingForConversation(conversationId: string): SessionContext | undefined {
+    return [...this.sessions.values()].find(
+      (s) => s.conversationId === conversationId && s.isProcessing,
+    );
   }
 
   isConversationProcessing(conversationId: string, excludeSessionId?: string): boolean {
@@ -91,6 +98,14 @@ export class SessionRegistryService {
     this.sessions.delete(sessionId);
     this.logger.log(`Session destroyed: ${sessionId} (total: ${this.sessions.size})`);
     this.broadcastSessionCount();
+  }
+
+  destroyConversation(conversationId: string): void {
+    for (const ctx of [...this.sessions.values()]) {
+      if (ctx.conversationId === conversationId) {
+        this.destroy(ctx.sessionId);
+      }
+    }
   }
 
   /**

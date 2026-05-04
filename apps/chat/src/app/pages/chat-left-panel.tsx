@@ -21,6 +21,9 @@ interface ChatLeftPanelProps {
   onTabChange: (tab: FileTab) => void;
   playgroundStats?: TabStats;
   agentStats?: TabStats;
+  agentFileApiPath?: string;
+  agentFileUploadApiPath?: string;
+  agentWorkspaceAvailable?: boolean;
   onSettingsClick: () => void;
   onToggleCollapse: () => void;
   onFileSelect: (entry: PlaygroundEntry) => void;
@@ -53,6 +56,9 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onTabChange,
   playgroundStats,
   agentStats,
+  agentFileApiPath,
+  agentFileUploadApiPath,
+  agentWorkspaceAvailable,
   onSettingsClick,
   onToggleCollapse,
   onFileSelect,
@@ -101,7 +107,9 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
               agentTree={agentFileTree}
               activeTab={activeFileTab}
               onTabChange={onTabChange}
-              agentFileApiPath="agent-files/file"
+              agentFileApiPath={agentFileApiPath ?? 'agent-files/file'}
+              agentFileUploadApiPath={agentFileUploadApiPath}
+              agentWorkspaceAvailable={agentWorkspaceAvailable}
               playgroundStats={playgroundStats}
               agentStats={agentStats}
               collapsed={isCollapsed}

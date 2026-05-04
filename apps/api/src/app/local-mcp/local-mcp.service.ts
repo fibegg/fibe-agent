@@ -123,9 +123,9 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
   // ─── Tool call entry point ──────────────────────────────────────────────────
 
   async handleToolCall(req: LocalToolCallRequest): Promise<LocalToolCallResponse> {
-    const { requestId, tool, args } = req;
+    const { requestId, tool, args, conversationId } = req;
     try {
-      const result = await this.dispatch(tool as LocalToolName, args);
+      const result = await this.dispatch(tool as LocalToolName, args, conversationId);
       return { requestId, ok: true, result };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
@@ -137,29 +137,31 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
   private async dispatch(
     tool: LocalToolName,
     args: Record<string, unknown>,
+    conversationId?: string,
   ): Promise<unknown> {
     const str = (key: string) =>
       args[key] !== undefined ? String(args[key]) : undefined;
 
     switch (tool) {
       case LOCAL_TOOL.ASK_USER:
-        return this.askUser(str('question') ?? '', str('placeholder'));
+        return this.askUser(str('question') ?? '', str('placeholder'), conversationId);
 
       case LOCAL_TOOL.CONFIRM_ACTION:
         return this.confirmAction(
           str('message') ?? '',
           str('confirmLabel'),
           str('cancelLabel'),
+          conversationId,
         );
 
       case LOCAL_TOOL.SHOW_IMAGE:
-        return this.showImage(str('url'), str('base64'), str('mimeType'), str('caption'));
+        return this.showImage(str('url'), str('base64'), str('mimeType'), str('caption'), conversationId);
 
       case LOCAL_TOOL.NOTIFY:
-        return this.emit(WS_EVENT.NOTIFY, { message: str('message') ?? '', level: str('level') ?? 'info' });
+        return this.emit(WS_EVENT.NOTIFY, { message: str('message') ?? '', level: str('level') ?? 'info' }, conversationId);
 
       case LOCAL_TOOL.SET_TITLE:
-        return this.emit(WS_EVENT.SET_TITLE, { title: str('title') ?? '' });
+        return this.emit(WS_EVENT.SET_TITLE, { title: str('title') ?? '' }, conversationId);
 
       case LOCAL_TOOL.GET_MODE:
         return { mode: this.modeGetter ? this.modeGetter() : 'Exploring...' };
@@ -181,14 +183,14 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
 
   // ─── Tool handlers ──────────────────────────────────────────────────────────
 
-  private askUser(question: string, placeholder?: string): Promise<{ answer: string }> {
+  private askUser(question: string, placeholder?: string, conversationId?: string): Promise<{ answer: string }> {
     if (!question.trim()) {
       return Promise.reject(new Error('ask_user: question must not be empty'));
     }
     const questionId = randomUUID();
     this.outbound$.next({
       type: WS_EVENT.ASK_USER_PROMPT,
-      data: { questionId, question, placeholder: placeholder ?? '' },
+      data: { questionId, question, placeholder: placeholder ?? '', ...(conversationId ? { conversationId } : {}) },
     });
     return this.waitForReply<{ answer: string }>(questionId);
   }
@@ -197,6 +199,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     message: string,
     confirmLabel?: string,
     cancelLabel?: string,
+    conversationId?: string,
   ): Promise<{ confirmed: boolean }> {
     if (!message.trim()) {
       return Promise.reject(new Error('confirm_action: message must not be empty'));
@@ -209,6 +212,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
         message,
         confirmLabel: confirmLabel ?? 'Yes',
         cancelLabel: cancelLabel ?? 'No',
+        ...(conversationId ? { conversationId } : {}),
       },
     });
     return this.waitForReply<{ confirmed: boolean }>(questionId);
@@ -219,6 +223,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     base64?: string,
     mimeType?: string,
     caption?: string,
+    conversationId?: string,
   ): Promise<{ ok: true }> {
     if (!url && !base64) {
       return Promise.reject(new Error('show_image: either url or base64 must be provided'));
@@ -228,12 +233,12 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       base64: base64 ?? null,
       mimeType: mimeType ?? 'image/png',
       caption: caption ?? '',
-    });
+    }, conversationId);
   }
 
   /** Fire-and-forget: emit an event and immediately resolve { ok: true }. */
-  private emit(type: string, data: Record<string, unknown>): Promise<{ ok: true }> {
-    this.outbound$.next({ type, data });
+  private emit(type: string, data: Record<string, unknown>, conversationId?: string): Promise<{ ok: true }> {
+    this.outbound$.next({ type, data: { ...data, ...(conversationId ? { conversationId } : {}) } });
     return Promise.resolve({ ok: true });
   }
 

@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { ERROR_CODE } from '@shared/ws-constants';
 
@@ -9,9 +10,10 @@ export type SendMessageOrchestratorResult = {
   accepted: boolean;
   messageId?: string;
   error?: string;
+  resolvedPolicy?: string;
 };
 
-export type SendMessageSuccess = { accepted: true; messageId: string };
+export type SendMessageSuccess = { accepted: true; messageId: string; resolvedPolicy?: string };
 
 export function handleSendMessage(
   result: SendMessageOrchestratorResult
@@ -23,10 +25,17 @@ export function handleSendMessage(
     if (result.error === ERROR_CODE.AGENT_BUSY) {
       throw new ConflictException(ERROR_CODE.AGENT_BUSY);
     }
+    if (result.error === 'Conversation not found') {
+      throw new NotFoundException('Conversation not found');
+    }
     throw new BadRequestException(result.error ?? 'Unknown error');
   }
   if (result.messageId == null) {
     throw new BadRequestException('messageId missing');
   }
-  return { accepted: true, messageId: result.messageId };
+  return {
+    accepted: true,
+    messageId: result.messageId,
+    ...(result.resolvedPolicy ? { resolvedPolicy: result.resolvedPolicy } : {}),
+  };
 }

@@ -35,9 +35,10 @@ export function hasNonEmptyPlainTextOnClipboard(data: DataTransfer | null): bool
 
 export interface UseChatAttachmentsParams {
   isAuthenticated: boolean;
+  conversationId?: string;
 }
 
-export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams) {
+export function useChatAttachments({ isAuthenticated, conversationId = 'default' }: UseChatAttachmentsParams) {
   const [pendingImages, setPendingImages] = useState<{ url: string; filename: string }[]>([]);
   const [pendingAttachments, setPendingAttachments] = useState<{ filename: string; name: string }[]>([]);
   const [pendingVoice, setPendingVoice] = useState<string | null>(null);
@@ -64,11 +65,12 @@ export function useChatAttachments({ isAuthenticated }: UseChatAttachmentsParams
   const uploadAttachment = useCallback(async (file: File): Promise<string | null> => {
     const formData = new FormData();
     formData.append('file', file, file.name);
-    const res = await apiRequest(API_PATHS.UPLOADS, { method: 'POST', body: formData });
+    const url = `${API_PATHS.UPLOADS}?conversationId=${encodeURIComponent(conversationId)}`;
+    const res = await apiRequest(url, { method: 'POST', body: formData });
     if (!res.ok) return null;
     const data = (await res.json()) as { filename: string };
     return data.filename ?? null;
-  }, []);
+  }, [conversationId]);
 
   const addAttachment = useCallback((filename: string, name: string) => {
     setPendingAttachments((prev) =>

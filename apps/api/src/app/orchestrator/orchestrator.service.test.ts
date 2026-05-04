@@ -70,6 +70,7 @@ describe('OrchestratorService', () => {
     const effortStore = new EffortStoreService(config as never);
     // Mock ConversationManagerService — returns the same stores for any conversationId
     const conversationManager = {
+      get: (_id: string) => ({ messageStore, activityStore }),
       getOrCreate: (_id: string) => ({ messageStore, activityStore }),
       dataDirProvider: (_id: string) => ({ getConversationDataDir: () => dataDir }),
       touch: (_id: string) => undefined,
@@ -77,11 +78,6 @@ describe('OrchestratorService', () => {
       create: () => ({ id: 'test', title: 'New chat', createdAt: '', lastMessageAt: '' }),
       setTitle: () => true,
       delete: () => true,
-      // Per-conversation model/effort — return null so global stores are used
-      getConversationModel: (_id: string) => null,
-      setConversationModel: (_id: string, _model: string) => true,
-      getConversationEffort: (_id: string) => null,
-      setConversationEffort: (_id: string, _effort: string) => true,
       // Claude session marker
       getClaudeSessionMarker: (_id: string) => null,
       setClaudeSessionMarker: (_id: string, _sessionId: string | null) => true,
@@ -382,9 +378,54 @@ describe('OrchestratorService', () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
     ctx.isAuthenticated = true; orch.isAuthenticated = true;
     ctx.isProcessing = true;
-    const result = await orch.sendMessageFromApi('hello');
+    const result = await orch.sendMessageFromApi('hello', 'default');
     expect(result.accepted).toBe(false);
     expect(result.error).toBe(ERROR_CODE.AGENT_BUSY);
+  });
+
+  test('sendMessageFromApi queue policy accepts same-conversation busy sends', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+
+    const result = await orch.sendMessageFromApi('queued', 'default', undefined, undefined, 'queue');
+
+    expect(result.accepted).toBe(true);
+    expect(result.resolvedPolicy).toBe('queue');
+    expect(ctx.queuedTurns).toHaveLength(1);
+    expect(ctx.queuedTurns[0]?.text).toBe('queued');
+  });
+
+  test('sendMessageFromApi steer policy uses provider steer when available', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+    let steered = '';
+    (ctx.strategy as unknown as { steerAgent?: (message: string) => void }).steerAgent = (message) => {
+      steered = message;
+    };
+
+    const result = await orch.sendMessageFromApi('steer me', 'default', undefined, undefined, 'steer');
+
+    expect(result.accepted).toBe(true);
+    expect(result.resolvedPolicy).toBe('steer');
+    expect(steered).toBe('steer me');
+    expect(ctx.queuedTurns).toHaveLength(1);
+    expect(ctx.queuedTurns[0]?.text).toBe('');
+  });
+
+  test('sendMessageFromApi steer policy falls back to queue when provider cannot steer', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+    (ctx.strategy as unknown as { steerAgent?: (message: string) => void }).steerAgent = undefined;
+
+    const result = await orch.sendMessageFromApi('fallback', 'default', undefined, undefined, 'steer');
+
+    expect(result.accepted).toBe(true);
+    expect(result.resolvedPolicy).toBe('queue');
+    expect(ctx.queuedTurns).toHaveLength(1);
+    expect(ctx.queuedTurns[0]?.text).toBe('fallback');
   });
 
   test('sendMessageFromApi returns accepted and messageId when authenticated', async () => {
@@ -394,6 +435,7 @@ describe('OrchestratorService', () => {
     expect(result.accepted).toBe(true);
     expect(result.messageId).toBeDefined();
     expect(typeof result.messageId).toBe('string');
+    expect(sessionRegistry.all().some((s) => s.conversationId === 'inbox')).toBe(true);
     await waitForIdle(ctx);
   });
 

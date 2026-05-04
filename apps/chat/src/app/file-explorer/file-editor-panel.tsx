@@ -43,6 +43,14 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
   );
 }
 
+function withQueryParams(path: string, params: Record<string, string>): string {
+  const url = new URL(path, window.location.origin);
+  for (const [key, value] of Object.entries(params)) {
+    url.searchParams.set(key, value);
+  }
+  return `${url.pathname}${url.search}`;
+}
+
 // ─── Status Bar ───────────────────────────────────────────────────────────────
 
 function StatusBar({ language, lines, isDirty, isSaving }: { language: string; lines: number; isDirty: boolean; isSaving: boolean }) {
@@ -127,7 +135,7 @@ export function FileEditorPanel({
     setLiveContent(null);
     setEditorReady(false);
 
-    const path = `${apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE}?path=${encodeURIComponent(entry.path)}`;
+    const path = withQueryParams(apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE, { path: entry.path });
 
     apiRequest(path, { signal: ac.signal })
       .then(async (res) => {
@@ -225,9 +233,7 @@ export function FileEditorPanel({
 
     setIsSaving(true);
     try {
-      const savePath = apiBasePath
-        ? apiBasePath.replace('/file', '/file')
-        : API_PATHS.PLAYGROUNDS_FILE;
+      const savePath = apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE;
 
       const res = await apiRequest(savePath, {
         method: 'PUT',

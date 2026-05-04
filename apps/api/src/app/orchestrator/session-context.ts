@@ -3,6 +3,16 @@ import type { TokenUsage } from '../activity-store/activity-store.service';
 import type { OutboundEvent } from './orchestrator.service';
 import type { AgentStrategy } from '../strategies/strategy.types';
 
+export type BusyPolicy = 'reject' | 'queue' | 'steer';
+
+export interface QueuedAgentTurn {
+  text: string;
+  imageUrls: string[];
+  audioFilename: string | null;
+  attachmentFilenames?: string[];
+  policy: Exclude<BusyPolicy, 'reject'>;
+}
+
 /**
  * Holds all mutable state that is scoped to a single WebSocket connection / chat session.
  *
@@ -45,6 +55,9 @@ export class SessionContext {
   currentActivityId: string | null = null;
   reasoningTextAccumulated = '';
   lastStreamUsage: TokenUsage | undefined = undefined;
+
+  /** User turns accepted while this conversation is already processing. */
+  queuedTurns: QueuedAgentTurn[] = [];
 
   /** Cached system-prompt file contents (same for all sessions, but cheaply replicated). */
   cachedSystemPromptFromFile: string | null = null;

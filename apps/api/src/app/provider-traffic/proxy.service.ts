@@ -62,11 +62,11 @@ export class ProxyService implements OnModuleInit, OnModuleDestroy {
 
     this.proxy = new ConnectProxy({
       certManager: this.certManager,
-      onCapturedRequest: (record) => {
+      onCapturedRequest: (record, conversationId) => {
         this.logger.debug(
           `Captured ${record.request.method} ${record.request.url} → ${record.response.statusCode} (${record.durationMs}ms)`
         );
-        this.trafficStore.append(record);
+        this.trafficStore.append(record, conversationId);
       },
       maxBodySize,
       redactBodies,

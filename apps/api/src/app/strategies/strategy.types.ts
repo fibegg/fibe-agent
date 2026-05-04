@@ -55,11 +55,14 @@ export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
 
 export interface ConversationDataDirProvider {
   getConversationDataDir(): string;
+  getDefaultConversationDataDir?(): string;
+  getConversationId?(): string;
 }
 
 export interface AgentStrategy {
   ensureSettings?(): void;
   getWorkingDir?(): string | null;
+  prepareWorkingDir?(): void;
   executeAuth(connection: AuthConnection): void;
   submitAuthCode(code: string): void;
   cancelAuth(): void;

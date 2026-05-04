@@ -9,6 +9,10 @@ export class SendMessageDto {
   conversationId?: string;
 
   @IsOptional()
+  @IsString()
+  busyPolicy?: 'reject' | 'queue' | 'steer';
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   images?: string[];

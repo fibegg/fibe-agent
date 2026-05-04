@@ -27,11 +27,12 @@ export class ChatPromptContextService {
     audioFilename: string | null,
     attachmentFilenames: string[] | undefined,
     historyMessages?: HistoryMessage[],
+    conversationId?: string,
   ): Promise<string> {
     const historyContext = this.buildHistoryContext(historyMessages);
-    const imageContext = await this.buildImageContext(imageUrls);
-    const voiceContext = this.buildVoiceContext(audioFilename);
-    const attachmentContext = this.buildAttachmentContext(attachmentFilenames ?? []);
+    const imageContext = await this.buildImageContext(imageUrls, conversationId);
+    const voiceContext = this.buildVoiceContext(audioFilename, conversationId);
+    const attachmentContext = this.buildAttachmentContext(attachmentFilenames ?? [], conversationId);
     const fileContext = await this.buildFileContext(text);
     return `${historyContext}${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
   }
@@ -75,15 +76,15 @@ export class ChatPromptContextService {
     return `[MODE]${mode}[/MODE]\n${text}`;
   }
 
-  private async buildImageContext(imageUrls: string[]): Promise<string> {
+  private async buildImageContext(imageUrls: string[], conversationId?: string): Promise<string> {
     if (!imageUrls.length) return '';
     const strings: string[] = [];
     for (const f of imageUrls) {
-      const p = this.uploadsService.getPath(f);
+      const p = this.uploadsService.getPath(f, conversationId);
       if (!p) continue;
       
       let infoStr = `- ${p}\n`;
-      const info = await this.uploadsService.extractImageInfo(f);
+      const info = await this.uploadsService.extractImageInfo(f, conversationId);
       if (info) {
         const dimensions = (info.width && info.height) ? `${info.width}x${info.height} pixels` : '';
         const format = info.format || '';
@@ -102,16 +103,16 @@ export class ChatPromptContextService {
       : '';
   }
 
-  private buildVoiceContext(audioFilename: string | null): string {
+  private buildVoiceContext(audioFilename: string | null, conversationId?: string): string {
     if (!audioFilename) return '';
-    const path = this.uploadsService.getPath(audioFilename);
+    const path = this.uploadsService.getPath(audioFilename, conversationId);
     return path ? `\n\nThe user attached a voice recording. File path: ${path}\n\n` : '';
   }
 
-  private buildAttachmentContext(attachmentFilenames: string[]): string {
+  private buildAttachmentContext(attachmentFilenames: string[], conversationId?: string): string {
     if (!attachmentFilenames.length) return '';
     const paths = attachmentFilenames
-      .map((f) => this.uploadsService.getPath(f))
+      .map((f) => this.uploadsService.getPath(f, conversationId))
       .filter((p): p is string => p !== null);
     return paths.length > 0
       ? `\n\nThe user attached ${paths.length} file(s). Full paths (for reference):\n${paths.map((p) => `- ${p}`).join('\n')}\n\n`

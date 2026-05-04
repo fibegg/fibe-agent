@@ -211,6 +211,18 @@ describe('FileExplorer', () => {
     );
   });
 
+  it('shows the agent workspace empty state when the workspace exists without visible files', () => {
+    render(
+      <FileExplorer
+        tree={[]}
+        agentTree={[]}
+        agentWorkspaceAvailable
+      />
+    );
+
+    expect(screen.getByText('AI workspace is empty.')).toBeTruthy();
+  });
+
   it('expands and collapses directory when folder is clicked', async () => {
     const tree: PlaygroundEntry[] = [
       {

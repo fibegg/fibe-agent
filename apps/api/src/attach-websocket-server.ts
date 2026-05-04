@@ -22,6 +22,7 @@ type ClientMessage = {
   audio?: string;
   audioFilename?: string;
   attachmentFilenames?: string[];
+  busyPolicy?: 'reject' | 'queue' | 'steer';
 };
 
 /** Extract the token query param from an IncomingMessage URL. */

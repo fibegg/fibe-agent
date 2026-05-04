@@ -447,6 +447,34 @@ describe('ChatHeader', () => {
     expect(screen.getByRole('slider', { name: /effort/i })).toBeTruthy();
   });
 
+  it('switches conversations from the Simplicate header picker', () => {
+    const onConversationSelect = vi.fn();
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+        simplicateMode
+        conversations={[
+          { id: 'default', title: 'Default', createdAt: '2026-01-01', lastMessageAt: '2026-01-01' },
+          { id: 'thread-1', title: 'Thread one', createdAt: '2026-01-01', lastMessageAt: '2026-01-01' },
+        ]}
+        activeConversationId="default"
+        onConversationSelect={onConversationSelect}
+        onConversationCreate={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /switch conversation/i }));
+    const threadItem = screen.getByRole('menuitem', { name: /thread one/i });
+    fireEvent.mouseDown(threadItem);
+    expect(screen.getByRole('menu', { name: /conversations/i })).toBeTruthy();
+    fireEvent.click(threadItem);
+
+    expect(onConversationSelect).toHaveBeenCalledWith('thread-1');
+    expect(screen.queryByRole('menu', { name: /conversations/i })).toBeNull();
+  });
+
   // ─── Reset conversation ───────────────────────────────────────────────────
 
   it('shows Reset conversation item in MoreActionsMenu when onResetConversation is provided', () => {
@@ -556,4 +584,3 @@ describe('ChatHeader', () => {
     });
   });
 });
-

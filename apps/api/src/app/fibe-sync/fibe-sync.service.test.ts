@@ -67,7 +67,7 @@ describe('FibeSyncService', () => {
             'Content-Type': 'application/json',
             Authorization: 'Bearer key123',
           },
-          body: JSON.stringify({ content: '{"data":"test"}' }),
+          body: JSON.stringify({ content: '{"data":"test"}', conversation_id: 'default' }),
         },
       );
     } finally {
@@ -122,7 +122,7 @@ describe('FibeSyncService', () => {
         'https://fibe.test/api/agents/agent-1/raw_providers',
         expect.objectContaining({
           method: 'PUT',
-          body: JSON.stringify({ content: '[{"id":"raw-1"}]' }),
+          body: JSON.stringify({ content: '[{"id":"raw-1"}]', conversation_id: 'default' }),
         }),
       );
     } finally {

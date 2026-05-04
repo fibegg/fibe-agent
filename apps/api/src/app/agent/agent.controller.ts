@@ -44,7 +44,8 @@ export class AgentController {
       text,
       body.conversationId,
       body.images,
-      body.attachmentFilenames
+      body.attachmentFilenames,
+      body.busyPolicy,
     );
     return handleSendMessage(result);
   }

@@ -7,6 +7,7 @@ export const WS_ACTION = {
   LOGOUT: 'logout',
   SEND_CHAT_MESSAGE: 'send_chat_message',
   QUEUE_MESSAGE: 'queue_message',
+  STEER_MESSAGE: 'steer_message',
   SUBMIT_STORY: 'submit_story',
   GET_MODEL: 'get_model',
   SET_MODEL: 'set_model',
@@ -63,6 +64,8 @@ export const WS_EVENT = {
   SESSIONS_UPDATED: 'sessions_updated',
   /** Sent to a client right after WS connect to identify which conversation this session is for. */
   CONVERSATION_ID: 'conversation_id',
+  /** Conversation was deleted by another client or API caller. */
+  CONVERSATION_DELETED: 'conversation_deleted',
 } as const;
 
 export const AUTH_STATUS = {

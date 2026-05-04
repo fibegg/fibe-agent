@@ -3,6 +3,7 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  NotFoundException,
 } from '@nestjs/common';
 import { handleSendMessage } from './agent-send-message.handler';
 import { ERROR_CODE } from '@shared/ws-constants';
@@ -39,6 +40,12 @@ describe('handleSendMessage', () => {
     expect(() =>
       handleSendMessage({ accepted: false, error: 'Unknown error' })
     ).toThrow(BadRequestException);
+  });
+
+  test('throws NotFoundException when conversation does not exist', () => {
+    expect(() =>
+      handleSendMessage({ accepted: false, error: 'Conversation not found' })
+    ).toThrow(NotFoundException);
   });
 
   test('throws BadRequestException when result accepted false and no error', () => {

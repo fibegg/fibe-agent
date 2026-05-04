@@ -1,11 +1,13 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   ConversationManagerService,
   DEFAULT_CONVERSATION_ID,
   DEFAULT_CONVERSATION_TITLE,
+  INBOX_CONVERSATION_ID,
+  INBOX_CONVERSATION_TITLE,
 } from './conversation-manager.service';
 
 describe('ConversationManagerService', () => {
@@ -34,23 +36,45 @@ describe('ConversationManagerService', () => {
       expect.objectContaining({
         id: DEFAULT_CONVERSATION_ID,
         title: DEFAULT_CONVERSATION_TITLE,
+        readonly: false,
+        system: false,
+        hiddenWhenEmpty: false,
       }),
     );
     expect(manager.get(DEFAULT_CONVERSATION_ID)).toBeTruthy();
   });
 
-  test('does not delete the default conversation', () => {
+  test('creates protected inbox conversation hidden while empty', () => {
+    const manager = createManager();
+
+    expect(manager.list().find((m) => m.id === INBOX_CONVERSATION_ID)).toBeUndefined();
+    expect(manager.get(INBOX_CONVERSATION_ID)?.meta).toEqual(
+      expect.objectContaining({
+        id: INBOX_CONVERSATION_ID,
+        title: INBOX_CONVERSATION_TITLE,
+        readonly: true,
+        system: true,
+        hiddenWhenEmpty: true,
+      }),
+    );
+  });
+
+  test('does not delete protected system conversations', () => {
     const manager = createManager();
 
     expect(manager.delete(DEFAULT_CONVERSATION_ID)).toBe(false);
+    expect(manager.delete(INBOX_CONVERSATION_ID)).toBe(false);
     expect(manager.get(DEFAULT_CONVERSATION_ID)).toBeTruthy();
+    expect(manager.get(INBOX_CONVERSATION_ID)).toBeTruthy();
   });
 
-  test('does not rename the default conversation', () => {
+  test('does not rename protected system conversations', () => {
     const manager = createManager();
 
     expect(manager.setTitle(DEFAULT_CONVERSATION_ID, 'Renamed')).toBe(false);
+    expect(manager.setTitle(INBOX_CONVERSATION_ID, 'Renamed')).toBe(false);
     expect(manager.get(DEFAULT_CONVERSATION_ID)?.meta.title).toBe(DEFAULT_CONVERSATION_TITLE);
+    expect(manager.get(INBOX_CONVERSATION_ID)?.meta.title).toBe(INBOX_CONVERSATION_TITLE);
   });
 
   test('delete() removes the conversation directory from disk', () => {
@@ -65,40 +89,20 @@ describe('ConversationManagerService', () => {
     expect(manager.list().find((m) => m.id === meta.id)).toBeUndefined();
   });
 
-  // ── Per-conversation model / effort ──────────────────────────────────────
+  test('startup retry cleans tombstoned conversation directories', () => {
+    const conversationsDir = join(dataDir, 'conversations');
+    const staleDir = join(conversationsDir, 'stale-conversation');
+    const tombstonesPath = join(conversationsDir, 'tombstones.json');
+    mkdirSync(staleDir, { recursive: true });
+    writeFileSync(join(staleDir, 'leftover.txt'), 'stale', 'utf8');
+    writeFileSync(tombstonesPath, JSON.stringify([
+      { id: 'stale-conversation', dir: staleDir, tombstonedAt: new Date().toISOString() },
+    ]), 'utf8');
 
-  test('getConversationModel returns null when not set', () => {
-    const manager = createManager();
-    const { id } = manager.create('test');
-    expect(manager.getConversationModel(id)).toBeNull();
-  });
+    createManager();
 
-  test('setConversationModel persists and is readable', () => {
-    const manager = createManager();
-    const { id } = manager.create('test');
-
-    expect(manager.setConversationModel(id, 'claude-opus-4-5')).toBe(true);
-    expect(manager.getConversationModel(id)).toBe('claude-opus-4-5');
-
-    // Persisted to index — a fresh manager load should see it
-    const manager2 = createManager();
-    expect(manager2.getConversationModel(id)).toBe('claude-opus-4-5');
-  });
-
-  test('setConversationModel with empty string clears the override', () => {
-    const manager = createManager();
-    const { id } = manager.create('test');
-    manager.setConversationModel(id, 'some-model');
-    manager.setConversationModel(id, '');
-    expect(manager.getConversationModel(id)).toBeNull();
-  });
-
-  test('setConversationEffort persists and is readable', () => {
-    const manager = createManager();
-    const { id } = manager.create('test');
-
-    expect(manager.setConversationEffort(id, 'high')).toBe(true);
-    expect(manager.getConversationEffort(id)).toBe('high');
+    expect(existsSync(staleDir)).toBe(false);
+    expect(existsSync(tombstonesPath)).toBe(false);
   });
 
   // ── Claude session marker ─────────────────────────────────────────────────
@@ -118,7 +122,7 @@ describe('ConversationManagerService', () => {
     expect(manager.getClaudeSessionMarker(id)).toBe(sessionId);
 
     // Verify the file is on disk in the expected location
-    const markerPath = join(dataDir, 'conversations', id, 'claude_workspace', '.claude_session');
+    const markerPath = join(dataDir, 'conversations', id, '.claude_session');
     expect(existsSync(markerPath)).toBe(true);
     expect(readFileSync(markerPath, 'utf8').trim()).toBe(sessionId);
   });
@@ -129,5 +133,18 @@ describe('ConversationManagerService', () => {
     manager.setClaudeSessionMarker(id, 'some-session');
     manager.setClaudeSessionMarker(id, null);
     expect(manager.getClaudeSessionMarker(id)).toBeNull();
+  });
+
+  test('default conversation falls back to legacy workspace session marker', () => {
+    const manager = createManager();
+    const legacyWorkspaceDir = join(dataDir, 'claude_workspace');
+    mkdirSync(legacyWorkspaceDir, { recursive: true });
+    writeFileSync(join(legacyWorkspaceDir, '.claude_session'), 'legacy-default-session', 'utf8');
+
+    expect(manager.getClaudeSessionMarker(DEFAULT_CONVERSATION_ID)).toBe('legacy-default-session');
+
+    manager.setClaudeSessionMarker(DEFAULT_CONVERSATION_ID, null);
+    expect(manager.getClaudeSessionMarker(DEFAULT_CONVERSATION_ID)).toBeNull();
+    expect(existsSync(join(legacyWorkspaceDir, '.claude_session'))).toBe(false);
   });
 });

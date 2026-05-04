@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { existsSync, mkdirSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
+import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from '../conversation/conversation-manager.service';
 import { extFromMimetype } from './uploads-handler';
 import sizeOf from 'image-size';
 import Tesseract from 'tesseract.js';
@@ -28,15 +29,18 @@ function audioExtFromMime(mime: string): string {
 export class UploadsService {
   private readonly logger = new Logger(UploadsService.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly conversationManager?: ConversationManagerService,
+  ) {}
 
-  getUploadsDir(): string {
-    return join(this.config.getConversationDataDir(), 'uploads');
+  getUploadsDir(conversationId = DEFAULT_CONVERSATION_ID): string {
+    return join(this.conversationDataDir(conversationId), 'uploads');
   }
 
-  async saveImage(dataUrl: string): Promise<string> {
+  async saveImage(dataUrl: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
     if (!dataUrl.startsWith('data:')) return dataUrl;
-    this.ensureUploadsDir();
+    this.ensureUploadsDir(conversationId);
     const match = dataUrl.match(DATA_URL_REGEX);
     const ext = match?.[1]?.startsWith('image/')
       ? match[1].replace('image/', '') === 'jpeg'
@@ -44,38 +48,38 @@ export class UploadsService {
         : match[1].replace('image/', '')
       : 'png';
     const base64 = match?.[2] ?? dataUrl.replace(/^data:[^;]+;base64,/, '');
-    return this.writeFile(ext, Buffer.from(base64, 'base64'));
+    return this.writeFile(ext, Buffer.from(base64, 'base64'), conversationId);
   }
 
-  async saveAudio(dataUrl: string): Promise<string> {
-    this.ensureUploadsDir();
+  async saveAudio(dataUrl: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+    this.ensureUploadsDir(conversationId);
     const match = dataUrl.match(DATA_URL_REGEX);
     const mime = match?.[1] ?? 'audio/webm';
     const base64 = match?.[2] ?? dataUrl.replace(/^data:[^;]+;base64,/, '');
     const ext = audioExtFromMime(mime);
-    return this.writeFile(ext, Buffer.from(base64, 'base64'));
+    return this.writeFile(ext, Buffer.from(base64, 'base64'), conversationId);
   }
 
-  async saveAudioFromBuffer(buffer: Buffer, mimeType: string): Promise<string> {
-    this.ensureUploadsDir();
+  async saveAudioFromBuffer(buffer: Buffer, mimeType: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+    this.ensureUploadsDir(conversationId);
     const ext = audioExtFromMime(mimeType);
-    return this.writeFile(ext, buffer);
+    return this.writeFile(ext, buffer, conversationId);
   }
 
-  async saveFileFromBuffer(buffer: Buffer, mimetype: string): Promise<string> {
-    this.ensureUploadsDir();
+  async saveFileFromBuffer(buffer: Buffer, mimetype: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+    this.ensureUploadsDir(conversationId);
     const ext = extFromMimetype(mimetype);
-    return this.writeFile(ext, buffer);
+    return this.writeFile(ext, buffer, conversationId);
   }
 
-  getPath(filename: string): string | null {
+  getPath(filename: string, conversationId = DEFAULT_CONVERSATION_ID): string | null {
     if (!this.isSafeFilename(filename)) return null;
-    const path = join(this.getUploadsDir(), filename);
+    const path = join(this.getUploadsDir(conversationId), filename);
     return existsSync(path) ? path : null;
   }
 
-  async extractImageInfo(filename: string): Promise<ImageInfo | null> {
-    const p = this.getPath(filename);
+  async extractImageInfo(filename: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<ImageInfo | null> {
+    const p = this.getPath(filename, conversationId);
     if (!p) return null;
 
     if (!/\.(jpg|jpeg|png)$/i.test(filename)) {
@@ -110,15 +114,22 @@ export class UploadsService {
     }
   }
 
-  private ensureUploadsDir(): void {
-    const dir = this.getUploadsDir();
+  private ensureUploadsDir(conversationId: string): void {
+    const dir = this.getUploadsDir(conversationId);
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
   }
 
-  private async writeFile(ext: string, buffer: Buffer): Promise<string> {
+  private async writeFile(ext: string, buffer: Buffer, conversationId: string): Promise<string> {
     const filename = `${randomUUID()}.${ext}`;
-    await writeFile(join(this.getUploadsDir(), filename), buffer);
+    await writeFile(join(this.getUploadsDir(conversationId), filename), buffer);
     return filename;
+  }
+
+  private conversationDataDir(conversationId: string): string {
+    if (!this.conversationManager || conversationId === DEFAULT_CONVERSATION_ID) {
+      return this.config.getConversationDataDir();
+    }
+    return this.conversationManager.dataDirFor(conversationId || DEFAULT_CONVERSATION_ID);
   }
 
   private isSafeFilename(filename: string): boolean {

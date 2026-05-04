@@ -82,6 +82,6 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
    * Returns an empty object when the proxy is not active.
    */
   protected getProxyEnv(): Record<string, string> {
-    return getProxyEnv();
+    return getProxyEnv(this.conversationDataDir?.getConversationId?.());
   }
 }

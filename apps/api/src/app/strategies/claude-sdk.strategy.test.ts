@@ -21,9 +21,18 @@ import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
-function makeStrategy(useApiTokenMode = false, dataDir?: string): ClaudeSdkStrategy {
+function makeStrategy(
+  useApiTokenMode = false,
+  dataDir?: string,
+  defaultDataDir?: string,
+  conversationId = 'conv-123',
+): ClaudeSdkStrategy {
   const provider = dataDir
-    ? { getConversationDataDir: () => dataDir }
+    ? {
+        getConversationDataDir: () => dataDir,
+        ...(defaultDataDir ? { getDefaultConversationDataDir: () => defaultDataDir } : {}),
+        getConversationId: () => conversationId,
+      }
     : undefined;
   return new ClaudeSdkStrategy(useApiTokenMode, provider as never);
 }
@@ -517,6 +526,11 @@ describe('ClaudeSdkStrategy › getWorkingDir', () => {
     const strategy = makeStrategy(false, '/data/conv-123');
     expect(strategy.getWorkingDir()).toContain('claude_workspace');
     expect(strategy.getWorkingDir()).toContain('conv-123');
+  });
+
+  test('uses shared default workspace when a default data dir is provided', () => {
+    const strategy = makeStrategy(false, '/data/conversations/thread-a', '/data/default-agent');
+    expect(strategy.getWorkingDir()).toBe(join('/data/default-agent', 'claude_workspace'));
   });
 
   test('falls back to playground dir when no conversationDataDir', () => {

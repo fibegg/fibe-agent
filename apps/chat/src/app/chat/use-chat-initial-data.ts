@@ -16,6 +16,7 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [refreshingModels, setRefreshingModels] = useState(false);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [messagesLoadError, setMessagesLoadError] = useState(false);
   const [agentProvider, setAgentProvider] = useState<string | null>(null);
   const loadSeqRef = useRef(0);
   const messageCacheRef = useRef(new Map<string, ChatListItem[]>());
@@ -35,6 +36,7 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
     loadSeqRef.current = loadSeq;
     setMessagesState(messageCacheRef.current.get(conversationId) ?? []);
     setMessagesLoaded(false);
+    setMessagesLoadError(false);
 
     try {
       const res = await apiRequest(messagesPathForConversation(conversationId));
@@ -50,10 +52,12 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
       const next = Array.isArray(data) ? data : [];
       messageCacheRef.current.set(conversationId, next);
       setMessagesState(next);
+      setMessagesLoadError(false);
       setMessagesLoaded(true);
     } catch {
       if (loadSeq !== loadSeqRef.current) return;
       setMessagesState(messageCacheRef.current.get(conversationId) ?? []);
+      setMessagesLoadError(true);
       setMessagesLoaded(true);
     }
   }, [conversationId, navigate]);
@@ -107,5 +111,5 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
     }
   }, [authenticated, loadMessages, loadModelOptions]);
 
-  return { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, loadMessages, refreshModelOptions, agentProvider };
+  return { messages, setMessages, messagesLoaded, messagesLoadError, modelOptions, refreshingModels, loadMessages, refreshModelOptions, agentProvider };
 }

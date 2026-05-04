@@ -1,4 +1,4 @@
-import { ChevronDown, GitCompareArrows, Loader2, TerminalSquare } from 'lucide-react';
+import { ChevronDown, ChevronRight, GitCompareArrows, Loader2, TerminalSquare } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
@@ -98,7 +98,7 @@ export function ChatPage() {
 
   const authenticated = isAuthenticated();
   const {
-    conversations,
+    conversations: rawConversations,
     loading: conversationsLoading,
     activeId: activeConversationId,
     create: createConversation,
@@ -106,16 +106,21 @@ export function ChatPage() {
     autoTitle: autoTitleConversation,
     remove: deleteConversation,
     switchTo: switchConversation,
+    refresh: refreshConversations,
   } = useConversations();
-  const { messages, setMessages, messagesLoaded, modelOptions, refreshingModels, refreshModelOptions, agentProvider } =
+  const conversations = Array.isArray(rawConversations) ? rawConversations : [];
+  const activeConversationReadonly =
+    activeConversationId === 'inbox' ||
+    conversations.find((c) => c.id === activeConversationId)?.readonly === true;
+  const { messages, setMessages, messagesLoaded, messagesLoadError, modelOptions, refreshingModels, refreshModelOptions, agentProvider } =
     useChatInitialData(authenticated, activeConversationId);
 
   const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, stats: playgroundStats, refetch: refetchPlaygrounds } =
     usePlaygroundFiles();
-  const { tree: agentFileTree, hasFiles: hasAgentFiles, stats: agentStats } =
-    useAgentFiles();
+  const { tree: agentFileTree, hasFiles: hasAgentFiles, workspaceAvailable: hasAgentWorkspace, stats: agentStats, refetch: refetchAgentFiles } =
+    useAgentFiles(activeConversationId);
   const hasPlaygroundFiles = playgroundEntries.length > 0;
-  const hasAnyFiles = hasPlaygroundFiles || hasAgentFiles;
+  const hasAnyFiles = hasPlaygroundFiles || hasAgentFiles || hasAgentWorkspace;
   const layout = useChatLayout(hasAnyFiles, playgroundLoading);
   const [activeFileTab, setActiveFileTab] = useState<FileTab>('playground');
   const {
@@ -164,17 +169,21 @@ export function ChatPage() {
 
   const handleLocalToolEvent = useCallback((data: ServerMessage) => {
     if (data.type === 'ask_user_prompt' && data.questionId && data.question) {
+      const questionId = data.questionId;
+      const question = data.question;
       setLocalToolItems((prev) => [
         ...prev,
-        { kind: 'ask', questionId: data.questionId!, question: data.question!, placeholder: data.placeholder },
+        { kind: 'ask', questionId, question, placeholder: data.placeholder },
       ]);
     } else if (data.type === 'confirm_action_prompt' && data.questionId && data.message) {
+      const questionId = data.questionId;
+      const message = data.message;
       setLocalToolItems((prev) => [
         ...prev,
         {
           kind: 'confirm',
-          questionId: data.questionId!,
-          message: data.message!,
+          questionId,
+          message,
           confirmLabel: data.confirmLabel,
           cancelLabel: data.cancelLabel,
         },
@@ -192,9 +201,10 @@ export function ChatPage() {
         },
       ]);
     } else if (data.type === 'notify' && data.message) {
+      const message = data.message;
       setToasts((prev) => [
         ...prev,
-        { id: makeClientId('toast'), message: data.message!, level: data.level ?? 'info' },
+        { id: makeClientId('toast'), message, level: data.level ?? 'info' },
       ]);
     }
   }, []);
@@ -369,6 +379,13 @@ export function ChatPage() {
     }
   }, [setCurrentEffort, setCurrentModel, setMessages]);
 
+  const handleConversationDeleted = useCallback((conversationId: string) => {
+    if (conversationId === activeConversationId) {
+      switchConversation('default');
+    }
+    void refreshConversations();
+  }, [activeConversationId, refreshConversations, switchConversation]);
+
   const voiceRecorder = useVoiceRecorder();
   const localStt = useLocalStt();
   const voiceRecorderRef = useRef(voiceRecorder);
@@ -446,6 +463,7 @@ export function ChatPage() {
     handleConversationReset,
     activeConversationId,
     handleStreamAbort,
+    handleConversationDeleted,
   );
 
   useEffect(() => {
@@ -453,11 +471,28 @@ export function ChatPage() {
   }, [send]);
 
   useEffect(() => {
+    void refreshConversations();
+  }, [anyProcessing, refreshConversations]);
+
+  useEffect(() => {
     handleStreamAbort();
     resetActivityState();
     setLastSentMessage(null);
     setLocalToolItems([]);
   }, [activeConversationId, handleStreamAbort, resetActivityState]);
+
+  const handleConversationSelect = useCallback((id: string): void => {
+    if (id === activeConversationId) return;
+    setSearchQuery('');
+    setViewingFile(null);
+    switchConversation(id);
+  }, [activeConversationId, setSearchQuery, switchConversation]);
+
+  const handleConversationCreate = useCallback(async (): Promise<void> => {
+    setSearchQuery('');
+    setViewingFile(null);
+    await createConversation();
+  }, [createConversation, setSearchQuery]);
 
   useEffect(() => {
     const notifyParent = () => {
@@ -480,6 +515,7 @@ export function ChatPage() {
     if (greetingSentRef.current) return;
     if (state !== CHAT_STATES.AUTHENTICATED) return;
     if (!messagesLoaded) return; // Wait for history fetch to complete
+    if (messagesLoadError) return; // Do not treat a failed history load as an empty conversation.
     if (activeConversationId !== initialGreetingConversationIdRef.current) return;
 
     const greeting = consumeGreeting();
@@ -494,7 +530,7 @@ export function ChatPage() {
       { role: 'user', body: greeting, created_at: new Date().toISOString(), optimistic: true },
     ]);
     scroll.markJustSent();
-  }, [activeConversationId, state, messagesLoaded, messages, send, setMessages, scroll]);
+  }, [activeConversationId, state, messagesLoaded, messagesLoadError, messages, send, setMessages, scroll]);
 
   const {
     pendingImages,
@@ -514,7 +550,10 @@ export function ChatPage() {
     handleDragLeave,
     handleDrop,
     handlePaste,
-  } = useChatAttachments({ isAuthenticated: state === CHAT_STATES.AUTHENTICATED });
+  } = useChatAttachments({
+    isAuthenticated: state === CHAT_STATES.AUTHENTICATED,
+    conversationId: activeConversationId,
+  });
 
   const {
     filteredMessages,
@@ -556,7 +595,7 @@ export function ChatPage() {
     return transcript;
   }, []);
 
-  const handleSend = useCallback(async () => {
+  const handleSend = useCallback(async (busyPolicy: 'queue' | 'steer' = 'queue') => {
     let currentInput = inputValue.trim();
     const isQueuing = state === CHAT_STATES.AWAITING_RESPONSE;
     const currentPendingImages = [...pendingImages];
@@ -577,19 +616,14 @@ export function ChatPage() {
     if (!hasContent) return;
     if (!isQueuing && state !== CHAT_STATES.AUTHENTICATED) return;
 
-    if (isQueuing) {
-      // Queue mode — text only
-      if (!currentInput) return;
-      send({ action: 'queue_message', text: currentInput });
-    } else {
-      send({
-        action: 'send_chat_message',
-        text: currentInput || '',
-        ...(currentPendingImages.length ? { images: currentPendingImages.map(img => img.filename) } : {}),
-        ...(currentPendingVoiceFilename ? { audioFilename: currentPendingVoiceFilename } : currentPendingVoice ? { audio: currentPendingVoice } : {}),
-        ...(currentPendingAttachments.length ? { attachmentFilenames: currentPendingAttachments.map((a) => a.filename) } : {}),
-      });
-    }
+    send({
+      action: isQueuing && busyPolicy === 'steer' ? 'steer_message' : 'send_chat_message',
+      text: currentInput || '',
+      ...(isQueuing ? { busyPolicy } : {}),
+      ...(currentPendingImages.length ? { images: currentPendingImages.map(img => img.filename) } : {}),
+      ...(currentPendingVoiceFilename ? { audioFilename: currentPendingVoiceFilename } : currentPendingVoice ? { audio: currentPendingVoice } : {}),
+      ...(currentPendingAttachments.length ? { attachmentFilenames: currentPendingAttachments.map((a) => a.filename) } : {}),
+    });
 
     try {
       window.parent.postMessage({ type: 'player_message_sent' }, '*');
@@ -609,7 +643,7 @@ export function ChatPage() {
     }
     setLastSentMessage(currentInput || null);
     setInputState({ value: '', cursor: 0 });
-    if (!isQueuing) clearPending();
+    clearPending();
     scroll.markJustSent();
     focusInput({ persistent: true });
   }, [
@@ -617,6 +651,10 @@ export function ChatPage() {
     clearPending, focusInput, setInputState, setMessages, stopAndTranscribe,
     autoTitleConversation, activeConversationId,
   ]);
+
+  const handleSteer = useCallback(() => {
+    void handleSend('steer');
+  }, [handleSend]);
 
   const handleSendContinue = useCallback(() => {
     send({
@@ -637,7 +675,7 @@ export function ChatPage() {
   }, [dismissError, handleSendContinue]);
 
   useEffect(() => {
-    handleSendRef.current = handleSend;
+    handleSendRef.current = () => { void handleSend(); };
   }, [handleSend]);
 
   // Clear queued badges when streaming stops (e.g. session interrupted and restarted)
@@ -737,7 +775,9 @@ export function ChatPage() {
                   agentTree={agentFileTree as PlaygroundEntry[]}
                   activeTab={activeFileTab}
                   onTabChange={setActiveFileTab}
-                  agentFileApiPath="agent-files/file"
+                  agentFileApiPath={`agent-files/file?conversationId=${encodeURIComponent(activeConversationId)}`}
+                  agentFileUploadApiPath={`${API_PATHS.AGENT_FILES_UPLOAD}?conversationId=${encodeURIComponent(activeConversationId)}`}
+                  agentWorkspaceAvailable={hasAgentWorkspace}
                   playgroundStats={playgroundStats}
                   agentStats={agentStats}
                   onSettingsClick={openSettings}
@@ -749,7 +789,7 @@ export function ChatPage() {
                   selectedPath={viewingFile?.path ?? null}
                   dirtyPaths={pageDirtyPaths}
                   onPlaygroundUploaded={refetchPlaygrounds}
-                  onAgentUploaded={refetchPlaygrounds}
+                  onAgentUploaded={refetchAgentFiles}
                   agentProviderLabel={agentProviderLabel}
                   currentModel={currentModel}
                 />
@@ -821,14 +861,17 @@ export function ChatPage() {
             selectedPath={viewingFile?.path ?? null}
             dirtyPaths={pageDirtyPaths}
             onPlaygroundUploaded={refetchPlaygrounds}
-            onAgentUploaded={refetchPlaygrounds}
+            onAgentUploaded={refetchAgentFiles}
+            agentFileApiPath={`agent-files/file?conversationId=${encodeURIComponent(activeConversationId)}`}
+            agentFileUploadApiPath={`${API_PATHS.AGENT_FILES_UPLOAD}?conversationId=${encodeURIComponent(activeConversationId)}`}
+            agentWorkspaceAvailable={hasAgentWorkspace}
             agentProviderLabel={agentProviderLabel}
             currentModel={currentModel}
             conversations={conversations}
             conversationsLoading={conversationsLoading}
             activeConversationId={activeConversationId}
-            onConversationSelect={(id) => { switchConversation(id); }}
-            onConversationCreate={async () => { await createConversation(); }}
+            onConversationSelect={handleConversationSelect}
+            onConversationCreate={handleConversationCreate}
             onConversationRename={renameConversation}
             onConversationDelete={deleteConversation}
           />
@@ -919,8 +962,8 @@ export function ChatPage() {
           anyProcessing={anyProcessing}
           conversations={compactMode ? conversations : undefined}
           activeConversationId={compactMode ? activeConversationId : undefined}
-          onConversationSelect={compactMode ? switchConversation : undefined}
-          onConversationCreate={compactMode ? async () => { await createConversation(); } : undefined}
+          onConversationSelect={compactMode ? handleConversationSelect : undefined}
+          onConversationCreate={compactMode ? handleConversationCreate : undefined}
         />
         <ChatErrorBanner
           errorMessage={errorMessage}
@@ -928,6 +971,17 @@ export function ChatPage() {
           onRetry={handleRetryFromError}
           onDismiss={dismissError}
         />
+        {!isMobile && compactMode && !compactFileBrowserOpen && (
+          <button
+            type="button"
+            onClick={() => setCompactFileBrowserOpen(true)}
+            className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/90 text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md transition-all hover:scale-105 hover:bg-card hover:text-violet-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+            aria-label={t('fileExplorer.expand')}
+            title={t('fileExplorer.expand')}
+          >
+            <ChevronRight className="size-4" aria-hidden />
+          </button>
+        )}
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
           <div
             ref={scroll.scrollRef}
@@ -947,6 +1001,7 @@ export function ChatPage() {
                 }
                 noOutputBody={t('chat.noOutput')}
                 onRetry={handleSendContinue}
+                conversationId={activeConversationId}
               />
               <div ref={scroll.endRef} />
             </div>
@@ -1019,16 +1074,17 @@ export function ChatPage() {
               aria-label={t('header.files')}
             >
               <LazyFileViewerPanel
-                entry={viewingFile!}
+                entry={viewingFile}
                 onClose={() => setViewingFile(null)}
                 inline
-                apiBasePath={viewingFile.source === 'agent' ? API_PATHS.AGENT_FILES_FILE : undefined}
+                apiBasePath={viewingFile.source === 'agent' ? `${API_PATHS.AGENT_FILES_FILE}?conversationId=${encodeURIComponent(activeConversationId)}` : undefined}
                 onDirtyChange={handlePageDirtyChange}
               />
             </div>
           </Suspense>
         )}
         </div>
+        {!activeConversationReadonly && (
         <ChatInputArea
           state={state}
           inputValue={inputValue}
@@ -1054,11 +1110,13 @@ export function ChatPage() {
           onRemovePendingVoice={removePendingVoice}
           onFileChange={handleFileChange}
           onSend={handleSend}
+          onSteer={handleSteer}
           onRequestInputFocus={() => focusInput({ persistent: true })}
           onInterrupt={interruptAgent}
           onVoiceToggle={handleVoiceToggle}
           maxPendingTotal={MAX_PENDING_TOTAL}
         />
+        )}
         <RightDrawer
           open={terminalOpen}
           onClose={closeTerminal}
