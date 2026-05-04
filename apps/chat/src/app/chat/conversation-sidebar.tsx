@@ -162,7 +162,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search…"
-              className="w-full rounded-md bg-muted/40 border border-border/20 pl-6 pr-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-1 focus:ring-violet-500/30 transition-all"
+              className="w-full rounded-md bg-background/80 border border-border/30 pl-6 pr-2 py-1 text-xs text-foreground placeholder:text-muted-foreground/40 outline-none focus:ring-1 focus:ring-violet-500/30 transition-all appearance-none"
+              style={{ colorScheme: 'dark' }}
             />
             {searchQuery && (
               <button

@@ -103,6 +103,7 @@ export function ChatPage() {
     activeId: activeConversationId,
     create: createConversation,
     rename: renameConversation,
+    autoTitle: autoTitleConversation,
     remove: deleteConversation,
     switchTo: switchConversation,
   } = useConversations();
@@ -601,6 +602,10 @@ export function ChatPage() {
         ...prev,
         { role: 'user', body: currentInput, created_at: new Date().toISOString(), optimistic: true, ...(isQueuing ? { queued: true } : {}) },
       ]);
+      // Auto-title the conversation on the very first user message
+      if (!isQueuing) {
+        autoTitleConversation(activeConversationId, currentInput);
+      }
     }
     setLastSentMessage(currentInput || null);
     setInputState({ value: '', cursor: 0 });
@@ -610,6 +615,7 @@ export function ChatPage() {
   }, [
     send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll,
     clearPending, focusInput, setInputState, setMessages, stopAndTranscribe,
+    autoTitleConversation, activeConversationId,
   ]);
 
   const handleSendContinue = useCallback(() => {
