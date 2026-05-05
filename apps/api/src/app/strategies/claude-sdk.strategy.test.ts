@@ -13,7 +13,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
@@ -49,6 +49,21 @@ function freshState() {
   };
 }
 
+function readApiPackageJson(): { name?: string; dependencies?: Record<string, string> } {
+  for (const path of [join(process.cwd(), 'package.json'), join(process.cwd(), 'apps/api/package.json')]) {
+    try {
+      const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
+        name?: string;
+        dependencies?: Record<string, string>;
+      };
+      if (parsed.name === '@fibe.gg/api') return parsed;
+    } catch {
+      /* keep looking; tests may run from the workspace root or apps/api */
+    }
+  }
+  throw new Error('Unable to locate apps/api/package.json');
+}
+
 // Access private handleSdkMessage and handleStreamEvent via casting.
 function handleMsg(
   strategy: ClaudeSdkStrategy,
@@ -75,6 +90,13 @@ function handleEvent(
 }
 
 // ─── describe blocks ─────────────────────────────────────────────────────────
+
+describe('ClaudeSdkStrategy › runtime packaging', () => {
+  test('declares the Claude agent SDK as an API runtime dependency', () => {
+    const pkg = readApiPackageJson();
+    expect(pkg.dependencies?.['@anthropic-ai/claude-agent-sdk']).toBe('0.2.126');
+  });
+});
 
 describe('ClaudeSdkStrategy › handleSdkMessage', () => {
   let strategy: ClaudeSdkStrategy;
