@@ -36,7 +36,7 @@ export function ChatLayout({
 }: ChatLayoutProps) {
   return (
     <div
-      className={`flex h-dvh w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
+      className={`flex h-full w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
       style={isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : undefined}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
