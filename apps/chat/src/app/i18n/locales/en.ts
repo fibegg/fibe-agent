@@ -149,6 +149,8 @@ export const en = {
   'auth.tokenPlaceholder': 'sk-...',
   'auth.codePlaceholder': 'Paste code here...',
   'auth.copyDeviceCode': 'Copy device code',
+  'auth.waitingForUrl': 'Generating authorization link…',
+  'auth.generatingUrl': 'Please wait while the provider generates an authorization link.',
   'auth.connecting': 'Connecting...',
 
   'login.connecting': 'Connecting...',

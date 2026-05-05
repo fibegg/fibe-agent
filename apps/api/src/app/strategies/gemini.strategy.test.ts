@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { GeminiStrategy, buildGeminiArgs } from './gemini.strategy';
+import { GeminiStrategy, buildGeminiArgs, parseGeminiStreamJsonLine } from './gemini.strategy';
 
 function writeFakeGemini(path: string): void {
   writeFileSync(path, `#!/usr/bin/env node
@@ -58,7 +58,8 @@ if (process.env.GEMINI_FAKE_MODE === 'empty') {
   process.exit(0);
 }
 writeSessionFile();
-console.log(process.env.GEMINI_FAKE_MESSAGE || 'fake response');
+const fakeMsg = process.env.GEMINI_FAKE_MESSAGE || 'fake response';
+console.log(JSON.stringify({ type: 'message', role: 'assistant', content: fakeMsg, delta: true }));
 `, { mode: 0o755 });
   chmodSync(path, 0o755);
 }
@@ -246,7 +247,7 @@ describe('GeminiStrategy API token mode', () => {
 describe('buildGeminiArgs', () => {
   test('passes the prompt via the -p=value equals form so yargs binds it to -p', () => {
     const args = buildGeminiArgs('hello world', 'gemini-2.5-pro', null);
-    expect(args).toEqual(['-m', 'gemini-2.5-pro', '-p=hello world', '--yolo']);
+    expect(args).toEqual(['-m', 'gemini-2.5-pro', '-p=hello world', '--output-format', 'stream-json', '--yolo']);
   });
 
   test('keeps -p bound to the value when the prompt starts with a dash (markdown bullet)', () => {
@@ -266,10 +267,68 @@ describe('buildGeminiArgs', () => {
   });
 
   test('omits -m when model is empty or the literal string "undefined"', () => {
-    expect(buildGeminiArgs('hi', '', null)).toEqual(['-p=hi', '--yolo']);
-    expect(buildGeminiArgs('hi', 'undefined', null)).toEqual(['-p=hi', '--yolo']);
+    expect(buildGeminiArgs('hi', '', null)).toEqual(['-p=hi', '--output-format', 'stream-json', '--yolo']);
+    expect(buildGeminiArgs('hi', 'undefined', null)).toEqual(['-p=hi', '--output-format', 'stream-json', '--yolo']);
   });
 });
+describe('parseGeminiStreamJsonLine', () => {
+  test('returns content for an assistant delta message', () => {
+    const line = JSON.stringify({ type: 'message', role: 'assistant', content: 'Hello!', delta: true });
+    expect(parseGeminiStreamJsonLine(line)).toBe('Hello!');
+  });
+
+  test('returns content even when delta field is absent', () => {
+    const line = JSON.stringify({ type: 'message', role: 'assistant', content: 'Hi there' });
+    expect(parseGeminiStreamJsonLine(line)).toBe('Hi there');
+  });
+
+  test('returns null for user messages', () => {
+    const line = JSON.stringify({ type: 'message', role: 'user', content: 'who r u' });
+    expect(parseGeminiStreamJsonLine(line)).toBeNull();
+  });
+
+  test('returns null for init events', () => {
+    const line = JSON.stringify({ type: 'init', session_id: 'abc', model: 'gemini-2.5-flash' });
+    expect(parseGeminiStreamJsonLine(line)).toBeNull();
+  });
+
+  test('returns null for result events', () => {
+    const line = JSON.stringify({ type: 'result', status: 'success', stats: { total_tokens: 100 } });
+    expect(parseGeminiStreamJsonLine(line)).toBeNull();
+  });
+
+  test('returns null for empty string', () => {
+    expect(parseGeminiStreamJsonLine('')).toBeNull();
+  });
+
+  test('returns null for whitespace-only line', () => {
+    expect(parseGeminiStreamJsonLine('   ')).toBeNull();
+  });
+
+  test('returns null for non-JSON lines (MCP warnings, ANSI output)', () => {
+    expect(parseGeminiStreamJsonLine('MCP issues detected. Run /mcp list for status.')).toBeNull();
+    expect(parseGeminiStreamJsonLine('Warning: Basic terminal detected (TERM=dumb).')).toBeNull();
+    expect(parseGeminiStreamJsonLine('\x1B[2J\x1B[H')).toBeNull();
+  });
+
+  test('returns null when content is not a string', () => {
+    const line = JSON.stringify({ type: 'message', role: 'assistant', content: 42 });
+    expect(parseGeminiStreamJsonLine(line)).toBeNull();
+  });
+
+  test('handles empty string content', () => {
+    const line = JSON.stringify({ type: 'message', role: 'assistant', content: '', delta: true });
+    // Empty string is a valid content (e.g. a partial chunk starting with nothing)
+    expect(parseGeminiStreamJsonLine(line)).toBe('');
+  });
+
+  test('handles multi-word content with newlines', () => {
+    const content = 'Line one\nLine two\nLine three';
+    const line = JSON.stringify({ type: 'message', role: 'assistant', content, delta: true });
+    expect(parseGeminiStreamJsonLine(line)).toBe(content);
+  });
+});
+
 describe('GeminiStrategy session recovery', () => {
   let testHome = '';
   const savedEnv: Record<string, string | undefined> = {};
@@ -353,6 +412,8 @@ describe('GeminiStrategy session recovery', () => {
       '--resume',
       'stale-gemini-session',
       '-p=continue',
+      '--output-format',
+      'stream-json',
       '--yolo',
     ]);
     expect(existsSync(join(convDir, '.gemini_session'))).toBe(false);
@@ -380,6 +441,8 @@ describe('GeminiStrategy session recovery', () => {
       '-m',
       'gemini-2.5-pro',
       '-p=hello',
+      '--output-format',
+      'stream-json',
       '--yolo',
     ]);
 
@@ -390,6 +453,8 @@ describe('GeminiStrategy session recovery', () => {
       '--resume',
       'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
       '-p=again',
+      '--output-format',
+      'stream-json',
       '--yolo',
     ]);
   });
@@ -417,6 +482,8 @@ describe('GeminiStrategy session recovery', () => {
       '-m',
       'gemini-2.5-pro',
       '-p=fresh',
+      '--output-format',
+      'stream-json',
       '--yolo',
     ]);
   });

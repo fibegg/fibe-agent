@@ -26,6 +26,8 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
 
   const showUrl = authModal.authUrl && !authModal.isManualToken;
   const isDeviceCode = Boolean(authModal.deviceCode && !authModal.isManualToken);
+  // Waiting for OAuth URL: OAuth flow started (not manual token, no device code yet, no URL yet)
+  const isWaitingForUrl = !authModal.isManualToken && !authModal.authUrl && !authModal.deviceCode;
   const codeLabel = authModal.isManualToken
     ? t('auth.apiToken')
     : isDeviceCode
@@ -84,6 +86,13 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           </button>
         </div>
         <div className="p-4 sm:p-5 space-y-4">
+          {isWaitingForUrl && (
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <span className="size-7 border-2 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
+              <p className="text-sm font-medium text-foreground">{t('auth.waitingForUrl')}</p>
+              <p className="text-xs text-muted-foreground max-w-xs">{t('auth.generatingUrl')}</p>
+            </div>
+          )}
           {showUrl && (
             <div className="space-y-2">
               <p className="text-xs sm:text-sm text-muted-foreground">
@@ -103,57 +112,59 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           {showUrl && (authModal.deviceCode || authModal.isManualToken) && (
             <div className="border-t border-border-subtle pt-4" />
           )}
-          <div className="space-y-2">
-            <label htmlFor="auth-code" className="block text-xs sm:text-sm font-medium text-foreground">
-              {codeLabel}
-            </label>
-            {authModal.isManualToken && (
-              <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
-                {t('auth.manualHelp')}
-              </p>
-            )}
-            <div className="relative">
-              <input
-                id="auth-code"
-                type={authModal.isManualToken ? 'password' : 'text'}
-                value={codeValue}
-                readOnly={readOnly}
-                onChange={(e) => setCode(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={authModal.isManualToken ? t('auth.tokenPlaceholder') : t('auth.codePlaceholder')}
-                className={INPUT_ROUNDED}
-                autoComplete="off"
-                autoFocus
-              />
-              {isDeviceCode && (
+          {!isWaitingForUrl && (
+            <div className="space-y-2">
+              <label htmlFor="auth-code" className="block text-xs sm:text-sm font-medium text-foreground">
+                {codeLabel}
+              </label>
+              {authModal.isManualToken && (
+                <p className="text-[11px] sm:text-xs text-muted-foreground leading-relaxed">
+                  {t('auth.manualHelp')}
+                </p>
+              )}
+              <div className="relative">
+                <input
+                  id="auth-code"
+                  type={authModal.isManualToken ? 'password' : 'text'}
+                  value={codeValue}
+                  readOnly={readOnly}
+                  onChange={(e) => setCode(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={authModal.isManualToken ? t('auth.tokenPlaceholder') : t('auth.codePlaceholder')}
+                  className={INPUT_ROUNDED}
+                  autoComplete="off"
+                  autoFocus
+                />
+                {isDeviceCode && (
+                  <button
+                    type="button"
+                    onClick={handleCopyDeviceCode}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                    title={t('auth.copyDeviceCode')}
+                  >
+                    {copied ? `✓ ${t('common.copied')}` : t('common.copy')}
+                  </button>
+                )}
+              </div>
+              {showSubmit && (
                 <button
                   type="button"
-                  onClick={handleCopyDeviceCode}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
-                  title={t('auth.copyDeviceCode')}
+                  onClick={handleSubmit}
+                  disabled={submitting}
+                  className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-violet-500/20 disabled:opacity-50`}
                 >
-                  {copied ? `✓ ${t('common.copied')}` : t('common.copy')}
+                  {submitting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      {t('auth.connecting')}
+                    </span>
+                  ) : (
+                    t('common.submit')
+                  )}
                 </button>
               )}
             </div>
-            {showSubmit && (
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={submitting}
-                className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-violet-500/20 disabled:opacity-50`}
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="size-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    {t('auth.connecting')}
-                  </span>
-                ) : (
-                  t('common.submit')
-                )}
-              </button>
-            )}
-          </div>
+          )}
         </div>
       </div>
     </div>

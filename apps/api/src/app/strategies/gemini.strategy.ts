@@ -53,6 +53,19 @@ function getGeminiProcessEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEn
   };
 }
 
+/**
+ * Environment for the auth subprocess only.
+ * We intentionally omit NO_BROWSER so that Gemini CLI ≥0.40 goes through the
+ * consent→URL flow instead of throwing FatalAuthenticationError immediately when
+ * both NO_BROWSER=true AND non-interactive mode are detected together.
+ * The strategy auto-answers the consent prompt and extracts the printed URL.
+ */
+function getGeminiAuthProcessEnv(): NodeJS.ProcessEnv {
+  const env = getGeminiProcessEnv();
+  const { NO_BROWSER: _, ...rest } = env;
+  return rest;
+}
+
 function getGeminiConfigDir(): string {
   if (process.env.SESSION_DIR?.trim()) return process.env.SESSION_DIR;
   if (process.env.GEMINI_CLI_HOME?.trim()) return join(process.env.GEMINI_CLI_HOME, '.gemini');
@@ -87,8 +100,32 @@ export function buildGeminiArgs(
     ...getModelArgsList(model),
     ...(sessionId ? ['--resume', sessionId] : []),
     `-p=${effectivePrompt}`,
+    '--output-format', 'stream-json',
     ...buildProviderArgs(GEMINI_PROVIDER_ARGS_CONFIG),
   ];
+}
+
+/**
+ * Parse a single line from Gemini CLI stream-json output.
+ * Returns the content text to stream if the line is an assistant delta message,
+ * or null for all other event types (init, result, user message, etc.).
+ */
+export function parseGeminiStreamJsonLine(line: string): string | null {
+  if (!line.trim()) return null;
+  try {
+    const parsed = JSON.parse(line) as Record<string, unknown>;
+    if (
+      parsed.type === 'message' &&
+      parsed.role === 'assistant' &&
+      typeof parsed.content === 'string'
+    ) {
+      return parsed.content;
+    }
+  } catch {
+    // Not valid JSON — could be a warning line like "MCP issues detected..." or ANSI output.
+    // Ignore silently.
+  }
+  return null;
 }
 
 function missingSessionError(message: string): boolean {
@@ -289,9 +326,10 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     this.ensureSettings();
     let authUrlExtracted = false;
     let isCode42Expected = false;
+    let consentAnswered = false;
 
     const { process: proc, cancel } = runAuthProcess('gemini', ['-p', ''], {
-      env: getGeminiProcessEnv(),
+      env: getGeminiAuthProcessEnv(),
       onData: (output) => {
         if (
           output.includes('No input provided via stdin') ||
@@ -302,10 +340,30 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         if (!output.includes('Waiting for authentication')) {
           this.logger.log(`RAW OUTPUT: ${output.trim()}`);
         }
-        const urlMatch = output.match(/https:\/\/accounts\.google\.com[^\s"'>]+/);
+
+        // Gemini CLI ≥0.40 asks for consent before showing the URL in non-interactive mode.
+        // Auto-answer 'Y' so the CLI proceeds to generate and print the OAuth URL.
+        if (
+          !consentAnswered &&
+          (output.includes('Do you want to continue') || output.includes('[Y/n]'))
+        ) {
+          consentAnswered = true;
+          this.logger.log('Gemini consent prompt detected — auto-answering Y');
+          try {
+            proc.stdin?.write('Y\n');
+          } catch {
+            /* stdin may not be writable, ignore */
+          }
+        }
+
+        // Newer CLI: "Please visit the following URL to authorize the application:\n\n<URL>"
+        // Older CLI: URL appears bare in output matching accounts.google.com directly
+        const visitMatch = output.match(/Please visit the following URL[^\n]*\n+\s*(https:\/\/\S+)/);
+        const bareMatch = output.match(/https:\/\/accounts\.google\.com[^\s"'<>]+/);
+        const urlMatch = visitMatch?.[1] ?? bareMatch?.[0];
         if (urlMatch && !authUrlExtracted) {
           authUrlExtracted = true;
-          this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
+          this.currentConnection?.sendAuthUrlGenerated(urlMatch);
         }
       },
       onClose: (code) => {
@@ -323,6 +381,21 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       },
       onError: (err) => {
         this.logger.error('Gemini Auth Process error', err);
+        if (this.currentConnection) {
+          const isNotFound = (err as NodeJS.ErrnoException).code === 'ENOENT';
+          if (isNotFound) {
+            this.currentConnection.sendError(
+              'Gemini CLI not found. Install it with: npm install -g @google/gemini-cli\n' +
+              'Alternatively, set AGENT_AUTH_MODE=api-token and provide your GEMINI_API_KEY.'
+            );
+            this.currentConnection.sendAuthManualToken();
+          } else {
+            this.currentConnection.sendAuthStatus('unauthenticated');
+          }
+          this.currentConnection = null;
+        }
+        this.activeAuthProcess = null;
+        this.authCancel = null;
       },
     });
 
@@ -514,6 +587,8 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       let stdoutBuffer = '';
       let authUrlEmitted = false;
       let hasEmittedOutput = false;
+      /** Partial line accumulator — a chunk may not end on a newline boundary. */
+      let lineCarryOver = '';
 
       const detectAndEmitAuthUrl = (output: string): boolean => {
         if (authUrlEmitted) return true;
@@ -527,15 +602,27 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       };
 
       geminiProcess.stdout?.on('data', (data: Buffer | string) => {
-        const text = data.toString();
-        stdoutBuffer += text;
+        const raw = data.toString();
+        stdoutBuffer += raw;
         if (detectAndEmitAuthUrl(stdoutBuffer)) {
           geminiProcess.kill();
           reject(new Error(AUTH_REQUIRED_MESSAGE));
           return;
         }
-        if (text.trim()) hasEmittedOutput = true;
-        onChunk(text);
+
+        // Line-buffer the stream-json output so we parse complete JSON lines.
+        const combined = lineCarryOver + raw;
+        const lines = combined.split('\n');
+        // The last element is either '' (if raw ended with \n) or an incomplete line.
+        lineCarryOver = lines.pop() ?? '';
+
+        for (const line of lines) {
+          const content = parseGeminiStreamJsonLine(line);
+          if (content !== null) {
+            hasEmittedOutput = true;
+            onChunk(content);
+          }
+        }
       });
 
       geminiProcess.stderr?.on('data', (data: Buffer | string) => {

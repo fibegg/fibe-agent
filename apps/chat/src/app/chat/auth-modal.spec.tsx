@@ -94,11 +94,24 @@ describe('AuthModal', () => {
     expect(screen.getByText(/open authentication url/i)).toBeTruthy();
   });
 
-  it('shows submit button for standard code mode', () => {
+  it('shows waiting-for-url spinner when no authUrl, deviceCode, or isManualToken', () => {
     render(
       <AuthModal
         open={true}
         authModal={DEFAULT_AUTH_MODAL}
+        onClose={vi.fn()}
+        onSubmitCode={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/generating authorization link/i)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /submit/i })).toBeNull();
+  });
+
+  it('shows submit button for standard code mode (authUrl present)', () => {
+    render(
+      <AuthModal
+        open={true}
+        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
       />
@@ -111,7 +124,7 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={DEFAULT_AUTH_MODAL}
+        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
       />
@@ -126,7 +139,7 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={DEFAULT_AUTH_MODAL}
+        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
       />
@@ -140,7 +153,7 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={DEFAULT_AUTH_MODAL}
+        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
       />
@@ -156,7 +169,7 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={DEFAULT_AUTH_MODAL}
+        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
       />

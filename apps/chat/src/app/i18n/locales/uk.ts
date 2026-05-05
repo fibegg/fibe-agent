@@ -151,6 +151,8 @@ export const uk: Record<TranslationKey, string> = {
   'auth.tokenPlaceholder': 'sk-...',
   'auth.codePlaceholder': 'Вставте код тут...',
   'auth.copyDeviceCode': 'Копіювати код пристрою',
+  'auth.waitingForUrl': 'Генерується посилання авторизації…',
+  'auth.generatingUrl': 'Зачекайте, поки провайдер генерує посилання для авторизації.',
   'auth.connecting': 'Підключення...',
 
   'login.connecting': 'Підключення...',
