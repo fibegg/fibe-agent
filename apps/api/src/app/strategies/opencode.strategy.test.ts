@@ -100,7 +100,15 @@ if (args[0] === 'serve') {
       const body = await readBody(req);
       record({ type: 'message-body', sessionID: messageMatch[1], query: Object.fromEntries(url.searchParams.entries()), body });
       const text = process.env.OPENCODE_FAKE_MESSAGE || 'fake app-server response';
+      const prompt = (body && body.parts && body.parts[0] && body.parts[0].text) || 'hello';
+      // Simulate real opencode: user message first, then assistant
+      sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_user', sessionID: messageMatch[1], role: 'user' } } });
+      sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_user', sessionID: messageMatch[1], messageID: 'msg_user', type: 'text', text: '[MODE]Casting...[/MODE]\\n' + prompt } } });
+      sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_assistant', sessionID: messageMatch[1], role: 'assistant' } } });
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_reason', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'reasoning', text: 'thinking' } } });
+      // Emit delta events for the assistant text part
+      sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(0, Math.ceil(text.length / 2)) } });
+      sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(Math.ceil(text.length / 2)) } });
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
       sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } });
       sendJson(res, 200, {
@@ -494,7 +502,10 @@ describe('OpencodeStrategy', () => {
       { onReasoningChunk: (chunk) => reasoning.push(chunk) },
     );
 
-    expect(chunks.join('')).toBe('fake app-server response');
+    const joinedChunks = chunks.join('');
+    expect(joinedChunks).toContain('fake app-server response');
+    // Ensure text is not duplicated (dedup works correctly)
+    expect(joinedChunks).not.toBe('fake app-server responsefake app-server response');
     expect(reasoning.join('')).toContain('thinking');
     expect(readFileSync(join(convDir, '.opencode_session'), 'utf8')).toBe('ses_fakeOpenCodeSession');
     expect(existsSync(join(defaultDir, 'opencode_workspace', 'opencode.json'))).toBe(true);
@@ -562,6 +573,103 @@ describe('OpencodeStrategy', () => {
     expect(messageRequest?.body?.parts?.[0]?.text).toContain('[Operator Interruption]');
     expect(messageRequest?.body?.parts?.[0]?.text).toContain('adjust course');
     expect(messageRequest?.body?.parts?.[0]?.text).toContain('continue');
+  });
+});
+
+// ─── User-message filtering & MODE tag stripping ────────────────────────────
+
+describe('OpencodeStrategy app-server SSE filtering', () => {
+  const savedFilterEnv: Record<string, string | undefined> = {};
+  const filterEnvKeys = [
+    'HOME', 'PATH', 'ANTHROPIC_API_KEY', 'OPENCODE_AGENT_TRANSPORT',
+    'OPENCODE_FAKE_MESSAGE', 'OPENCODE_FAKE_ENV_PATH', 'OPENCODE_FAKE_ARGS_PATH',
+    'OPENCODE_FAKE_MODE', 'OPENCODE_FAKE_REQUESTS_PATH', 'OPENCODE_CONFIG_CONTENT',
+    'OPENCODE_USE_APP_SERVER', 'OPENCODE_FAKE_SESSION_ID',
+  ] as const;
+
+  beforeEach(() => {
+    for (const k of filterEnvKeys) savedFilterEnv[k] = process.env[k];
+    process.env.HOME = TEST_HOME;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    delete process.env.OPENCODE_FAKE_MODE;
+    delete process.env.OPENCODE_FAKE_MESSAGE;
+    if (existsSync(TEST_HOME)) rmSync(TEST_HOME, { recursive: true, force: true });
+    mkdirSync(TEST_HOME, { recursive: true });
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+  });
+
+  afterEach(() => {
+    for (const k of filterEnvKeys) {
+      if (savedFilterEnv[k] === undefined) delete process.env[k];
+      else process.env[k] = savedFilterEnv[k];
+    }
+    if (existsSync(TEST_HOME)) rmSync(TEST_HOME, { recursive: true, force: true });
+  });
+
+  function makeFilterStrategy(convDir: string) {
+    return new OpencodeStrategy({
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'filter-test-conv',
+      getEncryptionKey: () => undefined,
+    });
+  }
+
+  test('does not echo the user prompt in assistant chunks', async () => {
+    const convDir = join(TEST_HOME, 'filter-conv-1');
+    const strategy = makeFilterStrategy(convDir);
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('say only hi', 'openai/gpt-5.4', (c) => chunks.push(c));
+    const joined = chunks.join('');
+    expect(joined).not.toContain('say only hi');
+    expect(joined).toContain('fake app-server response');
+    expect(joined).not.toContain('say only hi');
+  });
+
+  test('user-message text part with [MODE] prefix is excluded from assistant chunks', async () => {
+    // The fake server emits a user-message part: "[MODE]Casting...[/MODE]\n<prompt>"
+    // This must never appear in the assistant output chunks
+    const convDir = join(TEST_HOME, 'filter-conv-2');
+    const strategy = makeFilterStrategy(convDir);
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('unique-test-prompt-xyz', 'openai/gpt-5.4', (c) => chunks.push(c));
+    const joined = chunks.join('');
+    expect(joined).not.toContain('[MODE]');
+    expect(joined).not.toContain('[/MODE]');
+    expect(joined).not.toContain('unique-test-prompt-xyz');
+    // Assistant text should still come through
+    expect(joined).toContain('fake app-server response');
+  });
+
+  test('assistant content streams via deltas without user prompt contamination', async () => {
+    process.env.OPENCODE_FAKE_MESSAGE = 'DELTA_RESPONSE';
+    const convDir = join(TEST_HOME, 'filter-conv-3');
+    const strategy = makeFilterStrategy(convDir);
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('my secret prompt', 'openai/gpt-5.4', (c) => chunks.push(c));
+    const joined = chunks.join('');
+    expect(joined).not.toContain('my secret prompt');
+    expect(joined).toContain('DELTA_RESPONSE');
+  });
+
+  test('reasoning chunks stream separately without user prompt contamination', async () => {
+    const convDir = join(TEST_HOME, 'filter-conv-4');
+    const strategy = makeFilterStrategy(convDir);
+    const chunks: string[] = [];
+    const reasoning: string[] = [];
+    await strategy.executePromptStreaming(
+      'think and respond',
+      'openai/gpt-5.4',
+      (c) => chunks.push(c),
+      { onReasoningChunk: (c) => reasoning.push(c) },
+    );
+    expect(reasoning.join('')).toContain('thinking');
+    expect(chunks.join('')).not.toContain('think and respond');
+    expect(chunks.join('')).toContain('fake app-server response');
   });
 });
 

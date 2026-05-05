@@ -393,23 +393,33 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
       /* start fresh */
     }
 
+    // opencode v1.14.38 config schema:
+    //   - top-level key is "mcp" (NOT "mcpServers")
+    //   - local stdio servers: { type: "local", enabled: true, command, args, env? }
+    //   - remote HTTP servers: { type: "remote", enabled: true, url }
     const nativeServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
       if (entry.command) {
         nativeServers[name] = {
+          type: 'local',
+          enabled: true,
           command: entry.command,
           args: entry.args ?? [],
           ...(entry.env ? { env: entry.env } : {}),
         };
       } else if (entry.serverUrl) {
-        nativeServers[name] = { url: entry.serverUrl };
+        nativeServers[name] = {
+          type: 'remote',
+          enabled: true,
+          url: entry.serverUrl,
+        };
       }
     }
 
     const config = {
       ...existing,
-      mcpServers: {
-        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
+      mcp: {
+        ...((existing.mcp as Record<string, unknown>) ?? {}),
         ...nativeServers,
       },
     };

@@ -500,8 +500,11 @@ describe('writeMcpConfig', () => {
     expect(process.env.OPENCODE_CONFIG_CONTENT).toBeDefined();
     const configContent = process.env.OPENCODE_CONFIG_CONTENT ?? '{}';
     const config = JSON.parse(configContent);
-    expect(config.mcpServers['test-server']).toBeDefined();
-    expect(config.mcpServers['test-server'].url).toBe('https://example.com/mcp');
+    // opencode uses "mcp" key (not "mcpServers") with type: "remote" and enabled: true
+    expect(config.mcp['test-server']).toBeDefined();
+    expect(config.mcp['test-server'].type).toBe('remote');
+    expect(config.mcp['test-server'].enabled).toBe(true);
+    expect(config.mcp['test-server'].url).toBe('https://example.com/mcp');
   });
 
   it('normalizes provider name with underscores to hyphens', () => {

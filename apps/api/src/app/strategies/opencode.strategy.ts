@@ -217,8 +217,11 @@ interface OpenCodeEventState {
   reasoningOpen: boolean;
   hasVisibleOutput: boolean;
   textByPartId: Map<string, string>;
+  rawTextByPartId: Map<string, string>;
   partTypeById: Map<string, string>;
   emittedToolStateByPartId: Map<string, string>;
+  /** message role (user|assistant) keyed by messageID — used to skip user-message text parts */
+  messageRoleById: Map<string, string>;
 }
 
 export class OpencodeStrategy extends AbstractCLIStrategy {
@@ -750,8 +753,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       reasoningOpen: false,
       hasVisibleOutput: false,
       textByPartId: new Map(),
+      rawTextByPartId: new Map(),
       partTypeById: new Map(),
       emittedToolStateByPartId: new Map(),
+      messageRoleById: new Map(),
     };
 
     let eventStream: { stop: () => void; done: Promise<void> } | null = null;
@@ -908,7 +913,9 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       signal: controller.signal,
     });
     if (!res.ok) {
-      throw new Error(`OpenCode event stream failed with ${res.status}`);
+      const body = await res.text().catch(() => '');
+      this.logger.error(`OpenCode event stream failed with ${res.status}: ${body}`);
+      throw new Error(`OpenCode event stream failed with ${res.status}: ${body}`);
     }
 
     const done = this.consumeAppServerEvents(res, state, controller.signal).catch((err) => {
@@ -984,6 +991,8 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
   private handleOpenCodeMessageInfo(state: OpenCodeEventState, info?: OpenCodeMessage): void {
     if (!info || info.sessionID !== state.sessionId) return;
+    // Track the role of each message so we can skip user-message text parts
+    if (info.id && info.role) state.messageRoleById.set(info.id, info.role);
     if (info.error) {
       const msg = errorMessage(info.error);
       state.errorResult += msg;
@@ -997,11 +1006,20 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
   private handleOpenCodePart(state: OpenCodeEventState, part: OpenCodePart): void {
     if (part.sessionID !== state.sessionId) return;
     state.partTypeById.set(part.id, part.type);
+    // Track message role when we first see a part so we can filter by it
+    // (messageID on the part is the parent message; we may not have seen its message.updated yet)
 
     switch (part.type) {
-      case 'text':
+      case 'text': {
+        // Skip user-message text parts — opencode echoes the user's question as a text part.
+        // Guard 1: role map (populated by message.updated events)
+        const parentRole = state.messageRoleById.get(part.messageID);
+        if (parentRole === 'user') break;
+        // Guard 2: user parts always start with [MODE] — assistant response parts never do
+        if ((part.text ?? '').startsWith('[MODE]')) break;
         this.emitPartTextDelta(state, part, 'assistant');
         break;
+      }
       case 'reasoning':
         this.emitPartTextDelta(state, part, 'reasoning');
         break;
@@ -1030,18 +1048,53 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
   ): void {
     if (props.sessionID !== state.sessionId || props.field !== 'text' || !props.partID || !props.delta) return;
     const partType = state.partTypeById.get(props.partID);
-    state.textByPartId.set(props.partID, (state.textByPartId.get(props.partID) ?? '') + props.delta);
+
+    // Skip deltas for user-message parts (echoed question text)
+    const parentRole = props.messageID ? state.messageRoleById.get(props.messageID) : undefined;
+    if (parentRole === 'user') return;
+
+    // Accumulate raw text, then strip MODE tags to find what's cleanly emittable
+    const rawAccumulated = (state.rawTextByPartId.get(props.partID) ?? '') + props.delta;
+    state.rawTextByPartId.set(props.partID, rawAccumulated);
+
+    // Guard 2: if accumulated text starts with [MODE], this is a user-message part — skip entirely
+    if (rawAccumulated.startsWith('[MODE]')) {
+      // Still hold back until we see a [/MODE] in case the text transitions to assistant content
+      if (!rawAccumulated.includes('[/MODE]')) return;
+      // After [/MODE], there's nothing useful (it's the user message); skip
+      return;
+    }
+
+    // Strip any remaining [MODE]...[/MODE] blocks and emit only new clean content
+    // hold the text after the last complete [/MODE] — or hold everything if still inside a block.
+    let clean = rawAccumulated;
+    const modeEnd = rawAccumulated.lastIndexOf('[/MODE]');
+    if (modeEnd >= 0) {
+      // Emit only what's after the last complete [/MODE]
+      clean = rawAccumulated.slice(modeEnd + '[/MODE]'.length).trimStart();
+    } else if (rawAccumulated.includes('[MODE]')) {
+      // We're mid-MODE block — hold everything back
+      return;
+    }
+
+    const previousClean = state.textByPartId.get(props.partID) ?? '';
+    const delta = clean.startsWith(previousClean) ? clean.slice(previousClean.length) : clean;
+    state.textByPartId.set(props.partID, clean);
+
+    if (!delta) return;
     state.hasVisibleOutput = true;
     if (partType === 'reasoning') {
       this.startReasoning(state);
-      state.callbacks?.onReasoningChunk?.(props.delta);
+      state.callbacks?.onReasoningChunk?.(delta);
     } else {
-      state.onChunk(props.delta);
+      state.onChunk(delta);
     }
   }
 
   private emitPartTextDelta(state: OpenCodeEventState, part: OpenCodePart, target: 'assistant' | 'reasoning'): void {
-    const text = part.text ?? '';
+    // Strip any stray [MODE]...[/MODE] context markers (shouldn't reach here after guards, but belt-and-suspenders)
+    const rawText = part.text ?? '';
+    const text = rawText.replace(/\[MODE\][\s\S]*?\[\/MODE\]/g, '').trimStart();
     const previous = state.textByPartId.get(part.id) ?? '';
     const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
     state.textByPartId.set(part.id, text);
