@@ -42,6 +42,14 @@ const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   },
 };
 
+type ClaudeSdkQueryFunction = typeof import('@anthropic-ai/claude-agent-sdk')['query'];
+type RuntimeClaudeAgentSdkModule = {
+  query?: unknown;
+  default?: {
+    query?: unknown;
+  };
+};
+
 function getClaudeConfigDir(): string {
   return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude');
 }
@@ -133,6 +141,18 @@ function providerTokensToExtraArgs(tokens: string[]): Record<string, string | nu
     }
   }
   return args;
+}
+
+async function loadClaudeAgentSdkQuery(): Promise<ClaudeSdkQueryFunction> {
+  const sdk = (await import('@anthropic-ai/claude-agent-sdk')) as RuntimeClaudeAgentSdkModule;
+  const candidate = sdk.query ?? sdk.default?.query;
+  if (typeof candidate !== 'function') {
+    const exportsList = Object.keys(sdk).sort().join(', ') || '(none)';
+    throw new Error(
+      `@anthropic-ai/claude-agent-sdk query export is unavailable; expected function, got ${typeof candidate}. Exports: ${exportsList}`
+    );
+  }
+  return candidate as ClaudeSdkQueryFunction;
 }
 
 function userTextMessage(text: string, sessionId: string | null): SDKUserMessage {
@@ -519,7 +539,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       return existing;
     }
 
-    const { query } = await import('@anthropic-ai/claude-agent-sdk');
+    const query = await loadClaudeAgentSdkQuery();
     const input = new AsyncMessageQueue<SDKUserMessage>();
     const token = this.getToken();
     const envOverrides: Record<string, string> = claudeProcessDefaults();
