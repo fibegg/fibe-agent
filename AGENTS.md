@@ -48,16 +48,16 @@ Two WebSocket servers share a single HTTP upgrade dispatcher — `/ws` for chat 
 
 ## Providers
 
-| `AGENT_PROVIDER` value | Aliases | CLI tool installed | Docker tag |
-|------------------------|---------|-------------------|------------|
-| `gemini`               | — | `@google/gemini-cli` | `gemini` |
-| `claude-code` (code default) | — | `@anthropic-ai/claude-code` | `claude-code` |
-| `openai-codex`         | `openai` | `@openai/codex` | `openai-codex` |
-| `cursor`               | — | `cursor-agent` | `cursor` |
-| `opencode`             | `opencodex` | `opencode-ai` | `opencode` |
+| `AGENT_PROVIDER` value | Aliases | Transport | Docker tag |
+|------------------------|---------|-----------|------------|
+| `gemini`               | — | `@google/gemini-cli` CLI | `gemini` |
+| `claude-code` (default) | — | `@anthropic-ai/claude-agent-sdk` (in-process SDK) | `claude-code` |
+| `openai-codex`         | `openai` | `@openai/codex` CLI | `openai-codex` |
+| `cursor`               | — | `cursor-agent` CLI | `cursor` |
+| `opencode`             | `opencodex` | `opencode-ai` CLI | `opencode` |
 | `mock`                 | — | _(built-in, no CLI)_ | — |
 
-> **Note:** When `AGENT_PROVIDER` is not set, the code falls back to `claude-code`. The `.env.example` file sets it to `gemini` for convenience — always set it explicitly in production.
+> **Note:** When `AGENT_PROVIDER` is not set, the code falls back to `claude-code`. Set it explicitly in production.
 
 `mock` is useful for local UI development without any API key. It echoes configurable fake responses.
 
@@ -68,12 +68,13 @@ All strategies live under `apps/api/src/app/strategies/`:
 | File | Strategy |
 |------|----------|
 | `gemini.strategy.ts` | Gemini CLI — OAuth device flow or `GEMINI_API_KEY` |
-| `claude-code.strategy.ts` | Claude Code — OAuth or `ANTHROPIC_API_KEY` |
+| `claude-sdk.strategy.ts` | Claude Code — `@anthropic-ai/claude-agent-sdk` in-process SDK; OAuth or `ANTHROPIC_API_KEY` |
 | `openai-codex.strategy.ts` | OpenAI Codex — OAuth or `OPENAI_API_KEY` |
 | `cursor.strategy.ts` | Cursor Agent CLI — `CURSOR_API_KEY`, stream-json |
 | `opencode.strategy.ts` | OpenCode — auto-detects key from env |
 | `mock.strategy.ts` | No-op mock for local development |
-| `abstract-cli.strategy.ts` | Shared base for all CLI strategies |
+| `abstract-cli.strategy.ts` | Shared base for the CLI-process strategies |
+| `tool-use-to-event.ts` | Shared `toolUseToEvent` helper used by the Claude SDK strategy |
 | `strategy-registry.service.ts` | Resolves the active strategy from `AGENT_PROVIDER` |
 | `strategy.types.ts` | Shared TypeScript interfaces (`AgentStrategy`, `AuthConnection`, `StreamingCallbacks`, `TokenUsage`, etc.) |
 
