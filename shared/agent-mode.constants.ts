@@ -16,23 +16,12 @@ export type AgentModeValue = (typeof AGENT_MODES)[AgentModeKey];
 
 export const DEFAULT_AGENT_MODE: AgentModeValue = AGENT_MODES.exploring;
 
-const LEGACY_AGENT_MODE_ALIASES: Record<string, AgentModeValue> = {
-  greenfielding: AGENT_MODES.build,
-  brownfielding: AGENT_MODES.build,
-  'greenfielding...': AGENT_MODES.build,
-  'brownfielding...': AGENT_MODES.build,
-};
-
 const AGENT_MODE_TRIGGER_VALUES: Record<string, AgentModeValue> = {
   EXPLORING: AGENT_MODES.exploring,
   CASTING: AGENT_MODES.casting,
   OVERSEEING: AGENT_MODES.overseeing,
   BUILD: AGENT_MODES.build,
   BUILDING: AGENT_MODES.build,
-  GREENFIELD: AGENT_MODES.build,
-  GREENFIELDING: AGENT_MODES.build,
-  BROWNFIELD: AGENT_MODES.build,
-  BROWNFIELDING: AGENT_MODES.build,
 };
 
 /** All accepted keys */
@@ -57,12 +46,7 @@ export function resolveAgentMode(raw: string): AgentModeValue | null {
     return AGENT_MODES[lower as AgentModeKey];
   }
 
-  // Legacy key/display aliases from the previous greenfield/brownfield split.
-  if (lower in LEGACY_AGENT_MODE_ALIASES) {
-    return LEGACY_AGENT_MODE_ALIASES[lower];
-  }
-
-  // Display-string match (e.g. "Exploring...") — backwards compat with old shell script
+  // Display-string match (e.g. "Exploring...")
   const entry = Object.entries(AGENT_MODES).find(([, v]) => v.toLowerCase() === lower);
   if (entry) {
     return entry[1] as AgentModeValue;

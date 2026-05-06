@@ -42,7 +42,6 @@ describe('writeMcpConfig', () => {
     writeMcpConfig();
     // Falls back to claude-code: should write claude config files
     expect(existsSync(join(testHome, '.claude'))).toBe(true);
-    expect(existsSync(join(testHome, '.claude.json'))).toBe(true);
     // Should NOT write gemini or codex dirs
     expect(existsSync(join(testHome, '.gemini'))).toBe(false);
     expect(existsSync(join(testHome, '.codex'))).toBe(false);
@@ -183,17 +182,6 @@ describe('writeMcpConfig', () => {
       });
       });
 
-    it('writes .claude.json with mcpServers block', () => {
-      writeMcpConfig();
-      const configPath = join(testHome, '.claude.json');
-      expect(existsSync(configPath)).toBe(true);
-      const config = JSON.parse(readFileSync(configPath, 'utf8'));
-      expect(config.mcpServers['fibe']).toEqual({
-        command: 'mcp-remote-wrapper',
-        args: ['https://fibe.gg', '--header', 'Authorization:Bearer fibe_test_key456'],
-      });
-    });
-
     it('writes ~/.claude/settings.json with mcpServers block', () => {
       writeMcpConfig();
       const settingsPath = join(testHome, '.claude', 'settings.json');
@@ -205,22 +193,23 @@ describe('writeMcpConfig', () => {
       });
     });
 
-    it('merges extraServers into claude config', () => {
+    it('merges extraServers into claude settings.json', () => {
       writeMcpConfig({ docker: { command: 'uvx', args: ['mcp-server-docker'] } });
       const config = JSON.parse(
-        readFileSync(join(testHome, '.claude.json'), 'utf8'),
+        readFileSync(join(testHome, '.claude', 'settings.json'), 'utf8'),
       );
       expect(Object.keys(config.mcpServers)).toContain('fibe');
       expect(Object.keys(config.mcpServers)).toContain('docker');
     });
 
-    it('preserves existing .claude.json content', () => {
-      writeFileSync(join(testHome, '.claude.json'), JSON.stringify({ userID: 'abc123', firstStartTime: '2026-01-01' }));
+    it('preserves existing ~/.claude/settings.json content', () => {
+      const claudeDir = join(testHome, '.claude');
+      mkdirSync(claudeDir, { recursive: true });
+      writeFileSync(join(claudeDir, 'settings.json'), JSON.stringify({ theme: 'dark' }));
 
       writeMcpConfig();
-      const config = JSON.parse(readFileSync(join(testHome, '.claude.json'), 'utf8'));
-      expect(config.userID).toBe('abc123');
-      expect(config.firstStartTime).toBe('2026-01-01');
+      const config = JSON.parse(readFileSync(join(claudeDir, 'settings.json'), 'utf8'));
+      expect(config.theme).toBe('dark');
       expect(config.mcpServers['fibe']).toBeDefined();
     });
 
@@ -592,7 +581,7 @@ describe('writeMcpConfig', () => {
     expect(content).toContain('model = "gpt-4"');
   });
 
-  it('claude-code writer writes to project .mcp.json, settings.json, and legacy .claude.json', () => {
+  it('claude-code writer writes to project .mcp.json and ~/.claude/settings.json', () => {
     process.env.AGENT_PROVIDER = 'claude-code';
     process.env.DATA_DIR = join(testHome, 'data');
     process.env.FIBE_AGENT_ID = 'agent-three-paths';
@@ -604,10 +593,8 @@ describe('writeMcpConfig', () => {
     writeMcpConfig();
 
     const settingsPath = join(testHome, '.claude', 'settings.json');
-    const legacyPath = join(testHome, '.claude.json');
     const projectPath = join(testHome, 'data', 'agent-three-paths', 'claude_workspace', '.mcp.json');
     expect(existsSync(settingsPath)).toBe(true);
-    expect(existsSync(legacyPath)).toBe(true);
     expect(existsSync(projectPath)).toBe(true);
   });
 });

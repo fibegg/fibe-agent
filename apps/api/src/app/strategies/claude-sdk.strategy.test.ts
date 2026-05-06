@@ -428,12 +428,6 @@ describe('ClaudeSdkStrategy › AsyncMessageQueue', () => {
 describe('ClaudeSdkStrategy › utility functions', () => {
   const strategy = makeStrategy();
 
-  function callUsageFromObject(usage: unknown, fallback?: unknown): { inputTokens: number; outputTokens: number } | null {
-    return (ClaudeSdkStrategy as unknown as {
-      usageFromObject?: (u: unknown, f?: unknown) => { inputTokens: number; outputTokens: number } | null;
-    }).usageFromObject?.(usage, fallback) ?? null;
-  }
-
   test('usageFromObject handles snake_case keys', () => {
     // We test indirectly via handleStreamEvent which calls usageFromObject
     const state = freshState();

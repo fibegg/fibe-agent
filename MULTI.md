@@ -292,32 +292,6 @@ Notes:
 - Conversation isolation comes from separate SDK sessions/markers, not separate
   workspaces.
 
-## Claude CLI
-
-Primary file:
-
-```text
-apps/api/src/app/strategies/claude-code.strategy.ts
-```
-
-Transport:
-
-- Spawns Claude CLI in print/headless mode.
-- Resumes with a stored `.claude_session` marker.
-- Parses stream/JSON output for text, usage, reasoning, and tool events.
-
-Workspace/session:
-
-- Uses shared `claude_workspace`.
-- Uses `.claude_session` marker.
-- Default can read legacy workspace marker.
-
-Steer:
-
-- This is older than the SDK path.
-- The process can be interrupted.
-- True provider-native turn steering is weaker than SDK and Codex app-server.
-- Queue remains the reliable fallback.
 
 When possible, prefer the Claude SDK strategy for multi-conversation Claude.
 

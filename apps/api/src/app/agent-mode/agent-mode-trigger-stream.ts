@@ -5,7 +5,7 @@ import {
 } from '@shared/agent-mode.constants';
 
 const MODE_TRIGGER_PATTERN =
-  /\[?\bMODE\s*:\s*(EXPLORING|CASTING|OVERSEEING|BUILDING|BUILD|GREENFIELDING|GREENFIELD|BROWNFIELDING|BROWNFIELD)\b\]?/gi;
+  /\[?\bMODE\s*:\s*(EXPLORING|CASTING|OVERSEEING|BUILDING|BUILD)\b\]?/gi;
 
 const NORMALIZED_TRIGGER_WORDS = AGENT_MODE_TRIGGER_WORDS.map(normalizeTriggerCandidate);
 const LONGEST_TRIGGER_WORD_LENGTH = Math.max(...NORMALIZED_TRIGGER_WORDS.map((word) => word.length));

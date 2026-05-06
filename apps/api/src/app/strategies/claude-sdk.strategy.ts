@@ -15,7 +15,7 @@ import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 import { getEnrichedPath, resolveClaude } from './resolve-claude';
-import { toolUseToEvent } from './claude-code.strategy';
+import { toolUseToEvent } from './tool-use-to-event';
 import type {
   McpServerConfig,
   Options as ClaudeSdkOptions,

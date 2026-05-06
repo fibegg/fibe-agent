@@ -37,7 +37,7 @@ describe('AgentModeStoreService', () => {
     expect(service.get()).toBe(AGENT_MODES.casting);
   });
 
-  test('set with a display string is accepted (backwards compat)', () => {
+  test('set with a display string is accepted', () => {
     const service = new AgentModeStoreService(makeConfig(dataDir) as never);
     const result = service.set('Casting...');
     expect(result).toBe(AGENT_MODES.casting);
@@ -51,12 +51,11 @@ describe('AgentModeStoreService', () => {
     expect(service.get()).toBe(AGENT_MODES.build);
   });
 
-  test('legacy greenfield and brownfield values resolve to Building', () => {
+  test('retired MODE:GREENFIELD/BROWNFIELD trigger words are rejected', () => {
     const service = new AgentModeStoreService(makeConfig(dataDir) as never);
-    expect(service.set('greenfielding')).toBe(AGENT_MODES.build);
-    expect(service.set('Brownfielding...')).toBe(AGENT_MODES.build);
-    expect(service.set('MODE:GREENFIELD')).toBe(AGENT_MODES.build);
-    expect(service.set('MODE:BROWNFIELD')).toBe(AGENT_MODES.build);
+    expect(service.set('MODE:GREENFIELD')).toBeNull();
+    expect(service.set('MODE:BROWNFIELD')).toBeNull();
+    expect(service.get()).toBe(DEFAULT_AGENT_MODE);
   });
 
   test('set with unknown value returns null and does not change stored mode', () => {

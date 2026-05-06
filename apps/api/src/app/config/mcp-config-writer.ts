@@ -251,12 +251,10 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   },
 
   /**
-   * Claude Code: writes MCP servers to all known config locations:
+   * Claude Code: writes MCP servers to:
    *   1. <workspace>/.mcp.json     — project-scoped MCP config used by Claude Code
-   *   2. ~/.claude/settings.json   — settings fallback
-   *   3. ~/.claude.json            — legacy/fallback location
+   *   2. ~/.claude/settings.json   — user-scoped settings file
    *
-   * Writing to all known paths ensures tools are discovered regardless of Claude Code version.
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
   'claude-code': (servers) => {
@@ -318,27 +316,6 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     };
     writeFileSync(settingsPath, JSON.stringify(settingsConfig, null, 2));
     logger.log(`Wrote Claude MCP config to ${settingsPath}`);
-
-    // Also write to ~/.claude.json (legacy/fallback)
-    const legacyPath = join(getHome(), '.claude.json');
-    let legacyExisting: Record<string, unknown> = {};
-    try {
-      if (existsSync(legacyPath)) {
-        legacyExisting = JSON.parse(readFileSync(legacyPath, 'utf8'));
-      }
-    } catch {
-      /* start fresh */
-    }
-
-    const legacyConfig = {
-      ...legacyExisting,
-      mcpServers: {
-        ...((legacyExisting.mcpServers as Record<string, unknown>) ?? {}),
-        ...nativeServers,
-      },
-    };
-    writeFileSync(legacyPath, JSON.stringify(legacyConfig, null, 2));
-    logger.log(`Wrote Claude MCP config to ${legacyPath}`);
   },
 
   /**

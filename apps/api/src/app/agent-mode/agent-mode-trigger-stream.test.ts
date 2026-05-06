@@ -14,12 +14,12 @@ describe('agent mode trigger stream', () => {
     expect(modes).toEqual([AGENT_MODES.build]);
   });
 
-  test('maps legacy brownfield and greenfield triggers to Building mode', () => {
+  test('leaves retired brownfield and greenfield triggers visible', () => {
     const modes: string[] = [];
     const output = stripAgentModeTriggers('MODE:BROWNFIELD MODE:GREENFIELD working', (mode) => modes.push(mode));
 
-    expect(output).toBe('  working');
-    expect(modes).toEqual([AGENT_MODES.build, AGENT_MODES.build]);
+    expect(output).toBe('MODE:BROWNFIELD MODE:GREENFIELD working');
+    expect(modes).toEqual([]);
   });
 
   test('detects trigger words split across streaming chunks', () => {
