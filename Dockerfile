@@ -187,11 +187,25 @@ RUN --mount=type=cache,target=/root/.npm \
 RUN --mount=type=cache,target=/root/.npm \
     npm install -g @playwright/mcp@0.0.68
 
-# System libraries required by Chromium.
+# System libraries and Chrome channel required by Playwright. Install this as
+# root at build time so non-root agent sessions do not try to elevate later.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
-    DEBIAN_FRONTEND=noninteractive npx -y playwright install-deps chromium
+    DEBIAN_FRONTEND=noninteractive npx -y playwright install-deps chromium && \
+    if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
+        DEBIAN_FRONTEND=noninteractive npx -y playwright install chrome; \
+    else \
+        apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium && \
+        mkdir -p /opt/google/chrome && \
+        ln -sf /usr/bin/chromium /opt/google/chrome/chrome && \
+        ln -sf /usr/bin/chromium /usr/local/bin/google-chrome; \
+    fi && \
+    /opt/google/chrome/chrome --version && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/*
+
+ENV CHROME_BIN=/opt/google/chrome/chrome \
+    GOOGLE_CHROME_BIN=/opt/google/chrome/chrome
 
 # ---- FIX FILE DESCRIPTOR LIMITS ----
 # Ensures su/sudo sessions inherit high nofile — prevents EMFILE in dev mode
@@ -204,8 +218,8 @@ RUN mkdir -p /app/data /app/playground /home/node/.cache \
 
 USER node
 
-# Download Chromium browser binary as node
-RUN npx -y playwright install chromium
+# Download Chromium browser binary as node and verify Chrome is non-root usable.
+RUN npx -y playwright install chromium && /opt/google/chrome/chrome --version
 
 USER root
 
