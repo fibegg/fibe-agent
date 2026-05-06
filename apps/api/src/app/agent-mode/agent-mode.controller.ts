@@ -11,6 +11,7 @@ import {
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { AgentModeStoreService } from './agent-mode.store.service';
+import { AGENT_MODE_KEYS } from '@shared/agent-mode.constants';
 
 @Controller()
 @UseGuards(AgentAuthGuard)
@@ -32,7 +33,7 @@ export class AgentModeController {
     const resolved = this.orchestrator.setAgentMode(raw);
     if (!resolved) {
       throw new BadRequestException(
-        `Invalid mode "${raw}". Valid keys: exploring, casting, overseeing, greenfielding, brownfielding`,
+        `Invalid mode "${raw}". Valid keys: ${AGENT_MODE_KEYS.join(', ')}`,
       );
     }
     return { success: true, mode: resolved };

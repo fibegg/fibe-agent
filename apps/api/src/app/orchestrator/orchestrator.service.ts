@@ -16,6 +16,7 @@ import { FibeSyncService } from '../fibe-sync/fibe-sync.service';
 import { ModelStoreService } from '../model-store/model-store.service';
 import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
+import { createAgentModeTriggerStream } from '../agent-mode/agent-mode-trigger-stream';
 import { UploadsService } from '../uploads/uploads.service';
 import type {
   AuthConnection,
@@ -600,11 +601,19 @@ export class OrchestratorService implements OnModuleInit {
         },
       };
       const callbacks = createStreamingCallbacks(streamDeps);
-      await ctx.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
+      const modeTriggerStream = createAgentModeTriggerStream((mode) => {
+        this.setAgentMode(mode);
+      });
+      const emitVisibleChunk = (chunk: string) => {
+        if (!chunk) return;
         accumulated += chunk;
         // Fan-out stream chunks to every tab watching this conversation
         this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: chunk });
+      };
+      await ctx.strategy.executePromptStreaming(fullPrompt, model, (chunk) => {
+        emitVisibleChunk(modeTriggerStream.push(chunk));
       }, callbacks, systemPrompt || undefined, { effort });
+      emitVisibleChunk(modeTriggerStream.flush());
       finishAgentStream(
         this.finishStreamDeps(ctx),
         accumulated,

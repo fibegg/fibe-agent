@@ -1,6 +1,7 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search, Link2 } from 'lucide-react';
+import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search, Link2, ChevronDown, ChevronRight } from 'lucide-react';
 import type { ConversationMeta } from './use-conversations';
+import { useT } from '../i18n';
 import {
   INPUT_SEARCH,
   SEARCH_ICON_POSITION,
@@ -16,17 +17,19 @@ interface ConversationSidebarProps {
   onCreate: () => void;
   onRename: (id: string, title: string) => void;
   onDelete: (id: string) => void;
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
-function timeAgo(iso: string): string {
-  const ms = Date.now() - new Date(iso).getTime();
+function timeAgo(iso: string, t: ReturnType<typeof useT>): string {
+  const ms = Math.max(0, Date.now() - new Date(iso).getTime());
   const m = Math.floor(ms / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return t('conversation.justNow');
+  if (m < 60) return t('conversation.minutesAgo', { count: m });
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return t('conversation.hoursAgo', { count: h });
   const d = Math.floor(h / 24);
-  return `${d}d ago`;
+  return t('conversation.daysAgo', { count: d });
 }
 
 const ConversationItem = memo(function ConversationItem({
@@ -42,6 +45,7 @@ const ConversationItem = memo(function ConversationItem({
   onRename: (title: string) => void;
   onDelete: () => void;
 }) {
+  const t = useT();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(conv.title);
   const [copied, setCopied] = useState(false);
@@ -117,7 +121,7 @@ const ConversationItem = memo(function ConversationItem({
         ) : (
           <p className="truncate text-xs font-medium leading-tight">{conv.title}</p>
         )}
-        <p className="mt-0.5 text-[10px] text-muted-foreground/50">{timeAgo(conv.lastMessageAt)}</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground/50">{timeAgo(conv.lastMessageAt, t)}</p>
       </div>
 
       {/* Action buttons — visible on hover / active */}
@@ -126,7 +130,8 @@ const ConversationItem = memo(function ConversationItem({
           <button
             onClick={handleShare}
             className="rounded p-0.5 text-muted-foreground/60 hover:text-violet-400 transition-colors"
-            title={copied ? 'Copied!' : 'Share link'}
+            title={copied ? t('common.copied') : t('conversation.shareLink')}
+            aria-label={copied ? t('common.copied') : t('conversation.shareLink')}
           >
             {copied
               ? <Check className="h-3 w-3 text-green-400" />
@@ -137,14 +142,16 @@ const ConversationItem = memo(function ConversationItem({
               <button
                 onClick={startEdit}
                 className="rounded p-0.5 text-muted-foreground/60 hover:text-foreground transition-colors"
-                title="Rename"
+                title={t('conversation.rename')}
+                aria-label={t('conversation.rename')}
               >
                 <Edit3 className="h-3 w-3" />
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); onDelete(); }}
                 className="rounded p-0.5 text-muted-foreground/60 hover:text-red-400 transition-colors"
-                title="Delete"
+                title={t('conversation.delete')}
+                aria-label={t('conversation.delete')}
               >
                 <Trash2 className="h-3 w-3" />
               </button>
@@ -164,9 +171,13 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   onCreate,
   onRename,
   onDelete,
+  collapsed = false,
+  onCollapsedChange,
 }: ConversationSidebarProps) {
+  const t = useT();
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const toggleLabel = collapsed ? t('conversation.expand') : t('conversation.collapse');
 
   const filtered = searchQuery.trim()
     ? conversations.filter((c) =>
@@ -178,86 +189,107 @@ export const ConversationSidebar = memo(function ConversationSidebar({
     <div className="flex flex-col h-full min-h-0">
       {/* Header + New Chat */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30 shrink-0">
-        <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
-          Conversations
-        </span>
         <button
+          type="button"
+          onClick={() => onCollapsedChange?.(!collapsed)}
+          className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-violet-500/10 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          aria-expanded={!collapsed}
+          aria-label={toggleLabel}
+          title={toggleLabel}
+        >
+          {collapsed ? (
+            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
+          ) : (
+            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
+          )}
+          <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
+            {t('conversation.title')}
+          </span>
+        </button>
+        <button
+          type="button"
           onClick={onCreate}
           className="flex items-center gap-1 rounded-md bg-violet-500/15 border border-violet-500/25 px-2 py-1 text-[10px] font-medium text-violet-400 hover:bg-violet-500/25 transition-colors"
-          title="New chat"
+          title={t('conversation.newChat')}
+          aria-label={t('conversation.newChat')}
           id="conversation-sidebar-new-btn"
         >
           <Plus className="h-3 w-3" />
-          New
+          {t('conversation.new')}
         </button>
       </div>
 
-      {/* Search */}
-      {conversations.length > 0 && (
-        <div className="px-2 pt-2 shrink-0">
-          <div className={SEARCH_ROW_WRAPPER}>
-            <Search className={SEARCH_ICON_POSITION} aria-hidden />
-            <input
-              ref={searchRef}
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search…"
-              className={INPUT_SEARCH}
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className={CLEAR_BUTTON_POSITION}
-                aria-label="Clear search"
-              >
-                <X className="size-3.5" />
-              </button>
+      {!collapsed && (
+        <>
+          {/* Search */}
+          {conversations.length > 0 && (
+            <div className="px-2 pt-2 shrink-0">
+              <div className={SEARCH_ROW_WRAPPER}>
+                <Search className={SEARCH_ICON_POSITION} aria-hidden />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder={t('conversation.searchPlaceholder')}
+                  className={INPUT_SEARCH}
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className={CLEAR_BUTTON_POSITION}
+                    aria-label={t('conversation.clearSearch')}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* List */}
+          <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-0.5">
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <span className="text-xs text-muted-foreground/50 animate-pulse">{t('common.loading')}</span>
+              </div>
+            ) : conversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 gap-3 px-4 text-center">
+                <div className="rounded-full bg-violet-500/10 border border-violet-500/20 p-3">
+                  <MessageSquare className="h-5 w-5 text-violet-400/60" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-foreground/70">{t('conversation.emptyTitle')}</p>
+                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">{t('conversation.emptyDescription')}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={onCreate}
+                  className="flex items-center gap-1.5 rounded-md bg-violet-500/20 border border-violet-500/30 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-500/30 transition-colors"
+                >
+                  <Plus className="h-3 w-3" />
+                  {t('conversation.newConversation')}
+                </button>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                <span className="text-xs text-muted-foreground/50">{t('conversation.noMatches')}</span>
+              </div>
+            ) : (
+              filtered.map((conv) => (
+                <ConversationItem
+                  key={conv.id}
+                  conv={conv}
+                  isActive={conv.id === activeId}
+                  onSelect={() => onSelect(conv.id)}
+                  onRename={(title) => onRename(conv.id, title)}
+                  onDelete={() => onDelete(conv.id)}
+                />
+              ))
             )}
           </div>
-        </div>
+        </>
       )}
-
-      {/* List */}
-      <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-0.5">
-        {loading ? (
-          <div className="flex items-center justify-center py-8">
-            <span className="text-xs text-muted-foreground/50 animate-pulse">Loading…</span>
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-10 gap-3 px-4 text-center">
-            <div className="rounded-full bg-violet-500/10 border border-violet-500/20 p-3">
-              <MessageSquare className="h-5 w-5 text-violet-400/60" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-foreground/70">No conversations yet</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-0.5">Create one to get started</p>
-            </div>
-            <button
-              onClick={onCreate}
-              className="flex items-center gap-1.5 rounded-md bg-violet-500/20 border border-violet-500/30 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-500/30 transition-colors"
-            >
-              <Plus className="h-3 w-3" />
-              New conversation
-            </button>
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 gap-2">
-            <span className="text-xs text-muted-foreground/50">No matches</span>
-          </div>
-        ) : (
-          filtered.map((conv) => (
-            <ConversationItem
-              key={conv.id}
-              conv={conv}
-              isActive={conv.id === activeId}
-              onSelect={() => onSelect(conv.id)}
-              onRename={(title) => onRename(conv.id, title)}
-              onDelete={() => onDelete(conv.id)}
-            />
-          ))
-        )}
-      </div>
     </div>
   );
 });

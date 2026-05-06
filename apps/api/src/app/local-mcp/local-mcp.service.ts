@@ -168,7 +168,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
 
       case LOCAL_TOOL.SET_MODE: {
         const raw = str('mode') ?? '';
-        if (!AGENT_MODE_KEYS.includes(raw as never)) {
+        if (!resolveAgentMode(raw)) {
           throw new Error(`Invalid mode "${raw}". Valid values: ${AGENT_MODE_KEYS.join(', ')}`);
         }
         const resolved = this.modeSetter ? this.modeSetter(raw) : resolveAgentMode(raw);

@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Brain, ChevronDown, Command, Ellipsis, FolderOpen, GitCompareArrows, Loader2, Menu, MessageSquare, Plus, RefreshCcw, Search, Settings, Sparkles, TerminalSquare, X } from 'lucide-react';
+import { Brain, Command, Ellipsis, GitCompareArrows, Loader2, Menu, MessageSquare, Plus, RefreshCcw, Search, Sparkles, TerminalSquare, X } from 'lucide-react';
 
 import { Link } from 'react-router-dom';
 import { EFFORT_OPTIONS, resolveEffort } from '@shared/effort.constants';
-import { PlaygroundSelector } from './playground-selector';
 import { ModelSelector } from './model-selector';
-import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, truncateError } from './chat-state';
 import { getChatStateLabel, type ChatState } from './chat-state';
 import { TypewriterText } from './typewriter-text';
@@ -47,7 +45,6 @@ export interface ChatHeaderProps {
   onToggleTonyStarkMode?: () => void;
   simplicateMode?: boolean;
   onSimplicateModeChange?: (enabled: boolean) => void;
-  onOpenFileBrowser?: () => void;
   currentEffort?: string;
   onEffortSelect?: (effort: string) => void;
   showModelSelector?: boolean;
@@ -57,21 +54,6 @@ export interface ChatHeaderProps {
   modelLocked?: boolean;
   onRefreshModels?: () => void;
   refreshingModels?: boolean;
-  // Playground selector
-  playgroundEntries?: BrowseEntry[];
-  playgroundLoading?: boolean;
-  playgroundError?: string | null;
-  playgroundCurrentLink?: string | null;
-  playgroundLinking?: boolean;
-  playgroundCanGoBack?: boolean;
-  playgroundBreadcrumbs?: string[];
-  onPlaygroundOpen?: () => void;
-  onPlaygroundBrowse?: (path: string) => void;
-  onPlaygroundGoBack?: () => void;
-  onPlaygroundGoToRoot?: () => void;
-  onPlaygroundLink?: (path: string) => Promise<boolean>;
-  onPlaygroundLinked?: () => void;
-  onPlaygroundSmartMount?: () => void;
   /** When provided, shows a Reset button in the MoreActionsMenu. */
   onResetConversation?: () => void;
   /** Number of currently connected WS sessions (browser tabs). */
@@ -114,38 +96,6 @@ const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <path d="M16 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
   </svg>
 );
-
-/** Shared prop-forwarding helper — avoids repeating the 13-prop spread twice. */
-function PlaygroundSelectorSlot({
-  props,
-  className,
-  variant = 'icon',
-}: {
-  props: ChatHeaderProps;
-  className?: string;
-  variant?: 'icon' | 'menu';
-}) {
-  if (!props.onPlaygroundOpen || !props.onPlaygroundLink) {
-    return null;
-  }
-
-  return (
-    <div className={className}>
-      <PlaygroundSelector
-        entries={props.playgroundEntries ?? []}
-        loading={props.playgroundLoading ?? false}
-        error={props.playgroundError ?? null}
-        currentLink={props.playgroundCurrentLink ?? null}
-        linking={props.playgroundLinking ?? false}
-        onOpen={props.onPlaygroundOpen}
-        onLink={props.onPlaygroundLink}
-        onLinked={props.onPlaygroundLinked}
-        visible={true}
-        variant={variant}
-      />
-    </div>
-  );
-}
 
 /** Commands toggle button, shared between the desktop top-row and the mobile search-row. */
 function CliButton({
@@ -284,13 +234,13 @@ function SimplicateSwitch({
       aria-checked={checked}
       aria-label={t('header.simplicate')}
       onClick={() => onChange(!checked)}
-      className={`relative h-5 w-9 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
+      className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
         checked ? 'border-violet-400/70 bg-violet-500' : 'border-muted-foreground/50 bg-background/80'
-      }`}
+      } ${checked ? 'justify-end' : 'justify-start'}`}
     >
       <span
-        className={`pointer-events-none absolute left-0.5 top-0.5 size-4 rounded-full border shadow-sm transition-transform ${
-          checked ? 'translate-x-4 border-white/70 bg-white' : 'translate-x-0 border-muted-foreground/50 bg-muted-foreground'
+        className={`pointer-events-none block size-4 rounded-full border shadow-sm transition-colors ${
+          checked ? 'border-white/70 bg-white' : 'border-muted-foreground/50 bg-muted-foreground'
         }`}
       />
     </button>
@@ -488,7 +438,6 @@ function ProviderModelMenu({
 }
 
 interface MoreActionsMenuProps {
-  playgroundProps: ChatHeaderProps;
   searchQuery: string;
   filteredMessagesCount: number;
   onSearchChange: (value: string) => void;
@@ -496,7 +445,6 @@ interface MoreActionsMenuProps {
   statsAriaLabel: string;
   onStartAuth: () => void;
   state: string;
-  onOpenFileBrowser?: () => void;
   onToggleTerminal?: () => void;
   terminalOpen: boolean;
   onToggleDiff?: () => void;
@@ -510,7 +458,6 @@ interface MoreActionsMenuProps {
 }
 
 function MoreActionsMenu({
-  playgroundProps,
   searchQuery,
   filteredMessagesCount,
   onSearchChange,
@@ -518,7 +465,6 @@ function MoreActionsMenu({
   statsAriaLabel,
   onStartAuth,
   state,
-  onOpenFileBrowser,
   onToggleTerminal,
   terminalOpen,
   onToggleDiff,
@@ -633,8 +579,6 @@ function MoreActionsMenu({
                 </Link>
               )}
 
-              <PlaygroundSelectorSlot props={playgroundProps} variant="menu" />
-
               {onToggleTerminal && (
                 <button
                   type="button"
@@ -656,18 +600,6 @@ function MoreActionsMenu({
                 >
                   <Command className="size-4 shrink-0 text-blue-300" />
                   <span className="min-w-0 flex-1 truncate">{t('header.commands')}</span>
-                </button>
-              )}
-
-              {onOpenFileBrowser && (
-                <button
-                  type="button"
-                  role="menuitem"
-                  onClick={() => runAndClose(onOpenFileBrowser)}
-                  className={MORE_MENU_ITEM_CLASS}
-                >
-                  <FolderOpen className="size-4 shrink-0 text-amber-300" />
-                  <span className="min-w-0 flex-1 truncate">{t('header.files')}</span>
                 </button>
               )}
 
@@ -785,13 +717,14 @@ function CompactConversationPicker({
   onSelect: (id: string) => void;
   onCreate?: () => Promise<void>;
 }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
-  const label = activeConv?.title ?? 'Conversations';
+  const label = activeConv?.title ?? t('header.conversations');
 
   const openPicker = useCallback(() => {
     const el = triggerRef.current;
@@ -834,20 +767,17 @@ function CompactConversationPicker({
         ref={triggerRef}
         type="button"
         onClick={open ? () => setOpen(false) : openPicker}
-        aria-label="Switch conversation"
-        className="inline-flex shrink-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300 transition-colors max-w-[120px]"
+        aria-label={t('header.switchConversation')}
+        className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${open ? 'bg-violet-500/15 text-violet-300' : ''}`}
         title={label}
       >
-        <MessageSquare className="size-3 shrink-0 text-violet-400" />
-        <span className="truncate">{label}</span>
-        <ChevronDown className={`size-3 shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <MessageSquare className="size-4 shrink-0 text-violet-400" aria-hidden />
       </button>
-      <span className="shrink-0 text-muted-foreground/40">·</span>
       {open && rect && createPortal(
         <div
           ref={menuRef}
           role="menu"
-          aria-label="Conversations"
+          aria-label={t('header.conversations')}
           className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card/95 shadow-xl shadow-black/30 backdrop-blur-xl py-1"
           style={{ top: rect.top, left: rect.left, width: rect.width }}
         >
@@ -878,7 +808,7 @@ function CompactConversationPicker({
                 className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 transition-colors"
               >
                 <Plus className="size-3.5 shrink-0" />
-                <span>New chat</span>
+                <span>{t('conversation.newChat')}</span>
               </button>
             </div>
           )}
@@ -920,7 +850,6 @@ export function ChatHeader({
   onToggleTonyStarkMode,
   simplicateMode = false,
   onSimplicateModeChange,
-  onOpenFileBrowser,
   currentEffort = 'max',
   onEffortSelect,
   showModelSelector = false,
@@ -939,55 +868,10 @@ export function ChatHeader({
   activeConversationId,
   onConversationSelect,
   onConversationCreate,
-  ...rest
 }: ChatHeaderProps) {
   const t = useT();
   const displayName = agentName || agentProviderLabel?.trim() || 'Claude';
   const modelLabel = currentModel?.trim() ?? '';
-  // Collect all playground-related props so they can be forwarded via PlaygroundSelectorSlot.
-  const playgroundProps: ChatHeaderProps = {
-    isMobile,
-    agentName,
-    agentProvider,
-    agentProviderLabel,
-    currentModel,
-    state,
-    agentMode,
-    errorMessage,
-    sessionTimeMs,
-    mobileSessionStats,
-    sessionTokenUsage,
-    mobileBrainClasses,
-    statusClass,
-    searchQuery,
-    filteredMessagesCount,
-    onSearchChange,
-    onReconnect,
-    onStartAuth,
-    onOpenMenu,
-    onOpenActivity,
-    onToggleTerminal,
-    terminalOpen,
-    onToggleDiff,
-    diffOpen,
-    onToggleCli,
-    cliOpen,
-    tonyStarkMode,
-    onToggleTonyStarkMode,
-    simplicateMode,
-    onSimplicateModeChange,
-    onOpenFileBrowser,
-    currentEffort,
-    onEffortSelect,
-    showModelSelector,
-    modelOptions,
-    onModelSelect,
-    onModelInputChange,
-    modelLocked,
-    onRefreshModels,
-    refreshingModels,
-    ...rest,
-  };
   const statusContent = state === CHAT_STATES.AWAITING_RESPONSE && agentMode
     ? <TypewriterText text={agentMode} speed={40} />
     : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
@@ -1011,7 +895,8 @@ export function ChatHeader({
   const statsAriaLabel = `${mobileSessionStats.totalActions} ${t('header.totalActions')} / ${mobileSessionStats.completed} ${t('header.completed')} / ${mobileSessionStats.processing} ${t('header.processing')}${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} ${t('header.inputShort')} / ${sessionTokenUsage.outputTokens} ${t('header.outputShort')}` : ''}${sessionTimeMs > 0 ? ` / ${formatSessionDurationMs(sessionTimeMs)}` : ''}`;
   const compactMode = simplicateMode;
   const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
-  const menuButtonLabel = compactMode ? t('header.openSettings') : t('header.openMenu');
+  const menuButtonLabel = t('header.openMenu');
+  const compactShowsProviderModel = state === CHAT_STATES.AUTHENTICATED;
   const simplicateHeaderRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -1048,7 +933,7 @@ export function ChatHeader({
             aria-label={menuButtonLabel}
             title={menuButtonLabel}
           >
-            <Settings className="size-4 sm:size-5" />
+            <Menu className="size-4 sm:size-5" />
           </button>
 
           <div className="min-w-0 flex-1">
@@ -1062,37 +947,39 @@ export function ChatHeader({
                   onCreate={onConversationCreate}
                 />
               )}
-              <ProviderModelMenu
-                triggerClassName="-ml-1 inline-flex min-w-0 max-w-[62vw] items-center gap-1.5 px-1 py-0.5 text-left sm:max-w-[360px]"
-                panelLabel={t('header.changeModelEffort')}
-                showModelSelector={showModelSelector}
-                currentModel={currentModel}
-                modelOptions={modelOptions}
-                onModelSelect={onModelSelect}
-                onModelInputChange={onModelInputChange}
-                modelLocked={modelLocked}
-                onRefreshModels={onRefreshModels}
-                refreshingModels={refreshingModels}
-                currentEffort={currentEffort}
-                onEffortSelect={onEffortSelect}
-              >
-                <span className="truncate font-semibold text-foreground" title={displayName}>{displayName}</span>
-                {modelLabel && (
-                  <>
-                    <span className="shrink-0 text-muted-foreground/60">·</span>
-                    <span
-                      className="min-w-0 truncate text-xs font-medium text-muted-foreground"
-                      title={t('header.modelTitle', { model: modelLabel })}
-                    >
-                      {modelLabel}
-                    </span>
-                  </>
-                )}
-              </ProviderModelMenu>
-              <span className="shrink-0 text-muted-foreground/60">·</span>
-              <span className={`min-w-0 truncate text-xs ${statusTextClass}`}>
-                {statusContent}
-              </span>
+              {compactShowsProviderModel ? (
+                <ProviderModelMenu
+                  triggerClassName="-ml-1 inline-flex min-w-0 max-w-[62vw] items-center gap-1.5 px-1 py-0.5 text-left sm:max-w-[360px]"
+                  panelLabel={t('header.changeModelEffort')}
+                  showModelSelector={showModelSelector}
+                  currentModel={currentModel}
+                  modelOptions={modelOptions}
+                  onModelSelect={onModelSelect}
+                  onModelInputChange={onModelInputChange}
+                  modelLocked={modelLocked}
+                  onRefreshModels={onRefreshModels}
+                  refreshingModels={refreshingModels}
+                  currentEffort={currentEffort}
+                  onEffortSelect={onEffortSelect}
+                >
+                  <span className="truncate font-semibold text-foreground" title={displayName}>{displayName}</span>
+                  {modelLabel && (
+                    <>
+                      <span className="shrink-0 text-muted-foreground/60">·</span>
+                      <span
+                        className="min-w-0 truncate text-xs font-medium text-muted-foreground"
+                        title={t('header.modelTitle', { model: modelLabel })}
+                      >
+                        {modelLabel}
+                      </span>
+                    </>
+                  )}
+                </ProviderModelMenu>
+              ) : (
+                <span className={`min-w-0 truncate text-xs ${statusTextClass}`}>
+                  {statusContent}
+                </span>
+              )}
               {/* Multi-session indicators */}
               {anyProcessing && state !== CHAT_STATES.AWAITING_RESPONSE && (
                 <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20 animate-pulse">
@@ -1122,7 +1009,6 @@ export function ChatHeader({
               </button>
             )}
             <MoreActionsMenu
-              playgroundProps={playgroundProps}
               searchQuery={searchQuery}
               filteredMessagesCount={filteredMessagesCount}
               onSearchChange={onSearchChange}
@@ -1130,7 +1016,6 @@ export function ChatHeader({
               statsAriaLabel={statsAriaLabel}
               onStartAuth={onStartAuth}
               state={state}
-              onOpenFileBrowser={onOpenFileBrowser}
               onToggleTerminal={onToggleTerminal}
               terminalOpen={terminalOpen}
               onToggleDiff={onToggleDiff}
@@ -1284,8 +1169,6 @@ export function ChatHeader({
             </Link>
           )}
 
-          {/* Desktop-only: playground selector in top row */}
-          <PlaygroundSelectorSlot props={playgroundProps} className="hidden sm:block" />
           <LocaleSelector />
           {/* Desktop-only: conversations toggle */}
           {onToggleConversations && (
@@ -1297,8 +1180,8 @@ export function ChatHeader({
                   ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
                   : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
               }`}
-              title="Conversations"
-              aria-label="Toggle conversations"
+              title={t('header.conversations')}
+              aria-label={t('header.toggleConversations')}
               aria-pressed={conversationsOpen}
               id="chat-header-conversations-btn"
             >
@@ -1329,11 +1212,8 @@ export function ChatHeader({
         </div>
       </div>
 
-      {/* Search row — on mobile: [playground icon] [search input] [terminal icon] */}
+      {/* Search row */}
       <div className="flex items-center gap-1.5 mt-2">
-        {/* Mobile-only: playground selector left of search */}
-        <PlaygroundSelectorSlot props={playgroundProps} className="sm:hidden shrink-0" />
-
         {/* Search field */}
         <div className="relative flex-1 h-8">
           <Search className={SEARCH_ICON_POSITION} aria-hidden />

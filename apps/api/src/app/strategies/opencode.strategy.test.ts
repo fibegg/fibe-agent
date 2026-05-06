@@ -106,10 +106,16 @@ if (args[0] === 'serve') {
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_user', sessionID: messageMatch[1], messageID: 'msg_user', type: 'text', text: '[MODE]Casting...[/MODE]\\n' + prompt } } });
       sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_assistant', sessionID: messageMatch[1], role: 'assistant' } } });
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_reason', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'reasoning', text: 'thinking' } } });
+      const snapshotFirst = process.env.OPENCODE_FAKE_EVENT_ORDER === 'snapshot-first';
+      if (snapshotFirst) {
+        sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
+      }
       // Emit delta events for the assistant text part
       sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(0, Math.ceil(text.length / 2)) } });
       sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(Math.ceil(text.length / 2)) } });
-      sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
+      if (!snapshotFirst) {
+        sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
+      }
       sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } });
       sendJson(res, 200, {
         info: {
@@ -156,6 +162,7 @@ describe('OpencodeStrategy', () => {
     'OPENCODE_FAKE_ENV_PATH',
     'OPENCODE_FAKE_MODE',
     'OPENCODE_FAKE_MESSAGE',
+    'OPENCODE_FAKE_EVENT_ORDER',
     'OPENCODE_FAKE_REQUESTS_PATH',
     'OPENCODE_CONFIG_CONTENT',
     'OPENCODE_AGENT_TRANSPORT',
@@ -175,6 +182,7 @@ describe('OpencodeStrategy', () => {
     delete process.env.OPENCODE_FAKE_ENV_PATH;
     delete process.env.OPENCODE_FAKE_MODE;
     delete process.env.OPENCODE_FAKE_MESSAGE;
+    delete process.env.OPENCODE_FAKE_EVENT_ORDER;
     delete process.env.OPENCODE_FAKE_REQUESTS_PATH;
     delete process.env.OPENCODE_CONFIG_CONTENT;
     process.env.OPENCODE_AGENT_TRANSPORT = 'run';
@@ -518,6 +526,28 @@ describe('OpencodeStrategy', () => {
     const messageRequest = requests.find((request) => request.type === 'message-body');
     expect(messageRequest?.body?.model).toEqual({ providerID: 'openai', modelID: 'gpt-5.4' });
     expect(messageRequest?.query?.directory).toBe(join(defaultDir, 'opencode_workspace'));
+  });
+
+  test('executePromptStreaming dedupes deltas that arrive after a full text snapshot', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_EVENT_ORDER = 'snapshot-first';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'snapshot-first-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'conversation-snapshot-first',
+      getEncryptionKey: () => undefined,
+    });
+
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    expect(chunks.join('')).toBe('fake app-server response');
   });
 
   test('executePromptStreaming app-server clears stale OpenCode session marker on missing session', async () => {

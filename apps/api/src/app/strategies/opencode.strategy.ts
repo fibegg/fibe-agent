@@ -1078,6 +1078,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     }
 
     const previousClean = state.textByPartId.get(props.partID) ?? '';
+    if (previousClean.startsWith(clean)) return;
     const delta = clean.startsWith(previousClean) ? clean.slice(previousClean.length) : clean;
     state.textByPartId.set(props.partID, clean);
 

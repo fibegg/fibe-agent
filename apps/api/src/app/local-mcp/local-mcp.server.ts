@@ -13,7 +13,7 @@
  *   ask_user            — ask the operator a question; blocks until answered
  *   confirm_action      — ask yes/no; blocks until answered
  *   show_image          — render an image inline in the chat thread (fire-and-forget)
- *   set_mode            — set the agent mode (exploring, casting, …)
+ *   set_mode            — set the agent mode (exploring, casting, overseeing, build)
  *   get_mode            — return current agent mode
  *   notify              — show a toast notification (fire-and-forget)
  *   set_title           — update the run title in the sidebar (fire-and-forget)
@@ -116,13 +116,13 @@ const TOOL_DEFINITIONS = [
     name: LOCAL_TOOL.SET_MODE,
     description:
       'Set the agent mode. Returns { ok: true, mode: string }. ' +
-      'Valid values: exploring, casting, overseeing, greenfielding, brownfielding.',
+      'Valid values: exploring, casting, overseeing, build.',
     inputSchema: {
       type: 'object',
       properties: {
         mode: {
           type: 'string',
-          enum: ['exploring', 'casting', 'overseeing', 'greenfielding', 'brownfielding'],
+          enum: ['exploring', 'casting', 'overseeing', 'build'],
           description: 'The new agent mode.',
         },
       },

@@ -157,13 +157,13 @@ function SettingsSwitch({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 shrink-0 rounded-full border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`inline-flex h-6 w-11 shrink-0 items-center rounded-full border p-0.5 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 disabled:cursor-not-allowed disabled:opacity-50 ${
         checked ? 'border-primary/60 bg-primary shadow-[inset_0_0_0_1px_rgba(255,255,255,0.08)]' : 'border-muted-foreground/50 bg-background/80'
-      }`}
+      } ${checked ? 'justify-end' : 'justify-start'}`}
     >
       <span
-        className={`pointer-events-none absolute left-0.5 top-1/2 size-5 -translate-y-1/2 rounded-full border shadow-sm transition-transform ${
-          checked ? 'translate-x-5 border-white/70 bg-white' : 'translate-x-0 border-muted-foreground/50 bg-muted-foreground'
+        className={`pointer-events-none block size-5 rounded-full border shadow-sm transition-colors ${
+          checked ? 'border-white/70 bg-white' : 'border-muted-foreground/50 bg-muted-foreground'
         }`}
       />
     </button>
@@ -184,12 +184,17 @@ function FibeSyncRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
-      <div className="flex min-w-0 items-center gap-2.5">
+    <div className="flex min-h-10 min-w-0 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
+      <div className="flex min-w-0 flex-1 items-center gap-2.5 overflow-hidden">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-primary/20 bg-primary/10 text-primary">
           {icon}
         </span>
-        <span className="truncate text-sm font-medium text-foreground">{label}</span>
+        <span
+          className="settings-inline-scroll min-w-0 flex-1 overflow-x-auto overflow-y-hidden whitespace-nowrap pb-0.5 pr-1 text-sm font-medium leading-5 text-foreground"
+          title={label}
+        >
+          <span className="inline-block min-w-max">{label}</span>
+        </span>
       </div>
       <SettingsSwitch
         checked={checked}
@@ -276,7 +281,11 @@ export function ChatSettingsModal({
 
   const handleAuthClick = () => {
     onClose();
-    state === CHAT_STATES.UNAUTHENTICATED ? onStartAuth() : onReauthenticate();
+    if (state === CHAT_STATES.UNAUTHENTICATED) {
+      onStartAuth();
+    } else {
+      onReauthenticate();
+    }
   };
 
   const handleLogoutClick = () => {
@@ -378,7 +387,7 @@ export function ChatSettingsModal({
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.fibeSync')}</span>
               {syncSaving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label={t('common.saving')} />}
             </div>
-            <div className="grid gap-2 rounded-lg border border-border/40 bg-muted/15 p-2.5 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-2 rounded-lg border border-border/40 bg-muted/15 p-2.5 sm:grid-cols-2">
               {([
                 ['messages', t('settings.sync.messages'), <MessageSquareText key="messages" className="size-3.5" />],
                 ['activity', t('settings.sync.activity'), <Activity key="activity" className="size-3.5" />],

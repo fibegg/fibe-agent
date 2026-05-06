@@ -125,6 +125,14 @@ describe('LocalMcpService', () => {
     expect((res.result as Record<string, unknown>)['mode']).toBe('Casting...');
   });
 
+  test('set_mode accepts MODE:BUILD trigger values', async () => {
+    const { svc } = makeService();
+    svc.registerModeAccessors(() => 'Exploring...', () => 'Building...');
+    const res = await svc.handleToolCall({ requestId: 'r9b', tool: LOCAL_TOOL.SET_MODE, args: { mode: 'MODE:BUILD' } });
+    expect(res.ok).toBe(true);
+    expect((res.result as Record<string, unknown>)['mode']).toBe('Building...');
+  });
+
   test('set_mode with invalid value returns error', async () => {
     const { svc } = makeService();
     const res = await svc.handleToolCall({ requestId: 'r10', tool: LOCAL_TOOL.SET_MODE, args: { mode: 'hacking' } });

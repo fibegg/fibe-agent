@@ -44,6 +44,21 @@ describe('AgentModeStoreService', () => {
     expect(service.get()).toBe(AGENT_MODES.casting);
   });
 
+  test('set with MODE:BUILD trigger resolves to Building display string', () => {
+    const service = new AgentModeStoreService(makeConfig(dataDir) as never);
+    const result = service.set('MODE:BUILD');
+    expect(result).toBe(AGENT_MODES.build);
+    expect(service.get()).toBe(AGENT_MODES.build);
+  });
+
+  test('legacy greenfield and brownfield values resolve to Building', () => {
+    const service = new AgentModeStoreService(makeConfig(dataDir) as never);
+    expect(service.set('greenfielding')).toBe(AGENT_MODES.build);
+    expect(service.set('Brownfielding...')).toBe(AGENT_MODES.build);
+    expect(service.set('MODE:GREENFIELD')).toBe(AGENT_MODES.build);
+    expect(service.set('MODE:BROWNFIELD')).toBe(AGENT_MODES.build);
+  });
+
   test('set with unknown value returns null and does not change stored mode', () => {
     const service = new AgentModeStoreService(makeConfig(dataDir) as never);
     const result = service.set('hacking');
@@ -59,7 +74,7 @@ describe('AgentModeStoreService', () => {
 
   test('all canonical keys are accepted', () => {
     const service = new AgentModeStoreService(makeConfig(dataDir) as never);
-    const keys = ['exploring', 'casting', 'overseeing', 'greenfielding', 'brownfielding'] as const;
+    const keys = ['exploring', 'casting', 'overseeing', 'build'] as const;
     for (const key of keys) {
       expect(service.set(key)).not.toBeNull();
     }
@@ -77,19 +92,19 @@ describe('AgentModeStoreService', () => {
 
   test('get uses cache after first read', () => {
     const service = new AgentModeStoreService(makeConfig(dataDir) as never);
-    service.set('greenfielding');
-    expect(service.get()).toBe(AGENT_MODES.greenfielding);
-    expect(service.get()).toBe(AGENT_MODES.greenfielding);
+    service.set('build');
+    expect(service.get()).toBe(AGENT_MODES.build);
+    expect(service.get()).toBe(AGENT_MODES.build);
   });
 
   test('onModuleDestroy flushes pending writes', async () => {
     const service = new AgentModeStoreService(makeConfig(dataDir) as never);
-    service.set('brownfielding');
+    service.set('build');
     await service.onModuleDestroy();
 
     const raw = readFileSync(join(dataDir, 'mode.json'), 'utf8');
     const data = JSON.parse(raw) as { mode: string };
-    expect(data.mode).toBe(AGENT_MODES.brownfielding);
+    expect(data.mode).toBe(AGENT_MODES.build);
   });
 
   test('get reads previously persisted value from disk', async () => {

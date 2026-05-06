@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import type { ReactNode } from 'react';
 import { ChatLeftPanel } from './chat-left-panel';
 
 // Mock the heavy child components
@@ -10,12 +11,16 @@ vi.mock('../file-explorer/file-explorer', () => ({
       data-testid="file-explorer"
       data-collapsed={String(props.collapsed)}
       data-agent-workspace={String(props.agentWorkspaceAvailable)}
-    />
+    >
+      {props.playgroundSelector as ReactNode}
+    </div>
   ),
 }));
 
 vi.mock('../chat/conversation-sidebar', () => ({
-  ConversationSidebar: () => <div data-testid="conversation-sidebar" />,
+  ConversationSidebar: (props: { collapsed?: boolean }) => (
+    <div data-testid="conversation-sidebar" data-collapsed={String(props.collapsed)} />
+  ),
 }));
 
 vi.mock('../sidebar-toggle', () => ({
@@ -127,6 +132,27 @@ describe('ChatLeftPanel', () => {
     expect(screen.getByTestId('conversation-sidebar')).toBeTruthy();
     // File explorer also still present (files exist)
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
+  });
+
+  it('passes collapsed state to ConversationSidebar', () => {
+    render(
+      <MemoryRouter>
+        <ChatLeftPanel {...baseProps} {...conversationProps} conversationsCollapsed />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('conversation-sidebar').getAttribute('data-collapsed')).toBe('true');
+  });
+
+  it('renders playground selector inside the file explorer', () => {
+    render(
+      <MemoryRouter>
+        <ChatLeftPanel
+          {...baseProps}
+          playgroundSelector={<button type="button">Link Playground</button>}
+        />
+      </MemoryRouter>
+    );
+    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
   });
 
   it('shows ConversationSidebar at full height when there are no files', () => {

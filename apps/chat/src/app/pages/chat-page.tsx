@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, GitCompareArrows, Loader2, TerminalSquare } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
 import { MessageList, type MessageListHandle, type ConversationResetSeparator, type ChatMessage } from '../chat/message-list';
@@ -7,6 +7,7 @@ import { WS_ACTION } from '@shared/ws-constants';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useConversations } from '../chat/use-conversations';
 import { ConversationSidebar } from '../chat/conversation-sidebar';
+import { PlaygroundSelector } from '../chat/playground-selector';
 import { useScrollToBottom } from '../chat/use-scroll-to-bottom';
 import { usePlaygroundFiles } from '../chat/use-playground-files';
 import { usePlaygroundSelector } from '../chat/use-playground-selector';
@@ -114,7 +115,7 @@ export function ChatPage() {
     switchTo: switchConversation,
     refresh: refreshConversations,
   } = useConversations();
-  const conversations = Array.isArray(rawConversations) ? rawConversations : [];
+  const conversations = useMemo(() => (Array.isArray(rawConversations) ? rawConversations : []), [rawConversations]);
   const activeConversationReadonly =
     activeConversationId === 'inbox' ||
     conversations.find((c) => c.id === activeConversationId)?.readonly === true;
@@ -137,6 +138,8 @@ export function ChatPage() {
     setRightSidebarOpen,
     sidebarCollapsed,
     setSidebarCollapsed,
+    conversationSidebarCollapsed,
+    setConversationSidebarCollapsed,
     rightSidebarCollapsed,
     setRightSidebarCollapsed,
     settingsOpen,
@@ -156,6 +159,20 @@ export function ChatPage() {
   const toggleCli = useCallback(() => setCliOpen(v => !v), []);
   const closeCli = useCallback(() => setCliOpen(false), []);
   const pgSelector = usePlaygroundSelector();
+  const playgroundSelector = (
+    <PlaygroundSelector
+      entries={pgSelector.entries}
+      loading={pgSelector.loading}
+      error={pgSelector.error}
+      currentLink={pgSelector.currentLink}
+      linking={pgSelector.linking}
+      onOpen={pgSelector.open}
+      onLink={pgSelector.linkPlayground}
+      onLinked={refetchPlaygrounds}
+      visible={true}
+      variant="icon"
+    />
+  );
   const [standaloneMode, setStandaloneMode] = useState(() => isStandaloneMode());
   const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
   const [simplicateMode, setSimplicateMode] = useState(() => readStoredSimplicateMode() ?? false);
@@ -879,10 +896,14 @@ export function ChatPage() {
                   onAgentUploaded={refetchAgentFiles}
                   agentProviderLabel={agentProviderLabel}
                   currentModel={currentModel}
+                  playgroundSelector={playgroundSelector}
                 />
               </div>
               {/* Conversations — always visible at bottom on mobile too */}
-              <div className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col" style={{ height: '40%', minHeight: 200 }}>
+              <div
+                className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
+                style={conversationSidebarCollapsed ? undefined : { height: '40%', minHeight: 200 }}
+              >
                 <ConversationSidebar
                   conversations={conversations}
                   activeId={activeConversationId}
@@ -891,6 +912,8 @@ export function ChatPage() {
                   onCreate={async () => { await createConversation(); }}
                   onRename={renameConversation}
                   onDelete={deleteConversation}
+                  collapsed={conversationSidebarCollapsed}
+                  onCollapsedChange={setConversationSidebarCollapsed}
                 />
               </div>
             </div>
@@ -954,6 +977,7 @@ export function ChatPage() {
             agentWorkspaceAvailable={hasAgentWorkspace}
             agentProviderLabel={agentProviderLabel}
             currentModel={currentModel}
+            playgroundSelector={playgroundSelector}
             conversations={conversations}
             conversationsLoading={conversationsLoading}
             activeConversationId={activeConversationId}
@@ -961,6 +985,8 @@ export function ChatPage() {
             onConversationCreate={handleConversationCreate}
             onConversationRename={renameConversation}
             onConversationDelete={deleteConversation}
+            conversationsCollapsed={conversationSidebarCollapsed}
+            onConversationsCollapsedChange={setConversationSidebarCollapsed}
           />
         ) : null
       }
@@ -1004,7 +1030,7 @@ export function ChatPage() {
           onSearchChange={setSearchQuery}
           onReconnect={reconnect}
           onStartAuth={startAuth}
-          onOpenMenu={compactMode ? openSettings : () => setSidebarOpen(true)}
+          onOpenMenu={compactMode ? openFileBrowser : () => setSidebarOpen(true)}
           onOpenActivity={() => setRightSidebarOpen(true)}
           onToggleTerminal={toggleTerminal}
           terminalOpen={terminalOpen}
@@ -1021,25 +1047,10 @@ export function ChatPage() {
           modelLocked={chatModelLocked}
           onRefreshModels={refreshModelOptions}
           refreshingModels={refreshingModels}
-          playgroundEntries={pgSelector.entries}
-          playgroundLoading={pgSelector.loading}
-          playgroundError={pgSelector.error}
-          playgroundCurrentLink={pgSelector.currentLink}
-          playgroundLinking={pgSelector.linking}
-          playgroundCanGoBack={pgSelector.canGoBack}
-          playgroundBreadcrumbs={pgSelector.breadcrumbs}
-          onPlaygroundOpen={pgSelector.open}
-          onPlaygroundBrowse={pgSelector.browseTo}
-          onPlaygroundGoBack={pgSelector.goBack}
-          onPlaygroundGoToRoot={pgSelector.goToRoot}
-          onPlaygroundLink={pgSelector.linkPlayground}
-          onPlaygroundLinked={refetchPlaygrounds}
-          onPlaygroundSmartMount={pgSelector.smartMount}
           tonyStarkMode={tonyStarkMode}
           onToggleTonyStarkMode={handleToggleTonyStarkMode}
           simplicateMode={simplicateMode}
           onSimplicateModeChange={handleSimplicateModeChange}
-          onOpenFileBrowser={openFileBrowser}
           onResetConversation={
             !anyProcessing
               ? () => send({ action: WS_ACTION.RESET_CONVERSATION })

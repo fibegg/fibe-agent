@@ -8,6 +8,7 @@ export const MAIN_CONTENT_MIN_WIDTH_PX = 260;
 export const PANEL_HEADER_MIN_HEIGHT_PX = 128;
 export const SIDEBAR_COLLAPSE_STORAGE_KEY = 'fibe-sidebar-collapsed';
 export const SIDEBAR_WIDTH_STORAGE_KEY = 'fibe-sidebar-width';
+export const CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY = 'fibe-conversations-collapsed';
 
 export const RIGHT_SIDEBAR_WIDTH_PX = 280;
 export const RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX = 48;
@@ -30,6 +31,27 @@ export function persistSidebarCollapsed(collapsed: boolean): void {
   try {
     localStorage.setItem(
       SIDEBAR_COLLAPSE_STORAGE_KEY,
+      JSON.stringify(collapsed)
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getInitialConversationSidebarCollapsed(): boolean {
+  try {
+    return JSON.parse(
+      localStorage.getItem(CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY) ?? 'true'
+    ) as boolean;
+  } catch {
+    return true;
+  }
+}
+
+export function persistConversationSidebarCollapsed(collapsed: boolean): void {
+  try {
+    localStorage.setItem(
+      CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY,
       JSON.stringify(collapsed)
     );
   } catch {

@@ -13,6 +13,7 @@ describe('useChatLayout', () => {
     expect(typeof result.current.isMobile).toBe('boolean');
     expect(result.current.sidebarOpen).toBe(false);
     expect(result.current.rightSidebarOpen).toBe(false);
+    expect(result.current.conversationSidebarCollapsed).toBe(true);
     expect(typeof result.current.settingsOpen).toBe('boolean');
     expect(result.current.searchQuery).toBe('');
   });
@@ -67,6 +68,24 @@ describe('useChatLayout', () => {
     const prev = result.current.rightSidebarCollapsed;
     act(() => { result.current.setRightSidebarCollapsed(!prev); });
     expect(result.current.rightSidebarCollapsed).toBe(!prev);
+  });
+
+  it('setConversationSidebarCollapsed updates conversationSidebarCollapsed', () => {
+    const { result } = renderHook(() => useChatLayout(false, false));
+    act(() => { result.current.setConversationSidebarCollapsed(false); });
+    expect(result.current.conversationSidebarCollapsed).toBe(false);
+  });
+
+  it('initializes conversation sidebar collapse state from localStorage', () => {
+    localStorage.setItem('fibe-conversations-collapsed', 'false');
+    const { result } = renderHook(() => useChatLayout(false, false));
+    expect(result.current.conversationSidebarCollapsed).toBe(false);
+  });
+
+  it('persists conversation sidebar collapse state', () => {
+    const { result } = renderHook(() => useChatLayout(false, false));
+    act(() => { result.current.setConversationSidebarCollapsed(false); });
+    expect(localStorage.getItem('fibe-conversations-collapsed')).toBe('false');
   });
 
   it('auto-expands sidebar when playground files first appear', () => {

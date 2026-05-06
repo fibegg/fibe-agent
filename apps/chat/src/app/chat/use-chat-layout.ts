@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getInitialSidebarCollapsed,
+  getInitialConversationSidebarCollapsed,
   getInitialRightSidebarCollapsed,
   persistSidebarCollapsed,
+  persistConversationSidebarCollapsed,
   persistRightSidebarCollapsed,
 } from '../layout-constants';
 
@@ -13,6 +15,9 @@ export function useChatLayout(hasPlaygroundFiles: boolean, playgroundLoading: bo
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
+  const [conversationSidebarCollapsed, setConversationSidebarCollapsed] = useState(
+    getInitialConversationSidebarCollapsed
+  );
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(
     getInitialRightSidebarCollapsed
   );
@@ -21,6 +26,10 @@ export function useChatLayout(hasPlaygroundFiles: boolean, playgroundLoading: bo
   const prevHasPlaygroundFilesRef = useRef(hasPlaygroundFiles);
 
   useEffect(() => persistSidebarCollapsed(sidebarCollapsed), [sidebarCollapsed]);
+  useEffect(
+    () => persistConversationSidebarCollapsed(conversationSidebarCollapsed),
+    [conversationSidebarCollapsed]
+  );
   useEffect(
     () => persistRightSidebarCollapsed(rightSidebarCollapsed),
     [rightSidebarCollapsed]
@@ -75,6 +84,8 @@ export function useChatLayout(hasPlaygroundFiles: boolean, playgroundLoading: bo
     setRightSidebarOpen,
     sidebarCollapsed,
     setSidebarCollapsed,
+    conversationSidebarCollapsed,
+    setConversationSidebarCollapsed,
     rightSidebarCollapsed,
     setRightSidebarCollapsed,
     settingsOpen,

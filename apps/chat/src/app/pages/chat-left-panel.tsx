@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import type { ReactNode } from 'react';
 import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
 import type { FileTab, TabStats } from '../file-explorer/file-explorer-tabs';
 import { SIDEBAR_COLLAPSED_WIDTH_PX } from '../layout-constants';
@@ -34,6 +35,7 @@ interface ChatLeftPanelProps {
   onAgentUploaded?: () => void;
   agentProviderLabel?: string;
   currentModel?: string;
+  playgroundSelector?: ReactNode;
   // Conversation sidebar — always shown when panel is open
   conversations?: ConversationMeta[];
   conversationsLoading?: boolean;
@@ -42,6 +44,8 @@ interface ChatLeftPanelProps {
   onConversationCreate?: () => void;
   onConversationRename?: (id: string, title: string) => void;
   onConversationDelete?: (id: string) => void;
+  conversationsCollapsed?: boolean;
+  onConversationsCollapsedChange?: (collapsed: boolean) => void;
 }
 
 export const ChatLeftPanel = memo(function ChatLeftPanel({
@@ -69,6 +73,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onAgentUploaded,
   agentProviderLabel,
   currentModel,
+  playgroundSelector,
   conversations,
   conversationsLoading = false,
   activeConversationId = 'default',
@@ -76,6 +81,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   onConversationCreate,
   onConversationRename,
   onConversationDelete,
+  conversationsCollapsed = false,
+  onConversationsCollapsedChange,
 }: ChatLeftPanelProps) {
   const t = useT();
   // Icon rail when user explicitly collapsed OR when there are no files and also
@@ -86,6 +93,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   // and the necessary props are wired up. When there are no files, conversations
   // take the full height so progress is always trackable.
   const showConversations = !isCollapsed && conversations !== undefined && !!onConversationSelect;
+  const hasFileSection = hasAnyFiles || Boolean(playgroundSelector);
 
   const panelWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : width;
 
@@ -100,7 +108,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
         {/* File explorer — takes available space above conversations.
             hideSidebarToggle suppresses the toggle inside FileExplorer so we
             can render it here on the aside and center it over the full height. */}
-        {(hasAnyFiles || isCollapsed) && (
+        {(hasFileSection || isCollapsed) && (
           <div className="flex flex-1 flex-col overflow-hidden min-h-0">
             <FileExplorer
               tree={playgroundTree}
@@ -121,6 +129,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
               onAgentUploaded={onAgentUploaded}
               agentProviderLabel={agentProviderLabel}
               currentModel={currentModel}
+              playgroundSelector={playgroundSelector}
             />
           </div>
         )}
@@ -129,7 +138,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
         {showConversations && (
           <div
             className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
-            style={{ height: hasAnyFiles ? '45%' : '100%', minHeight: 180 }}
+            style={conversationsCollapsed ? undefined : { height: hasFileSection ? '45%' : '100%', minHeight: 180 }}
           >
             <ConversationSidebar
               conversations={conversations}
@@ -139,6 +148,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
               onCreate={onConversationCreate ?? (() => undefined)}
               onRename={onConversationRename ?? (() => undefined)}
               onDelete={onConversationDelete ?? (() => undefined)}
+              collapsed={conversationsCollapsed}
+              onCollapsedChange={onConversationsCollapsedChange}
             />
           </div>
         )}

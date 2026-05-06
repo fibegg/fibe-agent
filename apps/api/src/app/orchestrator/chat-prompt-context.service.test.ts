@@ -190,7 +190,7 @@ describe('ChatPromptContextService', () => {
     });
 
     test('works with all canonical mode display strings', () => {
-      const modes = ['Exploring...', 'Casting...', 'Overseeing...', 'Greenfielding...', 'Brownfielding...'];
+      const modes = ['Exploring...', 'Casting...', 'Overseeing...', 'Building...'];
       for (const mode of modes) {
         const result = service.injectModeHint('go', mode);
         expect(result).toContain(`[MODE]${mode}[/MODE]`);

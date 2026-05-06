@@ -104,6 +104,8 @@ vi.mock('../chat/use-chat-layout', () => ({
     setRightSidebarOpen: vi.fn(),
     sidebarCollapsed: false,
     setSidebarCollapsed: vi.fn(),
+    conversationSidebarCollapsed: true,
+    setConversationSidebarCollapsed: vi.fn(),
     rightSidebarCollapsed: false,
     setRightSidebarCollapsed: vi.fn(),
     settingsOpen: false,
@@ -238,7 +240,11 @@ vi.mock('../chat/message-list', () => ({
 }));
 
 vi.mock('../file-explorer/file-explorer', () => ({
-  FileExplorer: () => <div data-testid="file-explorer" />,
+  FileExplorer: (props: { playgroundSelector?: React.ReactNode }) => (
+    <div data-testid="file-explorer">
+      {props.playgroundSelector}
+    </div>
+  ),
 }));
 
 vi.mock('../chat/use-conversations', () => ({
@@ -381,6 +387,8 @@ describe('ChatPage', () => {
       setRightSidebarOpen: vi.fn(),
       sidebarCollapsed: false,
       setSidebarCollapsed: vi.fn(),
+      conversationSidebarCollapsed: true,
+      setConversationSidebarCollapsed: vi.fn(),
       rightSidebarCollapsed: false,
       setRightSidebarCollapsed: vi.fn(),
       settingsOpen: false,
@@ -447,6 +455,7 @@ describe('ChatPage', () => {
     });
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
   });
 
   it('shows a desktop expand arrow for the compact file browser', () => {
@@ -620,6 +629,8 @@ describe('ChatPage', () => {
       setRightSidebarOpen: vi.fn(),
       sidebarCollapsed: false,
       setSidebarCollapsed: vi.fn(),
+      conversationSidebarCollapsed: true,
+      setConversationSidebarCollapsed: vi.fn(),
       rightSidebarCollapsed: false,
       setRightSidebarCollapsed: vi.fn(),
       settingsOpen: false,
@@ -632,6 +643,7 @@ describe('ChatPage', () => {
     render(<ChatPage />, { wrapper });
     // File explorer is rendered inside the mobile sidebar overlay
     expect(screen.getAllByTestId('file-explorer').length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
   });
 
   it('renders mobile activity sidebar when isMobile=true and rightSidebarOpen=true', () => {
@@ -643,6 +655,8 @@ describe('ChatPage', () => {
       setRightSidebarOpen: vi.fn(),
       sidebarCollapsed: false,
       setSidebarCollapsed: vi.fn(),
+      conversationSidebarCollapsed: true,
+      setConversationSidebarCollapsed: vi.fn(),
       rightSidebarCollapsed: false,
       setRightSidebarCollapsed: vi.fn(),
       settingsOpen: false,
@@ -665,6 +679,8 @@ describe('ChatPage', () => {
       setRightSidebarOpen: vi.fn(),
       sidebarCollapsed: false,
       setSidebarCollapsed: vi.fn(),
+      conversationSidebarCollapsed: true,
+      setConversationSidebarCollapsed: vi.fn(),
       rightSidebarCollapsed: false,
       setRightSidebarCollapsed: vi.fn(),
       settingsOpen: false,

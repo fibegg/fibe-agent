@@ -8,6 +8,7 @@ import {
   SIDEBAR_MIN_WIDTH_PX,
   SIDEBAR_MAX_WIDTH_PX,
   SIDEBAR_WIDTH_STORAGE_KEY,
+  CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY,
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
   RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY,
   RIGHT_SIDEBAR_WIDTH_PX,
@@ -16,6 +17,8 @@ import {
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
   getInitialSidebarCollapsed,
   persistSidebarCollapsed,
+  getInitialConversationSidebarCollapsed,
+  persistConversationSidebarCollapsed,
   getInitialRightSidebarCollapsed,
   persistRightSidebarCollapsed,
   getInitialSidebarWidth,
@@ -48,6 +51,12 @@ describe('layout-constants', () => {
     expect(SIDEBAR_WIDTH_STORAGE_KEY).toBe('fibe-sidebar-width');
   });
 
+  it('exports storage key for conversation sidebar collapse', () => {
+    expect(CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY).toBe(
+      'fibe-conversations-collapsed'
+    );
+  });
+
   it('exports expected right sidebar width values', () => {
     expect(RIGHT_SIDEBAR_WIDTH_PX).toBe(280);
     expect(RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX).toBe(48);
@@ -63,6 +72,49 @@ describe('layout-constants', () => {
 
   it('exports storage key for right sidebar width', () => {
     expect(RIGHT_SIDEBAR_WIDTH_STORAGE_KEY).toBe('fibe-right-sidebar-width');
+  });
+});
+
+describe('getInitialConversationSidebarCollapsed', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns true when key is missing', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    expect(getInitialConversationSidebarCollapsed()).toBe(true);
+  });
+
+  it('returns false when key is "false"', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue('false');
+    expect(getInitialConversationSidebarCollapsed()).toBe(false);
+  });
+});
+
+describe('persistConversationSidebarCollapsed', () => {
+  const key = CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY;
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('writes the collapsed state', () => {
+    persistConversationSidebarCollapsed(false);
+    expect(localStorage.setItem).toHaveBeenCalledWith(key, 'false');
   });
 });
 

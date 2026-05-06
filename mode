@@ -3,15 +3,15 @@
 MODE="$1"
 
 if [ -z "$MODE" ]; then
-  echo "Usage: ./mode <exploring|casting|overseeing|greenfielding|brownfielding>"
+  echo "Usage: ./mode <exploring|casting|overseeing|build>"
   exit 1
 fi
 
 # Validate against known keys
 case "$MODE" in
-  exploring|casting|overseeing|greenfielding|brownfielding) ;;
+  exploring|casting|overseeing|build|greenfielding|brownfielding) ;;
   *)
-    echo "Unknown mode \"$MODE\". Valid options: exploring, casting, overseeing, greenfielding, brownfielding"
+    echo "Unknown mode \"$MODE\". Valid options: exploring, casting, overseeing, build"
     exit 1
     ;;
 esac

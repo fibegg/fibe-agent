@@ -4,27 +4,10 @@ import { MemoryRouter } from 'react-router-dom';
 import { ChatHeader } from './chat-header';
 import { CHAT_STATES } from './chat-state';
 
-// Lightweight stub so PlaygroundSelector renders a recognisable element.
-vi.mock('./playground-selector', () => ({
-  PlaygroundSelector: ({ currentLink, variant }: { currentLink: string | null; variant?: 'icon' | 'menu' }) => (
-    <button type="button" aria-label={variant === 'menu' ? 'Playgrounds' : 'Link Playground'} data-testid="playground-selector">
-      {variant === 'menu' ? 'Playgrounds' : currentLink ?? 'no-link'}
-    </button>
-  ),
-}));
-
 vi.mock('./model-selector', () => ({
   ModelSelector: ({ currentModel, visible }: { currentModel: string; visible: boolean }) =>
     visible ? <div data-testid="model-selector">{currentModel}</div> : null,
 }));
-
-const PLAYGROUND_PROPS = {
-  onPlaygroundOpen: vi.fn(),
-  onPlaygroundBrowse: vi.fn(),
-  onPlaygroundGoBack: vi.fn(),
-  onPlaygroundGoToRoot: vi.fn(),
-  onPlaygroundLink: vi.fn(async () => true),
-};
 
 const DEFAULT_PROPS = {
   isMobile: false,
@@ -195,7 +178,7 @@ describe('ChatHeader', () => {
   it('calls onOpenActivity when activity button clicked', () => {
     const onOpenActivity = vi.fn();
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenActivity={onOpenActivity} />);
-    fireEvent.click(document.querySelector('[aria-label="Open agent activity"]')!);
+    fireEvent.click(screen.getByLabelText('Open agent activity'));
     expect(onOpenActivity).toHaveBeenCalled();
   });
 
@@ -263,50 +246,6 @@ describe('ChatHeader', () => {
     btns.forEach((btn) => expect(btn.getAttribute('aria-pressed')).toBe('false'));
   });
 
-  // ─── Playground selector layout (desktop vs mobile) ───────────────────────
-
-  it('renders playground selector when all playground props supplied', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
-    // Both the desktop (hidden sm:block) and mobile (sm:hidden) slots are in the DOM.
-    const slots = screen.getAllByTestId('playground-selector');
-    expect(slots.length).toBe(2);
-  });
-
-  it('desktop playground slot has hidden-on-mobile class', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
-    const slots = screen.getAllByTestId('playground-selector');
-    // The desktop wrapper has "hidden sm:block"; the mobile wrapper has "sm:hidden".
-    const wrappers = slots.map((s) => s.parentElement as HTMLElement);
-    const hasDesktopWrapper = wrappers.some((w) => w.className.includes('hidden') && w.className.includes('sm:block'));
-    expect(hasDesktopWrapper).toBe(true);
-  });
-
-  it('mobile playground slot has sm:hidden class', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} {...PLAYGROUND_PROPS} />);
-    const slots = screen.getAllByTestId('playground-selector');
-    const wrappers = slots.map((s) => s.parentElement as HTMLElement);
-    const hasMobileWrapper = wrappers.some((w) => w.className.includes('sm:hidden'));
-    expect(hasMobileWrapper).toBe(true);
-  });
-
-  it('does not render playground selector when playground props are missing', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} />);
-    expect(screen.queryByTestId('playground-selector')).toBeNull();
-  });
-
-  it('passes currentLink to playground selector', () => {
-    render(
-      <ChatHeader
-        {...DEFAULT_PROPS}
-        {...PLAYGROUND_PROPS}
-        playgroundCurrentLink="my/project"
-      />,
-    );
-    // Both slots should show the same link value.
-    const slots = screen.getAllByTestId('playground-selector');
-    slots.forEach((s) => expect(s.textContent).toBe('my/project'));
-  });
-
   // ─── Tony Stark ───────────────────────────────────────────────────────────
 
   it('renders Tony Stark link when onToggleTonyStarkMode is provided', () => {
@@ -328,7 +267,7 @@ describe('ChatHeader', () => {
 
   // ─── Simplicate mode ──────────────────────────────────────────────────────
 
-  it('renders compact header when Simplicate is on with settings gear and no inline search', () => {
+  it('renders compact header when Simplicate is on with sidebar menu and no idle status/search', () => {
     render(
       <ChatHeader
         {...DEFAULT_PROPS}
@@ -338,10 +277,11 @@ describe('ChatHeader', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: /open settings/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /open menu/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /more actions/i })).toBeTruthy();
     expect(screen.getByText('Claude')).toBeTruthy();
     expect(screen.getByText('haiku')).toBeTruthy();
+    expect(screen.queryByText('Ready')).toBeNull();
     expect(screen.queryByPlaceholderText(/search in conversation/i)).toBeNull();
   });
 
@@ -350,10 +290,8 @@ describe('ChatHeader', () => {
       <MemoryRouter>
         <ChatHeader
           {...DEFAULT_PROPS}
-          {...PLAYGROUND_PROPS}
           simplicateMode
           onToggleTonyStarkMode={vi.fn()}
-          onOpenFileBrowser={vi.fn()}
           onToggleTerminal={vi.fn()}
           onToggleCli={vi.fn()}
           onSimplicateModeChange={vi.fn()}
@@ -368,25 +306,27 @@ describe('ChatHeader', () => {
 
     expect(screen.getByRole('menu', { name: /chat actions/i })).toBeTruthy();
     expect(screen.getByText('Tony Stark')).toBeTruthy();
-    expect(screen.getByLabelText('Playgrounds')).toBeTruthy();
+    expect(screen.queryByLabelText('Playgrounds')).toBeNull();
     expect(screen.getByRole('menuitem', { name: /terminal/i })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /commands/i })).toBeTruthy();
-    expect(screen.getByRole('menuitem', { name: /files/i })).toBeTruthy();
-    expect(screen.getByRole('switch', { name: /simplicate/i }).getAttribute('aria-checked')).toBe('true');
+    expect(screen.queryByRole('menuitem', { name: /files/i })).toBeNull();
+    const simplicateSwitch = screen.getByRole('switch', { name: /simplicate/i });
+    expect(simplicateSwitch.getAttribute('aria-checked')).toBe('true');
+    expect(simplicateSwitch.className).toContain('inline-flex');
+    expect(simplicateSwitch.className).toContain('justify-end');
+    expect(simplicateSwitch.firstElementChild?.className).not.toContain('absolute');
     expect(screen.getByText(/9\/9\/0 · 3k in \/ 1\.2k out · 22s/i)).toBeTruthy();
     expect(screen.getByPlaceholderText(/search in conversation/i)).toBeTruthy();
   });
 
   it('runs compact menu actions', () => {
     const onToggleTerminal = vi.fn();
-    const onOpenFileBrowser = vi.fn();
     const onSimplicateModeChange = vi.fn();
     render(
       <ChatHeader
         {...DEFAULT_PROPS}
         simplicateMode
         onToggleTerminal={onToggleTerminal}
-        onOpenFileBrowser={onOpenFileBrowser}
         onSimplicateModeChange={onSimplicateModeChange}
       />,
     );
@@ -396,12 +336,24 @@ describe('ChatHeader', () => {
     expect(onToggleTerminal).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /files/i }));
-    expect(onOpenFileBrowser).toHaveBeenCalledTimes(1);
-
-    fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
     fireEvent.click(screen.getByRole('switch', { name: /simplicate/i }));
     expect(onSimplicateModeChange).toHaveBeenCalledWith(false);
+  });
+
+  it('shows compact status instead of provider/model when not idle', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+        state={CHAT_STATES.AUTH_PENDING}
+        simplicateMode
+      />,
+    );
+
+    expect(screen.getByText('Authentication in progress...')).toBeTruthy();
+    expect(screen.queryByText('Claude')).toBeNull();
+    expect(screen.queryByText('haiku')).toBeNull();
   });
 
   it('opens provider/model dropdown from standard header with model and effort controls', () => {
@@ -465,6 +417,7 @@ describe('ChatHeader', () => {
       />,
     );
 
+    expect(screen.queryByText('Default')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: /switch conversation/i }));
     const threadItem = screen.getByRole('menuitem', { name: /thread one/i });
     fireEvent.mouseDown(threadItem);

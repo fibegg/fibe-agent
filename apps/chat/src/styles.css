@@ -315,6 +315,24 @@ body {
   display: none;
 }
 
+.settings-inline-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) transparent;
+}
+
+.settings-inline-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.settings-inline-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.settings-inline-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--primary) 55%, transparent);
+  border-radius: 999px;
+}
+
 .sidebar-toggle {
   box-shadow: 0 0 0 1px var(--border-subtle);
 }

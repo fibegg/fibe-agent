@@ -1,5 +1,5 @@
 import { Search, Settings, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
 import { PANEL_HEADER_MIN_HEIGHT_PX, REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
@@ -65,6 +65,7 @@ export function FileExplorer({
   onAgentUploaded,
   agentProviderLabel,
   currentModel,
+  playgroundSelector,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -94,6 +95,8 @@ export function FileExplorer({
   agentProviderLabel?: string;
   /** Active model shown as muted secondary text in the explorer header. */
   currentModel?: string;
+  /** Optional playground selector rendered inside the file browser chrome. */
+  playgroundSelector?: ReactNode;
 } = {}) {
   const t = useT();
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
@@ -333,17 +336,18 @@ export function FileExplorer({
   const collapsedContent = (
     <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 pt-3 pb-4 backdrop-blur-xl">
       <div className="flex flex-col items-center gap-3">
-          <button
-            type="button"
-            className={`${BUTTON_ICON_ACCENT} size-9`}
-            title={t('fileExplorer.settings')}
-            aria-label={t('fileExplorer.settings')}
-            onClick={onSettingsClick}
-          >
-            <Settings className="size-4" />
-          </button>
-          {!shouldHideThemeSwitch() && <ThemeToggle />}
-        </div>
+        {playgroundSelector}
+        <button
+          type="button"
+          className={`${BUTTON_ICON_ACCENT} size-9`}
+          title={t('fileExplorer.settings')}
+          aria-label={t('fileExplorer.settings')}
+          onClick={onSettingsClick}
+        >
+          <Settings className="size-4" />
+        </button>
+        {!shouldHideThemeSwitch() && <ThemeToggle />}
+      </div>
     </div>
   );
 
@@ -373,6 +377,7 @@ export function FileExplorer({
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {playgroundSelector && <div className="shrink-0">{playgroundSelector}</div>}
             <button
               type="button"
               className={BUTTON_ICON_ACCENT_SM}

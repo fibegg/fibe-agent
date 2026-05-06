@@ -141,6 +141,35 @@ describe('ChatSettingsModal', () => {
     expect(document.documentElement.dataset.uiEffects).toBe('reduced');
   });
 
+  it('positions settings switch knobs through the track layout', () => {
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+        simplicateMode={false}
+        onSimplicateModeChange={vi.fn()}
+      />
+    );
+
+    const enabledSwitch = screen.getByRole('switch', { name: /animations and visual effects/i }) as HTMLElement;
+    const disabledSwitch = screen.getByRole('switch', { name: /simplicate/i }) as HTMLElement;
+    const enabledSwitchKnob = enabledSwitch.firstElementChild as HTMLElement;
+    const disabledSwitchKnob = disabledSwitch.firstElementChild as HTMLElement;
+
+    expect(enabledSwitch.className).toContain('inline-flex');
+    expect(enabledSwitch.className).toContain('justify-end');
+    expect(disabledSwitch.className).toContain('justify-start');
+    expect(enabledSwitchKnob.className).toContain('block');
+    expect(enabledSwitchKnob.className).not.toContain('absolute');
+    expect(disabledSwitchKnob.className).not.toContain('absolute');
+    expect(enabledSwitchKnob.getAttribute('style')).toBeNull();
+    expect(disabledSwitchKnob.getAttribute('style')).toBeNull();
+  });
+
   it('does not render model or effort controls in settings', () => {
     render(
       <ChatSettingsModal
@@ -155,6 +184,27 @@ describe('ChatSettingsModal', () => {
 
     expect(screen.queryByText('Model')).toBeNull();
     expect(screen.queryByText('Claude Effort')).toBeNull();
+  });
+
+  it('renders long Fibe sync labels in a horizontally scrollable track', () => {
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />
+    );
+
+    const label = screen.getByText('Send raw provider activity to Fibe');
+    const scrollTrack = label.parentElement;
+
+    expect(scrollTrack?.className).toContain('settings-inline-scroll');
+    expect(scrollTrack?.className).toContain('overflow-x-auto');
+    expect(scrollTrack?.className).toContain('whitespace-nowrap');
+    expect(scrollTrack?.className).not.toContain('truncate');
   });
 
   it('runs reset only after confirmation click', () => {

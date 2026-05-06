@@ -578,6 +578,12 @@ describe('OrchestratorService', () => {
     expect(result).toBe(AGENT_MODES.casting);
   });
 
+  test('setAgentMode accepts MODE:BUILD and legacy brownfield triggers as Building', async () => {
+    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    expect(orch.setAgentMode('MODE:BUILD')).toBe(AGENT_MODES.build);
+    expect(orch.setAgentMode('MODE:BROWNFIELD')).toBe(AGENT_MODES.build);
+  });
+
   test('setAgentMode with unknown mode returns null and does not emit', async () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
     const events: { type: string; data: unknown }[] = [];

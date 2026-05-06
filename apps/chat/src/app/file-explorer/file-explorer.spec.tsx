@@ -64,6 +64,17 @@ describe('FileExplorer', () => {
     expect(screen.getByTitle('Model: haiku')).toBeTruthy();
   });
 
+  it('renders the playground selector in the explorer header', () => {
+    render(
+      <FileExplorer
+        tree={[]}
+        agentTree={[]}
+        playgroundSelector={<button type="button">Link Playground</button>}
+      />
+    );
+    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
+  });
+
   it('shows empty playground message when API returns empty array', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,
