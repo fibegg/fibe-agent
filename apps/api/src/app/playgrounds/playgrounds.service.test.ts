@@ -359,14 +359,15 @@ describe('PlaygroundsService', () => {
     expect(files[0].path).toContain('deep.txt');
   });
 
-  test('getUrls uses local playgrounds urls when a current link exists', async () => {
+  test('getUrls uses local playgrounds info urls view when a current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
       getMarqueeRoot: () => '/opt/fibe',
+      getMarqueeRootDomain: () => 'example.test',
     };
     const playroomBrowser = { getCurrentLink: async () => 'project' };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
-    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'web|web.example.test\n' });
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]) });
 
     const urls = await service.getUrls();
 
@@ -375,13 +376,17 @@ describe('PlaygroundsService', () => {
     expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
       '--output',
-      'table',
+      'json',
       'local',
       'playgrounds',
+      'info',
+      '--view',
       'urls',
+      '--playground',
       'project',
     ]);
     expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe('/opt/fibe/playgrounds');
+    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT_DOMAIN).toBe('example.test');
   });
 
   test('getUrls accepts a static-only playground as the current selection', async () => {
@@ -391,17 +396,20 @@ describe('PlaygroundsService', () => {
     };
     const playroomBrowser = { getCurrentLink: async () => 'static-site--24' };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
-    mockExecFileAsync.mockResolvedValueOnce({ stdout: 'web|web.example.test\n' });
+    mockExecFileAsync.mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]) });
 
     const urls = await service.getUrls();
 
     expect(urls).toEqual(['web|web.example.test']);
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
       '--output',
-      'table',
+      'json',
       'local',
       'playgrounds',
+      'info',
+      '--view',
       'urls',
+      '--playground',
       'static-site--24',
     ]);
   });
@@ -414,17 +422,17 @@ describe('PlaygroundsService', () => {
     const playroomBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
     mockExecFileAsync
-      .mockResolvedValueOnce({ stdout: 'pg1|spec1\npg2|spec2\n' })
-      .mockResolvedValueOnce({ stdout: 'web|web1.example.test\n' })
-      .mockResolvedValueOnce({ stdout: 'api|api2.example.test\n' });
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }, { id: '2', name: 'pg2', playspec: 'spec2' }]) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web1.example.test' }]) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'api', url: 'api2.example.test' }]) });
 
     const urls = await service.getUrls();
 
     expect(urls).toEqual(['web|web1.example.test', 'api|api2.example.test']);
     expect(mockExecFileAsync).toHaveBeenCalledTimes(3);
-    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'list']);
-    expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'urls', 'pg1']);
-    expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'urls', 'pg2']);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
+    expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'urls', '--playground', '1']);
+    expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'urls', '--playground', '2']);
   });
 
   test('getUrls returns empty array on local playgrounds failure', async () => {

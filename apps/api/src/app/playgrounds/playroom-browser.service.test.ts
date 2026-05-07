@@ -74,7 +74,10 @@ describe('PlayroomBrowserService', () => {
 
     test('parses stdout into BrowseEntry array', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
-        stdout: `proj1|fibe.gg/play1\nproj2|fibe.gg/play2\n`
+        stdout: JSON.stringify([
+          { id: '1', name: 'proj1', playspec: 'fibe.gg/play1', path: `${rootDir}/playgrounds/proj1` },
+          { id: '2', name: 'proj2', playspec: 'fibe.gg/play2', path: `${rootDir}/playgrounds/proj2` },
+        ]),
       });
 
       const entries = await service.browse('');
@@ -85,12 +88,16 @@ describe('PlayroomBrowserService', () => {
 
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
       expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
-      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'table', 'local', 'playgrounds', 'list']);
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
+      expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(join(rootDir, 'playgrounds'));
     });
 
     test('keeps static-only playgrounds visible from CLI list output', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
-        stdout: `static-site--24|static-site\nsource-app--23|source-app\n`
+        stdout: JSON.stringify([
+          { id: '24', name: 'static-site--24', playspec: 'static-site' },
+          { id: '23', name: 'source-app--23', playspec: 'source-app' },
+        ]),
       });
 
       const entries = await service.browse('');
@@ -133,7 +140,7 @@ describe('PlayroomBrowserService', () => {
       expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
       expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
         '--output',
-        'table',
+        'json',
         'local',
         'playgrounds',
         'link',

@@ -120,7 +120,7 @@ Copy `.env.example` to `.env` before starting.
 | `SYSTEM_PROMPT` | — | Inline system prompt (overrides file) |
 | `SYSTEM_PROMPT_PATH` | `dist/assets/SYSTEM_PROMPT.md` | Path to a custom system prompt file |
 | `PLAYGROUNDS_DIR` | `./playground` | Root for the file explorer and shell sessions |
-| `PLAYROOMS_ROOT` | `/opt/fibe` | Root directory for the playground selector (browse & link playrooms) |
+| `MARQUEE_ROOT` | `/opt/fibe` | Root directory for Marquee local data; the playground selector reads its `playgrounds` subdirectory |
 | `POST_INIT_SCRIPT` | — | Shell script run once on first boot; state at `GET /api/init-status` |
 | `SESSION_DIR` | — | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) |
 | `AGENT_CREDENTIALS_JSON` | — | JSON map of credential file names to content, injected at startup |
@@ -504,7 +504,7 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `GET` | `/api/playgrounds/file?path=…` | Bearer | Read a playground file → `{ content }` |
 | `PUT` | `/api/playgrounds/file` | Bearer | `{ path, content }` — save a playground file → `{ ok }` |
 | `GET` | `/api/playgrounds/stats` | Bearer | Playground directory stats |
-| `GET` | `/api/playrooms/browse?path=…` | Bearer | Browse `PLAYROOMS_ROOT` directory |
+| `GET` | `/api/playrooms/browse?path=…` | Bearer | Browse local playgrounds under `MARQUEE_ROOT` |
 | `POST` | `/api/playrooms/link` | Bearer | `{ path }` — symlink a playroom as `./playground` → `{ ok, linkedPath }` |
 | `GET` | `/api/playrooms/current` | Bearer | Current linked playroom path → `{ current }` |
 | `GET` | `/api/agent-files` | Bearer | Agent-generated file tree |

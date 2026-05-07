@@ -48,10 +48,26 @@ const HIDDEN_PREFIX = '.';
 /** Maximum recursion depth for directory traversal (prevents symlink cycle crashes). */
 const MAX_DEPTH = 50;
 
-function parseCliLines(stdout: string): string[] {
-  return stdout.split('\n')
-    .map((l: string) => l.trim())
-    .filter((l: string) => l.length > 0 && !l.includes('Network: Internal only'));
+interface LocalPlaygroundName {
+  id?: string;
+  name: string;
+  playspec?: string;
+}
+
+interface LocalPlaygroundUrl {
+  service: string;
+  url: string;
+}
+
+function parseLocalPlaygroundNames(stdout: string): LocalPlaygroundName[] {
+  return JSON.parse(stdout) as LocalPlaygroundName[];
+}
+
+function parseLocalPlaygroundUrls(stdout: string): string[] {
+  const entries = JSON.parse(stdout) as LocalPlaygroundUrl[];
+  return entries
+    .filter((entry) => entry.service && entry.url)
+    .map((entry) => `${entry.service}|${entry.url}`);
 }
 
 @Injectable()
@@ -120,17 +136,19 @@ export class PlaygroundsService {
     try {
       const currentLink = await this.playroomBrowser.getCurrentLink();
       if (currentLink) {
-        const stdout = await runLocalPlaygroundsCli(this.config, ['urls', currentLink]);
-        return parseCliLines(stdout);
+        const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'urls', '--playground', currentLink]);
+        return parseLocalPlaygroundUrls(stdout);
       }
 
-      const listStdout = await runLocalPlaygroundsCli(this.config, ['list']);
-      const playgrounds = parseCliLines(listStdout).map((line) => line.split('|')[0]).filter(Boolean);
+      const listStdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'names']);
+      const playgrounds = parseLocalPlaygroundNames(listStdout)
+        .map((playground) => playground.id || playground.name)
+        .filter(Boolean);
       const urls: string[] = [];
 
       for (const playground of playgrounds) {
-        const stdout = await runLocalPlaygroundsCli(this.config, ['urls', playground]);
-        urls.push(...parseCliLines(stdout));
+        const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'urls', '--playground', playground]);
+        urls.push(...parseLocalPlaygroundUrls(stdout));
       }
 
       return urls;

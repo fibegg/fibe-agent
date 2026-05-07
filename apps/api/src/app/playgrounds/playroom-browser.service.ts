@@ -10,6 +10,13 @@ export interface BrowseEntry {
   type: 'file' | 'directory' | 'symlink';
 }
 
+interface LocalPlaygroundName {
+  id?: string;
+  name: string;
+  playspec?: string;
+  path?: string;
+}
+
 @Injectable()
 export class PlayroomBrowserService {
   constructor(private readonly config: ConfigService) {}
@@ -19,20 +26,15 @@ export class PlayroomBrowserService {
     if (relPath) return []; // Flattened UI workflow doesn't browse subdirectories
 
     try {
-      const stdout = await runLocalPlaygroundsCli(this.config, ['list']);
-      const lines = stdout.split('\n').filter((l: string) => l.trim().length > 0);
-
-      const entries: BrowseEntry[] = [];
-      for (const line of lines) {
-         // Fallback split for older CLI just in case, but rely on whatever CLI gives
-         const parts = line.split('|');
-         const path = parts[0];
-         const name = parts.length > 1 ? parts[1] : path;
-         if (path) {
-             entries.push({ name: name || path, path, type: 'directory' });
-         }
-      }
-      return entries;
+      const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'names']);
+      const items = JSON.parse(stdout) as LocalPlaygroundName[];
+      return items
+        .filter((item) => item.name)
+        .map((item) => ({
+          name: item.playspec || item.name,
+          path: item.name,
+          type: 'directory' as const,
+        }));
     } catch {
       throw new NotFoundException(`Cannot execute Fibe local playgrounds command.`);
     }
