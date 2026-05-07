@@ -77,6 +77,24 @@ describe('ConversationManagerService', () => {
     expect(manager.get(INBOX_CONVERSATION_ID)?.meta.title).toBe(INBOX_CONVERSATION_TITLE);
   });
 
+  test('createWithId is idempotent for safe external conversation ids', () => {
+    const manager = createManager();
+
+    const created = manager.createWithId('likeable-123', 'Likeable Project');
+    const again = manager.createWithId('likeable-123', 'Updated Project');
+
+    expect(created.id).toBe('likeable-123');
+    expect(again.id).toBe('likeable-123');
+    expect(again.title).toBe('Updated Project');
+    expect(manager.get('likeable-123')).toBeTruthy();
+  });
+
+  test('createWithId rejects unsafe external conversation ids', () => {
+    const manager = createManager();
+
+    expect(() => manager.createWithId('../escape', 'bad')).toThrow(/conversation id/);
+  });
+
   test('delete() removes the conversation directory from disk', () => {
     const manager = createManager();
     const meta = manager.create('To be deleted');

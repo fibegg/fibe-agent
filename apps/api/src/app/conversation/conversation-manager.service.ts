@@ -29,6 +29,7 @@ export const DEFAULT_CONVERSATION_ID = 'default';
 export const DEFAULT_CONVERSATION_TITLE = 'Default';
 export const INBOX_CONVERSATION_ID = 'inbox';
 export const INBOX_CONVERSATION_TITLE = 'INBOX';
+export const EXTERNAL_CONVERSATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export interface ConversationBundle {
   meta: ConversationMeta;
@@ -130,10 +131,26 @@ export class ConversationManagerService {
 
   /** Create a brand-new conversation, persist, and return its meta. */
   create(title?: string): ConversationMeta {
-    const id = randomUUID();
+    return this.createWithId(randomUUID(), title);
+  }
+
+  /** Idempotently create a conversation with a caller-provided safe ID. */
+  createWithId(id: string, title?: string): ConversationMeta {
+    const normalizedId = id.trim();
+    if (!EXTERNAL_CONVERSATION_ID_PATTERN.test(normalizedId)) {
+      throw new Error('conversation id must be 1-128 URL-safe characters');
+    }
+    const existing = this.bundles.get(normalizedId);
+    if (existing) {
+      if (!this.isProtected(normalizedId) && typeof title === 'string' && title.trim()) {
+        existing.meta.title = title.trim();
+        this.flushIndex();
+      }
+      return this.enrichedMeta(existing);
+    }
     const now = new Date().toISOString();
     const meta: ConversationMeta = {
-      id,
+      id: normalizedId,
       title: title ?? 'New chat',
       createdAt: now,
       lastMessageAt: now,
@@ -141,8 +158,8 @@ export class ConversationManagerService {
       system: false,
       hiddenWhenEmpty: false,
     };
-    const bundle = this.createBundle(id, meta);
-    this.logger.log(`Conversation created: ${id}`);
+    const bundle = this.createBundle(normalizedId, meta);
+    this.logger.log(`Conversation created: ${normalizedId}`);
     return this.enrichedMeta(bundle);
   }
 

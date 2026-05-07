@@ -36,7 +36,15 @@ export class ConversationsController {
 
   /** Create a new conversation. */
   @Post()
-  create(@Body() body: { title?: string }): ConversationMeta {
+  create(@Body() body: { id?: string; conversationId?: string; conversation_id?: string; title?: string }): ConversationMeta {
+    const requestedId = body?.id ?? body?.conversationId ?? body?.conversation_id;
+    if (typeof requestedId === 'string' && requestedId.trim()) {
+      try {
+        return this.convManager.createWithId(requestedId, body?.title);
+      } catch (err) {
+        throw new BadRequestException(err instanceof Error ? err.message : 'invalid conversation id');
+      }
+    }
     return this.convManager.create(body?.title);
   }
 
