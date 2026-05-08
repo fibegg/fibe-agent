@@ -2,9 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   HttpStatus,
+  Param,
+  Patch,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -59,6 +62,41 @@ export class AgentController {
     return {
       accepted: true,
       ...this.orchestrator.interruptFromApi(body.conversationId),
+    };
+  }
+
+  @Delete('queue/:turnId')
+  removeQueuedTurn(
+    @Param('turnId') turnId: string,
+    @Body() body: { conversationId?: string; conversation_id?: string },
+  ): { accepted: true; removed: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+    return {
+      accepted: true,
+      ...this.orchestrator.removeQueuedTurnFromApi(body.conversationId ?? body.conversation_id, turnId),
+    };
+  }
+
+  @Patch('queue/:turnId')
+  updateQueuedTurn(
+    @Param('turnId') turnId: string,
+    @Body() body: { conversationId?: string; conversation_id?: string; text?: string; policy?: 'queue' | 'steer' },
+  ): { accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+    return {
+      accepted: true,
+      ...this.orchestrator.updateQueuedTurnFromApi(body.conversationId ?? body.conversation_id, turnId, {
+        text: body.text,
+        policy: body.policy,
+      }),
+    };
+  }
+
+  @Post('queue/reorder')
+  reorderQueuedTurns(
+    @Body() body: { conversationId?: string; conversation_id?: string; turnIds?: string[]; turn_ids?: string[] },
+  ): { accepted: true; reordered: boolean; conversationId?: string; queueCount?: number } {
+    return {
+      accepted: true,
+      ...this.orchestrator.reorderQueuedTurnsFromApi(body.conversationId ?? body.conversation_id, body.turnIds ?? body.turn_ids ?? []),
     };
   }
 }

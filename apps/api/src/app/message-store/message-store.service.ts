@@ -74,6 +74,22 @@ export class MessageStoreService implements OnModuleDestroy {
     return msg;
   }
 
+  updateBody(id: string, body: string): boolean {
+    const msg = this.messages.find((message) => message.id === id);
+    if (!msg) return false;
+    msg.body = body;
+    this.jsonWriter.schedule();
+    return true;
+  }
+
+  removeById(id: string): boolean {
+    const before = this.messages.length;
+    this.messages = this.messages.filter((message) => message.id !== id);
+    if (this.messages.length === before) return false;
+    this.jsonWriter.schedule();
+    return true;
+  }
+
   clear(): void {
     this.messages = [];
     this.jsonWriter.schedule();

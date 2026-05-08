@@ -92,7 +92,7 @@ describe('SessionRegistryService', () => {
     active.streamTextAccumulated = 'partial assistant output';
     active.streamStartedAt = '2026-05-07T20:00:00.000Z';
     active.currentActivityId = 'activity-1';
-    active.queuedTurns.push({ text: 'next', imageUrls: [], audioFilename: null, policy: 'queue' });
+    active.queuedTurns.push({ id: 'turn-1', messageId: 'msg-1', text: 'next', imageUrls: [], audioFilename: null, policy: 'queue', attachmentFilenames: ['notes.zip'] });
 
     expect(registry.liveConversationState('thread-a')).toEqual({
       conversationId: 'thread-a',
@@ -100,6 +100,7 @@ describe('SessionRegistryService', () => {
       streamText: 'partial assistant output',
       currentActivityId: 'activity-1',
       queuedTurns: 1,
+      queue: [{ id: 'turn-1', messageId: 'msg-1', text: 'next', policy: 'queue', attachmentFilenames: ['notes.zip'] }],
       startedAt: '2026-05-07T20:00:00.000Z',
       finishedAt: null,
     });
@@ -122,6 +123,7 @@ describe('SessionRegistryService', () => {
       streamText: 'recent completed output',
       currentActivityId: null,
       queuedTurns: 0,
+      queue: [],
       startedAt: '2026-05-07T20:00:00.000Z',
       finishedAt: ctx.lastStreamFinishedAt,
     });
@@ -139,6 +141,7 @@ describe('SessionRegistryService', () => {
       streamText: '',
       currentActivityId: null,
       queuedTurns: 0,
+      queue: [],
       startedAt: null,
       finishedAt: null,
     });

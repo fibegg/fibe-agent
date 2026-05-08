@@ -486,6 +486,32 @@ describe('OrchestratorService', () => {
     expect(interrupted).toBe(1);
   });
 
+  test('removeQueuedTurnFromApi removes a queued turn by id or index', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.conversationId = 'project-a';
+    ctx.isProcessing = true;
+    ctx.queuedTurns.push(
+      { id: 'turn-a', messageId: 'msg-a', text: 'first', imageUrls: [], audioFilename: null, policy: 'queue' },
+      { id: 'turn-b', messageId: 'msg-b', text: 'second', imageUrls: [], audioFilename: null, policy: 'queue' },
+    );
+
+    expect(orch.removeQueuedTurnFromApi('project-a', 'turn-a')).toEqual({
+      removed: true,
+      conversationId: 'project-a',
+      queueCount: 1,
+      messageId: 'msg-a',
+    });
+    expect(ctx.queuedTurns.map((turn) => turn.text)).toEqual(['second']);
+
+    expect(orch.removeQueuedTurnFromApi('project-a', '0')).toEqual({
+      removed: true,
+      conversationId: 'project-a',
+      queueCount: 0,
+      messageId: 'msg-b',
+    });
+    expect(ctx.queuedTurns).toHaveLength(0);
+  });
+
   test('sendMessageFromApi returns accepted and messageId when authenticated', async () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
     ctx.isAuthenticated = true; orch.isAuthenticated = true;

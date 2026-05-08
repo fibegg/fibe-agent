@@ -21,6 +21,8 @@ describe('validateUploadMimetype', () => {
 
   test('allows document mimetypes', () => {
     expect(() => validateUploadMimetype('application/pdf')).not.toThrow();
+    expect(() => validateUploadMimetype('application/zip')).not.toThrow();
+    expect(() => validateUploadMimetype('application/x-zip-compressed')).not.toThrow();
     expect(() => validateUploadMimetype('text/plain')).not.toThrow();
     expect(() => validateUploadMimetype('text/csv')).not.toThrow();
     expect(() =>
@@ -40,6 +42,8 @@ describe('validateUploadMimetype', () => {
 describe('extFromMimetype', () => {
   test('returns correct ext for known types', () => {
     expect(extFromMimetype('application/pdf')).toBe('pdf');
+    expect(extFromMimetype('application/zip')).toBe('zip');
+    expect(extFromMimetype('application/x-zip-compressed')).toBe('zip');
     expect(extFromMimetype('text/plain')).toBe('txt');
     expect(extFromMimetype('image/jpeg')).toBe('jpg');
     expect(extFromMimetype('image/png')).toBe('png');

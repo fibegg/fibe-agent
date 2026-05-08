@@ -6,7 +6,10 @@ import type { AgentStrategy } from '../strategies/strategy.types';
 export type BusyPolicy = 'reject' | 'queue' | 'steer';
 
 export interface QueuedAgentTurn {
+  id: string;
+  messageId: string;
   text: string;
+  displayText?: string;
   imageUrls: string[];
   audioFilename: string | null;
   attachmentFilenames?: string[];

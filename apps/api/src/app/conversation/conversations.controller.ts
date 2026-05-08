@@ -150,6 +150,43 @@ export class ConversationsController {
     };
   }
 
+  @Delete(':id/queue/:turnId')
+  removeQueuedTurn(
+    @Param('id') id: string,
+    @Param('turnId') turnId: string,
+  ): { accepted: true; removed: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+    this.requireBundle(id);
+    return {
+      accepted: true,
+      ...this.orchestrator.removeQueuedTurnFromApi(id, turnId),
+    };
+  }
+
+  @Patch(':id/queue/:turnId')
+  updateQueuedTurn(
+    @Param('id') id: string,
+    @Param('turnId') turnId: string,
+    @Body() body: { text?: string; policy?: 'queue' | 'steer' },
+  ): { accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+    this.requireBundle(id);
+    return {
+      accepted: true,
+      ...this.orchestrator.updateQueuedTurnFromApi(id, turnId, body),
+    };
+  }
+
+  @Post(':id/queue/reorder')
+  reorderQueuedTurns(
+    @Param('id') id: string,
+    @Body() body: { turnIds?: string[]; turn_ids?: string[] },
+  ): { accepted: true; reordered: boolean; conversationId?: string; queueCount?: number } {
+    this.requireBundle(id);
+    return {
+      accepted: true,
+      ...this.orchestrator.reorderQueuedTurnsFromApi(id, body.turnIds ?? body.turn_ids ?? []),
+    };
+  }
+
   // ── Private helpers ───────────────────────────────────────────────────────
 
   /** Resolve a ConversationBundle by id, throwing 404 when unknown. */

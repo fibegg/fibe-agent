@@ -428,6 +428,95 @@ export class OrchestratorService implements OnModuleInit {
     return { interrupted: true, conversationId: ctx.conversationId };
   }
 
+  removeQueuedTurnFromApi(conversationId: string | undefined, turnId: string): { removed: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+    const normalizedTurnId = turnId.trim();
+    if (!normalizedTurnId) return { removed: false };
+
+    const targetConversationId = conversationId?.trim();
+    const ctx = targetConversationId
+      ? this.sessionRegistry.processingForConversation(targetConversationId)
+      : this.sessionRegistry.all().find((session) => session.isProcessing && session.queuedTurns.length > 0);
+    if (!ctx) return { removed: false };
+
+    const numericIndex = Number.parseInt(normalizedTurnId, 10);
+    const index = ctx.queuedTurns.findIndex((turn, candidateIndex) => (
+      turn.id === normalizedTurnId ||
+      (!Number.isNaN(numericIndex) && String(numericIndex) === normalizedTurnId && candidateIndex === numericIndex)
+    ));
+    if (index < 0) return { removed: false, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length };
+
+    const [removed] = ctx.queuedTurns.splice(index, 1);
+    if (removed?.messageId) {
+      this.stores(ctx).messageStore.removeById(removed.messageId);
+    }
+    return { removed: true, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length, messageId: removed?.messageId };
+  }
+
+  updateQueuedTurnFromApi(
+    conversationId: string | undefined,
+    turnId: string,
+    payload: { text?: string; policy?: Exclude<BusyPolicy, 'reject'> },
+  ): { updated: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+    const normalizedTurnId = turnId.trim();
+    if (!normalizedTurnId) return { updated: false };
+
+    const targetConversationId = conversationId?.trim();
+    const ctx = targetConversationId
+      ? this.sessionRegistry.processingForConversation(targetConversationId)
+      : this.sessionRegistry.all().find((session) => session.isProcessing && session.queuedTurns.length > 0);
+    if (!ctx) return { updated: false };
+
+    const turn = this.findQueuedTurn(ctx, normalizedTurnId);
+    if (!turn) return { updated: false, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length };
+
+    const nextText = payload.text?.trim();
+    if (nextText) {
+      turn.displayText = nextText;
+      if (turn.policy === 'queue') turn.text = nextText;
+      this.stores(ctx).messageStore.updateBody(turn.messageId, nextText);
+    }
+    if (payload.policy === 'queue' || payload.policy === 'steer') {
+      const previousPolicy = turn.policy;
+      turn.policy = payload.policy;
+      if (payload.policy === 'queue' && turn.displayText) turn.text = turn.displayText;
+      if (payload.policy === 'steer' && previousPolicy !== 'steer' && turn.displayText && ctx.strategy.steerAgent) {
+        ctx.strategy.steerAgent(turn.displayText);
+        turn.text = '';
+      }
+    }
+
+    return { updated: true, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length, messageId: turn.messageId };
+  }
+
+  reorderQueuedTurnsFromApi(conversationId: string | undefined, turnIds: string[]): { reordered: boolean; conversationId?: string; queueCount?: number } {
+    const targetConversationId = conversationId?.trim();
+    const ctx = targetConversationId
+      ? this.sessionRegistry.processingForConversation(targetConversationId)
+      : this.sessionRegistry.all().find((session) => session.isProcessing && session.queuedTurns.length > 0);
+    if (!ctx) return { reordered: false };
+
+    const byId = new Map<string, QueuedAgentTurn>(ctx.queuedTurns.map((turn, index) => [turn.id || String(index), turn]));
+    const used = new Set<string>();
+    const ordered = turnIds
+      .map((id) => {
+        const turn = byId.get(id);
+        if (turn) used.add(id);
+        return turn;
+      })
+      .filter((turn): turn is QueuedAgentTurn => Boolean(turn));
+    const rest = ctx.queuedTurns.filter((turn, index) => !used.has(turn.id || String(index)));
+    ctx.queuedTurns = [...ordered, ...rest];
+    return { reordered: true, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length };
+  }
+
+  private findQueuedTurn(ctx: SessionContext, turnId: string): QueuedAgentTurn | undefined {
+    const numericIndex = Number.parseInt(turnId, 10);
+    return ctx.queuedTurns.find((turn, candidateIndex) => (
+      turn.id === turnId ||
+      (!Number.isNaN(numericIndex) && String(numericIndex) === turnId && candidateIndex === numericIndex)
+    ));
+  }
+
   /**
    * Find an idle session. When a conversationId is supplied, a session already
    * bound to that conversation is preferred to maintain context continuity.
@@ -801,7 +890,10 @@ export class OrchestratorService implements OnModuleInit {
     }
 
     processingCtx.queuedTurns.push({
+      id: randomUUID(),
+      messageId: saved.messageId,
       text: queuedText,
+      displayText: saved.text,
       imageUrls: saved.imageUrls,
       audioFilename: saved.audioFilename,
       attachmentFilenames: saved.attachmentFilenames,

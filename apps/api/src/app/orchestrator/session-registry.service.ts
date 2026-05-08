@@ -12,6 +12,13 @@ export interface ConversationLiveState {
   streamText: string;
   currentActivityId: string | null;
   queuedTurns: number;
+  queue: {
+    id?: string;
+    messageId?: string;
+    text: string;
+    policy: 'queue' | 'steer';
+    attachmentFilenames?: string[];
+  }[];
   startedAt: string | null;
   finishedAt: string | null;
 }
@@ -105,6 +112,13 @@ export class SessionRegistryService {
         streamText: processing.streamTextAccumulated,
         currentActivityId: processing.currentActivityId,
         queuedTurns: processing.queuedTurns.length,
+        queue: processing.queuedTurns.map((turn) => ({
+          id: turn.id,
+          messageId: turn.messageId,
+          text: turn.displayText ?? turn.text,
+          policy: turn.policy,
+          ...(turn.attachmentFilenames?.length ? { attachmentFilenames: turn.attachmentFilenames } : {}),
+        })),
         startedAt: processing.streamStartedAt,
         finishedAt: null,
       };
@@ -116,6 +130,13 @@ export class SessionRegistryService {
       streamText: completed?.lastStreamText ?? '',
       currentActivityId: null,
       queuedTurns: completed?.queuedTurns.length ?? 0,
+      queue: completed?.queuedTurns.map((turn) => ({
+        id: turn.id,
+        messageId: turn.messageId,
+        text: turn.displayText ?? turn.text,
+        policy: turn.policy,
+        ...(turn.attachmentFilenames?.length ? { attachmentFilenames: turn.attachmentFilenames } : {}),
+      })) ?? [],
       startedAt: completed?.lastStreamStartedAt ?? null,
       finishedAt: completed?.lastStreamFinishedAt ?? null,
     };
