@@ -14,6 +14,7 @@ export interface QueuedAgentTurn {
   audioFilename: string | null;
   attachmentFilenames?: string[];
   policy: Exclude<BusyPolicy, 'reject'>;
+  createdAt: string;
 }
 
 /**

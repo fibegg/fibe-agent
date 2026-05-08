@@ -2,7 +2,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
-import { processUploadFile, type MultipartFileResult } from './uploads-handler';
+import { contentTypeFromFilename, processUploadFile, type MultipartFileResult } from './uploads-handler';
 import { UploadsService } from './uploads.service';
 
 @Controller('uploads')
@@ -20,6 +20,8 @@ export class UploadsController {
     if (!path) {
       return res.status(404).send();
     }
+    res.header('Content-Type', contentTypeFromFilename(filename));
+    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(filename)}"`);
     const stream = createReadStream(path);
     return res.send(stream);
   }
@@ -34,4 +36,8 @@ export class UploadsController {
       this.uploads.saveFileFromBuffer(buffer, mimetype, conversationId)
     );
   }
+}
+
+function safeHeaderFilename(filename: string): string {
+  return filename.replace(/[^\w.-]/g, '_');
 }

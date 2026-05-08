@@ -18,6 +18,7 @@ export interface ConversationLiveState {
     text: string;
     policy: 'queue' | 'steer';
     attachmentFilenames?: string[];
+    createdAt?: string;
   }[];
   startedAt: string | null;
   finishedAt: string | null;
@@ -117,6 +118,7 @@ export class SessionRegistryService {
           messageId: turn.messageId,
           text: turn.displayText ?? turn.text,
           policy: turn.policy,
+          createdAt: turn.createdAt,
           ...(turn.attachmentFilenames?.length ? { attachmentFilenames: turn.attachmentFilenames } : {}),
         })),
         startedAt: processing.streamStartedAt,
@@ -135,6 +137,7 @@ export class SessionRegistryService {
         messageId: turn.messageId,
         text: turn.displayText ?? turn.text,
         policy: turn.policy,
+        createdAt: turn.createdAt,
         ...(turn.attachmentFilenames?.length ? { attachmentFilenames: turn.attachmentFilenames } : {}),
       })) ?? [],
       startedAt: completed?.lastStreamStartedAt ?? null,

@@ -159,6 +159,7 @@ export class OrchestratorService implements OnModuleInit {
   set isAuthenticated(v: boolean) { this.sharedIsAuthenticated = v; }
   /** Backward-compat: true if ANY session is processing */
   get isProcessing(): boolean { return this.sessionRegistry.all().some(s => s.isProcessing); }
+  get queueCount(): number { return this.sessionRegistry.all().reduce((sum, s) => sum + s.queuedTurns.length, 0); }
   /** Backward-compat: default conversation message store (used by REST /messages endpoint). */
   get messages(): MessageStoreService { return this.messageStore; }
   ensureStrategySettings(): void { /* no-op in multi-session mode */ }
@@ -564,7 +565,9 @@ export class OrchestratorService implements OnModuleInit {
     const userMessage = ctxMsgStore.add(
       'user',
       text,
-      imageUrls.length ? imageUrls : undefined
+      imageUrls.length ? imageUrls : undefined,
+      undefined,
+      attachmentFilenames?.length ? attachmentFilenames : undefined,
     );
     await ctxMsgStore.flush();
     this.sessionRegistry.broadcastToConversation(
@@ -898,6 +901,7 @@ export class OrchestratorService implements OnModuleInit {
       audioFilename: saved.audioFilename,
       attachmentFilenames: saved.attachmentFilenames,
       policy: resolvedPolicy,
+      createdAt: new Date().toISOString(),
     });
     return { accepted: true, messageId: saved.messageId, resolvedPolicy };
   }

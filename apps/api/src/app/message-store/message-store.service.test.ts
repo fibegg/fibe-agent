@@ -38,6 +38,13 @@ describe('MessageStoreService', () => {
     expect(service.all().length).toBe(1);
   });
 
+  test('add persists attachment filenames', () => {
+    const service = makeService();
+    const msg = service.add('user', 'review files', undefined, undefined, ['notes.zip']);
+    expect(msg.attachmentFilenames).toEqual(['notes.zip']);
+    expect(service.all()[0].attachmentFilenames).toEqual(['notes.zip']);
+  });
+
   test('clear removes all messages', () => {
     const service = makeService();
     service.add('user', 'a');

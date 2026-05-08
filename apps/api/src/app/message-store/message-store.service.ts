@@ -22,6 +22,7 @@ export interface StoredMessage {
   model?: string;
   activityId?: string;
   imageUrls?: string[];
+  attachmentFilenames?: string[];
 }
 
 /** Alias for consumers that import the story-entry type from this module. */
@@ -59,7 +60,7 @@ export class MessageStoreService implements OnModuleDestroy {
     return this.messages;
   }
 
-  add(role: 'user' | 'assistant', body: string, imageUrls?: string[], model?: string): StoredMessage {
+  add(role: 'user' | 'assistant', body: string, imageUrls?: string[], model?: string, attachmentFilenames?: string[]): StoredMessage {
     const msg: StoredMessage = {
       id: randomUUID(),
       role,
@@ -68,6 +69,7 @@ export class MessageStoreService implements OnModuleDestroy {
     };
     if (imageUrls?.length) msg.imageUrls = imageUrls;
     if (model) msg.model = model;
+    if (attachmentFilenames?.length) msg.attachmentFilenames = attachmentFilenames;
 
     this.messages.push(msg);
     this.jsonWriter.schedule();

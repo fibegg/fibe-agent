@@ -55,6 +55,29 @@ const MIME_TO_EXT: Record<string, string> = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
 };
 
+const EXT_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  webm: 'audio/webm',
+  ogg: 'audio/ogg',
+  m4a: 'audio/mp4',
+  pdf: 'application/pdf',
+  zip: 'application/zip',
+  json: 'application/json',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  md: 'text/markdown',
+  html: 'text/html',
+  rtf: 'application/rtf',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+};
+
 export type MultipartFileResult = { mimetype: string; toBuffer: () => Promise<Buffer> } | undefined;
 
 function isAllowedMimetype(mimetype: string): boolean {
@@ -91,6 +114,11 @@ export function extFromMimetype(mimetype: string): string {
     return 'webm';
   }
   return 'bin';
+}
+
+export function contentTypeFromFilename(filename: string): string {
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  return EXT_TO_MIME[ext] || 'application/octet-stream';
 }
 
 export async function processUploadFile(

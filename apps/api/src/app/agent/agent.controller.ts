@@ -28,10 +28,12 @@ export class AgentController {
   getStatus(): {
     authenticated: boolean;
     isProcessing: boolean;
+    queueCount: number;
   } {
     return {
       authenticated: this.orchestrator.isAuthenticated,
       isProcessing: this.orchestrator.isProcessing,
+      queueCount: this.orchestrator.queueCount,
     };
   }
 

@@ -491,8 +491,8 @@ describe('OrchestratorService', () => {
     ctx.conversationId = 'project-a';
     ctx.isProcessing = true;
     ctx.queuedTurns.push(
-      { id: 'turn-a', messageId: 'msg-a', text: 'first', imageUrls: [], audioFilename: null, policy: 'queue' },
-      { id: 'turn-b', messageId: 'msg-b', text: 'second', imageUrls: [], audioFilename: null, policy: 'queue' },
+      { id: 'turn-a', messageId: 'msg-a', text: 'first', imageUrls: [], audioFilename: null, policy: 'queue', createdAt: '2026-05-07T20:00:01.000Z' },
+      { id: 'turn-b', messageId: 'msg-b', text: 'second', imageUrls: [], audioFilename: null, policy: 'queue', createdAt: '2026-05-07T20:00:02.000Z' },
     );
 
     expect(orch.removeQueuedTurnFromApi('project-a', 'turn-a')).toEqual({

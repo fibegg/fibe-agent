@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { UploadsService } from './uploads.service';
+import { contentTypeFromFilename } from './uploads-handler';
 import sizeOf from 'image-size';
 import Tesseract from 'tesseract.js';
 
@@ -118,6 +119,13 @@ describe('UploadsService', () => {
   test('saveFileFromBuffer uses correct extension for spreadsheet and text', async () => {
     const service = new UploadsService(config as never);
     expect(await service.saveFileFromBuffer(Buffer.from(''), 'text/plain')).toMatch(/\.txt$/);
+  });
+
+  test('contentTypeFromFilename maps retrievable upload extensions', () => {
+    expect(contentTypeFromFilename('archive.zip')).toBe('application/zip');
+    expect(contentTypeFromFilename('screenshot.PNG')).toBe('image/png');
+    expect(contentTypeFromFilename('notes.txt')).toBe('text/plain');
+    expect(contentTypeFromFilename('unknown.bin')).toBe('application/octet-stream');
   });
 
   describe('extractImageInfo', () => {
