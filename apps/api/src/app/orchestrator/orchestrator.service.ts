@@ -417,6 +417,17 @@ export class OrchestratorService implements OnModuleInit {
     return { accepted: true, messageId };
   }
 
+  interruptFromApi(conversationId?: string): { interrupted: boolean; conversationId?: string } {
+    const targetConversationId = conversationId?.trim();
+    const ctx = targetConversationId
+      ? this.sessionRegistry.processingForConversation(targetConversationId)
+      : this.sessionRegistry.all().find((session) => session.isProcessing);
+    if (!ctx) return { interrupted: false };
+
+    ctx.strategy.interruptAgent?.();
+    return { interrupted: true, conversationId: ctx.conversationId };
+  }
+
   /**
    * Find an idle session. When a conversationId is supplied, a session already
    * bound to that conversation is preferred to maintain context continuity.
@@ -562,6 +573,11 @@ export class OrchestratorService implements OnModuleInit {
       const effort = this.effectiveEffort();
       // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_START, { model });
+      ctx.streamTextAccumulated = '';
+      ctx.streamStartedAt = new Date().toISOString();
+      ctx.lastStreamText = '';
+      ctx.lastStreamStartedAt = null;
+      ctx.lastStreamFinishedAt = null;
       const streamStartEntry: StoredStoryEntry = {
         id: randomUUID(),
         type: 'stream_start',
@@ -607,6 +623,7 @@ export class OrchestratorService implements OnModuleInit {
       const emitVisibleChunk = (chunk: string) => {
         if (!chunk) return;
         accumulated += chunk;
+        ctx.streamTextAccumulated += chunk;
         // Fan-out stream chunks to every tab watching this conversation
         this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: chunk });
       };
@@ -671,6 +688,17 @@ export class OrchestratorService implements OnModuleInit {
     } finally {
       await this.flushStores(ctx);
       ctx.isProcessing = false;
+      if (ctx.streamTextAccumulated.trim()) {
+        ctx.lastStreamText = ctx.streamTextAccumulated;
+        ctx.lastStreamStartedAt = ctx.streamStartedAt;
+        ctx.lastStreamFinishedAt = new Date().toISOString();
+      } else {
+        ctx.lastStreamText = '';
+        ctx.lastStreamStartedAt = null;
+        ctx.lastStreamFinishedAt = null;
+      }
+      ctx.streamTextAccumulated = '';
+      ctx.streamStartedAt = null;
       // Notify all sessions that no agent is running anymore (anyProcessing may now be false)
       this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
         count: this.sessionRegistry.size,

@@ -87,6 +87,11 @@ describe('SessionContext', () => {
   it('streaming scratch-pad fields initialise to defaults', () => {
     expect(ctx.currentActivityId).toBeNull();
     expect(ctx.reasoningTextAccumulated).toBe('');
+    expect(ctx.streamTextAccumulated).toBe('');
+    expect(ctx.streamStartedAt).toBeNull();
+    expect(ctx.lastStreamText).toBe('');
+    expect(ctx.lastStreamStartedAt).toBeNull();
+    expect(ctx.lastStreamFinishedAt).toBeNull();
     expect(ctx.lastStreamUsage).toBeUndefined();
     expect(ctx.cachedSystemPromptFromFile).toBeNull();
   });

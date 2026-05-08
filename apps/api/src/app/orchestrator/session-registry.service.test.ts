@@ -85,6 +85,65 @@ describe('SessionRegistryService', () => {
     expect(idle.isProcessing).toBe(false);
   });
 
+  it('liveConversationState exposes in-progress stream text for one conversation', () => {
+    const active = registry.create('thread-a');
+    registry.create('thread-b');
+    active.isProcessing = true;
+    active.streamTextAccumulated = 'partial assistant output';
+    active.streamStartedAt = '2026-05-07T20:00:00.000Z';
+    active.currentActivityId = 'activity-1';
+    active.queuedTurns.push({ text: 'next', imageUrls: [], audioFilename: null, policy: 'queue' });
+
+    expect(registry.liveConversationState('thread-a')).toEqual({
+      conversationId: 'thread-a',
+      isProcessing: true,
+      streamText: 'partial assistant output',
+      currentActivityId: 'activity-1',
+      queuedTurns: 1,
+      startedAt: '2026-05-07T20:00:00.000Z',
+      finishedAt: null,
+    });
+    expect(registry.liveConversationState('thread-b')).toMatchObject({
+      conversationId: 'thread-b',
+      isProcessing: false,
+      streamText: '',
+    });
+  });
+
+  it('liveConversationState exposes a recently completed stream briefly', () => {
+    const ctx = registry.create('thread-a');
+    ctx.lastStreamText = 'recent completed output';
+    ctx.lastStreamStartedAt = '2026-05-07T20:00:00.000Z';
+    ctx.lastStreamFinishedAt = new Date().toISOString();
+
+    expect(registry.liveConversationState('thread-a')).toMatchObject({
+      conversationId: 'thread-a',
+      isProcessing: false,
+      streamText: 'recent completed output',
+      currentActivityId: null,
+      queuedTurns: 0,
+      startedAt: '2026-05-07T20:00:00.000Z',
+      finishedAt: ctx.lastStreamFinishedAt,
+    });
+  });
+
+  it('liveConversationState hides stale completed streams', () => {
+    const ctx = registry.create('thread-a');
+    ctx.lastStreamText = 'stale output';
+    ctx.lastStreamStartedAt = '2026-05-07T20:00:00.000Z';
+    ctx.lastStreamFinishedAt = new Date(Date.now() - 31_000).toISOString();
+
+    expect(registry.liveConversationState('thread-a')).toMatchObject({
+      conversationId: 'thread-a',
+      isProcessing: false,
+      streamText: '',
+      currentActivityId: null,
+      queuedTurns: 0,
+      startedAt: null,
+      finishedAt: null,
+    });
+  });
+
   it('get() returns the session by ID', () => {
     const ctx = registry.create();
     expect(registry.get(ctx.sessionId)).toBe(ctx);

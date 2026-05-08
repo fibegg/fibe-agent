@@ -54,6 +54,11 @@ export class SessionContext {
   // ── Streaming scratch-pad ──────────────────────────────────────────────────
   currentActivityId: string | null = null;
   reasoningTextAccumulated = '';
+  streamTextAccumulated = '';
+  streamStartedAt: string | null = null;
+  lastStreamText = '';
+  lastStreamStartedAt: string | null = null;
+  lastStreamFinishedAt: string | null = null;
   lastStreamUsage: TokenUsage | undefined = undefined;
 
   /** User turns accepted while this conversation is already processing. */

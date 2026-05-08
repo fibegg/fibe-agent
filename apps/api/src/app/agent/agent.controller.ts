@@ -11,6 +11,7 @@ import {
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { SendMessageDto } from './dto/send-message.dto';
+import { InterruptAgentDto } from './dto/interrupt-agent.dto';
 import { handleSendMessage } from './agent-send-message.handler';
 
 @Controller('agent')
@@ -48,5 +49,16 @@ export class AgentController {
       body.busyPolicy,
     );
     return handleSendMessage(result);
+  }
+
+  @Post('interrupt')
+  @HttpCode(HttpStatus.ACCEPTED)
+  interrupt(
+    @Body() body: InterruptAgentDto
+  ): { accepted: true; interrupted: boolean; conversationId?: string } {
+    return {
+      accepted: true,
+      ...this.orchestrator.interruptFromApi(body.conversationId),
+    };
   }
 }

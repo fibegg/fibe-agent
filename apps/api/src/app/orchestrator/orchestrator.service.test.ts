@@ -51,7 +51,17 @@ describe('OrchestratorService', () => {
     return { service, resolved };
   }
 
-  async function createOrchestrator(localMcp?: LocalMcpService): Promise<{ orch: OrchestratorService; ctx: SessionContext; sessionRegistry: SessionRegistryService }> {
+  async function createOrchestrator(localMcp?: LocalMcpService): Promise<{
+    orch: OrchestratorService;
+    ctx: SessionContext;
+    sessionRegistry: SessionRegistryService;
+    promptBuilds: Array<{
+      text: string;
+      imageUrls: string[];
+      audioFilename: string | null;
+      attachmentFilenames?: string[];
+    }>;
+  }> {
     const config = {
       getDataDir: () => dataDir,
       getConversationDataDir: () => dataDir,
@@ -90,13 +100,22 @@ describe('OrchestratorService', () => {
       syncActivity: (getContent: () => string) => { void getContent(); },
       hydrate: async () => null,
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
+    const promptBuilds: Array<{
+      text: string;
+      imageUrls: string[];
+      audioFilename: string | null;
+      attachmentFilenames?: string[];
+    }> = [];
     const chatContext = {
       buildFullPrompt: async (
         text: string,
-        _imageUrls: string[],
-        _audioFilename: string | null,
-        _attachmentFilenames?: string[],
-      ) => text.trim(),
+        imageUrls: string[],
+        audioFilename: string | null,
+        attachmentFilenames?: string[],
+      ) => {
+        promptBuilds.push({ text, imageUrls, audioFilename, attachmentFilenames });
+        return text.trim();
+      },
       injectToolHint: (text: string) => text,
       injectModeHint: (text: string) => text,
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
@@ -128,7 +147,7 @@ describe('OrchestratorService', () => {
     await orch.onModuleInit();
     const ctx = sessionRegistry.create();
     ctx.isAuthenticated = false;
-    return { orch, ctx, sessionRegistry };
+    return { orch, ctx, sessionRegistry, promptBuilds };
   }
 
   async function waitForIdle(ctx: SessionContext): Promise<void> {
@@ -396,6 +415,29 @@ describe('OrchestratorService', () => {
     expect(ctx.queuedTurns[0]?.text).toBe('queued');
   });
 
+  test('sendMessageFromApi passes conversation, image, and attachment context into prompt build', async () => {
+    const { orch, ctx, sessionRegistry, promptBuilds } = await createOrchestrator();
+    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+
+    const result = await orch.sendMessageFromApi(
+      ' update the app ',
+      'thread-a',
+      ['data:image/png;base64,abc'],
+      ['notes.txt'],
+      'queue',
+    );
+
+    expect(result.accepted).toBe(true);
+    expect(sessionRegistry.all().some((s) => s.conversationId === 'thread-a')).toBe(true);
+    await waitForIdle(sessionRegistry.all().find((s) => s.conversationId === 'thread-a') ?? ctx);
+    const promptBuild = promptBuilds.at(-1);
+    expect(promptBuild?.text).toBe(' update the app ');
+    expect(promptBuild?.imageUrls).toHaveLength(1);
+    expect(promptBuild?.imageUrls[0]).toMatch(/\.png$/);
+    expect(promptBuild?.audioFilename).toBeNull();
+    expect(promptBuild?.attachmentFilenames).toEqual(['notes.txt']);
+  });
+
   test('sendMessageFromApi steer policy uses provider steer when available', async () => {
     const { orch, ctx } = await createOrchestrator();
     ctx.isAuthenticated = true; orch.isAuthenticated = true;
@@ -426,6 +468,22 @@ describe('OrchestratorService', () => {
     expect(result.resolvedPolicy).toBe('queue');
     expect(ctx.queuedTurns).toHaveLength(1);
     expect(ctx.queuedTurns[0]?.text).toBe('fallback');
+  });
+
+  test('interruptFromApi interrupts active conversation only', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.conversationId = 'project-a';
+    ctx.isProcessing = true;
+    let interrupted = 0;
+    ctx.strategy.interruptAgent = () => {
+      interrupted += 1;
+    };
+
+    expect(orch.interruptFromApi('project-b')).toEqual({ interrupted: false });
+    expect(interrupted).toBe(0);
+
+    expect(orch.interruptFromApi('project-a')).toEqual({ interrupted: true, conversationId: 'project-a' });
+    expect(interrupted).toBe(1);
   });
 
   test('sendMessageFromApi returns accepted and messageId when authenticated', async () => {

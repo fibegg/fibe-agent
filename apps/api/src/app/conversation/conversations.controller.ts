@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, NotFoundException, Param, Patch, Post } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, Patch, Post } from '@nestjs/common';
 import {
   ConversationManagerService,
   DEFAULT_CONVERSATION_ID,
@@ -10,6 +10,7 @@ import { enrichMessagesWithActivityUsage } from '../messages/enrich-messages-wit
 import { SessionRegistryService } from '../orchestrator/session-registry.service';
 import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { SendMessageDto } from '../agent/dto/send-message.dto';
+import { InterruptAgentDto } from '../agent/dto/interrupt-agent.dto';
 import { handleSendMessage } from '../agent/agent-send-message.handler';
 import { WS_EVENT } from '@shared/ws-constants';
 import { ProviderTrafficStoreService } from '../provider-traffic/provider-traffic-store.service';
@@ -103,6 +104,13 @@ export class ConversationsController {
     return this.requireBundle(id).activityStore.all();
   }
 
+  /** Current non-durable runtime stream state for one conversation. */
+  @Get(':id/live')
+  live(@Param('id') id: string) {
+    this.requireBundle(id);
+    return this.sessionRegistry.liveConversationState(id);
+  }
+
   @Get(':id/provider-traffic')
   providerTraffic(@Param('id') id: string) {
     this.requireBundle(id);
@@ -127,6 +135,19 @@ export class ConversationsController {
       body.busyPolicy,
     );
     return handleSendMessage(result);
+  }
+
+  @Post(':id/agent/interrupt')
+  @HttpCode(HttpStatus.ACCEPTED)
+  interrupt(
+    @Param('id') id: string,
+    @Body() _body: InterruptAgentDto,
+  ): { accepted: true; interrupted: boolean; conversationId?: string } {
+    this.requireBundle(id);
+    return {
+      accepted: true,
+      ...this.orchestrator.interruptFromApi(id),
+    };
   }
 
   // ── Private helpers ───────────────────────────────────────────────────────

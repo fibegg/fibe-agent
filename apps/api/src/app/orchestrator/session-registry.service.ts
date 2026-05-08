@@ -6,6 +6,18 @@ import { StrategyRegistryService } from '../strategies/strategy-registry.service
 import { WS_EVENT } from '@shared/ws-constants';
 import { ConversationManagerService } from '../conversation/conversation-manager.service';
 
+export interface ConversationLiveState {
+  conversationId: string;
+  isProcessing: boolean;
+  streamText: string;
+  currentActivityId: string | null;
+  queuedTurns: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+}
+
+const RECENT_STREAM_RETENTION_MS = 30_000;
+
 /**
  * Manages the lifecycle of per-connection SessionContexts.
  *
@@ -82,6 +94,42 @@ export class SessionRegistryService {
         s.sessionId !== excludeSessionId &&
         s.isProcessing,
     );
+  }
+
+  liveConversationState(conversationId: string): ConversationLiveState {
+    const processing = this.processingForConversation(conversationId);
+    if (processing) {
+      return {
+        conversationId,
+        isProcessing: true,
+        streamText: processing.streamTextAccumulated,
+        currentActivityId: processing.currentActivityId,
+        queuedTurns: processing.queuedTurns.length,
+        startedAt: processing.streamStartedAt,
+        finishedAt: null,
+      };
+    }
+    const completed = this.recentCompletedStreamForConversation(conversationId);
+    return {
+      conversationId,
+      isProcessing: false,
+      streamText: completed?.lastStreamText ?? '',
+      currentActivityId: null,
+      queuedTurns: completed?.queuedTurns.length ?? 0,
+      startedAt: completed?.lastStreamStartedAt ?? null,
+      finishedAt: completed?.lastStreamFinishedAt ?? null,
+    };
+  }
+
+  private recentCompletedStreamForConversation(conversationId: string): SessionContext | undefined {
+    const cutoff = Date.now() - RECENT_STREAM_RETENTION_MS;
+    return [...this.sessions.values()]
+      .filter((s) => {
+        if (s.conversationId !== conversationId || !s.lastStreamText || !s.lastStreamFinishedAt) return false;
+        const finishedAt = Date.parse(s.lastStreamFinishedAt);
+        return !Number.isNaN(finishedAt) && finishedAt >= cutoff;
+      })
+      .sort((a, b) => Date.parse(b.lastStreamFinishedAt ?? '') - Date.parse(a.lastStreamFinishedAt ?? ''))[0];
   }
 
   get size(): number {
