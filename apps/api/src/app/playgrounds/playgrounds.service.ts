@@ -9,7 +9,7 @@ import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 import { exec } from 'node:child_process';
 import { promisify } from 'node:util';
-import { runLocalPlaygroundsCli } from './local-playgrounds-cli';
+import { isLocalPlaygroundsUnavailableError, runLocalPlaygroundsCli } from './local-playgrounds-cli';
 
 const execAsync = promisify(exec);
 
@@ -154,8 +154,7 @@ export class PlaygroundsService {
       return urls;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      // "does not exist" is expected in local dev when no playgrounds dir is configured.
-      if (message.includes('does not exist') || message.includes('ENOENT')) {
+      if (isLocalPlaygroundsUnavailableError(err)) {
         this.logger.debug(`getUrls: playgrounds CLI unavailable — ${message.split('\n')[0]}`);
       } else {
         this.logger.warn(`getUrls: unexpected error — ${message.split('\n')[0]}`);

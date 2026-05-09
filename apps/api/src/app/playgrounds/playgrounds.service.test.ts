@@ -435,6 +435,20 @@ describe('PlaygroundsService', () => {
     expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'urls', '--playground', '2']);
   });
 
+  test('getUrls returns empty array when local playgrounds directory is missing', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getMarqueeRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => null };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const err = new Error('fibe failed') as Error & { stderr: string };
+    err.stderr = JSON.stringify({ error: { code: 'LOCAL_PLAYGROUNDS_DIR_MISSING', status: 404, message: 'missing' } });
+    mockExecFileAsync.mockRejectedValueOnce(err);
+
+    expect(await service.getUrls()).toEqual([]);
+  });
+
   test('getUrls returns empty array on local playgrounds failure', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
