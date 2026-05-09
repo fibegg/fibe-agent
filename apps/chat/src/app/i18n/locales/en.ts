@@ -371,13 +371,13 @@ export const en = {
   'cli.startPlayground': 'Start Playground',
   'cli.startPlaygroundDescription': 'Start a playground by ID',
   'cli.listAgents': 'List Agents',
-  'cli.listAgentsDescription': 'Show all running agents',
-  'cli.stopAgent': 'Stop Agent',
-  'cli.stopAgentDescription': 'Stop a running agent',
+  'cli.listAgentsDescription': 'Show all agents',
+  'cli.interruptAgent': 'Interrupt Agent',
+  'cli.interruptAgentDescription': 'Stop the current agent turn',
   'cli.systemStatus': 'System Status',
   'cli.systemStatusDescription': 'Show Fibe system status',
-  'cli.mcpServers': 'MCP Servers',
-  'cli.mcpServersDescription': 'List connected MCP servers',
+  'cli.mcpTools': 'MCP Tool Catalog',
+  'cli.mcpToolsDescription': 'Print the MCP tool catalog',
 } as const;
 
 export type TranslationKey = keyof typeof en;

@@ -15,7 +15,7 @@ const CLI_COMMANDS = [
     icon: <Users className="size-4" />,
     items: [
       { nameKey: 'cli.listAgents', command: 'fibe agents list', descriptionKey: 'cli.listAgentsDescription' },
-      { nameKey: 'cli.stopAgent', command: 'fibe agents stop ', descriptionKey: 'cli.stopAgentDescription' },
+      { nameKey: 'cli.interruptAgent', command: 'fibe agents interrupt ', descriptionKey: 'cli.interruptAgentDescription' },
     ]
   },
   {
@@ -23,7 +23,7 @@ const CLI_COMMANDS = [
     icon: <TerminalSquare className="size-4" />,
     items: [
       { nameKey: 'cli.systemStatus', command: 'fibe status', descriptionKey: 'cli.systemStatusDescription' },
-      { nameKey: 'cli.mcpServers', command: 'fibe mcp list', descriptionKey: 'cli.mcpServersDescription' }
+      { nameKey: 'cli.mcpTools', command: 'fibe mcp docs', descriptionKey: 'cli.mcpToolsDescription' }
     ]
   }
 ] as const;
