@@ -53,6 +53,8 @@ export interface AgentRuntimeOptions {
 
 export const INTERRUPTED_MESSAGE = 'INTERRUPTED';
 
+export type SteerAgentResult = 'handled' | 'queued';
+
 export interface ConversationDataDirProvider {
   getConversationDataDir(): string;
   getDefaultConversationDataDir?(): string;
@@ -72,7 +74,7 @@ export interface AgentStrategy {
   getModelArgs?(model: string): string[];
   listModels?(): Promise<string[]>;
   interruptAgent?(): void;
-  steerAgent?(message: string): void;
+  steerAgent?(message: string): void | SteerAgentResult | Promise<void | SteerAgentResult>;
   hasNativeSessionSupport?(): boolean;
   executePromptStreaming(
     prompt: string,

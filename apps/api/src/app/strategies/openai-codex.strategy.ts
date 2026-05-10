@@ -7,6 +7,7 @@ import type {
   AgentRuntimeOptions,
   ConversationDataDirProvider,
   LogoutConnection,
+  SteerAgentResult,
   StreamingCallbacks,
   TokenUsage,
   ToolEvent,
@@ -26,6 +27,7 @@ const CODEX_BIN_NAME = process.platform === 'win32' ? 'codex.cmd' : 'codex';
 const OPENAI_API_KEY_ENV = 'OPENAI_API_KEY';
 const RESPONSE_PREVIEW_MAX = 200;
 const CODEX_APP_SERVER_REQUEST_TIMEOUT_MS = 120_000;
+const CODEX_APP_SERVER_STEER_TIMEOUT_MS = 5_000;
 const CODEX_APP_SERVER_TURN_TIMEOUT_MS = 60 * 60 * 1000;
 const MISSING_SESSION_ERROR_PATTERNS = [
   /No conversation found with session ID:/i,
@@ -564,23 +566,27 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     this.currentStreamProcess?.kill();
   }
 
-  override steerAgent(message: string): void {
+  override async steerAgent(message: string): Promise<SteerAgentResult> {
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed) return 'queued';
     const threadId = this.activeAppServerThreadId;
     const expectedTurnId = this.activeAppServerTurnId;
     if (this.appServer && threadId && expectedTurnId) {
-      void this.appServer.request(
-        'turn/steer',
-        { threadId, expectedTurnId, input: codexUserInput(trimmed) },
-        CODEX_APP_SERVER_REQUEST_TIMEOUT_MS,
-      ).catch((err) => {
+      try {
+        await this.appServer.request(
+          'turn/steer',
+          { threadId, expectedTurnId, input: codexUserInput(trimmed) },
+          CODEX_APP_SERVER_STEER_TIMEOUT_MS,
+        );
+        return 'handled';
+      } catch (err) {
         this.logger.warn(`Codex app-server steer failed; queueing for next turn: ${err}`);
         this.pendingSteerMessages.push(trimmed);
-      });
-      return;
+        return 'queued';
+      }
     }
     this.pendingSteerMessages.push(trimmed);
+    return 'queued';
   }
 
   executePromptStreaming(

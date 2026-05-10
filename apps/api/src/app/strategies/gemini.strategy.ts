@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
-import type { AuthConnection, ConversationDataDirProvider, LogoutConnection } from './strategy.types';
+import type { AuthConnection, ConversationDataDirProvider, LogoutConnection, SteerAgentResult } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
@@ -707,12 +707,13 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     return this.readStoredSession() !== null;
   }
 
-  override steerAgent(message: string): void {
+  override steerAgent(message: string): SteerAgentResult {
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed) return 'queued';
     // Gemini CLI headless mode has no supported in-flight steering boundary.
     // Preserve the operator message and let the orchestrator's queued empty turn
     // deliver it as the next prompt instead of interrupting the current run.
     this.pendingSteerMessages.push(trimmed);
+    return 'queued';
   }
 }

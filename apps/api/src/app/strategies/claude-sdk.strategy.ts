@@ -508,6 +508,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     } finally {
       record.busy = false;
       if (this.activeRecord === record) this.activeRecord = null;
+      this.closeRecord(record);
     }
   }
 
@@ -533,10 +534,11 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     const recordKey = this.getRecordKey(workspaceDir);
     const existing = ClaudeSdkStrategy.records.get(recordKey);
     if (existing && !existing.closed) {
-      if (!existing.busy && model.trim()) {
-        await existing.query.setModel(model.trim()).catch(() => undefined);
-      }
-      return existing;
+      if (existing.busy) return existing;
+      // The Claude SDK can still yield delayed messages from a completed turn.
+      // Start every new user turn with a fresh query and resume the saved native
+      // Claude session instead of reusing an idle iterator that may contain stale output.
+      this.closeRecord(existing);
     }
 
     const query = await loadClaudeAgentSdkQuery();
@@ -757,8 +759,16 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   private closeRecord(record: ClaudeSdkConversationRecord): void {
     if (record.closed) return;
     record.closed = true;
-    record.input.close();
-    record.query.close();
+    try {
+      record.input.close();
+    } catch {
+      /* ignore close failures */
+    }
+    try {
+      record.query.close();
+    } catch {
+      /* ignore close failures */
+    }
     ClaudeSdkStrategy.records.delete(record.recordKey);
   }
 

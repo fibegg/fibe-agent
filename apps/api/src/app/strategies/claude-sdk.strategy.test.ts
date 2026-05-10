@@ -12,7 +12,7 @@
  *  - executePromptStreaming: busy record throws, interrupt rethrows INTERRUPTED_MESSAGE
  */
 
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -403,6 +403,90 @@ describe('ClaudeSdkStrategy › session marker', () => {
     strategy = makeStrategy(); // no dataDir
     expect(() => writeMarker(strategy, tmpDir, 'sid')).not.toThrow();
     expect(readMarker(strategy, tmpDir)).toBeNull();
+  });
+});
+
+describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
+  let tmpDir: string;
+  let queryCalls: Array<{ prompt: AsyncIterable<unknown>; options: { resume?: string; sessionId?: string } }>;
+  let closedCalls: number[];
+  let receivedPrompts: string[];
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'claude-turns-'));
+    queryCalls = [];
+    closedCalls = [];
+    receivedPrompts = [];
+    (ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }).records.clear();
+    mock.module('@anthropic-ai/claude-agent-sdk', () => ({
+      query: ({ prompt, options }: { prompt: AsyncIterable<unknown>; options: { resume?: string; sessionId?: string } }) => {
+        const callIndex = queryCalls.length;
+        queryCalls.push({ prompt, options });
+        const iterator = (async function* () {
+          const input = prompt[Symbol.asyncIterator]();
+          const turn = await input.next();
+          const text = JSON.stringify(turn.value ?? {});
+          receivedPrompts.push(text);
+          yield {
+            type: 'assistant',
+            session_id: `session-${callIndex}`,
+            message: {
+              role: 'assistant',
+              content: [{ type: 'text', text: `answer-${callIndex}:${text.includes('second turn') ? 'second' : 'first'}` }],
+            },
+          };
+          yield {
+            type: 'result',
+            session_id: `session-${callIndex}`,
+            subtype: 'success',
+            is_error: false,
+            result: '',
+            usage: { input_tokens: 1, output_tokens: 1 },
+          };
+        })();
+        return {
+          [Symbol.asyncIterator]: () => iterator,
+          interrupt: async () => undefined,
+          close: () => {
+            closedCalls.push(callIndex);
+          },
+          setModel: async () => undefined,
+        };
+      },
+    }));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+    (ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }).records.clear();
+  });
+
+  test('starts a fresh Claude SDK query for every user turn and resumes the saved session', async () => {
+    const strategy = makeStrategy(false, tmpDir, undefined, 'likeable-project-1');
+    const chunks: string[] = [];
+
+    await strategy.executePromptStreaming('first turn', 'opus', (chunk) => chunks.push(chunk));
+    await strategy.executePromptStreaming('second turn', 'opus', (chunk) => chunks.push(chunk));
+
+    expect(chunks).toEqual(['answer-0:first', 'answer-1:second']);
+    expect(queryCalls).toHaveLength(2);
+    expect(queryCalls[0].options.resume).toBeUndefined();
+    expect(queryCalls[1].options.resume).toBe('session-0');
+    expect(closedCalls).toEqual([0, 1]);
+  });
+
+  test('folds pending steer text into the next fresh provider turn', async () => {
+    const strategy = makeStrategy(false, tmpDir, undefined, 'likeable-project-1');
+    const chunks: string[] = [];
+
+    strategy.steerAgent?.('change direction');
+    await strategy.executePromptStreaming('continue work', 'opus', (chunk) => chunks.push(chunk));
+    const text = receivedPrompts[0] ?? '';
+
+    expect(chunks).toEqual(['answer-0:first']);
+    expect(text).toContain('[Operator Interruption]');
+    expect(text).toContain('change direction');
+    expect(text).toContain('continue work');
   });
 });
 

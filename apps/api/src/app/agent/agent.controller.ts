@@ -79,16 +79,16 @@ export class AgentController {
   }
 
   @Patch('queue/:turnId')
-  updateQueuedTurn(
+  async updateQueuedTurn(
     @Param('turnId') turnId: string,
     @Body() body: { conversationId?: string; conversation_id?: string; text?: string; policy?: 'queue' | 'steer' },
-  ): { accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+  ): Promise<{ accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string }> {
     return {
       accepted: true,
-      ...this.orchestrator.updateQueuedTurnFromApi(body.conversationId ?? body.conversation_id, turnId, {
+      ...(await this.orchestrator.updateQueuedTurnFromApi(body.conversationId ?? body.conversation_id, turnId, {
         text: body.text,
         policy: body.policy,
-      }),
+      })),
     };
   }
 

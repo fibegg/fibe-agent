@@ -456,6 +456,24 @@ describe('OrchestratorService', () => {
     expect(ctx.queuedTurns[0]?.text).toBe('');
   });
 
+  test('sendMessageFromApi steer policy does not enqueue an empty turn when provider handled steering', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+    let steered = '';
+    (ctx.strategy as unknown as { steerAgent?: (message: string) => Promise<'handled'> }).steerAgent = async (message) => {
+      steered = message;
+      return 'handled';
+    };
+
+    const result = await orch.sendMessageFromApi('steer native', 'default', undefined, undefined, 'steer');
+
+    expect(result.accepted).toBe(true);
+    expect(result.resolvedPolicy).toBe('steer');
+    expect(steered).toBe('steer native');
+    expect(ctx.queuedTurns).toHaveLength(0);
+  });
+
   test('sendMessageFromApi steer policy falls back to queue when provider cannot steer', async () => {
     const { orch, ctx } = await createOrchestrator();
     ctx.isAuthenticated = true; orch.isAuthenticated = true;

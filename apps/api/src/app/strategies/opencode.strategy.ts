@@ -7,6 +7,7 @@ import type {
   AuthConnection,
   ConversationDataDirProvider,
   LogoutConnection,
+  SteerAgentResult,
   StreamingCallbacks,
   TokenUsage,
   ToolEvent,
@@ -486,12 +487,13 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     this.currentStreamProcess?.kill();
   }
 
-  override steerAgent(message: string): void {
+  override steerAgent(message: string): SteerAgentResult {
     const trimmed = message.trim();
-    if (!trimmed) return;
+    if (!trimmed) return 'queued';
     // OpenCode serve does not expose Codex-style turn steering. Preserve the
     // user intent and let the orchestrator's queued empty turn deliver it next.
     this.pendingSteerMessages.push(trimmed);
+    return 'queued';
   }
 
   /**

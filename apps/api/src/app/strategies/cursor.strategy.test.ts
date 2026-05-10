@@ -443,6 +443,47 @@ describe('CursorStrategy', () => {
     expect(readFileSync(join(markerDir, '.cursor_session'), 'utf8')).toBe('session-existing');
   });
 
+  test('executePromptStreaming starts one Cursor process per user turn and resumes the saved session', async () => {
+    const fakeCursorPath = join(testHome, 'fake-cursor-agent');
+    const firstArgsPath = join(testHome, 'cursor-first-turn-args.json');
+    const secondArgsPath = join(testHome, 'cursor-second-turn-args.json');
+    writeFakeCursor(fakeCursorPath);
+    process.env.CURSOR_AGENT_BIN = fakeCursorPath;
+
+    const convDir = join(testHome, 'sequential-conv');
+    const strategy = new CursorStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    process.env.CURSOR_FAKE_ARGS_PATH = firstArgsPath;
+    process.env.CURSOR_FAKE_SESSION_ID = 'session-first';
+    process.env.CURSOR_FAKE_MESSAGE = 'first cursor response';
+    await strategy.executePromptStreaming('first turn', 'Composer 2', (chunk) => chunks.push(chunk));
+
+    process.env.CURSOR_FAKE_ARGS_PATH = secondArgsPath;
+    process.env.CURSOR_FAKE_SESSION_ID = 'session-second';
+    process.env.CURSOR_FAKE_MESSAGE = 'second cursor response';
+    await strategy.executePromptStreaming('second turn', 'Composer 2', (chunk) => chunks.push(chunk));
+
+    expect(chunks).toEqual(['first cursor response', 'second cursor response']);
+    expect(JSON.parse(readFileSync(firstArgsPath, 'utf8'))).toContain('first turn');
+    expect(JSON.parse(readFileSync(secondArgsPath, 'utf8'))).toEqual([
+      '--model',
+      'Composer 2',
+      '--print',
+      '--force',
+      '--output-format',
+      'stream-json',
+      '--resume',
+      'session-first',
+      '--',
+      'second turn',
+    ]);
+    expect(readFileSync(join(convDir, 'cursor_workspace', '.cursor_session'), 'utf8')).toBe('session-second');
+  });
+
   test('executePromptStreaming treats tool events as useful output', async () => {
     const fakeCursorPath = join(testHome, 'fake-cursor-agent');
     writeFakeCursor(fakeCursorPath);

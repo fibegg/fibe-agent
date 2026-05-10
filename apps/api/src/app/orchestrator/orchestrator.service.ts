@@ -453,11 +453,11 @@ export class OrchestratorService implements OnModuleInit {
     return { removed: true, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length, messageId: removed?.messageId };
   }
 
-  updateQueuedTurnFromApi(
+  async updateQueuedTurnFromApi(
     conversationId: string | undefined,
     turnId: string,
     payload: { text?: string; policy?: Exclude<BusyPolicy, 'reject'> },
-  ): { updated: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+  ): Promise<{ updated: boolean; conversationId?: string; queueCount?: number; messageId?: string }> {
     const normalizedTurnId = turnId.trim();
     if (!normalizedTurnId) return { updated: false };
 
@@ -481,7 +481,11 @@ export class OrchestratorService implements OnModuleInit {
       turn.policy = payload.policy;
       if (payload.policy === 'queue' && turn.displayText) turn.text = turn.displayText;
       if (payload.policy === 'steer' && previousPolicy !== 'steer' && turn.displayText && ctx.strategy.steerAgent) {
-        ctx.strategy.steerAgent(turn.displayText);
+        const steerResult = await ctx.strategy.steerAgent(turn.displayText);
+        if (steerResult === 'handled') {
+          ctx.queuedTurns = ctx.queuedTurns.filter((queued) => queued !== turn);
+          return { updated: true, conversationId: ctx.conversationId, queueCount: ctx.queuedTurns.length, messageId: turn.messageId };
+        }
         turn.text = '';
       }
     }
@@ -887,7 +891,10 @@ export class OrchestratorService implements OnModuleInit {
     let resolvedPolicy: Exclude<BusyPolicy, 'reject'> = 'queue';
     let queuedText = saved.text;
     if (policy === 'steer' && processingCtx.strategy.steerAgent) {
-      processingCtx.strategy.steerAgent(saved.text);
+      const steerResult = await processingCtx.strategy.steerAgent(saved.text);
+      if (steerResult === 'handled') {
+        return { accepted: true, messageId: saved.messageId, resolvedPolicy: 'steer' };
+      }
       queuedText = '';
       resolvedPolicy = 'steer';
     }

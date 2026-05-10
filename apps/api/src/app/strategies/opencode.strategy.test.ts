@@ -550,6 +550,42 @@ describe('OpencodeStrategy', () => {
     expect(chunks.join('')).toBe('fake app-server response');
   });
 
+  test('executePromptStreaming posts one OpenCode app-server message per user turn', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    const requestsPath = join(TEST_HOME, 'opencode-sequential-requests.jsonl');
+    process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'opencode-sequential-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'opencode-sequential',
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    process.env.OPENCODE_FAKE_MESSAGE = 'first opencode response';
+    await strategy.executePromptStreaming('first turn', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+    process.env.OPENCODE_FAKE_MESSAGE = 'second opencode response';
+    await strategy.executePromptStreaming('second turn', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    const requests = readFileSync(requestsPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { type?: string; path?: string; body?: { parts?: Array<{ text?: string }> } });
+    const messageRequests = requests.filter((request) => request.type === 'message-body');
+    expect(chunks.join('')).toBe('first opencode responsesecond opencode response');
+    expect(messageRequests).toHaveLength(2);
+    expect(messageRequests[0].body?.parts?.[0]?.text).toBe('first turn');
+    expect(messageRequests[1].body?.parts?.[0]?.text).toBe('second turn');
+    expect(requests.filter((request) => request.type === 'create-session-body')).toHaveLength(1);
+    expect(requests.some((request) => request.path === '/session/ses_fakeOpenCodeSession')).toBe(true);
+  });
+
   test('executePromptStreaming app-server clears stale OpenCode session marker on missing session', async () => {
     const fakeBinDir = join(TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });

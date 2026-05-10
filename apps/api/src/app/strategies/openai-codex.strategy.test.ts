@@ -1141,6 +1141,39 @@ describe('OpenaiCodexStrategy', () => {
     expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-existing-app');
   });
 
+  test('executePromptStreaming starts one Codex app-server turn per user turn', async () => {
+    process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    const requestsPath = join(TEST_HOME, 'codex-app-sequential-requests.jsonl');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+    process.env.CODEX_FAKE_THREAD_ID = 'thread-sequential-app';
+
+    const convDir = join(TEST_HOME, 'conversations', 'app-sequential');
+    const strategy = new OpenaiCodexStrategy(false, {
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'app-sequential',
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    process.env.CODEX_FAKE_MESSAGE = 'first app response';
+    await strategy.executePromptStreaming('first turn', 'gpt-5.4', (chunk) => chunks.push(chunk));
+    process.env.CODEX_FAKE_MESSAGE = 'second app response';
+    await strategy.executePromptStreaming('second turn', 'gpt-5.4', (chunk) => chunks.push(chunk));
+
+    const requests = readJsonl(requestsPath);
+    const turnStarts = requests.filter((request) => request.method === 'turn/start') as Array<{ params: Record<string, unknown> }>;
+    expect(chunks).toEqual(['first app response', 'second app response']);
+    expect(turnStarts).toHaveLength(2);
+    expect(turnStarts[0].params.input).toEqual([{ type: 'text', text: 'first turn', text_elements: [] }]);
+    expect(turnStarts[1].params.input).toEqual([{ type: 'text', text: 'second turn', text_elements: [] }]);
+    expect(requests.filter((request) => request.method === 'thread/start')).toHaveLength(1);
+    expect(requests.filter((request) => request.method === 'thread/resume')).toHaveLength(1);
+  });
+
   test('steerAgent sends turn/steer to active Codex app-server turn', async () => {
     process.env.CODEX_AGENT_TRANSPORT = 'app-server';
     const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
@@ -1160,7 +1193,7 @@ describe('OpenaiCodexStrategy', () => {
 
     const promise = strategy.executePromptStreaming('hello', 'gpt-5.4', () => undefined);
     await waitFor(() => existsSync(requestsPath) && readJsonl(requestsPath).some((request) => request.method === 'turn/start'));
-    strategy.steerAgent('adjust course');
+    await strategy.steerAgent('adjust course');
     await promise;
 
     const steer = readJsonl(requestsPath).find((request) => request.method === 'turn/steer') as { params: Record<string, unknown> };

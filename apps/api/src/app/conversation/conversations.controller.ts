@@ -163,15 +163,15 @@ export class ConversationsController {
   }
 
   @Patch(':id/queue/:turnId')
-  updateQueuedTurn(
+  async updateQueuedTurn(
     @Param('id') id: string,
     @Param('turnId') turnId: string,
     @Body() body: { text?: string; policy?: 'queue' | 'steer' },
-  ): { accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+  ): Promise<{ accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string }> {
     this.requireBundle(id);
     return {
       accepted: true,
-      ...this.orchestrator.updateQueuedTurnFromApi(id, turnId, body),
+      ...(await this.orchestrator.updateQueuedTurnFromApi(id, turnId, body)),
     };
   }
 

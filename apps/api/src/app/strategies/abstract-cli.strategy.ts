@@ -6,6 +6,7 @@ import type {
   ConversationDataDirProvider,
   AgentRuntimeOptions,
   LogoutConnection,
+  SteerAgentResult,
   StreamingCallbacks,
 } from './strategy.types';
 import { getProxyEnv } from '../provider-traffic/types';
@@ -65,9 +66,10 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
     this.currentStreamProcess?.kill();
   }
 
-  steerAgent(message: string): void {
+  steerAgent(message: string): SteerAgentResult | Promise<SteerAgentResult> {
     this.pendingSteerMessages.push(message);
     this.interruptAgent();
+    return 'queued';
   }
 
   protected consumePendingMessages(): string | undefined {
