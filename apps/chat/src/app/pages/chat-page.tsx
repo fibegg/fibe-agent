@@ -160,7 +160,6 @@ export function ChatPage() {
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const { diffOpen, toggleDiff, closeDiff } = useDiffPanel();
   const [cliOpen, setCliOpen] = useState(false);
-  const toggleCli = useCallback(() => setCliOpen(v => !v), []);
   const closeCli = useCallback(() => setCliOpen(false), []);
   const pgSelector = usePlaygroundSelector();
   const playgroundSelector = (
