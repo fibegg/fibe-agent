@@ -1,5 +1,5 @@
-import { useEffect, useRef, type ReactNode } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { RIGHT_DRAWER_OVERLAY, RIGHT_DRAWER_PANEL } from './ui-classes';
 import { useT } from './i18n';
 
@@ -24,6 +24,12 @@ export interface RightDrawerProps {
   width?: string;
   /** Extra class names applied to the inner panel element. */
   className?: string;
+  /**
+   * When true, a maximize/restore button is shown in the drawer header so
+   * the user can expand the panel to full viewport size.
+   * Defaults to false.
+   */
+  expandable?: boolean;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -46,19 +52,32 @@ export function RightDrawer({
   children,
   width = 'min(85vw, 520px)',
   className = '',
+  expandable = false,
 }: RightDrawerProps) {
   const t = useT();
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Reset expanded state when drawer closes
+  useEffect(() => {
+    if (!open) setIsExpanded(false);
+  }, [open]);
 
   // ── Escape key ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (isExpanded) {
+          setIsExpanded(false);
+        } else {
+          onClose();
+        }
+      }
     };
     document.addEventListener('keydown', handleKey);
     return () => document.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
+  }, [open, onClose, isExpanded]);
 
   // ── Focus trap — move focus into panel when it opens ────────────────────────
   useEffect(() => {
@@ -83,6 +102,26 @@ export function RightDrawer({
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
+  // ── Expanded panel style — covers the full viewport ─────────────────────────
+  const panelStyle: React.CSSProperties = isExpanded
+    ? {
+        width: '100vw',
+        height: '100vh',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        transform: open ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 250ms cubic-bezier(0.32, 0.72, 0, 1)',
+        visibility: open ? 'visible' : 'hidden',
+      }
+    : {
+        width,
+        transform: open ? 'translateX(0)' : 'translateX(100%)',
+        transition: 'transform 250ms cubic-bezier(0.32, 0.72, 0, 1)',
+        // Keep in DOM but out of tab order when closed so xterm stays mounted
+        visibility: open ? 'visible' : 'hidden',
+      };
+
   return (
     <>
       {/* ── Backdrop ──────────────────────────────────────────────────────── */}
@@ -104,13 +143,7 @@ export function RightDrawer({
         aria-modal="true"
         aria-label={title}
         className={`${RIGHT_DRAWER_PANEL} ${className}`}
-        style={{
-          width,
-          transform: open ? 'translateX(0)' : 'translateX(100%)',
-          transition: 'transform 250ms cubic-bezier(0.32, 0.72, 0, 1)',
-          // Keep in DOM but out of tab order when closed so xterm stays mounted
-          visibility: open ? 'visible' : 'hidden',
-        }}
+        style={panelStyle}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div 
@@ -127,14 +160,30 @@ export function RightDrawer({
               {title}
             </span>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors shrink-0 ml-2"
-            aria-label={t('drawer.close', { title })}
-          >
-            <X className="size-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {expandable && (
+              <button
+                type="button"
+                onClick={() => setIsExpanded((v) => !v)}
+                className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors shrink-0"
+                aria-label={isExpanded ? t('drawer.restoreTerminal') : t('drawer.expandTerminal')}
+                title={isExpanded ? t('drawer.restoreTerminal') : t('drawer.expandTerminal')}
+              >
+                {isExpanded
+                  ? <Minimize2 className="size-3.5" />
+                  : <Maximize2 className="size-3.5" />
+                }
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors shrink-0 ml-1"
+              aria-label={t('drawer.close', { title })}
+            >
+              <X className="size-4" />
+            </button>
+          </div>
         </div>
 
         {/* ── Body ────────────────────────────────────────────────────────── */}
@@ -145,3 +194,4 @@ export function RightDrawer({
     </>
   );
 }
+

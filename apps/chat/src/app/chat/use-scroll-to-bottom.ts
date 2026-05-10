@@ -18,6 +18,7 @@ export function useScrollToBottom(whenToScroll: unknown) {
   const userWasAtBottomRef = useRef(true);
   const userJustSentRef = useRef(false);
   const [isAtBottom, setIsAtBottom] = useState(true);
+  const [newMessageCount, setNewMessageCount] = useState(0);
 
   const prevAtBottomRef = useRef(true);
   const checkAtBottom = useCallback(() => {
@@ -31,7 +32,10 @@ export function useScrollToBottom(whenToScroll: unknown) {
     userWasAtBottomRef.current = atBottom;
     const changed = prevAtBottomRef.current !== atBottom;
     prevAtBottomRef.current = atBottom;
-    if (changed) setIsAtBottom(atBottom);
+    if (changed) {
+      setIsAtBottom(atBottom);
+      if (atBottom) setNewMessageCount(0);
+    }
     return atBottom;
   }, []);
 
@@ -39,24 +43,33 @@ export function useScrollToBottom(whenToScroll: unknown) {
     safeScrollIntoView(endRef.current, { behavior });
     userWasAtBottomRef.current = true;
     setIsAtBottom(true);
+    setNewMessageCount(0);
   }, []);
 
+  const mountedRef = useRef(false);
+
   useEffect(() => {
-    if (!userWasAtBottomRef.current && !userJustSentRef.current) return;
-    let cancelled = false;
-    const id = requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        if (cancelled) return;
-        safeScrollIntoView(endRef.current, { behavior: 'smooth' });
-        userJustSentRef.current = false;
-        userWasAtBottomRef.current = true;
+    // Skip the initial mount — there's nothing to scroll to yet
+    if (!mountedRef.current) {
+      mountedRef.current = true;
+      return;
+    }
+    if (!userWasAtBottomRef.current && !userJustSentRef.current) {
+      // Scrolled up — count new arrivals
+      setNewMessageCount((n) => n + 1);
+      return;
+    }
+    // Defer past current render so the DOM has finished updating
+    const id = setTimeout(() => {
+      safeScrollIntoView(endRef.current, { behavior: 'smooth' });
+      userJustSentRef.current = false;
+      userWasAtBottomRef.current = true;
+      if (!prevAtBottomRef.current) {
+        prevAtBottomRef.current = true;
         setIsAtBottom(true);
-      });
-    });
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(id);
-    };
+      }
+    }, 0);
+    return () => clearTimeout(id);
   }, [whenToScroll]);
 
   const onScroll = useCallback(() => {
@@ -71,8 +84,11 @@ export function useScrollToBottom(whenToScroll: unknown) {
     scrollRef,
     endRef,
     isAtBottom,
+    newMessageCount,
     scrollToBottom,
     onScroll,
     markJustSent,
   };
 }
+
+

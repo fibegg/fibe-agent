@@ -114,6 +114,14 @@ export function FileEditorPanel({
   const isDirty = liveContent !== null && originalContent !== null && liveContent !== originalContent;
   const lineCount = liveContent !== null ? liveContent.split('\n').length : null;
   const language = getLanguageLabel(entry.name);
+
+  // ── Image files bypass the text editor entirely ────────────────────────────
+  const IMAGE_FILE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif', '.bmp', '.ico', '.tiff', '.tif']);
+  function getFileExt(name: string): string {
+    const i = name.lastIndexOf('.');
+    return i >= 0 ? name.slice(i).toLowerCase() : '';
+  }
+  const isImageFile = IMAGE_FILE_EXTS.has(getFileExt(entry.name));
   
   const isGitModified = entry.gitStatus === 'modified';
   const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
@@ -126,8 +134,9 @@ export function FileEditorPanel({
     onDirtyChangeRef.current?.(entry.path, isDirty);
   }, [entry.path, isDirty]);
 
-  // ── Fetch content ──────────────────────────────────────────────────────────
+  // ── Fetch content (text files only) ──────────────────────────────────────
   useEffect(() => {
+    if (isImageFile) { setLoading(false); return; }  // Skip text fetch for images
     const ac = new AbortController();
     setLoading(true);
     setFetchError(null);
@@ -176,8 +185,9 @@ export function FileEditorPanel({
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ── Mount CodeMirror ───────────────────────────────────────────────────────
+  // ── Mount CodeMirror (text files only) ────────────────────────────────────
   useEffect(() => {
+    if (isImageFile) return;  // Images don't use the text editor
     if (loading || fetchError || originalContent === null || !editorContainerRef.current) return;
 
     let destroyed = false;
@@ -393,7 +403,28 @@ export function FileEditorPanel({
           </div>
         </div>
 
+        {/* ── Image Preview (replaces editor for image files) ───────────────── */}
+        {isImageFile && (
+          <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-auto bg-background dark:bg-[#1a1a2e] p-6">
+            <div className="relative group max-w-full max-h-full flex flex-col items-center gap-3">
+              <div
+                className="rounded-xl border border-border/50 shadow-xl overflow-hidden bg-[repeating-conic-gradient(#80808020_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]"
+                style={{ maxWidth: 'min(100%, 900px)', maxHeight: 'calc(100vh - 16rem)' }}
+              >
+                <img
+                  src={`${withQueryParams(apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE, { path: entry.path })}`}
+                  alt={entry.name}
+                  className="max-w-full max-h-full object-contain block"
+                  style={{ maxHeight: 'calc(100vh - 18rem)' }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground/60 font-mono">{entry.path}</p>
+            </div>
+          </div>
+        )}
+
         {/* ── Editor Area ─────────────────────────────────────────────────── */}
+        {!isImageFile && (
         <div className="flex-1 flex flex-col overflow-hidden min-h-0 relative">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-card z-10">
@@ -440,9 +471,10 @@ export function FileEditorPanel({
             </div>
           )}
         </div>
+        )}
 
-        {/* ── Status Bar ──────────────────────────────────────────────────── */}
-        {!loading && !fetchError && (
+        {/* ── Status Bar (text files only) ─────────────────────────────────── */}
+        {!isImageFile && !loading && !fetchError && (
           <StatusBar
             language={language}
             lines={lineCount ?? 0}

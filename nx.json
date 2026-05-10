@@ -78,7 +78,7 @@
         "watchDepsTargetName": "watch-deps",
         "serveStaticTargetName": "serve-static"
       }
-    },
+    }
   ],
   "targetDefaults": {
     "build": {
@@ -115,5 +115,6 @@
         "linter": "eslint"
       }
     }
-  }
+  },
+  "analytics": true
 }

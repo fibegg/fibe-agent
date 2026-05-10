@@ -14,6 +14,7 @@ import { useAgentFiles } from '../chat/use-agent-files';
 import { useChatLayout } from '../chat/use-chat-layout';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { useLocalStt } from '../chat/use-local-stt';
+import { useVisualViewport } from '../chat/use-visual-viewport';
 import { useChatAttachments, MAX_PENDING_TOTAL } from '../chat/use-chat-attachments';
 import { useChatActivityLog } from '../chat/use-chat-activity-log';
 import { useChatInitialData } from '../chat/use-chat-initial-data';
@@ -101,6 +102,9 @@ export function ChatPage() {
   const navigate = useNavigate();
   const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => undefined);
   const handleSendRef = useRef<() => void>(() => undefined);
+
+  // Keep --vh CSS variable in sync with the visual viewport for iOS keyboard handling
+  useVisualViewport();
 
   const authenticated = isAuthenticated();
   const {
@@ -1010,7 +1014,7 @@ export function ChatPage() {
           terminalOpen={terminalOpen}
           onToggleDiff={canShowDiff ? toggleDiff : undefined}
           diffOpen={diffOpen}
-          onToggleCli={toggleCli}
+          // onToggleCli={toggleCli}  // Hidden: CLI commands not yet wired to execution
           cliOpen={cliOpen}
           currentEffort={currentEffort}
           onEffortSelect={handleEffortSelect}
@@ -1144,6 +1148,11 @@ export function ChatPage() {
             >
               <ChevronDown className="size-4 shrink-0" aria-hidden />
               <span>{t('header.latest')}</span>
+              {scroll.newMessageCount > 0 && (
+                <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold text-white animate-pulse">
+                  {scroll.newMessageCount > 99 ? '99+' : scroll.newMessageCount}
+                </span>
+              )}
             </button>
           )}
         </div>
@@ -1211,6 +1220,7 @@ export function ChatPage() {
           icon={<TerminalSquare />}
           width="min(90vw, 680px)"
           className="font-mono"
+          expandable={!isMobile}
         >
           <Suspense fallback={
             <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">

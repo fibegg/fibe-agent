@@ -178,10 +178,24 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'Mic denied', liveText: '' }}
+        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'Recording failed', liveText: '' }}
       />
     );
-    expect(screen.getByText('Mic denied')).toBeTruthy();
+    expect(screen.getByText('Recording failed')).toBeTruthy();
+  });
+
+  it('shows mic-denied error as translated message', () => {
+    const { container } = render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'NotAllowedError: Permission denied', liveText: '' }}
+      />
+    );
+    // Raw error string should NOT appear — it's replaced by the i18n message
+    expect(screen.queryByText('NotAllowedError: Permission denied')).toBeNull();
+    // The error alert container should be rendered
+    const alert = container.querySelector('[class*="border-red"]');
+    expect(alert).toBeTruthy();
   });
 
   it('shows voice button when recorder is supported', () => {

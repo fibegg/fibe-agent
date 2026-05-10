@@ -28,7 +28,7 @@ describe('useLocalLlm', () => {
     
     (webllm.CreateWebWorkerMLCEngine as any).mockResolvedValue(mockEngine as any);
 
-    const { result } = renderHook(() => useLocalLlm());
+    const { result } = renderHook(() => useLocalLlm({ enabled: true }));
 
     expect(result.current.isReady).toBe(false);
 
@@ -51,7 +51,7 @@ describe('useLocalLlm', () => {
     
     (webllm.CreateWebWorkerMLCEngine as any).mockResolvedValue(mockEngine as any);
 
-    const { result } = renderHook(() => useLocalLlm());
+    const { result } = renderHook(() => useLocalLlm({ enabled: true }));
 
     await waitFor(() => {
       expect(result.current.isReady).toBe(true);
@@ -77,7 +77,7 @@ describe('useLocalLlm', () => {
           return { unload: vi.fn().mockResolvedValue(undefined) } as any;
       });
 
-      const { result } = renderHook(() => useLocalLlm());
+      const { result } = renderHook(() => useLocalLlm({ enabled: true }));
       
       // Wait for the initialization promise to kick off the effect and capture the callback
       await waitFor(() => {
