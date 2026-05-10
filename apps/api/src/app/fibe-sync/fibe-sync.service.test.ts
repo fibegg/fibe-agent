@@ -130,6 +130,76 @@ describe('FibeSyncService', () => {
     }
   });
 
+  test('syncMessages keeps separate pending syncs per conversation', async () => {
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () =>
+      new Response('', { status: 200 })
+    ) as unknown as typeof fetch;
+
+    const service = new FibeSyncService(mockConfig as never);
+    try {
+      service.syncMessages(() => '{"conversation":"a"}', 'conv-a');
+      service.syncMessages(() => '{"conversation":"b"}', 'conv-b');
+      await new Promise((r) => setTimeout(r, 600));
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://fibe.test/api/agents/agent-1/messages',
+        expect.objectContaining({
+          body: JSON.stringify({ content: '{"conversation":"a"}', conversation_id: 'conv-a' }),
+        }),
+      );
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        'https://fibe.test/api/agents/agent-1/messages',
+        expect.objectContaining({
+          body: JSON.stringify({ content: '{"conversation":"b"}', conversation_id: 'conv-b' }),
+        }),
+      );
+    } finally {
+      service.onModuleDestroy();
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('retries failed sync with latest content for the conversation', async () => {
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
+
+    const originalFetch = globalThis.fetch;
+    let attempts = 0;
+    let content = '{"attempt":"first"}';
+    globalThis.fetch = mock(async () => {
+      attempts += 1;
+      return new Response('', { status: attempts === 1 ? 500 : 200 });
+    }) as unknown as typeof fetch;
+
+    const service = new FibeSyncService(mockConfig as never);
+    try {
+      service.syncMessages(() => content, 'conv-retry');
+      await new Promise((r) => setTimeout(r, 600));
+      content = '{"attempt":"second"}';
+      await new Promise((r) => setTimeout(r, 1200));
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        'https://fibe.test/api/agents/agent-1/messages',
+        expect.objectContaining({
+          body: JSON.stringify({ content: '{"attempt":"second"}', conversation_id: 'conv-retry' }),
+        }),
+      );
+    } finally {
+      service.onModuleDestroy();
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('handles non-ok response without throwing', async () => {
     mockConfig.isFibeSyncEnabled = () => true;
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';
@@ -141,11 +211,13 @@ describe('FibeSyncService', () => {
       new Response('Server Error', { status: 500 })
     ) as unknown as typeof fetch;
 
+    const service = new FibeSyncService(mockConfig as never);
     try {
-      const service = new FibeSyncService(mockConfig as never);
       // Should not throw
       service.syncMessages(() => '{}');
+      await new Promise((r) => setTimeout(r, 600));
     } finally {
+      service.onModuleDestroy();
       globalThis.fetch = originalFetch;
     }
   });
@@ -161,10 +233,12 @@ describe('FibeSyncService', () => {
       throw new Error('ECONNREFUSED');
     }) as unknown as typeof fetch;
 
+    const service = new FibeSyncService(mockConfig as never);
     try {
-      const service = new FibeSyncService(mockConfig as never);
       service.syncMessages(() => '{}');
+      await new Promise((r) => setTimeout(r, 600));
     } finally {
+      service.onModuleDestroy();
       globalThis.fetch = originalFetch;
     }
   });
