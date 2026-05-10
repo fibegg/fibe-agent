@@ -36,8 +36,14 @@ export function ChatLayout({
 }: ChatLayoutProps) {
   return (
     <div
-      className={`flex h-full w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
-      style={isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : undefined}
+      className={`flex w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
+      style={{
+        ...(isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : {}),
+        // Use the JS-measured visual viewport height (--vh) so the container
+        // shrinks correctly when the iOS software keyboard appears. Falls back
+        // to 100dvh when the CSS variable is not yet set.
+        height: 'calc(var(--vh, 1svh) * 100)',
+      }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}

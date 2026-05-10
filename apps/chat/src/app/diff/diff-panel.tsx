@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { GitCompareArrows, RefreshCw, FileText, FilePlus, FileMinus, FileQuestion } from 'lucide-react';
+import { GitCompareArrows, RefreshCw, FileText, FilePlus, FileMinus, FileQuestion, GitBranch, Loader2 as SpinnerIcon } from 'lucide-react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
 import { useT, type TranslationKey } from '../i18n';
@@ -89,6 +89,8 @@ export function DiffPanel() {
   const [result, setResult] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pushing, setPushing] = useState(false);
+  const [pushResult, setPushResult] = useState<{ ok: boolean; message: string } | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
   const fetchDiff = useCallback(async () => {
@@ -122,6 +124,28 @@ export function DiffPanel() {
     return () => clearInterval(id);
   }, [fetchDiff]);
 
+  // Auto-dismiss push result after 4 s
+  useEffect(() => {
+    if (!pushResult) return;
+    const id = setTimeout(() => setPushResult(null), 4000);
+    return () => clearTimeout(id);
+  }, [pushResult]);
+
+  const handlePush = useCallback(async () => {
+    setPushing(true);
+    setPushResult(null);
+    try {
+      const res = await apiRequest('/api/playgrounds/git-push', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setPushResult({ ok: true, message: t('drawer.gitPushSuccess') });
+      void fetchDiff();
+    } catch {
+      setPushResult({ ok: false, message: t('drawer.gitPushFailed') });
+    } finally {
+      setPushing(false);
+    }
+  }, [fetchDiff, t]);
+
   const lines = result?.diff.split('\n') ?? [];
 
   return (
@@ -139,18 +163,45 @@ export function DiffPanel() {
             </span>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => { void fetchDiff(); }}
-          disabled={loading}
-          className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
-          aria-label={t('diff.refreshDiff')}
-          title={t('diff.refresh')}
-        >
-          <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} aria-hidden />
-          <span>{t('diff.refresh')}</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {result?.hasDiff && (
+            <button
+              type="button"
+              onClick={() => { void handlePush(); }}
+              disabled={pushing || loading}
+              className="flex items-center gap-1 text-[10px] text-emerald-400/80 hover:text-emerald-300 transition-colors disabled:opacity-40 shrink-0 rounded px-1.5 py-0.5 hover:bg-emerald-500/10"
+              aria-label={t('drawer.gitPush')}
+              title={t('drawer.gitPush')}
+            >
+              {pushing
+                ? <SpinnerIcon className="size-3 animate-spin" aria-hidden />
+                : <GitBranch className="size-3" aria-hidden />
+              }
+              <span>{pushing ? t('drawer.gitPushPushing') : t('drawer.gitPush')}</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => { void fetchDiff(); }}
+            disabled={loading}
+            className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
+            aria-label={t('diff.refreshDiff')}
+            title={t('diff.refresh')}
+          >
+            <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} aria-hidden />
+            <span>{t('diff.refresh')}</span>
+          </button>
+        </div>
       </div>
+
+      {/* ── Push result toast ───────────────────────────────────────────── */}
+      {pushResult && (
+        <div className={`px-3 py-1.5 text-[11px] font-medium shrink-0 border-b border-violet-500/10 ${
+          pushResult.ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+        }`}>
+          {pushResult.message}
+        </div>
+      )}
 
       {/* ── Not a git repo ──────────────────────────────────────────────── */}
       {!loading && result && !result.isGitRepo && (

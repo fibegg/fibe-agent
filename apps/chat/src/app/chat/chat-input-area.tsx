@@ -1,5 +1,5 @@
-import { CornerDownRight, Mic, Paperclip, Send, Square, X } from 'lucide-react';
-import { useRef } from 'react';
+import { AlertCircle, CornerDownRight, MicOff, Mic, Paperclip, Send, Square, X } from 'lucide-react';
+import { useRef, useState } from 'react';
 import { MentionInput } from './mention-input';
 import { FileMentionDropdown } from './file-mention-dropdown';
 import { CHAT_STATES } from './chat-state';
@@ -81,12 +81,27 @@ export function ChatInputArea({
 }: ChatInputAreaProps) {
   const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dismissedVoiceError, setDismissedVoiceError] = useState<string | null>(null);
+
   const isWorking = state === CHAT_STATES.AWAITING_RESPONSE;
   const isReady = state === CHAT_STATES.AUTHENTICATED;
   const canType = isReady || isWorking;
   const canAttach =
     isReady &&
     pendingImages.length + pendingAttachments.length < maxPendingTotal;
+
+  // Resolve the voice error message — translate mic-denied specifically
+  const rawVoiceError = voiceRecorder.error;
+  const isMicDenied =
+    rawVoiceError !== null &&
+    (rawVoiceError.toLowerCase().includes('permission') ||
+      rawVoiceError.toLowerCase().includes('denied') ||
+      rawVoiceError.toLowerCase().includes('notallowed'));
+  const voiceErrorMsg = rawVoiceError === null ? null
+    : rawVoiceError === dismissedVoiceError ? null
+    : isMicDenied ? t('chat.input.micDenied') : rawVoiceError;
+
+  const activeError = voiceErrorMsg ?? voiceUploadError ?? attachmentUploadError;
 
   return (
     <div
@@ -147,10 +162,24 @@ export function ChatInputArea({
             ))}
           </div>
         )}
-        {(voiceRecorder.error || voiceUploadError || attachmentUploadError) && (
-          <p className="text-destructive text-sm">
-            {voiceRecorder.error ?? voiceUploadError ?? attachmentUploadError}
-          </p>
+        {activeError && (
+          <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/8 px-3 py-2 text-sm text-red-400 animate-modal-enter">
+            {isMicDenied
+              ? <MicOff className="size-4 shrink-0 mt-0.5" aria-hidden />
+              : <AlertCircle className="size-4 shrink-0 mt-0.5" aria-hidden />
+            }
+            <span className="flex-1">{activeError}</span>
+            {voiceErrorMsg && (
+              <button
+                type="button"
+                onClick={() => setDismissedVoiceError(rawVoiceError)}
+                className="shrink-0 size-4 flex items-center justify-center text-red-400/60 hover:text-red-300 transition-colors"
+                aria-label={t('common.close')}
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
         )}
         <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border/60 p-2 sm:p-3 shadow-xl shadow-violet-500/[0.04] transition-shadow duration-300 focus-within:shadow-violet-500/[0.08]">
           <input

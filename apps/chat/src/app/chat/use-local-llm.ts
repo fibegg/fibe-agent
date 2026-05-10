@@ -10,7 +10,7 @@ export interface LocalLlmProgress {
   total?: number;
 }
 
-export function useLocalLlm() {
+export function useLocalLlm({ enabled = false }: { enabled?: boolean } = {}) {
   const [isReady, setIsReady] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState<LocalLlmProgress[]>([]);
@@ -19,6 +19,9 @@ export function useLocalLlm() {
   const engineRef = useRef<MLCEngineInterface | null>(null);
 
   useEffect(() => {
+    // Guard: don't download anything unless the consumer has explicitly opted in
+    if (!enabled) return;
+
     let active = true;
 
     const initializeEngine = async () => {
@@ -70,7 +73,7 @@ export function useLocalLlm() {
         engineRef.current = null;
       }
     };
-  }, []);
+  }, [enabled]);
 
   const generate = useCallback(async (messages: ChatCompletionMessageParam[]): Promise<string> => {
     if (!engineRef.current) {
@@ -100,6 +103,7 @@ export function useLocalLlm() {
   }, []);
 
   return {
+    isEnabled: enabled,
     isReady,
     isGenerating,
     progress,
