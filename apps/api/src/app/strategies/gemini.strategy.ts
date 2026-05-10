@@ -14,12 +14,6 @@ const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Goog
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
 const SESSION_MARKER_FILE = '.gemini_session';
 const GEMINI_RESUME_LATEST = 'latest';
-const MISSING_SESSION_ERROR_PATTERNS = [
-  /No conversation found with session ID:/i,
-  /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
-  /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
-];
-
 interface GeminiSessionFile {
   sessionId: string;
   filePath: string;
@@ -126,10 +120,6 @@ export function parseGeminiStreamJsonLine(line: string): string | null {
     // Ignore silently.
   }
   return null;
-}
-
-function missingSessionError(message: string): boolean {
-  return MISSING_SESSION_ERROR_PATTERNS.some((pattern) => pattern.test(message));
 }
 
 export class GeminiStrategy extends AbstractCLIStrategy {
@@ -667,7 +657,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           );
           return;
         }
-        if (code !== 0 && missingSessionError(errorResult)) {
+        if (code !== 0 && this.missingSessionError(errorResult)) {
           this.clearStoredSession();
         }
         if ((code === 0 || code === null) && !hasEmittedOutput) {

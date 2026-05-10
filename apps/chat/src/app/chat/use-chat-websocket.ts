@@ -18,7 +18,7 @@ import {
 } from './chat-state';
 import type { ThinkingStep } from './thinking-types';
 import type { ToolOrFileEvent } from './thinking-types';
-
+import { useStableRef } from '../hooks/use-stable-ref';
 import { useChatAuth, type AuthModalState } from './use-chat-auth';
 
 const AUTO_AUTH_SUCCESS_EVENT = 'fibe:auto-auth-success';
@@ -85,26 +85,18 @@ export function useChatWebSocket(
   const responseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageQueueRef = useRef<Record<string, unknown>[]>([]);
-  const onMessageRef = useRef(onMessage);
-  const onStreamChunkRef = useRef(onStreamChunk);
-  const onStreamStartRef = useRef(onStreamStart);
-  const onStreamEndRef = useRef(onStreamEnd);
-  const thinkingRef = useRef(thinkingCallbacks);
-  const onPlaygroundChangedRef = useRef(onPlaygroundChanged);
-  const onLocalToolEventRef = useRef(onLocalToolEvent);
-  const onConversationResetRef = useRef(onConversationReset);
-  const onConversationDeletedRef = useRef(onConversationDeleted);
-  const onStreamAbortRef = useRef(onStreamAbort);
-  thinkingRef.current = thinkingCallbacks;
-  onMessageRef.current = onMessage;
-  onStreamChunkRef.current = onStreamChunk;
-  onStreamStartRef.current = onStreamStart;
-  onStreamEndRef.current = onStreamEnd;
-  onPlaygroundChangedRef.current = onPlaygroundChanged;
-  onLocalToolEventRef.current = onLocalToolEvent;
-  onConversationResetRef.current = onConversationReset;
-  onConversationDeletedRef.current = onConversationDeleted;
-  onStreamAbortRef.current = onStreamAbort;
+  // Stable callback refs — always reflect the latest value without becoming
+  // stale inside long-lived WebSocket handlers.
+  const onMessageRef = useStableRef(onMessage);
+  const onStreamChunkRef = useStableRef(onStreamChunk);
+  const onStreamStartRef = useStableRef(onStreamStart);
+  const onStreamEndRef = useStableRef(onStreamEnd);
+  const thinkingRef = useStableRef(thinkingCallbacks);
+  const onPlaygroundChangedRef = useStableRef(onPlaygroundChanged);
+  const onLocalToolEventRef = useStableRef(onLocalToolEvent);
+  const onConversationResetRef = useStableRef(onConversationReset);
+  const onConversationDeletedRef = useStableRef(onConversationDeleted);
+  const onStreamAbortRef = useStableRef(onStreamAbort);
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {

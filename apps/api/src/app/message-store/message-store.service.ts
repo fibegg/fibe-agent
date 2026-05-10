@@ -3,7 +3,8 @@ import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
-import { AsyncJsonWriter } from '../../utils/async-json-writer';
+import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
+import { decryptData } from '../crypto/crypto.util';
 
 export interface StoryEntry {
   id: string;
@@ -31,25 +32,30 @@ export type StoredStoryEntry = StoryEntry;
 @Injectable()
 export class MessageStoreService implements OnModuleDestroy {
   private messages: StoredMessage[] = [];
+  /** O(1) lookups and mutations by message ID. */
+  private readonly indexById = new Map<string, StoredMessage>();
   private readonly storePath: string;
   private readonly previousMessagesPath: string;
-  private readonly jsonWriter: AsyncJsonWriter<StoredMessage[]>;
+  private readonly jsonWriter: SequentialJsonWriter;
 
   constructor(private readonly config: ConfigService) {
     const dir = this.config.getConversationDataDir();
     this.storePath = join(dir, 'messages.json');
     this.previousMessagesPath = join(dir, 'messages.previous.json');
-    
-    this.jsonWriter = new AsyncJsonWriter({
-      filePath: this.storePath,
-      getData: () => this.messages,
-      encryptionKey: this.config.getEncryptionKey(),
-    });
+
+    this.jsonWriter = new SequentialJsonWriter(
+      this.storePath,
+      () => this.messages,
+      this.config.getEncryptionKey(),
+      200, // debounce — rapid successive writes coalesce into one atomic flush
+    );
 
     if (existsSync(this.storePath)) {
       try {
         const raw = readFileSync(this.storePath, 'utf8');
-        this.messages = JSON.parse(raw);
+        const decrypted = decryptData(raw, this.config.getEncryptionKey());
+        this.messages = JSON.parse(decrypted);
+        this.rebuildIndex();
       } catch (err) {
         console.error('Failed to parse messages.json:', err);
       }
@@ -58,6 +64,16 @@ export class MessageStoreService implements OnModuleDestroy {
 
   all(): StoredMessage[] {
     return this.messages;
+  }
+
+  /** O(1) count without building a new array. */
+  count(): number {
+    return this.messages.length;
+  }
+
+  /** O(1) lookup by ID. */
+  getById(id: string): StoredMessage | undefined {
+    return this.indexById.get(id);
   }
 
   add(role: 'user' | 'assistant', body: string, imageUrls?: string[], model?: string, attachmentFilenames?: string[]): StoredMessage {
@@ -72,28 +88,33 @@ export class MessageStoreService implements OnModuleDestroy {
     if (attachmentFilenames?.length) msg.attachmentFilenames = attachmentFilenames;
 
     this.messages.push(msg);
+    this.indexById.set(msg.id, msg);
     this.jsonWriter.schedule();
     return msg;
   }
 
+  /** O(1) body update via Map index. */
   updateBody(id: string, body: string): boolean {
-    const msg = this.messages.find((message) => message.id === id);
+    const msg = this.indexById.get(id);
     if (!msg) return false;
     msg.body = body;
     this.jsonWriter.schedule();
     return true;
   }
 
+  /** O(1) removal via Map index. */
   removeById(id: string): boolean {
-    const before = this.messages.length;
-    this.messages = this.messages.filter((message) => message.id !== id);
-    if (this.messages.length === before) return false;
+    const msg = this.indexById.get(id);
+    if (!msg) return false;
+    this.indexById.delete(id);
+    this.messages = this.messages.filter((m) => m.id !== id);
     this.jsonWriter.schedule();
     return true;
   }
 
   clear(): void {
     this.messages = [];
+    this.indexById.clear();
     this.jsonWriter.schedule();
   }
 
@@ -110,12 +131,14 @@ export class MessageStoreService implements OnModuleDestroy {
       }
     }
     this.messages = [];
+    this.indexById.clear();
     this.jsonWriter.schedule();
   }
 
   hydrate(messages: StoredMessage[]): void {
     if (Array.isArray(messages) && messages.length > 0) {
       this.messages = messages;
+      this.rebuildIndex();
       this.jsonWriter.schedule();
     }
   }
@@ -137,5 +160,12 @@ export class MessageStoreService implements OnModuleDestroy {
   async onModuleDestroy(): Promise<void> {
     await this.jsonWriter.flush();
     this.jsonWriter.destroy();
+  }
+
+  private rebuildIndex(): void {
+    this.indexById.clear();
+    for (const msg of this.messages) {
+      this.indexById.set(msg.id, msg);
+    }
   }
 }

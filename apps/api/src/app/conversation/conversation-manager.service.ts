@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -11,6 +11,7 @@ import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 import { MessageStoreService, type StoredMessage } from '../message-store/message-store.service';
 import { ActivityStoreService, type StoredActivityEntry } from '../activity-store/activity-store.service';
+import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
 import type { ConversationDataDirProvider } from '../strategies/strategy.types';
 
 export interface ConversationMeta {
@@ -68,12 +69,13 @@ class ConversationScopedConfig {
  * into other services still works for the "default" legacy conversation.
  */
 @Injectable()
-export class ConversationManagerService {
+export class ConversationManagerService implements OnModuleDestroy {
   private readonly logger = new Logger(ConversationManagerService.name);
   private readonly bundles = new Map<string, ConversationBundle>();
   private readonly conversationsDir: string;
   private readonly indexPath: string;
   private readonly tombstonesPath: string;
+  private readonly indexWriter: SequentialJsonWriter;
   private cleanupRetryTimer?: NodeJS.Timeout;
 
   constructor(private readonly config: ConfigService) {
@@ -81,9 +83,23 @@ export class ConversationManagerService {
     this.indexPath = join(this.conversationsDir, 'index.json');
     this.tombstonesPath = join(this.conversationsDir, 'tombstones.json');
     mkdirSync(this.conversationsDir, { recursive: true });
+    this.indexWriter = new SequentialJsonWriter(
+      this.indexPath,
+      () => [...this.bundles.values()].map((b) => {
+        const { messageCount: _mc, isProcessing: _ip, ...meta } = b.meta;
+        return meta;
+      }),
+      undefined,
+      300, // debounce — rapid touch() calls (one per message) coalesce
+    );
     this.loadIndex();
     this.ensureDefaultConversation();
     if (this.retryTombstonedCleanup() > 0) this.scheduleTombstoneRetry();
+  }
+
+  onModuleDestroy(): Promise<void> {
+    this.indexWriter.destroy();
+    return this.indexWriter.flush();
   }
 
   /** List visible conversations sorted by lastMessageAt desc. */
@@ -327,7 +343,7 @@ export class ConversationManagerService {
     this.applySystemFlags(bundle.meta);
     return {
       ...bundle.meta,
-      messageCount: bundle.messageStore.all().length,
+      messageCount: bundle.messageStore.count(),
     };
   }
 
@@ -362,15 +378,7 @@ export class ConversationManagerService {
   }
 
   private flushIndex(): void {
-    try {
-      const metas = [...this.bundles.values()].map((b) => {
-        const { messageCount: _messageCount, isProcessing: _isProcessing, ...meta } = b.meta;
-        return meta;
-      });
-      writeFileSync(this.indexPath, JSON.stringify(metas, null, 2), 'utf8');
-    } catch (err) {
-      this.logger.warn('Failed to flush conversations index', err);
-    }
+    this.indexWriter.schedule();
   }
 
   private removeConversationDir(id: string, dir: string): boolean {

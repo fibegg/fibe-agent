@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import type { IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
+import { randomUUID } from 'node:crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { RawData } from 'ws';
 import { ConfigService } from './app/config/config.service';
@@ -25,26 +26,31 @@ type ClientMessage = {
   busyPolicy?: 'reject' | 'queue' | 'steer';
 };
 
-/** Extract the token query param from an IncomingMessage URL. */
-function extractToken(req: IncomingMessage): string | null {
-  const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
-  return url.searchParams.get('token');
+interface ConnectionParams {
+  token: string | null;
+  conversationId: string;
 }
 
-/** Extract the conversation ID from the ?c= query param. Falls back to 'default'. */
-function extractConversationId(req: IncomingMessage): string {
+/**
+ * Parse the WS upgrade URL once per connection — avoids creating two URL
+ * objects (previously done by extractToken + extractConversationId separately).
+ */
+function parseConnectionParams(req: IncomingMessage): ConnectionParams {
   const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
   const c = (
     url.searchParams.get('conversation_id') ??
     url.searchParams.get('c')
   )?.trim();
-  return c || 'default';
+  return {
+    token: url.searchParams.get('token'),
+    conversationId: c || 'default',
+  };
 }
 
 /** Return true and close with 4001 if the required password is set but doesn't match. */
-function rejectIfUnauthorized(ws: WebSocket, req: IncomingMessage, requiredPassword: string | undefined): boolean {
+function rejectIfUnauthorized(ws: WebSocket, params: ConnectionParams, requiredPassword: string | undefined): boolean {
   if (!requiredPassword) return false;
-  if (extractToken(req) !== requiredPassword) {
+  if (params.token !== requiredPassword) {
     logWs({ event: 'disconnect', closeCode: WS_CLOSE.UNAUTHORIZED, error: 'Unauthorized' });
     ws.close(WS_CLOSE.UNAUTHORIZED, 'Unauthorized');
     return true;
@@ -69,21 +75,21 @@ function attachChatWs(
   );
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    if (rejectIfUnauthorized(ws, req, config.getAgentPassword())) return;
+    // Parse URL once for all downstream consumers
+    const params = parseConnectionParams(req);
+
+    if (rejectIfUnauthorized(ws, params, config.getAgentPassword())) return;
 
     // Enforce max connections by evicting the oldest session
     const allSessions = sessionRegistry.connected();
     if (allSessions.length >= MAX_CONNECTIONS) {
       const oldest = allSessions[0];
       logWs({ event: 'disconnect', closeCode: WS_CLOSE.SESSION_TAKEN_OVER, error: 'Max connections reached — oldest session evicted' });
-      // Close the WS for the oldest session — the 'close' handler below will destroy it
-      // We need to find the WS for that session; simplest is to just send a close frame
-      // Since we track sessions by sessionId, we close via the registry
       sessionRegistry.destroy(oldest.sessionId);
     }
 
     // Validate conversation_id: reject connections to non-existent conversations
-    const conversationId = extractConversationId(req);
+    const { conversationId } = params;
     if (conversationId !== DEFAULT_CONVERSATION_ID && !conversationManager.get(conversationId)) {
       logWs({ event: 'disconnect', closeCode: 4004, error: `Unknown conversation_id: ${conversationId}` });
       ws.close(4004, 'Unknown conversation');
@@ -145,10 +151,9 @@ function attachTerminalWs(
   config: ConfigService,
   terminalService: TerminalService,
 ): void {
-  const { randomUUID } = require('node:crypto') as typeof import('node:crypto');
-
   terminalWss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    if (rejectIfUnauthorized(ws, req, config.getAgentPassword())) return;
+    const params = parseConnectionParams(req);
+    if (rejectIfUnauthorized(ws, params, config.getAgentPassword())) return;
 
     const sessionId = randomUUID();
     const playgroundDir = config.getPlaygroundsDir();

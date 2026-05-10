@@ -5,28 +5,72 @@ import { encryptData } from '../crypto/crypto.util';
 /**
  * Chains writes per file so rapid mutations serialize to disk in order
  * without overlapping writeFile calls corrupting JSON.
+ *
+ * When `debounceMs > 0`, rapid `schedule()` calls are coalesced into one
+ * write after the debounce window (like AsyncJsonWriter), while still using
+ * safe atomic temp-rename under the hood.
  */
 export class SequentialJsonWriter {
   private chain: Promise<void> = Promise.resolve();
   private writeCounter = 0;
+  private debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(
     private readonly filePath: string,
     private readonly getSnapshot: () => unknown,
-    private readonly encryptionKey?: string
+    private readonly encryptionKey?: string,
+    private readonly debounceMs = 0,
   ) {}
 
-  schedule(): Promise<void> {
+  /**
+   * Schedule a write.
+   * - When `debounceMs > 0`: debounces — multiple rapid calls coalesce into one.
+   * - When `debounceMs === 0`: chains immediately (original behaviour).
+   */
+  schedule(): void {
+    if (this.debounceMs > 0) {
+      if (this.debounceTimer !== null) {
+        clearTimeout(this.debounceTimer);
+      }
+      this.debounceTimer = setTimeout(() => {
+        this.debounceTimer = null;
+        this.enqueueWrite();
+      }, this.debounceMs);
+    } else {
+      this.enqueueWrite();
+    }
+  }
+
+  /**
+   * Flush any pending write immediately and wait for it to complete.
+   * Cancels the debounce timer when in debounce mode, then writes in-line.
+   */
+  flush(): Promise<void> {
+    if (this.debounceMs > 0 && this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+      this.enqueueWrite();
+    }
+    return this.chain;
+  }
+
+  /**
+   * Cancel any pending debounced write.
+   * Call from `onModuleDestroy` after `flush()` to avoid stale timer fires.
+   */
+  destroy(): void {
+    if (this.debounceTimer !== null) {
+      clearTimeout(this.debounceTimer);
+      this.debounceTimer = null;
+    }
+  }
+
+  private enqueueWrite(): void {
     this.chain = this.chain
       .then(() => this.writeSnapshot())
       .catch((err) => {
         console.error('SequentialJsonWriter failed:', err);
       });
-    return this.chain;
-  }
-
-  flush(): Promise<void> {
-    return this.chain;
   }
 
   private async writeSnapshot(): Promise<void> {

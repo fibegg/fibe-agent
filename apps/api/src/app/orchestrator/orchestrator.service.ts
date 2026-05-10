@@ -324,9 +324,11 @@ export class OrchestratorService implements OnModuleInit {
   private async checkAndSendAuthStatus(ctx: SessionContext): Promise<void> {
     const authenticated = await ctx.strategy.checkAuthStatus();
     this.sharedIsAuthenticated = authenticated;
-    for (const s of this.sessionRegistry.all()) s.isAuthenticated = authenticated;
-    const anyProcessing = this.sessionRegistry.all().some((s) => s.isProcessing);
-    for (const s of this.sessionRegistry.all()) {
+    // Single pass: set auth flag, compute anyProcessing, and emit — no repeated all() calls
+    const sessions = this.sessionRegistry.all();
+    const anyProcessing = sessions.some((s) => s.isProcessing);
+    for (const s of sessions) {
+      s.isAuthenticated = authenticated;
       const isConversationProcessing =
         s.isProcessing || this.sessionRegistry.isConversationProcessing(s.conversationId, s.sessionId);
       s.send(WS_EVENT.AUTH_STATUS, {
@@ -370,6 +372,7 @@ export class OrchestratorService implements OnModuleInit {
   private handleLogout(ctx: SessionContext): void {
     ctx.strategy.cancelAuth();
     this.setAllSessionsAuthenticated(false);
+    // Single pass: clear processing flag on all sessions
     for (const s of this.sessionRegistry.all()) s.isProcessing = false;
     this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, { status: AUTH_STATUS_VAL.UNAUTHENTICATED, anyProcessing: false });
     const connection = this.createLogoutConnection(ctx);

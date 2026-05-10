@@ -34,11 +34,20 @@ const RECENT_STREAM_RETENTION_MS = 30_000;
  * - `broadcast()` pushes an event to ALL live sessions (used for shared-state changes
  *   like model/effort updates, auth status, conversation resets).
  * - `broadcastProcessingState()` pushes anyProcessing flag + session count to all.
+ *
+ * Performance notes:
+ * - `byConversation` maintains a per-conversation Set for O(k) broadcasts, where k
+ *   is the number of sessions in that conversation (vs O(n) total sessions).
+ * - `_allCache` caches the full sessions array and is invalidated on create/destroy.
  */
 @Injectable()
 export class SessionRegistryService {
   private readonly logger = new Logger(SessionRegistryService.name);
   private readonly sessions = new Map<string, SessionContext>();
+  /** Per-conversation session sets for O(k) broadcastToConversation. */
+  private readonly byConversation = new Map<string, Set<SessionContext>>();
+  /** Cached result of `all()` — invalidated on create/destroy. */
+  private _allCache: SessionContext[] | null = null;
 
   constructor(
     private readonly strategyRegistry: StrategyRegistryService,
@@ -51,9 +60,8 @@ export class SessionRegistryService {
    * Pass conversationId to bind this session to a specific conversation thread.
    */
   create(conversationId = 'default', clientConnected = true): SessionContext {
-    const detached = [...this.sessions.values()].find(
-      (s) => s.conversationId === conversationId && !s.isClientConnected && s.isProcessing,
-    );
+    const detached = this.sessionsForConversation(conversationId)
+      .find((s) => !s.isClientConnected && s.isProcessing);
     if (detached) {
       detached.isClientConnected = true;
       detached.destroyWhenIdle = false;
@@ -69,6 +77,8 @@ export class SessionRegistryService {
     const ctx = new SessionContext(sessionId, strategy, conversationId);
     ctx.isClientConnected = clientConnected;
     this.sessions.set(sessionId, ctx);
+    this.addToConversationIndex(ctx);
+    this._allCache = null;
     this.logger.log(`Session created: ${sessionId} conversation:${conversationId} (total: ${this.sessions.size})`);
     this.broadcastSessionCount();
     return ctx;
@@ -79,9 +89,12 @@ export class SessionRegistryService {
     return this.sessions.get(sessionId);
   }
 
-  /** All active sessions. */
+  /** All active sessions (cached — O(1) on repeat calls between mutations). */
   all(): SessionContext[] {
-    return [...this.sessions.values()];
+    if (!this._allCache) {
+      this._allCache = [...this.sessions.values()];
+    }
+    return this._allCache;
   }
 
   /** Sessions that still have a browser WebSocket attached. */
@@ -90,13 +103,23 @@ export class SessionRegistryService {
   }
 
   processingForConversation(conversationId: string): SessionContext | undefined {
-    return [...this.sessions.values()].find(
+    const inIndex = this.sessionsForConversation(conversationId);
+    // If the index has entries, use it (fast path O(k))
+    if (inIndex.length > 0) return inIndex.find((s) => s.isProcessing);
+    // Fallback: scan all sessions for the conversationId (handles runtime mutations)
+    return this.all().find(
       (s) => s.conversationId === conversationId && s.isProcessing,
     );
   }
 
   isConversationProcessing(conversationId: string, excludeSessionId?: string): boolean {
-    return [...this.sessions.values()].some(
+    const inIndex = this.sessionsForConversation(conversationId);
+    if (inIndex.length > 0) {
+      return inIndex.some(
+        (s) => s.sessionId !== excludeSessionId && s.isProcessing,
+      );
+    }
+    return this.all().some(
       (s) =>
         s.conversationId === conversationId &&
         s.sessionId !== excludeSessionId &&
@@ -147,9 +170,9 @@ export class SessionRegistryService {
 
   private recentCompletedStreamForConversation(conversationId: string): SessionContext | undefined {
     const cutoff = Date.now() - RECENT_STREAM_RETENTION_MS;
-    return [...this.sessions.values()]
+    return this.sessionsForConversation(conversationId)
       .filter((s) => {
-        if (s.conversationId !== conversationId || !s.lastStreamText || !s.lastStreamFinishedAt) return false;
+        if (!s.lastStreamText || !s.lastStreamFinishedAt) return false;
         const finishedAt = Date.parse(s.lastStreamFinishedAt);
         return !Number.isNaN(finishedAt) && finishedAt >= cutoff;
       })
@@ -168,15 +191,15 @@ export class SessionRegistryService {
     if (!ctx) return;
     ctx.destroy();
     this.sessions.delete(sessionId);
+    this.removeFromConversationIndex(ctx);
+    this._allCache = null;
     this.logger.log(`Session destroyed: ${sessionId} (total: ${this.sessions.size})`);
     this.broadcastSessionCount();
   }
 
   destroyConversation(conversationId: string): void {
-    for (const ctx of [...this.sessions.values()]) {
-      if (ctx.conversationId === conversationId) {
-        this.destroy(ctx.sessionId);
-      }
+    for (const ctx of this.sessionsForConversation(conversationId)) {
+      this.destroy(ctx.sessionId);
     }
   }
 
@@ -217,7 +240,7 @@ export class SessionRegistryService {
 
   /**
    * Push an event only to sessions bound to a given conversation.
-   * This keeps live chat and activity updates isolated across threads.
+   * O(k) where k = sessions in that conversation — uses per-conversation index.
    */
   broadcastToConversation(
     conversationId: string,
@@ -228,23 +251,25 @@ export class SessionRegistryService {
       type,
       data: { conversationId, ...data },
     };
-    for (const ctx of this.sessions.values()) {
-      if (ctx.conversationId === conversationId) {
-        ctx.outbound$.next(event);
-      }
+    const set = this.byConversation.get(conversationId);
+    if (!set) return;
+    for (const ctx of set) {
+      ctx.outbound$.next(event);
     }
   }
 
   /**
    * Push auth_status to every session with the current anyProcessing flag.
    * Called when any session's isProcessing changes so all UIs stay in sync.
+   * Single pass: compute anyProcessing once, then iterate once.
    */
   broadcastAuthStatus(
     status: string,
     extraData: Record<string, unknown> = {}
   ): void {
-    const anyProcessing = [...this.sessions.values()].some((s) => s.isProcessing);
-    for (const s of this.sessions.values()) {
+    const sessions = this.all();
+    const anyProcessing = sessions.some((s) => s.isProcessing);
+    for (const s of sessions) {
       const isProcessing =
         s.isProcessing || this.isConversationProcessing(s.conversationId, s.sessionId);
       s.send('auth_status', { status, isProcessing, anyProcessing, ...extraData });
@@ -257,5 +282,29 @@ export class SessionRegistryService {
    */
   private broadcastSessionCount(): void {
     this.broadcast(WS_EVENT.SESSIONS_UPDATED, { count: this.size });
+  }
+
+  /** Returns sessions for a conversation as an array for iteration. */
+  private sessionsForConversation(conversationId: string): SessionContext[] {
+    const set = this.byConversation.get(conversationId);
+    return set ? [...set] : [];
+  }
+
+  private addToConversationIndex(ctx: SessionContext): void {
+    let set = this.byConversation.get(ctx.conversationId);
+    if (!set) {
+      set = new Set();
+      this.byConversation.set(ctx.conversationId, set);
+    }
+    set.add(ctx);
+  }
+
+  private removeFromConversationIndex(ctx: SessionContext): void {
+    const set = this.byConversation.get(ctx.conversationId);
+    if (!set) return;
+    set.delete(ctx);
+    if (set.size === 0) {
+      this.byConversation.delete(ctx.conversationId);
+    }
   }
 }
