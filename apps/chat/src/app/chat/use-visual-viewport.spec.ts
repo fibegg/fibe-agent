@@ -16,6 +16,7 @@ describe('useVisualViewport', () => {
       writable: true,
     });
     document.documentElement.style.removeProperty('--vh');
+    document.documentElement.style.removeProperty('--keyboard-height');
   });
 
   it('sets --vh CSS variable on mount using window.innerHeight fallback', () => {
@@ -29,6 +30,7 @@ describe('useVisualViewport', () => {
     renderHook(() => useVisualViewport());
 
     expect(document.documentElement.style.getPropertyValue('--vh')).toBe('8px');
+    expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   });
 
   it('sets --vh CSS variable using visualViewport.height when available', () => {
@@ -39,10 +41,28 @@ describe('useVisualViewport', () => {
       removeEventListener: vi.fn(),
     };
     Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true, writable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 600, configurable: true });
 
     renderHook(() => useVisualViewport());
 
     expect(document.documentElement.style.getPropertyValue('--vh')).toBe('6px');
+    expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
+  });
+
+  it('sets --keyboard-height when software keyboard is visible', () => {
+    const vv = {
+      height: 400,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true, writable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 800, configurable: true });
+
+    renderHook(() => useVisualViewport());
+
+    // keyboard height = innerHeight - visualViewport.height = 800 - 400 = 400
+    expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('400px');
+    expect(document.documentElement.style.getPropertyValue('--vh')).toBe('4px');
   });
 
   it('cleans up event listeners on unmount', () => {

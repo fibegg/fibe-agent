@@ -39,10 +39,11 @@ export function ChatLayout({
       className={`flex w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
       style={{
         ...(isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : {}),
-        // Use the JS-measured visual viewport height (--vh) so the container
-        // shrinks correctly when the iOS software keyboard appears. Falls back
-        // to 100dvh when the CSS variable is not yet set.
-        height: 'calc(var(--vh, 1svh) * 100)',
+        // Keep the layout at full window height — the keyboard overlays the
+        // content rather than shrinking it (Telegram / WhatsApp approach).
+        // The chat input area uses `padding-bottom: var(--keyboard-height)`
+        // to stay pinned above the soft keyboard on mobile.
+        height: '100dvh',
       }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}

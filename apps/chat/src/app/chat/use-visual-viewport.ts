@@ -1,27 +1,34 @@
 import { useEffect } from 'react';
 
 /**
- * Sets a `--vh` CSS custom property on `:root` equal to `1vh` of the
- * *visual* viewport height (i.e., the portion visible when the soft keyboard
- * is not covering it).
+ * Sets CSS custom properties on `:root` for mobile keyboard awareness:
  *
- * This is the standard workaround for iOS Safari where `100vh` measures the
- * *layout* viewport and doesn't shrink when the software keyboard appears.
- * Using `calc(var(--vh, 1vh) * 100)` in CSS provides a reliable full-height
- * value on all platforms.
+ * - `--vh`: 1% of the *visual* viewport height (the portion visible above the
+ *   soft keyboard). Used as a reliable full-height value on iOS Safari.
  *
- * Usage in CSS / Tailwind inline style:
- *   `height: calc(var(--vh, 1vh) * 100)`
+ * - `--keyboard-height`: the height in pixels that the software keyboard
+ *   currently occupies (= `window.innerHeight - visualViewport.height`).
+ *   Zero when no keyboard is shown. Use this to push the chat input area
+ *   above the keyboard without shrinking the whole layout.
  *
- * Or just use this hook once at the top of your app — it handles the update
- * loop automatically.
+ * This is the Telegram / WhatsApp approach: the layout container stays at
+ * the full window height (`100dvh`) and only the input area's bottom padding
+ * grows by `--keyboard-height`, keeping it visually above the keyboard.
+ *
+ * Usage:
+ *   `height: calc(var(--vh, 1svh) * 100)`   // full visual-viewport height
+ *   `padding-bottom: var(--keyboard-height, 0px)` // input above keyboard
  */
 export function useVisualViewport(): void {
   useEffect(() => {
     function update(): void {
-      const height = window.visualViewport?.height ?? window.innerHeight;
-      // Set 1vh = 1% of the *visual* viewport height
-      document.documentElement.style.setProperty('--vh', `${height * 0.01}px`);
+      const vv = window.visualViewport;
+      const vvHeight = vv?.height ?? window.innerHeight;
+      // 1% of the visual viewport height (shrinks when keyboard is open)
+      document.documentElement.style.setProperty('--vh', `${vvHeight * 0.01}px`);
+      // Height of the software keyboard (0 when closed)
+      const keyboardHeight = Math.max(0, window.innerHeight - vvHeight);
+      document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
     }
 
     update();
