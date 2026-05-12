@@ -417,11 +417,15 @@ describe('useChatWebSocket message handlers', () => {
     );
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
 
+    act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'stale error' }) } as MessageEvent));
+    expect(result.current.errorMessage).toBe('stale error');
+
     // Not processing
     act(() => {
       messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: false }) } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
+    expect(result.current.errorMessage).toBeNull();
     expect(onStreamAbort).toHaveBeenCalled();
 
     // Processing
@@ -649,9 +653,13 @@ describe('useChatWebSocket message handlers', () => {
     const thinkingCb = { onStreamStartData: vi.fn() };
     const { result } = renderHook(() => useChatWebSocket(undefined, onStreamChunk, onStreamStart, onStreamEnd, thinkingCb), { wrapper });
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+
+    act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'stale error' }) } as MessageEvent));
+    expect(result.current.errorMessage).toBe('stale error');
     
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_start', model: 'gpt' }) } as MessageEvent));
     expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
+    expect(result.current.errorMessage).toBeNull();
     expect(onStreamStart).toHaveBeenCalledWith({ model: 'gpt' });
     expect(thinkingCb.onStreamStartData).toHaveBeenCalledWith({ model: 'gpt' });
 

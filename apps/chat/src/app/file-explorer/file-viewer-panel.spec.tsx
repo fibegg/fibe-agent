@@ -5,6 +5,7 @@ import { apiRequest } from '../api-url';
 
 vi.mock('../api-url', () => ({
   apiRequest: vi.fn(),
+  getAuthTokenForRequest: vi.fn(() => ''),
 }));
 
 vi.mock('./prism-loader', () => ({

@@ -278,12 +278,12 @@ export function ChatPage() {
     }
   }, [setRightSidebarOpen, setSidebarOpen]);
 
-  const openFileBrowser = useCallback(() => {
+  const toggleFileBrowser = useCallback(() => {
     if (isMobile) {
-      setSidebarOpen(true);
+      setSidebarOpen((open) => !open);
       return;
     }
-    setCompactFileBrowserOpen(true);
+    setCompactFileBrowserOpen((open) => !open);
     setSidebarCollapsed(false);
   }, [isMobile, setSidebarCollapsed, setSidebarOpen]);
 
@@ -1015,64 +1015,68 @@ export function ChatPage() {
       }
     >
       <div className="relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden">
-        <ChatHeader
-          isMobile={isMobile}
-          agentProvider={agentProvider}
-          agentProviderLabel={agentProviderLabel}
-          currentModel={currentModel}
-          state={state}
-          agentMode={agentMode}
-          errorMessage={errorMessage}
-          sessionTimeMs={sessionTimeMs}
-          mobileSessionStats={mobileSessionStats}
-          sessionTokenUsage={sessionTokenUsage}
-          mobileBrainClasses={mobileBrainClasses}
-          statusClass={statusClass}
-          searchQuery={searchQuery}
-          filteredMessagesCount={filteredMessages.length}
-          onSearchChange={setSearchQuery}
-          onReconnect={reconnect}
-          onStartAuth={startAuth}
-          onOpenMenu={compactMode ? openFileBrowser : () => setSidebarOpen(true)}
-          onOpenActivity={() => setRightSidebarOpen(true)}
-          onToggleTerminal={toggleTerminal}
-          terminalOpen={terminalOpen}
-          onToggleDiff={canShowDiff ? toggleDiff : undefined}
-          diffOpen={diffOpen}
-          // onToggleCli={toggleCli}  // Hidden: CLI commands not yet wired to execution
-          cliOpen={cliOpen}
-          currentEffort={currentEffort}
-          onEffortSelect={handleEffortSelect}
-          showModelSelector={showModelSelector}
-          modelOptions={modelOptions}
-          onModelSelect={handleModelSelect}
-          onModelInputChange={handleModelInputChange}
-          modelLocked={chatModelLocked}
-          onRefreshModels={refreshModelOptions}
-          refreshingModels={refreshingModels}
-          tonyStarkMode={tonyStarkMode}
-          onToggleTonyStarkMode={handleToggleTonyStarkMode}
-          simplicateMode={simplicateMode}
-          onSimplicateModeChange={handleSimplicateModeChange}
-          onResetConversation={
-            !anyProcessing
-              ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
-              : undefined
-          }
-          sessionCount={sessionCount}
-          anyProcessing={anyProcessing}
-          conversations={compactMode ? conversations : undefined}
-          activeConversationId={compactMode ? activeConversationId : undefined}
-          onConversationSelect={compactMode ? handleConversationSelect : undefined}
-          onConversationCreate={compactMode ? handleConversationCreate : undefined}
-        />
-        <ChatErrorBanner
-          errorMessage={errorMessage}
-          state={state}
-          onRetry={handleRetryFromError}
-          onDismiss={dismissError}
-        />
-        {!isMobile && compactMode && !compactFileBrowserOpen && (
+        {!viewingFile && (
+          <>
+            <ChatHeader
+              isMobile={isMobile}
+              agentProvider={agentProvider}
+              agentProviderLabel={agentProviderLabel}
+              currentModel={currentModel}
+              state={state}
+              agentMode={agentMode}
+              errorMessage={errorMessage}
+              sessionTimeMs={sessionTimeMs}
+              mobileSessionStats={mobileSessionStats}
+              sessionTokenUsage={sessionTokenUsage}
+              mobileBrainClasses={mobileBrainClasses}
+              statusClass={statusClass}
+              searchQuery={searchQuery}
+              filteredMessagesCount={filteredMessages.length}
+              onSearchChange={setSearchQuery}
+              onReconnect={reconnect}
+              onStartAuth={startAuth}
+              onOpenMenu={compactMode ? toggleFileBrowser : () => setSidebarOpen(true)}
+              onOpenActivity={() => setRightSidebarOpen(true)}
+              onToggleTerminal={toggleTerminal}
+              terminalOpen={terminalOpen}
+              onToggleDiff={canShowDiff ? toggleDiff : undefined}
+              diffOpen={diffOpen}
+              // onToggleCli={toggleCli}  // Hidden: CLI commands not yet wired to execution
+              cliOpen={cliOpen}
+              currentEffort={currentEffort}
+              onEffortSelect={handleEffortSelect}
+              showModelSelector={showModelSelector}
+              modelOptions={modelOptions}
+              onModelSelect={handleModelSelect}
+              onModelInputChange={handleModelInputChange}
+              modelLocked={chatModelLocked}
+              onRefreshModels={refreshModelOptions}
+              refreshingModels={refreshingModels}
+              tonyStarkMode={tonyStarkMode}
+              onToggleTonyStarkMode={handleToggleTonyStarkMode}
+              simplicateMode={simplicateMode}
+              onSimplicateModeChange={handleSimplicateModeChange}
+              onResetConversation={
+                !anyProcessing
+                  ? () => send({ action: WS_ACTION.RESET_CONVERSATION })
+                  : undefined
+              }
+              sessionCount={sessionCount}
+              anyProcessing={anyProcessing}
+              conversations={compactMode ? conversations : undefined}
+              activeConversationId={compactMode ? activeConversationId : undefined}
+              onConversationSelect={compactMode ? handleConversationSelect : undefined}
+              onConversationCreate={compactMode ? handleConversationCreate : undefined}
+            />
+            <ChatErrorBanner
+              errorMessage={errorMessage}
+              state={state}
+              onRetry={handleRetryFromError}
+              onDismiss={dismissError}
+            />
+          </>
+        )}
+        {!viewingFile && !isMobile && compactMode && !compactFileBrowserOpen && (
           <button
             type="button"
             onClick={() => setCompactFileBrowserOpen(true)}
@@ -1184,13 +1188,14 @@ export function ChatPage() {
                 onClose={() => setViewingFile(null)}
                 inline
                 apiBasePath={viewingFile.source === 'agent' ? `${API_PATHS.AGENT_FILES_FILE}?conversationId=${encodeURIComponent(activeConversationId)}` : undefined}
+                rawApiBasePath={viewingFile.source === 'agent' ? `${API_PATHS.AGENT_FILES_FILE_RAW}?conversationId=${encodeURIComponent(activeConversationId)}` : undefined}
                 onDirtyChange={handlePageDirtyChange}
               />
             </div>
           </Suspense>
         )}
         </div>
-        {!activeConversationReadonly && (
+        {!viewingFile && !activeConversationReadonly && (
         <ChatInputArea
           state={state}
           inputValue={inputValue}

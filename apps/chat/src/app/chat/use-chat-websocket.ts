@@ -179,6 +179,7 @@ export function useChatWebSocket(
     const handlers: Record<string, (d: ServerMessage) => void> = {
       auth_status: (d) => {
         if (d.status === 'authenticated') {
+          setErrorMessage(null);
           if (d.isProcessing) {
             setState(CHAT_STATES.AWAITING_RESPONSE);
             startResponseTimer();
@@ -205,6 +206,7 @@ export function useChatWebSocket(
       },
       auth_success: () => {
         setAuthModal({ authUrl: null, deviceCode: null, isManualToken: false });
+        setErrorMessage(null);
         setState(CHAT_STATES.AUTHENTICATED);
       },
       logout_success: () => setState(CHAT_STATES.UNAUTHENTICATED),
@@ -216,10 +218,14 @@ export function useChatWebSocket(
       },
       message: (d) => {
         clearResponseTimer();
-        if (d.role === 'assistant') setState(CHAT_STATES.AUTHENTICATED);
+        if (d.role === 'assistant') {
+          setErrorMessage(null);
+          setState(CHAT_STATES.AUTHENTICATED);
+        }
         onMessageRef.current?.(d);
       },
       stream_start: (d) => {
+        setErrorMessage(null);
         setState(CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
         onStreamStartRef.current?.({ model: d.model });
@@ -231,6 +237,7 @@ export function useChatWebSocket(
       },
       stream_end: (d) => {
         clearResponseTimer();
+        setErrorMessage(null);
         const usage =
           d.usage && typeof d.usage.inputTokens === 'number' && typeof d.usage.outputTokens === 'number'
             ? { inputTokens: d.usage.inputTokens, outputTokens: d.usage.outputTokens }

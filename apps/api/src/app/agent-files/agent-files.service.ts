@@ -95,6 +95,10 @@ export class AgentFilesService {
   }
 
   async getFileContent(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+    return readFile(await this.getFilePath(relativePath, conversationId), 'utf-8');
+  }
+
+  async getFilePath(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) throw new NotFoundException('No agent working directory');
     const settings = await loadFibeSettings(dir);
@@ -114,7 +118,7 @@ export class AgentFilesService {
     if (!st.isFile()) {
       throw new NotFoundException('File not found');
     }
-    return readFile(absPath, 'utf-8');
+    return absPath;
   }
 
   async uploadFile(relativeDir: string, filename: string, buffer: Buffer, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {

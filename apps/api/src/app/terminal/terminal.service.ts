@@ -1,6 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import * as pty from 'node-pty';
 import { randomUUID } from 'node:crypto';
+import { chmodSync, existsSync, mkdirSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 
 const MIN_COLS = 10;
 const MIN_ROWS = 5;
@@ -18,9 +20,18 @@ export interface TerminalSessionInfo {
 export class TerminalService implements OnModuleDestroy {
   private readonly sessions = new Map<string, pty.IPty>();
 
-  /** Resolve the shell binary: $SHELL on Unix/macOS, powershell on Windows. */
+  /** Resolve the shell binary without relying on PATH when common absolute paths exist. */
   private resolveShell(): string {
-    return process.env.SHELL ?? (process.platform === 'win32' ? 'powershell.exe' : 'bash');
+    const configuredShell = process.env.SHELL?.trim();
+    if (configuredShell) return configuredShell;
+
+    if (process.platform === 'win32') return 'powershell.exe';
+
+    for (const shell of ['/bin/bash', '/usr/bin/bash', '/bin/sh', '/usr/bin/sh']) {
+      if (existsSync(shell)) return shell;
+    }
+
+    return 'sh';
   }
 
   /** Clamp dimensions to safe minimums to avoid PTY errors. */
@@ -39,6 +50,29 @@ export class TerminalService implements OnModuleDestroy {
     return env;
   }
 
+  private resolveCwd(cwd?: string): string {
+    const preferred = cwd || process.env.PLAYGROUNDS_DIR || `${process.cwd()}/playground`;
+    try {
+      mkdirSync(preferred, { recursive: true });
+      if (existsSync(preferred)) return preferred;
+    } catch {
+      // Fall back to the process cwd below; node-pty fails hard when cwd is missing.
+    }
+    return process.cwd();
+  }
+
+  private ensurePtyRuntime(): void {
+    if (process.platform !== 'darwin') return;
+
+    try {
+      const packagePath = require.resolve('node-pty/package.json');
+      const helperPath = join(dirname(packagePath), 'prebuilds', `darwin-${process.arch}`, 'spawn-helper');
+      if (existsSync(helperPath)) chmodSync(helperPath, 0o755);
+    } catch {
+      // node-pty will surface the actual spawn error if the helper is still unusable.
+    }
+  }
+
   /**
    * Spawn a new PTY shell session.
    * @param id      Session identifier (defaults to a fresh UUID).
@@ -48,7 +82,8 @@ export class TerminalService implements OnModuleDestroy {
    */
   create(id: string = randomUUID(), cols = 80, rows = 24, cwd?: string): pty.IPty {
     const { cols: c, rows: r } = this.clamp(cols, rows);
-    const sessionCwd = cwd ?? process.env.PLAYGROUNDS_DIR ?? process.cwd();
+    const sessionCwd = this.resolveCwd(cwd);
+    this.ensurePtyRuntime();
 
     const ptyProcess = pty.spawn(this.resolveShell(), [], {
       name: 'xterm-256color',

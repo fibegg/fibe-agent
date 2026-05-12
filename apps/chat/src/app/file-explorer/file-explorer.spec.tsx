@@ -4,6 +4,7 @@ import { FileExplorer, type PlaygroundEntry } from './file-explorer';
 import { FileViewerPanel } from './file-viewer-panel';
 
 vi.mock('../api-url', () => ({
+  getAuthTokenForRequest: vi.fn(() => ''),
   apiRequest: (path: string, options?: RequestInit) => {
     if (path.includes('/urls')) {
       return Promise.resolve({ ok: true, status: 200, json: async () => ({ urls: [] }) });

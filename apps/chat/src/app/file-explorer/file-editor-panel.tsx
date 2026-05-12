@@ -1,17 +1,25 @@
 import {
   Check,
+  Code2,
+  Columns2,
   Copy,
   Download,
   Edit3,
+  ExternalLink,
   FileText,
+  Image as ImageIcon,
   Loader2,
+  Maximize2,
+  PanelRight,
   RotateCcw,
   Save,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { API_PATHS } from '@shared/api-paths';
-import { apiRequest } from '../api-url';
+import { apiRequest, getAuthTokenForRequest } from '../api-url';
 import {
   BUTTON_GHOST_ACCENT,
   BUTTON_ICON_MUTED,
@@ -90,12 +98,14 @@ export function FileEditorPanel({
   onClose,
   inline = false,
   apiBasePath,
+  rawApiBasePath,
   onDirtyChange,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
   inline?: boolean;
   apiBasePath?: string;
+  rawApiBasePath?: string;
   onDirtyChange?: (path: string, isDirty: boolean) => void;
 }) {
   const t = useT();
@@ -106,6 +116,9 @@ export function FileEditorPanel({
   const [isSaving, setIsSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [editorReady, setEditorReady] = useState(false);
+  const [previewMode, setPreviewMode] = useState<'code' | 'preview' | 'split'>('code');
+  const [imageFit, setImageFit] = useState<'fit' | 'actual'>('fit');
+  const [imageZoom, setImageZoom] = useState(1);
 
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorHandleRef = useRef<EditorHandle | null>(null);
@@ -121,7 +134,14 @@ export function FileEditorPanel({
     const i = name.lastIndexOf('.');
     return i >= 0 ? name.slice(i).toLowerCase() : '';
   }
-  const isImageFile = IMAGE_FILE_EXTS.has(getFileExt(entry.name));
+  const ext = getFileExt(entry.name);
+  const isImageFile = IMAGE_FILE_EXTS.has(ext);
+  const isHtmlFile = ext === '.html' || ext === '.htm';
+  const authToken = getAuthTokenForRequest();
+  const rawFileUrl = withQueryParams(rawApiBasePath ?? API_PATHS.PLAYGROUNDS_FILE_RAW, {
+    path: entry.path,
+    ...(authToken ? { token: authToken } : {}),
+  });
   
   const isGitModified = entry.gitStatus === 'modified';
   const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
@@ -133,6 +153,12 @@ export function FileEditorPanel({
   useEffect(() => {
     onDirtyChangeRef.current?.(entry.path, isDirty);
   }, [entry.path, isDirty]);
+
+  useEffect(() => {
+    setPreviewMode('code');
+    setImageFit('fit');
+    setImageZoom(1);
+  }, [entry.path]);
 
   // ── Fetch content (text files only) ──────────────────────────────────────
   useEffect(() => {
@@ -167,7 +193,7 @@ export function FileEditorPanel({
       });
 
     return () => ac.abort();
-  }, [entry.path, apiBasePath, t]);
+  }, [entry.path, apiBasePath, isImageFile, t]);
 
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -188,6 +214,7 @@ export function FileEditorPanel({
   // ── Mount CodeMirror (text files only) ────────────────────────────────────
   useEffect(() => {
     if (isImageFile) return;  // Images don't use the text editor
+    if (isHtmlFile && previewMode === 'preview') return;
     if (loading || fetchError || originalContent === null || !editorContainerRef.current) return;
 
     let destroyed = false;
@@ -234,7 +261,7 @@ export function FileEditorPanel({
       setEditorReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, fetchError, originalContent, entry.name]);
+  }, [loading, fetchError, originalContent, entry.name, previewMode]);
 
   // ── Save ───────────────────────────────────────────────────────────────────
   const handleSave = useCallback(async (contentToSave?: string) => {
@@ -271,6 +298,13 @@ export function FileEditorPanel({
 
   // ── Download ───────────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
+    if (isImageFile) {
+      const a = document.createElement('a');
+      a.href = rawFileUrl;
+      a.download = entry.name;
+      a.click();
+      return;
+    }
     const content = editorHandleRef.current?.getContent() ?? liveContent;
     if (content === null) return;
     const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
@@ -279,7 +313,11 @@ export function FileEditorPanel({
     a.download = entry.name;
     a.click();
     URL.revokeObjectURL(a.href);
-  }, [liveContent, entry.name]);
+  }, [entry.name, isImageFile, liveContent, rawFileUrl]);
+
+  const handleOpenRaw = useCallback(() => {
+    window.open(rawFileUrl, '_blank', 'noopener,noreferrer');
+  }, [rawFileUrl]);
 
   // ── Discard ────────────────────────────────────────────────────────────────
   const handleDiscard = useCallback(() => {
@@ -292,6 +330,16 @@ export function FileEditorPanel({
   const panelClasses = inline
     ? 'flex flex-col overflow-hidden bg-card flex-1 min-h-0 rounded-none border-0'
     : 'flex flex-col overflow-hidden bg-card w-full max-w-[95vw] sm:max-w-[92vw] sm:w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card';
+  const headerClasses = inline
+    ? 'border-b border-border/50 bg-card/40 px-2 py-2 sm:px-4 backdrop-blur-xl shrink-0'
+    : CARD_HEADER;
+  const headerStyle = inline ? undefined : { minHeight: PANEL_HEADER_MIN_HEIGHT_PX };
+  const headerRowClasses = inline
+    ? 'min-h-10 flex-shrink-0 flex-wrap sm:flex-nowrap'
+    : HEADER_FIRST_ROW;
+  const logoClasses = inline
+    ? 'size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0'
+    : LOGO_ICON_BOX;
 
   return (
     <>
@@ -301,12 +349,12 @@ export function FileEditorPanel({
         onClick={inline ? undefined : (e) => e.stopPropagation()}
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className={CARD_HEADER} style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX }}>
-          <div className={`flex items-center justify-between gap-2 min-w-0 ${HEADER_FIRST_ROW}`}>
+        <div className={headerClasses} style={headerStyle}>
+          <div className={`flex items-center justify-between gap-2 min-w-0 ${headerRowClasses}`}>
             {/* Title */}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
-              <div className={LOGO_ICON_BOX}>
-                <Edit3 className="size-5 text-white" />
+            <div className={`${inline ? 'hidden sm:flex' : 'flex'} items-center gap-3 min-w-0 flex-1`}>
+              <div className={logoClasses}>
+                <Edit3 className={inline ? 'size-4 text-white' : 'size-5 text-white'} />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
@@ -345,56 +393,104 @@ export function FileEditorPanel({
             </div>
 
             {/* Toolbar Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={() => void handleSave()}
-                disabled={!isDirty || isSaving}
-                className={`${BUTTON_GHOST_ACCENT} ${isDirty ? 'text-violet-400 hover:text-violet-300' : ''}`}
-                title={t('fileEditor.saveTitle')}
-              >
-                {isSaving ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  <Save className="size-3" />
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
+              {isHtmlFile && (
+                <div className="mr-1 flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border/60 bg-background/60">
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('code')}
+                    className={`grid size-8 place-items-center ${previewMode === 'code' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    title={t('fileEditor.code')}
+                    aria-label={t('fileEditor.code')}
+                  >
+                    <Code2 className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('preview')}
+                    className={`grid size-8 place-items-center ${previewMode === 'preview' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    title={t('fileEditor.preview')}
+                    aria-label={t('fileEditor.preview')}
+                  >
+                    <PanelRight className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('split')}
+                    className={`grid size-8 place-items-center ${previewMode === 'split' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    title={t('fileEditor.split')}
+                    aria-label={t('fileEditor.split')}
+                  >
+                    <Columns2 className="size-3.5" />
+                  </button>
+                </div>
+              )}
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain sm:flex-none">
+                {!isImageFile && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSave()}
+                    disabled={!isDirty || isSaving}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${isDirty ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    title={t('fileEditor.saveTitle')}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Save className="size-3" />
+                    )}
+                    <span className="hidden sm:inline">{t('fileEditor.save')}</span>
+                  </button>
                 )}
-                {t('fileEditor.save')}
-              </button>
-              {isDirty && (
+                {!isImageFile && isDirty && (
+                  <button
+                    type="button"
+                    onClick={handleDiscard}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                    title={t('fileEditor.discardTitle')}
+                  >
+                    <RotateCcw className="size-3" />
+                    <span className="hidden sm:inline">{t('fileEditor.discard')}</span>
+                  </button>
+                )}
+                {!isImageFile && (
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    disabled={liveContent === null || loading}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                    title={t('fileEditor.copyTitle')}
+                  >
+                    <Copy className="size-3" />
+                    <span className="hidden sm:inline">{t('common.copy')}</span>
+                  </button>
+                )}
+                {(isImageFile || isHtmlFile) && (
+                  <button
+                    type="button"
+                    onClick={handleOpenRaw}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                    title={t('fileEditor.openRaw')}
+                  >
+                    <ExternalLink className="size-3" />
+                    <span className="hidden sm:inline">{t('fileEditor.open')}</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={handleDiscard}
-                  className={BUTTON_GHOST_ACCENT}
-                  title={t('fileEditor.discardTitle')}
+                  onClick={handleDownload}
+                  disabled={!isImageFile && (liveContent === null || loading)}
+                  className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                  title={t('fileEditor.downloadTitle')}
                 >
-                  <RotateCcw className="size-3" />
-                  {t('fileEditor.discard')}
+                  <Download className="size-3" />
+                  <span className="hidden sm:inline">{t('fileEditor.download')}</span>
                 </button>
-              )}
-              <button
-                type="button"
-                onClick={handleCopy}
-                disabled={liveContent === null || loading}
-                className={BUTTON_GHOST_ACCENT}
-                title={t('fileEditor.copyTitle')}
-              >
-                <Copy className="size-3" />
-                {t('common.copy')}
-              </button>
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={liveContent === null || loading}
-                className={BUTTON_GHOST_ACCENT}
-                title={t('fileEditor.downloadTitle')}
-              >
-                <Download className="size-3" />
-                {t('fileEditor.download')}
-              </button>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
-                className={`${BUTTON_ICON_MUTED} size-8`}
+                className={`${BUTTON_ICON_MUTED} size-8 shrink-0`}
                 aria-label={t('common.close')}
               >
                 <X className="size-4" />
@@ -405,27 +501,86 @@ export function FileEditorPanel({
 
         {/* ── Image Preview (replaces editor for image files) ───────────────── */}
         {isImageFile && (
-          <div className="flex-1 flex flex-col items-center justify-center min-h-0 overflow-auto bg-background dark:bg-[#1a1a2e] p-6">
-            <div className="relative group max-w-full max-h-full flex flex-col items-center gap-3">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-background dark:bg-[#1a1a2e]">
+            <div className="flex items-center justify-between gap-2 border-b border-border/40 bg-card/35 px-4 py-2">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+                <ImageIcon className="size-3.5 shrink-0" />
+                <span className="truncate" title={entry.path}>{entry.path}</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setImageFit('fit')}
+                  className={`${BUTTON_ICON_MUTED} size-8 ${imageFit === 'fit' ? 'text-violet-300 bg-violet-500/15' : ''}`}
+                  title={t('fileEditor.fit')}
+                  aria-label={t('fileEditor.fit')}
+                >
+                  <Maximize2 className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageFit('actual')}
+                  className={`${BUTTON_ICON_MUTED} size-8 ${imageFit === 'actual' ? 'text-violet-300 bg-violet-500/15' : ''}`}
+                  title={t('fileEditor.actualSize')}
+                  aria-label={t('fileEditor.actualSize')}
+                >
+                  <span className="text-[10px] font-semibold">1:1</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageZoom((value) => Math.max(0.25, value - 0.25))}
+                  className={`${BUTTON_ICON_MUTED} size-8`}
+                  title={t('fileEditor.zoomOut')}
+                  aria-label={t('fileEditor.zoomOut')}
+                >
+                  <ZoomOut className="size-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setImageFit('actual');
+                    setImageZoom((value) => Math.min(4, value + 0.25));
+                  }}
+                  className={`${BUTTON_ICON_MUTED} size-8`}
+                  title={t('fileEditor.zoomIn')}
+                  aria-label={t('fileEditor.zoomIn')}
+                >
+                  <ZoomIn className="size-4" />
+                </button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 overflow-auto p-6 flex items-center justify-center">
               <div
                 className="rounded-xl border border-border/50 shadow-xl overflow-hidden bg-[repeating-conic-gradient(#80808020_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]"
-                style={{ maxWidth: 'min(100%, 900px)', maxHeight: 'calc(100vh - 16rem)' }}
               >
                 <img
-                  src={`${withQueryParams(apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE, { path: entry.path })}`}
+                  src={rawFileUrl}
                   alt={entry.name}
-                  className="max-w-full max-h-full object-contain block"
-                  style={{ maxHeight: 'calc(100vh - 18rem)' }}
+                  className="object-contain block"
+                  style={imageFit === 'fit'
+                    ? { maxWidth: 'min(100%, 1200px)', maxHeight: 'calc(100vh - 12rem)' }
+                    : { width: `${imageZoom * 100}%`, maxWidth: 'none' }}
                 />
               </div>
-              <p className="text-[11px] text-muted-foreground/60 font-mono">{entry.path}</p>
             </div>
           </div>
         )}
 
         {/* ── Editor Area ─────────────────────────────────────────────────── */}
         {!isImageFile && (
-        <div className="flex-1 flex flex-col overflow-hidden min-h-0 relative">
+        <div className={`flex-1 overflow-hidden min-h-0 relative ${isHtmlFile && previewMode === 'split' ? 'grid grid-rows-2 md:grid-cols-2 md:grid-rows-none' : 'flex flex-col'}`}>
+          {isHtmlFile && previewMode !== 'code' && (
+            <div className={`${previewMode === 'split' ? 'order-2 border-t border-border/50 md:border-l md:border-t-0' : ''} min-h-0 flex-1 overflow-hidden bg-white`}>
+              <iframe
+                src={rawFileUrl}
+                title={t('fileEditor.preview')}
+                className="h-full w-full border-0 bg-white"
+                sandbox="allow-scripts allow-forms allow-modals allow-popups"
+              />
+            </div>
+          )}
+          {previewMode !== 'preview' && (
+          <div className={`${isHtmlFile && previewMode === 'split' ? 'order-1' : ''} relative flex min-h-0 flex-1 flex-col overflow-hidden`}>
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-card z-10">
               <Loader2 className="size-4 animate-spin mr-2" />
@@ -470,6 +625,8 @@ export function FileEditorPanel({
               {t('fileEditor.empty')}
             </div>
           )}
+          </div>
+          )}
         </div>
         )}
 
@@ -496,11 +653,13 @@ export function FileEditorDialog({
   entry,
   onClose,
   apiBasePath,
+  rawApiBasePath,
   onDirtyChange,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
   apiBasePath?: string;
+  rawApiBasePath?: string;
   onDirtyChange?: (path: string, isDirty: boolean) => void;
 }) {
   return (
@@ -509,7 +668,13 @@ export function FileEditorDialog({
       onClick={onClose}
     >
       <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)]">
-        <FileEditorPanel entry={entry} onClose={onClose} apiBasePath={apiBasePath} onDirtyChange={onDirtyChange} />
+        <FileEditorPanel
+          entry={entry}
+          onClose={onClose}
+          apiBasePath={apiBasePath}
+          rawApiBasePath={rawApiBasePath}
+          onDirtyChange={onDirtyChange}
+        />
       </div>
     </div>
   );

@@ -6,12 +6,14 @@ export function FileViewerPanel({
   onClose,
   inline = false,
   apiBasePath,
+  rawApiBasePath,
   onDirtyChange,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
   inline?: boolean;
   apiBasePath?: string;
+  rawApiBasePath?: string;
   onDirtyChange?: (path: string, isDirty: boolean) => void;
 }) {
   return (
@@ -20,6 +22,7 @@ export function FileViewerPanel({
       onClose={onClose}
       inline={inline}
       apiBasePath={apiBasePath}
+      rawApiBasePath={rawApiBasePath}
       onDirtyChange={onDirtyChange}
     />
   );
@@ -29,12 +32,22 @@ export function FileDetailsDialog({
   entry,
   onClose,
   apiBasePath,
+  rawApiBasePath,
   onDirtyChange,
 }: {
   entry: PlaygroundEntry;
   onClose: () => void;
   apiBasePath?: string;
+  rawApiBasePath?: string;
   onDirtyChange?: (path: string, isDirty: boolean) => void;
 }) {
-  return <FileEditorDialog entry={entry} onClose={onClose} apiBasePath={apiBasePath} onDirtyChange={onDirtyChange} />;
+  return (
+    <FileEditorDialog
+      entry={entry}
+      onClose={onClose}
+      apiBasePath={apiBasePath}
+      rawApiBasePath={rawApiBasePath}
+      onDirtyChange={onDirtyChange}
+    />
+  );
 }
