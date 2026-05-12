@@ -225,6 +225,7 @@ describe('FileEditorPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     const iframe = document.querySelector('iframe');
     expect(iframe?.getAttribute('src')).toContain('/api/playgrounds/file/raw?path=index.html');
+    expect(iframe?.parentElement?.className).toContain('flex-1');
   });
 
   it('shows saved state in status bar (not dirty)', async () => {

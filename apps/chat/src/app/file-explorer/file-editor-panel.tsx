@@ -568,7 +568,7 @@ export function FileEditorPanel({
         {!isImageFile && (
         <div className={`flex-1 overflow-hidden min-h-0 relative ${isHtmlFile && previewMode === 'split' ? 'grid grid-cols-2' : 'flex flex-col'}`}>
           {isHtmlFile && previewMode !== 'code' && (
-            <div className={`${previewMode === 'split' ? 'order-2 border-l border-border/50' : ''} min-h-0 overflow-hidden bg-white`}>
+            <div className={`${previewMode === 'split' ? 'order-2 border-l border-border/50' : ''} min-h-0 flex-1 overflow-hidden bg-white`}>
               <iframe
                 src={rawFileUrl}
                 title={t('fileEditor.preview')}

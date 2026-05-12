@@ -125,8 +125,8 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
       <div className="animate-stark-scanline"></div>
       
       <div className="relative z-10 flex flex-col h-full pointer-events-auto">
-        <header className="flex items-center justify-between p-4 border-b border-cyan-500/30 bg-cyan-950/40 backdrop-blur-md shrink-0">
-          <div className="flex items-center gap-4">
+        <header className="flex items-center justify-between gap-3 p-4 border-b border-cyan-500/30 bg-cyan-950/40 backdrop-blur-md shrink-0">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             {!inline && (
               <>
                 <Link 
@@ -141,17 +141,17 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                 <div className="h-4 w-px bg-cyan-800"></div>
               </>
             )}
-            <div className="flex flex-col">
-              <span className="text-cyan-300 text-[10px] uppercase tracking-[0.2em] font-semibold">
+            <div className="flex min-w-0 flex-col">
+              <span className="truncate text-cyan-300 text-[10px] uppercase tracking-[0.2em] font-semibold">
                 {t('stark.mode')}
               </span>
-              <span className="text-cyan-600 text-[9px] uppercase tracking-widest">
+              <span className="max-w-[12rem] truncate text-cyan-600 text-[9px] uppercase tracking-widest sm:max-w-none">
                 {t('stark.systemActive', { target: activityId ?? t('stark.globalMonitor') })}
               </span>
             </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex shrink-0 items-center gap-3 sm:gap-6">
             <div className="flex items-center gap-3 bg-cyan-950/50 border border-cyan-800/50 rounded p-1.5 backdrop-blur hidden sm:flex">
               <span className="text-cyan-500 text-[9px] uppercase tracking-widest ml-1 opacity-70">{t('stark.query')}</span>
               <input 
@@ -162,7 +162,7 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                 className="bg-transparent border-none text-cyan-300 text-[10px] uppercase font-mono w-40 focus:outline-none placeholder:text-cyan-800"
               />
             </div>
-            <LocaleSelector />
+            <LocaleSelector variant="stark" />
             {brainState === 'working' ? (
               <StarkArcReactor />
             ) : (
@@ -215,8 +215,8 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
               style={{ scrollBehavior: 'smooth' }}
             >
               {/* Top decorative corners */}
-              <div className="fixed top-20 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
-              <div className="fixed top-20 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
               
               {/* Grid layout for chronological LTR reading order */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12 w-full auto-rows-max items-start">
@@ -232,8 +232,8 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
               </div>
 
               {/* Bottom decorative corners */}
-              <div className="fixed bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
-              <div className="fixed bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              <div className="absolute bottom-4 left-4 w-4 h-4 border-b-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
+              <div className="absolute bottom-4 right-4 w-4 h-4 border-b-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
             </div>
           </div>
         )}

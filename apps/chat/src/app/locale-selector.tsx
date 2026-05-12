@@ -1,18 +1,22 @@
-import { useEffect, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Languages } from 'lucide-react';
 import { shouldHideLocaleSelector } from './embed-config';
 import { LOCALES, LOCALE_OPTIONS, localeLabel, useI18n, type Locale } from './i18n';
 import { BUTTON_ICON_ACCENT_SM } from './ui-classes';
 
-export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu' | 'row' }) {
+export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu' | 'row' | 'stark' }) {
   const { locale, setLocale, t } = useI18n();
   const [open, setOpen] = useState(false);
+  const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const handlePointerDown = (event: MouseEvent) => {
       if (rootRef.current?.contains(event.target as Node)) return;
+      if (menuRef.current?.contains(event.target as Node)) return;
       setOpen(false);
     };
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -26,11 +30,105 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
     };
   }, [open]);
 
+  useEffect(() => {
+    if (!open || variant === 'menu' || variant === 'row') return;
+
+    const updatePosition = () => {
+      const rect = rootRef.current?.getBoundingClientRect();
+      if (!rect) return;
+
+      const gap = 8;
+      const width = 176;
+      const menuHeight = menuRef.current?.offsetHeight ?? 160;
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const left = Math.min(
+        Math.max(gap, rect.right - width),
+        Math.max(gap, viewportWidth - width - gap),
+      );
+      const opensAbove = rect.bottom + gap + menuHeight > viewportHeight - gap && rect.top > menuHeight + gap;
+      const top = opensAbove ? rect.top - menuHeight - gap : rect.bottom + gap;
+
+      setMenuStyle({
+        position: 'fixed',
+        top,
+        left,
+        width,
+        maxHeight: `min(16rem, calc(100dvh - ${gap * 2}px))`,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener('resize', updatePosition);
+    document.addEventListener('scroll', updatePosition, true);
+    return () => {
+      window.removeEventListener('resize', updatePosition);
+      document.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, variant]);
+
   if (shouldHideLocaleSelector()) return null;
 
   const selectLocale = (next: Locale) => {
     setLocale(next);
     setOpen(false);
+  };
+
+  const renderDropdown = (tone: 'default' | 'stark') => {
+    if (!open) return null;
+    const style = menuStyle ?? {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      width: 176,
+      visibility: 'hidden',
+    } satisfies CSSProperties;
+
+    return createPortal(
+      <div
+        ref={menuRef}
+        role="menu"
+        aria-label={t('locale.selector')}
+        className={
+          tone === 'stark'
+            ? 'z-[300] overflow-y-auto rounded-sm border border-cyan-500/60 bg-slate-950/95 p-1 shadow-[0_0_20px_rgba(6,182,212,0.25)] backdrop-blur-md'
+            : 'z-[300] overflow-y-auto rounded-lg border border-border bg-card/95 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl'
+        }
+        style={style}
+      >
+        {LOCALES.map((option) => {
+          const optionMeta = LOCALE_OPTIONS[option];
+          return (
+            <button
+              key={option}
+              type="button"
+              role="menuitemradio"
+              aria-checked={option === locale}
+              onClick={() => selectLocale(option)}
+              className={
+                tone === 'stark'
+                  ? `flex h-8 w-full items-center justify-between gap-3 rounded-sm px-2.5 text-left font-mono text-xs uppercase tracking-wider transition-colors ${
+                      option === locale
+                        ? 'bg-cyan-500/20 text-cyan-100 shadow-[inset_0_0_0_1px_rgba(34,211,238,0.25)]'
+                        : 'text-cyan-500 hover:bg-cyan-500/10 hover:text-cyan-200'
+                    }`
+                  : `flex h-8 w-full items-center justify-between gap-3 rounded-md px-2.5 text-left text-sm transition-colors ${
+                      option === locale
+                        ? 'bg-violet-500/15 text-violet-200'
+                        : 'text-foreground hover:bg-violet-500/10 hover:text-violet-300'
+                    }`
+              }
+            >
+              <span className="min-w-0 truncate">{localeLabel(option)}</span>
+              <span className={tone === 'stark' ? 'shrink-0 text-[10px] text-cyan-700' : 'shrink-0 text-xs text-muted-foreground'}>
+                {optionMeta.shortLabel}
+              </span>
+            </button>
+          );
+        })}
+      </div>,
+      document.body,
+    );
   };
 
   if (variant === 'menu') {
@@ -91,6 +189,26 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
     );
   }
 
+  if (variant === 'stark') {
+    return (
+      <div className="relative shrink-0" ref={rootRef}>
+        <button
+          type="button"
+          onClick={() => setOpen((value) => !value)}
+          className="grid size-8 place-items-center rounded border border-cyan-800/70 bg-cyan-950/60 text-cyan-400 transition-colors hover:border-cyan-400 hover:bg-cyan-900/60 hover:text-cyan-200"
+          aria-label={t('locale.selector')}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          title={t('locale.current', { locale: localeLabel(locale) })}
+        >
+          <Languages className="size-4" aria-hidden />
+          <span className="sr-only">{t('common.language')}</span>
+        </button>
+        {renderDropdown('stark')}
+      </div>
+    );
+  }
+
   return (
     <div className="relative shrink-0" ref={rootRef}>
       <button
@@ -105,34 +223,7 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
         <Languages className="size-3.5 sm:size-4" aria-hidden />
         <span className="sr-only">{t('common.language')}</span>
       </button>
-      {open && (
-        <div
-          role="menu"
-          aria-label={t('locale.selector')}
-          className="absolute right-0 top-full z-[100] mt-2 max-h-64 w-44 overflow-y-auto rounded-lg border border-border bg-card/95 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl"
-        >
-          {LOCALES.map((option) => {
-            const optionMeta = LOCALE_OPTIONS[option];
-            return (
-              <button
-                key={option}
-                type="button"
-                role="menuitemradio"
-                aria-checked={option === locale}
-                onClick={() => selectLocale(option)}
-                className={`flex h-8 w-full items-center justify-between gap-3 rounded-md px-2.5 text-left text-sm transition-colors ${
-                  option === locale
-                    ? 'bg-violet-500/15 text-violet-200'
-                    : 'text-foreground hover:bg-violet-500/10 hover:text-violet-300'
-                }`}
-              >
-                <span className="min-w-0 truncate">{localeLabel(option)}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">{optionMeta.shortLabel}</span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {renderDropdown('default')}
     </div>
   );
 }
