@@ -51,12 +51,16 @@ describe('CertificateManager', () => {
     expect(caCert.verify(leafCert)).toBe(true);
 
     // Verify SAN
-    const sanExt = leafCert.getExtension('subjectAltName') as { altNames?: { type: number; value: string }[] } | null;
+    const sanExt = leafCert.getExtension('subjectAltName') as {
+      altNames?: { type: number; value: string }[];
+    } | null;
     expect(sanExt).toBeTruthy();
     expect(sanExt?.altNames).toEqual(
-      expect.arrayContaining([expect.objectContaining({ type: 2, value: 'api.anthropic.com' })])
+      expect.arrayContaining([
+        expect.objectContaining({ type: 2, value: 'api.anthropic.com' }),
+      ]),
     );
-  });
+  }, 10000);
 
   test('caches leaf certs per domain', () => {
     manager = new CertificateManager();

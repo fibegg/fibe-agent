@@ -68,13 +68,20 @@ export class SessionContext {
   /** User turns accepted while this conversation is already processing. */
   queuedTurns: QueuedAgentTurn[] = [];
 
+  /** True while an in-flight turn is being deliberately interrupted for steer/restart. */
+  pendingSteerRestart = false;
+
   /** Cached system-prompt file contents (same for all sessions, but cheaply replicated). */
   cachedSystemPromptFromFile: string | null = null;
 
   /** The conversation this session is bound to. Defaults to 'default' (legacy). */
   conversationId: string;
 
-  constructor(sessionId: string, strategy: AgentStrategy, conversationId = 'default') {
+  constructor(
+    sessionId: string,
+    strategy: AgentStrategy,
+    conversationId = 'default',
+  ) {
     this.sessionId = sessionId;
     this.strategy = strategy;
     this.conversationId = conversationId;

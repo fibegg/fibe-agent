@@ -14,7 +14,12 @@ import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { UploadsService } from '../uploads/uploads.service';
 import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
 import type { LocalMcpService } from '../local-mcp/local-mcp.service';
-import { WS_ACTION, WS_EVENT, AUTH_STATUS, ERROR_CODE } from '@shared/ws-constants';
+import {
+  WS_ACTION,
+  WS_EVENT,
+  AUTH_STATUS,
+  ERROR_CODE,
+} from '@shared/ws-constants';
 import { AGENT_MODES } from '@shared/agent-mode.constants';
 import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
 
@@ -40,12 +45,17 @@ describe('OrchestratorService', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
-  function makeLocalMcpStub(): { service: LocalMcpService; resolved: Map<string, unknown> } {
+  function makeLocalMcpStub(): {
+    service: LocalMcpService;
+    resolved: Map<string, unknown>;
+  } {
     const resolved = new Map<string, unknown>();
     const service = {
       outbound$: new Subject<{ type: string; data: Record<string, unknown> }>(),
       registerModeAccessors: () => undefined,
-      resolveQuestion: (id: string, payload: unknown) => { resolved.set(id, payload); },
+      resolveQuestion: (id: string, payload: unknown) => {
+        resolved.set(id, payload);
+      },
       getServerScriptPath: () => '/dev/null/local-mcp.server.js',
     } as unknown as LocalMcpService;
     return { service, resolved };
@@ -82,22 +92,56 @@ describe('OrchestratorService', () => {
     const conversationManager = {
       get: (_id: string) => ({ messageStore, activityStore }),
       getOrCreate: (_id: string) => ({ messageStore, activityStore }),
-      dataDirProvider: (_id: string) => ({ getConversationDataDir: () => dataDir }),
+      dataDirProvider: (_id: string) => ({
+        getConversationDataDir: () => dataDir,
+      }),
       touch: (_id: string) => undefined,
       list: () => [],
-      create: () => ({ id: 'test', title: 'New chat', createdAt: '', lastMessageAt: '' }),
+      create: () => ({
+        id: 'test',
+        title: 'New chat',
+        createdAt: '',
+        lastMessageAt: '',
+      }),
       setTitle: () => true,
       delete: () => true,
       // Claude session marker
       getClaudeSessionMarker: (_id: string) => null,
       setClaudeSessionMarker: (_id: string, _sessionId: string | null) => true,
     } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
-    const strategyRegistry = { resolveStrategy: () => ({ checkAuthStatus: async () => true, executeAuth: () => undefined, submitAuthCode: () => undefined, cancelAuth: () => undefined, clearCredentials: () => undefined, executeLogout: () => undefined, executePromptStreaming: async (_p: string, _m: string, onChunk: (c: string) => void) => { onChunk('test response'); }, ensureSettings: () => undefined, interruptAgent: () => undefined, hasNativeSessionSupport: () => true, steerAgent: undefined }) } as unknown as import('../strategies/strategy-registry.service').StrategyRegistryService;
-    const sessionRegistry = new SessionRegistryService(strategyRegistry as never, conversationManager);
+    const strategyRegistry = {
+      resolveStrategy: () => ({
+        checkAuthStatus: async () => true,
+        executeAuth: () => undefined,
+        submitAuthCode: () => undefined,
+        cancelAuth: () => undefined,
+        clearCredentials: () => undefined,
+        executeLogout: () => undefined,
+        executePromptStreaming: async (
+          _p: string,
+          _m: string,
+          onChunk: (c: string) => void,
+        ) => {
+          onChunk('test response');
+        },
+        ensureSettings: () => undefined,
+        interruptAgent: () => undefined,
+        hasNativeSessionSupport: () => true,
+        steerAgent: undefined,
+      }),
+    } as unknown as import('../strategies/strategy-registry.service').StrategyRegistryService;
+    const sessionRegistry = new SessionRegistryService(
+      strategyRegistry as never,
+      conversationManager,
+    );
     const uploadsService = new UploadsService(config as never);
     const fibeSync = {
-      syncMessages: (getContent: () => string) => { void getContent(); },
-      syncActivity: (getContent: () => string) => { void getContent(); },
+      syncMessages: (getContent: () => string) => {
+        void getContent();
+      },
+      syncActivity: (getContent: () => string) => {
+        void getContent();
+      },
       hydrate: async () => null,
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
     const promptBuilds: Array<{
@@ -113,14 +157,22 @@ describe('OrchestratorService', () => {
         audioFilename: string | null,
         attachmentFilenames?: string[],
       ) => {
-        promptBuilds.push({ text, imageUrls, audioFilename, attachmentFilenames });
+        promptBuilds.push({
+          text,
+          imageUrls,
+          audioFilename,
+          attachmentFilenames,
+        });
         return text.trim();
       },
       injectToolHint: (text: string) => text,
       injectModeHint: (text: string) => text,
     } as unknown as import('./chat-prompt-context.service').ChatPromptContextService;
     const gemmaRouter = {
-      analyze: async () => ({ action: { type: 'DELEGATE_TO_AGENT', tools: [], confidence: 0 }, skipped: true }),
+      analyze: async () => ({
+        action: { type: 'DELEGATE_TO_AGENT', tools: [], confidence: 0 },
+        skipped: true,
+      }),
     } as unknown as GemmaRouterService;
     const gemmaMcpTools = {
       refresh: async () => undefined,
@@ -189,7 +241,10 @@ describe('OrchestratorService', () => {
     const { orch, ctx } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SET_MODEL, model: 'gemini-2' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SET_MODEL,
+      model: 'gemini-2',
+    });
     // broadcastToConversation sends to conversation sessions; ctx is in 'default' conversation
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.MODEL_UPDATED);
@@ -210,7 +265,10 @@ describe('OrchestratorService', () => {
     const { orch, ctx } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SET_EFFORT, effort: 'high' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SET_EFFORT,
+      effort: 'high',
+    });
     // broadcastToConversation sends to conversation sessions; ctx is in 'default' conversation
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.EFFORT_UPDATED);
@@ -219,22 +277,33 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage send_chat_message without auth sends error NEED_AUTH', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = false; orch.isAuthenticated = false;
+    ctx.isAuthenticated = false;
+    orch.isAuthenticated = false;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
-    expect(events.some((e) => e.type === WS_EVENT.ERROR && e.data.message === 'NEED_AUTH')).toBe(true);
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
+    expect(
+      events.some(
+        (e) => e.type === WS_EVENT.ERROR && e.data.message === 'NEED_AUTH',
+      ),
+    ).toBe(true);
   });
 
   test('handleClientMessage check_auth_status sends auth_status', async () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     const second = sessionRegistry.create('thread-b');
-    const secondEvents: Array<{ type: string; data: Record<string, unknown> }> = [];
+    const secondEvents: Array<{ type: string; data: Record<string, unknown> }> =
+      [];
     ctx.isProcessing = true;
     ctx.outbound$.subscribe((ev) => events.push(ev));
     second.outbound$.subscribe((ev) => secondEvents.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.CHECK_AUTH_STATUS });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.CHECK_AUTH_STATUS,
+    });
     expect(events.length).toBe(1);
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.isProcessing).toBe(true);
@@ -246,10 +315,18 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage send_chat_message with audioFilename streams response', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
-    const uploads = new UploadsService({ getDataDir: () => dataDir, getConversationDataDir: () => dataDir,
-      getEncryptionKey: () => undefined, getEncryptionKey: () => undefined } as never);
-    const filename = await uploads.saveAudioFromBuffer(Buffer.from('audio'), 'audio/webm');
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    const uploads = new UploadsService({
+      getDataDir: () => dataDir,
+      getConversationDataDir: () => dataDir,
+      getEncryptionKey: () => undefined,
+      getEncryptionKey: () => undefined,
+    } as never);
+    const filename = await uploads.saveAudioFromBuffer(
+      Buffer.from('audio'),
+      'audio/webm',
+    );
     const events: Array<{ type: string }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage(ctx, {
@@ -264,8 +341,10 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage send_chat_message with audio base64 saves and streams', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
-    const dataUrl = 'data:audio/webm;base64,' + Buffer.from('voice').toString('base64');
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    const dataUrl =
+      'data:audio/webm;base64,' + Buffer.from('voice').toString('base64');
     const events: Array<{ type: string }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage(ctx, {
@@ -280,10 +359,14 @@ describe('OrchestratorService', () => {
 
   test('send_chat_message sends stream_start with model and synthetic thinking_step', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
     const streamStart = events.find((e) => e.type === WS_EVENT.STREAM_START);
     expect(streamStart).toBeDefined();
     expect(streamStart?.data.model).toBeDefined();
@@ -295,10 +378,14 @@ describe('OrchestratorService', () => {
 
   test('send_chat_message sends stream_end with model', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
     const streamEnd = events.find((e) => e.type === WS_EVENT.STREAM_END);
     expect(streamEnd).toBeDefined();
     expect(streamEnd?.data.model).toBeDefined();
@@ -307,28 +394,38 @@ describe('OrchestratorService', () => {
 
   test('provider authentication failures clear backend auth state and send clear error', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const message =
       'Authentication failed for Claude Code: the API key or token is invalid. Check the configured Claude Code credentials, then reconnect or re-authenticate.';
     // Override the session's strategy to throw an auth error
-    (ctx.strategy as unknown as Record<string, unknown>).executePromptStreaming = async () => {
+    (
+      ctx.strategy as unknown as Record<string, unknown>
+    ).executePromptStreaming = async () => {
       throw new Error(message);
     };
 
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
 
     expect(orch.isAuthenticated).toBe(false);
-    expect(events.some((e) => e.type === WS_EVENT.ERROR && e.data.message === message)).toBe(true);
+    expect(
+      events.some(
+        (e) => e.type === WS_EVENT.ERROR && e.data.message === message,
+      ),
+    ).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(false);
     expect(
       events.some(
         (e) =>
           e.type === WS_EVENT.THINKING_STEP &&
           e.data.status === 'complete' &&
-          e.data.details === message
-      )
+          e.data.details === message,
+      ),
     ).toBe(true);
   });
 
@@ -342,10 +439,14 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage interrupt_agent when processing sends stream_end with accumulated', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const events: Array<{ type: string }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    const promise = orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    const promise = orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
     orch.handleClientMessage(ctx, { action: WS_ACTION.INTERRUPT_AGENT });
     await promise;
     expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
@@ -355,47 +456,127 @@ describe('OrchestratorService', () => {
 
   test('interrupted run without accumulated output does not store no-output assistant', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
-    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async () => {
-      throw new Error(INTERRUPTED_MESSAGE);
-    });
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(
+      async () => {
+        throw new Error(INTERRUPTED_MESSAGE);
+      },
+    );
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
 
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
 
     expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(false);
-    expect(events.some((e) => e.type === WS_EVENT.ERROR && e.data.message === 'Interrupted before producing output.')).toBe(true);
-    expect(orch.messages.all().filter((m) => m.role === 'assistant')).toEqual([]);
+    expect(
+      events.some(
+        (e) =>
+          e.type === WS_EVENT.ERROR &&
+          e.data.message === 'Interrupted before producing output.',
+      ),
+    ).toBe(true);
+    expect(orch.messages.all().filter((m) => m.role === 'assistant')).toEqual(
+      [],
+    );
+  });
+
+  test('steer restart suppresses empty interrupt error and immediately drains steer turn', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    let releaseFirst: (() => void) | undefined;
+    let calls = 0;
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(
+      async (_prompt, _model, onChunk) => {
+        calls += 1;
+        if (calls === 1) {
+          await new Promise<void>((resolve) => {
+            releaseFirst = resolve;
+          });
+          throw new Error(INTERRUPTED_MESSAGE);
+        }
+        onChunk('steered response');
+      },
+    );
+    (ctx.strategy as unknown as { steerAgent: () => 'queued' }).steerAgent =
+      () => 'queued';
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe((ev) => events.push(ev));
+
+    const first = orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'first',
+    });
+    while (calls < 1) await new Promise((resolve) => setTimeout(resolve, 1));
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.STEER_MESSAGE,
+      text: 'change course',
+    });
+    releaseFirst?.();
+    await first;
+
+    expect(
+      events.some(
+        (e) =>
+          e.type === WS_EVENT.ERROR &&
+          e.data.message === 'Interrupted before producing output.',
+      ),
+    ).toBe(false);
+    expect(calls).toBe(2);
+    expect(
+      orch.messages
+        .all()
+        .some((m) => m.role === 'assistant' && m.body === 'steered response'),
+    ).toBe(true);
   });
 
   test('send_chat_message while processing queues the message instead of blocking', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    const promise = orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'first' });
+    const promise = orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'first',
+    });
     // While processing, send another message — should be queued
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'queued msg' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'queued msg',
+    });
     await promise;
     const msgEvents = events.filter((e) => e.type === WS_EVENT.MESSAGE);
-    expect(msgEvents.some((e) => (e.data as Record<string, unknown>).body === 'queued msg')).toBe(true);
+    expect(
+      msgEvents.some(
+        (e) => (e.data as Record<string, unknown>).body === 'queued msg',
+      ),
+    ).toBe(true);
   });
 
   test('queue_message action queues and emits message', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.QUEUE_MESSAGE, text: 'steer this way' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.QUEUE_MESSAGE,
+      text: 'steer this way',
+    });
     expect(events.some((e) => e.type === WS_EVENT.MESSAGE)).toBe(true);
   });
 
   test('sendMessageFromApi returns AGENT_BUSY when isProcessing', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
     const result = await orch.sendMessageFromApi('hello', 'default');
     expect(result.accepted).toBe(false);
@@ -404,10 +585,17 @@ describe('OrchestratorService', () => {
 
   test('sendMessageFromApi queue policy accepts same-conversation busy sends', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
 
-    const result = await orch.sendMessageFromApi('queued', 'default', undefined, undefined, 'queue');
+    const result = await orch.sendMessageFromApi(
+      'queued',
+      'default',
+      undefined,
+      undefined,
+      'queue',
+    );
 
     expect(result.accepted).toBe(true);
     expect(result.resolvedPolicy).toBe('queue');
@@ -416,8 +604,10 @@ describe('OrchestratorService', () => {
   });
 
   test('sendMessageFromApi passes conversation, image, and attachment context into prompt build', async () => {
-    const { orch, ctx, sessionRegistry, promptBuilds } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    const { orch, ctx, sessionRegistry, promptBuilds } =
+      await createOrchestrator();
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
 
     const result = await orch.sendMessageFromApi(
       ' update the app ',
@@ -428,8 +618,12 @@ describe('OrchestratorService', () => {
     );
 
     expect(result.accepted).toBe(true);
-    expect(sessionRegistry.all().some((s) => s.conversationId === 'thread-a')).toBe(true);
-    await waitForIdle(sessionRegistry.all().find((s) => s.conversationId === 'thread-a') ?? ctx);
+    expect(
+      sessionRegistry.all().some((s) => s.conversationId === 'thread-a'),
+    ).toBe(true);
+    await waitForIdle(
+      sessionRegistry.all().find((s) => s.conversationId === 'thread-a') ?? ctx,
+    );
     const promptBuild = promptBuilds.at(-1);
     expect(promptBuild?.text).toBe(' update the app ');
     expect(promptBuild?.imageUrls).toHaveLength(1);
@@ -440,14 +634,23 @@ describe('OrchestratorService', () => {
 
   test('sendMessageFromApi steer policy uses provider steer when available', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
     let steered = '';
-    (ctx.strategy as unknown as { steerAgent?: (message: string) => void }).steerAgent = (message) => {
+    (
+      ctx.strategy as unknown as { steerAgent?: (message: string) => void }
+    ).steerAgent = (message) => {
       steered = message;
     };
 
-    const result = await orch.sendMessageFromApi('steer me', 'default', undefined, undefined, 'steer');
+    const result = await orch.sendMessageFromApi(
+      'steer me',
+      'default',
+      undefined,
+      undefined,
+      'steer',
+    );
 
     expect(result.accepted).toBe(true);
     expect(result.resolvedPolicy).toBe('steer');
@@ -458,15 +661,26 @@ describe('OrchestratorService', () => {
 
   test('sendMessageFromApi steer policy does not enqueue an empty turn when provider handled steering', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
     let steered = '';
-    (ctx.strategy as unknown as { steerAgent?: (message: string) => Promise<'handled'> }).steerAgent = async (message) => {
+    (
+      ctx.strategy as unknown as {
+        steerAgent?: (message: string) => Promise<'handled'>;
+      }
+    ).steerAgent = async (message) => {
       steered = message;
       return 'handled';
     };
 
-    const result = await orch.sendMessageFromApi('steer native', 'default', undefined, undefined, 'steer');
+    const result = await orch.sendMessageFromApi(
+      'steer native',
+      'default',
+      undefined,
+      undefined,
+      'steer',
+    );
 
     expect(result.accepted).toBe(true);
     expect(result.resolvedPolicy).toBe('steer');
@@ -476,11 +690,20 @@ describe('OrchestratorService', () => {
 
   test('sendMessageFromApi steer policy falls back to queue when provider cannot steer', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
-    (ctx.strategy as unknown as { steerAgent?: (message: string) => void }).steerAgent = undefined;
+    (
+      ctx.strategy as unknown as { steerAgent?: (message: string) => void }
+    ).steerAgent = undefined;
 
-    const result = await orch.sendMessageFromApi('fallback', 'default', undefined, undefined, 'steer');
+    const result = await orch.sendMessageFromApi(
+      'fallback',
+      'default',
+      undefined,
+      undefined,
+      'steer',
+    );
 
     expect(result.accepted).toBe(true);
     expect(result.resolvedPolicy).toBe('queue');
@@ -500,7 +723,10 @@ describe('OrchestratorService', () => {
     expect(orch.interruptFromApi('project-b')).toEqual({ interrupted: false });
     expect(interrupted).toBe(0);
 
-    expect(orch.interruptFromApi('project-a')).toEqual({ interrupted: true, conversationId: 'project-a' });
+    expect(orch.interruptFromApi('project-a')).toEqual({
+      interrupted: true,
+      conversationId: 'project-a',
+    });
     expect(interrupted).toBe(1);
   });
 
@@ -509,8 +735,24 @@ describe('OrchestratorService', () => {
     ctx.conversationId = 'project-a';
     ctx.isProcessing = true;
     ctx.queuedTurns.push(
-      { id: 'turn-a', messageId: 'msg-a', text: 'first', imageUrls: [], audioFilename: null, policy: 'queue', createdAt: '2026-05-07T20:00:01.000Z' },
-      { id: 'turn-b', messageId: 'msg-b', text: 'second', imageUrls: [], audioFilename: null, policy: 'queue', createdAt: '2026-05-07T20:00:02.000Z' },
+      {
+        id: 'turn-a',
+        messageId: 'msg-a',
+        text: 'first',
+        imageUrls: [],
+        audioFilename: null,
+        policy: 'queue',
+        createdAt: '2026-05-07T20:00:01.000Z',
+      },
+      {
+        id: 'turn-b',
+        messageId: 'msg-b',
+        text: 'second',
+        imageUrls: [],
+        audioFilename: null,
+        policy: 'queue',
+        createdAt: '2026-05-07T20:00:02.000Z',
+      },
     );
 
     expect(orch.removeQueuedTurnFromApi('project-a', 'turn-a')).toEqual({
@@ -532,18 +774,22 @@ describe('OrchestratorService', () => {
 
   test('sendMessageFromApi returns accepted and messageId when authenticated', async () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const result = await orch.sendMessageFromApi('ping');
     expect(result.accepted).toBe(true);
     expect(result.messageId).toBeDefined();
     expect(typeof result.messageId).toBe('string');
-    expect(sessionRegistry.all().some((s) => s.conversationId === 'inbox')).toBe(true);
+    expect(
+      sessionRegistry.all().some((s) => s.conversationId === 'inbox'),
+    ).toBe(true);
     await waitForIdle(ctx);
   });
 
   test('sendMessageFromApi calls checkAndSendAuthStatus first', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = false; orch.isAuthenticated = false;
+    ctx.isAuthenticated = false;
+    orch.isAuthenticated = false;
     // Mock strategy checkAuthStatus returns true, so it will authenticate
     const result = await orch.sendMessageFromApi('hello');
     // After checkAndSendAuthStatus, isAuthenticated becomes true
@@ -554,7 +800,8 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage initiate_auth sends auth_success when already authenticated', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = false; orch.isAuthenticated = false;
+    ctx.isAuthenticated = false;
+    orch.isAuthenticated = false;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     // Mock strategy returns true for checkAuthStatus
@@ -566,7 +813,8 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage cancel_auth sets isAuthenticated to false', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.CANCEL_AUTH });
@@ -578,7 +826,8 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage reauthenticate clears credentials and re-initiates auth', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.REAUTHENTICATE });
@@ -591,7 +840,8 @@ describe('OrchestratorService', () => {
 
   test('handleClientMessage logout sets isAuthenticated and isProcessing to false', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     ctx.isProcessing = true;
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
@@ -606,23 +856,40 @@ describe('OrchestratorService', () => {
   test('handleClientMessage submit_auth_code passes code to strategy', async () => {
     const { orch, ctx } = await createOrchestrator();
     // Should not throw — mock strategy handles it
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SUBMIT_AUTH_CODE, code: 'test-code' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SUBMIT_AUTH_CODE,
+      code: 'test-code',
+    });
   });
 
   test('handleClientMessage submit_story stores story for last assistant', async () => {
     const { orch, ctx } = await createOrchestrator();
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
     // First send a message to create an activity
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     const story = [
-      { id: 's1', type: 'step', message: 'Did something', timestamp: new Date().toISOString() },
+      {
+        id: 's1',
+        type: 'step',
+        message: 'Did something',
+        timestamp: new Date().toISOString(),
+      },
     ];
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SUBMIT_STORY, story });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SUBMIT_STORY,
+      story,
+    });
     // Should emit activity_updated or activity_appended
     const hasActivityEvent = events.some(
-      (e) => e.type === WS_EVENT.ACTIVITY_UPDATED || e.type === WS_EVENT.ACTIVITY_APPENDED
+      (e) =>
+        e.type === WS_EVENT.ACTIVITY_UPDATED ||
+        e.type === WS_EVENT.ACTIVITY_APPENDED,
     );
     expect(hasActivityEvent).toBe(true);
   });
@@ -632,11 +899,23 @@ describe('OrchestratorService', () => {
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
     const story = [
-      { id: 's1', type: 'step', message: 'New story', timestamp: new Date().toISOString() },
+      {
+        id: 's1',
+        type: 'step',
+        message: 'New story',
+        timestamp: new Date().toISOString(),
+      },
     ];
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SUBMIT_STORY, story });
-    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_APPENDED)).toBe(false);
-    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_UPDATED)).toBe(false);
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SUBMIT_STORY,
+      story,
+    });
+    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_APPENDED)).toBe(
+      false,
+    );
+    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_UPDATED)).toBe(
+      false,
+    );
   });
 
   test('outbound stream exists on session context', async () => {
@@ -664,14 +943,20 @@ describe('OrchestratorService', () => {
   test('setAgentMode emits AGENT_MODE_UPDATED event', async () => {
     const { orch, ctx } = await createOrchestrator();
     const events: { type: string; data: unknown }[] = [];
-    ctx.outbound$.subscribe((e: { type: string; data: unknown }) => events.push(e));
+    ctx.outbound$.subscribe((e: { type: string; data: unknown }) =>
+      events.push(e),
+    );
 
     const result = orch.setAgentMode('exploring');
     expect(result).toBe(AGENT_MODES.exploring);
 
-    const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
+    const modeEvent = events.find(
+      (e) => e.type === WS_EVENT.AGENT_MODE_UPDATED,
+    );
     expect(modeEvent).toBeDefined();
-    expect((modeEvent?.data as { mode: string })?.mode).toBe(AGENT_MODES.exploring);
+    expect((modeEvent?.data as { mode: string })?.mode).toBe(
+      AGENT_MODES.exploring,
+    );
   });
 
   test('setAgentMode with display string is accepted', async () => {
@@ -689,11 +974,15 @@ describe('OrchestratorService', () => {
   test('setAgentMode with unknown mode returns null and does not emit', async () => {
     const { orch, ctx } = await createOrchestrator();
     const events: { type: string; data: unknown }[] = [];
-    ctx.outbound$.subscribe((e: { type: string; data: unknown }) => events.push(e));
+    ctx.outbound$.subscribe((e: { type: string; data: unknown }) =>
+      events.push(e),
+    );
 
     const result = orch.setAgentMode('hacking');
     expect(result).toBeNull();
-    expect(events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED)).toBeUndefined();
+    expect(
+      events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED),
+    ).toBeUndefined();
   });
 
   test('handleClientConnected sends agent_mode_updated with current mode', async () => {
@@ -701,12 +990,18 @@ describe('OrchestratorService', () => {
     orch.setAgentMode('casting');
 
     const events: { type: string; data: unknown }[] = [];
-    ctx.outbound$.subscribe((e: { type: string; data: unknown }) => events.push(e));
+    ctx.outbound$.subscribe((e: { type: string; data: unknown }) =>
+      events.push(e),
+    );
     await orch.handleClientConnected(ctx);
 
-    const modeEvent = events.find((e) => e.type === WS_EVENT.AGENT_MODE_UPDATED);
+    const modeEvent = events.find(
+      (e) => e.type === WS_EVENT.AGENT_MODE_UPDATED,
+    );
     expect(modeEvent).toBeDefined();
-    expect((modeEvent?.data as { mode: string })?.mode).toBe(AGENT_MODES.casting);
+    expect((modeEvent?.data as { mode: string })?.mode).toBe(
+      AGENT_MODES.casting,
+    );
   });
 
   // ─── Local MCP tool WS actions ───────────────────────────────────────────
@@ -758,39 +1053,63 @@ describe('OrchestratorService', () => {
     ctx.outbound$.subscribe((e) => events.push(e));
 
     // Emit a synthetic ask_user_prompt event from the localMcp stub
-    (localMcp as unknown as { outbound$: Subject<{ type: string; data: Record<string, unknown> }> })
-      .outbound$.next({ type: 'ask_user_prompt', data: { questionId: 'q1', question: 'Name?' } });
+    (
+      localMcp as unknown as {
+        outbound$: Subject<{ type: string; data: Record<string, unknown> }>;
+      }
+    ).outbound$.next({
+      type: 'ask_user_prompt',
+      data: { questionId: 'q1', question: 'Name?' },
+    });
 
     const fwdEvent = events.find((e) => e.type === 'ask_user_prompt');
     expect(fwdEvent).toBeDefined();
-    expect((fwdEvent?.data as Record<string, unknown>)['questionId']).toBe('q1');
+    expect((fwdEvent?.data as Record<string, unknown>)['questionId']).toBe(
+      'q1',
+    );
   });
 
   test('send_chat_message with EXECUTE_CLI from GemmaRouter short-circuits to CLI execution', async () => {
     const { service: localMcp } = makeLocalMcpStub();
     const { orch, ctx } = await createOrchestrator(localMcp);
-    ctx.isAuthenticated = true; orch.isAuthenticated = true;
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
 
     // Force gemmaRouter to return an EXECUTE_CLI action
-    const configSpy = spyOn(orch['config'], 'isGemmaRouterEnabled').mockReturnValue(true);
-    orch['gemmaMcpTools'].getTools = () => [{ name: 'fibe', description: 'desc' }];
+    const configSpy = spyOn(
+      orch['config'],
+      'isGemmaRouterEnabled',
+    ).mockReturnValue(true);
+    orch['gemmaMcpTools'].getTools = () => [
+      { name: 'fibe', description: 'desc' },
+    ];
     orch['gemmaRouter'].analyze = async () => ({
       skipped: false,
       action: { type: 'EXECUTE_CLI', command: 'echo hello_from_cli' },
     });
 
     const events: { type: string; data: Record<string, unknown> }[] = [];
-    ctx.outbound$.subscribe((e) => events.push(e as { type: string; data: Record<string, unknown> }));
+    ctx.outbound$.subscribe((e) =>
+      events.push(e as { type: string; data: Record<string, unknown> }),
+    );
 
-    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hello CLI' });
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hello CLI',
+    });
 
-    expect(events.some((e) => e.type === WS_EVENT.STREAM_START && e.data.model === 'CLI Router')).toBe(true);
+    expect(
+      events.some(
+        (e) =>
+          e.type === WS_EVENT.STREAM_START && e.data.model === 'CLI Router',
+      ),
+    ).toBe(true);
     const chunkEvents = events.filter((e) => e.type === WS_EVENT.STREAM_CHUNK);
     expect(chunkEvents.length).toBeGreaterThan(0);
     const allChunks = chunkEvents.map((e) => String(e.data.text)).join('');
     expect(allChunks).toContain('hello_from_cli');
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
-    
+
     configSpy.mockRestore();
   });
 });

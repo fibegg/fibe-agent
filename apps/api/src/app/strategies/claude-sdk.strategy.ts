@@ -1,4 +1,11 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { resolveEffort } from '@shared/effort.constants';
@@ -9,6 +16,7 @@ import type {
   ConversationDataDirProvider,
   LogoutConnection,
   StreamingCallbacks,
+  SteerAgentResult,
   ToolEvent,
 } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
@@ -24,13 +32,18 @@ import type {
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
-const ENV_TOKEN_VARS = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
+const ENV_TOKEN_VARS = [
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'ANTHROPIC_API_KEY',
+  'CLAUDE_API_KEY',
+] as const;
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const SESSION_MARKER_FILE = '.claude_session';
 const CLAUDE_SDK_CLIENT_APP = 'fibe-agent/claude-sdk';
 const SDK_INTERRUPTED_ERROR_NAME = 'AbortError';
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   defaultArgs: {},
@@ -42,7 +55,8 @@ const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   },
 };
 
-type ClaudeSdkQueryFunction = typeof import('@anthropic-ai/claude-agent-sdk')['query'];
+type ClaudeSdkQueryFunction =
+  (typeof import('@anthropic-ai/claude-agent-sdk'))['query'];
 type RuntimeClaudeAgentSdkModule = {
   query?: unknown;
   default?: {
@@ -51,7 +65,9 @@ type RuntimeClaudeAgentSdkModule = {
 };
 
 function getClaudeConfigDir(): string {
-  return process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude');
+  return (
+    process.env.SESSION_DIR || join(process.env.HOME ?? '/home/node', '.claude')
+  );
 }
 
 function isNativeHomeFallback(home: string | undefined): boolean {
@@ -69,10 +85,14 @@ function getClaudeXdgEnv(): Record<string, string> {
   if (!process.env.SESSION_DIR) return {};
   const homeDir = getClaudeHomeDir();
   const env: Record<string, string> = {};
-  if (!process.env.XDG_CONFIG_HOME?.trim()) env.XDG_CONFIG_HOME = join(homeDir, '.config');
-  if (!process.env.XDG_DATA_HOME?.trim()) env.XDG_DATA_HOME = join(homeDir, '.local', 'share');
-  if (!process.env.XDG_STATE_HOME?.trim()) env.XDG_STATE_HOME = join(homeDir, '.local', 'state');
-  if (!process.env.XDG_CACHE_HOME?.trim()) env.XDG_CACHE_HOME = join(homeDir, '.cache');
+  if (!process.env.XDG_CONFIG_HOME?.trim())
+    env.XDG_CONFIG_HOME = join(homeDir, '.config');
+  if (!process.env.XDG_DATA_HOME?.trim())
+    env.XDG_DATA_HOME = join(homeDir, '.local', 'share');
+  if (!process.env.XDG_STATE_HOME?.trim())
+    env.XDG_STATE_HOME = join(homeDir, '.local', 'state');
+  if (!process.env.XDG_CACHE_HOME?.trim())
+    env.XDG_CACHE_HOME = join(homeDir, '.cache');
   return env;
 }
 
@@ -87,7 +107,9 @@ function getTokenFilePath(): string {
   return join(getClaudeConfigDir(), 'agent_token.txt');
 }
 
-function parseMcpServers(path: string): Record<string, McpServerConfig> | undefined {
+function parseMcpServers(
+  path: string,
+): Record<string, McpServerConfig> | undefined {
   if (!existsSync(path)) return undefined;
   try {
     const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
@@ -103,11 +125,17 @@ function parseMcpServers(path: string): Record<string, McpServerConfig> | undefi
 }
 
 function localMcpServer(conversationId?: string): McpServerConfig {
-  const localServerPath = join(__dirname, '..', 'local-mcp', 'local-mcp.server.js');
+  const localServerPath = join(
+    __dirname,
+    '..',
+    'local-mcp',
+    'local-mcp.server.js',
+  );
   const env: Record<string, string> = {
     PORT: process.env['PORT'] ?? '3000',
   };
-  if (process.env['AGENT_PASSWORD']) env.AGENT_PASSWORD = process.env['AGENT_PASSWORD'];
+  if (process.env['AGENT_PASSWORD'])
+    env.AGENT_PASSWORD = process.env['AGENT_PASSWORD'];
   if (conversationId) env.CONVERSATION_ID = conversationId;
 
   return {
@@ -118,14 +146,19 @@ function localMcpServer(conversationId?: string): McpServerConfig {
   };
 }
 
-function mcpServersForConversation(workspaceDir: string, conversationId?: string): Record<string, McpServerConfig> {
+function mcpServersForConversation(
+  workspaceDir: string,
+  conversationId?: string,
+): Record<string, McpServerConfig> {
   return {
     ...(parseMcpServers(join(workspaceDir, '.mcp.json')) ?? {}),
     'fibe-local': localMcpServer(conversationId),
   };
 }
 
-function providerTokensToExtraArgs(tokens: string[]): Record<string, string | null> {
+function providerTokensToExtraArgs(
+  tokens: string[],
+): Record<string, string | null> {
   const args: Record<string, string | null> = {};
   for (let i = 0; i < tokens.length; i += 1) {
     const token = tokens[i];
@@ -144,18 +177,23 @@ function providerTokensToExtraArgs(tokens: string[]): Record<string, string | nu
 }
 
 async function loadClaudeAgentSdkQuery(): Promise<ClaudeSdkQueryFunction> {
-  const sdk = (await import('@anthropic-ai/claude-agent-sdk')) as RuntimeClaudeAgentSdkModule;
+  const sdk = (await import(
+    '@anthropic-ai/claude-agent-sdk'
+  )) as RuntimeClaudeAgentSdkModule;
   const candidate = sdk.query ?? sdk.default?.query;
   if (typeof candidate !== 'function') {
     const exportsList = Object.keys(sdk).sort().join(', ') || '(none)';
     throw new Error(
-      `@anthropic-ai/claude-agent-sdk query export is unavailable; expected function, got ${typeof candidate}. Exports: ${exportsList}`
+      `@anthropic-ai/claude-agent-sdk query export is unavailable; expected function, got ${typeof candidate}. Exports: ${exportsList}`,
     );
   }
   return candidate as ClaudeSdkQueryFunction;
 }
 
-function userTextMessage(text: string, sessionId: string | null): SDKUserMessage {
+function userTextMessage(
+  text: string,
+  sessionId: string | null,
+): SDKUserMessage {
   return {
     type: 'user',
     session_id: sessionId ?? '',
@@ -176,7 +214,7 @@ function messageSessionId(message: SDKMessage): string | null {
 
 function usageFromObject(
   usage: unknown,
-  fallback?: { inputTokens: number; outputTokens: number } | null
+  fallback?: { inputTokens: number; outputTokens: number } | null,
 ): { inputTokens: number; outputTokens: number } | null {
   if (!usage || typeof usage !== 'object') return fallback ?? null;
   const u = usage as {
@@ -190,19 +228,22 @@ function usageFromObject(
       ? u.input_tokens
       : typeof u.inputTokens === 'number'
         ? u.inputTokens
-        : fallback?.inputTokens ?? 0;
+        : (fallback?.inputTokens ?? 0);
   const outputTokens =
     typeof u.output_tokens === 'number'
       ? u.output_tokens
       : typeof u.outputTokens === 'number'
         ? u.outputTokens
-        : fallback?.outputTokens ?? 0;
+        : (fallback?.outputTokens ?? 0);
   return { inputTokens, outputTokens };
 }
 
 function assistantText(message: SDKMessage): string | null {
   if (message.type !== 'assistant') return null;
-  const blocks = message.message.content as Array<{ type: string; text?: string }>;
+  const blocks = message.message.content as Array<{
+    type: string;
+    text?: string;
+  }>;
   const text = blocks
     .filter((block) => block.type === 'text')
     .map((block) => block.text ?? '')
@@ -216,7 +257,8 @@ class AsyncMessageQueue<T> implements AsyncIterable<T>, AsyncIterator<T> {
   private closed = false;
 
   enqueue(value: T): void {
-    if (this.closed) throw new Error('Cannot enqueue into a closed Claude SDK input stream');
+    if (this.closed)
+      throw new Error('Cannot enqueue into a closed Claude SDK input stream');
     if (this.waiter) {
       const waiter = this.waiter;
       this.waiter = null;
@@ -275,11 +317,17 @@ interface StreamTurnState {
 }
 
 export class ClaudeSdkStrategy extends AbstractCLIStrategy {
-  private static readonly records = new Map<string, ClaudeSdkConversationRecord>();
+  private static readonly records = new Map<
+    string,
+    ClaudeSdkConversationRecord
+  >();
   private _pendingAuthCheck: Promise<boolean> | null = null;
   private activeRecord: ClaudeSdkConversationRecord | null = null;
 
-  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
+  constructor(
+    useApiTokenMode = false,
+    conversationDataDir?: ConversationDataDirProvider,
+  ) {
     super(ClaudeSdkStrategy.name, useApiTokenMode, conversationDataDir);
   }
 
@@ -326,7 +374,9 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     return null;
   }
 
-  private getClaudeProcessEnv(extraEnv: Record<string, string> = {}): NodeJS.ProcessEnv {
+  private getClaudeProcessEnv(
+    extraEnv: Record<string, string> = {},
+  ): NodeJS.ProcessEnv {
     return {
       ...process.env,
       ...this.getProxyEnv(),
@@ -381,7 +431,8 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     });
     logoutProcess.stdin?.end();
 
-    const handleOutput = (data: Buffer | string) => connection.sendLogoutOutput(data.toString());
+    const handleOutput = (data: Buffer | string) =>
+      connection.sendLogoutOutput(data.toString());
     logoutProcess.stdout?.on('data', handleOutput);
     logoutProcess.stderr?.on('data', handleOutput);
     logoutProcess.on('close', () => connection.sendLogoutSuccess());
@@ -431,11 +482,18 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
           return;
         }
         try {
-          // eslint-disable-next-line no-control-regex
-          const cleaned = outputStr.replace(/\x1b(?:\[[0-9;]*[a-zA-Z]|[=>]?[0-9]*[a-zA-Z]|\][^\x07]*\x07|[78])/g, '').replace(/\r/g, '');
+          const ansiControlPattern =
+            // eslint-disable-next-line no-control-regex -- strips terminal ANSI/OSC control sequences from CLI auth output.
+            /\x1b(?:\[[0-9;]*[a-zA-Z]|[=>]?[0-9]*[a-zA-Z]|\][^\x07]*\x07|[78])/g;
+          const cleaned = outputStr
+            .replace(ansiControlPattern, '')
+            .replace(/\r/g, '');
           const jsonStart = cleaned.indexOf('{');
           const jsonEnd = cleaned.lastIndexOf('}');
-          const jsonStr = jsonStart !== -1 && jsonEnd !== -1 ? cleaned.slice(jsonStart, jsonEnd + 1) : cleaned;
+          const jsonStr =
+            jsonStart !== -1 && jsonEnd !== -1
+              ? cleaned.slice(jsonStart, jsonEnd + 1)
+              : cleaned;
           const status = JSON.parse(jsonStr) as { loggedIn?: boolean };
           finish(status.loggedIn === true);
         } catch {
@@ -454,13 +512,18 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
     systemPrompt?: string,
-    runtimeOptions?: AgentRuntimeOptions
+    runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
     this.streamInterrupted = false;
     const workspaceDir = this.getClaudeWorkspaceDir();
     this.prepareWorkingDir();
 
-    const record = await this.getOrCreateRecord(workspaceDir, model, systemPrompt, runtimeOptions);
+    const record = await this.getOrCreateRecord(
+      workspaceDir,
+      model,
+      systemPrompt,
+      runtimeOptions,
+    );
     if (record.busy) {
       throw new Error('AGENT_BUSY');
     }
@@ -473,15 +536,15 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       ? `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`
       : prompt;
 
-      const state: StreamTurnState = {
-        inThinking: false,
-        currentToolBlock: null,
-        usage: null,
-        emittedVisibleOutput: false,
-        emittedTextDelta: false,
-        errorText: '',
-        sessionId: record.sessionId,
-      };
+    const state: StreamTurnState = {
+      inThinking: false,
+      currentToolBlock: null,
+      usage: null,
+      emittedVisibleOutput: false,
+      emittedTextDelta: false,
+      errorText: '',
+      sessionId: record.sessionId,
+    };
 
     try {
       record.input.enqueue(userTextMessage(finalPrompt, record.sessionId));
@@ -490,7 +553,9 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
         throw new Error(state.errorText.trim());
       }
       if (!state.emittedVisibleOutput) {
-        throw new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.');
+        throw new Error(
+          'Agent process completed successfully but returned no output. Session not saved to prevent corruption.',
+        );
       }
       if (state.sessionId) {
         record.sessionId = state.sessionId;
@@ -521,6 +586,19 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     });
   }
 
+  override steerAgent(message: string): SteerAgentResult {
+    const trimmed = message.trim();
+    if (trimmed) this.pendingSteerMessages.push(trimmed);
+    const record = this.activeRecord;
+    if (record && !record.closed && record.busy) {
+      this.streamInterrupted = true;
+      void record.query.interrupt().catch(() => {
+        this.closeRecord(record);
+      });
+    }
+    return 'queued';
+  }
+
   hasNativeSessionSupport(): boolean {
     return true;
   }
@@ -529,7 +607,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     workspaceDir: string,
     model: string,
     systemPrompt: string | undefined,
-    runtimeOptions: AgentRuntimeOptions | undefined
+    runtimeOptions: AgentRuntimeOptions | undefined,
   ): Promise<ClaudeSdkConversationRecord> {
     const recordKey = this.getRecordKey(workspaceDir);
     const existing = ClaudeSdkStrategy.records.get(recordKey);
@@ -552,23 +630,36 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       !markerSessionId && fibeConversationId && UUID_RE.test(fibeConversationId)
         ? fibeConversationId
         : undefined;
-    const mcpServers = mcpServersForConversation(workspaceDir, fibeConversationId);
+    const mcpServers = mcpServersForConversation(
+      workspaceDir,
+      fibeConversationId,
+    );
     const options: ClaudeSdkOptions = {
       cwd: workspaceDir,
       env: this.getClaudeProcessEnv(envOverrides),
       pathToClaudeCodeExecutable: resolveClaude(),
       model: model.trim() || undefined,
-      effort: resolveEffort(runtimeOptions?.effort ?? process.env.CLAUDE_EFFORT),
+      effort: resolveEffort(
+        runtimeOptions?.effort ?? process.env.CLAUDE_EFFORT,
+      ),
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       includePartialMessages: true,
       additionalDirectories: this.getPlaygroundDirs(),
-      extraArgs: providerTokensToExtraArgs(buildProviderArgs(CLAUDE_PROVIDER_ARGS_CONFIG)),
+      extraArgs: providerTokensToExtraArgs(
+        buildProviderArgs(CLAUDE_PROVIDER_ARGS_CONFIG),
+      ),
       ...(mcpServers ? { mcpServers } : {}),
       ...(markerSessionId ? { resume: markerSessionId } : {}),
       ...(fibeSessionId ? { sessionId: fibeSessionId } : {}),
       ...(systemPrompt
-        ? { systemPrompt: { type: 'preset', preset: 'claude_code', append: systemPrompt.trim() } }
+        ? {
+            systemPrompt: {
+              type: 'preset',
+              preset: 'claude_code',
+              append: systemPrompt.trim(),
+            },
+          }
         : {}),
     };
 
@@ -591,7 +682,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     record: ClaudeSdkConversationRecord,
     state: StreamTurnState,
     onChunk: (chunk: string) => void,
-    callbacks?: StreamingCallbacks
+    callbacks?: StreamingCallbacks,
   ): Promise<void> {
     while (true) {
       const { value, done } = await record.iterator.next();
@@ -605,7 +696,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     message: SDKMessage,
     state: StreamTurnState,
     onChunk: (chunk: string) => void,
-    callbacks?: StreamingCallbacks
+    callbacks?: StreamingCallbacks,
   ): void {
     const nextSessionId = messageSessionId(message);
     if (nextSessionId) state.sessionId = nextSessionId;
@@ -630,9 +721,14 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
         callbacks?.onUsage?.(usage);
       }
       if (message.is_error) {
-        const errors = 'errors' in message ? message.errors.join('\n') : message.result;
+        const errors =
+          'errors' in message ? message.errors.join('\n') : message.result;
         state.errorText += `${state.errorText ? '\n' : ''}${errors}`;
-      } else if (!state.emittedVisibleOutput && 'result' in message && message.result) {
+      } else if (
+        !state.emittedVisibleOutput &&
+        'result' in message &&
+        message.result
+      ) {
         state.emittedVisibleOutput = true;
         onChunk(message.result);
       }
@@ -640,7 +736,12 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     }
 
     if (message.type === 'stream_event') {
-      this.handleStreamEvent(message.event as unknown, state, onChunk, callbacks);
+      this.handleStreamEvent(
+        message.event as unknown,
+        state,
+        onChunk,
+        callbacks,
+      );
     }
   }
 
@@ -648,12 +749,17 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     rawEvent: unknown,
     state: StreamTurnState,
     onChunk: (chunk: string) => void,
-    callbacks?: StreamingCallbacks
+    callbacks?: StreamingCallbacks,
   ): void {
     if (!rawEvent || typeof rawEvent !== 'object') return;
     const ev = rawEvent as {
       type?: string;
-      delta?: { type?: string; text?: string; thinking?: string; partial_json?: string };
+      delta?: {
+        type?: string;
+        text?: string;
+        thinking?: string;
+        partial_json?: string;
+      };
       content_block?: { type?: string; name?: string; input?: unknown };
       message?: { usage?: unknown };
       usage?: unknown;
@@ -669,7 +775,10 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       callbacks?.onUsage?.(state.usage);
     }
 
-    if (ev.type === 'content_block_start' && ev.content_block?.type === 'tool_use') {
+    if (
+      ev.type === 'content_block_start' &&
+      ev.content_block?.type === 'tool_use'
+    ) {
       state.currentToolBlock = { name: ev.content_block.name, inputStr: '' };
       return;
     }
@@ -710,12 +819,18 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       let input: Record<string, unknown> | undefined;
       try {
         if (state.currentToolBlock.inputStr.trim()) {
-          input = JSON.parse(state.currentToolBlock.inputStr) as Record<string, unknown>;
+          input = JSON.parse(state.currentToolBlock.inputStr) as Record<
+            string,
+            unknown
+          >;
         }
       } catch {
         /* ignore malformed tool input */
       }
-      const event: ToolEvent = toolUseToEvent({ name: state.currentToolBlock.name }, input);
+      const event: ToolEvent = toolUseToEvent(
+        { name: state.currentToolBlock.name },
+        input,
+      );
       callbacks?.onTool?.(event);
       state.currentToolBlock = null;
     }
@@ -728,14 +843,16 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     if (stored) return stored;
 
     const stateDir = this.getClaudeStateDir();
-    const defaultDir = this.conversationDataDir.getDefaultConversationDataDir?.();
+    const defaultDir =
+      this.conversationDataDir.getDefaultConversationDataDir?.();
     if (stateDir && defaultDir && stateDir !== defaultDir) return null;
     return this.readMarkerFile(join(workspaceDir, SESSION_MARKER_FILE));
   }
 
   private writeSessionMarker(workspaceDir: string, sessionId: string): void {
     if (!this.conversationDataDir) return;
-    const markerPath = this.getSessionMarkerPath() ?? join(workspaceDir, SESSION_MARKER_FILE);
+    const markerPath =
+      this.getSessionMarkerPath() ?? join(workspaceDir, SESSION_MARKER_FILE);
     try {
       writeFileSync(markerPath, sessionId);
     } catch {

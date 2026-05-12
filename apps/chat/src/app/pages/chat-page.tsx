@@ -1,8 +1,27 @@
-import { ChevronDown, ChevronRight, GitCompareArrows, Loader2, TerminalSquare } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
+import {
+  ChevronDown,
+  ChevronRight,
+  GitCompareArrows,
+  Loader2,
+  TerminalSquare,
+} from 'lucide-react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  lazy,
+  Suspense,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '../chat/auth-modal';
-import { MessageList, type MessageListHandle, type ConversationResetSeparator, type ChatMessage } from '../chat/message-list';
+import {
+  MessageList,
+  type MessageListHandle,
+  type ConversationResetSeparator,
+  type ChatMessage,
+} from '../chat/message-list';
 import { WS_ACTION } from '@shared/ws-constants';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
 import { useConversations } from '../chat/use-conversations';
@@ -16,7 +35,10 @@ import { useChatLayout } from '../chat/use-chat-layout';
 import { useVoiceRecorder } from '../chat/use-voice-recorder';
 import { useLocalStt } from '../chat/use-local-stt';
 import { useVisualViewport } from '../chat/use-visual-viewport';
-import { useChatAttachments, MAX_PENDING_TOTAL } from '../chat/use-chat-attachments';
+import {
+  useChatAttachments,
+  MAX_PENDING_TOTAL,
+} from '../chat/use-chat-attachments';
 import { useChatActivityLog } from '../chat/use-chat-activity-log';
 import { useChatInitialData } from '../chat/use-chat-initial-data';
 import { useChatModel } from '../chat/use-chat-model';
@@ -25,7 +47,10 @@ import { useChatDisplayState } from '../chat/use-chat-display-state';
 import { useChatInput } from '../chat/use-chat-input';
 import { useChatAuthUI } from '../chat/use-chat-auth-ui';
 import { useChatStreaming } from '../chat/use-chat-streaming';
-import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
+import {
+  FileExplorer,
+  type PlaygroundEntry,
+} from '../file-explorer/file-explorer';
 import { API_PATHS } from '@shared/api-paths';
 import type { FileTab } from '../file-explorer/file-explorer-tabs';
 import { ChatLeftPanel } from './chat-left-panel';
@@ -71,9 +96,19 @@ import { CliDrawerContent } from '../chat/components/cli-drawer';
 import { Command } from 'lucide-react';
 import { useT } from '../i18n';
 
-const LazyFileViewerPanel = lazy(() => import('../file-explorer/file-viewer-panel').then((m) => ({ default: m.FileViewerPanel })));
-const LazyTerminalPanel = lazy(() => import('../terminal/terminal-panel').then((m) => ({ default: m.TerminalPanel })));
-const LazyDiffPanel = lazy(() => import('../diff/diff-panel').then((m) => ({ default: m.DiffPanel })));
+const LazyFileViewerPanel = lazy(() =>
+  import('../file-explorer/file-viewer-panel').then((m) => ({
+    default: m.FileViewerPanel,
+  })),
+);
+const LazyTerminalPanel = lazy(() =>
+  import('../terminal/terminal-panel').then((m) => ({
+    default: m.TerminalPanel,
+  })),
+);
+const LazyDiffPanel = lazy(() =>
+  import('../diff/diff-panel').then((m) => ({ default: m.DiffPanel })),
+);
 
 interface RuntimeConfigResponse {
   agentProviderLabel?: string | null;
@@ -101,7 +136,9 @@ function readStoredSimplicateMode(): boolean | null {
 export function ChatPage() {
   const t = useT();
   const navigate = useNavigate();
-  const sendRef = useRef<(payload: Record<string, unknown>) => void>(() => undefined);
+  const sendRef = useRef<(payload: Record<string, unknown>) => void>(
+    () => undefined,
+  );
   const handleSendRef = useRef<() => void>(() => undefined);
 
   // Keep --vh CSS variable in sync with the visual viewport for iOS keyboard handling
@@ -119,17 +156,38 @@ export function ChatPage() {
     switchTo: switchConversation,
     refresh: refreshConversations,
   } = useConversations();
-  const conversations = useMemo(() => (Array.isArray(rawConversations) ? rawConversations : []), [rawConversations]);
+  const conversations = useMemo(
+    () => (Array.isArray(rawConversations) ? rawConversations : []),
+    [rawConversations],
+  );
   const activeConversationReadonly =
     activeConversationId === 'inbox' ||
     conversations.find((c) => c.id === activeConversationId)?.readonly === true;
-  const { messages, setMessages, messagesLoaded, messagesLoadError, modelOptions, refreshingModels, refreshModelOptions, agentProvider } =
-    useChatInitialData(authenticated, activeConversationId);
+  const {
+    messages,
+    setMessages,
+    messagesLoaded,
+    messagesLoadError,
+    modelOptions,
+    refreshingModels,
+    refreshModelOptions,
+    agentProvider,
+  } = useChatInitialData(authenticated, activeConversationId);
 
-  const { entries: playgroundEntries, tree: playgroundTree, loading: playgroundLoading, stats: playgroundStats, refetch: refetchPlaygrounds } =
-    usePlaygroundFiles();
-  const { tree: agentFileTree, hasFiles: hasAgentFiles, workspaceAvailable: hasAgentWorkspace, stats: agentStats, refetch: refetchAgentFiles } =
-    useAgentFiles(activeConversationId);
+  const {
+    entries: playgroundEntries,
+    tree: playgroundTree,
+    loading: playgroundLoading,
+    stats: playgroundStats,
+    refetch: refetchPlaygrounds,
+  } = usePlaygroundFiles();
+  const {
+    tree: agentFileTree,
+    hasFiles: hasAgentFiles,
+    workspaceAvailable: hasAgentWorkspace,
+    stats: agentStats,
+    refetch: refetchAgentFiles,
+  } = useAgentFiles(activeConversationId);
   const hasPlaygroundFiles = playgroundEntries.length > 0;
   const hasAnyFiles = hasPlaygroundFiles || hasAgentFiles || hasAgentWorkspace;
   const layout = useChatLayout(hasAnyFiles, playgroundLoading);
@@ -176,9 +234,18 @@ export function ChatPage() {
       variant="icon"
     />
   );
-  const [standaloneMode, setStandaloneMode] = useState(() => isStandaloneMode());
+  const [standaloneMode, setStandaloneMode] = useState(() =>
+    isStandaloneMode(),
+  );
   const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
-  const [simplicateMode, setSimplicateMode] = useState(() => readStoredSimplicateMode() ?? false);
+  const supportsImmediateSteer = useMemo(() => {
+    const provider =
+      `${agentProvider ?? ''} ${agentProviderLabel ?? ''}`.toLowerCase();
+    return provider.includes('codex') || provider.includes('claude');
+  }, [agentProvider, agentProviderLabel]);
+  const [simplicateMode, setSimplicateMode] = useState(
+    () => readStoredSimplicateMode() ?? false,
+  );
   const [compactFileBrowserOpen, setCompactFileBrowserOpen] = useState(false);
   const compactMode = simplicateMode;
   const canShowDiff = playgroundStats.hasGitRepo;
@@ -186,9 +253,27 @@ export function ChatPage() {
   // ─── Local MCP tool state ─────────────────────────────────────────────────
 
   type LocalToolItem =
-    | { kind: 'ask'; questionId: string; question: string; placeholder?: string }
-    | { kind: 'confirm'; questionId: string; message: string; confirmLabel?: string; cancelLabel?: string }
-    | { kind: 'image'; key: string; url?: string; base64?: string; mimeType?: string; caption?: string };
+    | {
+        kind: 'ask';
+        questionId: string;
+        question: string;
+        placeholder?: string;
+      }
+    | {
+        kind: 'confirm';
+        questionId: string;
+        message: string;
+        confirmLabel?: string;
+        cancelLabel?: string;
+      }
+    | {
+        kind: 'image';
+        key: string;
+        url?: string;
+        base64?: string;
+        mimeType?: string;
+        caption?: string;
+      };
 
   const [localToolItems, setLocalToolItems] = useState<LocalToolItem[]>([]);
   const [toasts, setToasts] = useState<ToastItem[]>([]);
@@ -201,7 +286,11 @@ export function ChatPage() {
         ...prev,
         { kind: 'ask', questionId, question, placeholder: data.placeholder },
       ]);
-    } else if (data.type === 'confirm_action_prompt' && data.questionId && data.message) {
+    } else if (
+      data.type === 'confirm_action_prompt' &&
+      data.questionId &&
+      data.message
+    ) {
       const questionId = data.questionId;
       const message = data.message;
       setLocalToolItems((prev) => [
@@ -235,27 +324,49 @@ export function ChatPage() {
     }
   }, []);
 
-  const handleConversationReset = useCallback((resetAt: string) => {
-    const separator: ConversationResetSeparator = { kind: 'reset_separator', resetAt };
-    setMessages(() => [separator]);
-    setTimeout(() => messageListRef.current?.scrollToBottom('auto'), 50);
-  }, [setMessages]);
+  const handleConversationReset = useCallback(
+    (resetAt: string) => {
+      const separator: ConversationResetSeparator = {
+        kind: 'reset_separator',
+        resetAt,
+      };
+      setMessages(() => [separator]);
+      setTimeout(() => messageListRef.current?.scrollToBottom('auto'), 50);
+    },
+    [setMessages],
+  );
 
-  const handleAnswerQuestion = useCallback((questionId: string, answer: string) => {
-    sendRef.current({ action: 'answer_user_question', questionId, answer });
-    setLocalToolItems((prev) => prev.filter((i) => !('questionId' in i) || i.questionId !== questionId));
-  }, []);
+  const handleAnswerQuestion = useCallback(
+    (questionId: string, answer: string) => {
+      sendRef.current({ action: 'answer_user_question', questionId, answer });
+      setLocalToolItems((prev) =>
+        prev.filter((i) => !('questionId' in i) || i.questionId !== questionId),
+      );
+    },
+    [],
+  );
 
-  const handleConfirmQuestion = useCallback((questionId: string, confirmed: boolean) => {
-    sendRef.current({ action: 'confirm_action_response', questionId, confirmed });
-    setLocalToolItems((prev) => prev.filter((i) => !('questionId' in i) || i.questionId !== questionId));
-  }, []);
+  const handleConfirmQuestion = useCallback(
+    (questionId: string, confirmed: boolean) => {
+      sendRef.current({
+        action: 'confirm_action_response',
+        questionId,
+        confirmed,
+      });
+      setLocalToolItems((prev) =>
+        prev.filter((i) => !('questionId' in i) || i.questionId !== questionId),
+      );
+    },
+    [],
+  );
 
   const handleDismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  const [tonyStarkMode, setTonyStarkMode] = useState(() => localStorage.getItem('tony-stark-mode') === 'true');
+  const [tonyStarkMode, setTonyStarkMode] = useState(
+    () => localStorage.getItem('tony-stark-mode') === 'true',
+  );
   const handleToggleTonyStarkMode = useCallback(() => {
     setTonyStarkMode((prev) => {
       const next = !prev;
@@ -264,19 +375,22 @@ export function ChatPage() {
     });
   }, []);
 
-  const handleSimplicateModeChange = useCallback((enabled: boolean) => {
-    setSimplicateMode(enabled);
-    setCompactFileBrowserOpen(false);
-    if (!enabled) {
-      setSidebarOpen(false);
-      setRightSidebarOpen(false);
-    }
-    try {
-      localStorage.setItem(SIMPLICATE_STORAGE_KEY, String(enabled));
-    } catch {
-      // localStorage can be unavailable in restrictive embed contexts.
-    }
-  }, [setRightSidebarOpen, setSidebarOpen]);
+  const handleSimplicateModeChange = useCallback(
+    (enabled: boolean) => {
+      setSimplicateMode(enabled);
+      setCompactFileBrowserOpen(false);
+      if (!enabled) {
+        setSidebarOpen(false);
+        setRightSidebarOpen(false);
+      }
+      try {
+        localStorage.setItem(SIMPLICATE_STORAGE_KEY, String(enabled));
+      } catch {
+        // localStorage can be unavailable in restrictive embed contexts.
+      }
+    },
+    [setRightSidebarOpen, setSidebarOpen],
+  );
 
   const toggleFileBrowser = useCallback(() => {
     if (isMobile) {
@@ -305,17 +419,26 @@ export function ChatPage() {
 
   const isPanelResizing = leftResize.isDragging || rightResize.isDragging;
 
-  const handlePageDirtyChange = useCallback((path: string, isDirty: boolean) => {
-    setPageDirtyPaths((prev) => {
-      const next = new Set(prev);
-      if (isDirty) next.add(path);
-      else next.delete(path);
-      return next;
-    });
-  }, []);
+  const handlePageDirtyChange = useCallback(
+    (path: string, isDirty: boolean) => {
+      setPageDirtyPaths((prev) => {
+        const next = new Set(prev);
+        if (isDirty) next.add(path);
+        else next.delete(path);
+        return next;
+      });
+    },
+    [],
+  );
 
-  const { currentModel, setCurrentModel, handleModelSelect, handleModelInputChange } = useChatModel(sendRef);
-  const { currentEffort, setCurrentEffort, handleEffortSelect } = useChatEffort(sendRef);
+  const {
+    currentModel,
+    setCurrentModel,
+    handleModelSelect,
+    handleModelInputChange,
+  } = useChatModel(sendRef);
+  const { currentEffort, setCurrentEffort, handleEffortSelect } =
+    useChatEffort(sendRef);
 
   useEffect(() => {
     setStandaloneMode(isStandaloneMode());
@@ -347,13 +470,18 @@ export function ChatPage() {
   }, [canShowDiff, diffOpen, closeDiff]);
 
   useEffect(() => {
-    const conversation = conversations.find((c) => c.id === activeConversationId);
+    const conversation = conversations.find(
+      (c) => c.id === activeConversationId,
+    );
     try {
-      window.parent.postMessage({
-        type: 'fibe_conversation_changed',
-        conversationId: activeConversationId,
-        title: conversation?.title ?? activeConversationId,
-      }, '*');
+      window.parent.postMessage(
+        {
+          type: 'fibe_conversation_changed',
+          conversationId: activeConversationId,
+          title: conversation?.title ?? activeConversationId,
+        },
+        '*',
+      );
     } catch {
       // Parent may be unavailable outside the Rails iframe.
     }
@@ -382,10 +510,17 @@ export function ChatPage() {
   const messageListRef = useRef<MessageListHandle | null>(null);
   const activeConversationIdRef = useRef(activeConversationId);
   const conversationsRef = useRef(conversations);
-  const [pendingTimestampFocus, setPendingTimestampFocus] = useState<PendingTimestampFocus | null>(null);
+  const [pendingTimestampFocus, setPendingTimestampFocus] =
+    useState<PendingTimestampFocus | null>(null);
+  const [workingStartedAt, setWorkingStartedAt] = useState<number | null>(null);
+  const [workingNow, setWorkingNow] = useState(() => Date.now());
 
-  useEffect(() => { activeConversationIdRef.current = activeConversationId; }, [activeConversationId]);
-  useEffect(() => { conversationsRef.current = conversations; }, [conversations]);
+  useEffect(() => {
+    activeConversationIdRef.current = activeConversationId;
+  }, [activeConversationId]);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
 
   useEffect(() => {
     if (!authenticated) {
@@ -393,64 +528,105 @@ export function ChatPage() {
     }
   }, [authenticated, navigate]);
 
-  const handleMessage = useCallback((data: ServerMessage) => {
-    if (data.type === 'message' && data.role && data.body !== undefined) {
-      const payload = data as { id?: string; imageUrls?: string[]; model?: string };
-      const role = data.role as string;
-      const body = data.body ?? '';
-      const created_at = (data.created_at as string) ?? new Date().toISOString();
-      const serverMsg = {
-        id: payload.id,
-        role,
-        body,
-        created_at,
-        ...(payload.imageUrls?.length ? { imageUrls: payload.imageUrls } : {}),
-        ...(payload.model ? { model: payload.model } : {}),
-      };
-      setMessages((prev) => {
-        const last = prev[prev.length - 1];
-        const lastMsg = last && !('kind' in last) ? last as ChatMessage : null;
-        if (lastMsg?.role === 'user' && lastMsg?.optimistic && lastMsg.body === body) {
-          return [...prev.slice(0, -1), { ...serverMsg, ...(lastMsg.queued ? { queued: true } : {}) }];
-        }
-        return [...prev, serverMsg];
-      });
-    }
-    if (data.type === 'model_updated' && data.model !== undefined) {
-      setCurrentModel(data.model);
-    }
-    if (data.type === 'effort_updated' && data.effort !== undefined) {
-      setCurrentEffort(data.effort);
-    }
-  }, [setCurrentEffort, setCurrentModel, setMessages]);
+  const handleMessage = useCallback(
+    (data: ServerMessage) => {
+      if (data.type === 'message' && data.role && data.body !== undefined) {
+        const payload = data as {
+          id?: string;
+          imageUrls?: string[];
+          model?: string;
+        };
+        const role = data.role as string;
+        const body = data.body ?? '';
+        const created_at =
+          (data.created_at as string) ?? new Date().toISOString();
+        const serverMsg = {
+          id: payload.id,
+          role,
+          body,
+          created_at,
+          ...(payload.imageUrls?.length
+            ? { imageUrls: payload.imageUrls }
+            : {}),
+          ...(payload.model ? { model: payload.model } : {}),
+        };
+        setMessages((prev) => {
+          const last = prev[prev.length - 1];
+          const lastMsg =
+            last && !('kind' in last) ? (last as ChatMessage) : null;
+          if (
+            lastMsg?.role === 'user' &&
+            lastMsg?.optimistic &&
+            lastMsg.body === body
+          ) {
+            return [
+              ...prev.slice(0, -1),
+              {
+                ...serverMsg,
+                ...(lastMsg.queued ? { queued: true } : {}),
+                ...(lastMsg.queueStatus
+                  ? { queueStatus: lastMsg.queueStatus }
+                  : {}),
+              },
+            ];
+          }
+          return [...prev, serverMsg];
+        });
+      }
+      if (data.type === 'model_updated' && data.model !== undefined) {
+        setCurrentModel(data.model);
+      }
+      if (data.type === 'effort_updated' && data.effort !== undefined) {
+        setCurrentEffort(data.effort);
+      }
+    },
+    [setCurrentEffort, setCurrentModel, setMessages],
+  );
 
-  const handleConversationDeleted = useCallback((conversationId: string) => {
-    if (conversationId === activeConversationId) {
-      switchConversation('default');
-    }
-    void refreshConversations();
-  }, [activeConversationId, refreshConversations, switchConversation]);
+  const handleConversationDeleted = useCallback(
+    (conversationId: string) => {
+      if (conversationId === activeConversationId) {
+        switchConversation('default');
+      }
+      void refreshConversations();
+    },
+    [activeConversationId, refreshConversations, switchConversation],
+  );
 
   const voiceRecorder = useVoiceRecorder();
   const localStt = useLocalStt();
   const voiceRecorderRef = useRef(voiceRecorder);
-  useEffect(() => { voiceRecorderRef.current = voiceRecorder; });
+  useEffect(() => {
+    voiceRecorderRef.current = voiceRecorder;
+  });
   const localSttRef = useRef(localStt);
-  useEffect(() => { localSttRef.current = localStt; });
+  useEffect(() => {
+    localSttRef.current = localStt;
+  });
 
   const onStreamEndCallback = useCallback(
-    (finalText: string, usage?: { inputTokens: number; outputTokens: number }, model?: string, streamModel?: string | null) => {
+    (
+      finalText: string,
+      usage?: { inputTokens: number; outputTokens: number },
+      model?: string,
+      streamModel?: string | null,
+    ) => {
       const text = finalText?.trim() || t('chat.noOutput');
       const log = activityLogRef.current;
-      const storyForApi = log.map(({ id, type, message, timestamp, details, command, path }) => ({
-        id,
-        type,
-        message,
-        timestamp: timestamp instanceof Date ? timestamp.toISOString() : String(timestamp),
-        ...(details !== undefined ? { details } : {}),
-        ...(command !== undefined ? { command } : {}),
-        ...(path !== undefined ? { path } : {}),
-      }));
+      const storyForApi = log.map(
+        ({ id, type, message, timestamp, details, command, path }) => ({
+          id,
+          type,
+          message,
+          timestamp:
+            timestamp instanceof Date
+              ? timestamp.toISOString()
+              : String(timestamp),
+          ...(details !== undefined ? { details } : {}),
+          ...(command !== undefined ? { command } : {}),
+          ...(path !== undefined ? { path } : {}),
+        }),
+      );
       const modelForMessage = model ?? streamModel ?? undefined;
       setMessages((m) => [
         ...m,
@@ -467,7 +643,7 @@ export function ChatPage() {
       setLastSentMessage(null);
       refetchPlaygrounds();
     },
-    [setMessages, refetchPlaygrounds, activityLogRef, t]
+    [setMessages, refetchPlaygrounds, activityLogRef, t],
   );
 
   const {
@@ -477,6 +653,30 @@ export function ChatPage() {
     handleStreamEnd,
     handleStreamAbort,
   } = useChatStreaming({ onStreamEndCallback, resetForNewStream });
+
+  const handleStreamStartWithTimer = useCallback(
+    (data?: { model?: string }) => {
+      const now = Date.now();
+      setWorkingStartedAt(now);
+      setWorkingNow(now);
+      handleStreamStart(data);
+    },
+    [handleStreamStart],
+  );
+
+  const handleStreamEndWithTimer = useCallback(
+    (usage?: { inputTokens: number; outputTokens: number }, model?: string) => {
+      setWorkingNow(Date.now());
+      handleStreamEnd(usage, model);
+    },
+    [handleStreamEnd],
+  );
+
+  const handleStreamAbortWithTimer = useCallback(() => {
+    setWorkingStartedAt(null);
+    setWorkingNow(Date.now());
+    handleStreamAbort();
+  }, [handleStreamAbort]);
 
   const scroll = useScrollToBottom([messages, streamingText]);
 
@@ -500,14 +700,14 @@ export function ChatPage() {
   } = useChatWebSocket(
     handleMessage,
     handleStreamChunk,
-    handleStreamStart,
-    handleStreamEnd,
+    handleStreamStartWithTimer,
+    handleStreamEndWithTimer,
     thinkingCallbacks,
     refetchPlaygrounds,
     handleLocalToolEvent,
     handleConversationReset,
     activeConversationId,
-    handleStreamAbort,
+    handleStreamAbortWithTimer,
     handleConversationDeleted,
   );
 
@@ -520,18 +720,35 @@ export function ChatPage() {
   }, [anyProcessing, refreshConversations]);
 
   useEffect(() => {
-    handleStreamAbort();
+    if (state !== CHAT_STATES.AWAITING_RESPONSE) {
+      setWorkingStartedAt(null);
+      setWorkingNow(Date.now());
+      return;
+    }
+
+    const now = Date.now();
+    setWorkingStartedAt((startedAt) => startedAt ?? now);
+    setWorkingNow(now);
+    const timer = window.setInterval(() => setWorkingNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [state]);
+
+  useEffect(() => {
+    handleStreamAbortWithTimer();
     resetActivityState();
     setLastSentMessage(null);
     setLocalToolItems([]);
-  }, [activeConversationId, handleStreamAbort, resetActivityState]);
+  }, [activeConversationId, handleStreamAbortWithTimer, resetActivityState]);
 
-  const handleConversationSelect = useCallback((id: string): void => {
-    if (id === activeConversationId) return;
-    setSearchQuery('');
-    setViewingFile(null);
-    switchConversation(id);
-  }, [activeConversationId, setSearchQuery, switchConversation]);
+  const handleConversationSelect = useCallback(
+    (id: string): void => {
+      if (id === activeConversationId) return;
+      setSearchQuery('');
+      setViewingFile(null);
+      switchConversation(id);
+    },
+    [activeConversationId, setSearchQuery, switchConversation],
+  );
 
   const handleConversationCreate = useCallback(async (): Promise<void> => {
     setSearchQuery('');
@@ -544,21 +761,28 @@ export function ChatPage() {
       const data = event.data;
       if (!data || data.type !== 'fibe_focus_message_by_timestamp') return;
 
-      const timestamp = typeof data.timestamp === 'string' ? data.timestamp : '';
+      const timestamp =
+        typeof data.timestamp === 'string' ? data.timestamp : '';
       if (!Number.isFinite(Date.parse(timestamp))) return;
 
-      const requestedConversationId = typeof data.conversationId === 'string' && data.conversationId.trim()
-        ? data.conversationId.trim()
-        : activeConversationIdRef.current;
+      const requestedConversationId =
+        typeof data.conversationId === 'string' && data.conversationId.trim()
+          ? data.conversationId.trim()
+          : activeConversationIdRef.current;
       const knownConversations = conversationsRef.current;
-      if (knownConversations.length > 0 && !knownConversations.some((c) => c.id === requestedConversationId)) return;
+      if (
+        knownConversations.length > 0 &&
+        !knownConversations.some((c) => c.id === requestedConversationId)
+      )
+        return;
 
       setSearchQuery('');
       setViewingFile(null);
       setPendingTimestampFocus({
         timestamp,
         conversationId: requestedConversationId,
-        requestId: typeof data.requestId === 'string' ? data.requestId : undefined,
+        requestId:
+          typeof data.requestId === 'string' ? data.requestId : undefined,
       });
       if (requestedConversationId !== activeConversationIdRef.current) {
         switchConversation(requestedConversationId);
@@ -572,8 +796,14 @@ export function ChatPage() {
   useEffect(() => {
     if (!pendingTimestampFocus) return;
 
-    const conversationKnown = conversations.some((c) => c.id === pendingTimestampFocus.conversationId);
-    if (!conversationsLoading && conversations.length > 0 && !conversationKnown) {
+    const conversationKnown = conversations.some(
+      (c) => c.id === pendingTimestampFocus.conversationId,
+    );
+    if (
+      !conversationsLoading &&
+      conversations.length > 0 &&
+      !conversationKnown
+    ) {
       setPendingTimestampFocus(null);
       return;
     }
@@ -604,7 +834,13 @@ export function ChatPage() {
   useEffect(() => {
     const notifyParent = () => {
       try {
-        window.parent.postMessage({ type: 'agent_status_update', isWorking: state === CHAT_STATES.AWAITING_RESPONSE }, '*');
+        window.parent.postMessage(
+          {
+            type: 'agent_status_update',
+            isWorking: state === CHAT_STATES.AWAITING_RESPONSE,
+          },
+          '*',
+        );
       } catch {
         // ignore across cross-origin if parent is unavailable
       }
@@ -623,7 +859,8 @@ export function ChatPage() {
     if (state !== CHAT_STATES.AUTHENTICATED) return;
     if (!messagesLoaded) return; // Wait for history fetch to complete
     if (messagesLoadError) return; // Do not treat a failed history load as an empty conversation.
-    if (activeConversationId !== initialGreetingConversationIdRef.current) return;
+    if (activeConversationId !== initialGreetingConversationIdRef.current)
+      return;
 
     const greeting = consumeGreeting();
     if (!greeting) return;
@@ -634,10 +871,24 @@ export function ChatPage() {
     send({ action: 'send_chat_message', text: greeting });
     setMessages((prev) => [
       ...prev,
-      { role: 'user', body: greeting, created_at: new Date().toISOString(), optimistic: true },
+      {
+        role: 'user',
+        body: greeting,
+        created_at: new Date().toISOString(),
+        optimistic: true,
+      },
     ]);
     scroll.markJustSent();
-  }, [activeConversationId, state, messagesLoaded, messagesLoadError, messages, send, setMessages, scroll]);
+  }, [
+    activeConversationId,
+    state,
+    messagesLoaded,
+    messagesLoadError,
+    messages,
+    send,
+    setMessages,
+    scroll,
+  ]);
 
   const {
     pendingImages,
@@ -679,7 +930,10 @@ export function ChatPage() {
     sessionActivity,
     lastSentMessage,
   });
-
+  const workingElapsedMs =
+    state === CHAT_STATES.AWAITING_RESPONSE && workingStartedAt !== null
+      ? Math.max(0, workingNow - workingStartedAt)
+      : 0;
 
   /**
    * Stops the active voice recording and resolves the final transcript.
@@ -694,70 +948,123 @@ export function ChatPage() {
     if (!result) return '';
     let transcript = result.transcript || liveTextSnapshot || '';
     if (!transcript && result.blob.size > 0) {
-      transcript = await localSttRef.current.transcribe(result.blob).catch((err: unknown) => {
-        console.error('Local STT Error:', err);
-        return '';
-      });
+      transcript = await localSttRef.current
+        .transcribe(result.blob)
+        .catch((err: unknown) => {
+          console.error('Local STT Error:', err);
+          return '';
+        });
     }
     return transcript;
   }, []);
 
-  const handleSend = useCallback(async (busyPolicy: 'queue' | 'steer' = 'queue') => {
-    let currentInput = inputValue.trim();
-    const isQueuing = state === CHAT_STATES.AWAITING_RESPONSE;
-    const currentPendingImages = [...pendingImages];
-    const currentPendingVoiceFilename = pendingVoiceFilename;
-    const currentPendingVoice = pendingVoice;
-    const currentPendingAttachments = [...pendingAttachments];
+  const handleSend = useCallback(
+    async (busyPolicy: 'queue' | 'steer' = 'queue') => {
+      let currentInput = inputValue.trim();
+      const isQueuing = state === CHAT_STATES.AWAITING_RESPONSE;
+      const currentPendingImages = [...pendingImages];
+      const currentPendingVoiceFilename = pendingVoiceFilename;
+      const currentPendingVoice = pendingVoice;
+      const currentPendingAttachments = [...pendingAttachments];
 
-    if (voiceRecorderRef.current.isRecording) {
-      const transcript = await stopAndTranscribe();
-      if (transcript) {
-        currentInput = currentInput ? `${currentInput} ${transcript}` : transcript;
+      if (voiceRecorderRef.current.isRecording) {
+        const transcript = await stopAndTranscribe();
+        if (transcript) {
+          currentInput = currentInput
+            ? `${currentInput} ${transcript}`
+            : transcript;
+        }
       }
-    }
 
-    const hasVoice = !!currentPendingVoiceFilename || !!currentPendingVoice;
-    const hasContent = currentInput || currentPendingImages.length > 0 || hasVoice || currentPendingAttachments.length > 0;
+      const hasVoice = !!currentPendingVoiceFilename || !!currentPendingVoice;
+      const hasContent =
+        currentInput ||
+        currentPendingImages.length > 0 ||
+        hasVoice ||
+        currentPendingAttachments.length > 0;
 
-    if (!hasContent) return;
-    if (!isQueuing && state !== CHAT_STATES.AUTHENTICATED) return;
+      if (!hasContent) return;
+      if (!isQueuing && state !== CHAT_STATES.AUTHENTICATED) return;
 
-    send({
-      action: isQueuing && busyPolicy === 'steer' ? 'steer_message' : 'send_chat_message',
-      text: currentInput || '',
-      ...(isQueuing ? { busyPolicy } : {}),
-      ...(currentPendingImages.length ? { images: currentPendingImages.map(img => img.filename) } : {}),
-      ...(currentPendingVoiceFilename ? { audioFilename: currentPendingVoiceFilename } : currentPendingVoice ? { audio: currentPendingVoice } : {}),
-      ...(currentPendingAttachments.length ? { attachmentFilenames: currentPendingAttachments.map((a) => a.filename) } : {}),
-    });
+      send({
+        action: isQueuing
+          ? busyPolicy === 'steer'
+            ? WS_ACTION.STEER_MESSAGE
+            : WS_ACTION.QUEUE_MESSAGE
+          : WS_ACTION.SEND_CHAT_MESSAGE,
+        text: currentInput || '',
+        ...(isQueuing ? { busyPolicy } : {}),
+        ...(currentPendingImages.length
+          ? { images: currentPendingImages.map((img) => img.filename) }
+          : {}),
+        ...(currentPendingVoiceFilename
+          ? { audioFilename: currentPendingVoiceFilename }
+          : currentPendingVoice
+            ? { audio: currentPendingVoice }
+            : {}),
+        ...(currentPendingAttachments.length
+          ? {
+              attachmentFilenames: currentPendingAttachments.map(
+                (a) => a.filename,
+              ),
+            }
+          : {}),
+      });
 
-    try {
-      window.parent.postMessage({ type: 'player_message_sent' }, '*');
-    } catch {
-      // ignore across cross-origin if parent is unavailable
-    }
-
-    if (currentInput) {
-      setMessages((prev) => [
-        ...prev,
-        { role: 'user', body: currentInput, created_at: new Date().toISOString(), optimistic: true, ...(isQueuing ? { queued: true } : {}) },
-      ]);
-      // Auto-title the conversation on the very first user message
-      if (!isQueuing) {
-        autoTitleConversation(activeConversationId, currentInput);
+      try {
+        window.parent.postMessage({ type: 'player_message_sent' }, '*');
+      } catch {
+        // ignore across cross-origin if parent is unavailable
       }
-    }
-    setLastSentMessage(currentInput || null);
-    setInputState({ value: '', cursor: 0 });
-    clearPending();
-    scroll.markJustSent();
-    focusInput({ persistent: true });
-  }, [
-    send, state, inputValue, pendingImages, pendingVoice, pendingVoiceFilename, pendingAttachments, scroll,
-    clearPending, focusInput, setInputState, setMessages, stopAndTranscribe,
-    autoTitleConversation, activeConversationId,
-  ]);
+
+      if (currentInput) {
+        const queueStatus = !isQueuing
+          ? undefined
+          : busyPolicy === 'steer'
+            ? supportsImmediateSteer
+              ? 'steering'
+              : 'next'
+            : 'queued';
+        setMessages((prev) => [
+          ...prev,
+          {
+            role: 'user',
+            body: currentInput,
+            created_at: new Date().toISOString(),
+            optimistic: true,
+            ...(queueStatus ? { queued: true, queueStatus } : {}),
+          },
+        ]);
+        // Auto-title the conversation on the very first user message
+        if (!isQueuing) {
+          autoTitleConversation(activeConversationId, currentInput);
+        }
+      }
+      setLastSentMessage(currentInput || null);
+      setInputState({ value: '', cursor: 0 });
+      clearPending();
+      scroll.markJustSent();
+      focusInput({ persistent: true });
+    },
+    [
+      send,
+      state,
+      inputValue,
+      pendingImages,
+      pendingVoice,
+      pendingVoiceFilename,
+      pendingAttachments,
+      scroll,
+      clearPending,
+      focusInput,
+      setInputState,
+      setMessages,
+      stopAndTranscribe,
+      autoTitleConversation,
+      activeConversationId,
+      supportsImmediateSteer,
+    ],
+  );
 
   const handleSteer = useCallback(() => {
     void handleSend('steer');
@@ -770,7 +1077,12 @@ export function ChatPage() {
     });
     setMessages((prev) => [
       ...prev,
-      { role: 'user', body: t('chat.continue'), created_at: new Date().toISOString(), optimistic: true },
+      {
+        role: 'user',
+        body: t('chat.continue'),
+        created_at: new Date().toISOString(),
+        optimistic: true,
+      },
     ]);
     setLastSentMessage(t('chat.continue'));
     scroll.markJustSent();
@@ -782,21 +1094,31 @@ export function ChatPage() {
   }, [dismissError, handleSendContinue]);
 
   useEffect(() => {
-    handleSendRef.current = () => { void handleSend(); };
+    handleSendRef.current = () => {
+      void handleSend();
+    };
   }, [handleSend]);
 
   // Clear queued badges when streaming stops (e.g. session interrupted and restarted)
   useEffect(() => {
     if (state !== CHAT_STATES.AWAITING_RESPONSE) {
       setMessages((prev) => {
-        if (!prev.some((m) => !('kind' in m) && m.queued)) return prev;
-        return prev.map((m) => (!('kind' in m) && m.queued ? { ...m, queued: false } : m));
+        if (!prev.some((m) => !('kind' in m) && (m.queued || m.queueStatus)))
+          return prev;
+        return prev.map((m) =>
+          !('kind' in m) && (m.queued || m.queueStatus)
+            ? { ...m, queued: false, queueStatus: undefined }
+            : m,
+        );
       });
     }
   }, [state, setMessages]);
 
   const handleVoiceToggle = useCallback(async () => {
-    if (voiceRecorderRef.current.isRecording || localSttRef.current.isTranscribing) {
+    if (
+      voiceRecorderRef.current.isRecording ||
+      localSttRef.current.isTranscribing
+    ) {
       if (voiceRecorderRef.current.isRecording) {
         const transcript = await stopAndTranscribe();
         if (transcript) {
@@ -811,10 +1133,8 @@ export function ChatPage() {
     }
   }, [setInputState, stopAndTranscribe]);
 
-  const { statusClass, showModelSelector, showAuthModal, authModalForModal } = useChatAuthUI(
-    state,
-    authModal
-  );
+  const { statusClass, showModelSelector, showAuthModal, authModalForModal } =
+    useChatAuthUI(state, authModal);
   const chatModelLocked = isChatModelLocked();
 
   const openSettings = useCallback(() => {
@@ -845,7 +1165,8 @@ export function ChatPage() {
             authModal={authModalForModal}
             onClose={cancelAuth}
             onSubmitCode={(code) => {
-              if (state === CHAT_STATES.UNAUTHENTICATED) send({ action: 'initiate_auth' });
+              if (state === CHAT_STATES.UNAUTHENTICATED)
+                send({ action: 'initiate_auth' });
               submitAuthCode(code);
             }}
           />
@@ -875,7 +1196,9 @@ export function ChatPage() {
               aria-hidden
               onClick={closeMobileSidebar}
             />
-            <div className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 flex flex-col`}>
+            <div
+              className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 flex flex-col`}
+            >
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <FileExplorer
                   tree={playgroundTree}
@@ -905,14 +1228,23 @@ export function ChatPage() {
               {/* Conversations — always visible at bottom on mobile too */}
               <div
                 className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
-                style={conversationSidebarCollapsed ? undefined : { height: '40%', minHeight: 200 }}
+                style={
+                  conversationSidebarCollapsed
+                    ? undefined
+                    : { height: '40%', minHeight: 200 }
+                }
               >
                 <ConversationSidebar
                   conversations={conversations}
                   activeId={activeConversationId}
                   loading={conversationsLoading}
-                  onSelect={(id) => { switchConversation(id); closeMobileSidebar(); }}
-                  onCreate={async () => { await createConversation(); }}
+                  onSelect={(id) => {
+                    switchConversation(id);
+                    closeMobileSidebar();
+                  }}
+                  onCreate={async () => {
+                    await createConversation();
+                  }}
                   onRename={renameConversation}
                   onDelete={deleteConversation}
                   collapsed={conversationSidebarCollapsed}
@@ -1025,7 +1357,9 @@ export function ChatPage() {
               state={state}
               agentMode={agentMode}
               errorMessage={errorMessage}
-              sessionTimeMs={sessionTimeMs}
+              sessionTimeMs={
+                workingElapsedMs > 0 ? workingElapsedMs : sessionTimeMs
+              }
               mobileSessionStats={mobileSessionStats}
               sessionTokenUsage={sessionTokenUsage}
               mobileBrainClasses={mobileBrainClasses}
@@ -1035,7 +1369,9 @@ export function ChatPage() {
               onSearchChange={setSearchQuery}
               onReconnect={reconnect}
               onStartAuth={startAuth}
-              onOpenMenu={compactMode ? toggleFileBrowser : () => setSidebarOpen(true)}
+              onOpenMenu={
+                compactMode ? toggleFileBrowser : () => setSidebarOpen(true)
+              }
               onOpenActivity={() => setRightSidebarOpen(true)}
               onToggleTerminal={toggleTerminal}
               terminalOpen={terminalOpen}
@@ -1064,9 +1400,15 @@ export function ChatPage() {
               sessionCount={sessionCount}
               anyProcessing={anyProcessing}
               conversations={compactMode ? conversations : undefined}
-              activeConversationId={compactMode ? activeConversationId : undefined}
-              onConversationSelect={compactMode ? handleConversationSelect : undefined}
-              onConversationCreate={compactMode ? handleConversationCreate : undefined}
+              activeConversationId={
+                compactMode ? activeConversationId : undefined
+              }
+              onConversationSelect={
+                compactMode ? handleConversationSelect : undefined
+              }
+              onConversationCreate={
+                compactMode ? handleConversationCreate : undefined
+              }
             />
             <ChatErrorBanner
               errorMessage={errorMessage}
@@ -1076,17 +1418,20 @@ export function ChatPage() {
             />
           </>
         )}
-        {!viewingFile && !isMobile && compactMode && !compactFileBrowserOpen && (
-          <button
-            type="button"
-            onClick={() => setCompactFileBrowserOpen(true)}
-            className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/90 text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md transition-all hover:scale-105 hover:bg-card hover:text-violet-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
-            aria-label={t('fileExplorer.expand')}
-            title={t('fileExplorer.expand')}
-          >
-            <ChevronRight className="size-4" aria-hidden />
-          </button>
-        )}
+        {!viewingFile &&
+          !isMobile &&
+          compactMode &&
+          !compactFileBrowserOpen && (
+            <button
+              type="button"
+              onClick={() => setCompactFileBrowserOpen(true)}
+              className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/90 text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md transition-all hover:scale-105 hover:bg-card hover:text-violet-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+              aria-label={t('fileExplorer.expand')}
+              title={t('fileExplorer.expand')}
+            >
+              <ChevronRight className="size-4" aria-hidden />
+            </button>
+          )}
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
           <div
             ref={scroll.scrollRef}
@@ -1099,10 +1444,16 @@ export function ChatPage() {
                 messages={filteredMessages}
                 streamingText={streamingText}
                 isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-                lastUserMessage={state === CHAT_STATES.AWAITING_RESPONSE ? lastUserMessage : null}
+                lastUserMessage={
+                  state === CHAT_STATES.AWAITING_RESPONSE
+                    ? lastUserMessage
+                    : null
+                }
                 scrollRef={scroll.scrollRef}
                 bothSidebarsCollapsed={
-                  !isMobile && (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) && rightSidebarCollapsed
+                  !isMobile &&
+                  (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) &&
+                  rightSidebarCollapsed
                 }
                 noOutputBody={t('chat.noOutput')}
                 onRetry={handleSendContinue}
@@ -1171,12 +1522,16 @@ export function ChatPage() {
           )}
         </div>
         {viewingFile && (
-          <Suspense fallback={
-            <div className="absolute inset-0 z-10 flex items-center justify-center bg-background rounded-xl border border-border">
-              <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
-              <span className="text-sm text-muted-foreground">{t('common.loading')}</span>
-            </div>
-          }>
+          <Suspense
+            fallback={
+              <div className="absolute inset-0 z-10 flex items-center justify-center bg-background rounded-xl border border-border">
+                <Loader2 className="size-5 animate-spin text-muted-foreground mr-2" />
+                <span className="text-sm text-muted-foreground">
+                  {t('common.loading')}
+                </span>
+              </div>
+            }
+          >
             <div
               className="absolute inset-0 z-10 flex flex-col min-h-0 bg-background"
               role="dialog"
@@ -1187,20 +1542,30 @@ export function ChatPage() {
                 entry={viewingFile}
                 onClose={() => setViewingFile(null)}
                 inline
-                apiBasePath={viewingFile.source === 'agent' ? `${API_PATHS.AGENT_FILES_FILE}?conversationId=${encodeURIComponent(activeConversationId)}` : undefined}
-                rawApiBasePath={viewingFile.source === 'agent' ? `${API_PATHS.AGENT_FILES_FILE_RAW}?conversationId=${encodeURIComponent(activeConversationId)}` : undefined}
+                apiBasePath={
+                  viewingFile.source === 'agent'
+                    ? `${API_PATHS.AGENT_FILES_FILE}?conversationId=${encodeURIComponent(activeConversationId)}`
+                    : undefined
+                }
+                rawApiBasePath={
+                  viewingFile.source === 'agent'
+                    ? `${API_PATHS.AGENT_FILES_FILE_RAW}?conversationId=${encodeURIComponent(activeConversationId)}`
+                    : undefined
+                }
                 onDirtyChange={handlePageDirtyChange}
               />
             </div>
           </Suspense>
         )}
-        </div>
-        {!viewingFile && !activeConversationReadonly && (
+      </div>
+      {!viewingFile && !activeConversationReadonly && (
         <ChatInputArea
           state={state}
           inputValue={inputValue}
           onInputChange={(v, c) => setInputState({ value: v, cursor: c })}
-          onCursorChange={(c) => setInputState((prev) => ({ ...prev, cursor: c }))}
+          onCursorChange={(c) =>
+            setInputState((prev) => ({ ...prev, cursor: c }))
+          }
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
           placeholder={getChatInputPlaceholderWithT(state, t)}
@@ -1226,59 +1591,69 @@ export function ChatPage() {
           onInterrupt={interruptAgent}
           onVoiceToggle={handleVoiceToggle}
           maxPendingTotal={MAX_PENDING_TOTAL}
+          workingElapsedMs={workingElapsedMs}
+          steerMode={supportsImmediateSteer ? 'live' : 'next'}
         />
-        )}
-        <RightDrawer
-          open={terminalOpen}
-          onClose={closeTerminal}
-          title={t('drawer.shell')}
-          icon={<TerminalSquare />}
-          width="min(90vw, 680px)"
-          className="font-mono"
-          expandable={!isMobile}
-        >
-          <Suspense fallback={
+      )}
+      <RightDrawer
+        open={terminalOpen}
+        onClose={closeTerminal}
+        title={t('drawer.shell')}
+        icon={<TerminalSquare />}
+        width="min(90vw, 680px)"
+        className="font-mono"
+        expandable={!isMobile}
+      >
+        <Suspense
+          fallback={
             <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
               <Loader2 className="size-5 animate-spin text-violet-400 mr-2" />
-              <span className="text-sm text-muted-foreground">{t('drawer.startingTerminal')}</span>
+              <span className="text-sm text-muted-foreground">
+                {t('drawer.startingTerminal')}
+              </span>
             </div>
-          }>
-            <LazyTerminalPanel />
-          </Suspense>
-        </RightDrawer>
-        <RightDrawer
-          open={canShowDiff && diffOpen}
-          onClose={closeDiff}
-          title={t('drawer.playgroundDiff')}
-          icon={<GitCompareArrows className="size-4" />}
-          width="min(90vw, 720px)"
-          className="font-mono"
+          }
         >
-          <Suspense fallback={
+          <LazyTerminalPanel />
+        </Suspense>
+      </RightDrawer>
+      <RightDrawer
+        open={canShowDiff && diffOpen}
+        onClose={closeDiff}
+        title={t('drawer.playgroundDiff')}
+        icon={<GitCompareArrows className="size-4" />}
+        width="min(90vw, 720px)"
+        className="font-mono"
+      >
+        <Suspense
+          fallback={
             <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
               <Loader2 className="size-5 animate-spin text-emerald-400 mr-2" />
-              <span className="text-sm text-muted-foreground">{t('drawer.loadingDiff')}</span>
+              <span className="text-sm text-muted-foreground">
+                {t('drawer.loadingDiff')}
+              </span>
             </div>
-          }>
-            {diffOpen && <LazyDiffPanel />}
-          </Suspense>
-        </RightDrawer>
-        <RightDrawer
-          open={cliOpen}
-          onClose={closeCli}
-          title={t('header.commands')}
-          icon={<Command className="size-4" />}
-          width="min(90vw, 520px)"
+          }
         >
-          <CliDrawerContent
-            onSelectCommand={(cmd) => {
-              setInputState({ value: cmd, cursor: cmd.length });
-              closeCli();
-              chatInputRef.current?.focus();
-            }}
-          />
-        </RightDrawer>
-    <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
+          {diffOpen && <LazyDiffPanel />}
+        </Suspense>
+      </RightDrawer>
+      <RightDrawer
+        open={cliOpen}
+        onClose={closeCli}
+        title={t('header.commands')}
+        icon={<Command className="size-4" />}
+        width="min(90vw, 520px)"
+      >
+        <CliDrawerContent
+          onSelectCommand={(cmd) => {
+            setInputState({ value: cmd, cursor: cmd.length });
+            closeCli();
+            chatInputRef.current?.focus();
+          }}
+        />
+      </RightDrawer>
+      <NotifyToastContainer toasts={toasts} onDismiss={handleDismissToast} />
     </ChatLayout>
   );
 }

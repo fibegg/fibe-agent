@@ -30,7 +30,9 @@ function makeStrategy(
   const provider = dataDir
     ? {
         getConversationDataDir: () => dataDir,
-        ...(defaultDataDir ? { getDefaultConversationDataDir: () => defaultDataDir } : {}),
+        ...(defaultDataDir
+          ? { getDefaultConversationDataDir: () => defaultDataDir }
+          : {}),
         getConversationId: () => conversationId,
       }
     : undefined;
@@ -49,8 +51,14 @@ function freshState() {
   };
 }
 
-function readApiPackageJson(): { name?: string; dependencies?: Record<string, string> } {
-  for (const path of [join(process.cwd(), 'package.json'), join(process.cwd(), 'apps/api/package.json')]) {
+function readApiPackageJson(): {
+  name?: string;
+  dependencies?: Record<string, string>;
+} {
+  for (const path of [
+    join(process.cwd(), 'package.json'),
+    join(process.cwd(), 'apps/api/package.json'),
+  ]) {
     try {
       const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
         name?: string;
@@ -70,11 +78,18 @@ function handleMsg(
   message: SDKMessage,
   state: ReturnType<typeof freshState>,
   onChunk: (c: string) => void,
-  callbacks?: Parameters<ClaudeSdkStrategy['executePromptStreaming']>[3]
+  callbacks?: Parameters<ClaudeSdkStrategy['executePromptStreaming']>[3],
 ) {
-  (strategy as unknown as {
-    handleSdkMessage: (m: SDKMessage, s: typeof state, cb: (c: string) => void, cbs?: typeof callbacks) => void;
-  }).handleSdkMessage(message, state, onChunk, callbacks);
+  (
+    strategy as unknown as {
+      handleSdkMessage: (
+        m: SDKMessage,
+        s: typeof state,
+        cb: (c: string) => void,
+        cbs?: typeof callbacks,
+      ) => void;
+    }
+  ).handleSdkMessage(message, state, onChunk, callbacks);
 }
 
 function handleEvent(
@@ -82,11 +97,18 @@ function handleEvent(
   rawEvent: unknown,
   state: ReturnType<typeof freshState>,
   onChunk: (c: string) => void,
-  callbacks?: Parameters<ClaudeSdkStrategy['executePromptStreaming']>[3]
+  callbacks?: Parameters<ClaudeSdkStrategy['executePromptStreaming']>[3],
 ) {
-  (strategy as unknown as {
-    handleStreamEvent: (e: unknown, s: typeof state, cb: (c: string) => void, cbs?: typeof callbacks) => void;
-  }).handleStreamEvent(rawEvent, state, onChunk, callbacks);
+  (
+    strategy as unknown as {
+      handleStreamEvent: (
+        e: unknown,
+        s: typeof state,
+        cb: (c: string) => void,
+        cbs?: typeof callbacks,
+      ) => void;
+    }
+  ).handleStreamEvent(rawEvent, state, onChunk, callbacks);
 }
 
 // ─── describe blocks ─────────────────────────────────────────────────────────
@@ -94,7 +116,9 @@ function handleEvent(
 describe('ClaudeSdkStrategy › runtime packaging', () => {
   test('declares the Claude agent SDK as an API runtime dependency', () => {
     const pkg = readApiPackageJson();
-    expect(pkg.dependencies?.['@anthropic-ai/claude-agent-sdk']).toBe('0.2.126');
+    expect(pkg.dependencies?.['@anthropic-ai/claude-agent-sdk']).toBe(
+      '0.2.126',
+    );
   });
 });
 
@@ -110,132 +134,199 @@ describe('ClaudeSdkStrategy › handleSdkMessage', () => {
   });
 
   test('extracts session_id from any message that carries one', () => {
-    handleMsg(strategy, {
-      type: 'assistant',
-      session_id: 'sess-abc',
-      message: { role: 'assistant', content: [] },
-    } as unknown as SDKMessage, state, () => undefined);
+    handleMsg(
+      strategy,
+      {
+        type: 'assistant',
+        session_id: 'sess-abc',
+        message: { role: 'assistant', content: [] },
+      } as unknown as SDKMessage,
+      state,
+      () => undefined,
+    );
     expect(state.sessionId).toBe('sess-abc');
   });
 
   test('ignores blank session_id strings', () => {
-    handleMsg(strategy, {
-      type: 'assistant',
-      session_id: '   ',
-      message: { role: 'assistant', content: [] },
-    } as unknown as SDKMessage, state, () => undefined);
+    handleMsg(
+      strategy,
+      {
+        type: 'assistant',
+        session_id: '   ',
+        message: { role: 'assistant', content: [] },
+      } as unknown as SDKMessage,
+      state,
+      () => undefined,
+    );
     expect(state.sessionId).toBeNull();
   });
 
   test('assistant message with text content emits chunk when no text delta was seen', () => {
-    handleMsg(strategy, {
-      type: 'assistant',
-      session_id: 's1',
-      message: { role: 'assistant', content: [{ type: 'text', text: 'Hello world' }] },
-    } as unknown as SDKMessage, state, (c) => chunks.push(c));
+    handleMsg(
+      strategy,
+      {
+        type: 'assistant',
+        session_id: 's1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'Hello world' }],
+        },
+      } as unknown as SDKMessage,
+      state,
+      (c) => chunks.push(c),
+    );
     expect(chunks).toEqual(['Hello world']);
     expect(state.emittedVisibleOutput).toBe(true);
   });
 
   test('assistant snapshot is suppressed when text_delta already emitted', () => {
     state.emittedTextDelta = true;
-    handleMsg(strategy, {
-      type: 'assistant',
-      session_id: 's1',
-      message: { role: 'assistant', content: [{ type: 'text', text: 'duplicate' }] },
-    } as unknown as SDKMessage, state, (c) => chunks.push(c));
+    handleMsg(
+      strategy,
+      {
+        type: 'assistant',
+        session_id: 's1',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'duplicate' }],
+        },
+      } as unknown as SDKMessage,
+      state,
+      (c) => chunks.push(c),
+    );
     expect(chunks).toHaveLength(0);
   });
 
   test('assistant message with error text accumulates errorText', () => {
-    handleMsg(strategy, {
-      type: 'assistant',
-      session_id: 's1',
-      error: 'Something went wrong',
-      message: { role: 'assistant', content: [] },
-    } as unknown as SDKMessage, state, () => undefined);
+    handleMsg(
+      strategy,
+      {
+        type: 'assistant',
+        session_id: 's1',
+        error: 'Something went wrong',
+        message: { role: 'assistant', content: [] },
+      } as unknown as SDKMessage,
+      state,
+      () => undefined,
+    );
     expect(state.errorText).toBe('Something went wrong');
   });
 
   test('multiple errors are newline-separated', () => {
     state.errorText = 'First error';
-    handleMsg(strategy, {
-      type: 'assistant',
-      session_id: 's1',
-      error: 'Second error',
-      message: { role: 'assistant', content: [] },
-    } as unknown as SDKMessage, state, () => undefined);
+    handleMsg(
+      strategy,
+      {
+        type: 'assistant',
+        session_id: 's1',
+        error: 'Second error',
+        message: { role: 'assistant', content: [] },
+      } as unknown as SDKMessage,
+      state,
+      () => undefined,
+    );
     expect(state.errorText).toBe('First error\nSecond error');
   });
 
   test('result message fires onUsage callback', () => {
     const usages: unknown[] = [];
-    handleMsg(strategy, {
-      type: 'result',
-      session_id: 's1',
-      subtype: 'success',
-      is_error: false,
-      result: 'output',
-      usage: { input_tokens: 10, output_tokens: 20 },
-    } as unknown as SDKMessage, state, (c) => chunks.push(c), { onUsage: (u) => usages.push(u) });
+    handleMsg(
+      strategy,
+      {
+        type: 'result',
+        session_id: 's1',
+        subtype: 'success',
+        is_error: false,
+        result: 'output',
+        usage: { input_tokens: 10, output_tokens: 20 },
+      } as unknown as SDKMessage,
+      state,
+      (c) => chunks.push(c),
+      { onUsage: (u) => usages.push(u) },
+    );
     expect(usages).toHaveLength(1);
     expect((usages[0] as { inputTokens: number }).inputTokens).toBe(10);
   });
 
   test('result message emits result text when no text delta was seen', () => {
-    handleMsg(strategy, {
-      type: 'result',
-      session_id: 's1',
-      subtype: 'success',
-      is_error: false,
-      result: 'Only output',
-      usage: { input_tokens: 1, output_tokens: 2 },
-    } as unknown as SDKMessage, state, (c) => chunks.push(c));
+    handleMsg(
+      strategy,
+      {
+        type: 'result',
+        session_id: 's1',
+        subtype: 'success',
+        is_error: false,
+        result: 'Only output',
+        usage: { input_tokens: 1, output_tokens: 2 },
+      } as unknown as SDKMessage,
+      state,
+      (c) => chunks.push(c),
+    );
     expect(chunks).toEqual(['Only output']);
     expect(state.emittedVisibleOutput).toBe(true);
   });
 
   test('result message does not re-emit when text_delta was already seen', () => {
     state.emittedVisibleOutput = true;
-    handleMsg(strategy, {
-      type: 'result',
-      session_id: 's1',
-      subtype: 'success',
-      is_error: false,
-      result: 'Already shown',
-      usage: { input_tokens: 1, output_tokens: 2 },
-    } as unknown as SDKMessage, state, (c) => chunks.push(c));
+    handleMsg(
+      strategy,
+      {
+        type: 'result',
+        session_id: 's1',
+        subtype: 'success',
+        is_error: false,
+        result: 'Already shown',
+        usage: { input_tokens: 1, output_tokens: 2 },
+      } as unknown as SDKMessage,
+      state,
+      (c) => chunks.push(c),
+    );
     expect(chunks).toHaveLength(0);
   });
 
   test('is_error result accumulates errorText', () => {
-    handleMsg(strategy, {
-      type: 'result',
-      session_id: 's1',
-      subtype: 'error',
-      is_error: true,
-      errors: ['Tool failed', 'Timeout'],
-    } as unknown as SDKMessage, state, () => undefined);
+    handleMsg(
+      strategy,
+      {
+        type: 'result',
+        session_id: 's1',
+        subtype: 'error',
+        is_error: true,
+        errors: ['Tool failed', 'Timeout'],
+      } as unknown as SDKMessage,
+      state,
+      () => undefined,
+    );
     expect(state.errorText).toContain('Tool failed');
     expect(state.errorText).toContain('Timeout');
   });
 
   test('only-hidden-thinking followed by result emits result text', () => {
     // Simulate thinking delta only → no visible output → result should provide text
-    handleEvent(strategy, {
-      type: 'content_block_delta',
-      delta: { type: 'thinking_delta', thinking: 'internal reasoning' },
-    }, state, (c) => chunks.push(c));
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'thinking_delta', thinking: 'internal reasoning' },
+      },
+      state,
+      (c) => chunks.push(c),
+    );
     expect(state.emittedVisibleOutput).toBe(false);
 
-    handleMsg(strategy, {
-      type: 'result',
-      session_id: 's1',
-      subtype: 'success',
-      is_error: false,
-      result: 'Visible answer',
-      usage: { input_tokens: 5, output_tokens: 3 },
-    } as unknown as SDKMessage, state, (c) => chunks.push(c));
+    handleMsg(
+      strategy,
+      {
+        type: 'result',
+        session_id: 's1',
+        subtype: 'success',
+        is_error: false,
+        result: 'Visible answer',
+        usage: { input_tokens: 5, output_tokens: 3 },
+      } as unknown as SDKMessage,
+      state,
+      (c) => chunks.push(c),
+    );
     expect(chunks).toEqual(['Visible answer']);
   });
 });
@@ -252,10 +343,15 @@ describe('ClaudeSdkStrategy › handleStreamEvent', () => {
   });
 
   test('text_delta emits visible chunk and sets flags', () => {
-    handleEvent(strategy, {
-      type: 'content_block_delta',
-      delta: { type: 'text_delta', text: 'streaming text' },
-    }, state, (c) => chunks.push(c));
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: 'streaming text' },
+      },
+      state,
+      (c) => chunks.push(c),
+    );
     expect(chunks).toEqual(['streaming text']);
     expect(state.emittedVisibleOutput).toBe(true);
     expect(state.emittedTextDelta).toBe(true);
@@ -264,12 +360,18 @@ describe('ClaudeSdkStrategy › handleStreamEvent', () => {
   test('text_delta after thinking closes reasoning and emits chunk', () => {
     const events: string[] = [];
     state.inThinking = true;
-    handleEvent(strategy, {
-      type: 'content_block_delta',
-      delta: { type: 'text_delta', text: 'answer' },
-    }, state, (c) => chunks.push(c), {
-      onReasoningEnd: () => events.push('end'),
-    });
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'text_delta', text: 'answer' },
+      },
+      state,
+      (c) => chunks.push(c),
+      {
+        onReasoningEnd: () => events.push('end'),
+      },
+    );
     expect(events).toEqual(['end']);
     expect(state.inThinking).toBe(false);
     expect(chunks).toEqual(['answer']);
@@ -282,34 +384,79 @@ describe('ClaudeSdkStrategy › handleStreamEvent', () => {
       onReasoningStart: () => starts.push(1),
       onReasoningChunk: (t: string) => reasoningChunks.push(t),
     };
-    handleEvent(strategy, { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'part A' } }, state, () => undefined, cb);
-    handleEvent(strategy, { type: 'content_block_delta', delta: { type: 'thinking_delta', thinking: 'part B' } }, state, () => undefined, cb);
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'thinking_delta', thinking: 'part A' },
+      },
+      state,
+      () => undefined,
+      cb,
+    );
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'thinking_delta', thinking: 'part B' },
+      },
+      state,
+      () => undefined,
+      cb,
+    );
     expect(starts).toHaveLength(1); // Only called once on first chunk
     expect(reasoningChunks).toEqual(['part A', 'part B']);
     expect(state.inThinking).toBe(true);
   });
 
   test('content_block_start tool_use creates currentToolBlock', () => {
-    handleEvent(strategy, {
-      type: 'content_block_start',
-      content_block: { type: 'tool_use', name: 'bash' },
-    }, state, () => undefined);
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_start',
+        content_block: { type: 'tool_use', name: 'bash' },
+      },
+      state,
+      () => undefined,
+    );
     expect(state.currentToolBlock).toEqual({ name: 'bash', inputStr: '' });
   });
 
   test('input_json_delta accumulates into currentToolBlock.inputStr', () => {
     state.currentToolBlock = { name: 'bash', inputStr: '' };
-    handleEvent(strategy, { type: 'content_block_delta', delta: { type: 'input_json_delta', partial_json: '{"cmd"' } }, state, () => undefined);
-    handleEvent(strategy, { type: 'content_block_delta', delta: { type: 'input_json_delta', partial_json: ':"ls"}' } }, state, () => undefined);
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'input_json_delta', partial_json: '{"cmd"' },
+      },
+      state,
+      () => undefined,
+    );
+    handleEvent(
+      strategy,
+      {
+        type: 'content_block_delta',
+        delta: { type: 'input_json_delta', partial_json: ':"ls"}' },
+      },
+      state,
+      () => undefined,
+    );
     expect(state.currentToolBlock.inputStr).toBe('{"cmd":"ls"}');
   });
 
   test('content_block_stop with tool fires onTool with parsed input and clears block', () => {
     state.currentToolBlock = { name: 'bash', inputStr: '{"command":"ls -la"}' };
     const toolEvents: unknown[] = [];
-    handleEvent(strategy, { type: 'content_block_stop' }, state, () => undefined, {
-      onTool: (e) => toolEvents.push(e),
-    });
+    handleEvent(
+      strategy,
+      { type: 'content_block_stop' },
+      state,
+      () => undefined,
+      {
+        onTool: (e) => toolEvents.push(e),
+      },
+    );
     expect(toolEvents).toHaveLength(1);
     expect(state.currentToolBlock).toBeNull();
   });
@@ -317,27 +464,44 @@ describe('ClaudeSdkStrategy › handleStreamEvent', () => {
   test('content_block_stop with malformed JSON still fires onTool (no input)', () => {
     state.currentToolBlock = { name: 'bash', inputStr: 'not json' };
     const toolEvents: unknown[] = [];
-    handleEvent(strategy, { type: 'content_block_stop' }, state, () => undefined, {
-      onTool: (e) => toolEvents.push(e),
-    });
+    handleEvent(
+      strategy,
+      { type: 'content_block_stop' },
+      state,
+      () => undefined,
+      {
+        onTool: (e) => toolEvents.push(e),
+      },
+    );
     expect(toolEvents).toHaveLength(1);
   });
 
   test('content_block_stop while inThinking fires onReasoningEnd', () => {
     state.inThinking = true;
     const events: string[] = [];
-    handleEvent(strategy, { type: 'content_block_stop' }, state, () => undefined, {
-      onReasoningEnd: () => events.push('end'),
-    });
+    handleEvent(
+      strategy,
+      { type: 'content_block_stop' },
+      state,
+      () => undefined,
+      {
+        onReasoningEnd: () => events.push('end'),
+      },
+    );
     expect(events).toEqual(['end']);
     expect(state.inThinking).toBe(false);
   });
 
   test('message_start sets usage from event', () => {
-    handleEvent(strategy, {
-      type: 'message_start',
-      message: { usage: { input_tokens: 15, output_tokens: 0 } },
-    }, state, () => undefined);
+    handleEvent(
+      strategy,
+      {
+        type: 'message_start',
+        message: { usage: { input_tokens: 15, output_tokens: 0 } },
+      },
+      state,
+      () => undefined,
+    );
     expect(state.usage?.inputTokens).toBe(15);
   });
 
@@ -351,9 +515,15 @@ describe('ClaudeSdkStrategy › handleStreamEvent', () => {
   });
 
   test('ignores null/non-object raw events', () => {
-    expect(() => handleEvent(strategy, null, state, () => undefined)).not.toThrow();
-    expect(() => handleEvent(strategy, 'string', state, () => undefined)).not.toThrow();
-    expect(() => handleEvent(strategy, 42, state, () => undefined)).not.toThrow();
+    expect(() =>
+      handleEvent(strategy, null, state, () => undefined),
+    ).not.toThrow();
+    expect(() =>
+      handleEvent(strategy, 'string', state, () => undefined),
+    ).not.toThrow();
+    expect(() =>
+      handleEvent(strategy, 42, state, () => undefined),
+    ).not.toThrow();
   });
 });
 
@@ -369,12 +539,23 @@ describe('ClaudeSdkStrategy › session marker', () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  function readMarker(s: ClaudeSdkStrategy, workspaceDir: string): string | null {
-    return (s as unknown as { readSessionMarker: (d: string) => string | null }).readSessionMarker(workspaceDir);
+  function readMarker(
+    s: ClaudeSdkStrategy,
+    workspaceDir: string,
+  ): string | null {
+    return (
+      s as unknown as { readSessionMarker: (d: string) => string | null }
+    ).readSessionMarker(workspaceDir);
   }
 
-  function writeMarker(s: ClaudeSdkStrategy, workspaceDir: string, id: string): void {
-    (s as unknown as { writeSessionMarker: (d: string, id: string) => void }).writeSessionMarker(workspaceDir, id);
+  function writeMarker(
+    s: ClaudeSdkStrategy,
+    workspaceDir: string,
+    id: string,
+  ): void {
+    (
+      s as unknown as { writeSessionMarker: (d: string, id: string) => void }
+    ).writeSessionMarker(workspaceDir, id);
   }
 
   test('readSessionMarker returns null when no conversationDataDir is set', () => {
@@ -408,7 +589,10 @@ describe('ClaudeSdkStrategy › session marker', () => {
 
 describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   let tmpDir: string;
-  let queryCalls: Array<{ prompt: AsyncIterable<unknown>; options: { resume?: string; sessionId?: string } }>;
+  let queryCalls: Array<{
+    prompt: AsyncIterable<unknown>;
+    options: { resume?: string; sessionId?: string };
+  }>;
   let closedCalls: number[];
   let receivedPrompts: string[];
 
@@ -417,9 +601,17 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     queryCalls = [];
     closedCalls = [];
     receivedPrompts = [];
-    (ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }).records.clear();
+    (
+      ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
+    ).records.clear();
     mock.module('@anthropic-ai/claude-agent-sdk', () => ({
-      query: ({ prompt, options }: { prompt: AsyncIterable<unknown>; options: { resume?: string; sessionId?: string } }) => {
+      query: ({
+        prompt,
+        options,
+      }: {
+        prompt: AsyncIterable<unknown>;
+        options: { resume?: string; sessionId?: string };
+      }) => {
         const callIndex = queryCalls.length;
         queryCalls.push({ prompt, options });
         const iterator = (async function* () {
@@ -432,7 +624,12 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
             session_id: `session-${callIndex}`,
             message: {
               role: 'assistant',
-              content: [{ type: 'text', text: `answer-${callIndex}:${text.includes('second turn') ? 'second' : 'first'}` }],
+              content: [
+                {
+                  type: 'text',
+                  text: `answer-${callIndex}:${text.includes('second turn') ? 'second' : 'first'}`,
+                },
+              ],
             },
           };
           yield {
@@ -458,15 +655,26 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-    (ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }).records.clear();
+    (
+      ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
+    ).records.clear();
   });
 
   test('starts a fresh Claude SDK query for every user turn and resumes the saved session', async () => {
-    const strategy = makeStrategy(false, tmpDir, undefined, 'likeable-project-1');
+    const strategy = makeStrategy(
+      false,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
     const chunks: string[] = [];
 
-    await strategy.executePromptStreaming('first turn', 'opus', (chunk) => chunks.push(chunk));
-    await strategy.executePromptStreaming('second turn', 'opus', (chunk) => chunks.push(chunk));
+    await strategy.executePromptStreaming('first turn', 'opus', (chunk) =>
+      chunks.push(chunk),
+    );
+    await strategy.executePromptStreaming('second turn', 'opus', (chunk) =>
+      chunks.push(chunk),
+    );
 
     expect(chunks).toEqual(['answer-0:first', 'answer-1:second']);
     expect(queryCalls).toHaveLength(2);
@@ -476,11 +684,18 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   });
 
   test('folds pending steer text into the next fresh provider turn', async () => {
-    const strategy = makeStrategy(false, tmpDir, undefined, 'likeable-project-1');
+    const strategy = makeStrategy(
+      false,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
     const chunks: string[] = [];
 
     strategy.steerAgent?.('change direction');
-    await strategy.executePromptStreaming('continue work', 'opus', (chunk) => chunks.push(chunk));
+    await strategy.executePromptStreaming('continue work', 'opus', (chunk) =>
+      chunks.push(chunk),
+    );
     const text = receivedPrompts[0] ?? '';
 
     expect(chunks).toEqual(['answer-0:first']);
@@ -500,12 +715,35 @@ describe('ClaudeSdkStrategy › AsyncMessageQueue', () => {
     expect(() => strategy.steerAgent?.('msg')).not.toThrow();
   });
 
+  test('steerAgent interrupts an active Claude SDK stream for immediate restart', async () => {
+    const strategy = makeStrategy();
+    const interrupt = mock(async () => undefined);
+    (strategy as unknown as { activeRecord: unknown }).activeRecord = {
+      closed: false,
+      busy: true,
+      query: { interrupt },
+    };
+
+    const result = strategy.steerAgent?.('change direction');
+    await Promise.resolve();
+
+    expect(result).toBe('queued');
+    expect(
+      (strategy as unknown as { streamInterrupted: boolean }).streamInterrupted,
+    ).toBe(true);
+    expect(interrupt).toHaveBeenCalled();
+  });
+
   test('interruptAgent sets streamInterrupted flag', () => {
     const strategy = makeStrategy();
     // Before interrupt
-    expect((strategy as unknown as { streamInterrupted: boolean }).streamInterrupted).toBe(false);
+    expect(
+      (strategy as unknown as { streamInterrupted: boolean }).streamInterrupted,
+    ).toBe(false);
     strategy.interruptAgent();
-    expect((strategy as unknown as { streamInterrupted: boolean }).streamInterrupted).toBe(true);
+    expect(
+      (strategy as unknown as { streamInterrupted: boolean }).streamInterrupted,
+    ).toBe(true);
   });
 });
 
@@ -516,28 +754,43 @@ describe('ClaudeSdkStrategy › utility functions', () => {
     // We test indirectly via handleStreamEvent which calls usageFromObject
     const state = freshState();
     const chunks: string[] = [];
-    handleEvent(strategy, {
-      type: 'message_start',
-      message: { usage: { input_tokens: 7, output_tokens: 3 } },
-    }, state, () => chunks.push(''));
+    handleEvent(
+      strategy,
+      {
+        type: 'message_start',
+        message: { usage: { input_tokens: 7, output_tokens: 3 } },
+      },
+      state,
+      () => chunks.push(''),
+    );
     expect(state.usage).toEqual({ inputTokens: 7, outputTokens: 3 });
   });
 
   test('usageFromObject handles camelCase keys', () => {
     const state = freshState();
-    handleEvent(strategy, {
-      type: 'message_start',
-      message: { usage: { inputTokens: 4, outputTokens: 8 } },
-    }, state, () => undefined);
+    handleEvent(
+      strategy,
+      {
+        type: 'message_start',
+        message: { usage: { inputTokens: 4, outputTokens: 8 } },
+      },
+      state,
+      () => undefined,
+    );
     expect(state.usage).toEqual({ inputTokens: 4, outputTokens: 8 });
   });
 
   test('usageFromObject returns null for non-object', () => {
     const state = freshState();
-    handleEvent(strategy, {
-      type: 'message_start',
-      message: { usage: null },
-    }, state, () => undefined);
+    handleEvent(
+      strategy,
+      {
+        type: 'message_start',
+        message: { usage: null },
+      },
+      state,
+      () => undefined,
+    );
     // usage stays null since we passed null
     expect(state.usage).toBeNull();
   });
@@ -589,7 +842,9 @@ describe('ClaudeSdkStrategy › auth management', () => {
       sendDeviceCode: () => undefined,
       sendAuthUrlGenerated: () => undefined,
     };
-    (strategy as unknown as { currentConnection: typeof connection }).currentConnection = connection;
+    (
+      strategy as unknown as { currentConnection: typeof connection }
+    ).currentConnection = connection;
     strategy.submitAuthCode('my-oauth-token');
     expect(events).toContain('success');
   });
@@ -604,7 +859,9 @@ describe('ClaudeSdkStrategy › auth management', () => {
       sendDeviceCode: () => undefined,
       sendAuthUrlGenerated: () => undefined,
     };
-    (strategy as unknown as { currentConnection: typeof connection }).currentConnection = connection;
+    (
+      strategy as unknown as { currentConnection: typeof connection }
+    ).currentConnection = connection;
     strategy.submitAuthCode('  ');
     expect(events).toContain('unauthenticated');
   });
@@ -629,8 +886,14 @@ describe('ClaudeSdkStrategy › getWorkingDir', () => {
   });
 
   test('uses shared default workspace when a default data dir is provided', () => {
-    const strategy = makeStrategy(false, '/data/conversations/thread-a', '/data/default-agent');
-    expect(strategy.getWorkingDir()).toBe(join('/data/default-agent', 'claude_workspace'));
+    const strategy = makeStrategy(
+      false,
+      '/data/conversations/thread-a',
+      '/data/default-agent',
+    );
+    expect(strategy.getWorkingDir()).toBe(
+      join('/data/default-agent', 'claude_workspace'),
+    );
   });
 
   test('falls back to playground dir when no conversationDataDir', () => {

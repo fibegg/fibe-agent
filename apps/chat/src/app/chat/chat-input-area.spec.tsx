@@ -4,7 +4,14 @@ import { ChatInputArea } from './chat-input-area';
 import { CHAT_STATES } from './chat-state';
 
 vi.mock('./mention-input', () => ({
-  MentionInput: ({ value, onChange, placeholder, disabled, onKeyDown, onPaste }: {
+  MentionInput: ({
+    value,
+    onChange,
+    placeholder,
+    disabled,
+    onKeyDown,
+    onPaste,
+  }: {
     value: string;
     onChange: (v: string) => void;
     placeholder?: string;
@@ -49,7 +56,13 @@ const BASE_PROPS = {
   pendingImages: [],
   pendingAttachments: [],
   pendingVoice: null,
-  voiceRecorder: { isSupported: false, isRecording: false, recordingTimeSec: 0, liveText: '', error: null },
+  voiceRecorder: {
+    isSupported: false,
+    isRecording: false,
+    recordingTimeSec: 0,
+    liveText: '',
+    error: null,
+  },
   voiceUploadError: null,
   attachmentUploadError: null,
   onRemovePendingImage: vi.fn(),
@@ -87,26 +100,51 @@ describe('ChatInputArea', () => {
   });
 
   it('Attach files button is disabled when not AUTHENTICATED', () => {
-    render(<ChatInputArea {...BASE_PROPS} state={CHAT_STATES.AWAITING_RESPONSE} />);
+    render(
+      <ChatInputArea {...BASE_PROPS} state={CHAT_STATES.AWAITING_RESPONSE} />,
+    );
     const attachBtn = screen.getByRole('button', { name: /attach files/i });
     expect(attachBtn.getAttribute('disabled')).not.toBeNull();
   });
 
   it('shows Stop and Queue buttons when AWAITING_RESPONSE', () => {
-    render(<ChatInputArea {...BASE_PROPS} state={CHAT_STATES.AWAITING_RESPONSE} inputValue="hello" />);
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+        inputValue="hello"
+        workingElapsedMs={65_000}
+      />,
+    );
     expect(screen.getByRole('button', { name: /stop/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /queue message/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /steer message/i })).toBeTruthy();
+    expect(screen.getByText('Agent is working')).toBeTruthy();
+    expect(screen.getByText('1m 5s')).toBeTruthy();
   });
 
   it('calls onInterrupt when Stop button is clicked', () => {
     const onInterrupt = vi.fn();
-    render(<ChatInputArea {...BASE_PROPS} state={CHAT_STATES.AWAITING_RESPONSE} onInterrupt={onInterrupt} />);
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+        onInterrupt={onInterrupt}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /stop/i }));
     expect(onInterrupt).toHaveBeenCalled();
   });
 
   it('shows pending image thumbnails', () => {
-    render(<ChatInputArea {...BASE_PROPS} pendingImages={[{ url: 'data:image/png;base64,abc', filename: 'test.png' }]} />);
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        pendingImages={[
+          { url: 'data:image/png;base64,abc', filename: 'test.png' },
+        ]}
+      />,
+    );
     expect(screen.getByRole('button', { name: /remove image/i })).toBeTruthy();
   });
 
@@ -115,9 +153,11 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        pendingImages={[{ url: 'data:image/png;base64,abc', filename: 'test.png' }]}
+        pendingImages={[
+          { url: 'data:image/png;base64,abc', filename: 'test.png' },
+        ]}
         onRemovePendingImage={onRemovePendingImage}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /remove image/i }));
     expect(onRemovePendingImage).toHaveBeenCalledWith(0);
@@ -128,7 +168,7 @@ describe('ChatInputArea', () => {
       <ChatInputArea
         {...BASE_PROPS}
         pendingAttachments={[{ filename: 'server-file.txt', name: 'file.txt' }]}
-      />
+      />,
     );
     expect(screen.getByTitle('file.txt')).toBeTruthy();
   });
@@ -140,14 +180,19 @@ describe('ChatInputArea', () => {
         {...BASE_PROPS}
         pendingAttachments={[{ filename: 'srv.txt', name: 'doc.txt' }]}
         onRemovePendingAttachment={onRemovePendingAttachment}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /remove attachment/i }));
     expect(onRemovePendingAttachment).toHaveBeenCalledWith(0);
   });
 
   it('shows pending voice audio player', () => {
-    const { container } = render(<ChatInputArea {...BASE_PROPS} pendingVoice="data:audio/webm;base64,abc" />);
+    const { container } = render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        pendingVoice="data:audio/webm;base64,abc"
+      />,
+    );
     expect(container.querySelector('audio')).toBeTruthy();
   });
 
@@ -158,7 +203,7 @@ describe('ChatInputArea', () => {
         {...BASE_PROPS}
         pendingVoice="data:audio/webm;base64,abc"
         onRemovePendingVoice={onRemovePendingVoice}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /remove voice/i }));
     expect(onRemovePendingVoice).toHaveBeenCalled();
@@ -170,7 +215,9 @@ describe('ChatInputArea', () => {
   });
 
   it('shows attachment error messages', () => {
-    render(<ChatInputArea {...BASE_PROPS} attachmentUploadError="File too large" />);
+    render(
+      <ChatInputArea {...BASE_PROPS} attachmentUploadError="File too large" />,
+    );
     expect(screen.getByText('File too large')).toBeTruthy();
   });
 
@@ -178,8 +225,14 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'Recording failed', liveText: '' }}
-      />
+        voiceRecorder={{
+          isSupported: true,
+          isRecording: false,
+          recordingTimeSec: 0,
+          error: 'Recording failed',
+          liveText: '',
+        }}
+      />,
     );
     expect(screen.getByText('Recording failed')).toBeTruthy();
   });
@@ -188,8 +241,14 @@ describe('ChatInputArea', () => {
     const { container } = render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: 'NotAllowedError: Permission denied', liveText: '' }}
-      />
+        voiceRecorder={{
+          isSupported: true,
+          isRecording: false,
+          recordingTimeSec: 0,
+          error: 'NotAllowedError: Permission denied',
+          liveText: '',
+        }}
+      />,
     );
     // Raw error string should NOT appear — it's replaced by the i18n message
     expect(screen.queryByText('NotAllowedError: Permission denied')).toBeNull();
@@ -202,8 +261,14 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: null, liveText: '' }}
-      />
+        voiceRecorder={{
+          isSupported: true,
+          isRecording: false,
+          recordingTimeSec: 0,
+          error: null,
+          liveText: '',
+        }}
+      />,
     );
     expect(screen.getByRole('button', { name: /voice input/i })).toBeTruthy();
   });
@@ -212,18 +277,32 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: true, recordingTimeSec: 5, error: null, liveText: '' }}
-      />
+        voiceRecorder={{
+          isSupported: true,
+          isRecording: true,
+          recordingTimeSec: 5,
+          error: null,
+          liveText: '',
+        }}
+      />,
     );
-    expect(screen.getByRole('button', { name: /stop recording/i })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /stop recording/i }),
+    ).toBeTruthy();
   });
 
   it('shows recording time in mm:ss format', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: true, recordingTimeSec: 75, error: null, liveText: '' }}
-      />
+        voiceRecorder={{
+          isSupported: true,
+          isRecording: true,
+          recordingTimeSec: 75,
+          error: null,
+          liveText: '',
+        }}
+      />,
     );
     // 75 seconds = 1:15
     expect(screen.getByText(/1:15/)).toBeTruthy();
@@ -234,17 +313,24 @@ describe('ChatInputArea', () => {
     render(
       <ChatInputArea
         {...BASE_PROPS}
-        voiceRecorder={{ isSupported: true, isRecording: false, recordingTimeSec: 0, error: null, liveText: '' }}
+        voiceRecorder={{
+          isSupported: true,
+          isRecording: false,
+          recordingTimeSec: 0,
+          error: null,
+          liveText: '',
+        }}
         onVoiceToggle={onVoiceToggle}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /voice input/i }));
     expect(onVoiceToggle).toHaveBeenCalled();
   });
 
-
   it('input is disabled when state is not AUTHENTICATED or AWAITING_RESPONSE', () => {
-    render(<ChatInputArea {...BASE_PROPS} state={CHAT_STATES.UNAUTHENTICATED} />);
+    render(
+      <ChatInputArea {...BASE_PROPS} state={CHAT_STATES.UNAUTHENTICATED} />,
+    );
     const input = screen.getByTestId('mention-input');
     expect(input.getAttribute('disabled')).not.toBeNull();
   });
@@ -255,7 +341,12 @@ describe('ChatInputArea', () => {
 
   it('Send button requests persistent chat input focus recovery', () => {
     const onRequestInputFocus = vi.fn();
-    render(<ChatInputArea {...BASE_PROPS} onRequestInputFocus={onRequestInputFocus} />);
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        onRequestInputFocus={onRequestInputFocus}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
 
     expect(onRequestInputFocus).toHaveBeenCalledOnce();
@@ -270,10 +361,46 @@ describe('ChatInputArea', () => {
         state={CHAT_STATES.AWAITING_RESPONSE}
         inputValue="hello"
         onRequestInputFocus={onRequestInputFocus}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /queue message/i }));
 
     expect(onRequestInputFocus).toHaveBeenCalledOnce();
+  });
+
+  it('Steer-message button calls onSteer and requests persistent focus recovery', () => {
+    const onSteer = vi.fn();
+    const onRequestInputFocus = vi.fn();
+
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+        inputValue="adjust course"
+        onSteer={onSteer}
+        onRequestInputFocus={onRequestInputFocus}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /steer message/i }));
+
+    expect(onSteer).toHaveBeenCalledOnce();
+    expect(onRequestInputFocus).toHaveBeenCalledOnce();
+  });
+
+  it('labels steer fallback as next-turn guidance when live steer is unavailable', () => {
+    render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+        inputValue="adjust course"
+        steerMode="next"
+      />,
+    );
+
+    expect(
+      screen.getByRole('button', { name: /queue guidance for next turn/i }),
+    ).toBeTruthy();
+    expect(screen.getByText('Next')).toBeTruthy();
+    expect(screen.getByText('Next: guide after current turn')).toBeTruthy();
   });
 });

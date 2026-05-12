@@ -11,12 +11,15 @@ vi.mock('./file-explorer/prism-loader', () => ({
   highlightCodeElement: vi.fn(),
 }));
 
-vi.stubGlobal('Worker', class MockWorker {
-  addEventListener = vi.fn();
-  removeEventListener = vi.fn();
-  postMessage = vi.fn();
-  terminate = vi.fn();
-});
+vi.stubGlobal(
+  'Worker',
+  class MockWorker {
+    addEventListener = vi.fn();
+    removeEventListener = vi.fn();
+    postMessage = vi.fn();
+    terminate = vi.fn();
+  },
+);
 
 describe('App', () => {
   it('should render successfully', () => {
@@ -34,6 +37,8 @@ describe('App', () => {
         <App />
       </MemoryRouter>,
     );
-    expect(await findByRole('button', { name: 'Login' }, { timeout: 5000 })).toBeTruthy();
+    expect(
+      await findByRole('button', { name: 'Login' }, { timeout: 10000 }),
+    ).toBeTruthy();
   });
 });

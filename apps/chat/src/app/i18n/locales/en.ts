@@ -40,17 +40,31 @@ export const en = {
   'chat.input.removeAttachment': 'Remove attachment',
   'chat.input.voiceInput': 'Voice input',
   'chat.input.stopRecording': 'Stop recording',
-  'chat.input.micDenied': 'Microphone access was denied. Please allow microphone access in your browser settings.',
+  'chat.input.micDenied':
+    'Microphone access was denied. Please allow microphone access in your browser settings.',
   'chat.input.queueMessage': 'Queue message',
   'chat.input.queueMessageTitle': 'Queue message for agent',
   'chat.input.steerMessage': 'Steer message',
   'chat.input.steerMessageTitle': 'Steer current agent run',
+  'chat.input.steerNextMessage': 'Queue guidance for next turn',
+  'chat.input.steerNextMessageTitle':
+    'Claude cannot live-steer; send this as operator guidance for the next turn',
+  'chat.input.queueShort': 'Queue',
+  'chat.input.steerShort': 'Steer',
+  'chat.input.steerNextShort': 'Next',
+  'chat.input.agentWorking': 'Agent is working',
+  'chat.input.workingTime': 'Current run time',
+  'chat.input.queueHint': 'Queue: next turn',
+  'chat.input.steerHint': 'Steer: guide now',
+  'chat.input.steerNextHint': 'Next: guide after current turn',
   'chat.input.stop': 'Stop',
   'chat.input.send': 'Send',
   'chat.noOutput': 'Process completed successfully but returned no output.',
   'chat.continue': 'Continue',
 
   'message.queued': 'Queued',
+  'message.nextTurn': 'Next',
+  'message.steering': 'Steering',
   'message.copyRawUser': 'Copy raw user message',
   'message.copyRawAssistant': 'Copy raw assistant message',
   'message.readAloud': 'Read aloud',
@@ -129,7 +143,8 @@ export const en = {
   'settings.activityFilter': 'Activity Filter',
   'settings.interface': 'Interface',
   'settings.uiEffects': 'Animations and visual effects',
-  'settings.uiEffectsDescription': 'Disable on slow devices to keep the UI functional with less motion and blur.',
+  'settings.uiEffectsDescription':
+    'Disable on slow devices to keep the UI functional with less motion and blur.',
   'settings.fibeSync': 'Fibe Sync',
   'settings.sync.messages': 'Send messages to Fibe',
   'settings.sync.activity': 'Send activity to Fibe',
@@ -146,7 +161,8 @@ export const en = {
   'settings.dataPrivacy': 'Data Privacy (GDPR/CCPA)',
   'settings.exportData': 'Export My Data',
   'settings.deleteData': 'Delete My Data',
-  'settings.deleteConfirm': 'Are you absolutely sure you want to permanently delete all your conversation data? This action cannot be undone.',
+  'settings.deleteConfirm':
+    'Are you absolutely sure you want to permanently delete all your conversation data? This action cannot be undone.',
   'settings.reauthenticate': 'Re-authenticate',
   'settings.logout': 'Logout',
   'settings.postInit': 'Post-init script',
@@ -167,17 +183,20 @@ export const en = {
   'settings.raw.response': 'Response',
 
   'auth.connect': 'Connect to Provider',
-  'auth.description': 'Please follow the link below to authorize the fibe agent.',
+  'auth.description':
+    'Please follow the link below to authorize the fibe agent.',
   'auth.openUrl': 'Open Authentication URL',
   'auth.apiToken': 'Paste API Key or Token',
   'auth.deviceCode': 'One-time device code',
   'auth.authorizationCode': 'Paste authorization code',
-  'auth.manualHelp': 'Enter your provider API key (e.g. ANTHROPIC_API_KEY, GEMINI_API_KEY) or OAuth token.',
+  'auth.manualHelp':
+    'Enter your provider API key (e.g. ANTHROPIC_API_KEY, GEMINI_API_KEY) or OAuth token.',
   'auth.tokenPlaceholder': 'sk-...',
   'auth.codePlaceholder': 'Paste code here...',
   'auth.copyDeviceCode': 'Copy device code',
   'auth.waitingForUrl': 'Generating authorization link…',
-  'auth.generatingUrl': 'Please wait while the provider generates an authorization link.',
+  'auth.generatingUrl':
+    'Please wait while the provider generates an authorization link.',
   'auth.connecting': 'Connecting...',
 
   'login.connecting': 'Connecting...',
@@ -393,7 +412,8 @@ export const en = {
   'stark.minimize': 'Minimize window',
   'stark.exec': 'EXEC',
 
-  'cli.description': 'Select a command to add it to your chat input. You can then ask the agent to run it.',
+  'cli.description':
+    'Select a command to add it to your chat input. You can then ask the agent to run it.',
   'cli.playgrounds': 'Playgrounds',
   'cli.agents': 'Agents',
   'cli.general': 'General',

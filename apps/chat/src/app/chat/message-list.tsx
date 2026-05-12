@@ -10,7 +10,19 @@ import {
   useRef,
   useState,
 } from 'react';
-import { Brain, Check, Clock, Copy, RefreshCcw, RotateCw, Sparkles, User, Play, Square } from 'lucide-react';
+import {
+  Brain,
+  Check,
+  Clock,
+  Copy,
+  CornerDownRight,
+  RefreshCcw,
+  RotateCw,
+  Sparkles,
+  User,
+  Play,
+  Square,
+} from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { useLocalTts } from './use-local-tts';
 import { API_PATH_UPLOADS_BY_FILENAME } from '@shared/api-paths';
@@ -35,11 +47,17 @@ import {
 } from './markdown-bare-pre';
 import { renderMarkdown } from './markdown-cache';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
-import { estimateMessageHeight, estimateStreamingHeight, computeTightBubbleWidth } from './pretext-height';
+import {
+  estimateMessageHeight,
+  estimateStreamingHeight,
+  computeTightBubbleWidth,
+} from './pretext-height';
 import { useI18n } from '../i18n';
 import { copyTextToClipboard } from '../browser-compat';
 
-let prismLoaderPromise: Promise<typeof import('../file-explorer/prism-loader')> | null = null;
+let prismLoaderPromise: Promise<
+  typeof import('../file-explorer/prism-loader')
+> | null = null;
 
 function getPrismLoader() {
   if (!prismLoaderPromise) {
@@ -80,12 +98,16 @@ function annotateChatCodeBlockLabels(root: HTMLElement): void {
     if (!id) return;
     pre.setAttribute(
       'data-code-lang',
-      PRISM_LANG_LABEL[id] ?? id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, ' ')
+      PRISM_LANG_LABEL[id] ??
+        id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, ' '),
     );
   });
 }
 
-function schedulePrismHighlightForRoot(root: HTMLElement, shouldAbort: () => boolean): void {
+function schedulePrismHighlightForRoot(
+  root: HTMLElement,
+  shouldAbort: () => boolean,
+): void {
   getPrismLoader().then((m) => {
     if (shouldAbort() || !root.isConnected) return;
     for (const el of root.querySelectorAll('pre code')) {
@@ -142,7 +164,10 @@ function CopyRawMessageButton({
     if (await copyTextToClipboard(rawText)) {
       setCopied(true);
       clearTimer();
-      timeoutRef.current = setTimeout(() => setCopied(false), COPY_SUCCESS_FEEDBACK_MS);
+      timeoutRef.current = setTimeout(
+        () => setCopied(false),
+        COPY_SUCCESS_FEEDBACK_MS,
+      );
     } else {
       setCopied(false);
     }
@@ -151,9 +176,14 @@ function CopyRawMessageButton({
   if (!rawText) return null;
 
   const btnClass =
-    visualVariant === 'user' ? COPY_BUTTON_CLASS_USER : COPY_BUTTON_CLASS_ASSISTANT;
+    visualVariant === 'user'
+      ? COPY_BUTTON_CLASS_USER
+      : COPY_BUTTON_CLASS_ASSISTANT;
 
-  const idleLabel = visualVariant === 'user' ? t('message.copyRawUser') : t('message.copyRawAssistant');
+  const idleLabel =
+    visualVariant === 'user'
+      ? t('message.copyRawUser')
+      : t('message.copyRawAssistant');
   const copiedLabel = t('common.copied');
 
   return (
@@ -164,7 +194,11 @@ function CopyRawMessageButton({
       title={copied ? copiedLabel : idleLabel}
       aria-label={copied ? copiedLabel : idleLabel}
     >
-      {copied ? <Check className="size-3.5" aria-hidden /> : <Copy className="size-3.5" aria-hidden />}
+      {copied ? (
+        <Check className="size-3.5" aria-hidden />
+      ) : (
+        <Copy className="size-3.5" aria-hidden />
+      )}
     </button>
   );
 }
@@ -180,7 +214,10 @@ const MarkdownWithPrism = memo(
     codeLangBadge?: boolean;
   }) {
     const ref = useRef<HTMLDivElement>(null);
-    const htmlForDom = useMemo(() => wrapBarePreElementsInHtmlString(html), [html]);
+    const htmlForDom = useMemo(
+      () => wrapBarePreElementsInHtmlString(html),
+      [html],
+    );
     useLayoutEffect(() => {
       if (!ref.current) return;
       const root = ref.current;
@@ -194,13 +231,17 @@ const MarkdownWithPrism = memo(
       };
     }, [htmlForDom, codeLangBadge]);
     return (
-      <div ref={ref} className={className} dangerouslySetInnerHTML={{ __html: htmlForDom }} />
+      <div
+        ref={ref}
+        className={className}
+        dangerouslySetInnerHTML={{ __html: htmlForDom }}
+      />
     );
   },
   (prev, next) =>
     prev.html === next.html &&
     prev.className === next.className &&
-    prev.codeLangBadge === next.codeLangBadge
+    prev.codeLangBadge === next.codeLangBadge,
 );
 
 function userMessageMarkdownPartKey(index: number, content: string): string {
@@ -208,10 +249,18 @@ function userMessageMarkdownPartKey(index: number, content: string): string {
 }
 
 function MentionChipIcon({ path }: { path: string }) {
-  return <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />;
+  return (
+    <FileIcon pathOrName={path} size={12} className="shrink-0 opacity-90" />
+  );
 }
 
-function MessageBodyWithMentions({ body, messageId }: { body: string; messageId?: string }) {
+function MessageBodyWithMentions({
+  body,
+  messageId,
+}: {
+  body: string;
+  messageId?: string;
+}) {
   const parts = parseMessageBodyParts(body);
   return (
     <div className="flex w-full min-w-0 flex-wrap items-start gap-x-1.5 gap-y-1">
@@ -224,7 +273,9 @@ function MessageBodyWithMentions({ body, messageId }: { body: string; messageId?
               title={part.path}
             >
               <MentionChipIcon path={part.path} />
-              <span className="truncate max-w-[120px] sm:max-w-[160px]">{pathDisplayName(part.path)}</span>
+              <span className="truncate max-w-[120px] sm:max-w-[160px]">
+                {pathDisplayName(part.path)}
+              </span>
             </span>
           );
         }
@@ -232,7 +283,10 @@ function MessageBodyWithMentions({ body, messageId }: { body: string; messageId?
         return (
           <MarkdownWithPrism
             key={userMessageMarkdownPartKey(i, part.content)}
-            html={renderMarkdown(prepareUserMessageMarkdownForRender(part.content), messageId ? `user-${messageId}-${i}` : undefined)}
+            html={renderMarkdown(
+              prepareUserMessageMarkdownForRender(part.content),
+              messageId ? `user-${messageId}-${i}` : undefined,
+            )}
             className={USER_MESSAGE_MARKDOWN_CLASS}
             codeLangBadge
           />
@@ -260,6 +314,7 @@ export interface ChatMessage {
   activityId?: string;
   optimistic?: boolean;
   queued?: boolean;
+  queueStatus?: 'queued' | 'next' | 'steering';
   usage?: { inputTokens: number; outputTokens: number };
   model?: string;
 }
@@ -272,7 +327,9 @@ export interface ConversationResetSeparator {
 
 export type ChatListItem = ChatMessage | ConversationResetSeparator;
 
-function isResetSeparator(item: ChatListItem): item is ConversationResetSeparator {
+function isResetSeparator(
+  item: ChatListItem,
+): item is ConversationResetSeparator {
   return (item as ConversationResetSeparator).kind === 'reset_separator';
 }
 
@@ -286,7 +343,11 @@ function ResetSeparatorRow({ resetAt }: { resetAt: string }) {
     minute: '2-digit',
   });
   return (
-    <div className="flex items-center gap-3 py-2 select-none" role="separator" aria-label={t('message.resetOn', { time: label })}>
+    <div
+      className="flex items-center gap-3 py-2 select-none"
+      role="separator"
+      aria-label={t('message.resetOn', { time: label })}
+    >
       <div className="flex-1 h-px bg-border/40" />
       <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground/60 whitespace-nowrap">
         <RefreshCcw className="size-3 shrink-0" aria-hidden />
@@ -308,7 +369,9 @@ function formatTime(iso: string, locale: string): string {
 
 function getUploadSrc(filename: string, conversationId = 'default'): string {
   const base = API_PATH_UPLOADS_BY_FILENAME(filename);
-  const path = buildApiUrl(`${base}?conversationId=${encodeURIComponent(conversationId)}`);
+  const path = buildApiUrl(
+    `${base}?conversationId=${encodeURIComponent(conversationId)}`,
+  );
   const token = getAuthTokenForRequest();
   return token ? `${path}&token=${encodeURIComponent(token)}` : path;
 }
@@ -328,7 +391,9 @@ const BUBBLE_WIDTH_FRACTION = 0.8;
 const STREAMING_HEIGHT_THROTTLE_CHARS = 80;
 
 function isNoOutputMessage(msg: ChatMessage, noOutputBody?: string): boolean {
-  return msg.role === 'assistant' && !!noOutputBody && msg.body === noOutputBody;
+  return (
+    msg.role === 'assistant' && !!noOutputBody && msg.body === noOutputBody
+  );
 }
 
 const MessageRow = memo(
@@ -364,128 +429,192 @@ const MessageRow = memo(
     // or we have no container measurement yet.
     const tightMaxWidth =
       msg.role === 'user' &&
-      !(msg.imageUrls?.length) &&
+      !msg.imageUrls?.length &&
       !msg.body.includes('```') &&
       containerWidthPx
-        ? computeTightBubbleWidth(msg.body, containerWidthPx * BUBBLE_WIDTH_FRACTION)
+        ? computeTightBubbleWidth(
+            msg.body,
+            containerWidthPx * BUBBLE_WIDTH_FRACTION,
+          )
         : undefined;
 
     return (
-    <div
-      id={anchorId}
-      data-message-id={msg.id}
-      data-message-created-at={msg.created_at}
-      data-conversation-id={conversationId}
-      className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-violet-500/10 shadow-[0_0_0_2px_rgba(139,92,246,0.35)]' : ''}`}
-    >
-      <div className="flex-shrink-0">
-        {msg.role === 'user' ? (
-          userAvatarUrl ? (
-            <div className={`${AVATAR_USER} overflow-hidden`}>
-              <img src={userAvatarUrl} alt="" className="size-full object-cover" />
-            </div>
-          ) : (
-            <div className={AVATAR_USER}>
-              <User className="size-3.5 sm:size-4" />
-            </div>
-          )
-        ) : assistantAvatarUrl ? (
-          <div className={`${AVATAR_ASSISTANT} overflow-hidden`}>
-            <img src={assistantAvatarUrl} alt="" className="size-full object-cover" />
-          </div>
-        ) : (
-          <div className={AVATAR_ASSISTANT}>
-            <Sparkles className="size-3.5 sm:size-4" />
-          </div>
-        )}
-      </div>
-      <div className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}>
-        <div
-          className={`${maxWidthClass} min-w-0 px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
-            msg.role === 'user' ? `rounded-tr-sm ${BUBBLE_USER}` : BUBBLE_ASSISTANT
-          }`}
-          style={tightMaxWidth !== undefined ? { maxWidth: tightMaxWidth } : undefined}
-        >
+      <div
+        id={anchorId}
+        data-message-id={msg.id}
+        data-message-created-at={msg.created_at}
+        data-conversation-id={conversationId}
+        className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-violet-500/10 shadow-[0_0_0_2px_rgba(139,92,246,0.35)]' : ''}`}
+      >
+        <div className="flex-shrink-0">
           {msg.role === 'user' ? (
-            <>
-              {msg.imageUrls?.length ? (
-                <div className="flex flex-col gap-2">
-                  <div className="flex flex-wrap gap-2">
-                    {msg.imageUrls.map((filename) => (
-                      <img
-                        key={filename}
-                        src={getUploadSrc(filename, conversationId)}
-                        alt=""
-                        loading="lazy"
-                        className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
-                      />
-                    ))}
-                  </div>
-                  {msg.body ? <MessageBodyWithMentions body={msg.body} /> : null}
-                </div>
-              ) : (
-                <MessageBodyWithMentions body={msg.body} messageId={msg.id} />
-              )}
-              <div className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center justify-between gap-2 min-h-[1.25rem]">
-                <p className="flex flex-wrap items-center gap-1.5 min-w-0">
-                  {formatTime(msg.created_at, locale)}
-                  {msg.queued && (
-                    <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-400/20 border border-amber-400/30 text-violet-300 text-[10px] font-medium leading-none">
-                      <Clock className="size-2.5" aria-hidden />
-                      {t('message.queued')}
-                    </span>
-                  )}
-                </p>
-                <CopyRawMessageButton rawText={msg.body} visualVariant="user" />
+            userAvatarUrl ? (
+              <div className={`${AVATAR_USER} overflow-hidden`}>
+                <img
+                  src={userAvatarUrl}
+                  alt=""
+                  className="size-full object-cover"
+                />
               </div>
-            </>
+            ) : (
+              <div className={AVATAR_USER}>
+                <User className="size-3.5 sm:size-4" />
+              </div>
+            )
+          ) : assistantAvatarUrl ? (
+            <div className={`${AVATAR_ASSISTANT} overflow-hidden`}>
+              <img
+                src={assistantAvatarUrl}
+                alt=""
+                className="size-full object-cover"
+              />
+            </div>
           ) : (
-            <>
-              <MarkdownWithPrism html={renderMarkdown(msg.body, msg.id ? `assistant-${msg.id}` : undefined)} className={PROSE_MESSAGE} />
-              {isNoOutput && onRetry && (
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-background/80 hover:bg-background border border-border text-foreground"
-                >
-                  <RotateCw className="size-3.5" aria-hidden />
-                  {t('common.retry')}
-                </button>
-              )}
-              <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 min-h-[1.25rem]">
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
-                  <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <div className={AVATAR_ASSISTANT}>
+              <Sparkles className="size-3.5 sm:size-4" />
+            </div>
+          )}
+        </div>
+        <div
+          className={`flex-1 min-w-0 ${msg.role === 'user' ? 'flex justify-end' : ''}`}
+        >
+          <div
+            className={`${maxWidthClass} min-w-0 px-3 sm:px-4 py-2 sm:py-3 rounded-2xl ${
+              msg.role === 'user'
+                ? `rounded-tr-sm ${BUBBLE_USER}`
+                : BUBBLE_ASSISTANT
+            }`}
+            style={
+              tightMaxWidth !== undefined
+                ? { maxWidth: tightMaxWidth }
+                : undefined
+            }
+          >
+            {msg.role === 'user' ? (
+              <>
+                {msg.imageUrls?.length ? (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      {msg.imageUrls.map((filename) => (
+                        <img
+                          key={filename}
+                          src={getUploadSrc(filename, conversationId)}
+                          alt=""
+                          loading="lazy"
+                          className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
+                        />
+                      ))}
+                    </div>
+                    {msg.body ? (
+                      <MessageBodyWithMentions body={msg.body} />
+                    ) : null}
+                  </div>
+                ) : (
+                  <MessageBodyWithMentions body={msg.body} messageId={msg.id} />
+                )}
+                <div className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center justify-between gap-2 min-h-[1.25rem]">
+                  <p className="flex flex-wrap items-center gap-1.5 min-w-0">
                     {formatTime(msg.created_at, locale)}
-                    {msg.usage && (
-                      <span className="tabular-nums">
-                        {formatCompactInteger(msg.usage.inputTokens)} {t('header.inputShort')} / {formatCompactInteger(msg.usage.outputTokens)} {t('header.outputShort')}
+                    {(msg.queued || msg.queueStatus) && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-400/20 border border-amber-400/30 text-violet-300 text-[10px] font-medium leading-none">
+                        {msg.queueStatus === 'next' ||
+                        msg.queueStatus === 'steering' ? (
+                          <CornerDownRight className="size-2.5" aria-hidden />
+                        ) : (
+                          <Clock className="size-2.5" aria-hidden />
+                        )}
+                        {msg.queueStatus === 'next'
+                          ? t('message.nextTurn')
+                          : msg.queueStatus === 'steering'
+                            ? t('message.steering')
+                            : t('message.queued')}
                       </span>
                     )}
                   </p>
-                  <CopyRawMessageButton rawText={msg.body} visualVariant="assistant" />
-                  {msg.id && onPlay && (
-                    <button
-                      type="button"
-                      onClick={() => msg.id && onPlay(msg.id, msg.body)}
-                      className={COPY_BUTTON_CLASS_ASSISTANT}
-                      title={playingId === msg.id ? t('message.stopVoice') : t('message.readAloud')}
-                      aria-label={playingId === msg.id ? t('message.stopVoice') : t('message.readAloud')}
-                    >
-                      {playingId === msg.id ? <Square className="size-3.5" aria-hidden /> : <Play className="size-3.5" aria-hidden />}
-                    </button>
-                  )}
+                  <CopyRawMessageButton
+                    rawText={msg.body}
+                    visualVariant="user"
+                  />
                 </div>
-                  <p className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70" title={msg.model ? t('message.processedBy', { model: msg.model }) : undefined}>
-                  <Brain className="size-3 shrink-0" aria-hidden />
-                  {msg.model ?? '—'}
-                </p>
-              </div>
-            </>
-          )}
+              </>
+            ) : (
+              <>
+                <MarkdownWithPrism
+                  html={renderMarkdown(
+                    msg.body,
+                    msg.id ? `assistant-${msg.id}` : undefined,
+                  )}
+                  className={PROSE_MESSAGE}
+                />
+                {isNoOutput && onRetry && (
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-sm font-medium bg-background/80 hover:bg-background border border-border text-foreground"
+                  >
+                    <RotateCw className="size-3.5" aria-hidden />
+                    {t('common.retry')}
+                  </button>
+                )}
+                <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-between gap-x-2 gap-y-0.5 min-h-[1.25rem]">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
+                    <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      {formatTime(msg.created_at, locale)}
+                      {msg.usage && (
+                        <span className="tabular-nums">
+                          {formatCompactInteger(msg.usage.inputTokens)}{' '}
+                          {t('header.inputShort')} /{' '}
+                          {formatCompactInteger(msg.usage.outputTokens)}{' '}
+                          {t('header.outputShort')}
+                        </span>
+                      )}
+                    </p>
+                    <CopyRawMessageButton
+                      rawText={msg.body}
+                      visualVariant="assistant"
+                    />
+                    {msg.id && onPlay && (
+                      <button
+                        type="button"
+                        onClick={() => msg.id && onPlay(msg.id, msg.body)}
+                        className={COPY_BUTTON_CLASS_ASSISTANT}
+                        title={
+                          playingId === msg.id
+                            ? t('message.stopVoice')
+                            : t('message.readAloud')
+                        }
+                        aria-label={
+                          playingId === msg.id
+                            ? t('message.stopVoice')
+                            : t('message.readAloud')
+                        }
+                      >
+                        {playingId === msg.id ? (
+                          <Square className="size-3.5" aria-hidden />
+                        ) : (
+                          <Play className="size-3.5" aria-hidden />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  <p
+                    className="text-xs text-muted-foreground flex items-center gap-1 shrink-0 leading-none opacity-70"
+                    title={
+                      msg.model
+                        ? t('message.processedBy', { model: msg.model })
+                        : undefined
+                    }
+                  >
+                    <Brain className="size-3 shrink-0" aria-hidden />
+                    {msg.model ?? '—'}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
   },
   // Custom memo comparator: include containerWidthPx in the shallow check
   // only when it affects tight-width calculations (simple user messages).
@@ -502,9 +631,14 @@ const MessageRow = memo(
     ) {
       return false;
     }
-    const needsTightWidth = prev.msg.role === 'user' && !prev.msg.imageUrls?.length && !prev.msg.body.includes('```');
-    return needsTightWidth ? prev.containerWidthPx === next.containerWidthPx : true;
-  }
+    const needsTightWidth =
+      prev.msg.role === 'user' &&
+      !prev.msg.imageUrls?.length &&
+      !prev.msg.body.includes('```');
+    return needsTightWidth
+      ? prev.containerWidthPx === next.containerWidthPx
+      : true;
+  },
 );
 
 export interface MessageListHandle {
@@ -524,7 +658,10 @@ export interface MessageListProps {
   conversationId?: string;
 }
 
-export const MessageList = forwardRef<MessageListHandle | null, MessageListProps>(function MessageList(
+export const MessageList = forwardRef<
+  MessageListHandle | null,
+  MessageListProps
+>(function MessageList(
   {
     messages,
     streamingText,
@@ -536,7 +673,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     onRetry,
     conversationId,
   },
-  ref
+  ref,
 ) {
   const maxWidthClass = bothSidebarsCollapsed ? FULL_WIDTH : DEFAULT_MAX_WIDTH;
 
@@ -567,7 +704,7 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
       tts.stop();
       setPlayingId(id);
       tts.speak(text).finally(() => {
-        setPlayingId((curr) => curr === id ? null : curr);
+        setPlayingId((curr) => (curr === id ? null : curr));
       });
     }
   }, []);
@@ -599,58 +736,71 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
         behavior: behavior === 'smooth' ? 'smooth' : 'auto',
       });
     },
-    [lastIndex, virtualizer]
+    [lastIndex, virtualizer],
   );
 
-  const scrollToTimestamp = useCallback((timestamp: string): boolean => {
-    const targetTime = Date.parse(timestamp);
-    if (!Number.isFinite(targetTime) || messages.length === 0) return false;
+  const scrollToTimestamp = useCallback(
+    (timestamp: string): boolean => {
+      const targetTime = Date.parse(timestamp);
+      if (!Number.isFinite(targetTime) || messages.length === 0) return false;
 
-    let beforeIndex = -1;
-    let beforeTime = Number.NEGATIVE_INFINITY;
-    let nearestIndex = -1;
-    let nearestDistance = Number.POSITIVE_INFINITY;
+      let beforeIndex = -1;
+      let beforeTime = Number.NEGATIVE_INFINITY;
+      let nearestIndex = -1;
+      let nearestDistance = Number.POSITIVE_INFINITY;
 
-    messages.forEach((item, index) => {
-      if (isResetSeparator(item)) return;
-      const time = messageTimeMs(item);
-      if (time === null) return;
-      if (time <= targetTime && time >= beforeTime) {
-        beforeIndex = index;
-        beforeTime = time;
-      }
-      const distance = Math.abs(time - targetTime);
-      if (distance < nearestDistance) {
-        nearestIndex = index;
-        nearestDistance = distance;
-      }
-    });
-
-    const index = beforeIndex >= 0 ? beforeIndex : nearestIndex;
-    if (index < 0) return false;
-
-    const item = messages[index];
-    if (isResetSeparator(item)) return false;
-    const anchorId = messageAnchorId(item, index);
-    setFocusedAnchorId(anchorId);
-    if (focusClearTimerRef.current) clearTimeout(focusClearTimerRef.current);
-    focusClearTimerRef.current = setTimeout(() => setFocusedAnchorId((current) => current === anchorId ? null : current), 3200);
-
-    if (scrollRef?.current) {
-      virtualizer.scrollToIndex(index, { align: 'center', behavior: 'smooth' });
-    } else {
-      requestAnimationFrame(() => {
-        document.getElementById(anchorId)?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      messages.forEach((item, index) => {
+        if (isResetSeparator(item)) return;
+        const time = messageTimeMs(item);
+        if (time === null) return;
+        if (time <= targetTime && time >= beforeTime) {
+          beforeIndex = index;
+          beforeTime = time;
+        }
+        const distance = Math.abs(time - targetTime);
+        if (distance < nearestDistance) {
+          nearestIndex = index;
+          nearestDistance = distance;
+        }
       });
-    }
-    return true;
-  }, [messages, scrollRef, virtualizer]);
 
-  useImperativeHandle(
-    ref,
-    () => ({ scrollToBottom, scrollToTimestamp }),
-    [scrollToBottom, scrollToTimestamp]
+      const index = beforeIndex >= 0 ? beforeIndex : nearestIndex;
+      if (index < 0) return false;
+
+      const item = messages[index];
+      if (isResetSeparator(item)) return false;
+      const anchorId = messageAnchorId(item, index);
+      setFocusedAnchorId(anchorId);
+      if (focusClearTimerRef.current) clearTimeout(focusClearTimerRef.current);
+      focusClearTimerRef.current = setTimeout(
+        () =>
+          setFocusedAnchorId((current) =>
+            current === anchorId ? null : current,
+          ),
+        3200,
+      );
+
+      if (scrollRef?.current) {
+        virtualizer.scrollToIndex(index, {
+          align: 'center',
+          behavior: 'smooth',
+        });
+      } else {
+        requestAnimationFrame(() => {
+          document
+            .getElementById(anchorId)
+            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        });
+      }
+      return true;
+    },
+    [messages, scrollRef, virtualizer],
   );
+
+  useImperativeHandle(ref, () => ({ scrollToBottom, scrollToTimestamp }), [
+    scrollToBottom,
+    scrollToTimestamp,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -660,13 +810,21 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
 
   const hasScrolledToBottomOnMountRef = useRef(false);
   useEffect(() => {
-    if (!scrollRef || messages.length === 0 || hasScrolledToBottomOnMountRef.current) return;
+    if (
+      !scrollRef ||
+      messages.length === 0 ||
+      hasScrolledToBottomOnMountRef.current
+    )
+      return;
     hasScrolledToBottomOnMountRef.current = true;
     let cancelled = false;
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         if (cancelled || !scrollRef.current) return;
-        virtualizer.scrollToIndex(messages.length - 1, { align: 'end', behavior: 'auto' });
+        virtualizer.scrollToIndex(messages.length - 1, {
+          align: 'end',
+          behavior: 'auto',
+        });
       });
     });
     return () => {
@@ -675,41 +833,76 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     };
   }, [scrollRef, messages.length, virtualizer]);
 
-  const listContent = scrollRef && virtualItems ? (
-    <div
-      className="w-full relative"
-      style={{ height: totalHeight, contain: 'layout' } as React.CSSProperties}
-    >
-      {virtualItems.map((virtualRow) => {
-        const item = messages[virtualRow.index];
-        if (isResetSeparator(item)) {
-          const rowKey = `reset-${item.resetAt}-${virtualRow.index}`;
+  const listContent =
+    scrollRef && virtualItems ? (
+      <div
+        className="w-full relative"
+        style={
+          { height: totalHeight, contain: 'layout' } as React.CSSProperties
+        }
+      >
+        {virtualItems.map((virtualRow) => {
+          const item = messages[virtualRow.index];
+          if (isResetSeparator(item)) {
+            const rowKey = `reset-${item.resetAt}-${virtualRow.index}`;
+            return (
+              <div
+                key={rowKey}
+                data-index={virtualRow.index}
+                ref={virtualizer.measureElement}
+                className="absolute left-0 w-full"
+                style={{ top: virtualRow.start, minHeight: virtualRow.size }}
+              >
+                <ResetSeparatorRow resetAt={item.resetAt} />
+              </div>
+            );
+          }
+          const rowKey =
+            item.id ??
+            `msg-${virtualRow.index}-${item.created_at}-${item.role}`;
+          const anchorId = messageAnchorId(item, virtualRow.index);
           return (
             <div
               key={rowKey}
               data-index={virtualRow.index}
               ref={virtualizer.measureElement}
               className="absolute left-0 w-full"
-              style={{ top: virtualRow.start, minHeight: virtualRow.size }}
+              style={{
+                top: virtualRow.start,
+                minHeight: virtualRow.size,
+              }}
             >
-              <ResetSeparatorRow resetAt={item.resetAt} />
+              <MessageRow
+                msg={item}
+                maxWidthClass={maxWidthClass}
+                isNoOutput={isNoOutputMessage(item, noOutputBody)}
+                onRetry={onRetry}
+                containerWidthPx={containerWidthPx}
+                onPlay={handlePlay}
+                playingId={playingId}
+                conversationId={conversationId}
+                anchorId={anchorId}
+                isFocused={focusedAnchorId === anchorId}
+              />
             </div>
           );
-        }
-        const rowKey = item.id ?? `msg-${virtualRow.index}-${item.created_at}-${item.role}`;
-        const anchorId = messageAnchorId(item, virtualRow.index);
-        return (
-          <div
-            key={rowKey}
-            data-index={virtualRow.index}
-            ref={virtualizer.measureElement}
-            className="absolute left-0 w-full"
-            style={{
-              top: virtualRow.start,
-              minHeight: virtualRow.size,
-            }}
-          >
+        })}
+      </div>
+    ) : (
+      <div className="space-y-4 sm:space-y-6">
+        {messages.map((item, i) => {
+          if (isResetSeparator(item)) {
+            return (
+              <ResetSeparatorRow
+                key={`reset-${item.resetAt}-${i}`}
+                resetAt={item.resetAt}
+              />
+            );
+          }
+          const anchorId = messageAnchorId(item, i);
+          return (
             <MessageRow
+              key={item.id ?? `msg-${i}-${item.created_at}-${item.role}`}
               msg={item}
               maxWidthClass={maxWidthClass}
               isNoOutput={isNoOutputMessage(item, noOutputBody)}
@@ -721,35 +914,10 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
               anchorId={anchorId}
               isFocused={focusedAnchorId === anchorId}
             />
-          </div>
-        );
-      })}
-    </div>
-  ) : (
-    <div className="space-y-4 sm:space-y-6">
-      {messages.map((item, i) => {
-        if (isResetSeparator(item)) {
-          return <ResetSeparatorRow key={`reset-${item.resetAt}-${i}`} resetAt={item.resetAt} />;
-        }
-        const anchorId = messageAnchorId(item, i);
-        return (
-          <MessageRow
-            key={item.id ?? `msg-${i}-${item.created_at}-${item.role}`}
-            msg={item}
-            maxWidthClass={maxWidthClass}
-            isNoOutput={isNoOutputMessage(item, noOutputBody)}
-            onRetry={onRetry}
-            containerWidthPx={containerWidthPx}
-            onPlay={handlePlay}
-            playingId={playingId}
-            conversationId={conversationId}
-            anchorId={anchorId}
-            isFocused={focusedAnchorId === anchorId}
-          />
-        );
-      })}
-    </div>
-  );
+          );
+        })}
+      </div>
+    );
 
   // Reserve vertical space for the streaming bubble proportional to the
   // current text flow, preventing abrupt container-height jumps on each flush.
@@ -766,7 +934,10 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     }
     const len = streamingText.length;
     const lastLen = streamingHeightLenRef.current;
-    if (lastLen !== null && Math.abs(len - lastLen) < STREAMING_HEIGHT_THROTTLE_CHARS) {
+    if (
+      lastLen !== null &&
+      Math.abs(len - lastLen) < STREAMING_HEIGHT_THROTTLE_CHARS
+    ) {
       // Not enough new text to justify a full layout pass — reuse cached value.
       return streamingHeightCacheRef.current;
     }
@@ -781,20 +952,32 @@ export const MessageList = forwardRef<MessageListHandle | null, MessageListProps
     <>
       {listContent}
       {isStreaming && (
-        <div className={`flex gap-2 sm:gap-3 md:gap-4 ${messages.length > 0 ? "mt-7" : ""}`}>
+        <div
+          className={`flex gap-2 sm:gap-3 md:gap-4 ${messages.length > 0 ? 'mt-7' : ''}`}
+        >
           <ThinkingAvatar />
           <div className="flex-1 min-w-0">
             <div
               className={`${maxWidthClass} min-w-0 px-4 py-3 transition-[min-height] duration-100 ${
                 streamingText ? BUBBLE_ASSISTANT : BUBBLE_TYPING
               }`}
-              style={streamingBubbleMinHeight !== undefined ? { minHeight: streamingBubbleMinHeight } : undefined}
+              style={
+                streamingBubbleMinHeight !== undefined
+                  ? { minHeight: streamingBubbleMinHeight }
+                  : undefined
+              }
             >
               {streamingText ? (
                 <>
-                  <MarkdownWithPrism html={renderMarkdown(streamingText, 'streaming-message')} className={PROSE_MESSAGE} />
+                  <MarkdownWithPrism
+                    html={renderMarkdown(streamingText, 'streaming-message')}
+                    className={PROSE_MESSAGE}
+                  />
                   <div className="mt-2 flex justify-end">
-                    <CopyRawMessageButton rawText={streamingText} visualVariant="assistant" />
+                    <CopyRawMessageButton
+                      rawText={streamingText}
+                      visualVariant="assistant"
+                    />
                   </div>
                 </>
               ) : (

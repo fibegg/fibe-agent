@@ -42,17 +42,31 @@ export const uk: Record<TranslationKey, string> = {
   'chat.input.removeAttachment': 'Вилучити вкладення',
   'chat.input.voiceInput': 'Голосове введення',
   'chat.input.stopRecording': 'Зупинити запис',
-  'chat.input.micDenied': 'Доступ до мікрофона забороно. Будь ласка, дозвольте доступ до мікрофона в налаштуваннях браузера.',
+  'chat.input.micDenied':
+    'Доступ до мікрофона забороно. Будь ласка, дозвольте доступ до мікрофона в налаштуваннях браузера.',
   'chat.input.queueMessage': 'Додати повідомлення в чергу',
   'chat.input.queueMessageTitle': 'Додати повідомлення агенту в чергу',
   'chat.input.steerMessage': 'Скерувати повідомлення',
   'chat.input.steerMessageTitle': 'Скерувати поточний запуск агента',
+  'chat.input.steerNextMessage': 'Додати інструкцію для наступного ходу',
+  'chat.input.steerNextMessageTitle':
+    'Claude не підтримує live-steer; інструкція піде наступним ходом',
+  'chat.input.queueShort': 'Черга',
+  'chat.input.steerShort': 'Скерувати',
+  'chat.input.steerNextShort': 'Далі',
+  'chat.input.agentWorking': 'Агент працює',
+  'chat.input.workingTime': 'Час поточного запуску',
+  'chat.input.queueHint': 'Черга: наступний хід',
+  'chat.input.steerHint': 'Скерувати: зараз',
+  'chat.input.steerNextHint': 'Далі: після поточного ходу',
   'chat.input.stop': 'Зупинити',
   'chat.input.send': 'Надіслати',
   'chat.noOutput': 'Процес завершився успішно, але не повернув результат.',
   'chat.continue': 'Продовжити',
 
   'message.queued': 'У черзі',
+  'message.nextTurn': 'Далі',
+  'message.steering': 'Скерування',
   'message.copyRawUser': 'Копіювати початкове повідомлення користувача',
   'message.copyRawAssistant': 'Копіювати початкове повідомлення асистента',
   'message.readAloud': 'Озвучити',
@@ -131,12 +145,15 @@ export const uk: Record<TranslationKey, string> = {
   'settings.activityFilter': 'Фільтр активності',
   'settings.interface': 'Інтерфейс',
   'settings.uiEffects': 'Анімації та візуальні ефекти',
-  'settings.uiEffectsDescription': 'Вимкніть на повільних пристроях, щоб лишити інтерфейс функціональним із меншим рухом і розмиттям.',
+  'settings.uiEffectsDescription':
+    'Вимкніть на повільних пристроях, щоб лишити інтерфейс функціональним із меншим рухом і розмиттям.',
   'settings.fibeSync': 'Синхронізація з Файбом',
   'settings.sync.messages': 'Надсилати повідомлення у Файб',
   'settings.sync.activity': 'Надсилати активність у Файб',
-  'settings.sync.rawProviders': 'Надсилати необроблену активність провайдера у Файб',
-  'settings.sync.rawProviderCapture': 'Перехоплювати необроблену активність провайдера',
+  'settings.sync.rawProviders':
+    'Надсилати необроблену активність провайдера у Файб',
+  'settings.sync.rawProviderCapture':
+    'Перехоплювати необроблену активність провайдера',
   'settings.sync.viewRaw': 'Переглянути необроблену активність провайдера',
   'settings.rawProviderActivity': 'Необроблена активність провайдера',
   'settings.conversation': 'Розмова',
@@ -148,7 +165,8 @@ export const uk: Record<TranslationKey, string> = {
   'settings.dataPrivacy': 'Приватність даних (GDPR/CCPA)',
   'settings.exportData': 'Експортувати мої дані',
   'settings.deleteData': 'Видалити мої дані',
-  'settings.deleteConfirm': 'Ви точно хочете назавжди видалити всі дані розмов? Цю дію не можна скасувати.',
+  'settings.deleteConfirm':
+    'Ви точно хочете назавжди видалити всі дані розмов? Цю дію не можна скасувати.',
   'settings.reauthenticate': 'Повторна автентифікація',
   'settings.logout': 'Вийти',
   'settings.postInit': 'Скрипт після ініціалізації',
@@ -159,7 +177,8 @@ export const uk: Record<TranslationKey, string> = {
   'settings.failed': 'Помилка',
   'settings.systemPrompt': 'SYSTEM_PROMPT',
   'settings.raw.copySection': 'Копіювати {title}',
-  'settings.raw.failedLoad': 'Не вдалося завантажити необроблену активність провайдера',
+  'settings.raw.failedLoad':
+    'Не вдалося завантажити необроблену активність провайдера',
   'settings.raw.loading': 'Завантаження необробленої активності провайдера...',
   'settings.raw.empty': 'Необроблена активність провайдера не записана.',
   'settings.raw.pairs': 'Пари запит-відповідь: {count}',
@@ -169,17 +188,20 @@ export const uk: Record<TranslationKey, string> = {
   'settings.raw.response': 'Відповідь',
 
   'auth.connect': 'Підключитися до провайдера',
-  'auth.description': 'Перейдіть за посиланням нижче, щоб авторизувати агента Файба.',
+  'auth.description':
+    'Перейдіть за посиланням нижче, щоб авторизувати агента Файба.',
   'auth.openUrl': 'Відкрити URL автентифікації',
   'auth.apiToken': 'Вставте API ключ або токен',
   'auth.deviceCode': 'Одноразовий код пристрою',
   'auth.authorizationCode': 'Вставте код авторизації',
-  'auth.manualHelp': 'Введіть API ключ провайдера (наприклад ANTHROPIC_API_KEY, GEMINI_API_KEY) або OAuth токен.',
+  'auth.manualHelp':
+    'Введіть API ключ провайдера (наприклад ANTHROPIC_API_KEY, GEMINI_API_KEY) або OAuth токен.',
   'auth.tokenPlaceholder': 'sk-...',
   'auth.codePlaceholder': 'Вставте код тут...',
   'auth.copyDeviceCode': 'Копіювати код пристрою',
   'auth.waitingForUrl': 'Генерується посилання авторизації…',
-  'auth.generatingUrl': 'Зачекайте, поки провайдер генерує посилання для авторизації.',
+  'auth.generatingUrl':
+    'Зачекайте, поки провайдер генерує посилання для авторизації.',
   'auth.connecting': 'Підключення...',
 
   'login.connecting': 'Підключення...',
@@ -395,7 +417,8 @@ export const uk: Record<TranslationKey, string> = {
   'stark.minimize': 'Згорнути вікно',
   'stark.exec': 'ВИКОНАННЯ',
 
-  'cli.description': 'Виберіть команду, щоб додати її у поле чату. Потім можна попросити агента виконати її.',
+  'cli.description':
+    'Виберіть команду, щоб додати її у поле чату. Потім можна попросити агента виконати її.',
   'cli.playgrounds': 'Майданчики',
   'cli.agents': 'Агенти',
   'cli.general': 'Загальне',
