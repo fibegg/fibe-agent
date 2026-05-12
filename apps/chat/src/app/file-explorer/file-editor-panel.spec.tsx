@@ -3,7 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { FileEditorPanel } from './file-editor-panel';
 import { apiRequest } from '../api-url';
 
-vi.mock('../api-url', () => ({ apiRequest: vi.fn() }));
+vi.mock('../api-url', () => ({ apiRequest: vi.fn(), getAuthTokenForRequest: vi.fn(() => '') }));
 
 // CodeMirror can't really run in jsdom — mock the loader so it renders content
 // into a child element (simulating what CM does) while exposing a handle.
@@ -198,6 +198,33 @@ describe('FileEditorPanel', () => {
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
     const call = (apiRequest as Mock).mock.calls[0][0] as string;
     expect(call).toContain('/api/agent-files/file');
+  });
+
+  it('renders image files from the raw file endpoint without fetching JSON content', () => {
+    const imageEntry = { name: 'preview.png', path: 'assets/preview.png', type: 'file' as const };
+    render(<FileEditorPanel entry={imageEntry} onClose={mockClose} />);
+
+    expect(apiRequest).not.toHaveBeenCalled();
+    expect(screen.getByAltText('preview.png').getAttribute('src')).toContain('/api/playgrounds/file/raw?path=assets%2Fpreview.png');
+    expect(screen.queryByRole('button', { name: /save/i })).toBeNull();
+  });
+
+  it('uses custom rawApiBasePath for image preview', () => {
+    const imageEntry = { name: 'preview.png', path: 'assets/preview.png', type: 'file' as const };
+    render(<FileEditorPanel entry={imageEntry} onClose={mockClose} rawApiBasePath="/api/agent-files/file/raw?conversationId=default" />);
+
+    const src = screen.getByAltText('preview.png').getAttribute('src') ?? '';
+    expect(src).toContain('/api/agent-files/file/raw?conversationId=default&path=assets%2Fpreview.png');
+  });
+
+  it('shows HTML preview iframe through the raw file endpoint', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: '<h1>Hello</h1>' }) });
+    render(<FileEditorPanel entry={{ name: 'index.html', path: 'index.html', type: 'file' }} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    const iframe = document.querySelector('iframe');
+    expect(iframe?.getAttribute('src')).toContain('/api/playgrounds/file/raw?path=index.html');
   });
 
   it('shows saved state in status bar (not dirty)', async () => {

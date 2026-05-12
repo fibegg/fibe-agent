@@ -132,6 +132,10 @@ export function FileExplorer({
     const normalized = raw.replace(/^\/+/, '');
     return normalized.startsWith('api/') ? `/${normalized}` : `/api/${normalized}`;
   }, [agentFileApiPath]);
+  const agentFileRawApiPath = useMemo(() => {
+    const raw = agentFileContentApiPath.replace(API_PATHS.AGENT_FILES_FILE, API_PATHS.AGENT_FILES_FILE_RAW);
+    return raw === agentFileContentApiPath ? API_PATHS.AGENT_FILES_FILE_RAW : raw;
+  }, [agentFileContentApiPath]);
 
   const selectedFile = selectedPathProp !== undefined
     ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
@@ -547,6 +551,7 @@ export function FileExplorer({
           entry={openFileEntry}
           onClose={() => setSelectedFileLocal(null)}
           apiBasePath={effectiveTab === 'agent' ? agentFileContentApiPath : undefined}
+          rawApiBasePath={effectiveTab === 'agent' ? agentFileRawApiPath : undefined}
           onDirtyChange={handleDirtyChange}
         />
       )}

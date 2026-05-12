@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach, mock } from 'bun:test';
 import { LocalMcpService } from './local-mcp.service';
 import { WS_EVENT } from '@shared/ws-constants';
 import { LOCAL_TOOL } from './local-mcp-types';
@@ -153,6 +153,25 @@ describe('LocalMcpService', () => {
     const res = await svc.handleToolCall({ requestId: 'r12', tool: 'no_such_tool' as never, args: {} });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/Unknown local tool/);
+  });
+
+  test('git stage forwards selected files and requires explicit confirmation in handler', async () => {
+    const playgrounds = {
+      stageGitFiles: mock(async (files: string[], confirm: boolean) => ({ ok: true, message: `${files.join(',')}:${confirm}` })),
+    };
+    process.env['ASK_USER_TIMEOUT_MS'] = '500';
+    const svc = new LocalMcpService(playgrounds as never);
+    (svc as unknown as { spawnServer(): void }).spawnServer = () => undefined;
+    svc.onModuleInit();
+
+    const res = await svc.handleToolCall({
+      requestId: 'git-stage',
+      tool: LOCAL_TOOL.GIT_STAGE,
+      args: { files: ['app.ts'], confirm: true },
+    });
+
+    expect(res.ok).toBe(true);
+    expect(playgrounds.stageGitFiles).toHaveBeenCalledWith(['app.ts'], true);
   });
 
   // ─── Interactive tools (blocking) ──────────────────────────────────────────

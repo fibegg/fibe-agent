@@ -571,6 +571,44 @@ describe('PlaygroundsService', () => {
     expect(newFile?.worktree).toBe('?');
   }, 15000);
 
+  test('stageGitFiles and commitGit require confirmation', async () => {
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+
+    await expect(service.stageGitFiles(['app.ts'], false)).rejects.toThrow(/confirm=true/);
+    await expect(service.commitGit('test', false)).rejects.toThrow(/confirm=true/);
+  });
+
+  test('stageGitFiles and commitGit stage selected files and commit only staged changes', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 1;');
+    execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 2;');
+    writeFileSync(join(playgroundDir, 'skip.ts'), 'export const skip = true;');
+
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+
+    const stageResult = await service.stageGitFiles(['app.ts'], true);
+    expect(stageResult.ok).toBe(true);
+    const commitResult = await service.commitGit('update app', true);
+    expect(commitResult.ok).toBe(true);
+
+    const status = execSync('git status --short', { cwd: playgroundDir, encoding: 'utf8' });
+    expect(status).not.toContain('app.ts');
+    expect(status).toContain('skip.ts');
+  }, 15000);
+
+  test('getGitFileDiff rejects unsafe paths', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    const config = { getPlaygroundsDir: () => playgroundDir };
+    const service = new PlaygroundsService(config as never, {} as never);
+    await expect(service.getGitFileDiff('../outside.ts')).rejects.toThrow(/Unsafe git path/);
+  });
+
   test('getDiff handles repository with no commits (status works, diff falls back to empty)', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
