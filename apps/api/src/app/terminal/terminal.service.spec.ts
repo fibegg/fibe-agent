@@ -1,4 +1,7 @@
 import { describe, it, expect, mock, beforeEach, afterEach } from 'bun:test';
+import { existsSync, mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { TerminalService } from './terminal.service';
 
 // ─── Mock node-pty ────────────────────────────────────────────────────────────
@@ -89,22 +92,34 @@ describe('TerminalService', () => {
   it('falls back to bash on non-Windows when SHELL is unset', () => {
     const saved = process.env.SHELL;
     delete process.env.SHELL;
-    // process.platform is 'darwin' or 'linux' in CI — neither is 'win32', so bash is expected
     service.create('s1');
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.stringMatching(/bash|zsh/),
+      expect.stringMatching(/(bash|sh)$/),
       [],
       expect.any(Object),
     );
-    if (saved !== undefined) process.env.SHELL = saved;
+    if (saved !== undefined) process.env.SHELL = saved; else delete process.env.SHELL;
   });
 
   it('uses explicit cwd when provided', () => {
-    service.create('s1', 80, 24, '/custom/playground');
+    const dir = mkdtempSync(join(tmpdir(), 'fibe-terminal-cwd-'));
+    service.create('s1', 80, 24, dir);
     expect(nodePty.spawn).toHaveBeenCalledWith(
       expect.any(String), [],
-      expect.objectContaining({ cwd: '/custom/playground' }),
+      expect.objectContaining({ cwd: dir }),
     );
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('creates missing cwd before spawning the PTY', () => {
+    const dir = join(mkdtempSync(join(tmpdir(), 'fibe-terminal-parent-')), 'missing-playground');
+    service.create('s1', 80, 24, dir);
+    expect(existsSync(dir)).toBe(true);
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      expect.any(String), [],
+      expect.objectContaining({ cwd: dir }),
+    );
+    rmSync(dir, { recursive: true, force: true });
   });
 
   it('adds fibe binary locations to PTY PATH', () => {
@@ -131,25 +146,35 @@ describe('TerminalService', () => {
 
   it('falls back to PLAYGROUNDS_DIR when no explicit cwd given', () => {
     const saved = process.env.PLAYGROUNDS_DIR;
-    process.env.PLAYGROUNDS_DIR = '/env/playground';
+    const dir = mkdtempSync(join(tmpdir(), 'fibe-terminal-playground-'));
+    process.env.PLAYGROUNDS_DIR = dir;
     service.create('s1');
     expect(nodePty.spawn).toHaveBeenCalledWith(
       expect.any(String), [],
-      expect.objectContaining({ cwd: '/env/playground' }),
+      expect.objectContaining({ cwd: dir }),
     );
+    rmSync(dir, { recursive: true, force: true });
     if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved; else delete process.env.PLAYGROUNDS_DIR;
   });
 
-  it('falls back to process.cwd() when neither cwd nor PLAYGROUNDS_DIR is set', () => {
+  it('falls back to a playground directory under process.cwd() when neither cwd nor PLAYGROUNDS_DIR is set', () => {
     const saved = process.env.PLAYGROUNDS_DIR;
+    const originalCwd = process.cwd();
+    const dir = mkdtempSync(join(tmpdir(), 'fibe-terminal-process-cwd-'));
     delete process.env.PLAYGROUNDS_DIR;
-    const expectedCwd = process.cwd();
-    service.create('s1');
-    expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String), [],
-      expect.objectContaining({ cwd: expectedCwd }),
-    );
-    if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved;
+    process.chdir(dir);
+    try {
+      const expectedCwd = join(process.cwd(), 'playground');
+      service.create('s1');
+      expect(nodePty.spawn).toHaveBeenCalledWith(
+        expect.any(String), [],
+        expect.objectContaining({ cwd: expectedCwd }),
+      );
+    } finally {
+      process.chdir(originalCwd);
+      rmSync(dir, { recursive: true, force: true });
+      if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved;
+    }
   });
 
   // ── write ───────────────────────────────────────────────────────────────────

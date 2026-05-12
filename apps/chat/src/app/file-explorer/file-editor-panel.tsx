@@ -331,11 +331,11 @@ export function FileEditorPanel({
     ? 'flex flex-col overflow-hidden bg-card flex-1 min-h-0 rounded-none border-0'
     : 'flex flex-col overflow-hidden bg-card w-full max-w-[95vw] sm:max-w-[92vw] sm:w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card';
   const headerClasses = inline
-    ? 'border-b border-border/50 bg-card/40 px-4 py-2 backdrop-blur-xl shrink-0'
+    ? 'border-b border-border/50 bg-card/40 px-2 py-2 sm:px-4 backdrop-blur-xl shrink-0'
     : CARD_HEADER;
   const headerStyle = inline ? undefined : { minHeight: PANEL_HEADER_MIN_HEIGHT_PX };
   const headerRowClasses = inline
-    ? 'h-10 overflow-hidden flex-shrink-0'
+    ? 'min-h-10 flex-shrink-0 flex-wrap sm:flex-nowrap'
     : HEADER_FIRST_ROW;
   const logoClasses = inline
     ? 'size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0'
@@ -352,7 +352,7 @@ export function FileEditorPanel({
         <div className={headerClasses} style={headerStyle}>
           <div className={`flex items-center justify-between gap-2 min-w-0 ${headerRowClasses}`}>
             {/* Title */}
-            <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className={`${inline ? 'hidden sm:flex' : 'flex'} items-center gap-3 min-w-0 flex-1`}>
               <div className={logoClasses}>
                 <Edit3 className={inline ? 'size-4 text-white' : 'size-5 text-white'} />
               </div>
@@ -393,9 +393,9 @@ export function FileEditorPanel({
             </div>
 
             {/* Toolbar Buttons */}
-            <div className="flex items-center gap-1.5 shrink-0">
+            <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
               {isHtmlFile && (
-                <div className="mr-1 flex h-8 items-center overflow-hidden rounded-lg border border-border/60 bg-background/60">
+                <div className="mr-1 flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border/60 bg-background/60">
                   <button
                     type="button"
                     onClick={() => setPreviewMode('code')}
@@ -425,70 +425,72 @@ export function FileEditorPanel({
                   </button>
                 </div>
               )}
-              {!isImageFile && (
+              <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto overscroll-x-contain sm:flex-none">
+                {!isImageFile && (
+                  <button
+                    type="button"
+                    onClick={() => void handleSave()}
+                    disabled={!isDirty || isSaving}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${isDirty ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    title={t('fileEditor.saveTitle')}
+                  >
+                    {isSaving ? (
+                      <Loader2 className="size-3 animate-spin" />
+                    ) : (
+                      <Save className="size-3" />
+                    )}
+                    <span className="hidden sm:inline">{t('fileEditor.save')}</span>
+                  </button>
+                )}
+                {!isImageFile && isDirty && (
+                  <button
+                    type="button"
+                    onClick={handleDiscard}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                    title={t('fileEditor.discardTitle')}
+                  >
+                    <RotateCcw className="size-3" />
+                    <span className="hidden sm:inline">{t('fileEditor.discard')}</span>
+                  </button>
+                )}
+                {!isImageFile && (
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    disabled={liveContent === null || loading}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                    title={t('fileEditor.copyTitle')}
+                  >
+                    <Copy className="size-3" />
+                    <span className="hidden sm:inline">{t('common.copy')}</span>
+                  </button>
+                )}
+                {(isImageFile || isHtmlFile) && (
+                  <button
+                    type="button"
+                    onClick={handleOpenRaw}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                    title={t('fileEditor.openRaw')}
+                  >
+                    <ExternalLink className="size-3" />
+                    <span className="hidden sm:inline">{t('fileEditor.open')}</span>
+                  </button>
+                )}
                 <button
                   type="button"
-                  onClick={() => void handleSave()}
-                  disabled={!isDirty || isSaving}
-                  className={`${BUTTON_GHOST_ACCENT} ${isDirty ? 'text-violet-400 hover:text-violet-300' : ''}`}
-                  title={t('fileEditor.saveTitle')}
+                  onClick={handleDownload}
+                  disabled={!isImageFile && (liveContent === null || loading)}
+                  className={`${BUTTON_GHOST_ACCENT} shrink-0`}
+                  title={t('fileEditor.downloadTitle')}
                 >
-                  {isSaving ? (
-                    <Loader2 className="size-3 animate-spin" />
-                  ) : (
-                    <Save className="size-3" />
-                  )}
-                  {t('fileEditor.save')}
+                  <Download className="size-3" />
+                  <span className="hidden sm:inline">{t('fileEditor.download')}</span>
                 </button>
-              )}
-              {!isImageFile && isDirty && (
-                <button
-                  type="button"
-                  onClick={handleDiscard}
-                  className={BUTTON_GHOST_ACCENT}
-                  title={t('fileEditor.discardTitle')}
-                >
-                  <RotateCcw className="size-3" />
-                  {t('fileEditor.discard')}
-                </button>
-              )}
-              {!isImageFile && (
-                <button
-                  type="button"
-                  onClick={handleCopy}
-                  disabled={liveContent === null || loading}
-                  className={BUTTON_GHOST_ACCENT}
-                  title={t('fileEditor.copyTitle')}
-                >
-                  <Copy className="size-3" />
-                  {t('common.copy')}
-                </button>
-              )}
-              {(isImageFile || isHtmlFile) && (
-                <button
-                  type="button"
-                  onClick={handleOpenRaw}
-                  className={BUTTON_GHOST_ACCENT}
-                  title={t('fileEditor.openRaw')}
-                >
-                  <ExternalLink className="size-3" />
-                  {t('fileEditor.open')}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={handleDownload}
-                disabled={!isImageFile && (liveContent === null || loading)}
-                className={BUTTON_GHOST_ACCENT}
-                title={t('fileEditor.downloadTitle')}
-              >
-                <Download className="size-3" />
-                {t('fileEditor.download')}
-              </button>
+              </div>
               <button
                 type="button"
                 onClick={onClose}
-                className={`${BUTTON_ICON_MUTED} size-8`}
+                className={`${BUTTON_ICON_MUTED} size-8 shrink-0`}
                 aria-label={t('common.close')}
               >
                 <X className="size-4" />
@@ -566,9 +568,9 @@ export function FileEditorPanel({
 
         {/* ── Editor Area ─────────────────────────────────────────────────── */}
         {!isImageFile && (
-        <div className={`flex-1 overflow-hidden min-h-0 relative ${isHtmlFile && previewMode === 'split' ? 'grid grid-cols-2' : 'flex flex-col'}`}>
+        <div className={`flex-1 overflow-hidden min-h-0 relative ${isHtmlFile && previewMode === 'split' ? 'grid grid-rows-2 md:grid-cols-2 md:grid-rows-none' : 'flex flex-col'}`}>
           {isHtmlFile && previewMode !== 'code' && (
-            <div className={`${previewMode === 'split' ? 'order-2 border-l border-border/50' : ''} min-h-0 flex-1 overflow-hidden bg-white`}>
+            <div className={`${previewMode === 'split' ? 'order-2 border-t border-border/50 md:border-l md:border-t-0' : ''} min-h-0 flex-1 overflow-hidden bg-white`}>
               <iframe
                 src={rawFileUrl}
                 title={t('fileEditor.preview')}
