@@ -1,4 +1,4 @@
-import { Search, Settings, X } from 'lucide-react';
+import { Command, Search, Settings, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
@@ -20,6 +20,7 @@ import { TreeNode } from './file-explorer-tree-node';
 import type { PlaygroundEntry } from './file-explorer-types';
 import {
   flattenTree,
+  flattenFiles,
   diffTrees,
   filterTreeByQuery,
   findEntryByPath,
@@ -35,6 +36,7 @@ import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-t
 import { useWorkspaceDrop } from './use-workspace-drop';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { useT } from '../i18n';
+import { FileIcon } from '../file-icon';
 import {
   normalizePlaygroundServices,
   type PlaygroundPreviewService,
@@ -115,6 +117,9 @@ export function FileExplorer({
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const [searchQuery, setSearchQuery] = useState('');
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [quickQuery, setQuickQuery] = useState('');
+  const [quickSelectedIndex, setQuickSelectedIndex] = useState(0);
   const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
   const [animatingPaths, setAnimatingPaths] = useState<Map<string, FileAnimationType>>(new Map());
   const [animatingPrev, setAnimatingPrev] = useState<PlaygroundEntry[] | null>(null);
@@ -373,6 +378,30 @@ export function FileExplorer({
 
   const filteredTree = useMemo(() => filterTreeByQuery(displayTree, searchQuery), [displayTree, searchQuery]);
   const flatTree = useMemo(() => flattenTree(filteredTree, expanded), [filteredTree, expanded]);
+  const quickFiles = useMemo(
+    () => flattenFiles([...playgroundTreeWithMeta, ...agentTreeWithMeta]),
+    [agentTreeWithMeta, playgroundTreeWithMeta],
+  );
+  const quickResults = useMemo(() => {
+    const query = quickQuery.trim().toLowerCase();
+    const scored = quickFiles
+      .map((item, index) => {
+        const name = item.entry.name.toLowerCase();
+        const path = item.entry.path.toLowerCase();
+        if (!query) return { item, index, score: 3 };
+        if (name === query) return { item, index, score: 0 };
+        if (name.startsWith(query)) return { item, index, score: 1 };
+        if (path.includes(query) || name.includes(query)) return { item, index, score: 2 };
+        return null;
+      })
+      .filter((item): item is { item: typeof quickFiles[number]; index: number; score: number } => item != null);
+
+    return scored
+      .sort((a, b) => a.score - b.score || a.item.entry.path.length - b.item.entry.path.length || a.index - b.index)
+      .slice(0, 80)
+      .map(({ item }) => item);
+  }, [quickFiles, quickQuery]);
+  const quickInputRef = useRef<HTMLInputElement>(null);
 
   // ── Workspace drop zones ──────────────────────────────────────────────────
   const playgroundDrop = useWorkspaceDrop({
@@ -399,6 +428,45 @@ export function FileExplorer({
 
   const openFileEntry =
     !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
+
+  const openQuickOpen = useCallback(() => {
+    if (quickFiles.length === 0) return;
+    setQuickOpen(true);
+    setQuickQuery('');
+    setQuickSelectedIndex(0);
+  }, [quickFiles.length]);
+
+  const closeQuickOpen = useCallback(() => {
+    setQuickOpen(false);
+    setQuickQuery('');
+    setQuickSelectedIndex(0);
+  }, []);
+
+  const selectQuickFile = useCallback((entry: PlaygroundEntry) => {
+    handleFileClick(entry);
+    closeQuickOpen();
+  }, [closeQuickOpen, handleFileClick]);
+
+  useEffect(() => {
+    if (!quickOpen) return;
+    const id = window.setTimeout(() => quickInputRef.current?.focus(), 0);
+    return () => window.clearTimeout(id);
+  }, [quickOpen]);
+
+  useEffect(() => {
+    setQuickSelectedIndex(0);
+  }, [quickQuery]);
+
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p') {
+        event.preventDefault();
+        openQuickOpen();
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [openQuickOpen]);
 
   const collapsedContent = (
     <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 pt-3 pb-4 backdrop-blur-xl">
@@ -445,6 +513,16 @@ export function FileExplorer({
           </div>
           <div className="flex items-center gap-1">
             {playgroundSelector && <div className="shrink-0">{playgroundSelector}</div>}
+            <button
+              type="button"
+              className={BUTTON_ICON_ACCENT_SM}
+              title={t('fileExplorer.quickOpenTitle')}
+              aria-label={t('fileExplorer.quickOpen')}
+              onClick={openQuickOpen}
+              disabled={quickFiles.length === 0}
+            >
+              <Command className="size-3.5 sm:size-4" />
+            </button>
             <button
               type="button"
               className={BUTTON_ICON_ACCENT_SM}
@@ -615,6 +693,99 @@ export function FileExplorer({
 
   return (
     <>
+      {quickOpen && (
+        <div
+          className="fixed inset-0 z-[90] flex items-start justify-center bg-black/35 px-4 pt-[12vh] backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-label={t('fileExplorer.quickOpen')}
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) closeQuickOpen();
+          }}
+        >
+          <div className="w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-background shadow-2xl">
+            <div className="relative border-b border-border/60">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <input
+                ref={quickInputRef}
+                value={quickQuery}
+                onChange={(event) => setQuickQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeQuickOpen();
+                    return;
+                  }
+                  if (event.key === 'ArrowDown') {
+                    event.preventDefault();
+                    setQuickSelectedIndex((index) => Math.min(index + 1, quickResults.length - 1));
+                    return;
+                  }
+                  if (event.key === 'ArrowUp') {
+                    event.preventDefault();
+                    setQuickSelectedIndex((index) => Math.max(index - 1, 0));
+                    return;
+                  }
+                  if (event.key === 'Enter' && quickResults[quickSelectedIndex]) {
+                    event.preventDefault();
+                    selectQuickFile(quickResults[quickSelectedIndex].entry);
+                  }
+                }}
+                placeholder={t('fileExplorer.quickOpenPlaceholder')}
+                className="h-11 w-full bg-transparent pl-10 pr-4 text-sm text-foreground outline-none placeholder:text-muted-foreground"
+              />
+            </div>
+            <div className="max-h-[min(24rem,55vh)] overflow-y-auto p-1.5">
+              {quickResults.length === 0 ? (
+                <div className="px-3 py-6 text-center text-sm text-muted-foreground">
+                  {t('fileExplorer.noMatches', { query: quickQuery })}
+                </div>
+              ) : (
+                quickResults.map(({ entry, source }, index) => {
+                  const isActive = index === quickSelectedIndex;
+                  const isGitModified = entry.gitStatus === 'modified';
+                  const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
+                  const isGitDeleted = entry.gitStatus === 'deleted';
+                  const statusClass =
+                    isGitModified ? 'bg-amber-400'
+                    : isGitAddedOrUntracked ? 'bg-green-400'
+                    : isGitDeleted ? 'bg-red-400'
+                    : entry.gitStatus === 'renamed' ? 'bg-blue-400'
+                    : 'bg-muted-foreground';
+
+                  return (
+                    <button
+                      key={`${source}:${entry.path}`}
+                      type="button"
+                      onMouseEnter={() => setQuickSelectedIndex(index)}
+                      onClick={() => selectQuickFile(entry)}
+                      className={`flex h-11 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors ${
+                        isActive ? 'bg-violet-500/12 text-foreground' : 'text-foreground hover:bg-muted/60'
+                      }`}
+                    >
+                      <FileIcon pathOrName={entry.name} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate font-medium">{entry.name}</span>
+                        <span className="block truncate text-[11px] text-muted-foreground">{entry.path}</span>
+                      </span>
+                      {entry.gitStatus && (
+                        <span
+                          className={`size-1.5 shrink-0 rounded-full ${statusClass}`}
+                          title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
+                          aria-label={t('fileEditor.gitStatus', { status: entry.gitStatus })}
+                        />
+                      )}
+                      <span className="shrink-0 rounded-[4px] border border-border/70 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
+                        {source === 'agent' ? t('fileExplorer.aiTab') : t('fileExplorer.playgroundTab')}
+                      </span>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       {onToggleCollapse && collapsed !== undefined && (playgroundTree.length > 0 || hasAgentWorkspace) ? (
         <div className="relative h-full flex flex-col min-h-0 flex-1">
           {content}

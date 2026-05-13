@@ -175,6 +175,29 @@ export interface FlatTreeNode {
   depth: number;
 }
 
+export interface FlatFileEntry {
+  entry: PlaygroundEntry;
+  source: NonNullable<PlaygroundEntry['source']>;
+}
+
+export function flattenFiles(entries: PlaygroundEntry[]): FlatFileEntry[] {
+  const result: FlatFileEntry[] = [];
+
+  function visit(entry: PlaygroundEntry, source: PlaygroundEntry['source']) {
+    const currentSource = entry.source ?? source;
+    if (entry.type === 'file' && currentSource) {
+      result.push({ entry: { ...entry, source: currentSource }, source: currentSource });
+      return;
+    }
+    for (const child of entry.children ?? []) {
+      visit(child, currentSource);
+    }
+  }
+
+  for (const entry of entries) visit(entry, entry.source);
+  return result;
+}
+
 export function flattenTree(
   entries: PlaygroundEntry[],
   expanded: Set<string>,

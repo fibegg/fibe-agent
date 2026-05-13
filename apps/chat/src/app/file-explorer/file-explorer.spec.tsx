@@ -256,6 +256,62 @@ describe('FileExplorer', () => {
     );
   });
 
+  it('quick-opens files across playground and agent workspaces with Cmd+P', async () => {
+    const onFileSelect = vi.fn();
+    const tree: PlaygroundEntry[] = [
+      { name: 'app.ts', path: 'src/app.ts', type: 'file' },
+    ];
+    const agentTree: PlaygroundEntry[] = [
+      { name: 'CLAUDE.md', path: 'CLAUDE.md', type: 'file' },
+    ];
+
+    render(
+      <FileExplorer
+        tree={tree}
+        agentTree={agentTree}
+        agentWorkspaceAvailable
+        onFileSelect={onFileSelect}
+      />
+    );
+
+    fireEvent.keyDown(window, { key: 'p', metaKey: true });
+    expect(screen.getByRole('dialog', { name: 'Quick open file' })).toBeTruthy();
+
+    fireEvent.change(screen.getByPlaceholderText('Search files by name or path...'), {
+      target: { value: 'claude' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /CLAUDE\.md/i }));
+
+    expect(onFileSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'CLAUDE.md',
+        source: 'agent',
+      })
+    );
+  });
+
+  it('selects the highlighted quick-open result with Enter', () => {
+    const onFileSelect = vi.fn();
+    const tree: PlaygroundEntry[] = [
+      { name: 'app.ts', path: 'src/app.ts', type: 'file' },
+      { name: 'settings.ts', path: 'src/settings.ts', type: 'file', gitStatus: 'modified' },
+    ];
+
+    render(<FileExplorer tree={tree} agentTree={[]} onFileSelect={onFileSelect} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quick open file' }));
+    const input = screen.getByPlaceholderText('Search files by name or path...');
+    fireEvent.change(input, { target: { value: 'settings' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(onFileSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'src/settings.ts',
+        source: 'playground',
+      })
+    );
+  });
+
   it('shows the agent workspace empty state when the workspace exists without visible files', () => {
     render(
       <FileExplorer

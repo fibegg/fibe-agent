@@ -4,6 +4,7 @@ import {
   getDirPathsAtDepth,
   findEntryByPath,
   filterTreeByQuery,
+  flattenFiles,
   diffTrees,
   mergeAnimatingRemoved,
   withEntrySource,
@@ -179,6 +180,26 @@ describe('withEntrySource', () => {
 
     expect(result[0].source).toBe('agent');
     expect(result[0].children?.[0].source).toBe('agent');
+  });
+});
+
+describe('flattenFiles', () => {
+  it('returns files with inherited source for quick open', () => {
+    const tree = withEntrySource([
+      dir('src', 'src', [
+        file('index.ts', 'src/index.ts'),
+        dir('app', 'src/app', [file('page.tsx', 'src/app/page.tsx')]),
+      ]),
+      file('README.md', 'README.md'),
+    ], 'playground');
+
+    const result = flattenFiles(tree);
+
+    expect(result.map((item) => `${item.source}:${item.entry.path}`)).toEqual([
+      'playground:src/index.ts',
+      'playground:src/app/page.tsx',
+      'playground:README.md',
+    ]);
   });
 });
 
