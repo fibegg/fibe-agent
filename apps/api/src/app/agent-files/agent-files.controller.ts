@@ -1,5 +1,5 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { contentTypeFromFilename } from '../uploads/uploads-handler';
@@ -45,6 +45,23 @@ export class AgentFilesController {
     res.header('Content-Type', contentTypeFromFilename(path));
     res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(path.split('/').pop() ?? 'file')}"`);
     return res.send(createReadStream(filePath));
+  }
+
+  @Put('agent-files/file')
+  @HttpCode(HttpStatus.OK)
+  async saveFileContent(
+    @Body() body: { path?: string; content?: string },
+    @Query('conversationId') conversationId?: string,
+  ) {
+    const { path, content } = body ?? {};
+    if (!path || typeof path !== 'string') {
+      throw new NotFoundException('Invalid path');
+    }
+    if (typeof content !== 'string') {
+      throw new NotFoundException('Invalid content');
+    }
+    await this.agentFiles.saveFileContent(path, content, conversationId);
+    return { ok: true };
   }
 
   @Post('agent-files/upload')

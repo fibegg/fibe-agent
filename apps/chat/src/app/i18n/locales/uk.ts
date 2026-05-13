@@ -327,6 +327,16 @@ export const uk: Record<TranslationKey, string> = {
   'playground.none': 'Немає доступних майданчиків',
   'playground.linked': 'Прив’язано: {path}',
 
+  'preview.title': 'Превʼю',
+  'preview.toggle': 'Перемкнути превʼю',
+  'preview.serviceSelector': 'Сервіс превʼю',
+  'preview.reload': 'Оновити превʼю',
+  'preview.openExternal': 'Відкрити превʼю в новій вкладці',
+  'preview.frameTitle': 'Превʼю {service}',
+  'preview.loading': 'Завантаження сервісів превʼю...',
+  'preview.emptyTitle': 'Немає сервісів превʼю',
+  'preview.emptyBody': 'Прив’яжіть майданчик або дозвольте Файбу передати URL сервісів, щоб показати превʼю тут.',
+
   'fileMention.linkFile': 'Прив’язати файл майданчика',
   'fileMention.empty': 'У майданчику немає файлів або папок',
   'fileMention.noMatches': 'Немає відповідних файлів або папок',

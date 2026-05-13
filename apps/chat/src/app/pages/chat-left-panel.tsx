@@ -9,6 +9,7 @@ import { ConversationSidebar } from '../chat/conversation-sidebar';
 import type { ConversationMeta } from '../chat/use-conversations';
 import { SidebarToggle } from '../sidebar-toggle';
 import { useT } from '../i18n';
+import type { PlaygroundPreviewService } from '../playground-preview/playground-services';
 
 interface ChatLeftPanelProps {
   hasAnyFiles: boolean;
@@ -36,6 +37,8 @@ interface ChatLeftPanelProps {
   agentProviderLabel?: string;
   currentModel?: string;
   playgroundSelector?: ReactNode;
+  playgroundServices?: PlaygroundPreviewService[];
+  onServicePreview?: (service: PlaygroundPreviewService) => void;
   // Conversation sidebar — always shown when panel is open
   conversations?: ConversationMeta[];
   conversationsLoading?: boolean;
@@ -74,6 +77,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   agentProviderLabel,
   currentModel,
   playgroundSelector,
+  playgroundServices,
+  onServicePreview,
   conversations,
   conversationsLoading = false,
   activeConversationId = 'default',
@@ -130,6 +135,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
               agentProviderLabel={agentProviderLabel}
               currentModel={currentModel}
               playgroundSelector={playgroundSelector}
+              playgroundServices={playgroundServices}
+              onServicePreview={onServicePreview}
             />
           </div>
         )}

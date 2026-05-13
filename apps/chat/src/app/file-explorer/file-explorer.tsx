@@ -33,6 +33,10 @@ import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-t
 import { useWorkspaceDrop } from './use-workspace-drop';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { useT } from '../i18n';
+import {
+  normalizePlaygroundServices,
+  type PlaygroundPreviewService,
+} from '../playground-preview/playground-services';
 
 export type { PlaygroundEntry } from './file-explorer-types';
 
@@ -66,6 +70,8 @@ export function FileExplorer({
   agentProviderLabel,
   currentModel,
   playgroundSelector,
+  playgroundServices,
+  onServicePreview,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -97,6 +103,9 @@ export function FileExplorer({
   currentModel?: string;
   /** Optional playground selector rendered inside the file browser chrome. */
   playgroundSelector?: ReactNode;
+  /** Optional service list for opening playground previews in the main pane. */
+  playgroundServices?: PlaygroundPreviewService[];
+  onServicePreview?: (service: PlaygroundPreviewService) => void;
 } = {}) {
   const t = useT();
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
@@ -142,6 +151,10 @@ export function FileExplorer({
     : selectedFileLocal;
 
   const [playgroundUrls, setPlaygroundUrls] = useState<string[]>([]);
+  const displayServices = useMemo(
+    () => playgroundServices ?? normalizePlaygroundServices(playgroundUrls, 'cli'),
+    [playgroundServices, playgroundUrls],
+  );
 
   const fetchUrls = useCallback(async (signal?: AbortSignal) => {
     try {
@@ -436,24 +449,38 @@ export function FileExplorer({
             />
           </div>
         )}
-        {effectiveTab === 'playground' && playgroundUrls?.length > 0 && (
+        {effectiveTab === 'playground' && displayServices.length > 0 && (
           <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
-            {playgroundUrls.map((urlStr) => {
-              const [name, rawUrl] = urlStr.includes('|') ? urlStr.split('|') : [urlStr, urlStr];
-              const fullUrl = rawUrl.startsWith('http') ? rawUrl : `https://${rawUrl}`;
-              return (
-                <a
-                  key={urlStr}
-                  href={fullUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20 shadow-sm"
-                >
+            {displayServices.map((service) => {
+              const pillClasses = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20 shadow-sm';
+              const content = (
+                <>
                   <div className="relative flex size-1.5">
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75"></span>
                     <span className="relative inline-flex size-1.5 rounded-full bg-blue-500"></span>
                   </div>
-                  {name}
+                  {service.name}
+                </>
+              );
+              return onServicePreview ? (
+                <button
+                  key={service.id}
+                  type="button"
+                  onClick={() => onServicePreview(service)}
+                  className={pillClasses}
+                  title={service.url}
+                >
+                  {content}
+                </button>
+              ) : (
+                <a
+                  key={service.id}
+                  href={service.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={pillClasses}
+                >
+                  {content}
                 </a>
               );
             })}

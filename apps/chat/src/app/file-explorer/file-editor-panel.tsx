@@ -117,6 +117,7 @@ export function FileEditorPanel({
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [editorReady, setEditorReady] = useState(false);
   const [previewMode, setPreviewMode] = useState<'code' | 'preview' | 'split'>('code');
+  const [rawFileRevision, setRawFileRevision] = useState(0);
   const [imageFit, setImageFit] = useState<'fit' | 'actual'>('fit');
   const [imageZoom, setImageZoom] = useState(1);
 
@@ -141,6 +142,7 @@ export function FileEditorPanel({
   const rawFileUrl = withQueryParams(rawApiBasePath ?? API_PATHS.PLAYGROUNDS_FILE_RAW, {
     path: entry.path,
     ...(authToken ? { token: authToken } : {}),
+    ...(rawFileRevision > 0 ? { v: String(rawFileRevision) } : {}),
   });
   
   const isGitModified = entry.gitStatus === 'modified';
@@ -155,10 +157,11 @@ export function FileEditorPanel({
   }, [entry.path, isDirty]);
 
   useEffect(() => {
-    setPreviewMode('code');
+    setPreviewMode(isHtmlFile ? 'preview' : 'code');
+    setRawFileRevision(0);
     setImageFit('fit');
     setImageZoom(1);
-  }, [entry.path]);
+  }, [entry.path, isHtmlFile]);
 
   // ── Fetch content (text files only) ──────────────────────────────────────
   useEffect(() => {
@@ -282,13 +285,14 @@ export function FileEditorPanel({
 
       setOriginalContent(content);
       setLiveContent(content);
+      if (isHtmlFile || isImageFile) setRawFileRevision((value) => value + 1);
       setToast({ message: t('fileEditor.fileSaved'), type: 'success' });
     } catch {
       setToast({ message: t('fileEditor.saveFailed'), type: 'error' });
     } finally {
       setIsSaving(false);
     }
-  }, [entry.path, liveContent, apiBasePath, t]);
+  }, [entry.path, liveContent, apiBasePath, t, isHtmlFile, isImageFile]);
 
   // ── Copy ───────────────────────────────────────────────────────────────────
   const handleCopy = useCallback(() => {
@@ -398,15 +402,6 @@ export function FileEditorPanel({
                 <div className="mr-1 flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border/60 bg-background/60">
                   <button
                     type="button"
-                    onClick={() => setPreviewMode('code')}
-                    className={`grid size-8 place-items-center ${previewMode === 'code' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
-                    title={t('fileEditor.code')}
-                    aria-label={t('fileEditor.code')}
-                  >
-                    <Code2 className="size-3.5" />
-                  </button>
-                  <button
-                    type="button"
                     onClick={() => setPreviewMode('preview')}
                     className={`grid size-8 place-items-center ${previewMode === 'preview' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
                     title={t('fileEditor.preview')}
@@ -422,6 +417,15 @@ export function FileEditorPanel({
                     aria-label={t('fileEditor.split')}
                   >
                     <Columns2 className="size-3.5" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreviewMode('code')}
+                    className={`grid size-8 place-items-center ${previewMode === 'code' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    title={t('fileEditor.code')}
+                    aria-label={t('fileEditor.code')}
+                  >
+                    <Code2 className="size-3.5" />
                   </button>
                 </div>
               )}
@@ -572,6 +576,7 @@ export function FileEditorPanel({
           {isHtmlFile && previewMode !== 'code' && (
             <div className={`${previewMode === 'split' ? 'order-2 border-t border-border/50 md:border-l md:border-t-0' : ''} min-h-0 flex-1 overflow-hidden bg-white`}>
               <iframe
+                key={rawFileUrl}
                 src={rawFileUrl}
                 title={t('fileEditor.preview')}
                 className="h-full w-full border-0 bg-white"

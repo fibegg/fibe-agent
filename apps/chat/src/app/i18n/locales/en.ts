@@ -322,6 +322,16 @@ export const en = {
   'playground.none': 'No playgrounds available',
   'playground.linked': 'Linked: {path}',
 
+  'preview.title': 'Preview',
+  'preview.toggle': 'Toggle preview',
+  'preview.serviceSelector': 'Preview service',
+  'preview.reload': 'Reload preview',
+  'preview.openExternal': 'Open preview in new tab',
+  'preview.frameTitle': '{service} preview',
+  'preview.loading': 'Loading preview services...',
+  'preview.emptyTitle': 'No preview services',
+  'preview.emptyBody': 'Link a playground or let Fibe send service URLs to show the app preview here.',
+
   'fileMention.linkFile': 'Link playground file',
   'fileMention.empty': 'No files or folders in playground',
   'fileMention.noMatches': 'No matching files or folders',

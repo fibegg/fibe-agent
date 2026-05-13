@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { NotFoundException } from '@nestjs/common';
@@ -59,6 +59,30 @@ describe('AgentFilesService', () => {
     };
     const service = new AgentFilesService(mockStrategyRegistry as never);
     await expect(service.uploadFile('../outside', 'test.txt', Buffer.from(''))).rejects.toThrow(NotFoundException);
+  });
+
+  test('saveFileContent writes LLM-created workspace files', async () => {
+    const mockStrategyRegistry = {
+      resolveStrategy: () => ({
+        getWorkingDir: () => agentDir
+      })
+    };
+    const service = new AgentFilesService(mockStrategyRegistry as never);
+
+    await service.saveFileContent('nested/zoo.html', '<h1>Zoo</h1>');
+
+    expect(readFileSync(join(agentDir, 'nested', 'zoo.html'), 'utf8')).toBe('<h1>Zoo</h1>');
+  });
+
+  test('saveFileContent rejects directory traversal', async () => {
+    const mockStrategyRegistry = {
+      resolveStrategy: () => ({
+        getWorkingDir: () => agentDir
+      })
+    };
+    const service = new AgentFilesService(mockStrategyRegistry as never);
+
+    await expect(service.saveFileContent('../outside.html', '<h1>x</h1>')).rejects.toThrow(NotFoundException);
   });
 
   test('getStats prepares and exposes an empty conversation workspace', async () => {

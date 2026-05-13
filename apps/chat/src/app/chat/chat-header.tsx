@@ -4,6 +4,7 @@ import {
   Loader2,
   Menu,
   MessageSquare,
+  MonitorUp,
   Search,
   Sparkles,
   X,
@@ -46,6 +47,9 @@ export interface ChatHeaderProps {
   terminalOpen?: boolean;
   onToggleDiff?: () => void;
   diffOpen?: boolean;
+  onTogglePreview?: () => void;
+  previewOpen?: boolean;
+  previewAvailable?: boolean;
   onToggleCli?: () => void;
   cliOpen?: boolean;
   tonyStarkMode?: boolean;
@@ -122,6 +126,9 @@ export function ChatHeader({
   terminalOpen = false,
   onToggleDiff,
   diffOpen = false,
+  onTogglePreview,
+  previewOpen = false,
+  previewAvailable = false,
   onToggleCli,
   cliOpen = false,
   tonyStarkMode = false,
@@ -471,6 +478,22 @@ export function ChatHeader({
           {onToggleDiff && (
             <DiffButton open={diffOpen} onToggle={onToggleDiff} className="hidden sm:flex size-9" />
           )}
+          {onTogglePreview && previewAvailable && (
+            <button
+              type="button"
+              onClick={onTogglePreview}
+              className={`hidden sm:flex size-9 rounded-md items-center justify-center transition-colors shrink-0 ${
+                previewOpen
+                  ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
+                  : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+              }`}
+              title={t('preview.title')}
+              aria-label={t('preview.toggle')}
+              aria-pressed={previewOpen}
+            >
+              <MonitorUp className="size-4" />
+            </button>
+          )}
           {/* Desktop-only: CLI button in top row */}
           {onToggleCli && (
             <CliButton open={cliOpen} onToggle={onToggleCli} className="hidden sm:flex size-9" />
@@ -518,6 +541,22 @@ export function ChatHeader({
         {/* Mobile-only: diff button right of search, before terminal */}
         {onToggleDiff && (
           <DiffButton open={diffOpen} onToggle={onToggleDiff} className="sm:hidden size-8" />
+        )}
+        {onTogglePreview && previewAvailable && (
+          <button
+            type="button"
+            onClick={onTogglePreview}
+            className={`sm:hidden size-8 rounded-md items-center justify-center transition-colors shrink-0 ${
+              previewOpen
+                ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
+                : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+            }`}
+            title={t('preview.title')}
+            aria-label={t('preview.toggle')}
+            aria-pressed={previewOpen}
+          >
+            <MonitorUp className="size-4" />
+          </button>
         )}
 
         {/* Mobile-only: CLI button right of search */}

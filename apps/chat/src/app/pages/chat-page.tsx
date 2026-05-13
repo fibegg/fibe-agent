@@ -85,6 +85,9 @@ import { useTerminalPanel } from '../terminal/use-terminal-panel';
 import { useDiffPanel } from '../diff/use-diff-panel';
 import { RightDrawer } from '../right-drawer';
 import { makeClientId } from '../browser-compat';
+import { usePlaygroundServices } from '../playground-preview/use-playground-services';
+import { PlaygroundServicePreviewPanel } from '../playground-preview/playground-service-preview-panel';
+import type { PlaygroundPreviewService } from '../playground-preview/playground-services';
 import {
   QuestionCard,
   ConfirmCard,
@@ -214,12 +217,19 @@ export function ChatPage() {
 
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
+  const [servicePreviewOpen, setServicePreviewOpen] = useState(false);
+  const [selectedPreviewServiceId, setSelectedPreviewServiceId] = useState<string | null>(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const { diffOpen, toggleDiff, closeDiff } = useDiffPanel();
   const [cliOpen, setCliOpen] = useState(false);
   const closeCli = useCallback(() => setCliOpen(false), []);
   const pgSelector = usePlaygroundSelector();
+  const {
+    services: previewServices,
+    loading: previewServicesLoading,
+    refresh: refreshPreviewServices,
+  } = usePlaygroundServices();
   const playgroundSelector = (
     <PlaygroundSelector
       entries={pgSelector.entries}
@@ -249,6 +259,11 @@ export function ChatPage() {
   const [compactFileBrowserOpen, setCompactFileBrowserOpen] = useState(false);
   const compactMode = simplicateMode;
   const canShowDiff = playgroundStats.hasGitRepo;
+  const openServicePreview = useCallback((service?: PlaygroundPreviewService) => {
+    setViewingFile(null);
+    if (service) setSelectedPreviewServiceId(service.id);
+    setServicePreviewOpen(true);
+  }, []);
 
   // ─── Local MCP tool state ─────────────────────────────────────────────────
 
@@ -745,6 +760,7 @@ export function ChatPage() {
       if (id === activeConversationId) return;
       setSearchQuery('');
       setViewingFile(null);
+      setServicePreviewOpen(false);
       switchConversation(id);
     },
     [activeConversationId, setSearchQuery, switchConversation],
@@ -753,6 +769,7 @@ export function ChatPage() {
   const handleConversationCreate = useCallback(async (): Promise<void> => {
     setSearchQuery('');
     setViewingFile(null);
+    setServicePreviewOpen(false);
     await createConversation();
   }, [createConversation, setSearchQuery]);
 
@@ -778,6 +795,7 @@ export function ChatPage() {
 
       setSearchQuery('');
       setViewingFile(null);
+      setServicePreviewOpen(false);
       setPendingTimestampFocus({
         timestamp,
         conversationId: requestedConversationId,
@@ -1214,6 +1232,7 @@ export function ChatPage() {
                   onClose={closeMobileSidebar}
                   onFileSelect={(entry) => {
                     setViewingFile(entry);
+                    setServicePreviewOpen(false);
                     closeMobileSidebar();
                   }}
                   selectedPath={viewingFile?.path ?? null}
@@ -1223,6 +1242,11 @@ export function ChatPage() {
                   agentProviderLabel={agentProviderLabel}
                   currentModel={currentModel}
                   playgroundSelector={playgroundSelector}
+                  playgroundServices={previewServices}
+                  onServicePreview={(service) => {
+                    openServicePreview(service);
+                    closeMobileSidebar();
+                  }}
                 />
               </div>
               {/* Conversations — always visible at bottom on mobile too */}
@@ -1301,7 +1325,10 @@ export function ChatPage() {
               }
               setSidebarCollapsed((v) => !v);
             }}
-            onFileSelect={(entry) => setViewingFile(entry)}
+            onFileSelect={(entry) => {
+              setViewingFile(entry);
+              setServicePreviewOpen(false);
+            }}
             onResizeStart={leftResize.startResize}
             selectedPath={viewingFile?.path ?? null}
             dirtyPaths={pageDirtyPaths}
@@ -1313,6 +1340,8 @@ export function ChatPage() {
             agentProviderLabel={agentProviderLabel}
             currentModel={currentModel}
             playgroundSelector={playgroundSelector}
+            playgroundServices={previewServices}
+            onServicePreview={openServicePreview}
             conversations={conversations}
             conversationsLoading={conversationsLoading}
             activeConversationId={activeConversationId}
@@ -1347,7 +1376,7 @@ export function ChatPage() {
       }
     >
       <div className="relative flex-1 min-h-0 flex flex-col min-w-0 overflow-hidden">
-        {!viewingFile && (
+        {!viewingFile && !servicePreviewOpen && (
           <>
             <ChatHeader
               isMobile={isMobile}
@@ -1377,6 +1406,12 @@ export function ChatPage() {
               terminalOpen={terminalOpen}
               onToggleDiff={canShowDiff ? toggleDiff : undefined}
               diffOpen={diffOpen}
+              onTogglePreview={() => {
+                setViewingFile(null);
+                setServicePreviewOpen((open) => !open);
+              }}
+              previewOpen={servicePreviewOpen}
+              previewAvailable
               // onToggleCli={toggleCli}  // Hidden: CLI commands not yet wired to execution
               cliOpen={cliOpen}
               currentEffort={currentEffort}
@@ -1419,6 +1454,7 @@ export function ChatPage() {
           </>
         )}
         {!viewingFile &&
+          !servicePreviewOpen &&
           !isMobile &&
           compactMode &&
           !compactFileBrowserOpen && (
@@ -1433,37 +1469,39 @@ export function ChatPage() {
             </button>
           )}
         <div className="relative flex-1 min-h-0 flex flex-col min-w-0">
-          <div
-            ref={scroll.scrollRef}
-            onScroll={scroll.onScroll}
-            className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 pb-24 sm:pb-28"
-          >
-            <div className="min-w-0">
-              <MessageList
-                ref={messageListRef}
-                messages={filteredMessages}
-                streamingText={streamingText}
-                isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
-                lastUserMessage={
-                  state === CHAT_STATES.AWAITING_RESPONSE
-                    ? lastUserMessage
-                    : null
-                }
-                scrollRef={scroll.scrollRef}
-                bothSidebarsCollapsed={
-                  !isMobile &&
-                  (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) &&
-                  rightSidebarCollapsed
-                }
-                noOutputBody={t('chat.noOutput')}
-                onRetry={handleSendContinue}
-                conversationId={activeConversationId}
-              />
-              <div ref={scroll.endRef} />
+          {!servicePreviewOpen && (
+            <div
+              ref={scroll.scrollRef}
+              onScroll={scroll.onScroll}
+              className="chat-messages-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 pb-24 sm:pb-28"
+            >
+              <div className="min-w-0">
+                <MessageList
+                  ref={messageListRef}
+                  messages={filteredMessages}
+                  streamingText={streamingText}
+                  isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+                  lastUserMessage={
+                    state === CHAT_STATES.AWAITING_RESPONSE
+                      ? lastUserMessage
+                      : null
+                  }
+                  scrollRef={scroll.scrollRef}
+                  bothSidebarsCollapsed={
+                    !isMobile &&
+                    (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) &&
+                    rightSidebarCollapsed
+                  }
+                  noOutputBody={t('chat.noOutput')}
+                  onRetry={handleSendContinue}
+                  conversationId={activeConversationId}
+                />
+                <div ref={scroll.endRef} />
+              </div>
             </div>
-          </div>
+          )}
           {/* Local MCP tool cards — rendered below message list, above input */}
-          {localToolItems.length > 0 && (
+          {!servicePreviewOpen && localToolItems.length > 0 && (
             <div className="px-3 sm:px-4 md:px-6 flex flex-col gap-1">
               {localToolItems.map((item) => {
                 if (item.kind === 'ask') {
@@ -1504,7 +1542,7 @@ export function ChatPage() {
               })}
             </div>
           )}
-          {!scroll.isAtBottom && (
+          {!servicePreviewOpen && !scroll.isAtBottom && (
             <button
               type="button"
               onClick={() => scroll.scrollToBottom('smooth')}
@@ -1557,8 +1595,24 @@ export function ChatPage() {
             </div>
           </Suspense>
         )}
+        {servicePreviewOpen && !viewingFile && (
+          <div
+            className="absolute inset-0 z-10 flex min-h-0 flex-col bg-background"
+            role="dialog"
+            aria-modal="true"
+            aria-label={t('preview.title')}
+          >
+            <PlaygroundServicePreviewPanel
+              services={previewServices}
+              initialServiceId={selectedPreviewServiceId}
+              loading={previewServicesLoading}
+              onClose={() => setServicePreviewOpen(false)}
+              onRefresh={() => void refreshPreviewServices()}
+            />
+          </div>
+        )}
       </div>
-      {!viewingFile && !activeConversationReadonly && (
+      {!viewingFile && !servicePreviewOpen && !activeConversationReadonly && (
         <ChatInputArea
           state={state}
           inputValue={inputValue}

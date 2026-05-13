@@ -1,5 +1,5 @@
 import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
-import { join, resolve, relative, basename } from 'node:path';
+import { join, resolve, relative, basename, dirname } from 'node:path';
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from '../conversation/conversation-manager.service';
@@ -96,6 +96,21 @@ export class AgentFilesService {
 
   async getFileContent(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
     return readFile(await this.getFilePath(relativePath, conversationId), 'utf-8');
+  }
+
+  async saveFileContent(relativePath: string, content: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<void> {
+    const dir = this.getAgentWorkingDir(conversationId);
+    if (!dir) throw new NotFoundException('No agent working directory');
+    const settings = await loadFibeSettings(dir);
+    const base = resolve(dir);
+    const absPath = resolve(base, relativePath);
+    const rel = relative(base, absPath);
+    const segments = rel.replace(/\\/g, '/').split('/');
+    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
+      throw new NotFoundException('File not found');
+    }
+    await mkdir(dirname(absPath), { recursive: true });
+    await writeFile(absPath, content, 'utf-8');
   }
 
   async getFilePath(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {

@@ -8,20 +8,26 @@ vi.mock('../api-url', () => ({ apiRequest: vi.fn(), getAuthTokenForRequest: vi.f
 // CodeMirror can't really run in jsdom — mock the loader so it renders content
 // into a child element (simulating what CM does) while exposing a handle.
 vi.mock('./file-editor-cm', () => ({
-  createEditor: vi.fn(({ parent, content }: { parent: HTMLElement; content: string }) => {
+  createEditor: vi.fn(({ parent, content, onChange }: { parent: HTMLElement; content: string; onChange?: (content: string) => void }) => {
     let currentContent = content;
-    const span = document.createElement('span');
-    span.setAttribute('data-testid', 'cm-mock');
-    span.textContent = content;
-    if (parent) parent.appendChild(span);
+    const textarea = document.createElement('textarea');
+    textarea.setAttribute('data-testid', 'cm-mock');
+    textarea.value = content;
+    textarea.textContent = content;
+    textarea.addEventListener('input', () => {
+      currentContent = textarea.value;
+      textarea.textContent = currentContent;
+      onChange?.(currentContent);
+    });
+    if (parent) parent.appendChild(textarea);
     return {
       view: {},
-      setContent: vi.fn((c: string) => { currentContent = c; span.textContent = c; }),
+      setContent: vi.fn((c: string) => { currentContent = c; textarea.value = c; textarea.textContent = c; }),
       setReadOnly: vi.fn(),
       setTheme: vi.fn(),
       getContent: vi.fn(() => currentContent),
       focus: vi.fn(),
-      destroy: vi.fn(() => { span.remove(); }),
+      destroy: vi.fn(() => { textarea.remove(); }),
     };
   }),
   getLanguageExtension: vi.fn(() => null),
@@ -222,10 +228,66 @@ describe('FileEditorPanel', () => {
     render(<FileEditorPanel entry={{ name: 'index.html', path: 'index.html', type: 'file' }} onClose={mockClose} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
 
-    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
     const iframe = document.querySelector('iframe');
     expect(iframe?.getAttribute('src')).toContain('/api/playgrounds/file/raw?path=index.html');
     expect(iframe?.parentElement?.className).toContain('flex-1');
+  });
+
+  it('opens HTML files in preview mode by default', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: '<h1>Hello</h1>' }) });
+    render(<FileEditorPanel entry={{ name: 'cosmetics.html', path: 'cosmetics.html', type: 'file' }} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    expect(document.querySelector('iframe')?.getAttribute('src')).toContain('/api/playgrounds/file/raw?path=cosmetics.html');
+    expect(screen.getByRole('button', { name: 'Preview' }).className).toContain('bg-violet-500/20');
+  });
+
+  it('orders HTML view modes as preview, split, then code', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: '<h1>Hello</h1>' }) });
+    render(<FileEditorPanel entry={{ name: 'index.html', path: 'index.html', type: 'file' }} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    const modeLabels = screen.getAllByRole('button').slice(0, 3).map((button) => button.getAttribute('aria-label'));
+
+    expect(modeLabels).toEqual(['Preview', 'Split', 'Code']);
+  });
+
+  it('saves agent workspace files through the provided content endpoint', async () => {
+    (apiRequest as Mock)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ content: 'original' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} apiBasePath="/api/agent-files/file?conversationId=thread-a" />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    const editor = screen.getByTestId('cm-mock') as HTMLTextAreaElement;
+    fireEvent.input(editor, { target: { value: 'updated' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(2));
+    expect(apiRequest).toHaveBeenLastCalledWith('/api/agent-files/file?conversationId=thread-a', expect.objectContaining({
+      method: 'PUT',
+      body: JSON.stringify({ path: 'src/app.ts', content: 'updated' }),
+    }));
+  });
+
+  it('refreshes the HTML preview iframe after saving', async () => {
+    (apiRequest as Mock)
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ content: '<h1>Hello</h1>' }) })
+      .mockResolvedValueOnce({ ok: true, json: async () => ({ ok: true }) });
+    render(<FileEditorPanel entry={{ name: 'index.html', path: 'index.html', type: 'file' }} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    const initialSrc = document.querySelector('iframe')?.getAttribute('src') ?? '';
+    fireEvent.click(screen.getByRole('button', { name: 'Code' }));
+    const editor = await screen.findByTestId('cm-mock') as HTMLTextAreaElement;
+    fireEvent.input(editor, { target: { value: '<h1>Updated</h1>' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await waitFor(() => expect(apiRequest).toHaveBeenCalledTimes(2));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => expect(document.querySelector('iframe')?.getAttribute('src')).toContain('&v=1'));
+    expect(document.querySelector('iframe')?.getAttribute('src')).not.toBe(initialSrc);
   });
 
   it('shows saved state in status bar (not dirty)', async () => {
