@@ -2,6 +2,18 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { PlaygroundServicePreviewPanel } from './playground-service-preview-panel';
 
+vi.mock('./preview-diagnostics', () => ({
+  fetchPreviewDiagnostics: vi.fn().mockResolvedValue({
+    url: 'https://app.example.test',
+    finalUrl: 'https://app.example.test',
+    ok: true,
+    reachable: true,
+    displayable: true,
+    redirects: [],
+    issues: [],
+  }),
+}));
+
 const services = [
   { id: 'app', name: 'app', url: 'https://app.example.test' },
   { id: 'admin', name: 'admin', url: 'https://admin.example.test' },

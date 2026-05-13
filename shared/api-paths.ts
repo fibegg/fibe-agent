@@ -10,6 +10,7 @@ export const API_PATHS = {
   PLAYGROUNDS_FILE_RAW: '/api/playgrounds/file/raw',
   PLAYGROUNDS_STATS: '/api/playgrounds/stats',
   PLAYGROUNDS_URLS: '/api/playgrounds/urls',
+  PLAYGROUNDS_PREVIEW_DIAGNOSTICS: '/api/playgrounds/preview-diagnostics',
   PLAYGROUNDS_DIFF: '/api/playgrounds/diff',
   AGENT_FILES: '/api/agent-files',
   AGENT_FILES_FILE: '/api/agent-files/file',

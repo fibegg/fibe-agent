@@ -336,6 +336,13 @@ export const uk: Record<TranslationKey, string> = {
   'preview.loading': 'Завантаження сервісів превʼю...',
   'preview.emptyTitle': 'Немає сервісів превʼю',
   'preview.emptyBody': 'Прив’яжіть майданчик або дозвольте Файбу передати URL сервісів, щоб показати превʼю тут.',
+  'preview.diagnostics': 'Діагностика превʼю',
+  'preview.checking': 'Перевірка...',
+  'preview.errorsCount': '{count} помилок',
+  'preview.warningsCount': '{count} попереджень',
+  'preview.noIssues': 'Без проблем',
+  'preview.checkingDiagnostics': 'Перевіряємо діагностику превʼю...',
+  'preview.diagnosticsFailed': 'Не вдалося завантажити діагностику превʼю',
 
   'fileMention.linkFile': 'Прив’язати файл майданчика',
   'fileMention.empty': 'У майданчику немає файлів або папок',

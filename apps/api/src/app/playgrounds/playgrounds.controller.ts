@@ -1,10 +1,11 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { contentTypeFromFilename } from '../uploads/uploads-handler';
 import { PlaygroundsService } from './playgrounds.service';
 import { PlayroomBrowserService } from './playroom-browser.service';
+import { diagnosePreviewUrl } from './preview-diagnostics';
 
 @Controller()
 @UseGuards(AgentAuthGuard)
@@ -28,6 +29,18 @@ export class PlaygroundsController {
   async getUrls() {
     const urls = await this.playgrounds.getUrls();
     return { urls };
+  }
+
+  @Get('playgrounds/preview-diagnostics')
+  async getPreviewDiagnostics(@Query('url') url?: string) {
+    if (!url || typeof url !== 'string') {
+      throw new BadRequestException('Preview URL is required');
+    }
+    try {
+      return await diagnosePreviewUrl(url);
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'Invalid preview URL');
+    }
   }
 
   @Get('playgrounds/diff')

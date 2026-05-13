@@ -331,6 +331,13 @@ export const en = {
   'preview.loading': 'Loading preview services...',
   'preview.emptyTitle': 'No preview services',
   'preview.emptyBody': 'Link a playground or let Fibe send service URLs to show the app preview here.',
+  'preview.diagnostics': 'Preview diagnostics',
+  'preview.checking': 'Checking...',
+  'preview.errorsCount': '{count} errors',
+  'preview.warningsCount': '{count} warnings',
+  'preview.noIssues': 'No issues',
+  'preview.checkingDiagnostics': 'Checking preview diagnostics...',
+  'preview.diagnosticsFailed': 'Failed to load preview diagnostics',
 
   'fileMention.linkFile': 'Link playground file',
   'fileMention.empty': 'No files or folders in playground',
