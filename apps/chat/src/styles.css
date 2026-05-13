@@ -112,6 +112,126 @@
     --shadow-glass: 0 8px 32px 0 rgb(139 92 246 / 0.12);
   }
 
+  .dark[data-theme='dracula'] {
+    --background: #282a36;
+    --foreground: #f8f8f2;
+    --card: #21222c;
+    --card-foreground: #f8f8f2;
+    --popover: #21222c;
+    --popover-foreground: #f8f8f2;
+    --muted: #343746;
+    --muted-foreground: #b9b9c8;
+    --accent: #3a2f55;
+    --accent-foreground: #bd93f9;
+    --border: rgba(189, 147, 249, 0.22);
+    --border-subtle: rgba(189, 147, 249, 0.12);
+    --input-bg: rgba(33, 34, 44, 0.72);
+    --input-background: rgba(33, 34, 44, 0.88);
+    --sidebar: #1f2029;
+    --sidebar-foreground: #f8f8f2;
+    --sidebar-border: rgba(189, 147, 249, 0.2);
+    --sidebar-primary: #bd93f9;
+    --sidebar-primary-foreground: #282a36;
+    --sidebar-accent: #3a2f55;
+    --sidebar-accent-foreground: #ff79c6;
+    --sidebar-ring: #bd93f9;
+    --primary: #bd93f9;
+    --primary-foreground: #282a36;
+    --secondary: #3a2f55;
+    --secondary-foreground: #ff79c6;
+    --ring: #bd93f9;
+    --input: rgba(189, 147, 249, 0.18);
+    --destructive: #ff5555;
+    --destructive-foreground: #282a36;
+    --success: #50fa7b;
+    --warning: #f1fa8c;
+    --chart-1: #bd93f9;
+    --chart-2: #ff79c6;
+    --chart-3: #8be9fd;
+    --chart-4: #50fa7b;
+    --chart-5: #f1fa8c;
+    --scrollbar-track: rgba(189, 147, 249, 0.1);
+    --scrollbar-thumb: rgba(189, 147, 249, 0.45);
+    --scrollbar-thumb-hover: rgba(255, 121, 198, 0.6);
+    --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.34);
+    --shadow-card: 0 6px 16px -8px rgb(0 0 0 / 0.55);
+    --shadow-elevated: 0 16px 42px -18px rgb(0 0 0 / 0.7);
+    --shadow-glass: 0 8px 32px 0 rgb(189 147 249 / 0.16);
+  }
+
+  .dark[data-theme='midnight'] {
+    --background: #07111f;
+    --foreground: #e6f1ff;
+    --card: #0b1727;
+    --card-foreground: #e6f1ff;
+    --popover: #0b1727;
+    --popover-foreground: #e6f1ff;
+    --muted: #12243a;
+    --muted-foreground: #96a8bd;
+    --accent: #102b45;
+    --accent-foreground: #7dd3fc;
+    --border: rgba(125, 211, 252, 0.2);
+    --border-subtle: rgba(125, 211, 252, 0.1);
+    --input-bg: rgba(11, 23, 39, 0.72);
+    --input-background: rgba(11, 23, 39, 0.88);
+    --sidebar: #050d18;
+    --sidebar-foreground: #e6f1ff;
+    --sidebar-border: rgba(125, 211, 252, 0.18);
+    --sidebar-primary: #38bdf8;
+    --sidebar-primary-foreground: #04111f;
+    --sidebar-accent: #102b45;
+    --sidebar-accent-foreground: #7dd3fc;
+    --sidebar-ring: #38bdf8;
+    --primary: #38bdf8;
+    --primary-foreground: #04111f;
+    --secondary: #102b45;
+    --secondary-foreground: #7dd3fc;
+    --ring: #38bdf8;
+    --input: rgba(56, 189, 248, 0.16);
+    --success: #34d399;
+    --warning: #fbbf24;
+    --scrollbar-track: rgba(56, 189, 248, 0.08);
+    --scrollbar-thumb: rgba(56, 189, 248, 0.34);
+    --scrollbar-thumb-hover: rgba(56, 189, 248, 0.52);
+  }
+
+  .dark[data-theme='contrast'] {
+    --background: #000000;
+    --foreground: #ffffff;
+    --card: #0b0b0b;
+    --card-foreground: #ffffff;
+    --popover: #0b0b0b;
+    --popover-foreground: #ffffff;
+    --muted: #181818;
+    --muted-foreground: #d4d4d4;
+    --accent: #2a2500;
+    --accent-foreground: #facc15;
+    --border: rgba(250, 204, 21, 0.34);
+    --border-subtle: rgba(250, 204, 21, 0.18);
+    --input-bg: rgba(11, 11, 11, 0.86);
+    --input-background: rgba(11, 11, 11, 0.96);
+    --sidebar: #000000;
+    --sidebar-foreground: #ffffff;
+    --sidebar-border: rgba(250, 204, 21, 0.34);
+    --sidebar-primary: #facc15;
+    --sidebar-primary-foreground: #000000;
+    --sidebar-accent: #2a2500;
+    --sidebar-accent-foreground: #fde047;
+    --sidebar-ring: #facc15;
+    --primary: #facc15;
+    --primary-foreground: #000000;
+    --secondary: #181818;
+    --secondary-foreground: #ffffff;
+    --ring: #facc15;
+    --input: rgba(250, 204, 21, 0.22);
+    --destructive: #ff4d4d;
+    --success: #22c55e;
+    --warning: #facc15;
+    --scrollbar-track: rgba(250, 204, 21, 0.1);
+    --scrollbar-thumb: rgba(250, 204, 21, 0.58);
+    --scrollbar-thumb-hover: rgba(250, 204, 21, 0.78);
+  }
+
   @keyframes sidebar-pulse {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.9; transform: scale(1.05); }

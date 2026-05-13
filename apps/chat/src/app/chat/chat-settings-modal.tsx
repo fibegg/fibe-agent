@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
-import { ThemeToggle } from '../theme-toggle';
+import { ThemeSelector } from '../theme-selector';
 import { CHAT_STATES } from './chat-state';
 import type { ChatState } from './chat-state';
 import { shouldHideThemeSwitch } from '../embed-config';
@@ -345,9 +345,9 @@ export function ChatSettingsModal({
         </div>
         <div className="px-5 py-4 space-y-4 overflow-y-auto min-h-0">
           {!shouldHideThemeSwitch() && (
-            <div className="flex items-center justify-between py-1">
-              <span className="text-sm font-medium text-foreground">{t('theme.darkMode')}</span>
-              <ThemeToggle />
+            <div className="space-y-2.5">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('theme.selector')}</span>
+              <ThemeSelector />
             </div>
           )}
           <LocaleSelector variant="row" />

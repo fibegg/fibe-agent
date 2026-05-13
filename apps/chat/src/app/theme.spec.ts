@@ -46,6 +46,11 @@ describe('getStoredTheme', () => {
     expect(getStoredTheme()).toBe('dark');
   });
 
+  it('returns dracula when stored', () => {
+    localStorage.setItem(STORAGE_KEY, 'dracula');
+    expect(getStoredTheme()).toBe('dracula');
+  });
+
   it('returns null when stored value is invalid', () => {
     localStorage.setItem(STORAGE_KEY, 'system');
     expect(getStoredTheme()).toBeNull();
@@ -56,6 +61,7 @@ describe('setStoredTheme', () => {
   beforeEach(() => {
     resetStorage();
     document.documentElement.classList.remove('dark');
+    document.documentElement.removeAttribute('data-theme');
   });
 
   it('stores light and removes dark class', () => {
@@ -63,12 +69,21 @@ describe('setStoredTheme', () => {
     setStoredTheme('light');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
     expect(document.documentElement.classList.contains('dark')).toBe(false);
+    expect(document.documentElement.dataset.theme).toBe('light');
   });
 
   it('stores dark and adds dark class', () => {
     setStoredTheme('dark');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('stores dracula and keeps dark class for dark-compatible styles', () => {
+    setStoredTheme('dracula');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dracula');
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(document.documentElement.dataset.theme).toBe('dracula');
   });
 });
 
@@ -100,8 +115,15 @@ describe('toggleTheme', () => {
     expect(getStoredTheme()).toBe('dark');
   });
 
-  it('switches to light and returns light when currently dark', () => {
+  it('switches to dracula when currently dark', () => {
     setStoredTheme('dark');
+    expect(toggleTheme()).toBe('dracula');
+    expect(isDark()).toBe(true);
+    expect(getStoredTheme()).toBe('dracula');
+  });
+
+  it('wraps back to light after the last theme', () => {
+    setStoredTheme('contrast');
     expect(toggleTheme()).toBe('light');
     expect(isDark()).toBe(false);
     expect(getStoredTheme()).toBe('light');
@@ -115,6 +137,10 @@ describe('isSetThemeMessage', () => {
 
   it('returns true for valid dark message', () => {
     expect(isSetThemeMessage({ action: 'set_theme', theme: 'dark' })).toBe(true);
+  });
+
+  it('returns true for valid named theme message', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dracula' })).toBe(true);
   });
 
   it('returns false for null', () => {

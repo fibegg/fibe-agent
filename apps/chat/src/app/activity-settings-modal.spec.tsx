@@ -3,8 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ActivitySettingsModal, type ActivitySettingsModalProps } from './activity-settings-modal';
 
-vi.mock('./theme-toggle', () => ({
-  ThemeToggle: () => <button data-testid="theme-toggle">Toggle</button>,
+vi.mock('./theme-selector', () => ({
+  ThemeSelector: () => <div data-testid="theme-selector">Themes</div>,
 }));
 
 vi.mock('./embed-config', () => ({
@@ -92,15 +92,15 @@ describe('ActivitySettingsModal', () => {
     const { shouldHideThemeSwitch } = await import('./embed-config');
     vi.mocked(shouldHideThemeSwitch).mockReturnValue(false);
     renderModal();
-    expect(screen.getByTestId('theme-toggle')).toBeTruthy();
-    expect(screen.getByText('Dark mode')).toBeTruthy();
+    expect(screen.getByTestId('theme-selector')).toBeTruthy();
+    expect(screen.getByText('Theme')).toBeTruthy();
   });
 
   it('hides the theme toggle when shouldHideThemeSwitch returns true', async () => {
     const { shouldHideThemeSwitch } = await import('./embed-config');
     vi.mocked(shouldHideThemeSwitch).mockReturnValue(true);
     renderModal();
-    expect(screen.queryByTestId('theme-toggle')).toBeNull();
+    expect(screen.queryByTestId('theme-selector')).toBeNull();
   });
 
   it('displays the app version', () => {

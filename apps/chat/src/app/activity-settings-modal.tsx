@@ -1,5 +1,5 @@
 import { X } from 'lucide-react';
-import { ThemeToggle } from './theme-toggle';
+import { ThemeSelector } from './theme-selector';
 import { shouldHideThemeSwitch } from './embed-config';
 import { MODAL_CARD, MODAL_OVERLAY_DARK, SETTINGS_CLOSE_BUTTON } from './ui-classes';
 import { ActivityTypeFilters } from './activity-type-filters';
@@ -51,9 +51,9 @@ export function ActivitySettingsModal({ open, onClose, typeFilter, onTypeFilterC
             </div>
           )}
           {!shouldHideThemeSwitch() && (
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm font-medium text-foreground">{t('theme.darkMode')}</span>
-              <ThemeToggle />
+            <div className="space-y-2">
+              <span className="text-sm font-medium text-foreground">{t('theme.selector')}</span>
+              <ThemeSelector />
             </div>
           )}
           <LocaleSelector variant="row" />

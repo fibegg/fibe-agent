@@ -15,8 +15,8 @@ vi.mock('../embed-config', () => ({
   shouldHideThemeSwitch: vi.fn().mockReturnValue(false),
 }));
 
-vi.mock('../theme-toggle', () => ({
-  ThemeToggle: () => <button type="button" aria-label="Toggle theme">Theme</button>,
+vi.mock('../theme-selector', () => ({
+  ThemeSelector: () => <div data-testid="theme-selector">Themes</div>,
 }));
 
 vi.mock('../activity-type-filters', () => ({

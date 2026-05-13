@@ -1,28 +1,30 @@
 import { useState, useEffect } from 'react';
-import { getStoredTheme, isDark, toggleTheme as doToggle } from './theme';
+import { Moon, Palette, Sun } from 'lucide-react';
+import { getEffectiveTheme, getStoredTheme, onThemeChanged, THEME_OPTIONS, toggleTheme as doToggle } from './theme';
 import { BUTTON_ICON_ACCENT_SM } from './ui-classes';
 import { useT } from './i18n';
 
 export function ThemeToggle() {
   const t = useT();
-  const [dark, setDark] = useState(
-    () => typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-  );
+  const [theme, setTheme] = useState(() => getEffectiveTheme());
 
   useEffect(() => {
-    setDark(isDark());
+    const sync = () => setTheme(getEffectiveTheme());
+    sync();
+    const offTheme = onThemeChanged(sync);
     const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)');
-    if (!m) return;
     const handler = () => {
-      if (getStoredTheme() === null) setDark(isDark());
+      if (getStoredTheme() === null) sync();
     };
-    m.addEventListener('change', handler);
-    return () => m.removeEventListener('change', handler);
+    if (m && typeof m.addEventListener === 'function') m.addEventListener('change', handler);
+    return () => {
+      offTheme();
+      if (m && typeof m.removeEventListener === 'function') m.removeEventListener('change', handler);
+    };
   }, []);
 
   const handleClick = () => {
-    doToggle();
-    setDark(isDark());
+    setTheme(doToggle());
   };
 
   return (
@@ -30,29 +32,16 @@ export function ThemeToggle() {
       type="button"
       onClick={handleClick}
       className={BUTTON_ICON_ACCENT_SM}
-      aria-label={dark ? t('theme.light') : t('theme.dark')}
+      aria-label={t('theme.next')}
+      title={t('theme.current', { theme: t(THEME_OPTIONS.find((option) => option.value === theme)?.labelKey ?? 'theme.option.light') })}
     >
-      {dark ? (
-        <SunIcon className="size-3.5 sm:size-4" />
+      {theme === 'light' ? (
+        <Sun className="size-3.5 sm:size-4" />
+      ) : theme === 'dark' ? (
+        <Moon className="size-3.5 sm:size-4" />
       ) : (
-        <MoonIcon className="size-3.5 sm:size-4" />
+        <Palette className="size-3.5 sm:size-4" />
       )}
     </button>
-  );
-}
-
-function SunIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-    </svg>
-  );
-}
-
-function MoonIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-    </svg>
   );
 }

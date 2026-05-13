@@ -1,8 +1,31 @@
 import { getThemeSource } from './embed-config';
 
 const STORAGE_KEY = 'chat-theme';
+const THEME_CHANGED_EVENT = 'fibe_theme_changed';
 
-export type Theme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'dracula' | 'midnight' | 'contrast';
+
+export const THEMES = ['light', 'dark', 'dracula', 'midnight', 'contrast'] as const;
+
+export interface ThemeOption {
+  value: Theme;
+  labelKey:
+    | 'theme.option.light'
+    | 'theme.option.dark'
+    | 'theme.option.dracula'
+    | 'theme.option.midnight'
+    | 'theme.option.contrast';
+  dark: boolean;
+  accent: string;
+}
+
+export const THEME_OPTIONS: ThemeOption[] = [
+  { value: 'light', labelKey: 'theme.option.light', dark: false, accent: '#7c3aed' },
+  { value: 'dark', labelKey: 'theme.option.dark', dark: true, accent: '#a78bfa' },
+  { value: 'dracula', labelKey: 'theme.option.dracula', dark: true, accent: '#bd93f9' },
+  { value: 'midnight', labelKey: 'theme.option.midnight', dark: true, accent: '#38bdf8' },
+  { value: 'contrast', labelKey: 'theme.option.contrast', dark: true, accent: '#facc15' },
+];
 
 export function isSetThemeMessage(data: unknown): data is { action: 'set_theme'; theme: Theme } {
   const o = data as Record<string, unknown> | null;
@@ -10,8 +33,12 @@ export function isSetThemeMessage(data: unknown): data is { action: 'set_theme';
     o !== null &&
     typeof o === 'object' &&
     o.action === 'set_theme' &&
-    (o.theme === 'light' || o.theme === 'dark')
+    isTheme(o.theme)
   );
+}
+
+export function isTheme(value: unknown): value is Theme {
+  return typeof value === 'string' && THEMES.includes(value as Theme);
 }
 
 function initFrameThemeListener(): void {
@@ -25,8 +52,12 @@ function initFrameThemeListener(): void {
 
 export function getStoredTheme(): Theme | null {
   if (typeof window === 'undefined') return null;
-  const s = localStorage.getItem(STORAGE_KEY);
-  return s === 'light' || s === 'dark' ? (s as Theme) : null;
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    return isTheme(s) ? s : null;
+  } catch {
+    return null;
+  }
 }
 
 function prefersDark(): boolean {
@@ -35,22 +66,32 @@ function prefersDark(): boolean {
   return m ? m.matches : false;
 }
 
-function getEffectiveDark(): boolean {
+export function getEffectiveTheme(): Theme {
   const stored = getStoredTheme();
-  if (stored === 'dark') return true;
-  if (stored === 'light') return false;
-  return prefersDark();
+  if (stored) return stored;
+  return prefersDark() ? 'dark' : 'light';
+}
+
+function getEffectiveDark(): boolean {
+  return THEME_OPTIONS.find((option) => option.value === getEffectiveTheme())?.dark ?? false;
 }
 
 function applyTheme(): void {
   if (typeof document === 'undefined') return;
+  const theme = getEffectiveTheme();
   document.documentElement.classList.toggle('dark', getEffectiveDark());
+  document.documentElement.dataset.theme = theme;
 }
 
 export function setStoredTheme(theme: Theme): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, theme);
+  try {
+    localStorage.setItem(STORAGE_KEY, theme);
+  } catch {
+    // localStorage can be unavailable in restrictive embed contexts.
+  }
   applyTheme();
+  window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme } }));
 }
 
 export function isDark(): boolean {
@@ -58,9 +99,17 @@ export function isDark(): boolean {
 }
 
 export function toggleTheme(): Theme {
-  const next: Theme = isDark() ? 'light' : 'dark';
+  const current = getEffectiveTheme();
+  const index = THEMES.indexOf(current);
+  const next = THEMES[(index + 1) % THEMES.length] ?? 'light';
   setStoredTheme(next);
   return next;
+}
+
+export function onThemeChanged(listener: () => void): () => void {
+  if (typeof window === 'undefined') return () => undefined;
+  window.addEventListener(THEME_CHANGED_EVENT, listener);
+  return () => window.removeEventListener(THEME_CHANGED_EVENT, listener);
 }
 
 export function initTheme(): void {

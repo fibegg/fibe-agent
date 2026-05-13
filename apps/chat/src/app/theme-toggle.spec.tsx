@@ -17,9 +17,9 @@ function setupMatchMedia(matches = false, onChange?: () => void) {
 
 describe('ThemeToggle', () => {
   beforeEach(() => {
-    vi.spyOn(themeModule, 'isDark').mockReturnValue(false);
+    vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('light');
     vi.spyOn(themeModule, 'getStoredTheme').mockReturnValue(null);
-    vi.spyOn(themeModule, 'toggleTheme').mockImplementation(() => 'light');
+    vi.spyOn(themeModule, 'toggleTheme').mockImplementation(() => 'dark');
     // Provide a default matchMedia stub so component doesn't crash
     const mq = {
       matches: false,
@@ -39,27 +39,23 @@ describe('ThemeToggle', () => {
     expect(screen.getByRole('button')).toBeTruthy();
   });
 
-  it('shows "Switch to dark mode" label when in light mode', () => {
-    vi.spyOn(themeModule, 'isDark').mockReturnValue(false);
+  it('shows switch theme label', () => {
     render(<ThemeToggle />);
-    expect(screen.getByRole('button').getAttribute('aria-label')).toBe('Switch to dark mode');
+    expect(screen.getByRole('button').getAttribute('aria-label')).toBe('Switch theme');
   });
 
-  it('shows "Switch to light mode" label when in dark mode', () => {
-    document.documentElement.classList.add('dark');
-    vi.spyOn(themeModule, 'isDark').mockReturnValue(true);
+  it('shows current theme title', () => {
+    vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dracula');
     render(<ThemeToggle />);
-    expect(screen.getByRole('button').getAttribute('aria-label')).toBe('Switch to light mode');
-    document.documentElement.classList.remove('dark');
+    expect(screen.getByRole('button').getAttribute('title')).toBe('Current theme: Dracula');
   });
 
   it('calls toggleTheme and updates state on click', () => {
-    vi.spyOn(themeModule, 'isDark').mockReturnValueOnce(false).mockReturnValue(true);
     render(<ThemeToggle />);
     const button = screen.getByRole('button');
     fireEvent.click(button);
     expect(themeModule.toggleTheme).toHaveBeenCalled();
-    expect(button.getAttribute('aria-label')).toBe('Switch to light mode');
+    expect(button.getAttribute('title')).toBe('Current theme: Fibe Dark');
   });
 
   it('adds matchMedia listener when matchMedia is available', () => {
@@ -72,7 +68,7 @@ describe('ThemeToggle', () => {
 
   it('updates dark state when matchMedia change fires and no stored theme', () => {
     vi.spyOn(themeModule, 'getStoredTheme').mockReturnValue(null);
-    vi.spyOn(themeModule, 'isDark').mockReturnValue(true);
+    const getEffectiveThemeSpy = vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dark');
 
     const { triggerChange } = setupMatchMedia();
 
@@ -81,24 +77,21 @@ describe('ThemeToggle', () => {
     // Manually trigger the change listener
     triggerChange();
 
-    // isDark was called on mount (in useEffect) + click/change
-    expect(themeModule.isDark).toHaveBeenCalled();
+    expect(getEffectiveThemeSpy).toHaveBeenCalled();
   });
 
   it('does not update state on matchMedia change when stored theme is set', () => {
     vi.spyOn(themeModule, 'getStoredTheme').mockReturnValue('dark');
-    const isDarkSpy = vi.spyOn(themeModule, 'isDark').mockReturnValue(false);
+    const getEffectiveThemeSpy = vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dark');
 
     const { triggerChange } = setupMatchMedia();
     render(<ThemeToggle />);
 
-    // Clear calls from mount
-    isDarkSpy.mockClear();
+    getEffectiveThemeSpy.mockClear();
 
-    // Fire the change listener — since stored theme is set, isDark should not be called
     triggerChange();
 
-    expect(isDarkSpy).not.toHaveBeenCalled();
+    expect(getEffectiveThemeSpy).not.toHaveBeenCalled();
   });
 
   it('handles case when matchMedia is not available (falsy)', () => {
