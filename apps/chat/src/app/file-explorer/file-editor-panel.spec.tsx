@@ -3,6 +3,8 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { FileEditorPanel } from './file-editor-panel';
 import { apiRequest } from '../api-url';
 
+const scrollToLineMock = vi.hoisted(() => vi.fn());
+
 vi.mock('../api-url', () => ({ apiRequest: vi.fn(), getAuthTokenForRequest: vi.fn(() => '') }));
 
 // CodeMirror can't really run in jsdom — mock the loader so it renders content
@@ -26,6 +28,7 @@ vi.mock('./file-editor-cm', () => ({
       setReadOnly: vi.fn(),
       setTheme: vi.fn(),
       getContent: vi.fn(() => currentContent),
+      scrollToLine: scrollToLineMock,
       focus: vi.fn(),
       destroy: vi.fn(() => { textarea.remove(); }),
     };
@@ -45,6 +48,7 @@ const mockClose = vi.fn();
 describe('FileEditorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    scrollToLineMock.mockClear();
     window.localStorage.clear();
     Object.assign(navigator, { clipboard: { writeText: vi.fn() } });
     global.URL.createObjectURL = vi.fn(() => 'blob:mock');
@@ -281,6 +285,29 @@ describe('FileEditorPanel', () => {
 
     expect(screen.getByRole('complementary', { name: 'File preview' })).toBeTruthy();
     expect(window.localStorage.getItem('fibe.fileEditor.filePreview')).toBe('1');
+  });
+
+  it('jumps through the file when the preview rail is used', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'line 1\nline 2\nline 3\nline 4' }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
+    const rail = screen.getByRole('complementary', { name: 'File preview' });
+    fireEvent.pointerDown(rail, { clientY: 0 });
+
+    expect(scrollToLineMock).toHaveBeenCalledWith(1);
+  });
+
+  it('supports keyboard activation for the file preview rail', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'line 1\nline 2' }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
+    fireEvent.keyDown(screen.getByRole('complementary', { name: 'File preview' }), { key: 'Enter' });
+
+    expect(scrollToLineMock).toHaveBeenCalledWith(1);
   });
 
   it('refreshes the HTML preview iframe after saving', async () => {

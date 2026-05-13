@@ -389,6 +389,7 @@ export const en = {
   'fileEditor.empty': 'Empty file',
   'fileEditor.gitStatus': 'Git: {status}',
   'fileEditor.filePreview': 'File preview',
+  'fileEditor.filePreviewJump': 'Click to jump in the file',
 
   'thinking.default.gatheringThoughts': 'Gathering thoughts...',
   'thinking.default.stokingFlames': 'Stoking the flames...',

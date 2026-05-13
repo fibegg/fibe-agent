@@ -394,6 +394,7 @@ export const uk: Record<TranslationKey, string> = {
   'fileEditor.empty': 'Порожній файл',
   'fileEditor.gitStatus': 'Git: {status}',
   'fileEditor.filePreview': 'Превʼю файлу',
+  'fileEditor.filePreviewJump': 'Натисніть, щоб перейти у файлі',
 
   'thinking.default.gatheringThoughts': 'Збираю думки...',
   'thinking.default.stokingFlames': 'Розпалюю ідеї...',

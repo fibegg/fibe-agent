@@ -145,6 +145,7 @@ export type EditorHandle = {
   setReadOnly: (readOnly: boolean) => void;
   setTheme: (dark: boolean) => void;
   getContent: () => string;
+  scrollToLine: (lineNumber: number) => void;
   focus: () => void;
   destroy: () => void;
 };
@@ -216,6 +217,14 @@ export function createEditor({
     setReadOnly: (ro: boolean) => view.dispatch({ effects: readOnlyCompartment.reconfigure(EditorState.readOnly.of(ro)) }),
     setTheme: (dark: boolean) => view.dispatch({ effects: themeCompartment.reconfigure(dark ? [oneDark, buildTheme(true)] : [buildTheme(false)]) }),
     getContent: () => view.state.doc.toString(),
+    scrollToLine: (lineNumber: number) => {
+      const line = view.state.doc.line(Math.max(1, Math.min(lineNumber, view.state.doc.lines)));
+      view.dispatch({
+        selection: { anchor: line.from },
+        effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
+      });
+      view.focus();
+    },
     focus: () => view.focus(),
     destroy: () => {
       isDestroyed = true;
