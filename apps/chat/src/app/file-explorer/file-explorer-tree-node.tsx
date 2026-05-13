@@ -81,6 +81,7 @@ export const TreeNode = memo(function TreeNode({
   const isGitModified = entry.gitStatus === 'modified';
   const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
   const isGitDeleted = entry.gitStatus === 'deleted';
+  const isGitRenamed = entry.gitStatus === 'renamed';
 
   let nameColorClass = isSelected ? 'text-violet-400' : 'text-foreground';
   if (!isSelected) {
@@ -125,16 +126,16 @@ export const TreeNode = memo(function TreeNode({
         <div className="flex items-center gap-1.5 shrink-0 ml-1">
           {entry.gitStatus && (
             <span
-              className={`text-[9px] font-bold tracking-wider ${
-                isGitModified ? 'text-amber-500 dark:text-amber-400' :
-                isGitAddedOrUntracked ? 'text-green-500 dark:text-green-400' :
-                isGitDeleted ? 'text-red-500 dark:text-red-400' :
-                'text-muted-foreground'
+              className={`size-1.5 rounded-full shrink-0 ${
+                isGitModified ? 'bg-amber-400' :
+                isGitAddedOrUntracked ? 'bg-green-400' :
+                isGitDeleted ? 'bg-red-400' :
+                isGitRenamed ? 'bg-blue-400' :
+                'bg-muted-foreground'
               }`}
               title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
-            >
-              {isGitModified ? 'M' : isGitAddedOrUntracked ? 'U' : isGitDeleted ? 'D' : ''}
-            </span>
+              aria-label={t('fileEditor.gitStatus', { status: entry.gitStatus })}
+            />
           )}
           {isDirty && (
             <span
@@ -147,5 +148,4 @@ export const TreeNode = memo(function TreeNode({
     </div>
   );
 });
-
 

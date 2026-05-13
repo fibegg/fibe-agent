@@ -28,6 +28,52 @@ export function findEntryByPath(entries: PlaygroundEntry[], path: string): Playg
   return null;
 }
 
+const GIT_STATUS_PRIORITY: Record<NonNullable<PlaygroundEntry['gitStatus']>, number> = {
+  deleted: 5,
+  renamed: 4,
+  modified: 3,
+  added: 2,
+  untracked: 1,
+};
+
+function strongerGitStatus(
+  current: PlaygroundEntry['gitStatus'],
+  next: PlaygroundEntry['gitStatus']
+): PlaygroundEntry['gitStatus'] {
+  if (!next) return current;
+  if (!current) return next;
+  return GIT_STATUS_PRIORITY[next] > GIT_STATUS_PRIORITY[current] ? next : current;
+}
+
+export function withInheritedGitStatus(entries: PlaygroundEntry[]): PlaygroundEntry[] {
+  function decorate(entry: PlaygroundEntry): PlaygroundEntry {
+    if (entry.type !== 'directory') return entry;
+
+    const children = (entry.children ?? []).map(decorate);
+    const childStatus = children.reduce<PlaygroundEntry['gitStatus']>(
+      (status, child) => strongerGitStatus(status, child.gitStatus),
+      undefined
+    );
+    const gitStatus = strongerGitStatus(entry.gitStatus, childStatus);
+
+    return {
+      ...entry,
+      children,
+      ...(gitStatus ? { gitStatus } : {}),
+    };
+  }
+
+  return entries.map(decorate);
+}
+
+export function withEntrySource(entries: PlaygroundEntry[], source: NonNullable<PlaygroundEntry['source']>): PlaygroundEntry[] {
+  return entries.map((entry) => ({
+    ...entry,
+    source,
+    ...(entry.children ? { children: withEntrySource(entry.children, source) } : {}),
+  }));
+}
+
 export function filterTreeByQuery(entries: PlaygroundEntry[], query: string): PlaygroundEntry[] {
   if (!query.trim()) return entries;
   const lower = query.trim().toLowerCase();

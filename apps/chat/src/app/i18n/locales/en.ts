@@ -347,7 +347,7 @@ export const en = {
   'fileExplorer.title': 'Claude',
   'fileExplorer.emptyPlayground': "You don't have any files in the playground.",
   'fileExplorer.emptyAgent': 'AI workspace is empty.',
-  'fileExplorer.searchPlaceholder': 'Search files...',
+  'fileExplorer.searchPlaceholder': 'Search all files...',
   'fileExplorer.clearSearch': 'Clear search',
   'fileExplorer.settings': 'Settings',
   'fileExplorer.loading': 'Loading…',
@@ -358,6 +358,7 @@ export const en = {
   'fileExplorer.collapse': 'Collapse file explorer',
   'fileExplorer.playgroundTab': 'Playground',
   'fileExplorer.aiTab': 'AI',
+  'fileExplorer.globalSearch': 'Searching playground and AI workspace',
 
   'fileEditor.lines': '{count} lines',
   'fileEditor.saving': 'Saving...',
@@ -387,6 +388,7 @@ export const en = {
   'fileEditor.zoomOut': 'Zoom out',
   'fileEditor.empty': 'Empty file',
   'fileEditor.gitStatus': 'Git: {status}',
+  'fileEditor.filePreview': 'File preview',
 
   'thinking.default.gatheringThoughts': 'Gathering thoughts...',
   'thinking.default.stokingFlames': 'Stoking the flames...',

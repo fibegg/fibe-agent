@@ -6,6 +6,8 @@ import {
   filterTreeByQuery,
   diffTrees,
   mergeAnimatingRemoved,
+  withEntrySource,
+  withInheritedGitStatus,
 } from './file-explorer-tree-utils';
 
 // Helper factories
@@ -138,6 +140,45 @@ describe('filterTreeByQuery', () => {
   it('is case-insensitive', () => {
     const result = filterTreeByQuery(tree, 'MAIN');
     expect(result.length).toBeGreaterThan(0);
+  });
+});
+
+describe('withInheritedGitStatus', () => {
+  it('promotes child git status to parent directories', () => {
+    const tree = [
+      dir('src', 'src', [
+        dir('app', 'src/app', [
+          { ...file('index.ts', 'src/app/index.ts'), gitStatus: 'modified' as const },
+        ]),
+      ]),
+    ];
+
+    const result = withInheritedGitStatus(tree);
+
+    expect(result[0].gitStatus).toBe('modified');
+    expect(result[0].children?.[0].gitStatus).toBe('modified');
+  });
+
+  it('keeps the strongest status when children differ', () => {
+    const tree = [
+      dir('src', 'src', [
+        { ...file('new.ts', 'src/new.ts'), gitStatus: 'added' as const },
+        { ...file('gone.ts', 'src/gone.ts'), gitStatus: 'deleted' as const },
+      ]),
+    ];
+
+    expect(withInheritedGitStatus(tree)[0].gitStatus).toBe('deleted');
+  });
+});
+
+describe('withEntrySource', () => {
+  it('sets source recursively', () => {
+    const tree = [dir('src', 'src', [file('index.ts', 'src/index.ts')])];
+
+    const result = withEntrySource(tree, 'agent');
+
+    expect(result[0].source).toBe('agent');
+    expect(result[0].children?.[0].source).toBe('agent');
   });
 });
 

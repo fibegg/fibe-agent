@@ -45,6 +45,7 @@ const mockClose = vi.fn();
 describe('FileEditorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.localStorage.clear();
     Object.assign(navigator, { clipboard: { writeText: vi.fn() } });
     global.URL.createObjectURL = vi.fn(() => 'blob:mock');
     global.URL.revokeObjectURL = vi.fn();
@@ -268,6 +269,18 @@ describe('FileEditorPanel', () => {
       method: 'PUT',
       body: JSON.stringify({ path: 'src/app.ts', content: 'updated' }),
     }));
+  });
+
+  it('toggles the optional file preview rail', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'const x = 1;\nconst y = 2;' }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    expect(screen.queryByRole('complementary', { name: 'File preview' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
+
+    expect(screen.getByRole('complementary', { name: 'File preview' })).toBeTruthy();
+    expect(window.localStorage.getItem('fibe.fileEditor.filePreview')).toBe('1');
   });
 
   it('refreshes the HTML preview iframe after saving', async () => {

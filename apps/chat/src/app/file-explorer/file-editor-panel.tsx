@@ -34,6 +34,8 @@ import { getLanguageLabel } from './file-editor-cm';
 import { useT } from '../i18n';
 import { copyTextToClipboard } from '../browser-compat';
 
+const FILE_PREVIEW_STORAGE_KEY = 'fibe.fileEditor.filePreview';
+
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
 function Toast({ message, type }: { message: string; type: 'success' | 'error' }) {
@@ -91,6 +93,23 @@ function StatusBar({ language, lines, isDirty, isSaving }: { language: string; l
   );
 }
 
+function FilePreviewRail({ content }: { content: string }) {
+  const t = useT();
+  const preview = content.split('\n').slice(0, 320).join('\n');
+
+  return (
+    <aside
+      role="complementary"
+      aria-label={t('fileEditor.filePreview')}
+      className="hidden w-24 shrink-0 overflow-hidden border-l border-border/50 bg-background/80 px-1.5 py-2 lg:block"
+    >
+      <pre className="select-none whitespace-pre text-[3px] leading-[4px] text-muted-foreground/50">
+        {preview}
+      </pre>
+    </aside>
+  );
+}
+
 // ─── FileEditorPanel ──────────────────────────────────────────────────────────
 
 export function FileEditorPanel({
@@ -120,6 +139,10 @@ export function FileEditorPanel({
   const [rawFileRevision, setRawFileRevision] = useState(0);
   const [imageFit, setImageFit] = useState<'fit' | 'actual'>('fit');
   const [imageZoom, setImageZoom] = useState(1);
+  const [showFilePreview, setShowFilePreview] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem(FILE_PREVIEW_STORAGE_KEY) === '1';
+  });
 
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorHandleRef = useRef<EditorHandle | null>(null);
@@ -148,6 +171,7 @@ export function FileEditorPanel({
   const isGitModified = entry.gitStatus === 'modified';
   const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
   const isGitDeleted = entry.gitStatus === 'deleted';
+  const isGitRenamed = entry.gitStatus === 'renamed';
 
   // Notify parent of dirty state changes
   const onDirtyChangeRef = useRef(onDirtyChange);
@@ -162,6 +186,10 @@ export function FileEditorPanel({
     setImageFit('fit');
     setImageZoom(1);
   }, [entry.path, isHtmlFile]);
+
+  useEffect(() => {
+    window.localStorage.setItem(FILE_PREVIEW_STORAGE_KEY, showFilePreview ? '1' : '0');
+  }, [showFilePreview]);
 
   // ── Fetch content (text files only) ──────────────────────────────────────
   useEffect(() => {
@@ -371,16 +399,16 @@ export function FileEditorPanel({
                   <div className="flex items-center gap-1.5 shrink-0">
                     {entry.gitStatus && (
                       <span
-                        className={`text-[10px] font-bold tracking-wider ${
-                          isGitModified ? 'text-amber-500 dark:text-amber-400' :
-                          isGitAddedOrUntracked ? 'text-green-500 dark:text-green-400' :
-                          isGitDeleted ? 'text-red-500 dark:text-red-400' :
-                          'text-muted-foreground'
+                        className={`size-2 rounded-full shrink-0 ${
+                          isGitModified ? 'bg-amber-400' :
+                          isGitAddedOrUntracked ? 'bg-green-400' :
+                          isGitDeleted ? 'bg-red-400' :
+                          isGitRenamed ? 'bg-blue-400' :
+                          'bg-muted-foreground'
                         }`}
                         title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
-                      >
-                        {isGitModified ? 'M' : isGitAddedOrUntracked ? 'U' : isGitDeleted ? 'D' : ''}
-                      </span>
+                        aria-label={t('fileEditor.gitStatus', { status: entry.gitStatus })}
+                      />
                     )}
                     {isDirty && (
                       <span
@@ -455,6 +483,18 @@ export function FileEditorPanel({
                   >
                     <RotateCcw className="size-3" />
                     <span className="hidden sm:inline">{t('fileEditor.discard')}</span>
+                  </button>
+                )}
+                {!isImageFile && (
+                  <button
+                    type="button"
+                    onClick={() => setShowFilePreview((value) => !value)}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${showFilePreview ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    title={t('fileEditor.filePreview')}
+                    aria-label={t('fileEditor.filePreview')}
+                    aria-pressed={showFilePreview}
+                  >
+                    <PanelRight className="size-3" />
                   </button>
                 )}
                 {!isImageFile && (
@@ -585,7 +625,8 @@ export function FileEditorPanel({
             </div>
           )}
           {previewMode !== 'preview' && (
-          <div className={`${isHtmlFile && previewMode === 'split' ? 'order-1' : ''} relative flex min-h-0 flex-1 flex-col overflow-hidden`}>
+          <div className={`${isHtmlFile && previewMode === 'split' ? 'order-1' : ''} relative flex min-h-0 flex-1 overflow-hidden`}>
+          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
           {loading && (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-card z-10">
               <Loader2 className="size-4 animate-spin mr-2" />
@@ -629,6 +670,10 @@ export function FileEditorPanel({
             <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
               {t('fileEditor.empty')}
             </div>
+          )}
+          </div>
+          {showFilePreview && liveContent !== null && !loading && !fetchError && (
+            <FilePreviewRail content={liveContent} />
           )}
           </div>
           )}

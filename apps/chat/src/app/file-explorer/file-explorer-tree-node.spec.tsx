@@ -201,7 +201,7 @@ describe('TreeNode', () => {
     expect(screen.queryByTitle('Unsaved changes')).toBeNull();
   });
 
-  it('shows M badge for modified git status', () => {
+  it('shows status dot for modified git status', () => {
     const modifiedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'modified' };
     render(
       <TreeNode
@@ -215,10 +215,10 @@ describe('TreeNode', () => {
       />
     );
     expect(screen.getByTitle('Git: modified')).toBeTruthy();
-    expect(screen.getByText('M')).toBeTruthy();
+    expect(screen.queryByText('M')).toBeNull();
   });
 
-  it('shows U badge for untracked git status', () => {
+  it('shows status dot for untracked git status', () => {
     const untrackedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'untracked' };
     render(
       <TreeNode
@@ -231,10 +231,11 @@ describe('TreeNode', () => {
         onToggle={vi.fn()}
       />
     );
-    expect(screen.getByText('U')).toBeTruthy();
+    expect(screen.getByTitle('Git: untracked')).toBeTruthy();
+    expect(screen.queryByText('U')).toBeNull();
   });
 
-  it('shows U badge for added git status', () => {
+  it('shows status dot for added git status', () => {
     const addedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'added' };
     render(
       <TreeNode
@@ -247,10 +248,11 @@ describe('TreeNode', () => {
         onToggle={vi.fn()}
       />
     );
-    expect(screen.getByText('U')).toBeTruthy();
+    expect(screen.getByTitle('Git: added')).toBeTruthy();
+    expect(screen.queryByText('U')).toBeNull();
   });
 
-  it('shows D badge for deleted git status', () => {
+  it('shows status dot for deleted git status', () => {
     const deletedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'deleted' };
     render(
       <TreeNode
@@ -263,7 +265,8 @@ describe('TreeNode', () => {
         onToggle={vi.fn()}
       />
     );
-    expect(screen.getByText('D')).toBeTruthy();
+    expect(screen.getByTitle('Git: deleted')).toBeTruthy();
+    expect(screen.queryByText('D')).toBeNull();
   });
 
   it('applies name color class for git modified', () => {

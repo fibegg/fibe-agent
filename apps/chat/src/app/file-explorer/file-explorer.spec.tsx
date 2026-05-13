@@ -223,6 +223,39 @@ describe('FileExplorer', () => {
     );
   });
 
+  it('searches across playground and agent files and preserves the selected source', async () => {
+    const onFileSelect = vi.fn();
+    const tree: PlaygroundEntry[] = [
+      { name: 'app.ts', path: 'src/app.ts', type: 'file' },
+    ];
+    const agentTree: PlaygroundEntry[] = [
+      { name: 'CLAUDE.md', path: 'CLAUDE.md', type: 'file' },
+    ];
+
+    render(
+      <FileExplorer
+        tree={tree}
+        agentTree={agentTree}
+        agentWorkspaceAvailable
+        onFileSelect={onFileSelect}
+      />
+    );
+
+    fireEvent.change(screen.getByPlaceholderText('Search all files...'), {
+      target: { value: 'claude' },
+    });
+
+    await waitFor(() => expect(screen.getByText('Searching playground and AI workspace')).toBeTruthy());
+    fireEvent.click(screen.getByText('CLAUDE.md'));
+
+    expect(onFileSelect).toHaveBeenCalledWith(
+      expect.objectContaining({
+        path: 'CLAUDE.md',
+        source: 'agent',
+      })
+    );
+  });
+
   it('shows the agent workspace empty state when the workspace exists without visible files', () => {
     render(
       <FileExplorer
@@ -355,7 +388,7 @@ describe('FileExplorer', () => {
       () => new Promise<Response>(() => undefined)
     );
     render(<FileExplorer collapsed />);
-    expect(screen.queryByPlaceholderText('Search files...')).toBeNull();
+    expect(screen.queryByPlaceholderText('Search all files...')).toBeNull();
     expect(screen.queryByText(/Expand Level/)).toBeNull();
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
   });
@@ -367,7 +400,7 @@ describe('FileExplorer', () => {
       json: async () => [] as PlaygroundEntry[],
     });
     render(<FileExplorer collapsed={false} />);
-    expect(screen.getByPlaceholderText('Search files...')).toBeTruthy();
+    expect(screen.getByPlaceholderText('Search all files...')).toBeTruthy();
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });

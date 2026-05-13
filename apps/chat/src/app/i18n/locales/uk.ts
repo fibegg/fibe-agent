@@ -352,7 +352,7 @@ export const uk: Record<TranslationKey, string> = {
   'fileExplorer.title': 'Claude',
   'fileExplorer.emptyPlayground': 'У майданчику немає файлів.',
   'fileExplorer.emptyAgent': 'Робоча область ШІ порожня.',
-  'fileExplorer.searchPlaceholder': 'Пошук файлів...',
+  'fileExplorer.searchPlaceholder': 'Пошук усіх файлів...',
   'fileExplorer.clearSearch': 'Очистити пошук',
   'fileExplorer.settings': 'Налаштування',
   'fileExplorer.loading': 'Завантаження…',
@@ -363,6 +363,7 @@ export const uk: Record<TranslationKey, string> = {
   'fileExplorer.collapse': 'Згорнути файловий браузер',
   'fileExplorer.playgroundTab': 'Майданчик',
   'fileExplorer.aiTab': 'ШІ',
+  'fileExplorer.globalSearch': 'Пошук у майданчику та робочій області ШІ',
 
   'fileEditor.lines': 'Рядків: {count}',
   'fileEditor.saving': 'Збереження...',
@@ -392,6 +393,7 @@ export const uk: Record<TranslationKey, string> = {
   'fileEditor.zoomOut': 'Зменшити',
   'fileEditor.empty': 'Порожній файл',
   'fileEditor.gitStatus': 'Git: {status}',
+  'fileEditor.filePreview': 'Превʼю файлу',
 
   'thinking.default.gatheringThoughts': 'Збираю думки...',
   'thinking.default.stokingFlames': 'Розпалюю ідеї...',

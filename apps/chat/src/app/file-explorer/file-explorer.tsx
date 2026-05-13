@@ -25,6 +25,8 @@ import {
   findEntryByPath,
   getDirPathsAtDepth,
   mergeAnimatingRemoved,
+  withEntrySource,
+  withInheritedGitStatus,
   type FileAnimationType,
 } from './file-explorer-tree-utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -127,13 +129,45 @@ export function FileExplorer({
   const agentTree = controlledAgent ? agentTreeProp : [];
   const loadingState = controlled ? false : loading;
   const hasAgentWorkspace = agentWorkspaceAvailable === true || agentTree.length > 0;
+  const playgroundTreeWithMeta = useMemo(
+    () => withInheritedGitStatus(withEntrySource(playgroundTree, 'playground')),
+    [playgroundTree]
+  );
+  const agentTreeWithMeta = useMemo(
+    () => withInheritedGitStatus(withEntrySource(agentTree, 'agent')),
+    [agentTree]
+  );
 
   const showTabs = playgroundTree.length > 0 && hasAgentWorkspace;
   const effectiveTab: FileTab =
     showTabs && activeTab ? activeTab
     : hasAgentWorkspace && playgroundTree.length === 0 ? 'agent'
     : 'playground';
-  const tree = effectiveTab === 'agent' ? agentTree : playgroundTree;
+  const activeTree = effectiveTab === 'agent' ? agentTreeWithMeta : playgroundTreeWithMeta;
+  const globalTree = useMemo(() => {
+    const roots: PlaygroundEntry[] = [];
+    if (playgroundTreeWithMeta.length > 0) {
+      roots.push({
+        name: t('fileExplorer.playgroundTab'),
+        path: '__global__/playground',
+        type: 'directory',
+        source: 'playground',
+        children: playgroundTreeWithMeta,
+      });
+    }
+    if (agentTreeWithMeta.length > 0) {
+      roots.push({
+        name: t('fileExplorer.aiTab'),
+        path: '__global__/agent',
+        type: 'directory',
+        source: 'agent',
+        children: agentTreeWithMeta,
+      });
+    }
+    return withInheritedGitStatus(roots);
+  }, [agentTreeWithMeta, playgroundTreeWithMeta, t]);
+  const isGlobalSearch = searchQuery.trim().length > 0 && globalTree.length > 1;
+  const tree = isGlobalSearch ? globalTree : activeTree;
   const agentFileContentApiPath = useMemo(() => {
     const raw = agentFileApiPath || API_PATHS.AGENT_FILES_FILE;
     if (raw.startsWith('/api/')) return raw;
@@ -245,9 +279,9 @@ export function FileExplorer({
 
   useEffect(() => {
     const prev = prevTreeRef.current;
-    prevTreeRef.current = tree;
-    if (prev.length === 0 || tree.length === 0) return;
-    const diff = diffTrees(prev, tree);
+    prevTreeRef.current = activeTree;
+    if (prev.length === 0 || activeTree.length === 0) return;
+    const diff = diffTrees(prev, activeTree);
     if (diff.size === 0) return;
     setAnimatingPaths(diff);
     setAnimatingPrev(prev);
@@ -276,7 +310,22 @@ export function FileExplorer({
       setAnimatingPrev(null);
     }, 600);
     return () => clearTimeout(timer);
-  }, [tree]);
+  }, [activeTree]);
+
+  useEffect(() => {
+    if (!isGlobalSearch) return;
+    setExpanded((currentExpanded) => {
+      let changed = false;
+      const nextExpanded = new Set(currentExpanded);
+      for (const entry of globalTree) {
+        if (!nextExpanded.has(entry.path)) {
+          nextExpanded.add(entry.path);
+          changed = true;
+        }
+      }
+      return changed ? nextExpanded : currentExpanded;
+    });
+  }, [globalTree, isGlobalSearch]);
 
   const handleToggle = useCallback((path: string) => {
     setExpanded((prev) => {
@@ -290,10 +339,11 @@ export function FileExplorer({
   const handleFileClick = useCallback(
     (entry: PlaygroundEntry) => {
       if (entry.type !== 'file') return;
+      const source = entry.source ?? effectiveTab;
       if (onFileSelect) {
-        onFileSelect({ ...entry, source: effectiveTab });
+        onFileSelect({ ...entry, source });
       } else {
-        setSelectedFileLocal(entry);
+        setSelectedFileLocal({ ...entry, source });
       }
     },
     [effectiveTab, onFileSelect]
@@ -512,6 +562,11 @@ export function FileExplorer({
           )}
           {!error && filteredTree.length > 0 && (
             <div className="p-2 animate-file-explorer-in">
+              {isGlobalSearch && (
+                <div className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
+                  {t('fileExplorer.globalSearch')}
+                </div>
+              )}
               <div
                 style={{
                   height: `${virtualizer.getTotalSize()}px`,
@@ -523,7 +578,7 @@ export function FileExplorer({
                   const { entry, depth } = flatTree[virtualItem.index];
                   return (
                     <div
-                      key={entry.path}
+                      key={`${entry.source ?? effectiveTab}:${entry.path}`}
                       style={{
                         position: 'absolute',
                         top: 0,
@@ -537,7 +592,9 @@ export function FileExplorer({
                         entry={entry}
                         depth={depth}
                         isExpanded={expanded.has(entry.path)}
-                        isSelected={selectedPathProp !== undefined ? selectedPathProp === entry.path : openFileEntry?.path === entry.path}
+                        isSelected={selectedPathProp !== undefined
+                          ? selectedPathProp === entry.path
+                          : openFileEntry?.path === entry.path && openFileEntry.source === entry.source}
                         isDirty={effectiveDirtyPaths?.has(entry.path) ?? false}
                         animType={animatingPaths.get(entry.path)}
                         onToggle={handleToggle}
@@ -577,8 +634,8 @@ export function FileExplorer({
         <FileDetailsDialog
           entry={openFileEntry}
           onClose={() => setSelectedFileLocal(null)}
-          apiBasePath={effectiveTab === 'agent' ? agentFileContentApiPath : undefined}
-          rawApiBasePath={effectiveTab === 'agent' ? agentFileRawApiPath : undefined}
+          apiBasePath={openFileEntry.source === 'agent' ? agentFileContentApiPath : undefined}
+          rawApiBasePath={openFileEntry.source === 'agent' ? agentFileRawApiPath : undefined}
           onDirtyChange={handleDirtyChange}
         />
       )}
