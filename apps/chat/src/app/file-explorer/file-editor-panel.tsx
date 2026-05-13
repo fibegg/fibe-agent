@@ -1,5 +1,7 @@
 import {
   Check,
+  ChevronDown,
+  ChevronUp,
   Code2,
   Columns2,
   Copy,
@@ -13,6 +15,7 @@ import {
   PanelRight,
   RotateCcw,
   Save,
+  Search,
   X,
   ZoomIn,
   ZoomOut,
@@ -114,7 +117,6 @@ function FilePreviewRail({ content, onJumpToLine }: { content: string; onJumpToL
 
   return (
     <aside
-      role="complementary"
       aria-label={t('fileEditor.filePreview')}
       title={t('fileEditor.filePreviewJump')}
       tabIndex={0}
@@ -162,9 +164,13 @@ export function FileEditorPanel({
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem(FILE_PREVIEW_STORAGE_KEY) === '1';
   });
+  const [fileSearchOpen, setFileSearchOpen] = useState(false);
+  const [fileSearchQuery, setFileSearchQuery] = useState('');
+  const [fileSearchResult, setFileSearchResult] = useState<{ current: number; total: number } | null>(null);
 
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorHandleRef = useRef<EditorHandle | null>(null);
+  const fileSearchInputRef = useRef<HTMLInputElement>(null);
   const isDark = useCallback(() => document.documentElement.classList.contains('dark'), []);
 
   const isDirty = liveContent !== null && originalContent !== null && liveContent !== originalContent;
@@ -204,6 +210,9 @@ export function FileEditorPanel({
     setRawFileRevision(0);
     setImageFit('fit');
     setImageZoom(1);
+    setFileSearchOpen(false);
+    setFileSearchQuery('');
+    setFileSearchResult(null);
   }, [entry.path, isHtmlFile]);
 
   useEffect(() => {
@@ -248,11 +257,24 @@ export function FileEditorPanel({
   // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f' && !isImageFile) {
+        e.preventDefault();
+        setFileSearchOpen(true);
+        setTimeout(() => fileSearchInputRef.current?.focus(), 0);
+        return;
+      }
+      if (e.key === 'Escape' && fileSearchOpen) {
+        setFileSearchOpen(false);
+        setFileSearchQuery('');
+        setFileSearchResult(null);
+        editorHandleRef.current?.focus();
+        return;
+      }
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [onClose]);
+  }, [fileSearchOpen, isImageFile, onClose]);
 
   // ── Toast auto-dismiss ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -372,6 +394,27 @@ export function FileEditorPanel({
 
   const handleJumpToPreviewLine = useCallback((lineNumber: number) => {
     editorHandleRef.current?.scrollToLine(lineNumber);
+  }, []);
+
+  const handleFileSearch = useCallback((query: string, direction: 'next' | 'previous') => {
+    const trimmed = query.trim();
+    if (!trimmed) {
+      setFileSearchResult(null);
+      return;
+    }
+    setFileSearchResult(editorHandleRef.current?.searchInFile(trimmed, direction) ?? { current: 0, total: 0 });
+  }, []);
+
+  const handleFileSearchChange = useCallback((query: string) => {
+    setFileSearchQuery(query);
+    handleFileSearch(query, 'next');
+  }, [handleFileSearch]);
+
+  const closeFileSearch = useCallback(() => {
+    setFileSearchOpen(false);
+    setFileSearchQuery('');
+    setFileSearchResult(null);
+    editorHandleRef.current?.focus();
   }, []);
 
   // ── Discard ────────────────────────────────────────────────────────────────
@@ -511,6 +554,21 @@ export function FileEditorPanel({
                 {!isImageFile && (
                   <button
                     type="button"
+                    onClick={() => {
+                      setFileSearchOpen((value) => !value);
+                      setTimeout(() => fileSearchInputRef.current?.focus(), 0);
+                    }}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${fileSearchOpen ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    title={t('fileEditor.searchTitle')}
+                    aria-label={t('fileEditor.search')}
+                    aria-pressed={fileSearchOpen}
+                  >
+                    <Search className="size-3" />
+                  </button>
+                )}
+                {!isImageFile && (
+                  <button
+                    type="button"
                     onClick={() => setShowFilePreview((value) => !value)}
                     className={`${BUTTON_GHOST_ACCENT} shrink-0 ${showFilePreview ? 'text-violet-400 hover:text-violet-300' : ''}`}
                     title={t('fileEditor.filePreview')}
@@ -630,6 +688,57 @@ export function FileEditorPanel({
                 />
               </div>
             </div>
+          </div>
+        )}
+
+        {!isImageFile && fileSearchOpen && (
+          <div className="flex shrink-0 items-center gap-1.5 border-b border-border/50 bg-card/60 px-3 py-2">
+            <Search className="size-3.5 shrink-0 text-muted-foreground" />
+            <input
+              ref={fileSearchInputRef}
+              type="text"
+              value={fileSearchQuery}
+              onChange={(event) => handleFileSearchChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') handleFileSearch(fileSearchQuery, event.shiftKey ? 'previous' : 'next');
+                if (event.key === 'Escape') {
+                  event.stopPropagation();
+                  closeFileSearch();
+                }
+              }}
+              placeholder={t('fileEditor.searchPlaceholder')}
+              className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+            />
+            <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground">
+              {fileSearchResult ? `${fileSearchResult.current}/${fileSearchResult.total}` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleFileSearch(fileSearchQuery, 'previous')}
+              className={`${BUTTON_ICON_MUTED} size-7`}
+              title={t('fileEditor.previousMatch')}
+              aria-label={t('fileEditor.previousMatch')}
+            >
+              <ChevronUp className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => handleFileSearch(fileSearchQuery, 'next')}
+              className={`${BUTTON_ICON_MUTED} size-7`}
+              title={t('fileEditor.nextMatch')}
+              aria-label={t('fileEditor.nextMatch')}
+            >
+              <ChevronDown className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              onClick={closeFileSearch}
+              className={`${BUTTON_ICON_MUTED} size-7`}
+              title={t('common.close')}
+              aria-label={t('common.close')}
+            >
+              <X className="size-3.5" />
+            </button>
           </div>
         )}
 

@@ -4,6 +4,7 @@ import { FileEditorPanel } from './file-editor-panel';
 import { apiRequest } from '../api-url';
 
 const scrollToLineMock = vi.hoisted(() => vi.fn());
+const searchInFileMock = vi.hoisted(() => vi.fn(() => ({ current: 1, total: 2 })));
 
 vi.mock('../api-url', () => ({ apiRequest: vi.fn(), getAuthTokenForRequest: vi.fn(() => '') }));
 
@@ -29,6 +30,7 @@ vi.mock('./file-editor-cm', () => ({
       setTheme: vi.fn(),
       getContent: vi.fn(() => currentContent),
       scrollToLine: scrollToLineMock,
+      searchInFile: searchInFileMock,
       focus: vi.fn(),
       destroy: vi.fn(() => { textarea.remove(); }),
     };
@@ -49,6 +51,7 @@ describe('FileEditorPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     scrollToLineMock.mockClear();
+    searchInFileMock.mockClear();
     window.localStorage.clear();
     Object.assign(navigator, { clipboard: { writeText: vi.fn() } });
     global.URL.createObjectURL = vi.fn(() => 'blob:mock');
@@ -308,6 +311,28 @@ describe('FileEditorPanel', () => {
     fireEvent.keyDown(screen.getByRole('complementary', { name: 'File preview' }), { key: 'Enter' });
 
     expect(scrollToLineMock).toHaveBeenCalledWith(1);
+  });
+
+  it('searches inside the open file from the toolbar', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'const x = 1;\nconst y = 2;' }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    fireEvent.change(screen.getByPlaceholderText('Search in file...'), { target: { value: 'const' } });
+
+    expect(searchInFileMock).toHaveBeenCalledWith('const', 'next');
+    expect(screen.getByText('1/2')).toBeTruthy();
+  });
+
+  it('opens in-file search with Cmd+F', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'const x = 1;' }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.keyDown(window, { key: 'f', metaKey: true });
+
+    expect(screen.getByPlaceholderText('Search in file...')).toBeTruthy();
   });
 
   it('refreshes the HTML preview iframe after saving', async () => {

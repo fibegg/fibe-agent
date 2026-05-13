@@ -146,9 +146,26 @@ export type EditorHandle = {
   setTheme: (dark: boolean) => void;
   getContent: () => string;
   scrollToLine: (lineNumber: number) => void;
+  searchInFile: (query: string, direction: 'next' | 'previous') => { current: number; total: number };
   focus: () => void;
   destroy: () => void;
 };
+
+function getSearchMatches(content: string, query: string): Array<{ from: number; to: number }> {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return [];
+
+  const normalizedContent = content.toLowerCase();
+  const matches: Array<{ from: number; to: number }> = [];
+  let from = 0;
+  while (from <= normalizedContent.length) {
+    const index = normalizedContent.indexOf(normalizedQuery, from);
+    if (index < 0) break;
+    matches.push({ from: index, to: index + normalizedQuery.length });
+    from = index + Math.max(1, normalizedQuery.length);
+  }
+  return matches;
+}
 
 export function createEditor({
   parent,
@@ -224,6 +241,27 @@ export function createEditor({
         effects: EditorView.scrollIntoView(line.from, { y: 'center' }),
       });
       view.focus();
+    },
+    searchInFile: (query: string, direction: 'next' | 'previous') => {
+      const matches = getSearchMatches(view.state.doc.toString(), query);
+      if (matches.length === 0) return { current: 0, total: 0 };
+
+      const cursor = view.state.selection.main.from;
+      let matchIndex = matches.findIndex((match) => direction === 'next' ? match.from > cursor : match.from >= cursor);
+      if (direction === 'next') {
+        if (matchIndex < 0) matchIndex = 0;
+      } else {
+        const previousIndex = matches.findIndex((match) => match.from >= cursor) - 1;
+        matchIndex = previousIndex >= 0 ? previousIndex : matches.length - 1;
+      }
+
+      const match = matches[matchIndex];
+      view.dispatch({
+        selection: { anchor: match.from, head: match.to },
+        effects: EditorView.scrollIntoView(match.from, { y: 'center' }),
+      });
+      view.focus();
+      return { current: matchIndex + 1, total: matches.length };
     },
     focus: () => view.focus(),
     destroy: () => {
