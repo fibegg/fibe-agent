@@ -99,15 +99,18 @@ function StatusBar({ language, lines, isDirty, isSaving }: { language: string; l
 function FilePreviewRail({ content, onJumpToLine }: { content: string; onJumpToLine: (lineNumber: number) => void }) {
   const t = useT();
   const lines = content.split('\n');
-  const visibleLines = lines.slice(0, 320);
-  const preview = visibleLines.join('\n');
+  const preview = lines.join('\n');
 
   const jumpFromPointer = useCallback((event: ReactPointerEvent<HTMLElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
-    const ratio = rect.height > 0 ? (event.clientY - rect.top) / rect.height : 0;
-    const lineNumber = Math.max(1, Math.min(lines.length, Math.floor(ratio * visibleLines.length) + 1));
+    const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top;
+    const visibleOffset = rect.height > 0 ? clientY - rect.top : 0;
+    const scrollableHeight = Math.max(event.currentTarget.scrollHeight, event.currentTarget.clientHeight, 1);
+    const absoluteOffset = event.currentTarget.scrollTop + Math.max(0, visibleOffset);
+    const ratio = absoluteOffset / scrollableHeight;
+    const lineNumber = Math.max(1, Math.min(lines.length, Math.floor(ratio * lines.length) + 1));
     onJumpToLine(lineNumber);
-  }, [lines.length, onJumpToLine, visibleLines.length]);
+  }, [lines.length, onJumpToLine]);
 
   const jumpFromKeyboard = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
     if (event.key !== 'Enter' && event.key !== ' ') return;
@@ -122,7 +125,7 @@ function FilePreviewRail({ content, onJumpToLine }: { content: string; onJumpToL
       tabIndex={0}
       onPointerDown={jumpFromPointer}
       onKeyDown={jumpFromKeyboard}
-      className="group hidden w-24 shrink-0 cursor-pointer overflow-hidden border-l border-border/50 bg-background/80 px-1.5 py-2 outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-violet-500/60 lg:block"
+      className="group hidden w-24 shrink-0 cursor-pointer overflow-y-auto overflow-x-hidden border-l border-border/50 bg-background/80 px-1.5 py-2 outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-violet-500/60 lg:block"
     >
       <pre className="select-none whitespace-pre text-[3px] leading-[4px] text-muted-foreground/50 transition-colors group-hover:text-muted-foreground/70">
         {preview}

@@ -302,6 +302,34 @@ describe('FileEditorPanel', () => {
     expect(scrollToLineMock).toHaveBeenCalledWith(1);
   });
 
+  it('uses the preview rail scroll position when jumping through the file', async () => {
+    const content = Array.from({ length: 100 }, (_, index) => `line ${index + 1}`).join('\n');
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content }) });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+
+    fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
+    const rail = screen.getByRole('complementary', { name: 'File preview' });
+    Object.defineProperty(rail, 'scrollTop', { configurable: true, value: 200 });
+    Object.defineProperty(rail, 'scrollHeight', { configurable: true, value: 400 });
+    Object.defineProperty(rail, 'clientHeight', { configurable: true, value: 100 });
+    vi.spyOn(rail, 'getBoundingClientRect').mockReturnValue({
+      width: 96,
+      height: 100,
+      top: 0,
+      left: 0,
+      right: 96,
+      bottom: 100,
+      x: 0,
+      y: 0,
+      toJSON: () => undefined,
+    } as DOMRect);
+
+    fireEvent(rail, new MouseEvent('pointerdown', { bubbles: true, clientY: 50 }));
+
+    expect(scrollToLineMock).toHaveBeenCalledWith(63);
+  });
+
   it('supports keyboard activation for the file preview rail', async () => {
     (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'line 1\nline 2' }) });
     render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
