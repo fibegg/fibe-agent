@@ -566,9 +566,9 @@ export function FileExplorer({
           )}
         </div>
       </div>
-      <div className="flex-1 min-h-0 flex flex-col pt-2">
+      <div className="flex-1 min-h-0 flex flex-col pt-1">
         {showTabs && onTabChange && (
-          <div className="shrink-0 mb-2">
+          <div className="shrink-0">
             <FileExplorerTabs
               activeTab={effectiveTab}
               onTabChange={onTabChange}
@@ -639,7 +639,7 @@ export function FileExplorer({
             </div>
           )}
           {!error && filteredTree.length > 0 && (
-            <div className="p-2 animate-file-explorer-in">
+            <div className="px-2 pb-2 pt-0 animate-file-explorer-in" data-testid="file-explorer-tree-list">
               {isGlobalSearch && (
                 <div className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
                   {t('fileExplorer.globalSearch')}

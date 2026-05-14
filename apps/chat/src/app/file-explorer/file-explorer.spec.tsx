@@ -256,6 +256,29 @@ describe('FileExplorer', () => {
     );
   });
 
+  it('keeps the tree list tight under the workspace tabs', () => {
+    const tree: PlaygroundEntry[] = [
+      { name: 'app.ts', path: 'src/app.ts', type: 'file' },
+    ];
+    const agentTree: PlaygroundEntry[] = [
+      { name: 'CLAUDE.md', path: 'CLAUDE.md', type: 'file' },
+    ];
+
+    render(
+      <FileExplorer
+        tree={tree}
+        agentTree={agentTree}
+        agentWorkspaceAvailable
+        activeTab="playground"
+        onTabChange={vi.fn()}
+      />
+    );
+
+    const list = screen.getByTestId('file-explorer-tree-list');
+    expect(list.className).toContain('pt-0');
+    expect(list.className).not.toContain('p-2');
+  });
+
   it('quick-opens files across playground and agent workspaces with Cmd+P', async () => {
     const onFileSelect = vi.fn();
     const tree: PlaygroundEntry[] = [
