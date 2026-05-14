@@ -501,6 +501,13 @@ describe('FileExplorer', () => {
     });
   });
 
+  it('can defer its right divider to a parent panel', () => {
+    const { container } = render(
+      <FileExplorer tree={[]} agentTree={[]} showRightBorder={false} />
+    );
+    expect(container.firstElementChild?.className).not.toContain('border-r');
+  });
+
   it('shows Settings in collapsed rail and calls onSettingsClick when clicked', async () => {
     (fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       ok: true,

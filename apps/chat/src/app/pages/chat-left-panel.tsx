@@ -137,6 +137,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
               playgroundSelector={playgroundSelector}
               playgroundServices={playgroundServices}
               onServicePreview={onServicePreview}
+              showRightBorder={false}
             />
           </div>
         )}

@@ -11,6 +11,7 @@ vi.mock('../file-explorer/file-explorer', () => ({
       data-testid="file-explorer"
       data-collapsed={String(props.collapsed)}
       data-agent-workspace={String(props.agentWorkspaceAvailable)}
+      data-show-right-border={String(props.showRightBorder)}
     >
       {props.playgroundSelector as ReactNode}
     </div>
@@ -73,6 +74,15 @@ describe('ChatLeftPanel', () => {
       </MemoryRouter>
     );
     expect(screen.getByTestId('file-explorer').getAttribute('data-agent-workspace')).toBe('true');
+  });
+
+  it('lets the parent panel own the right divider', () => {
+    render(
+      <MemoryRouter>
+        <ChatLeftPanel {...baseProps} />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId('file-explorer').getAttribute('data-show-right-border')).toBe('false');
   });
 
   it('passes collapsed=true when sidebarCollapsed is true', () => {

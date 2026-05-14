@@ -76,6 +76,7 @@ export function FileExplorer({
   playgroundSelector,
   playgroundServices,
   onServicePreview,
+  showRightBorder = true,
 }: {
   collapsed?: boolean;
   onSettingsClick?: () => void;
@@ -110,6 +111,8 @@ export function FileExplorer({
   /** Optional service list for opening playground previews in the main pane. */
   playgroundServices?: PlaygroundPreviewService[];
   onServicePreview?: (service: PlaygroundPreviewService) => void;
+  /** Draws the explorer's own right divider when it is not framed by a parent panel. */
+  showRightBorder?: boolean;
 } = {}) {
   const t = useT();
   const [internalTree, setInternalTree] = useState<PlaygroundEntry[]>([]);
@@ -468,8 +471,10 @@ export function FileExplorer({
     return () => window.removeEventListener('keydown', handler);
   }, [openQuickOpen]);
 
+  const rightDividerClass = showRightBorder ? 'border-r border-border/50' : '';
+
   const collapsedContent = (
-    <div className="flex min-h-0 w-full flex-1 flex-col items-center border-r border-border/50 bg-card/30 pt-3 pb-4 backdrop-blur-xl">
+    <div className={`flex min-h-0 w-full flex-1 flex-col items-center bg-card/30 pt-3 pb-4 backdrop-blur-xl ${rightDividerClass}`}>
       <div className="flex flex-col items-center gap-3">
         {playgroundSelector}
         <button
@@ -487,7 +492,7 @@ export function FileExplorer({
   );
 
   const expandedContent = (
-    <div className="min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl border-r border-border/50">
+    <div className={`min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl ${rightDividerClass}`}>
       <div
         className={`border-b border-border/50 bg-gradient-to-br from-violet-500/10 via-transparent to-purple-500/5 backdrop-blur-sm shrink-0 px-4 pb-3`}
         style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
