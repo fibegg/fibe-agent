@@ -170,6 +170,24 @@ describe('TreeNode', () => {
     expect(btn?.className).toContain('bg-violet-500/10');
   });
 
+  it('keeps the click target to the visible row content instead of the full empty row', () => {
+    render(
+      <TreeNode
+        entry={fileEntry}
+        depth={0}
+        isExpanded={false}
+        isSelected={false}
+        isDirty={false}
+        animType={undefined}
+        onToggle={vi.fn()}
+      />
+    );
+
+    const button = screen.getByRole('button');
+    expect(button.className).toContain('!w-fit');
+    expect(button.className).toContain('max-w-full');
+  });
+
   it('shows unsaved-changes dot when isDirty is true', () => {
     render(
       <TreeNode

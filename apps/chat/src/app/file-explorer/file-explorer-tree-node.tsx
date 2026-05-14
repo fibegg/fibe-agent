@@ -95,8 +95,10 @@ export const TreeNode = memo(function TreeNode({
       <button
         type="button"
         onClick={handleClick}
-        className={`${TREE_NODE_BASE} ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'}`}
-        style={{ paddingLeft: `${0.5 + depth * 0.75}rem` }}
+        className={`${TREE_NODE_BASE} !w-fit max-w-full ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'}`}
+        style={{
+          paddingLeft: `${0.5 + depth * 0.75}rem`,
+        }}
       >
         <span className="w-3 flex shrink-0 items-center justify-center text-foreground/70 dark:text-muted-foreground" aria-hidden>
           {isDir && hasChildren ? (
@@ -148,4 +150,3 @@ export const TreeNode = memo(function TreeNode({
     </div>
   );
 });
-
