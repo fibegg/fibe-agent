@@ -699,7 +699,7 @@ export function FileExplorer({
           role="dialog"
           aria-modal="true"
           aria-label={t('fileExplorer.quickOpen')}
-          onMouseDown={(event) => {
+          onClick={(event) => {
             if (event.target === event.currentTarget) closeQuickOpen();
           }}
         >

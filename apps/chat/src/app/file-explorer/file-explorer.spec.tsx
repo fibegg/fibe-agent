@@ -312,6 +312,22 @@ describe('FileExplorer', () => {
     );
   });
 
+  it('closes quick open from the backdrop without selecting a file underneath', () => {
+    const onFileSelect = vi.fn();
+    const tree: PlaygroundEntry[] = [
+      { name: 'index.html', path: 'index.html', type: 'file' },
+    ];
+
+    render(<FileExplorer tree={tree} agentTree={[]} onFileSelect={onFileSelect} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Quick open file' }));
+    const dialog = screen.getByRole('dialog', { name: 'Quick open file' });
+    fireEvent.click(dialog);
+
+    expect(screen.queryByRole('dialog', { name: 'Quick open file' })).toBeNull();
+    expect(onFileSelect).not.toHaveBeenCalled();
+  });
+
   it('shows the agent workspace empty state when the workspace exists without visible files', () => {
     render(
       <FileExplorer
