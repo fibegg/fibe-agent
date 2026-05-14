@@ -174,6 +174,7 @@ export function FileEditorPanel({
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorHandleRef = useRef<EditorHandle | null>(null);
   const fileSearchInputRef = useRef<HTMLInputElement>(null);
+  const fileSearchQueryRef = useRef(fileSearchQuery);
   const isDark = useCallback(() => document.documentElement.classList.contains('dark'), []);
 
   const isDirty = liveContent !== null && originalContent !== null && liveContent !== originalContent;
@@ -200,6 +201,8 @@ export function FileEditorPanel({
   const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
   const isGitDeleted = entry.gitStatus === 'deleted';
   const isGitRenamed = entry.gitStatus === 'renamed';
+
+  fileSearchQueryRef.current = fileSearchQuery;
 
   // Notify parent of dirty state changes
   const onDirtyChangeRef = useRef(onDirtyChange);
@@ -262,6 +265,7 @@ export function FileEditorPanel({
     const handler = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f' && !isImageFile) {
         e.preventDefault();
+        if (isHtmlFile && previewMode === 'preview') setPreviewMode('code');
         setFileSearchOpen(true);
         setTimeout(() => fileSearchInputRef.current?.focus(), 0);
         return;
@@ -277,7 +281,14 @@ export function FileEditorPanel({
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [fileSearchOpen, isImageFile, onClose]);
+  }, [fileSearchOpen, isHtmlFile, isImageFile, onClose, previewMode]);
+
+  useEffect(() => {
+    if (!editorReady || !fileSearchOpen) return;
+    const trimmed = fileSearchQueryRef.current.trim();
+    if (!trimmed) return;
+    setFileSearchResult(editorHandleRef.current?.searchInFile(trimmed, 'next') ?? { current: 0, total: 0 });
+  }, [editorReady, fileSearchOpen]);
 
   // ── Toast auto-dismiss ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -558,7 +569,9 @@ export function FileEditorPanel({
                   <button
                     type="button"
                     onClick={() => {
-                      setFileSearchOpen((value) => !value);
+                      const nextSearchOpen = !fileSearchOpen;
+                      if (nextSearchOpen && isHtmlFile && previewMode === 'preview') setPreviewMode('code');
+                      setFileSearchOpen(nextSearchOpen);
                       setTimeout(() => fileSearchInputRef.current?.focus(), 0);
                     }}
                     className={`${BUTTON_GHOST_ACCENT} shrink-0 ${fileSearchOpen ? 'text-violet-400 hover:text-violet-300' : ''}`}

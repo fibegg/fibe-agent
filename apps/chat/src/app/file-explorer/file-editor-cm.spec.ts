@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getLanguageExtension, getLanguageLabel, LANG_MAP } from './file-editor-cm';
+import { createEditor, getLanguageExtension, getLanguageLabel, LANG_MAP } from './file-editor-cm';
 
 describe('getLanguageExtension', () => {
   it('returns extension for .ts files', async () => {
@@ -157,5 +157,31 @@ describe('LANG_MAP', () => {
     for (const [ext, factory] of Object.entries(LANG_MAP)) {
       expect(await factory(), `LANG_MAP[${ext}] returned falsy`).toBeTruthy();
     }
+  });
+});
+
+describe('createEditor searchInFile', () => {
+  it('does not steal focus from the search input during live search', () => {
+    const parent = document.createElement('div');
+    const searchInput = document.createElement('input');
+    document.body.appendChild(searchInput);
+    document.body.appendChild(parent);
+    const editor = createEditor({
+      parent,
+      content: 'alpha beta alpha',
+      filename: 'example.txt',
+      isDark: false,
+      readOnly: false,
+    });
+
+    searchInput.focus();
+    const result = editor.searchInFile('alpha', 'next');
+
+    expect(result).toEqual({ current: 1, total: 2 });
+    expect(document.activeElement).toBe(searchInput);
+
+    editor.destroy();
+    parent.remove();
+    searchInput.remove();
   });
 });

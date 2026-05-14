@@ -246,9 +246,13 @@ export function createEditor({
       const matches = getSearchMatches(view.state.doc.toString(), query);
       if (matches.length === 0) return { current: 0, total: 0 };
 
-      const cursor = view.state.selection.main.from;
-      let matchIndex = matches.findIndex((match) => direction === 'next' ? match.from > cursor : match.from >= cursor);
+      const selection = view.state.selection.main;
+      const cursor = direction === 'next' ? selection.to : selection.from;
+      let matchIndex = matches.findIndex((match) => match.from >= cursor);
       if (direction === 'next') {
+        if (!selection.empty) {
+          matchIndex = matches.findIndex((match) => match.from > cursor);
+        }
         if (matchIndex < 0) matchIndex = 0;
       } else {
         const previousIndex = matches.findIndex((match) => match.from >= cursor) - 1;
@@ -260,7 +264,6 @@ export function createEditor({
         selection: { anchor: match.from, head: match.to },
         effects: EditorView.scrollIntoView(match.from, { y: 'center' }),
       });
-      view.focus();
       return { current: matchIndex + 1, total: matches.length };
     },
     focus: () => view.focus(),

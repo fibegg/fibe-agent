@@ -250,6 +250,21 @@ describe('FileEditorPanel', () => {
     expect(screen.getByRole('button', { name: 'Preview' }).className).toContain('bg-violet-500/20');
   });
 
+  it('switches HTML preview to code before searching file content', async () => {
+    (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: '<h1>Zoo</h1>' }) });
+    render(<FileEditorPanel entry={{ name: 'zoo.html', path: 'zoo.html', type: 'file' }} onClose={mockClose} />);
+    await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    expect(document.querySelector('iframe')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Search' }));
+    fireEvent.change(screen.getByPlaceholderText('Search in file...'), { target: { value: 'Zoo' } });
+
+    await waitFor(() => expect(screen.getByTestId('cm-mock')).toBeTruthy());
+    await waitFor(() => expect(searchInFileMock).toHaveBeenCalledWith('Zoo', 'next'));
+    expect(screen.getByRole('button', { name: 'Code' }).className).toContain('bg-violet-500/20');
+    expect(document.querySelector('iframe')).toBeNull();
+  });
+
   it('orders HTML view modes as preview, split, then code', async () => {
     (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: '<h1>Hello</h1>' }) });
     render(<FileEditorPanel entry={{ name: 'index.html', path: 'index.html', type: 'file' }} onClose={mockClose} />);
