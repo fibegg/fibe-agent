@@ -42,6 +42,7 @@ const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const SESSION_MARKER_FILE = '.claude_session';
 const CLAUDE_SDK_CLIENT_APP = 'fibe-agent/claude-sdk';
 const SDK_INTERRUPTED_ERROR_NAME = 'AbortError';
+const CLAUDE_INTERRUPT_FORCE_CLOSE_MS = 2_000;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -578,25 +579,27 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   }
 
   override interruptAgent(): void {
-    this.streamInterrupted = true;
     const record = this.activeRecord;
-    if (!record || record.closed) return;
-    void record.query.interrupt().catch(() => {
-      this.closeRecord(record);
-    });
+    this.interruptRecord(record);
   }
 
   override steerAgent(message: string): SteerAgentResult {
     const trimmed = message.trim();
     if (trimmed) this.pendingSteerMessages.push(trimmed);
-    const record = this.activeRecord;
-    if (record && !record.closed && record.busy) {
-      this.streamInterrupted = true;
-      void record.query.interrupt().catch(() => {
-        this.closeRecord(record);
-      });
-    }
+    this.interruptRecord(this.activeRecord);
     return 'queued';
+  }
+
+  private interruptRecord(record: ClaudeSdkConversationRecord | null): void {
+    this.streamInterrupted = true;
+    if (!record || record.closed) return;
+    void record.query.interrupt().catch(() => {
+      this.closeRecord(record);
+    });
+    const timer = setTimeout(() => {
+      if (!record.closed && record.busy) this.closeRecord(record);
+    }, CLAUDE_INTERRUPT_FORCE_CLOSE_MS);
+    timer.unref?.();
   }
 
   hasNativeSessionSupport(): boolean {

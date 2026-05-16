@@ -77,10 +77,11 @@ const playgroundWatcher = {
 let mockPtyProcess: { onData: MockFn; onExit: MockFn };
 let terminalService: import('./app/terminal/terminal.service').TerminalService;
 
-function makeConfig(password?: string) {
+function makeConfig(password?: string, websocketMaxConnections = 5) {
   return {
     getAgentPassword:  () => password,
     getPlaygroundsDir: () => '/tmp/playground',
+    getWebsocketMaxConnections: () => websocketMaxConnections,
   } as unknown as import('./app/config/config.service').ConfigService;
 }
 
@@ -267,6 +268,50 @@ describe('attachWebSocketServer — session takeover', () => {
     // 6th connection should evict the oldest
     wss.emit('connection', makeWsStub(), makeReq('/ws'));
     expect(localRegistry.destroy).toHaveBeenCalledWith(oldestId);
+  });
+
+  it('uses configured chat websocket connection limit', () => {
+    const server = new EventEmitter();
+    const localSessions: Array<{ sessionId: string; outbound$: Subject<{ type: string; data: Record<string, unknown> }>; destroy: ReturnType<typeof mock> }> = [];
+    let sessionCounter = 0;
+    const localRegistry = {
+      all: () => localSessions,
+      connected: () => localSessions,
+      create: mock(() => {
+        const ctx = {
+          sessionId: `configured-${sessionCounter++}`,
+          isAuthenticated: false,
+          isProcessing: false,
+          outbound$: new Subject<{ type: string; data: Record<string, unknown> }>(),
+          send: mock(() => undefined),
+          destroy: mock(() => undefined),
+        };
+        localSessions.push(ctx);
+        return ctx;
+      }),
+      destroy: mock((id: string) => {
+        const idx = localSessions.findIndex((s) => s.sessionId === id);
+        if (idx >= 0) localSessions.splice(idx, 1);
+      }),
+      detach: mock((id: string) => {
+        const idx = localSessions.findIndex((s) => s.sessionId === id);
+        if (idx >= 0) localSessions.splice(idx, 1);
+      }),
+      broadcast: mock(() => undefined),
+    } as unknown as typeof mockSessionRegistry;
+
+    const wss = attachWebSocketServer(
+      makeFastify(server), makeConfig(undefined, 2), orchestrator, localRegistry, playgroundWatcher, terminalService, mockConversationManager,
+    );
+
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    expect(localSessions).toHaveLength(2);
+    const oldestId = localSessions[0].sessionId;
+
+    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    expect(localRegistry.destroy).toHaveBeenCalledWith(oldestId);
+    expect(localSessions).toHaveLength(2);
   });
 });
 

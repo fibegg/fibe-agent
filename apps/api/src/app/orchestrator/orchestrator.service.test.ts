@@ -429,12 +429,13 @@ describe('OrchestratorService', () => {
     ).toBe(true);
   });
 
-  test('handleClientMessage interrupt_agent when not processing does nothing', async () => {
+  test('handleClientMessage interrupt_agent when not processing returns a control failure', async () => {
     const { orch, ctx } = await createOrchestrator();
-    const events: Array<{ type: string }> = [];
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((ev) => events.push(ev));
-    orch.handleClientMessage(ctx, { action: WS_ACTION.INTERRUPT_AGENT });
-    expect(events.length).toBe(0);
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.INTERRUPT_AGENT });
+    expect(events.some((e) => e.type === WS_EVENT.CONTROL_RESULT && e.data.accepted === false)).toBe(true);
+    expect(events.some((e) => e.type === WS_EVENT.ERROR)).toBe(true);
   });
 
   test('handleClientMessage interrupt_agent when processing sends stream_end with accumulated', async () => {
@@ -447,8 +448,9 @@ describe('OrchestratorService', () => {
       action: WS_ACTION.SEND_CHAT_MESSAGE,
       text: 'hi',
     });
-    orch.handleClientMessage(ctx, { action: WS_ACTION.INTERRUPT_AGENT });
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.INTERRUPT_AGENT });
     await promise;
+    expect(events.some((e) => e.type === WS_EVENT.CONTROL_RESULT)).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.STREAM_START)).toBe(true);
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
     expect(ctx.isProcessing).toBe(false);
@@ -571,6 +573,41 @@ describe('OrchestratorService', () => {
       text: 'steer this way',
     });
     expect(events.some((e) => e.type === WS_EVENT.MESSAGE)).toBe(true);
+    expect(
+      events.some(
+        (e) =>
+          e.type === WS_EVENT.CONTROL_RESULT &&
+          e.data.accepted === true &&
+          e.data.action === 'queue',
+      ),
+    ).toBe(true);
+  });
+
+  test('queue_message on the wrong conversation returns a clear control failure', async () => {
+    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    ctx.conversationId = 'project-a';
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+    const requester = sessionRegistry.create('project-b');
+    requester.isAuthenticated = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    requester.outbound$.subscribe((ev) => events.push(ev));
+
+    await orch.handleClientMessage(requester, {
+      action: WS_ACTION.QUEUE_MESSAGE,
+      text: 'wrong place',
+    });
+
+    expect(ctx.queuedTurns).toHaveLength(0);
+    expect(
+      events.some(
+        (e) =>
+          e.type === WS_EVENT.CONTROL_RESULT &&
+          e.data.accepted === false &&
+          String(e.data.reason).includes('project-b'),
+      ),
+    ).toBe(true);
   });
 
   test('sendMessageFromApi returns AGENT_BUSY when isProcessing', async () => {
@@ -720,14 +757,97 @@ describe('OrchestratorService', () => {
       interrupted += 1;
     };
 
-    expect(orch.interruptFromApi('project-b')).toEqual({ interrupted: false });
+    expect(orch.interruptFromApi('project-b')).toMatchObject({
+      accepted: false,
+      interrupted: false,
+      action: 'interrupt',
+      conversationId: 'project-b',
+    });
     expect(interrupted).toBe(0);
 
     expect(orch.interruptFromApi('project-a')).toEqual({
+      accepted: true,
+      action: 'interrupt',
       interrupted: true,
       conversationId: 'project-a',
     });
     expect(interrupted).toBe(1);
+  });
+
+  test('interruptFromApi without conversation targets the only active processing session', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.conversationId = 'detached-project';
+    ctx.isProcessing = true;
+    ctx.isClientConnected = false;
+    let interrupted = 0;
+    ctx.strategy.interruptAgent = () => {
+      interrupted += 1;
+    };
+
+    expect(orch.interruptFromApi()).toEqual({
+      accepted: true,
+      action: 'interrupt',
+      interrupted: true,
+      conversationId: 'detached-project',
+    });
+    expect(interrupted).toBe(1);
+  });
+
+  test('interruptFromApi without conversation rejects ambiguous active sessions', async () => {
+    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    ctx.conversationId = 'project-a';
+    ctx.isProcessing = true;
+    const second = sessionRegistry.create('project-b');
+    second.isProcessing = true;
+
+    expect(orch.interruptFromApi()).toMatchObject({
+      accepted: false,
+      action: 'interrupt',
+      interrupted: false,
+      reason: 'Multiple active agent runs; provide conversationId.',
+    });
+  });
+
+  test('sendMessageFromApi queue policy without conversation targets the only active session', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.conversationId = 'detached-project';
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+
+    const result = await orch.sendMessageFromApi(
+      'queued to only active',
+      undefined,
+      undefined,
+      undefined,
+      'queue',
+    );
+
+    expect(result.accepted).toBe(true);
+    expect(result.conversationId).toBe('detached-project');
+    expect(ctx.queuedTurns).toHaveLength(1);
+  });
+
+  test('sendMessageFromApi queue policy rejects ambiguous active sessions without conversation', async () => {
+    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    ctx.conversationId = 'project-a';
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    ctx.isProcessing = true;
+    const second = sessionRegistry.create('project-b');
+    second.isAuthenticated = true;
+    second.isProcessing = true;
+
+    const result = await orch.sendMessageFromApi(
+      'ambiguous',
+      undefined,
+      undefined,
+      undefined,
+      'queue',
+    );
+
+    expect(result.accepted).toBe(false);
+    expect(result.reason).toBe('Multiple active agent runs; provide conversationId.');
   });
 
   test('removeQueuedTurnFromApi removes a queued turn by id or index', async () => {

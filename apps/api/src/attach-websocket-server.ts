@@ -58,7 +58,6 @@ function rejectIfUnauthorized(ws: WebSocket, params: ConnectionParams, requiredP
   return false;
 }
 
-const MAX_CONNECTIONS = 5;
 const MESSAGE_LIMIT = 60;
 
 function attachChatWs(
@@ -81,8 +80,9 @@ function attachChatWs(
     if (rejectIfUnauthorized(ws, params, config.getAgentPassword())) return;
 
     // Enforce max connections by evicting the oldest session
+    const maxConnections = config.getWebsocketMaxConnections();
     const allSessions = sessionRegistry.connected();
-    if (allSessions.length >= MAX_CONNECTIONS) {
+    if (allSessions.length >= maxConnections) {
       const oldest = allSessions[0];
       logWs({ event: 'disconnect', closeCode: WS_CLOSE.SESSION_TAKEN_OVER, error: 'Max connections reached — oldest session evicted' });
       sessionRegistry.destroy(oldest.sessionId);

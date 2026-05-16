@@ -70,6 +70,8 @@ export interface FibeSettings {
   gemmaTimeoutMs?: number;
 
   // UI / Chat
+  /** Maximum simultaneous chat websocket connections before the oldest is evicted. */
+  websocketMaxConnections?: number | string;
   userAvatarUrl?: string;
   userAvatarBase64?: string;
   assistantAvatarUrl?: string;
@@ -198,6 +200,7 @@ function promoteToEnv(s: FibeSettings): void {
   if (s.gemmaTimeoutMs !== undefined) set('GEMMA_TIMEOUT_MS', String(s.gemmaTimeoutMs));
 
   // UI / Chat
+  if (s.websocketMaxConnections !== undefined) set('WEBSOCKET_MAX_CONNECTIONS', String(s.websocketMaxConnections));
   set('USER_AVATAR_URL', s.userAvatarUrl);
   set('USER_AVATAR_BASE64', s.userAvatarBase64);
   set('ASSISTANT_AVATAR_URL', s.assistantAvatarUrl);

@@ -60,6 +60,24 @@ export interface OutboundEvent {
   data: Record<string, unknown>;
 }
 
+type AgentControlAction = 'interrupt' | 'queue' | 'steer';
+
+interface AgentControlResult {
+  accepted: boolean;
+  action: AgentControlAction;
+  conversationId?: string;
+  interrupted?: boolean;
+  messageId?: string;
+  resolvedPolicy?: string;
+  queueCount?: number;
+  error?: string;
+  reason?: string;
+}
+
+type ControlTargetResolution =
+  | { accepted: true; ctx: SessionContext }
+  | { accepted: false; result: AgentControlResult };
+
 @Injectable()
 export class OrchestratorService implements OnModuleInit {
   private readonly logger = new Logger(OrchestratorService.name);
@@ -317,28 +335,16 @@ export class OrchestratorService implements OnModuleInit {
         }
       },
       [WS_ACTION.QUEUE_MESSAGE]: () =>
-        this.handleBusyMessage(
-          this.sessionRegistry.processingForConversation(ctx.conversationId) ??
-            ctx,
-          ctx,
-          { text: msg.text ?? '', busyPolicy: 'queue' },
-        ),
+        this.handleControlMessage('queue', ctx, { text: msg.text ?? '' }),
       [WS_ACTION.STEER_MESSAGE]: () =>
-        this.handleBusyMessage(
-          this.sessionRegistry.processingForConversation(ctx.conversationId) ??
-            ctx,
-          ctx,
-          { text: msg.text ?? '', busyPolicy: 'steer' },
-        ),
+        this.handleControlMessage('steer', ctx, { text: msg.text ?? '' }),
       [WS_ACTION.SUBMIT_STORY]: () =>
         this.handleSubmitStory(ctx, msg.story ?? []),
       [WS_ACTION.GET_MODEL]: () => this.handleGetModel(ctx),
       [WS_ACTION.SET_MODEL]: () => this.handleSetModel(ctx, msg.model ?? ''),
       [WS_ACTION.GET_EFFORT]: () => this.handleGetEffort(ctx),
       [WS_ACTION.SET_EFFORT]: () => this.handleSetEffort(ctx, msg.effort ?? ''),
-      [WS_ACTION.INTERRUPT_AGENT]: () => {
-        if (ctx.isProcessing) ctx.strategy.interruptAgent?.();
-      },
+      [WS_ACTION.INTERRUPT_AGENT]: () => this.handleInterruptControl(ctx),
       [WS_ACTION.SET_AGENT_MODE]: () => this.handleSetAgentMode(msg.mode ?? ''),
       [WS_ACTION.ANSWER_USER_QUESTION]: () =>
         this.handleAnswerUserQuestion(
@@ -478,10 +484,59 @@ export class OrchestratorService implements OnModuleInit {
     accepted: boolean;
     messageId?: string;
     error?: string;
+    reason?: string;
+    conversationId?: string;
     resolvedPolicy?: string;
+    queueCount?: number;
   }> {
-    const targetConversationId =
-      conversationId?.trim() || INBOX_CONVERSATION_ID;
+    const requestedConversationId = conversationId?.trim();
+    const activeProcessing = this.processingSessions();
+    if (
+      (busyPolicy === 'queue' || busyPolicy === 'steer') &&
+      activeProcessing.length > 0
+    ) {
+      const resolution = this.resolveControlTarget(
+        requestedConversationId,
+        busyPolicy,
+      );
+      if (!resolution.accepted) {
+        return this.controlFailureForSendMessage(resolution.result);
+      }
+      const result = await this.acceptBusyMessage(
+        resolution.ctx,
+        resolution.ctx,
+        {
+          text,
+          images,
+          attachmentFilenames,
+          busyPolicy,
+        },
+      );
+      return {
+        ...result,
+        conversationId: resolution.ctx.conversationId,
+        queueCount: resolution.ctx.queuedTurns.length,
+      };
+    }
+
+    if (!requestedConversationId && activeProcessing.length > 0) {
+      if (activeProcessing.length > 1) {
+        return {
+          accepted: false,
+          error: ERROR_CODE.AGENT_BUSY,
+          reason: 'Multiple active agent runs; provide conversationId.',
+        };
+      }
+      const onlyActive = activeProcessing[0];
+      return {
+        accepted: false,
+        error: ERROR_CODE.AGENT_BUSY,
+        reason: 'Agent run is active; provide conversationId or a queue/steer busyPolicy.',
+        ...(onlyActive ? { conversationId: onlyActive.conversationId } : {}),
+      };
+    }
+
+    const targetConversationId = requestedConversationId || INBOX_CONVERSATION_ID;
     if (!this.conversationManager.get(targetConversationId)) {
       return { accepted: false, error: 'Conversation not found' };
     }
@@ -524,21 +579,25 @@ export class OrchestratorService implements OnModuleInit {
       .catch((err) =>
         this.logger.warn('REST send-message agent run failed', err),
       );
-    return { accepted: true, messageId };
+    return { accepted: true, messageId, conversationId: ctx.conversationId };
   }
 
-  interruptFromApi(conversationId?: string): {
-    interrupted: boolean;
-    conversationId?: string;
-  } {
-    const targetConversationId = conversationId?.trim();
-    const ctx = targetConversationId
-      ? this.sessionRegistry.processingForConversation(targetConversationId)
-      : this.sessionRegistry.all().find((session) => session.isProcessing);
-    if (!ctx) return { interrupted: false };
+  interruptFromApi(conversationId?: string): AgentControlResult {
+    const resolution = this.resolveControlTarget(
+      conversationId?.trim(),
+      'interrupt',
+    );
+    if (!resolution.accepted) {
+      return { ...resolution.result, interrupted: false };
+    }
 
-    ctx.strategy.interruptAgent?.();
-    return { interrupted: true, conversationId: ctx.conversationId };
+    resolution.ctx.strategy.interruptAgent?.();
+    return {
+      accepted: true,
+      action: 'interrupt',
+      interrupted: true,
+      conversationId: resolution.ctx.conversationId,
+    };
   }
 
   removeQueuedTurnFromApi(
@@ -708,6 +767,151 @@ export class OrchestratorService implements OnModuleInit {
           String(numericIndex) === turnId &&
           candidateIndex === numericIndex),
     );
+  }
+
+  private processingSessions(): SessionContext[] {
+    return this.sessionRegistry.all().filter((session) => session.isProcessing);
+  }
+
+  private resolveControlTarget(
+    conversationId: string | undefined,
+    action: AgentControlAction,
+  ): ControlTargetResolution {
+    const targetConversationId = conversationId?.trim();
+    if (targetConversationId) {
+      const ctx =
+        this.sessionRegistry.processingForConversation(targetConversationId);
+      if (ctx) return { accepted: true, ctx };
+
+      if (!this.conversationManager.get(targetConversationId)) {
+        return {
+          accepted: false,
+          result: {
+            accepted: false,
+            action,
+            conversationId: targetConversationId,
+            error: 'Conversation not found',
+            reason: 'Conversation not found',
+          },
+        };
+      }
+      const reason = `No active agent run for conversation ${targetConversationId}.`;
+      return {
+        accepted: false,
+        result: {
+          accepted: false,
+          action,
+          conversationId: targetConversationId,
+          error: ERROR_CODE.AGENT_BUSY,
+          reason,
+        },
+      };
+    }
+
+    const active = this.processingSessions();
+    const onlyActive = active[0];
+    if (active.length === 1 && onlyActive) return { accepted: true, ctx: onlyActive };
+    const reason =
+      active.length === 0
+        ? 'No active agent run.'
+        : 'Multiple active agent runs; provide conversationId.';
+    return {
+      accepted: false,
+      result: {
+        accepted: false,
+        action,
+        error: ERROR_CODE.AGENT_BUSY,
+        reason,
+      },
+    };
+  }
+
+  private controlFailureForSendMessage(result: AgentControlResult): {
+    accepted: false;
+    error: string;
+    reason: string;
+    conversationId?: string;
+  } {
+    return {
+      accepted: false,
+      error: result.error ?? ERROR_CODE.AGENT_BUSY,
+      reason: result.reason ?? result.error ?? ERROR_CODE.AGENT_BUSY,
+      ...(result.conversationId ? { conversationId: result.conversationId } : {}),
+    };
+  }
+
+  private emitControlResult(
+    requesterCtx: SessionContext,
+    result: AgentControlResult,
+  ): void {
+    requesterCtx.send(
+      WS_EVENT.CONTROL_RESULT,
+      result as unknown as Record<string, unknown>,
+    );
+    if (!result.accepted) {
+      requesterCtx.send(WS_EVENT.ERROR, {
+        message: result.reason ?? result.error ?? ERROR_CODE.AGENT_BUSY,
+      });
+    }
+  }
+
+  private handleInterruptControl(requesterCtx: SessionContext): void {
+    const resolution = this.resolveControlTarget(
+      requesterCtx.conversationId,
+      'interrupt',
+    );
+    if (!resolution.accepted) {
+      this.emitControlResult(requesterCtx, {
+        ...resolution.result,
+        interrupted: false,
+      });
+      return;
+    }
+
+    resolution.ctx.strategy.interruptAgent?.();
+    this.emitControlResult(requesterCtx, {
+      accepted: true,
+      action: 'interrupt',
+      interrupted: true,
+      conversationId: resolution.ctx.conversationId,
+    });
+  }
+
+  private async handleControlMessage(
+    action: Exclude<AgentControlAction, 'interrupt'>,
+    requesterCtx: SessionContext,
+    payload: {
+      text: string;
+      images?: string[];
+      audio?: string;
+      audioFilename?: string;
+      attachmentFilenames?: string[];
+    },
+  ): Promise<void> {
+    const resolution = this.resolveControlTarget(
+      requesterCtx.conversationId,
+      action,
+    );
+    if (!resolution.accepted) {
+      this.emitControlResult(requesterCtx, resolution.result);
+      return;
+    }
+
+    const result = await this.acceptBusyMessage(
+      resolution.ctx,
+      requesterCtx,
+      { ...payload, busyPolicy: action },
+    );
+    this.emitControlResult(requesterCtx, {
+      accepted: result.accepted,
+      action,
+      conversationId: resolution.ctx.conversationId,
+      messageId: result.messageId,
+      resolvedPolicy: result.resolvedPolicy,
+      queueCount: resolution.ctx.queuedTurns.length,
+      error: result.error,
+      reason: result.error,
+    });
   }
 
   /**

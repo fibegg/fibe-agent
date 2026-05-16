@@ -142,12 +142,9 @@ export class ConversationsController {
   interrupt(
     @Param('id') id: string,
     @Body() _body: InterruptAgentDto,
-  ): { accepted: true; interrupted: boolean; conversationId?: string } {
+  ): ReturnType<OrchestratorService['interruptFromApi']> {
     this.requireBundle(id);
-    return {
-      accepted: true,
-      ...this.orchestrator.interruptFromApi(id),
-    };
+    return this.orchestrator.interruptFromApi(id);
   }
 
   @Delete(':id/queue/:turnId')

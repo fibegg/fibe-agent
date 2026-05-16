@@ -19,11 +19,13 @@ describe('ConfigService', () => {
     envBackup.FIBE_API_KEY = process.env.FIBE_API_KEY;
     envBackup.FIBE_DOMAIN = process.env.FIBE_DOMAIN;
     envBackup.FIBE_SYNC_ENABLED = process.env.FIBE_SYNC_ENABLED;
+    envBackup.WEBSOCKET_MAX_CONNECTIONS = process.env.WEBSOCKET_MAX_CONNECTIONS;
     envBackup.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
     // Clear to avoid cross-test leakage
     delete process.env.FIBE_SETTINGS_JSON;
     process.env.FIBE_SETTINGS_YAML_PATHS = join(process.cwd(), 'config-service-test-fibe.yml');
     delete process.env.FIBE_SYNC_ENABLED;
+    delete process.env.WEBSOCKET_MAX_CONNECTIONS;
     delete process.env.CLAUDE_EFFORT;
   });
 
@@ -37,6 +39,7 @@ describe('ConfigService', () => {
     process.env.FIBE_API_KEY = envBackup.FIBE_API_KEY;
     process.env.FIBE_DOMAIN = envBackup.FIBE_DOMAIN;
     process.env.FIBE_SYNC_ENABLED = envBackup.FIBE_SYNC_ENABLED;
+    process.env.WEBSOCKET_MAX_CONNECTIONS = envBackup.WEBSOCKET_MAX_CONNECTIONS;
     if (envBackup.CLAUDE_EFFORT === undefined) delete process.env.CLAUDE_EFFORT;
     else process.env.CLAUDE_EFFORT = envBackup.CLAUDE_EFFORT;
   });
@@ -255,5 +258,27 @@ describe('ConfigService', () => {
   test('isFibeSyncEnabled returns false for non-true values', () => {
     const config = withSettings({ fibeSyncEnabled: false });
     expect(config.isFibeSyncEnabled()).toBe(false);
+  });
+
+  test('getWebsocketMaxConnections defaults to 5', () => {
+    expect(new ConfigService().getWebsocketMaxConnections()).toBe(5);
+  });
+
+  test('getWebsocketMaxConnections reads from settings', () => {
+    const config = withSettings({ websocketMaxConnections: 10 });
+    expect(config.getWebsocketMaxConnections()).toBe(10);
+  });
+
+  test('getWebsocketMaxConnections prefers individual env var', () => {
+    process.env.WEBSOCKET_MAX_CONNECTIONS = '12';
+    const config = withSettings({ websocketMaxConnections: 10 });
+    expect(config.getWebsocketMaxConnections()).toBe(12);
+  });
+
+  test('getWebsocketMaxConnections falls back to 5 for invalid values', () => {
+    expect(withSettings({ websocketMaxConnections: 0 }).getWebsocketMaxConnections()).toBe(5);
+    expect(withSettings({ websocketMaxConnections: 'abc' }).getWebsocketMaxConnections()).toBe(5);
+    process.env.WEBSOCKET_MAX_CONNECTIONS = '-1';
+    expect(withSettings({ websocketMaxConnections: 10 }).getWebsocketMaxConnections()).toBe(5);
   });
 });

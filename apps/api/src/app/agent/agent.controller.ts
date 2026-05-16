@@ -60,11 +60,8 @@ export class AgentController {
   @HttpCode(HttpStatus.ACCEPTED)
   interrupt(
     @Body() body: InterruptAgentDto
-  ): { accepted: true; interrupted: boolean; conversationId?: string } {
-    return {
-      accepted: true,
-      ...this.orchestrator.interruptFromApi(body.conversationId),
-    };
+  ): ReturnType<OrchestratorService['interruptFromApi']> {
+    return this.orchestrator.interruptFromApi(body.conversationId);
   }
 
   @Delete('queue/:turnId')

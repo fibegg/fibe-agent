@@ -10,10 +10,17 @@ export type SendMessageOrchestratorResult = {
   accepted: boolean;
   messageId?: string;
   error?: string;
+  reason?: string;
+  conversationId?: string;
   resolvedPolicy?: string;
 };
 
-export type SendMessageSuccess = { accepted: true; messageId: string; resolvedPolicy?: string };
+export type SendMessageSuccess = {
+  accepted: true;
+  messageId: string;
+  conversationId?: string;
+  resolvedPolicy?: string;
+};
 
 export function handleSendMessage(
   result: SendMessageOrchestratorResult
@@ -23,7 +30,7 @@ export function handleSendMessage(
       throw new ForbiddenException(ERROR_CODE.NEED_AUTH);
     }
     if (result.error === ERROR_CODE.AGENT_BUSY) {
-      throw new ConflictException(ERROR_CODE.AGENT_BUSY);
+      throw new ConflictException(result.reason ?? ERROR_CODE.AGENT_BUSY);
     }
     if (result.error === 'Conversation not found') {
       throw new NotFoundException('Conversation not found');
@@ -36,6 +43,7 @@ export function handleSendMessage(
   return {
     accepted: true,
     messageId: result.messageId,
+    ...(result.conversationId ? { conversationId: result.conversationId } : {}),
     ...(result.resolvedPolicy ? { resolvedPolicy: result.resolvedPolicy } : {}),
   };
 }

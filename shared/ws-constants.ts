@@ -32,6 +32,7 @@ export const WS_EVENT = {
   LOGOUT_OUTPUT: 'logout_output',
   LOGOUT_SUCCESS: 'logout_success',
   ERROR: 'error',
+  CONTROL_RESULT: 'control_result',
   MESSAGE: 'message',
   STREAM_START: 'stream_start',
   STREAM_CHUNK: 'stream_chunk',

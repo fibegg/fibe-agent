@@ -3,12 +3,22 @@ import { Injectable } from '@nestjs/common';
 import { loadFibeSettings, type FibeSettings } from './fibe-settings';
 import { DEFAULT_EFFORT, normalizeEffort, resolveEffort, type EffortValue } from '@shared/effort.constants';
 
+const DEFAULT_WEBSOCKET_MAX_CONNECTIONS = 5;
+
 function sanitizeConversationId(id: string): string {
   const sanitized = id
     .replace(/[^a-zA-Z0-9_-]/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
   return sanitized || 'default';
+}
+
+function parsePositiveInteger(value: unknown): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  const str = String(value).trim();
+  if (!/^[1-9]\d*$/.test(str)) return undefined;
+  const parsed = Number.parseInt(str, 10);
+  return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
 @Injectable()
@@ -130,6 +140,15 @@ export class ConfigService {
 
   isSyscheckEnabled(): boolean {
     return this.settings.syscheckEnabled !== false;
+  }
+
+  getWebsocketMaxConnections(): number {
+    if (process.env.WEBSOCKET_MAX_CONNECTIONS !== undefined) {
+      return parsePositiveInteger(process.env.WEBSOCKET_MAX_CONNECTIONS) ??
+        DEFAULT_WEBSOCKET_MAX_CONNECTIONS;
+    }
+    return parsePositiveInteger(this.settings.websocketMaxConnections) ??
+      DEFAULT_WEBSOCKET_MAX_CONNECTIONS;
   }
 
   // ─── Gemma Router (local LLM pre-processor via Ollama) ───────────

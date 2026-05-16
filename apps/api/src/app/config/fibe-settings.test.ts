@@ -122,8 +122,7 @@ describe('parseYaml', () => {
 describe('loadFibeSettings', () => {
   const MANAGED = ['FIBE_SETTINGS_JSON', 'FIBE_SETTINGS_YAML_PATHS'];
   const savedEnv: Record<string, string | undefined> = {};
-  // Path to local fibe.yml (CWD-based, second candidate checked by loader)
-  const localYml = join(process.cwd(), 'fibe.yml');
+  const localYml = join(process.cwd(), 'fibe-settings-test.yml');
 
   beforeEach(() => {
     for (const k of MANAGED) { savedEnv[k] = process.env[k]; delete process.env[k]; }
@@ -164,6 +163,12 @@ describe('loadFibeSettings', () => {
     expect(result.gemmaTimeoutMs).toBe(5000);      // YAML fills the gap
   });
 
+  test('FIBE_SETTINGS_JSON wins over YAML on websocketMaxConnections conflict', () => {
+    writeFileSync(localYml, 'websocketMaxConnections: 6\n');
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 8 });
+    expect(loadFibeSettings().websocketMaxConnections).toBe(8);
+  });
+
   test('handles invalid FIBE_SETTINGS_JSON gracefully', () => {
     process.env.FIBE_SETTINGS_JSON = 'not-valid-json';
     expect(() => loadFibeSettings()).not.toThrow();
@@ -186,6 +191,7 @@ describe('applyFibeSettings', () => {
     'USER_AVATAR_URL', 'USER_AVATAR_BASE64',
     'ASSISTANT_AVATAR_URL', 'ASSISTANT_AVATAR_BASE64',
     'LOCK_CHAT_MODEL', 'SIMPLICATE',
+    'WEBSOCKET_MAX_CONNECTIONS',
     'GEMMA_ROUTER_ENABLED', 'OLLAMA_URL', 'GEMMA_MODEL',
     'GEMMA_CONFIDENCE_THRESHOLD', 'GEMMA_TIMEOUT_MS',
     'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON',
@@ -199,7 +205,7 @@ describe('applyFibeSettings', () => {
     'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
   ];
   const savedEnv: Record<string, string | undefined> = {};
-  const localYml = join(process.cwd(), 'fibe.yml');
+  const localYml = join(process.cwd(), 'fibe-settings-test.yml');
 
   beforeEach(() => {
     for (const k of MANAGED_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
@@ -229,6 +235,19 @@ describe('applyFibeSettings', () => {
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ simplicate: true });
     applyFibeSettings();
     expect(process.env.SIMPLICATE).toBe('true');
+  });
+
+  test('promotes websocketMaxConnections to WEBSOCKET_MAX_CONNECTIONS', () => {
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 10 });
+    applyFibeSettings();
+    expect(process.env.WEBSOCKET_MAX_CONNECTIONS).toBe('10');
+  });
+
+  test('does NOT overwrite existing websocket env var', () => {
+    process.env.WEBSOCKET_MAX_CONNECTIONS = '4';
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 10 });
+    applyFibeSettings();
+    expect(process.env.WEBSOCKET_MAX_CONNECTIONS).toBe('4');
   });
 
   test('promotes avatar settings', () => {

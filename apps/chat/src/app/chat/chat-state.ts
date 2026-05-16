@@ -92,6 +92,11 @@ export interface ServerMessage {
   url?: string;
   code?: string;
   message?: string;
+  accepted?: boolean;
+  reason?: string;
+  error?: string;
+  action?: string;
+  conversationId?: string;
   role?: string;
   body?: string;
   created_at?: string;

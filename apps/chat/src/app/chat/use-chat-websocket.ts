@@ -216,6 +216,14 @@ export function useChatWebSocket(
         setState(CHAT_STATES.ERROR);
         onStreamAbortRef.current?.();
       },
+      control_result: (d) => {
+        if (d.accepted === false) {
+          clearResponseTimer();
+          setErrorMessage(d.reason ?? d.error ?? 'Agent control was not accepted');
+          setState(CHAT_STATES.ERROR);
+          onStreamAbortRef.current?.();
+        }
+      },
       message: (d) => {
         clearResponseTimer();
         if (d.role === 'assistant') {
