@@ -36,6 +36,13 @@ RUN --mount=type=cache,target=/root/.npm \
 
 RUN mkdir -p /root/.local/share/cursor-agent
 
+# Wrapper binary `june15`. Always installed, regardless of AGENT_PROVIDER —
+# it's a thin PTY-driven stream-JSON adapter for `claude`. Activated at
+# runtime only when CLAUDE_PATH points at it (set by the platform per-agent),
+# so non-claude images carry it unused without harm.
+RUN --mount=type=cache,target=/root/.npm \
+    npm install -g june15@latest
+
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
 FROM node:24-slim AS builder
