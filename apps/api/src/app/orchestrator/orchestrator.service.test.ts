@@ -61,7 +61,13 @@ describe('OrchestratorService', () => {
     return { service, resolved };
   }
 
-  async function createOrchestrator(localMcp?: LocalMcpService): Promise<{
+  type CreateOrchestratorOptions = {
+    systemPrompt?: string;
+    cachedSystemPromptFromFile?: string | null;
+    nativeSessionSupport?: boolean;
+  };
+
+  async function createOrchestrator(localMcp?: LocalMcpService, options: CreateOrchestratorOptions = {}): Promise<{
     orch: OrchestratorService;
     ctx: SessionContext;
     sessionRegistry: SessionRegistryService;
@@ -71,12 +77,18 @@ describe('OrchestratorService', () => {
       audioFilename: string | null;
       attachmentFilenames?: string[];
     }>;
+    strategyCalls: Array<{
+      prompt: string;
+      model: string;
+      systemPrompt?: string;
+      effort?: string;
+    }>;
   }> {
     const config = {
       getDataDir: () => dataDir,
       getConversationDataDir: () => dataDir,
       getEncryptionKey: () => undefined,
-      getSystemPrompt: () => undefined,
+      getSystemPrompt: () => options.systemPrompt,
       getModelOptions: () => [],
       getDefaultModel: () => '',
       getDefaultEffort: () => 'max',
@@ -109,26 +121,42 @@ describe('OrchestratorService', () => {
       getClaudeSessionMarker: (_id: string) => null,
       setClaudeSessionMarker: (_id: string, _sessionId: string | null) => true,
     } as unknown as import('../conversation/conversation-manager.service').ConversationManagerService;
+    const strategyCalls: Array<{
+      prompt: string;
+      model: string;
+      systemPrompt?: string;
+      effort?: string;
+    }> = [];
+    const strategy = {
+      checkAuthStatus: async () => true,
+      executeAuth: () => undefined,
+      submitAuthCode: () => undefined,
+      cancelAuth: () => undefined,
+      clearCredentials: () => undefined,
+      executeLogout: () => undefined,
+      executePromptStreaming: async (
+        prompt: string,
+        model: string,
+        onChunk: (c: string) => void,
+        _callbacks?: unknown,
+        systemPrompt?: string,
+        runtimeOptions?: { effort?: string },
+      ) => {
+        strategyCalls.push({
+          prompt,
+          model,
+          systemPrompt,
+          effort: runtimeOptions?.effort,
+        });
+        onChunk('test response');
+      },
+      ensureSettings: () => undefined,
+      interruptAgent: () => undefined,
+      hasNativeSessionSupport: () => options.nativeSessionSupport ?? true,
+      steerAgent: undefined,
+    };
     const strategyRegistry = {
-      resolveStrategy: () => ({
-        checkAuthStatus: async () => true,
-        executeAuth: () => undefined,
-        submitAuthCode: () => undefined,
-        cancelAuth: () => undefined,
-        clearCredentials: () => undefined,
-        executeLogout: () => undefined,
-        executePromptStreaming: async (
-          _p: string,
-          _m: string,
-          onChunk: (c: string) => void,
-        ) => {
-          onChunk('test response');
-        },
-        ensureSettings: () => undefined,
-        interruptAgent: () => undefined,
-        hasNativeSessionSupport: () => true,
-        steerAgent: undefined,
-      }),
+      resolveStrategy: () => strategy,
     } as unknown as import('../strategies/strategy-registry.service').StrategyRegistryService;
     const sessionRegistry = new SessionRegistryService(
       strategyRegistry as never,
@@ -198,8 +226,11 @@ describe('OrchestratorService', () => {
     );
     await orch.onModuleInit();
     const ctx = sessionRegistry.create();
+    if (options.cachedSystemPromptFromFile !== undefined) {
+      ctx.cachedSystemPromptFromFile = options.cachedSystemPromptFromFile;
+    }
     ctx.isAuthenticated = false;
-    return { orch, ctx, sessionRegistry, promptBuilds };
+    return { orch, ctx, sessionRegistry, promptBuilds, strategyCalls };
   }
 
   async function waitForIdle(ctx: SessionContext): Promise<void> {
@@ -667,6 +698,39 @@ describe('OrchestratorService', () => {
     expect(promptBuild?.imageUrls[0]).toMatch(/\.png$/);
     expect(promptBuild?.audioFilename).toBeNull();
     expect(promptBuild?.attachmentFilenames).toEqual(['notes.txt']);
+  });
+
+  test('sendMessageFromApi passes configured system prompt to the provider strategy', async () => {
+    const { orch, ctx, strategyCalls } = await createOrchestrator(undefined, {
+      systemPrompt: 'System prompt from fibe.yml',
+      cachedSystemPromptFromFile: 'Built-in fallback prompt',
+    });
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+
+    const result = await orch.sendMessageFromApi('ship it', 'default');
+
+    expect(result.accepted).toBe(true);
+    await waitForIdle(ctx);
+    expect(strategyCalls.at(-1)).toMatchObject({
+      prompt: 'ship it',
+      systemPrompt: 'System prompt from fibe.yml',
+      effort: 'max',
+    });
+  });
+
+  test('sendMessageFromApi falls back to cached system prompt file when no configured prompt exists', async () => {
+    const { orch, ctx, strategyCalls } = await createOrchestrator(undefined, {
+      cachedSystemPromptFromFile: 'Built-in fallback prompt',
+    });
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+
+    const result = await orch.sendMessageFromApi('ship it', 'default');
+
+    expect(result.accepted).toBe(true);
+    await waitForIdle(ctx);
+    expect(strategyCalls.at(-1)?.systemPrompt).toBe('Built-in fallback prompt');
   });
 
   test('sendMessageFromApi steer policy uses provider steer when available', async () => {

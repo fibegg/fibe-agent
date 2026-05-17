@@ -24,15 +24,44 @@ export interface ProviderArgsConfig {
   blockedArgs: BlockedArgs;
 }
 
+function normalizeFlagKey(key: string): string {
+  if (key.startsWith('-')) return key;
+  return key.length === 1 ? `-${key}` : `--${key}`;
+}
+
+function normalizeDefaultArgs(defaultArgs: Record<string, string | true>): Record<string, string | true> {
+  return Object.fromEntries(
+    Object.entries(defaultArgs).map(([key, value]) => [
+      normalizeFlagKey(key),
+      value === true ? true : String(value),
+    ])
+  );
+}
+
+function normalizeBlockedArgs(blockedArgs: BlockedArgs): BlockedArgs {
+  return Object.fromEntries(
+    Object.entries(blockedArgs).map(([key, value]) => [normalizeFlagKey(key), value])
+  );
+}
+
+function normalizeUserValue(value: unknown): string | true | null {
+  if (value === true) return true;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'boolean') return String(value);
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return null;
+}
+
 /**
  * Parse PROVIDER_ARGS env and merge with strategy defaults + blocked args.
  * Returns an array of CLI tokens ready to spread into spawn args.
  */
 export function buildProviderArgs(config: ProviderArgsConfig): string[] {
-  const { defaultArgs, blockedArgs } = config;
+  const defaultArgs = normalizeDefaultArgs(config.defaultArgs);
+  const blockedArgs = normalizeBlockedArgs(config.blockedArgs);
 
   // Parse env
-  let userArgs: Record<string, string | true> = {};
+  let userArgs: Record<string, unknown> = {};
   const raw = process.env.PROVIDER_ARGS;
   if (raw) {
     try {
@@ -50,9 +79,11 @@ export function buildProviderArgs(config: ProviderArgsConfig): string[] {
 
   // Apply user overrides (skip blocked keys)
   for (const [key, value] of Object.entries(userArgs)) {
-    const flag = key.startsWith('--') ? key : `--${key}`;
+    const flag = normalizeFlagKey(key);
     if (flag in blockedArgs) continue; // silently skip blocked
-    merged[flag] = value === true ? true : String(value);
+    const normalizedValue = normalizeUserValue(value);
+    if (normalizedValue === null) continue;
+    merged[flag] = normalizedValue;
   }
 
   // Enforce blocked args

@@ -2,9 +2,29 @@ import { Logger } from '@nestjs/common';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 import type { ConversationDataDirProvider } from './strategy.types';
 import { INTERRUPTED_MESSAGE, type AgentStrategy } from './strategy.types';
+import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 
 const MOCK_AUTH_DELAY_MS = 1000;
 const MOCK_LOGOUT_DELAY_MS = 500;
+const MOCK_ECHO_PROMPT_ENV = 'MOCK_ECHO_PROMPT';
+const MOCK_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
+  defaultArgs: {},
+  blockedArgs: {
+    '--dangerously-skip-permissions': false,
+    '--dangerously-bypass-approvals-and-sandbox': false,
+    '--daemon': false,
+    '--detach': false,
+    '--force': false,
+    '--format': false,
+    '--json': false,
+    '--output-format': false,
+    '--print': false,
+    '--prompt': false,
+    '--yolo': false,
+    '-d': false,
+    '-p': false,
+  },
+};
 
 export class MockStrategy implements AgentStrategy {
   private readonly logger = new Logger(MockStrategy.name);
@@ -59,11 +79,11 @@ export class MockStrategy implements AgentStrategy {
   }
 
   executePromptStreaming(
-    _prompt: string,
+    prompt: string,
     _model: string,
     onChunk: (chunk: string) => void,
     callbacks?: import('./strategy.types').StreamingCallbacks,
-    _systemPrompt?: string
+    systemPrompt?: string
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const timeoutRef: { id: ReturnType<typeof setTimeout> | null } = { id: null };
@@ -84,9 +104,17 @@ export class MockStrategy implements AgentStrategy {
       timeoutRef.id = setTimeout(() => {
         this.streamCancel = null;
         timeoutRef.id = null;
-        const timestamp = new Date().toISOString();
-        onChunk('[MOCKED RESPONSE] Hello! ');
-        onChunk(`The current timestamp is ${timestamp}`);
+        if (process.env[MOCK_ECHO_PROMPT_ENV] === 'true') {
+          onChunk('[MOCKED RESPONSE]\n');
+          onChunk(`SYSTEM_PROMPT:\n${systemPrompt ?? ''}\n`);
+          onChunk(`PROVIDER_ARGS_JSON:\n${process.env.PROVIDER_ARGS ?? '{}'}\n`);
+          onChunk(`PROVIDER_CLI_TOKENS_JSON:\n${JSON.stringify(buildProviderArgs(MOCK_PROVIDER_ARGS_CONFIG))}\n`);
+          onChunk(`PROMPT:\n${prompt}`);
+        } else {
+          const timestamp = new Date().toISOString();
+          onChunk('[MOCKED RESPONSE] Hello! ');
+          onChunk(`The current timestamp is ${timestamp}`);
+        }
         resolve();
       }, MOCK_AUTH_DELAY_MS);
     });

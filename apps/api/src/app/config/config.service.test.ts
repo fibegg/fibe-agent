@@ -21,27 +21,29 @@ describe('ConfigService', () => {
     envBackup.FIBE_SYNC_ENABLED = process.env.FIBE_SYNC_ENABLED;
     envBackup.WEBSOCKET_MAX_CONNECTIONS = process.env.WEBSOCKET_MAX_CONNECTIONS;
     envBackup.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
+    envBackup.GEMMA_ROUTER_ENABLED = process.env.GEMMA_ROUTER_ENABLED;
+    envBackup.OLLAMA_URL = process.env.OLLAMA_URL;
+    envBackup.GEMMA_MODEL = process.env.GEMMA_MODEL;
+    envBackup.GEMMA_CONFIDENCE_THRESHOLD = process.env.GEMMA_CONFIDENCE_THRESHOLD;
+    envBackup.GEMMA_TIMEOUT_MS = process.env.GEMMA_TIMEOUT_MS;
     // Clear to avoid cross-test leakage
     delete process.env.FIBE_SETTINGS_JSON;
     process.env.FIBE_SETTINGS_YAML_PATHS = join(process.cwd(), 'config-service-test-fibe.yml');
     delete process.env.FIBE_SYNC_ENABLED;
     delete process.env.WEBSOCKET_MAX_CONNECTIONS;
     delete process.env.CLAUDE_EFFORT;
+    delete process.env.GEMMA_ROUTER_ENABLED;
+    delete process.env.OLLAMA_URL;
+    delete process.env.GEMMA_MODEL;
+    delete process.env.GEMMA_CONFIDENCE_THRESHOLD;
+    delete process.env.GEMMA_TIMEOUT_MS;
   });
 
   afterEach(() => {
-    process.env.FIBE_SETTINGS_JSON = envBackup.FIBE_SETTINGS_JSON;
-    if (envBackup.FIBE_SETTINGS_YAML_PATHS === undefined) delete process.env.FIBE_SETTINGS_YAML_PATHS;
-    else process.env.FIBE_SETTINGS_YAML_PATHS = envBackup.FIBE_SETTINGS_YAML_PATHS;
-    process.env.PLAYGROUNDS_DIR = envBackup.PLAYGROUNDS_DIR;
-    process.env.FIBE_AGENT_ID = envBackup.FIBE_AGENT_ID;
-    process.env.CONVERSATION_ID = envBackup.CONVERSATION_ID;
-    process.env.FIBE_API_KEY = envBackup.FIBE_API_KEY;
-    process.env.FIBE_DOMAIN = envBackup.FIBE_DOMAIN;
-    process.env.FIBE_SYNC_ENABLED = envBackup.FIBE_SYNC_ENABLED;
-    process.env.WEBSOCKET_MAX_CONNECTIONS = envBackup.WEBSOCKET_MAX_CONNECTIONS;
-    if (envBackup.CLAUDE_EFFORT === undefined) delete process.env.CLAUDE_EFFORT;
-    else process.env.CLAUDE_EFFORT = envBackup.CLAUDE_EFFORT;
+    for (const [key, value] of Object.entries(envBackup)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   });
 
   function withSettings(settings: Record<string, unknown>): ConfigService {
@@ -280,5 +282,79 @@ describe('ConfigService', () => {
     expect(withSettings({ websocketMaxConnections: 'abc' }).getWebsocketMaxConnections()).toBe(5);
     process.env.WEBSOCKET_MAX_CONNECTIONS = '-1';
     expect(withSettings({ websocketMaxConnections: 10 }).getWebsocketMaxConnections()).toBe(5);
+  });
+
+  test('returns storage and platform routing settings from fibe settings', () => {
+    const config = withSettings({
+      encryptionKey: 'enc-key',
+      sessionDir: '/app/data/42/.codex',
+      marqueeRootDomain: 'marquee.example.test',
+    });
+
+    expect(config.getEncryptionKey()).toBe('enc-key');
+    expect(config.getSessionDir()).toBe('/app/data/42/.codex');
+    expect(config.getMarqueeRootDomain()).toBe('marquee.example.test');
+  });
+
+  test('returns MCP config and cascade settings from fibe settings', () => {
+    const mcpConfig = { mcpServers: { fibe: { command: 'fibe' } } };
+    const providerArgs = {
+      sandbox: false,
+      'max-tokens': 4096,
+      temperature: 0.2,
+      config: 'value with spaces',
+      c: 'never',
+    };
+    const skillToggles = { 'fibe-hunks.md': false };
+    const config = withSettings({
+      mcpConfig,
+      providerArgs,
+      cliVersion: 'v1.2.3',
+      skillToggles,
+      syscheckEnabled: false,
+    });
+
+    expect(config.getMcpConfig()).toEqual(mcpConfig);
+    expect(config.getProviderArgs()).toEqual(providerArgs);
+    expect(config.getCliVersion()).toBe('v1.2.3');
+    expect(config.getSkillToggles()).toEqual(skillToggles);
+    expect(config.isSyscheckEnabled()).toBe(false);
+  });
+
+  test('isSyscheckEnabled defaults to true unless settings explicitly disable it', () => {
+    expect(new ConfigService().isSyscheckEnabled()).toBe(true);
+    expect(withSettings({ syscheckEnabled: true }).isSyscheckEnabled()).toBe(true);
+  });
+
+  test('returns Gemma router settings from fibe settings with bounds applied', () => {
+    const config = withSettings({
+      gemmaRouterEnabled: true,
+      ollamaUrl: 'http://ollama:11434',
+      gemmaModel: 'gemma3:12b',
+      gemmaConfidenceThreshold: 1.5,
+      gemmaTimeoutMs: 250,
+    });
+
+    expect(config.isGemmaRouterEnabled()).toBe(true);
+    expect(config.getGemmaUrl()).toBe('http://ollama:11434');
+    expect(config.getGemmaModel()).toBe('gemma3:12b');
+    expect(config.getGemmaConfidenceThreshold()).toBe(1);
+    expect(config.getGemmaTimeoutMs()).toBe(500);
+  });
+
+  test('returns Gemma router env fallbacks when settings are absent', () => {
+    process.env.GEMMA_ROUTER_ENABLED = 'true';
+    process.env.OLLAMA_URL = 'http://env-ollama:11434';
+    process.env.GEMMA_MODEL = 'env-gemma';
+    process.env.GEMMA_CONFIDENCE_THRESHOLD = '0.45';
+    process.env.GEMMA_TIMEOUT_MS = '1500';
+
+    const config = new ConfigService();
+
+    expect(config.isGemmaRouterEnabled()).toBe(true);
+    expect(config.getGemmaUrl()).toBe('http://env-ollama:11434');
+    expect(config.getGemmaModel()).toBe('env-gemma');
+    expect(config.getGemmaConfidenceThreshold()).toBe(0.45);
+    expect(config.getGemmaTimeoutMs()).toBe(1500);
   });
 });

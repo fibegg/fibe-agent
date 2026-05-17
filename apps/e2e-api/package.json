@@ -18,7 +18,7 @@
       "e2e": {
         "executor": "nx:run-commands",
         "options": {
-          "command": "sh -c '(cd ../api && node dist/main.js) & sleep 3 && bun test --preload ./src/support/test-setup.ts'",
+          "command": "sh -c 'rm -rf /tmp/fibe-agent-e2e-yaml /tmp/fibe-agent-e2e-playground; mkdir -p /tmp/fibe-agent-e2e-playground; export PORT=\"${PORT:-3334}\" FIBE_SETTINGS_YAML_PATHS=../e2e-api/fixtures/fibe-settings.e2e.yml PLAYGROUNDS_DIR=/tmp/fibe-agent-e2e-playground MOCK_ECHO_PROMPT=true NODE_ENV=production; (cd ../api && node dist/main.js) & sleep 3 && bun test --preload ./src/support/test-setup.ts'",
           "cwd": "apps/e2e-api"
         },
         "dependsOn": [

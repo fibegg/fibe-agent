@@ -1,0 +1,67 @@
+agentPassword: e2e-agent-pass
+agentProvider: mock
+agentAuthMode: password
+modelOptions:
+  - e2e-small
+  - e2e-large
+defaultModel: e2e-small
+claudeEffort: high
+dataDir: /tmp/fibe-agent-e2e-yaml
+conversationId: e2e-defaults
+systemPrompt: E2E system prompt from fibe.yml
+fibeSyncEnabled: true
+postInitScript: |
+  printf 'PROVIDER_ARGS=%s\n' "$PROVIDER_ARGS"
+  printf 'FIBE_CLI_VERSION=%s\n' "$FIBE_CLI_VERSION"
+  printf 'SKILL_TOGGLES=%s\n' "$SKILL_TOGGLES"
+  printf 'SYSCHECK_ENABLED=%s\n' "$SYSCHECK_ENABLED"
+  printf 'MCP_CONFIG_JSON=%s\n' "$MCP_CONFIG_JSON"
+  printf 'ASK_USER_TIMEOUT_MS=%s\n' "$ASK_USER_TIMEOUT_MS"
+  printf 'GEMMA_ROUTER_ENABLED=%s\n' "$GEMMA_ROUTER_ENABLED"
+  printf 'GEMMA_MODEL=%s\n' "$GEMMA_MODEL"
+  printf 'GEMMA_CONFIDENCE_THRESHOLD=%s\n' "$GEMMA_CONFIDENCE_THRESHOLD"
+  printf 'GEMMA_TIMEOUT_MS=%s\n' "$GEMMA_TIMEOUT_MS"
+  printf 'LOCK_CHAT_MODEL=%s\n' "$LOCK_CHAT_MODEL"
+  printf 'CORS_ORIGINS=%s\n' "$CORS_ORIGINS"
+cliVersion: 0.78.0-e2e
+providerArgs:
+  sandbox: workspace-write
+  approval-mode: never
+  max-turns: 7
+  max-tokens: 4096
+  temperature: 0.2
+  dry-run: false
+  config: value with spaces
+  c: never
+  verbose: true
+  bare: true
+  label: value with spaces
+  retries: -3
+  p: blocked-prompt-value
+  dangerously-skip-permissions: true
+  yolo: true
+  prompt: blocked-long-prompt-value
+  json: true
+  output-format: stream-json
+skillToggles:
+  fibe-hunks.md: false
+  fibe-planning.md: true
+syscheckEnabled: false
+mcpConfig:
+  mcpServers:
+    local-fixture:
+      command: node
+      args:
+        - fixture-server.js
+askUserTimeoutMs: 3456
+gemmaRouterEnabled: true
+ollamaUrl: http://localhost:11434
+gemmaModel: gemma-e2e
+gemmaConfidenceThreshold: 0.42
+gemmaTimeoutMs: 1234
+userAvatarUrl: https://example.test/user.png
+assistantAvatarBase64: data:image/png;base64,ZmliZQ==
+lockChatModel: true
+simplicate: true
+corsOrigins: http://localhost:3100,http://example.test
+frameAncestors: "'self',http://localhost:3100"

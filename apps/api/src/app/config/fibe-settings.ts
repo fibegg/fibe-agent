@@ -141,8 +141,8 @@ function readJson(): Record<string, unknown> {
  */
 function promoteToEnv(s: FibeSettings): void {
   // Only set if the env var is not already present
-  const set = (key: string, value: string | undefined): void => {
-    if (value !== undefined && !process.env[key]) process.env[key] = value;
+  const set = (key: string, value: string | null | undefined): void => {
+    if (value !== undefined && value !== null && !process.env[key]) process.env[key] = value;
   };
   const bool = (v: boolean) => (v ? 'true' : 'false');
 

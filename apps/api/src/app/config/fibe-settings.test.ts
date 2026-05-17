@@ -188,6 +188,8 @@ describe('applyFibeSettings', () => {
     'FIBE_SETTINGS_JSON',
     'FIBE_SETTINGS_YAML_PATHS',
     'AGENT_PROVIDER', 'AGENT_PASSWORD', 'AGENT_AUTH_MODE', 'MODEL_OPTIONS', 'DEFAULT_MODEL', 'CLAUDE_EFFORT',
+    'DATA_DIR', 'SESSION_DIR', 'SYSTEM_PROMPT', 'ENCRYPTION_KEY', 'FIBE_AGENT_ID', 'CONVERSATION_ID',
+    'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN', 'FIBE_API_KEY', 'POST_INIT_SCRIPT',
     'USER_AVATAR_URL', 'USER_AVATAR_BASE64',
     'ASSISTANT_AVATAR_URL', 'ASSISTANT_AVATAR_BASE64',
     'LOCK_CHAT_MODEL', 'SIMPLICATE',
@@ -195,9 +197,8 @@ describe('applyFibeSettings', () => {
     'GEMMA_ROUTER_ENABLED', 'OLLAMA_URL', 'GEMMA_MODEL',
     'GEMMA_CONFIDENCE_THRESHOLD', 'GEMMA_TIMEOUT_MS',
     'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON',
-    'FIBE_SYNC_ENABLED', 'DATA_DIR', 'SESSION_DIR', 'FIBE_API_KEY',
+    'FIBE_SYNC_ENABLED',
     'CORS_ORIGINS', 'FRAME_ANCESTORS',
-    'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN',
     'FIBE_CLI_VERSION', 'PROVIDER_ARGS', 'SKILL_TOGGLES', 'SYSCHECK_ENABLED',
     'AGENT_CREDENTIALS_JSON', 'AGENT_RUNTIME_FILES_JSON',
     // Credential env keys injected from credentialEnv
@@ -223,6 +224,111 @@ describe('applyFibeSettings', () => {
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock' });
     applyFibeSettings();
     expect(process.env.AGENT_PROVIDER).toBe('mock');
+  });
+
+  test('promotes the complete fibe.yml settings object to runtime env vars', () => {
+    writeFileSync(localYml, [
+      'agentPassword: pass',
+      'agentProvider: gemini',
+      'agentAuthMode: api-token',
+      'modelOptions:',
+      '  - flash-lite',
+      '  - flash',
+      'defaultModel: flash',
+      'claudeEffort: high',
+      'dataDir: /app/data',
+      'sessionDir: /app/data/42/.gemini',
+      'systemPrompt: Use the repo rules.',
+      'encryptionKey: enc-key',
+      'fibeAgentId: agent-42',
+      'conversationId: conversation-42',
+      'marqueeRoot: /opt/fibe',
+      'marqueeRootDomain: example.test',
+      'fibeApiKey: fibe-key',
+      'fibeSyncEnabled: true',
+      'postInitScript: echo ready',
+      'corsOrigins: https://app.example.test',
+      'frameAncestors: https://frame.example.test',
+      'cliVersion: v1.2.3',
+      'providerArgs:',
+      '  sandbox: false',
+      '  max-tokens: 4096',
+      '  temperature: 0.2',
+      '  config: value with spaces',
+      '  c: never',
+      'skillToggles:',
+      '  fibe-hunks.md: false',
+      'syscheckEnabled: false',
+      'agentCredentials:',
+      '  auth.json: "{}"',
+      'agentRuntimeFiles:',
+      '  version: 1',
+      '  files:',
+      '    - path: /app/data/42/.gemini/settings.json',
+      '      format: json',
+      '      content:',
+      '        theme: monokai',
+      'credentialEnv:',
+      '  GEMINI_API_KEY: gemini-key',
+      'mcpConfig:',
+      '  mcpServers:',
+      '    fibe:',
+      '      command: fibe',
+      'askUserTimeoutMs: 1234',
+      'gemmaRouterEnabled: true',
+      'ollamaUrl: http://ollama:11434',
+      'gemmaModel: gemma3:12b',
+      'gemmaConfidenceThreshold: 0.65',
+      'gemmaTimeoutMs: 9876',
+      'userAvatarUrl: https://example.test/user.png',
+      'userAvatarBase64: user-base64',
+      'assistantAvatarUrl: https://example.test/bot.png',
+      'assistantAvatarBase64: assistant-base64',
+      'lockChatModel: true',
+      'simplicate: true',
+    ].join('\n') + '\n');
+
+    applyFibeSettings();
+
+    expect(process.env.AGENT_PASSWORD).toBe('pass');
+    expect(process.env.AGENT_PROVIDER).toBe('gemini');
+    expect(process.env.AGENT_AUTH_MODE).toBe('api-token');
+    expect(process.env.MODEL_OPTIONS).toBe('flash-lite,flash');
+    expect(process.env.DEFAULT_MODEL).toBe('flash');
+    expect(process.env.CLAUDE_EFFORT).toBe('high');
+    expect(process.env.DATA_DIR).toBe('/app/data');
+    expect(process.env.SESSION_DIR).toBe('/app/data/42/.gemini');
+    expect(process.env.SYSTEM_PROMPT).toBe('Use the repo rules.');
+    expect(process.env.ENCRYPTION_KEY).toBe('enc-key');
+    expect(process.env.FIBE_AGENT_ID).toBe('agent-42');
+    expect(process.env.CONVERSATION_ID).toBe('conversation-42');
+    expect(process.env.MARQUEE_ROOT).toBe('/opt/fibe');
+    expect(process.env.MARQUEE_ROOT_DOMAIN).toBe('example.test');
+    expect(process.env.FIBE_API_KEY).toBe('fibe-key');
+    expect(process.env.FIBE_SYNC_ENABLED).toBe('true');
+    expect(process.env.POST_INIT_SCRIPT).toBe('echo ready');
+    expect(process.env.CORS_ORIGINS).toBe('https://app.example.test');
+    expect(process.env.FRAME_ANCESTORS).toBe('https://frame.example.test');
+    expect(process.env.FIBE_CLI_VERSION).toBe('v1.2.3');
+    expect(process.env.PROVIDER_ARGS).toBe('{"sandbox":false,"max-tokens":4096,"temperature":0.2,"config":"value with spaces","c":"never"}');
+    expect(process.env.SKILL_TOGGLES).toBe('{"fibe-hunks.md":false}');
+    expect(process.env.SYSCHECK_ENABLED).toBe('false');
+    expect(process.env.AGENT_CREDENTIALS_JSON).toBe('{"auth.json":"{}"}');
+    expect(process.env.AGENT_RUNTIME_FILES_JSON).toBe('{"version":1,"files":[{"path":"/app/data/42/.gemini/settings.json","format":"json","content":{"theme":"monokai"}}]}');
+    expect(process.env.GEMINI_API_KEY).toBe('gemini-key');
+    expect(process.env.MCP_CONFIG_JSON).toBe('{"mcpServers":{"fibe":{"command":"fibe"}}}');
+    expect(process.env.ASK_USER_TIMEOUT_MS).toBe('1234');
+    expect(process.env.GEMMA_ROUTER_ENABLED).toBe('true');
+    expect(process.env.OLLAMA_URL).toBe('http://ollama:11434');
+    expect(process.env.GEMMA_MODEL).toBe('gemma3:12b');
+    expect(process.env.GEMMA_CONFIDENCE_THRESHOLD).toBe('0.65');
+    expect(process.env.GEMMA_TIMEOUT_MS).toBe('9876');
+    expect(process.env.USER_AVATAR_URL).toBe('https://example.test/user.png');
+    expect(process.env.USER_AVATAR_BASE64).toBe('user-base64');
+    expect(process.env.ASSISTANT_AVATAR_URL).toBe('https://example.test/bot.png');
+    expect(process.env.ASSISTANT_AVATAR_BASE64).toBe('assistant-base64');
+    expect(process.env.LOCK_CHAT_MODEL).toBe('true');
+    expect(process.env.SIMPLICATE).toBe('true');
   });
 
   test('promotes lockChatModel to LOCK_CHAT_MODEL', () => {
@@ -290,6 +396,13 @@ describe('applyFibeSettings', () => {
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock' });
     applyFibeSettings();
     expect(process.env.AGENT_PROVIDER).toBe('claude-code');
+  });
+
+  test('does not promote null YAML values as string "null"', () => {
+    writeFileSync(localYml, 'agentProvider: null\nsystemPrompt: null\n');
+    applyFibeSettings();
+    expect(process.env.AGENT_PROVIDER).toBeUndefined();
+    expect(process.env.SYSTEM_PROMPT).toBeUndefined();
   });
 
   test('promotes Gemma router settings', () => {
