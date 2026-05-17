@@ -540,6 +540,52 @@ describe('MessageList', () => {
     });
   });
 
+  it('focuses exact message id before timestamp fallback', async () => {
+    const ref = createRef<MessageListHandle | null>();
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
+      configurable: true,
+      value: scrollIntoView,
+    });
+    const messages: ChatMessage[] = [
+      {
+        id: 'older',
+        role: 'assistant',
+        body: 'Older',
+        created_at: '2025-03-11T12:00:00.000Z',
+      },
+      {
+        id: 'target',
+        role: 'assistant',
+        body: 'Target',
+        created_at: '2025-03-11T12:05:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList
+        ref={ref}
+        messages={messages}
+        streamingText=""
+        isStreaming={false}
+      />,
+    );
+
+    act(() => {
+      const handle = ref.current;
+      if (handle) {
+        handle.scrollToMessage({
+          messageId: 'target',
+          timestamp: '2025-03-11T12:00:00.000Z',
+        });
+      }
+    });
+
+    await waitFor(() => {
+      const target = container.querySelector('[data-message-id="target"]');
+      expect(target?.className).toContain('bg-violet-500/10');
+    });
+  });
+
   const NO_OUTPUT_BODY =
     'Process completed successfully but returned no output.';
 

@@ -33,8 +33,9 @@ vi.mock('../api-url', () => ({
   buildApiUrl: vi.fn().mockImplementation((p: string) => p),
 }));
 
-const { mockScrollToBottom } = vi.hoisted(() => ({
+const { mockScrollToBottom, mockScrollToMessage } = vi.hoisted(() => ({
   mockScrollToBottom: vi.fn(),
+  mockScrollToMessage: vi.fn(),
 }));
 
 vi.mock('../chat/use-chat-websocket', () => ({
@@ -237,7 +238,14 @@ vi.mock('../chat/use-scroll-to-bottom', () => ({
 
 // Mock heavy UI components
 vi.mock('../chat/message-list', () => ({
-  MessageList: React.forwardRef(() => <div data-testid="message-list" />),
+  MessageList: React.forwardRef((_, ref) => {
+    React.useImperativeHandle(ref, () => ({
+      scrollToBottom: vi.fn(),
+      scrollToMessage: mockScrollToMessage,
+      scrollToTimestamp: vi.fn(),
+    }));
+    return <div data-testid="message-list" />;
+  }),
 }));
 
 vi.mock('../file-explorer/file-explorer', () => ({
@@ -458,6 +466,47 @@ describe('ChatPage', () => {
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
     expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
+  });
+
+  it('focuses a posted message id in the active conversation', async () => {
+    vi.mocked(useConversations).mockReturnValue({
+      conversations: [
+        {
+          id: 'thread-1',
+          title: 'Thread 1',
+          createdAt: '2026-05-17T12:00:00.000Z',
+          lastMessageAt: '2026-05-17T12:00:00.000Z',
+        },
+      ],
+      loading: false,
+      activeId: 'thread-1',
+      create: vi.fn().mockResolvedValue('thread-new'),
+      rename: vi.fn(),
+      autoTitle: vi.fn(),
+      remove: vi.fn(),
+      switchTo: vi.fn(),
+      refresh: vi.fn(),
+    });
+
+    render(<ChatPage />, { wrapper });
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          type: 'fibe_focus_message_by_timestamp',
+          messageId: 'runtime-message-1',
+          timestamp: '2026-05-17T12:00:00.000Z',
+          conversationId: 'thread-1',
+        },
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockScrollToMessage).toHaveBeenCalledWith({
+        messageId: 'runtime-message-1',
+        timestamp: '2026-05-17T12:00:00.000Z',
+      });
+    });
   });
 
   it('shows a desktop expand arrow for the compact file browser', () => {

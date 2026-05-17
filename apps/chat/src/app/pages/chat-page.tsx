@@ -118,8 +118,9 @@ interface RuntimeConfigResponse {
   simplicate?: boolean;
 }
 
-interface PendingTimestampFocus {
-  timestamp: string;
+interface PendingMessageFocus {
+  messageId?: string;
+  timestamp?: string;
   conversationId: string;
   requestId?: string;
 }
@@ -525,8 +526,8 @@ export function ChatPage() {
   const messageListRef = useRef<MessageListHandle | null>(null);
   const activeConversationIdRef = useRef(activeConversationId);
   const conversationsRef = useRef(conversations);
-  const [pendingTimestampFocus, setPendingTimestampFocus] =
-    useState<PendingTimestampFocus | null>(null);
+  const [pendingMessageFocus, setPendingMessageFocus] =
+    useState<PendingMessageFocus | null>(null);
   const [workingStartedAt, setWorkingStartedAt] = useState<number | null>(null);
   const [workingNow, setWorkingNow] = useState(() => Date.now());
 
@@ -780,7 +781,9 @@ export function ChatPage() {
 
       const timestamp =
         typeof data.timestamp === 'string' ? data.timestamp : '';
-      if (!Number.isFinite(Date.parse(timestamp))) return;
+      const messageId =
+        typeof data.messageId === 'string' ? data.messageId.trim() : '';
+      if (!messageId && !Number.isFinite(Date.parse(timestamp))) return;
 
       const requestedConversationId =
         typeof data.conversationId === 'string' && data.conversationId.trim()
@@ -796,8 +799,9 @@ export function ChatPage() {
       setSearchQuery('');
       setViewingFile(null);
       setServicePreviewOpen(false);
-      setPendingTimestampFocus({
-        timestamp,
+      setPendingMessageFocus({
+        messageId: messageId || undefined,
+        timestamp: timestamp || undefined,
         conversationId: requestedConversationId,
         requestId:
           typeof data.requestId === 'string' ? data.requestId : undefined,
@@ -812,40 +816,43 @@ export function ChatPage() {
   }, [setSearchQuery, switchConversation]);
 
   useEffect(() => {
-    if (!pendingTimestampFocus) return;
+    if (!pendingMessageFocus) return;
 
     const conversationKnown = conversations.some(
-      (c) => c.id === pendingTimestampFocus.conversationId,
+      (c) => c.id === pendingMessageFocus.conversationId,
     );
     if (
       !conversationsLoading &&
       conversations.length > 0 &&
       !conversationKnown
     ) {
-      setPendingTimestampFocus(null);
+      setPendingMessageFocus(null);
       return;
     }
 
-    if (activeConversationId !== pendingTimestampFocus.conversationId) {
-      switchConversation(pendingTimestampFocus.conversationId);
+    if (activeConversationId !== pendingMessageFocus.conversationId) {
+      switchConversation(pendingMessageFocus.conversationId);
       return;
     }
 
     if (messagesLoadError) {
-      setPendingTimestampFocus(null);
+      setPendingMessageFocus(null);
       return;
     }
     if (!messagesLoaded) return;
 
-    messageListRef.current?.scrollToTimestamp(pendingTimestampFocus.timestamp);
-    setPendingTimestampFocus(null);
+    messageListRef.current?.scrollToMessage({
+      messageId: pendingMessageFocus.messageId,
+      timestamp: pendingMessageFocus.timestamp,
+    });
+    setPendingMessageFocus(null);
   }, [
     activeConversationId,
     conversations,
     conversationsLoading,
     messagesLoaded,
     messagesLoadError,
-    pendingTimestampFocus,
+    pendingMessageFocus,
     switchConversation,
   ]);
 

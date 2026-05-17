@@ -643,7 +643,13 @@ const MessageRow = memo(
 
 export interface MessageListHandle {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
+  scrollToMessage: (request: MessageFocusRequest) => boolean;
   scrollToTimestamp: (timestamp: string) => boolean;
+}
+
+export interface MessageFocusRequest {
+  messageId?: string;
+  timestamp?: string;
 }
 
 export interface MessageListProps {
@@ -739,36 +745,10 @@ export const MessageList = forwardRef<
     [lastIndex, virtualizer],
   );
 
-  const scrollToTimestamp = useCallback(
-    (timestamp: string): boolean => {
-      const targetTime = Date.parse(timestamp);
-      if (!Number.isFinite(targetTime) || messages.length === 0) return false;
-
-      let beforeIndex = -1;
-      let beforeTime = Number.NEGATIVE_INFINITY;
-      let nearestIndex = -1;
-      let nearestDistance = Number.POSITIVE_INFINITY;
-
-      messages.forEach((item, index) => {
-        if (isResetSeparator(item)) return;
-        const time = messageTimeMs(item);
-        if (time === null) return;
-        if (time <= targetTime && time >= beforeTime) {
-          beforeIndex = index;
-          beforeTime = time;
-        }
-        const distance = Math.abs(time - targetTime);
-        if (distance < nearestDistance) {
-          nearestIndex = index;
-          nearestDistance = distance;
-        }
-      });
-
-      const index = beforeIndex >= 0 ? beforeIndex : nearestIndex;
-      if (index < 0) return false;
-
+  const focusMessageAtIndex = useCallback(
+    (index: number): boolean => {
       const item = messages[index];
-      if (isResetSeparator(item)) return false;
+      if (!item || isResetSeparator(item)) return false;
       const anchorId = messageAnchorId(item, index);
       setFocusedAnchorId(anchorId);
       if (focusClearTimerRef.current) clearTimeout(focusClearTimerRef.current);
@@ -797,10 +777,60 @@ export const MessageList = forwardRef<
     [messages, scrollRef, virtualizer],
   );
 
-  useImperativeHandle(ref, () => ({ scrollToBottom, scrollToTimestamp }), [
-    scrollToBottom,
-    scrollToTimestamp,
-  ]);
+  const scrollToMessage = useCallback(
+    (request: MessageFocusRequest): boolean => {
+      const messageId = request.messageId?.trim();
+      if (messageId) {
+        const exactIndex = messages.findIndex(
+          (item) => !isResetSeparator(item) && item.id === messageId,
+        );
+        if (exactIndex >= 0) return focusMessageAtIndex(exactIndex);
+      }
+
+      const timestamp = request.timestamp?.trim() ?? '';
+      const targetTime = Date.parse(timestamp);
+      if (!Number.isFinite(targetTime) || messages.length === 0) return false;
+
+      let beforeIndex = -1;
+      let beforeTime = Number.NEGATIVE_INFINITY;
+      let nearestIndex = -1;
+      let nearestDistance = Number.POSITIVE_INFINITY;
+
+      messages.forEach((item, index) => {
+        if (isResetSeparator(item)) return;
+        const time = messageTimeMs(item);
+        if (time === null) return;
+        if (time <= targetTime && time >= beforeTime) {
+          beforeIndex = index;
+          beforeTime = time;
+        }
+        const distance = Math.abs(time - targetTime);
+        if (distance < nearestDistance) {
+          nearestIndex = index;
+          nearestDistance = distance;
+        }
+      });
+
+      const index = beforeIndex >= 0 ? beforeIndex : nearestIndex;
+      if (index < 0) return false;
+
+      return focusMessageAtIndex(index);
+    },
+    [focusMessageAtIndex, messages],
+  );
+
+  const scrollToTimestamp = useCallback(
+    (timestamp: string): boolean => {
+      return scrollToMessage({ timestamp });
+    },
+    [scrollToMessage],
+  );
+
+  useImperativeHandle(
+    ref,
+    () => ({ scrollToBottom, scrollToMessage, scrollToTimestamp }),
+    [scrollToBottom, scrollToMessage, scrollToTimestamp],
+  );
 
   useEffect(() => {
     return () => {
