@@ -2,7 +2,7 @@ import { Injectable, Logger, Optional } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { FibeSyncSettingsStoreService } from './fibe-sync-settings-store.service';
 
-type SyncType = 'messages' | 'activity' | 'raw_providers';
+type SyncType = 'messages' | 'activity' | 'provider_traffic';
 
 interface PendingSync {
   type: SyncType;
@@ -36,7 +36,7 @@ export class FibeSyncService {
   }
 
   syncRawProviders(getContent: () => string, conversationId?: string): void {
-    this.scheduleSync('raw_providers', getContent, conversationId);
+    this.scheduleSync('provider_traffic', getContent, conversationId);
   }
 
   onModuleDestroy(): void {

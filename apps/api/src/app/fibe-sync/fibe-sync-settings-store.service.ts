@@ -39,7 +39,7 @@ export class FibeSyncSettingsStoreService {
     return this.get();
   }
 
-  isEnabled(type: 'messages' | 'activity' | 'raw_providers'): boolean {
+  isEnabled(type: 'messages' | 'activity' | 'provider_traffic'): boolean {
     if (type === 'messages') return this.settings.messages;
     if (type === 'activity') return this.settings.activity;
     return this.settings.rawProviders;

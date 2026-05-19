@@ -101,7 +101,7 @@ describe('FibeSyncService', () => {
     }
   });
 
-  test('syncRawProviders makes PUT request with raw_providers endpoint', async () => {
+  test('syncRawProviders makes PUT request with provider_traffic endpoint', async () => {
     mockConfig.isFibeSyncEnabled = () => true;
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';
     mockConfig.getFibeApiKey = () => 'key123';
@@ -119,7 +119,7 @@ describe('FibeSyncService', () => {
       await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
-        'https://fibe.test/api/agents/agent-1/raw_providers',
+        'https://fibe.test/api/agents/agent-1/provider_traffic',
         expect.objectContaining({
           method: 'PUT',
           body: JSON.stringify({ content: '[{"id":"raw-1"}]', conversation_id: 'default' }),
