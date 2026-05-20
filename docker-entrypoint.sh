@@ -16,6 +16,31 @@ DEV_DEPS_LOCK_DIR="${DEV_DEPS_LOCK_DIR:-/app/.nx/dev-deps-install.lock}"
 DEV_DEPS_LOCK_TIMEOUT_SECONDS="${DEV_DEPS_LOCK_TIMEOUT_SECONDS:-600}"
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
 
+start_secret_service() {
+  [ "${AGENT_PROVIDER:-}" = "antigravity" ] || [ -n "${ANTIGRAVITY_HOME:-}" ] || return 0
+  command -v dbus-launch >/dev/null 2>&1 || return 0
+
+  if [ -z "${XDG_RUNTIME_DIR:-}" ]; then
+    export XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"
+  fi
+  mkdir -p "$XDG_RUNTIME_DIR"
+  chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true
+
+  if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then
+    eval "$(dbus-launch --sh-syntax)"
+    export DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID
+  fi
+
+  if command -v gnome-keyring-daemon >/dev/null 2>&1; then
+    printf '\n' | gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1 || true
+    gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1 || true
+  fi
+}
+
+secret_service_setup_command() {
+  printf '%s' 'if { [ "${AGENT_PROVIDER:-}" = "antigravity" ] || [ -n "${ANTIGRAVITY_HOME:-}" ]; } && command -v dbus-launch >/dev/null 2>&1; then if [ -z "${XDG_RUNTIME_DIR:-}" ]; then export XDG_RUNTIME_DIR="/tmp/runtime-$(id -u)"; fi; mkdir -p "$XDG_RUNTIME_DIR"; chmod 700 "$XDG_RUNTIME_DIR" 2>/dev/null || true; if [ -z "${DBUS_SESSION_BUS_ADDRESS:-}" ]; then eval "$(dbus-launch --sh-syntax)"; export DBUS_SESSION_BUS_ADDRESS DBUS_SESSION_BUS_PID; fi; if command -v gnome-keyring-daemon >/dev/null 2>&1; then printf "\n" | gnome-keyring-daemon --unlock --components=secrets >/dev/null 2>&1 || true; gnome-keyring-daemon --start --components=secrets >/dev/null 2>&1 || true; fi; fi'
+}
+
 fix_file_limits() {
   mkdir -p /etc/security/limits.d
   printf '*  soft  nofile  1048576\n*  hard  nofile  1048576\n' > /etc/security/limits.d/99-nofile.conf
@@ -152,6 +177,7 @@ prepare_runtime_home() {
   runtime_home="$1"
   [ "$(id -u)" = "0" ] || return
 
+  runtime_antigravity_home="${ANTIGRAVITY_HOME:-}"
   runtime_config_home="${XDG_CONFIG_HOME:-$runtime_home/.config}"
   runtime_data_home="${XDG_DATA_HOME:-$runtime_home/.local/share}"
   runtime_state_home="${XDG_STATE_HOME:-$runtime_home/.local/state}"
@@ -165,6 +191,10 @@ prepare_runtime_home() {
     "$runtime_cache_home" \
     "$runtime_home/.claude" \
     "$runtime_home/claude_workspace"
+
+  if [ -n "$runtime_antigravity_home" ]; then
+    mkdir -p "$runtime_antigravity_home"
+  fi
 
   for path in \
     "$runtime_home" \
@@ -180,6 +210,10 @@ prepare_runtime_home() {
     "$runtime_home/claude_workspace/.mcp.json"; do
     ensure_node_owns_path "$path"
   done
+
+  if [ -n "$runtime_antigravity_home" ]; then
+    ensure_node_owns_tree "$runtime_antigravity_home"
+  fi
 }
 
 run_dev_command() {
@@ -191,7 +225,7 @@ run_dev_command() {
 
   if [ "$(id -u)" = "0" ]; then
     prepare_runtime_home "$runtime_home"
-    exec su node -c "export HOME=${runtime_home} PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
+    exec su node -c "export HOME=${runtime_home} PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; $(secret_service_setup_command); cd /app && ${command}"
   fi
 
   exec sh -c "export HOME=${runtime_home} PATH=${RUNTIME_FIBE_BIN_DIR}:\$PATH; cd /app && ${command}"
@@ -256,6 +290,7 @@ ensure_runtime_fibe
 if [ -f /app/dist/main.js ]; then
   # ── PRODUCTION: pre-built image, just run the compiled bundle ──────────────
   echo "[entrypoint] dist/main.js found — starting production server"
+  start_secret_service
   exec node /app/dist/main.js
 else
   # ── DEVELOPMENT: source code is mounted, dist/ is absent ──────────────────

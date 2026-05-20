@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { containerLog } from './container-logger';
 
 const CREDENTIALS_CONTEXT = 'Credentials';
+const BASE64_CREDENTIAL_PREFIX = '__fibe_base64__:';
 
 /**
  * Loads pre-authenticated credentials from AGENT_CREDENTIALS_JSON.
@@ -25,9 +26,9 @@ export function loadInjectedCredentials(): boolean {
     return false;
   }
 
-  let credentialFiles: Record<string, string>;
+  let credentialFiles: Record<string, unknown>;
   try {
-    credentialFiles = JSON.parse(raw) as Record<string, string>;
+    credentialFiles = JSON.parse(raw) as Record<string, unknown>;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     containerLog.error(`Failed to parse AGENT_CREDENTIALS_JSON: ${message}`, CREDENTIALS_CONTEXT);
@@ -59,18 +60,19 @@ export function loadInjectedCredentials(): boolean {
 
   let injectedCount = 0;
   for (const [filename, content] of entries) {
-    const safeName = path.basename(filename);
-    if (safeName !== filename) {
+    const targetPath = resolveCredentialPath(sessionDir, filename);
+    if (!targetPath) {
       containerLog.warn(`Skipping suspicious filename: ${filename}`, CREDENTIALS_CONTEXT);
       continue;
     }
     try {
-      fs.writeFileSync(path.join(sessionDir, safeName), content, { mode: 0o600 });
+      fs.mkdirSync(path.dirname(targetPath), { recursive: true });
+      fs.writeFileSync(targetPath, credentialContentBuffer(content), { mode: 0o600 });
       injectedCount++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       containerLog.error(
-        `Failed to write ${path.join(sessionDir, safeName)}: ${message}`,
+        `Failed to write ${targetPath}: ${message}`,
         CREDENTIALS_CONTEXT
       );
     }
@@ -83,4 +85,23 @@ export function loadInjectedCredentials(): boolean {
     );
   }
   return injectedCount > 0;
+}
+
+function credentialContentBuffer(content: unknown): Buffer | string {
+  const value = String(content ?? '');
+  if (!value.startsWith(BASE64_CREDENTIAL_PREFIX)) return value;
+
+  return Buffer.from(value.slice(BASE64_CREDENTIAL_PREFIX.length), 'base64');
+}
+
+function resolveCredentialPath(sessionDir: string, filename: string): string | null {
+  const normalizedName = String(filename || '').replace(/\\/g, '/');
+  if (!normalizedName || path.isAbsolute(normalizedName)) return null;
+
+  const rootPath = path.resolve(sessionDir);
+  const targetPath = path.resolve(rootPath, normalizedName);
+  if (targetPath === rootPath) return null;
+  if (!targetPath.startsWith(`${rootPath}${path.sep}`)) return null;
+
+  return targetPath;
 }

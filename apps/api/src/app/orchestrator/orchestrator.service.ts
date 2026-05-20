@@ -1090,6 +1090,10 @@ export class OrchestratorService implements OnModuleInit {
       );
       const model = this.effectiveModel();
       const effort = this.effectiveEffort();
+      const previousAssistantMessages = this.stores(ctx).messageStore
+        .all()
+        .filter((message) => message.role === 'assistant')
+        .map((message) => message.body);
       // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(
         ctx.conversationId,
@@ -1174,7 +1178,7 @@ export class OrchestratorService implements OnModuleInit {
         },
         callbacks,
         systemPrompt || undefined,
-        { effort },
+        { effort, previousAssistantMessages },
       );
       ctx.pendingSteerRestart = false;
       emitVisibleChunk(modeTriggerStream.flush());

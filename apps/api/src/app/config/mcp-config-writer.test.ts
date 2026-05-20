@@ -169,6 +169,58 @@ describe('writeMcpConfig', () => {
     });
   });
 
+  describe('antigravity provider', () => {
+    beforeEach(() => {
+      process.env.AGENT_PROVIDER = 'antigravity';
+      process.env.SESSION_DIR = join(testHome, '.gemini');
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: {
+          fibe: {
+            command: 'fibe',
+            args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
+            env: { FIBE_API_KEY: 'fibe_test_key', FIBE_DOMAIN: 'http://rails.test:3000' },
+          },
+          Sentry: {
+            serverUrl: 'https://mcp.sentry.dev/mcp',
+          },
+        },
+      });
+    });
+
+    it('writes Antigravity mcp_config.json under the session config directory', () => {
+      writeMcpConfig();
+
+      const configPath = join(testHome, '.gemini', 'config', 'mcp_config.json');
+      expect(existsSync(configPath)).toBe(true);
+      const config = JSON.parse(readFileSync(configPath, 'utf8'));
+      expect(config.mcpServers['fibe']).toEqual({
+        command: 'fibe',
+        args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
+        env: { FIBE_API_KEY: 'fibe_test_key', FIBE_DOMAIN: 'http://rails.test:3000' },
+      });
+      expect(config.mcpServers['Sentry']).toEqual({
+        serverUrl: 'https://mcp.sentry.dev/mcp',
+      });
+    });
+
+    it('replaces an empty file injected from stored OAuth credentials', () => {
+      const configDir = join(testHome, '.gemini', 'config');
+      mkdirSync(configDir, { recursive: true });
+      writeFileSync(join(configDir, 'mcp_config.json'), '');
+
+      writeMcpConfig({ docker: { command: 'uvx', args: ['mcp-server-docker'] } });
+
+      const config = JSON.parse(
+        readFileSync(join(configDir, 'mcp_config.json'), 'utf8'),
+      );
+      expect(config.mcpServers['fibe']).toBeDefined();
+      expect(config.mcpServers['docker']).toEqual({
+        command: 'uvx',
+        args: ['mcp-server-docker'],
+      });
+    });
+  });
+
   describe('claude-code provider', () => {
     beforeEach(() => {
       process.env.AGENT_PROVIDER = 'claude-code';

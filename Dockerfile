@@ -32,6 +32,9 @@ RUN --mount=type=cache,target=/root/.npm \
     bash /tmp/cursor-install.sh; \
     rm -f /tmp/cursor-install.sh; \
     /root/.local/bin/cursor-agent --help >/dev/null; \
+    elif [ "$AGENT_PROVIDER" = "antigravity" ]; then \
+    curl -fsSL https://antigravity.google/cli/install.sh | bash -s -- --dir /usr/local/bin; \
+    agy --help >/dev/null; \
     fi
 
 RUN mkdir -p /root/.local/share/cursor-agent
@@ -252,10 +255,10 @@ ARG AGENT_PROVIDER=gemini
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    if [ "$AGENT_PROVIDER" = "claude_code" ]; then \
+    if [ "$AGENT_PROVIDER" = "claude_code" ] || [ "$AGENT_PROVIDER" = "antigravity" ]; then \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    dbus gnome-keyring libsecret-1-0 \
+    dbus dbus-x11 gnome-keyring libsecret-1-0 \
     && rm -rf /var/lib/apt/lists/*; \
     fi
 
@@ -295,6 +298,8 @@ RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
     elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
     mkdir -p /home/node/.cursor && chown -R node:node /home/node/.cursor; \
+    elif [ "$AGENT_PROVIDER" = "antigravity" ]; then \
+    mkdir -p /home/node/.gemini/antigravity-cli && chown -R node:node /home/node/.gemini; \
     fi
 
 # ---- FINALLY COPY DIST FILES ----

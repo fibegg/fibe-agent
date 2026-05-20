@@ -91,6 +91,24 @@ describe('loadInjectedCredentials', () => {
     expect(fs.readFileSync(path.join(tempDir, 'credentials.json'), 'utf8')).toBe('{"refresh":"xyz"}');
   });
 
+  test('writes nested credential files inside SESSION_DIR', () => {
+    process.env.AGENT_CREDENTIALS_JSON = JSON.stringify({
+      'antigravity-cli/cache/last_conversations.json': '{"workspace":"session-1"}',
+    });
+    process.env.SESSION_DIR = tempDir;
+    expect(loadInjectedCredentials()).toBe(true);
+    expect(fs.readFileSync(path.join(tempDir, 'antigravity-cli', 'cache', 'last_conversations.json'), 'utf8')).toBe('{"workspace":"session-1"}');
+  });
+
+  test('decodes base64-encoded binary credential files', () => {
+    process.env.AGENT_CREDENTIALS_JSON = JSON.stringify({
+      '.local/share/keyrings/login.keyring': `__fibe_base64__:${Buffer.from([0, 1, 2, 3, 255]).toString('base64')}`,
+    });
+    process.env.SESSION_DIR = tempDir;
+    expect(loadInjectedCredentials()).toBe(true);
+    expect([...fs.readFileSync(path.join(tempDir, '.local', 'share', 'keyrings', 'login.keyring'))]).toEqual([0, 1, 2, 3, 255]);
+  });
+
   test('rejects path traversal in filenames', () => {
     process.env.AGENT_CREDENTIALS_JSON = '{"../../../etc/passwd":"malicious"}';
     process.env.SESSION_DIR = tempDir;
@@ -114,12 +132,12 @@ describe('loadInjectedCredentials', () => {
   test('returns true if at least one file succeeds even when another has suspicious name', () => {
     process.env.AGENT_CREDENTIALS_JSON = JSON.stringify({
       'good.txt': 'valid-content',
-      'sub/bad.txt': 'traversal-content',
+      '../bad.txt': 'traversal-content',
     });
     process.env.SESSION_DIR = tempDir;
     const result = loadInjectedCredentials();
     expect(result).toBe(true);
-    // good.txt should exist, sub/bad.txt should be skipped
     expect(fs.existsSync(path.join(tempDir, 'good.txt'))).toBe(true);
+    expect(fs.existsSync(path.join(path.dirname(tempDir), 'bad.txt'))).toBe(false);
   });
 });

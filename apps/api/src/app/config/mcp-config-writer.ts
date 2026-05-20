@@ -67,6 +67,18 @@ function toClaudeProjectJsonEntry(entry: McpServerEntry): Record<string, unknown
   return native;
 }
 
+function toAntigravityJsonEntry(entry: McpServerEntry): Record<string, unknown> {
+  return {
+    ...(entry.serverUrl ? { serverUrl: entry.serverUrl } : {}),
+    ...(entry.authHeader ? { authHeader: entry.authHeader } : {}),
+    ...(entry.bearerTokenEnvVar ? { bearerTokenEnvVar: entry.bearerTokenEnvVar } : {}),
+    ...(entry.type ? { type: entry.type } : {}),
+    ...(entry.command ? { command: entry.command } : {}),
+    ...(entry.args ? { args: entry.args } : {}),
+    ...(entry.env ? { env: entry.env } : {}),
+  };
+}
+
 function escapeTomlString(value: string): string {
   return value
     .replace(/\\/g, '\\\\')
@@ -248,6 +260,38 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     logger.log(`Wrote Gemini MCP config to ${configPath}`);
+  },
+
+  antigravity: (servers) => {
+    const dir = getSessionDir() || join(getHome(), '.gemini');
+    const configDir = join(dir, 'config');
+    const configPath = join(configDir, 'mcp_config.json');
+    let existing: Record<string, unknown> = {};
+
+    try {
+      if (existsSync(configPath)) {
+        existing = JSON.parse(readFileSync(configPath, 'utf8'));
+      }
+    } catch {
+      existing = {};
+    }
+
+    if (!existsSync(configDir)) mkdirSync(configDir, { recursive: true });
+
+    const nativeServers: Record<string, unknown> = {};
+    for (const [name, entry] of Object.entries(servers)) {
+      nativeServers[name] = toAntigravityJsonEntry(entry);
+    }
+
+    const config = {
+      ...existing,
+      mcpServers: {
+        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
+        ...nativeServers,
+      },
+    };
+    writeFileSync(configPath, JSON.stringify(config, null, 2));
+    logger.log(`Wrote Antigravity MCP config to ${configPath}`);
   },
 
   /**

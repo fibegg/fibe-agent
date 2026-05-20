@@ -49,6 +49,7 @@ export interface StreamingCallbacks {
 
 export interface AgentRuntimeOptions {
   effort?: string;
+  previousAssistantMessages?: string[];
 }
 
 export const INTERRUPTED_MESSAGE = 'INTERRUPTED';

@@ -22,6 +22,8 @@ function providerLabel(provider: string | null): string | null {
       return 'Codex';
     case 'gemini':
       return 'Gemini';
+    case 'antigravity':
+      return 'Antigravity';
     case 'opencode':
     case 'opencodex':
       return 'OpenCode';

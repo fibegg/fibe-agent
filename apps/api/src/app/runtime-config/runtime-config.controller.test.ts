@@ -28,6 +28,8 @@ function providerLabel(provider: string | null): string | null {
       return 'Codex';
     case 'gemini':
       return 'Gemini';
+    case 'antigravity':
+      return 'Antigravity';
     case 'opencode':
     case 'opencodex':
       return 'OpenCode';
@@ -160,6 +162,11 @@ describe('RuntimeConfigController — getConfig logic', () => {
     process.env.AGENT_PROVIDER = '  gemini  ';
     expect(getRuntimeConfig().agentProvider).toBe('gemini');
     expect(getRuntimeConfig().agentProviderLabel).toBe('Gemini');
+  });
+
+  test('labels Antigravity provider', () => {
+    process.env.AGENT_PROVIDER = 'antigravity';
+    expect(getRuntimeConfig().agentProviderLabel).toBe('Antigravity');
   });
 
   test('returns simplicate=true when SIMPLICATE is truthy', () => {

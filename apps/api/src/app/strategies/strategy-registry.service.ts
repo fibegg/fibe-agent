@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
+import { AntigravityStrategy } from './antigravity.strategy';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
 import { CursorStrategy } from './cursor.strategy';
 import { GeminiStrategy } from './gemini.strategy';
@@ -11,6 +12,7 @@ import type { AgentStrategy, ConversationDataDirProvider } from './strategy.type
 const PROVIDER_NAMES = [
   'mock',
   'gemini',
+  'antigravity',
   'claude-code',
   'cursor',
   'openai',
@@ -49,6 +51,8 @@ export class StrategyRegistryService {
         return new MockStrategy(this.config);
       case 'gemini':
         return new GeminiStrategy(useApiToken, conversationDataDir);
+      case 'antigravity':
+        return new AntigravityStrategy(useApiToken, conversationDataDir);
       case 'claude-code':
         return new ClaudeSdkStrategy(useApiToken, conversationDataDir);
       case 'cursor':

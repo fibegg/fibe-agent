@@ -1,5 +1,6 @@
 import { describe, test, expect, afterEach } from 'bun:test';
 import { StrategyRegistryService } from './strategy-registry.service';
+import { AntigravityStrategy } from './antigravity.strategy';
 import { MockStrategy } from './mock.strategy';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
 import { CursorStrategy } from './cursor.strategy';
@@ -70,6 +71,12 @@ describe('StrategyRegistryService', () => {
     process.env.AGENT_PROVIDER = 'gemini';
     const service = new StrategyRegistryService(mockConfig as never);
     expect(service.resolveStrategy()).toBeInstanceOf(GeminiStrategy);
+  });
+
+  test('resolveStrategy returns AntigravityStrategy when AGENT_PROVIDER is antigravity', () => {
+    process.env.AGENT_PROVIDER = 'antigravity';
+    const service = new StrategyRegistryService(mockConfig as never);
+    expect(service.resolveStrategy()).toBeInstanceOf(AntigravityStrategy);
   });
 
   test('resolveStrategy with AGENT_AUTH_MODE=api-token uses api-token mode for Gemini', async () => {
