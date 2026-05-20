@@ -1,11 +1,12 @@
 # Provider CLI Drift
 
-This document answers common architectural questions regarding how `fibe-agent` handles the underlying provider CLIs (such as `claude-code`, `codex`, `gemini-cli`, etc.).
+This document answers common architectural questions regarding how `fibe-agent` handles the underlying provider CLIs (such as `claude-code`, `codex`, `gemini-cli`, `agy`, etc.).
 
 ## 1. Do we pin claude/codex/etc version or let agent always download latest?
-**Decision: We pin versions.**
-To prevent unexpected API changes or output format drift from breaking the agent integration, we strictly pin the CLI versions in `package.json`. 
-- For Docker builds (`Dockerfile` and `Dockerfile.dev`), the CLI installation steps extract the exact version from `package.json` rather than pulling `latest`. This guarantees that the containerized agent operates with tested provider behavior.
+**Decision: We pin versions when the provider publishes an npm package we consume directly.**
+To prevent unexpected API changes or output format drift from breaking the agent integration, npm-distributed CLI versions are pinned in `package.json`.
+- For Docker builds (`Dockerfile` and `Dockerfile.dev`), npm-backed CLI installation steps extract the exact version from `package.json` rather than pulling `latest`. This guarantees that the containerized agent operates with tested provider behavior.
+- Binary-installer providers such as Cursor and Antigravity (`agy`) are installed from their official install scripts and verified with `--help` during image build. They must be re-audited when those upstream installers change behavior or add a stable version pinning interface.
 - For local/standalone setups, it is recommended to run `npm install` inside the agent repository to ensure the correct pinned version of the CLI is used.
 
 ## 2. Should this be configured by user in fibe-agent-standalone / rails-managed?

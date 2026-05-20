@@ -15,6 +15,7 @@ prompts/
 │   └── code-playground.md      ← canonical prompt for the code-playground use case
 └── providers/
     ├── gemini.md               ← Gemini CLI-specific system prompt
+    ├── antigravity.md          ← Antigravity CLI-specific system prompt
     ├── claude-code.md          ← Claude Code-specific system prompt
     ├── openai-codex.md         ← OpenAI Codex-specific system prompt
     ├── opencode.md             ← OpenCode-specific system prompt

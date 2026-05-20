@@ -20,7 +20,7 @@
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # AI provider backend.
-# Supported: gemini, claude-code, openai-codex, opencode, cursor
+# Supported: gemini, antigravity, claude-code, openai-codex, opencode, cursor
 # Default: claude-code
 # agentProvider: gemini
 

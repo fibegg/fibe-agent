@@ -134,7 +134,7 @@ When the chat app is loaded inside an iframe (e.g. Fibe frame), the following ap
 
 The backend talks to external model providers via CLI-based strategies. Two env vars control which agent is active and how it authenticates:
 
-- `AGENT_PROVIDER`: `mock` | `gemini` | `claude-code` | `openai` | `openai-codex` | `cursor` | `opencode` (default `claude-code`)
+- `AGENT_PROVIDER`: `mock` | `gemini` | `antigravity` | `claude-code` | `openai` | `openai-codex` | `cursor` | `opencode` (default `claude-code`)
 - `AGENT_AUTH_MODE`: `oauth` (default) | `api-token`
 - `CLAUDE_EFFORT`: default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`; default `max`)
 
@@ -144,6 +144,7 @@ When `AGENT_AUTH_MODE=api-token`, the strategies skip interactive OAuth/device f
 - Gemini: `GEMINI_API_KEY`
 - OpenAI Codex: `OPENAI_API_KEY`
 - OpenCode: any of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `OPENROUTER_API_KEY` (existing behavior)
+- Antigravity: Google OAuth code flow through `agy`; no API-token env var is currently supported by fibe-agent.
 
 In `api-token` mode:
 

@@ -51,6 +51,7 @@ Two WebSocket servers share a single HTTP upgrade dispatcher — `/ws` for chat 
 | `AGENT_PROVIDER` value | Aliases | Transport | Docker tag |
 |------------------------|---------|-----------|------------|
 | `gemini`               | — | `@google/gemini-cli` CLI | `gemini` |
+| `antigravity`          | — | Antigravity CLI (`agy`) | `antigravity` |
 | `claude-code` (default) | — | `@anthropic-ai/claude-agent-sdk` (in-process SDK) | `claude-code` |
 | `openai-codex`         | `openai` | `@openai/codex` CLI | `openai-codex` |
 | `cursor`               | — | `cursor-agent` CLI | `cursor` |
@@ -68,6 +69,7 @@ All strategies live under `apps/api/src/app/strategies/`:
 | File | Strategy |
 |------|----------|
 | `gemini.strategy.ts` | Gemini CLI — OAuth device flow or `GEMINI_API_KEY` |
+| `antigravity.strategy.ts` | Antigravity CLI — Google OAuth code flow, `agy --prompt=<text>` headless runs |
 | `claude-sdk.strategy.ts` | Claude Code — `@anthropic-ai/claude-agent-sdk` in-process SDK; OAuth or `ANTHROPIC_API_KEY` |
 | `openai-codex.strategy.ts` | OpenAI Codex — OAuth or `OPENAI_API_KEY` |
 | `cursor.strategy.ts` | Cursor Agent CLI — `CURSOR_API_KEY`, stream-json |
@@ -108,7 +110,7 @@ Copy `.env.example` to `.env` before starting.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | API listen port |
-| `AGENT_PROVIDER` | `gemini` | Active provider: `gemini` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
+| `AGENT_PROVIDER` | `gemini` | Active provider: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
 | `AGENT_AUTH_MODE` | `oauth` | `oauth` — interactive browser/device flow; `api-token` — env-var key only |
 | `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` or `?token=<password>` |
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the selector (e.g. `flash-lite,flash,pro`) |
@@ -298,6 +300,7 @@ prompts/
 │   └── code-playground.md      ← canonical prompt for code-generation sessions
 └── providers/
     ├── gemini.md               ← Gemini CLI-specific prompt
+    ├── antigravity.md          ← Antigravity CLI-specific prompt
     ├── claude-code.md          ← Claude Code-specific prompt
     ├── openai-codex.md         ← OpenAI Codex-specific prompt
     ├── cursor.md               ← Cursor-specific prompt
@@ -332,6 +335,7 @@ Each file in `prompts/providers/` extends the base code-playground behaviour wit
 | File | Provider | Notable additions |
 |------|----------|------------------|
 | `providers/gemini.md` | `gemini` | `--yolo` mode, `--resume` sessions, output-length advice |
+| `providers/antigravity.md` | `antigravity` | `agy --prompt=<text>` headless mode, `--conversation` sessions, OAuth code flow |
 | `providers/claude-code.md` | `claude-code` | Native file-edit tools, `--continue` sessions, extended thinking |
 | `providers/openai-codex.md` | `openai-codex` | Sandbox approval policy, full-file writes, o-series reasoning |
 | `providers/cursor.md` | `cursor` | `cursor-agent --print --output-format stream-json --force`, API-key auth |
@@ -532,6 +536,7 @@ CI publishes multi-arch (`linux/amd64`, `linux/arm64`) images to GHCR on every p
 
 ```
 ghcr.io/<owner>/fibe-agent:gemini-latest
+ghcr.io/<owner>/fibe-agent:antigravity-latest
 ghcr.io/<owner>/fibe-agent:claude-code-latest
 ghcr.io/<owner>/fibe-agent:openai-codex-latest
 ghcr.io/<owner>/fibe-agent:cursor-latest
@@ -561,6 +566,7 @@ docker run -p 3000:3000 \
 | Provider | `SESSION_DIR` |
 |----------|--------------|
 | `gemini` | `/home/node/.gemini` |
+| `antigravity` | `/home/node/.gemini` |
 | `claude-code` | `/home/node/.claude` |
 | `openai-codex` | `/home/node/.codex` |
 | `cursor` | `/home/node/.cursor` |

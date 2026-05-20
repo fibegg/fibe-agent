@@ -28,13 +28,13 @@
 
 ---
 
-**Fibe Agent** pairs a **NestJS + Fastify** API with a **React + Vite** chat client. The API orchestrates coding agents (Gemini, Claude Code, OpenAI Codex, OpenCode, or a mock provider) over a streaming WebSocket. The UI delivers a rich coding environment: streaming markdown chat, a **CodeMirror 6 inline editor**, an **xterm.js interactive terminal**, an activity/thinking sidebar, a file explorer with unsaved-change tracking, voice input, drag-&-drop file attachments, `@`-mention file references, and OAuth flows — all with light/dark theming and iframe-embedding support.
+**Fibe Agent** pairs a **NestJS + Fastify** API with a **React + Vite** chat client. The API orchestrates coding agents (Gemini, Antigravity, Claude Code, OpenAI Codex, Cursor, OpenCode, or a mock provider) over a streaming WebSocket. The UI delivers a rich coding environment: streaming markdown chat, a **CodeMirror 6 inline editor**, an **xterm.js interactive terminal**, an activity/thinking sidebar, a file explorer with unsaved-change tracking, voice input, drag-&-drop file attachments, `@`-mention file references, and OAuth flows — all with light/dark theming and iframe-embedding support.
 
 ## Features at a glance
 
 | Area | Details |
 |------|---------|
-| **Multi-provider agents** | `gemini`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` — select via `AGENT_PROVIDER`. OAuth and API-token auth modes. |
+| **Multi-provider agents** | `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` — select via `AGENT_PROVIDER`. OAuth and API-token auth modes. |
 | **Streaming chat** | WebSocket at `/ws` with per-chunk streaming, reasoning/thinking steps, tool-call and file-created events, token usage, and agent interrupt. |
 | **Inline code editor** | CodeMirror 6 with syntax highlighting for 15+ languages (JS/TS, Python, Go, Rust, Java, C++, CSS, HTML, Markdown, SQL, YAML, …), unsaved-change indicators, keyboard shortcuts, and REST-backed file persistence. |
 | **Interactive terminal** | xterm.js terminal backed by `node-pty`, connected via WebSocket at `/ws-terminal`, spawning shell sessions in the playground directory. |
@@ -154,7 +154,7 @@ fibe-agent/
 | Module | Responsibility |
 |--------|---------------|
 | `orchestrator` | Drives agent runs, streams chunks, manages session state |
-| `strategies` | Provider adapters: `gemini`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` |
+| `strategies` | Provider adapters: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` |
 | `agent` | `POST /api/agent/send-message` — async webhook endpoint |
 | `agent-files` | File watcher + REST for agent-generated files |
 | `auth` | Bearer token guard, login endpoint |
@@ -180,7 +180,7 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `3000` | API listen port |
-| `AGENT_PROVIDER` | `gemini` | Active agent: `gemini` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
+| `AGENT_PROVIDER` | `gemini` | Active agent: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
 | `AGENT_AUTH_MODE` | `oauth` | `oauth` — interactive browser/device flow; `api-token` — env-var key only |
 | `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` |
 | `MODEL_OPTIONS` | — | Comma-separated model names shown in the model selector (e.g. `flash-lite,flash,pro`) |
@@ -292,7 +292,7 @@ ghcr.io/<owner>/fibe-agent:<provider>-<git-sha>
 ghcr.io/<owner>/fibe-agent:<provider>-latest-dev
 ```
 
-Providers: `gemini`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and [ci.yml](.github/workflows/ci.yml).
+Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and [ci.yml](.github/workflows/ci.yml).
 
 ## Embedding (iframe)
 

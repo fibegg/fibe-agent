@@ -118,7 +118,7 @@ single conversation. Conversation title is the thread-level display name.
 
 ## Path Policy
 
-For Codex, OpenCode, and Gemini, the helper `ProviderConversationPaths` applies
+For Codex, OpenCode, Gemini, and Antigravity, the helper `ProviderConversationPaths` applies
 this policy:
 
 - workspace path comes from `getDefaultConversationDataDir()` when available.
@@ -138,6 +138,7 @@ Provider workspace subdirs:
 | Codex | `codex_workspace` | `.codex_session` |
 | OpenCode | `opencode_workspace` | `.opencode_session` |
 | Gemini | `gemini_workspace` | `.gemini_session` |
+| Antigravity | `antigravity_workspace` | `.antigravity_session` |
 | Cursor | `cursor_workspace` | `.cursor_session` |
 
 Cursor still uses older strategy code and has not been fully generalized through
@@ -231,6 +232,7 @@ details below.
 | Codex | `codex app-server` by default | yes | yes via `turn/steer` | yes | yes |
 | OpenCode | `opencode serve` by default | yes | no | yes | yes |
 | Gemini | headless `gemini -p` / `--resume` | best effort | no | yes | yes |
+| Antigravity | headless `agy --prompt=<text>` / `--conversation` | best effort | no | yes | yes |
 | Cursor | CLI resume | partial/older | no/older fallback | yes | not fully generalized |
 
 ## Claude SDK
@@ -897,6 +899,7 @@ DATA_DIR/conversations/<uuid>/.claude_session
 DATA_DIR/conversations/<uuid>/.codex_session
 DATA_DIR/conversations/<uuid>/.opencode_session
 DATA_DIR/conversations/<uuid>/.gemini_session
+DATA_DIR/conversations/<uuid>/.antigravity_session
 ```
 
 Shared provider workspaces:
@@ -906,6 +909,7 @@ DATA_DIR/claude_workspace/
 DATA_DIR/codex_workspace/
 DATA_DIR/opencode_workspace/
 DATA_DIR/gemini_workspace/
+DATA_DIR/antigravity_workspace/
 ```
 
 Useful failure checks:
