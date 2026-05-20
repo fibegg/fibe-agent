@@ -14,6 +14,7 @@ const resultWaitIntervalMs = Number(process.env.CI_RESULTS_WAIT_INTERVAL_MS || 1
 
 const imageStepLabels = {
   'ci-build-gemini': 'Gemini',
+  'ci-build-antigravity': 'Antigravity',
   'ci-build-claude': 'Claude Code',
   'ci-build-codex': 'OpenAI Codex',
   'ci-build-opencode': 'OpenCode',
@@ -84,7 +85,7 @@ function printFailurePayload(payload) {
 }
 
 async function collectVerifiedImagePulls(summary, detail) {
-  const imageSteps = ['ci-build-gemini', 'ci-build-claude', 'ci-build-codex', 'ci-build-opencode', 'ci-build-cursor'];
+  const imageSteps = ['ci-build-gemini', 'ci-build-antigravity', 'ci-build-claude', 'ci-build-codex', 'ci-build-opencode', 'ci-build-cursor'];
   const pulls = [];
   let missingImages = 0;
 

@@ -181,6 +181,15 @@ services:
       PROVIDER: gemini
       TAG_NAME: gemini
 
+  ci-build-antigravity:
+    <<: *provider-build-step
+    labels: *source-labels
+    environment:
+      <<: *provider-build-env
+      CI_STEP_NAME: ci-build-antigravity
+      PROVIDER: antigravity
+      TAG_NAME: antigravity
+
   ci-build-claude:
     <<: *provider-build-step
     labels: *source-labels
@@ -234,7 +243,7 @@ services:
       DPASTE_TOKEN:
       FIBE_BRANCH:
       FIBE_REPOSITORY_LABEL:
-      CI_EXPECTED_STEPS: "ci-setup ci-lint ci-test ci-scan ci-build-common ci-build-gemini ci-build-claude ci-build-codex ci-build-opencode ci-build-cursor"
+      CI_EXPECTED_STEPS: "ci-setup ci-lint ci-test ci-scan ci-build-common ci-build-gemini ci-build-antigravity ci-build-claude ci-build-codex ci-build-opencode ci-build-cursor"
       CI_RESULTS_WAIT_TIMEOUT_MS:
       CI_RESULTS_WAIT_INTERVAL_MS:
     restart: 'no'

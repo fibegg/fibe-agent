@@ -276,6 +276,7 @@ export async function ensureSharedBuilder(context, config, { recreateOnMissingPl
 export function providerDisplayName(provider) {
   return {
     gemini: 'Gemini CLI',
+    antigravity: 'Antigravity CLI',
     claude_code: 'Claude Code',
     openai_codex: 'OpenAI Codex',
     opencode: 'OpenCode',

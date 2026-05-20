@@ -67,6 +67,8 @@ jobs:
         provider:
           - key: gemini
             tag: gemini
+          - key: antigravity
+            tag: antigravity
           - key: claude_code
             tag: claude-code
           - key: openai_codex
