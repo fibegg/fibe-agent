@@ -30,6 +30,18 @@ const devServerPort = envNumber('VITE_PORT', 3100);
 const usePolling = process.env.CHOKIDAR_USEPOLLING === 'true';
 const pollingInterval = envNumber('CHOKIDAR_INTERVAL', 1000);
 const ES2020_BROWSER_TARGETS = ['es2020', 'chrome86', 'edge86', 'firefox90', 'safari15.6'] as const;
+const DEFAULT_ALLOWED_HOSTS = ['.ngrok-free.dev', '.phoenix.test', '.127.0.0.1.nip.io'] as const;
+
+function envList(name: string) {
+  return (process.env[name] ?? '')
+    .split(/[,\s]+/)
+    .map((value) => value.trim())
+    .filter(Boolean);
+}
+
+function devAllowedHosts() {
+  return [...new Set([...DEFAULT_ALLOWED_HOSTS, ...envList('VITE_ALLOWED_HOSTS')])];
+}
 
 export default defineConfig(() => ({
   base: '',
@@ -52,7 +64,7 @@ export default defineConfig(() => ({
     port: devServerPort,
     host: process.env.VITE_HOST || true,
     watch: usePolling ? { usePolling: true, interval: pollingInterval } : undefined,
-    allowedHosts: ['.ngrok-free.dev', '.phoenix.test'],
+    allowedHosts: devAllowedHosts(),
     proxy: {
       '/api': 'http://localhost:3000',
       '/ws': { target: 'http://localhost:3000', ws: true },
