@@ -349,7 +349,7 @@ export const uk: Record<TranslationKey, string> = {
   'fileMention.noMatches': 'Немає відповідних файлів або папок',
   'fileMention.more': '+{count} ще — введіть текст для фільтрації',
 
-  'fileExplorer.title': 'Claude',
+  'fileExplorer.title': 'Agent',
   'fileExplorer.emptyPlayground': 'У майданчику немає файлів.',
   'fileExplorer.emptyAgent': 'Робоча область ШІ порожня.',
   'fileExplorer.searchPlaceholder': 'Пошук усіх файлів...',

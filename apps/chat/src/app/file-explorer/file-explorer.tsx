@@ -44,7 +44,7 @@ import {
 
 export type { PlaygroundEntry } from './file-explorer-types';
 
-const SIDEBAR_TITLE = 'Claude';
+const SIDEBAR_TITLE = 'Agent';
 const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
 
 const isControlledTree = (t: PlaygroundEntry[] | null | undefined): t is PlaygroundEntry[] =>

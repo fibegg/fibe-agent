@@ -248,7 +248,7 @@ export function ChatPage() {
   const [standaloneMode, setStandaloneMode] = useState(() =>
     isStandaloneMode(),
   );
-  const [agentProviderLabel, setAgentProviderLabel] = useState('Claude');
+  const [agentProviderLabel, setAgentProviderLabel] = useState('Agent');
   const supportsImmediateSteer = useMemo(() => {
     const provider =
       `${agentProvider ?? ''} ${agentProviderLabel ?? ''}`.toLowerCase();
@@ -465,13 +465,13 @@ export function ChatPage() {
       .then((r) => (r.ok ? r.json() : null))
       .then((config: RuntimeConfigResponse | null) => {
         if (cancelled) return;
-        setAgentProviderLabel(config?.agentProviderLabel?.trim() || 'Claude');
+        setAgentProviderLabel(config?.agentProviderLabel?.trim() || 'Agent');
         if (readStoredSimplicateMode() === null) {
           setSimplicateMode(config?.simplicate === true);
         }
       })
       .catch(() => {
-        if (!cancelled) setAgentProviderLabel('Claude');
+        if (!cancelled) setAgentProviderLabel('Agent');
       });
 
     return () => {

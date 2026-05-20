@@ -49,9 +49,9 @@ describe('ChatHeader', () => {
     expect(screen.queryByText('Claude')).toBeNull();
   });
 
-  it('falls back to "Claude" when no provider label is available', () => {
+  it('falls back to "Agent" when no provider label is available', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
-    expect(screen.getByText('Claude')).toBeTruthy();
+    expect(screen.getByText('Agent')).toBeTruthy();
   });
 
   it('heading has title attribute for truncation tooltip', () => {

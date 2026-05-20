@@ -155,7 +155,7 @@ export function ChatHeader({
   onConversationCreate,
 }: ChatHeaderProps) {
   const t = useT();
-  const displayName = agentName || agentProviderLabel?.trim() || 'Claude';
+  const displayName = agentName || agentProviderLabel?.trim() || 'Agent';
   const modelLabel = currentModel?.trim() ?? '';
   const statusContent = state === CHAT_STATES.AWAITING_RESPONSE && agentMode
     ? <TypewriterText text={agentMode} speed={40} />

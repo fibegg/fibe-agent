@@ -344,7 +344,7 @@ export const en = {
   'fileMention.noMatches': 'No matching files or folders',
   'fileMention.more': '+{count} more — type to filter',
 
-  'fileExplorer.title': 'Claude',
+  'fileExplorer.title': 'Agent',
   'fileExplorer.emptyPlayground': "You don't have any files in the playground.",
   'fileExplorer.emptyAgent': 'AI workspace is empty.',
   'fileExplorer.searchPlaceholder': 'Search all files...',
