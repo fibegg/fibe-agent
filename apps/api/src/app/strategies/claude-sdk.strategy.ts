@@ -32,11 +32,8 @@ import type {
   SDKUserMessage,
 } from '@anthropic-ai/claude-agent-sdk';
 
-const ENV_TOKEN_VARS = [
-  'CLAUDE_CODE_OAUTH_TOKEN',
-  'ANTHROPIC_API_KEY',
-  'CLAUDE_API_KEY',
-] as const;
+const CLAUDE_OAUTH_TOKEN_ENV = 'CLAUDE_CODE_OAUTH_TOKEN';
+const CLAUDE_API_TOKEN_ENVS = ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'] as const;
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const SESSION_MARKER_FILE = '.claude_session';
@@ -317,6 +314,10 @@ interface StreamTurnState {
   sessionId: string | null;
 }
 
+type ClaudeAuthCredential =
+  | { kind: 'oauth'; value: string }
+  | { kind: 'api'; value: string; envKey?: (typeof CLAUDE_API_TOKEN_ENVS)[number] };
+
 export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   private static readonly records = new Map<
     string,
@@ -357,41 +358,72 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
   }
 
-  private getEnvToken(): string | null {
-    for (const key of ENV_TOKEN_VARS) {
+  private getEnvValue(keys: readonly string[]): { key: string; value: string } | null {
+    for (const key of keys) {
       const value = process.env[key];
-      if (value && value.trim()) return value.trim();
+      if (value && value.trim()) return { key, value: value.trim() };
     }
     return null;
   }
 
-  private getToken(): string | null {
-    if (this.useApiTokenMode) {
-      const envToken = this.getEnvToken();
-      if (envToken) return envToken;
-    }
+  private getEnvOAuthToken(): string | null {
+    return this.getEnvValue([CLAUDE_OAUTH_TOKEN_ENV])?.value ?? null;
+  }
+
+  private getEnvApiToken(): { key: (typeof CLAUDE_API_TOKEN_ENVS)[number]; value: string } | null {
+    const token = this.getEnvValue(CLAUDE_API_TOKEN_ENVS);
+    if (!token) return null;
+    return {
+      key: token.key as (typeof CLAUDE_API_TOKEN_ENVS)[number],
+      value: token.value,
+    };
+  }
+
+  private getStoredToken(): string | null {
     const tokenPath = getTokenFilePath();
-    if (existsSync(tokenPath)) return readFileSync(tokenPath, 'utf8').trim();
-    return null;
+    if (!existsSync(tokenPath)) return null;
+    const token = readFileSync(tokenPath, 'utf8').trim();
+    return token || null;
+  }
+
+  private getAuthCredential(): ClaudeAuthCredential | null {
+    if (this.useApiTokenMode) {
+      const apiToken = this.getEnvApiToken();
+      if (apiToken) {
+        return { kind: 'api', value: apiToken.value, envKey: apiToken.key };
+      }
+      const storedToken = this.getStoredToken();
+      if (storedToken) return { kind: 'api', value: storedToken };
+      const oauthToken = this.getEnvOAuthToken();
+      if (oauthToken) return { kind: 'oauth', value: oauthToken };
+      return null;
+    }
+
+    const oauthToken = this.getEnvOAuthToken() ?? this.getStoredToken();
+    return oauthToken ? { kind: 'oauth', value: oauthToken } : null;
   }
 
   private getClaudeProcessEnv(
-    extraEnv: Record<string, string> = {},
+    extraEnv: Record<string, string | undefined> = {},
   ): NodeJS.ProcessEnv {
-    return {
+    const env: NodeJS.ProcessEnv = {
       ...process.env,
       ...this.getProxyEnv(),
       HOME: getClaudeHomeDir(),
       ...getClaudeXdgEnv(),
       PATH: getEnrichedPath(process.env.PATH ?? ''),
       CLAUDE_AGENT_SDK_CLIENT_APP: CLAUDE_SDK_CLIENT_APP,
-      ...extraEnv,
     };
+    for (const [key, value] of Object.entries(extraEnv)) {
+      if (value === undefined) delete env[key];
+      else env[key] = value;
+    }
+    return env;
   }
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
-    const token = this.getToken();
+    const token = this.getAuthCredential();
     if (this.useApiTokenMode) {
       if (token) {
         connection.sendAuthSuccess();
@@ -423,9 +455,11 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
 
   executeLogout(connection: LogoutConnection): void {
     this.closeAllSdkRecords();
-    const token = this.getToken();
-    const envOverrides: Record<string, string> = {};
-    if (token) envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
+    const credential = this.getAuthCredential();
+    const envOverrides: Record<string, string | undefined> = {};
+    if (credential?.kind === 'oauth') {
+      envOverrides.CLAUDE_CODE_OAUTH_TOKEN = credential.value;
+    }
     const logoutProcess = spawn(resolveClaude(), ['auth', 'logout'], {
       env: this.getClaudeProcessEnv(envOverrides),
       shell: false,
@@ -444,15 +478,17 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     const authStatusTimeoutMs = 10_000;
 
     if (this.useApiTokenMode) {
-      return Promise.resolve(this.getToken() !== null);
+      return Promise.resolve(this.getAuthCredential() !== null);
     }
 
-    const token = this.getToken();
+    const credential = this.getAuthCredential();
     if (this._pendingAuthCheck) return this._pendingAuthCheck;
 
     this._pendingAuthCheck = new Promise<boolean>((resolve) => {
-      const envOverrides: Record<string, string> = {};
-      if (token) envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
+      const envOverrides: Record<string, string | undefined> = {};
+      if (credential?.kind === 'oauth') {
+        envOverrides.CLAUDE_CODE_OAUTH_TOKEN = credential.value;
+      }
 
       const checkProcess = spawn(resolveClaude(), ['auth', 'status'], {
         env: this.getClaudeProcessEnv(envOverrides),
@@ -624,9 +660,14 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
 
     const query = await loadClaudeAgentSdkQuery();
     const input = new AsyncMessageQueue<SDKUserMessage>();
-    const token = this.getToken();
-    const envOverrides: Record<string, string> = claudeProcessDefaults();
-    if (token) envOverrides.CLAUDE_CODE_OAUTH_TOKEN = token;
+    const credential = this.getAuthCredential();
+    const envOverrides: Record<string, string | undefined> = claudeProcessDefaults();
+    if (credential?.kind === 'oauth') {
+      envOverrides.CLAUDE_CODE_OAUTH_TOKEN = credential.value;
+    } else if (credential?.kind === 'api') {
+      envOverrides.CLAUDE_CODE_OAUTH_TOKEN = undefined;
+      envOverrides[credential.envKey ?? 'ANTHROPIC_API_KEY'] = credential.value;
+    }
     const markerSessionId = this.readSessionMarker(workspaceDir);
     const fibeConversationId = this.conversationDataDir?.getConversationId?.();
     const fibeSessionId =

@@ -591,7 +591,11 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   let tmpDir: string;
   let queryCalls: Array<{
     prompt: AsyncIterable<unknown>;
-    options: { resume?: string; sessionId?: string };
+    options: {
+      resume?: string;
+      sessionId?: string;
+      env?: Record<string, string | undefined>;
+    };
   }>;
   let closedCalls: number[];
   let receivedPrompts: string[];
@@ -610,7 +614,11 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
         options,
       }: {
         prompt: AsyncIterable<unknown>;
-        options: { resume?: string; sessionId?: string };
+        options: {
+          resume?: string;
+          sessionId?: string;
+          env?: Record<string, string | undefined>;
+        };
       }) => {
         const callIndex = queryCalls.length;
         queryCalls.push({ prompt, options });
@@ -655,6 +663,10 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.CLAUDE_API_KEY;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.SESSION_DIR;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
     ).records.clear();
@@ -702,6 +714,46 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(text).toContain('[Operator Interruption]');
     expect(text).toContain('change direction');
     expect(text).toContain('continue work');
+  });
+
+  test('api-token mode does not copy Anthropic API keys into the OAuth token env', async () => {
+    process.env.ANTHROPIC_API_KEY = 'sk-ant-api-token';
+    process.env.CLAUDE_CODE_OAUTH_TOKEN = 'stale-oauth-token';
+    const strategy = makeStrategy(
+      true,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
+
+    await strategy.executePromptStreaming('first turn', 'opus', () => undefined);
+
+    expect(queryCalls[0].options.env?.ANTHROPIC_API_KEY).toBe(
+      'sk-ant-api-token',
+    );
+    expect(queryCalls[0].options.env).not.toHaveProperty(
+      'CLAUDE_CODE_OAUTH_TOKEN',
+    );
+  });
+
+  test('api-token mode uses a stored manual key as Anthropic API key', async () => {
+    process.env.SESSION_DIR = tmpDir;
+    writeFileSync(join(tmpDir, 'agent_token.txt'), 'sk-ant-manual-token');
+    const strategy = makeStrategy(
+      true,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
+
+    await strategy.executePromptStreaming('first turn', 'opus', () => undefined);
+
+    expect(queryCalls[0].options.env?.ANTHROPIC_API_KEY).toBe(
+      'sk-ant-manual-token',
+    );
+    expect(queryCalls[0].options.env).not.toHaveProperty(
+      'CLAUDE_CODE_OAUTH_TOKEN',
+    );
   });
 });
 
@@ -797,10 +849,19 @@ describe('ClaudeSdkStrategy › utility functions', () => {
 });
 
 describe('ClaudeSdkStrategy › checkAuthStatus (API token mode)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'claude-auth-status-'));
+    process.env.SESSION_DIR = tmpDir;
+  });
+
   afterEach(() => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
     delete process.env.CLAUDE_API_KEY;
+    delete process.env.SESSION_DIR;
+    rmSync(tmpDir, { recursive: true, force: true });
   });
 
   test('returns true when env token is set and useApiTokenMode=true', async () => {
@@ -814,10 +875,7 @@ describe('ClaudeSdkStrategy › checkAuthStatus (API token mode)', () => {
     delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
     delete process.env.CLAUDE_API_KEY;
     const strategy = makeStrategy(true);
-    // No token file either, so should be false
-    const result = await strategy.checkAuthStatus();
-    // Either true (if file exists on developer machine) or false; just check it doesn't throw
-    expect(typeof result).toBe('boolean');
+    expect(await strategy.checkAuthStatus()).toBe(false);
   });
 });
 
