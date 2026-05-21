@@ -753,6 +753,34 @@ describe('OpenaiCodexStrategy', () => {
     expect(result).toBe(true);
   });
 
+  test('checkAuthStatus returns true when auth.json has nested Codex tokens', async () => {
+    const codexDir = join(TEST_HOME, '.codex');
+    mkdirSync(codexDir, { recursive: true });
+    writeFileSync(
+      join(codexDir, 'auth.json'),
+      JSON.stringify({ auth_mode: 'chatgpt', tokens: { access_token: 'tok' } }),
+      { mode: 0o600 }
+    );
+    process.env.SESSION_DIR = codexDir;
+    const strategy = new OpenaiCodexStrategy();
+    const result = await strategy.checkAuthStatus();
+    expect(result).toBe(true);
+  });
+
+  test('checkAuthStatus returns false when auth.json has only empty nested tokens', async () => {
+    const codexDir = join(TEST_HOME, '.codex');
+    mkdirSync(codexDir, { recursive: true });
+    writeFileSync(
+      join(codexDir, 'auth.json'),
+      JSON.stringify({ auth_mode: 'chatgpt', tokens: { access_token: ' ' } }),
+      { mode: 0o600 }
+    );
+    process.env.SESSION_DIR = codexDir;
+    const strategy = new OpenaiCodexStrategy();
+    const result = await strategy.checkAuthStatus();
+    expect(result).toBe(false);
+  });
+
   test('checkAuthStatus returns false when auth.json is invalid JSON', async () => {
     const codexDir = join(TEST_HOME, '.codex');
     mkdirSync(codexDir, { recursive: true });

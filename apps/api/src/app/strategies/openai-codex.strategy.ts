@@ -71,6 +71,37 @@ function getCodexCommand(): string {
   return 'codex';
 }
 
+function asRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function hasNonEmptyString(value: unknown): boolean {
+  return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasCodexAuth(auth: unknown): boolean {
+  const root = asRecord(auth);
+  if (!root) return false;
+
+  const directTokenKeys = ['access_token', 'token', 'api_key', 'OPENAI_API_KEY'];
+  if (directTokenKeys.some((key) => hasNonEmptyString(root[key]))) return true;
+
+  const tokens = asRecord(root.tokens);
+  if (tokens) {
+    const nestedTokenKeys = ['access_token', 'token', 'api_key', 'id_token', 'refresh_token'];
+    if (nestedTokenKeys.some((key) => hasNonEmptyString(tokens[key]))) return true;
+  }
+
+  const apiKey = asRecord(root.OPENAI_API_KEY);
+  if (apiKey) {
+    const apiKeyFields = ['api_key', 'token', 'value'];
+    if (apiKeyFields.some((key) => hasNonEmptyString(apiKey[key]))) return true;
+  }
+
+  return false;
+}
+
 // eslint-disable-next-line no-control-regex
 const stripAnsi = (s: string) => s.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '');
 
@@ -535,8 +566,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       const authFile = join(this.getCodexHomeForSession(), 'auth.json');
       if (!existsSync(authFile)) { resolve(false); return; }
       try {
-        const auth = JSON.parse(readFileSync(authFile, 'utf8')) as Record<string, string>;
-        resolve(Boolean(auth?.access_token ?? auth?.token ?? auth?.api_key));
+        resolve(hasCodexAuth(JSON.parse(readFileSync(authFile, 'utf8'))));
       } catch {
         resolve(false);
       }
