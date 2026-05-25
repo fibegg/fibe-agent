@@ -13,6 +13,7 @@ describe('ChatPromptContextService', () => {
   test('buildFullPrompt includes image context when imageUrls have paths', async () => {
     const uploads = { 
       getPath: (f: string) => (f === 'img1' ? '/path/img1' : null),
+      supportsImageOcr: () => true,
       extractImageInfo: async (f: string) => (f === 'img1' ? { text: 'test text', width: 100, height: 100, format: 'png' } : null)
     };
     const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
@@ -30,6 +31,7 @@ describe('ChatPromptContextService', () => {
     const ocrText = 'line one\nline two\nline three';
     const uploads = {
       getPath: (f: string) => (f === 'img1' ? '/path/img1' : null),
+      supportsImageOcr: () => true,
       extractImageInfo: async (f: string) => (f === 'img1' ? { text: ocrText, width: 50, height: 50, format: 'png' } : null),
     };
     const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
@@ -65,6 +67,51 @@ describe('ChatPromptContextService', () => {
     expect(result).toContain('file(s)');
     expect(result).toContain('/files/doc.pdf');
     expect(result).toContain('hi');
+  });
+
+  test('buildFullPrompt treats image attachments as visual references', async () => {
+    const uploads = {
+      getPath: (f: string) => (f === 'photo.png' ? '/files/photo.png' : null),
+      supportsImageOcr: () => true,
+      extractImageInfo: async (f: string) => (f === 'photo.png' ? { text: 'Menu title', width: 390, height: 844, format: 'png' } : null)
+    };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    const result = await service.buildFullPrompt('match the attached image', [], null, ['photo.png']);
+    expect(result).toContain('visual reference');
+    expect(result).toContain('not missing prompt artefacts');
+    expect(result).toContain('/files/photo.png');
+    expect(result).toContain('390x844 pixels png');
+    expect(result).toContain('Menu title');
+  });
+
+  test('buildFullPrompt treats unsupported image formats as visual-only references', async () => {
+    let extractCalls = 0;
+    const uploads = {
+      getPath: (f: string) => (f === 'animation.gif' ? '/files/animation.gif' : null),
+      supportsImageOcr: () => false,
+      extractImageInfo: async () => { extractCalls += 1; return null; },
+    };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    const result = await service.buildFullPrompt('match the attached image', [], null, ['animation.gif']);
+    expect(result).toContain('/files/animation.gif');
+    expect(result).toContain('visual reference only');
+    expect(result).toContain('OCR: unavailable');
+    expect(extractCalls).toBe(0);
+  });
+
+  test('buildFullPrompt treats failed OCR attempts as visual-only references', async () => {
+    const uploads = {
+      getPath: (f: string) => (f === 'photo.webp' ? '/files/photo.webp' : null),
+      supportsImageOcr: () => true,
+      extractImageInfo: async () => null,
+    };
+    const playgrounds = { getFileContent: async () => { throw new Error(); }, getFolderFileContents: async () => { throw new Error(); } };
+    const service = new ChatPromptContextService(uploads as never, playgrounds as never);
+    const result = await service.buildFullPrompt('match the attached image', [], null, ['photo.webp']);
+    expect(result).toContain('/files/photo.webp');
+    expect(result).toContain('OCR: unavailable; visual reference only');
   });
 
   test('buildFullPrompt includes file context when text has @path and getFileContent returns', async () => {

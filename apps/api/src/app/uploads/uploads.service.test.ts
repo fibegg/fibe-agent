@@ -1,4 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach, vi, Mock } from 'bun:test';
+import { spawn } from 'node:child_process';
+import { EventEmitter } from 'node:events';
 import { mkdtempSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -19,18 +21,55 @@ vi.mock('tesseract.js', () => {
   };
 });
 
+vi.mock('node:child_process', () => {
+  return {
+    spawn: vi.fn(),
+  };
+});
+
+function mockImageMagickConversion(output: Buffer): void {
+  const child = new EventEmitter() as EventEmitter & {
+    stdout: EventEmitter;
+    stderr: EventEmitter;
+    stdin: { end: Mock<(input: Buffer) => void> };
+    kill: Mock<(signal: string) => void>;
+  };
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdin = {
+    end: vi.fn(() => {
+      queueMicrotask(() => {
+        child.stdout.emit('data', output);
+        child.emit('close', 0);
+      });
+    }),
+  };
+  child.kill = vi.fn();
+  (spawn as unknown as Mock<typeof spawn>).mockReturnValue(child as never);
+}
+
 describe('UploadsService', () => {
   let dataDir: string;
-  const config = { getDataDir: () => '', getConversationDataDir: () => '', getEncryptionKey: () => undefined };
+  const config = {
+    getDataDir: () => '',
+    getConversationDataDir: () => '',
+    getEncryptionKey: () => undefined,
+    getOcrConversionMaxBytes: () => 10 * 1024 * 1024,
+    getOcrConversionMaxOutputBytes: () => 25 * 1024 * 1024,
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
     dataDir = mkdtempSync(join(tmpdir(), 'uploads-'));
     (config as { getDataDir: () => string; getConversationDataDir: () => string }).getDataDir = () => dataDir;
     (config as { getDataDir: () => string; getConversationDataDir: () => string }).getConversationDataDir = () => dataDir;
+    config.getOcrConversionMaxBytes = () => 10 * 1024 * 1024;
+    config.getOcrConversionMaxOutputBytes = () => 25 * 1024 * 1024;
   });
 
   afterEach(() => {
+    delete process.env.FIBE_OCR_CONVERSION_MAX_BYTES;
+    delete process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES;
     rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -129,6 +168,15 @@ describe('UploadsService', () => {
   });
 
   describe('extractImageInfo', () => {
+    test('supports OCR for native formats and bounded convertible formats', () => {
+      const service = new UploadsService(config as never);
+      expect(service.supportsImageOcr('screenshot.png')).toBe(true);
+      expect(service.supportsImageOcr('photo.jpeg')).toBe(true);
+      expect(service.supportsImageOcr('photo.webp')).toBe(true);
+      expect(service.supportsImageOcr('scan.tiff')).toBe(true);
+      expect(service.supportsImageOcr('animation.gif')).toBe(false);
+    });
+
     test('returns null if path does not exist', async () => {
       const service = new UploadsService(config as never);
       expect(await service.extractImageInfo('doesnotexist.jpg')).toBeNull();
@@ -138,6 +186,49 @@ describe('UploadsService', () => {
       const service = new UploadsService(config as never);
       const filename = await service.saveAudioFromBuffer(Buffer.from('x'), 'audio/webm');
       expect(await service.extractImageInfo(filename)).toBeNull();
+    });
+
+    test('converts small unsupported image formats to PNG before OCR', async () => {
+      const service = new UploadsService(config as never);
+      const dataUrl = 'data:image/webp;base64,' + Buffer.from('dummy').toString('base64');
+      const filename = await service.saveImage(dataUrl);
+      mockImageMagickConversion(Buffer.from('converted-png'));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (sizeOf as unknown as Mock<() => any>).mockReturnValue({ width: 20, height: 10, type: 'png' });
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (Tesseract.recognize as unknown as Mock<() => any>).mockResolvedValue({ data: { text: 'converted OCR' } });
+
+      expect(filename).toMatch(/\.webp$/);
+      expect(await service.extractImageInfo(filename)).toEqual({ text: 'converted OCR', width: 20, height: 10, format: 'png' });
+      expect(spawn).toHaveBeenCalledWith('magick', ['-', '-auto-orient', '-strip', 'png:-'], expect.any(Object));
+      expect(Tesseract.recognize).toHaveBeenCalledWith(
+        Buffer.from('converted-png'),
+        'eng',
+        expect.objectContaining({ workerBlobURL: false }),
+      );
+    });
+
+    test('does not convert unsupported image formats above the size limit', async () => {
+      config.getOcrConversionMaxBytes = () => 4;
+      const service = new UploadsService(config as never);
+      const dataUrl = 'data:image/webp;base64,' + Buffer.from('dummy').toString('base64');
+      const filename = await service.saveImage(dataUrl);
+      expect(await service.extractImageInfo(filename)).toBeNull();
+      expect(spawn).not.toHaveBeenCalled();
+      expect(sizeOf).not.toHaveBeenCalled();
+      expect(Tesseract.recognize).not.toHaveBeenCalled();
+    });
+
+    test('does not OCR converted images above the output size limit', async () => {
+      config.getOcrConversionMaxOutputBytes = () => 4;
+      const service = new UploadsService(config as never);
+      const dataUrl = 'data:image/webp;base64,' + Buffer.from('dummy').toString('base64');
+      const filename = await service.saveImage(dataUrl);
+      mockImageMagickConversion(Buffer.from('too-large'));
+      expect(await service.extractImageInfo(filename)).toBeNull();
+      expect(spawn).toHaveBeenCalled();
+      expect(sizeOf).not.toHaveBeenCalled();
+      expect(Tesseract.recognize).not.toHaveBeenCalled();
     });
 
     test('returns info using mocks and caches it', async () => {
@@ -155,6 +246,14 @@ describe('UploadsService', () => {
       expect(info1).toEqual({ text: 'hello OCR', width: 100, height: 200, format: 'png' });
       expect(sizeOf).toHaveBeenCalledTimes(1);
       expect(Tesseract.recognize).toHaveBeenCalledTimes(1);
+      expect(Tesseract.recognize).toHaveBeenCalledWith(
+        expect.any(Buffer),
+        'eng',
+        expect.objectContaining({
+          workerBlobURL: false,
+          workerPath: expect.stringContaining('worker-script/node/index.js'),
+        }),
+      );
 
       // Next call should use cached metadata
       const info2 = await service.extractImageInfo(filename);

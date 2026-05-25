@@ -32,7 +32,7 @@ export class ChatPromptContextService {
     const historyContext = this.buildHistoryContext(historyMessages);
     const imageContext = await this.buildImageContext(imageUrls, conversationId);
     const voiceContext = this.buildVoiceContext(audioFilename, conversationId);
-    const attachmentContext = this.buildAttachmentContext(attachmentFilenames ?? [], conversationId);
+    const attachmentContext = await this.buildAttachmentContext(attachmentFilenames ?? [], conversationId);
     const fileContext = await this.buildFileContext(text);
     return `${historyContext}${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
   }
@@ -84,6 +84,12 @@ export class ChatPromptContextService {
       if (!p) continue;
       
       let infoStr = `- ${p}\n`;
+      if (!this.uploadsService.supportsImageOcr(f)) {
+        infoStr += '  OCR: unavailable for this image format; visual reference only.\n';
+        strings.push(infoStr);
+        continue;
+      }
+
       const info = await this.uploadsService.extractImageInfo(f, conversationId);
       if (info) {
         const dimensions = (info.width && info.height) ? `${info.width}x${info.height} pixels` : '';
@@ -95,11 +101,13 @@ export class ChatPromptContextService {
         if (info.text) {
           infoStr += `  Extracted Text:\n  ---\n  ${info.text.split('\n').join('\n  ')}\n  ---\n`;
         }
+      } else {
+        infoStr += '  OCR: unavailable; visual reference only.\n';
       }
       strings.push(infoStr);
     }
     return strings.length
-      ? `\n\nThe user attached ${strings.length} image(s). Full paths and extracted local data (for reference):\n${strings.join('\n')}\n`
+      ? `\n\nThe user attached ${strings.length} image(s). Use these as visual reference material for the request. Full paths and extracted local data:\n${strings.join('\n')}\n`
       : '';
   }
 
@@ -109,14 +117,46 @@ export class ChatPromptContextService {
     return path ? `\n\nThe user attached a voice recording. File path: ${path}\n\n` : '';
   }
 
-  private buildAttachmentContext(attachmentFilenames: string[], conversationId?: string): string {
+  private async buildAttachmentContext(attachmentFilenames: string[], conversationId?: string): Promise<string> {
     if (!attachmentFilenames.length) return '';
-    const paths = attachmentFilenames
-      .map((f) => this.uploadsService.getPath(f, conversationId))
-      .filter((p): p is string => p !== null);
-    return paths.length > 0
-      ? `\n\nThe user attached ${paths.length} file(s). Full paths (for reference):\n${paths.map((p) => `- ${p}`).join('\n')}\n\n`
+    const entries: string[] = [];
+    for (const filename of attachmentFilenames) {
+      const path = this.uploadsService.getPath(filename, conversationId);
+      if (!path) continue;
+      if (!this.isImageFilename(filename)) {
+        entries.push(`- ${path}`);
+        continue;
+      }
+      let entry = `- ${path}\n  Type: image visual reference. Inspect this file when visual details matter.`;
+      if (!this.uploadsService.supportsImageOcr(filename)) {
+        entry += '\n  OCR: unavailable for this image format; visual reference only.';
+        entries.push(entry);
+        continue;
+      }
+
+      const info = await this.uploadsService.extractImageInfo(filename, conversationId);
+      if (info) {
+        const dimensions = (info.width && info.height) ? `${info.width}x${info.height} pixels` : '';
+        const format = info.format || '';
+        const meta = [dimensions, format].filter(Boolean).join(' ');
+        if (meta) {
+          entry += `\n  Metadata: ${meta}`;
+        }
+        if (info.text) {
+          entry += `\n  Extracted Text:\n  ---\n  ${info.text.split('\n').join('\n  ')}\n  ---`;
+        }
+      } else {
+        entry += '\n  OCR: unavailable; visual reference only.';
+      }
+      entries.push(entry);
+    }
+    return entries.length > 0
+      ? `\n\nThe user attached ${entries.length} file(s). Use them as request context. Image files are visual references, not missing prompt artefacts. Full paths:\n${entries.join('\n')}\n\n`
       : '';
+  }
+
+  private isImageFilename(filename: string): boolean {
+    return /\.(avif|bmp|gif|heic|heif|jpe?g|png|tiff?|webp)$/i.test(filename);
   }
 
   private async buildFileContext(text: string): Promise<string> {

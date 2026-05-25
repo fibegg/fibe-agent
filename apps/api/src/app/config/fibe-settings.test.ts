@@ -199,6 +199,7 @@ describe('applyFibeSettings', () => {
     'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON',
     'FIBE_SYNC_ENABLED',
     'CORS_ORIGINS', 'FRAME_ANCESTORS',
+    'FIBE_OCR_CONVERSION_MAX_BYTES', 'FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES',
     'FIBE_CLI_VERSION', 'PROVIDER_ARGS', 'SKILL_TOGGLES', 'SYSCHECK_ENABLED',
     'AGENT_CREDENTIALS_JSON', 'AGENT_RUNTIME_FILES_JSON',
     // Credential env keys injected from credentialEnv
@@ -280,6 +281,8 @@ describe('applyFibeSettings', () => {
       'gemmaModel: gemma3:12b',
       'gemmaConfidenceThreshold: 0.65',
       'gemmaTimeoutMs: 9876',
+      'ocrConversionMaxBytes: 1048576',
+      'ocrConversionMaxOutputBytes: 4194304',
       'userAvatarUrl: https://example.test/user.png',
       'userAvatarBase64: user-base64',
       'assistantAvatarUrl: https://example.test/bot.png',
@@ -323,6 +326,8 @@ describe('applyFibeSettings', () => {
     expect(process.env.GEMMA_MODEL).toBe('gemma3:12b');
     expect(process.env.GEMMA_CONFIDENCE_THRESHOLD).toBe('0.65');
     expect(process.env.GEMMA_TIMEOUT_MS).toBe('9876');
+    expect(process.env.FIBE_OCR_CONVERSION_MAX_BYTES).toBe('1048576');
+    expect(process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES).toBe('4194304');
     expect(process.env.USER_AVATAR_URL).toBe('https://example.test/user.png');
     expect(process.env.USER_AVATAR_BASE64).toBe('user-base64');
     expect(process.env.ASSISTANT_AVATAR_URL).toBe('https://example.test/bot.png');
@@ -354,6 +359,17 @@ describe('applyFibeSettings', () => {
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 10 });
     applyFibeSettings();
     expect(process.env.WEBSOCKET_MAX_CONNECTIONS).toBe('4');
+  });
+
+  test('promotes OCR conversion limits without overwriting individual env vars', () => {
+    process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES = '99';
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      ocrConversionMaxBytes: 123,
+      ocrConversionMaxOutputBytes: 456,
+    });
+    applyFibeSettings();
+    expect(process.env.FIBE_OCR_CONVERSION_MAX_BYTES).toBe('123');
+    expect(process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES).toBe('99');
   });
 
   test('promotes avatar settings', () => {

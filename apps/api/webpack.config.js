@@ -1,5 +1,43 @@
 const { NxAppWebpackPlugin } = require('@nx/webpack/app-plugin');
-const { join } = require('path');
+const { createRequire } = require('module');
+const { dirname, join } = require('path');
+
+const tesseractPackageJson = require.resolve('tesseract.js/package.json');
+const tesseractPackageRoot = dirname(tesseractPackageJson);
+const tesseractRequire = createRequire(tesseractPackageJson);
+
+function packageRoot(packageName) {
+  return dirname(tesseractRequire.resolve(`${packageName}/package.json`));
+}
+
+const tesseractRuntimeDependencyNames = [
+  'bmp-js',
+  'idb-keyval',
+  'is-url',
+  'node-fetch',
+  'regenerator-runtime',
+  'tesseract.js-core',
+  'wasm-feature-detect',
+  'zlibjs',
+];
+
+const tesseractRuntimeAssets = [
+  {
+    input: tesseractPackageRoot,
+    glob: 'package.json',
+    output: 'tesseract/tesseract.js/package.json',
+  },
+  {
+    input: join(tesseractPackageRoot, 'src'),
+    glob: '**/*',
+    output: 'tesseract/tesseract.js/src',
+  },
+  ...tesseractRuntimeDependencyNames.map((name) => ({
+    input: packageRoot(name),
+    glob: '**/*',
+    output: `tesseract/tesseract.js/node_modules/${name}/`,
+  })),
+];
 
 function envNumber(name, fallback) {
   const value = Number(process.env[name]);
@@ -30,7 +68,7 @@ module.exports = {
       compiler: 'tsc',
       main: './src/main.ts',
       tsConfig: './tsconfig.app.json',
-      assets: ['./src/assets'],
+      assets: ['./src/assets', ...tesseractRuntimeAssets],
       optimization: false,
       outputHashing: 'none',
       generatePackageJson: false,

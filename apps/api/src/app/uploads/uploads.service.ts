@@ -1,7 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
+import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { createRequire } from 'node:module';
 import { randomUUID } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
 import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from '../conversation/conversation-manager.service';
@@ -17,6 +19,85 @@ export interface ImageInfo {
 }
 
 const DATA_URL_REGEX = /^data:([^;]+);base64,(.+)$/;
+const runtimeRequire = createRequire(__filename);
+const OCR_NATIVE_IMAGE_REGEX = /\.(jpe?g|png)$/i;
+const OCR_CONVERTIBLE_IMAGE_REGEX = /\.(avif|bmp|heic|heif|tiff?|webp)$/i;
+const OCR_CONVERSION_TIMEOUT_MS = 10_000;
+
+function resolveTesseractWorkerPath(): string {
+  const distWorkerPath = join(__dirname, 'tesseract', 'tesseract.js', 'src', 'worker-script', 'node', 'index.js');
+  return existsSync(distWorkerPath)
+    ? distWorkerPath
+    : runtimeRequire.resolve('tesseract.js/src/worker-script/node/index.js');
+}
+
+const TESSERACT_RECOGNIZE_OPTIONS = {
+  logger: () => void 0,
+  workerBlobURL: false,
+  workerPath: resolveTesseractWorkerPath(),
+};
+
+function convertImageWith(command: string, input: Buffer, maxOutputBytes: number): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, ['-', '-auto-orient', '-strip', 'png:-'], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    const chunks: Buffer[] = [];
+    let byteCount = 0;
+    let stderr = '';
+    let settled = false;
+
+    const finish = (error?: Error, output?: Buffer) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      if (error) {
+        reject(error);
+      } else {
+        resolve(output ?? Buffer.alloc(0));
+      }
+    };
+
+    const timeout = setTimeout(() => {
+      child.kill('SIGKILL');
+      finish(new Error(`Image conversion timed out after ${OCR_CONVERSION_TIMEOUT_MS}ms`));
+    }, OCR_CONVERSION_TIMEOUT_MS);
+
+    child.stdout.on('data', (chunk: Buffer) => {
+      byteCount += chunk.length;
+      if (byteCount > maxOutputBytes) {
+        child.kill('SIGKILL');
+        finish(new Error('Converted image exceeded OCR conversion output limit'));
+        return;
+      }
+      chunks.push(chunk);
+    });
+
+    child.stderr.on('data', (chunk: Buffer) => {
+      if (stderr.length < 4096) stderr += chunk.toString();
+    });
+
+    child.on('error', (error) => finish(error));
+    child.on('close', (code) => {
+      if (code === 0) {
+        finish(undefined, Buffer.concat(chunks));
+      } else {
+        finish(new Error(`Image conversion failed with code ${code}: ${stderr.trim()}`));
+      }
+    });
+
+    child.stdin.end(input);
+  });
+}
+
+async function convertImageToPng(input: Buffer, maxOutputBytes: number): Promise<Buffer> {
+  try {
+    return await convertImageWith('magick', input, maxOutputBytes);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    return convertImageWith('convert', input, maxOutputBytes);
+  }
+}
 
 function audioExtFromMime(mime: string): string {
   if (mime.includes('webm')) return 'webm';
@@ -78,11 +159,15 @@ export class UploadsService {
     return existsSync(path) ? path : null;
   }
 
+  supportsImageOcr(filename: string): boolean {
+    return OCR_NATIVE_IMAGE_REGEX.test(filename) || OCR_CONVERTIBLE_IMAGE_REGEX.test(filename);
+  }
+
   async extractImageInfo(filename: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<ImageInfo | null> {
     const p = this.getPath(filename, conversationId);
     if (!p) return null;
 
-    if (!/\.(jpg|jpeg|png)$/i.test(filename)) {
+    if (!this.supportsImageOcr(filename)) {
       return null;
     }
 
@@ -97,9 +182,11 @@ export class UploadsService {
     }
 
     try {
-      const buffer = await readFile(p);
+      const buffer = await this.readImageBufferForOcr(filename, p);
+      if (!buffer) return null;
+
       const metadata = sizeOf(buffer);
-      const { data } = await Tesseract.recognize(buffer, 'eng', { logger: () => void 0 });
+      const { data } = await Tesseract.recognize(buffer, 'eng', TESSERACT_RECOGNIZE_OPTIONS);
       const info: ImageInfo = {
         text: data?.text?.trim() || '',
         width: metadata?.width,
@@ -110,6 +197,28 @@ export class UploadsService {
       return info;
     } catch (e) {
       this.logger.warn(`Failed to extract image info for ${filename}`, e);
+      return null;
+    }
+  }
+
+  private async readImageBufferForOcr(filename: string, path: string): Promise<Buffer | null> {
+    if (OCR_NATIVE_IMAGE_REGEX.test(filename)) {
+      return readFile(path);
+    }
+
+    if (!OCR_CONVERTIBLE_IMAGE_REGEX.test(filename)) {
+      return null;
+    }
+
+    const { size } = await stat(path);
+    if (size > this.config.getOcrConversionMaxBytes()) {
+      return null;
+    }
+
+    try {
+      return await convertImageToPng(await readFile(path), this.config.getOcrConversionMaxOutputBytes());
+    } catch (e) {
+      this.logger.warn(`Failed to convert image for OCR for ${filename}`, e);
       return null;
     }
   }

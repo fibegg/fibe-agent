@@ -20,6 +20,8 @@ describe('ConfigService', () => {
     envBackup.FIBE_DOMAIN = process.env.FIBE_DOMAIN;
     envBackup.FIBE_SYNC_ENABLED = process.env.FIBE_SYNC_ENABLED;
     envBackup.WEBSOCKET_MAX_CONNECTIONS = process.env.WEBSOCKET_MAX_CONNECTIONS;
+    envBackup.FIBE_OCR_CONVERSION_MAX_BYTES = process.env.FIBE_OCR_CONVERSION_MAX_BYTES;
+    envBackup.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES = process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES;
     envBackup.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
     envBackup.GEMMA_ROUTER_ENABLED = process.env.GEMMA_ROUTER_ENABLED;
     envBackup.OLLAMA_URL = process.env.OLLAMA_URL;
@@ -31,6 +33,8 @@ describe('ConfigService', () => {
     process.env.FIBE_SETTINGS_YAML_PATHS = join(process.cwd(), 'config-service-test-fibe.yml');
     delete process.env.FIBE_SYNC_ENABLED;
     delete process.env.WEBSOCKET_MAX_CONNECTIONS;
+    delete process.env.FIBE_OCR_CONVERSION_MAX_BYTES;
+    delete process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES;
     delete process.env.CLAUDE_EFFORT;
     delete process.env.GEMMA_ROUTER_ENABLED;
     delete process.env.OLLAMA_URL;
@@ -282,6 +286,35 @@ describe('ConfigService', () => {
     expect(withSettings({ websocketMaxConnections: 'abc' }).getWebsocketMaxConnections()).toBe(5);
     process.env.WEBSOCKET_MAX_CONNECTIONS = '-1';
     expect(withSettings({ websocketMaxConnections: 10 }).getWebsocketMaxConnections()).toBe(5);
+  });
+
+  test('returns OCR conversion limits from settings', () => {
+    const config = withSettings({
+      ocrConversionMaxBytes: 1048576,
+      ocrConversionMaxOutputBytes: '4194304',
+    });
+
+    expect(config.getOcrConversionMaxBytes()).toBe(1048576);
+    expect(config.getOcrConversionMaxOutputBytes()).toBe(4194304);
+  });
+
+  test('prefers OCR conversion limit env vars over settings', () => {
+    process.env.FIBE_OCR_CONVERSION_MAX_BYTES = '2097152';
+    process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES = '8388608';
+    const config = withSettings({
+      ocrConversionMaxBytes: 1048576,
+      ocrConversionMaxOutputBytes: 4194304,
+    });
+
+    expect(config.getOcrConversionMaxBytes()).toBe(2097152);
+    expect(config.getOcrConversionMaxOutputBytes()).toBe(8388608);
+  });
+
+  test('falls back to OCR conversion defaults for invalid values', () => {
+    expect(withSettings({ ocrConversionMaxBytes: 0 }).getOcrConversionMaxBytes()).toBe(10 * 1024 * 1024);
+    expect(withSettings({ ocrConversionMaxOutputBytes: 'abc' }).getOcrConversionMaxOutputBytes()).toBe(25 * 1024 * 1024);
+    process.env.FIBE_OCR_CONVERSION_MAX_BYTES = '-1';
+    expect(withSettings({ ocrConversionMaxBytes: 1048576 }).getOcrConversionMaxBytes()).toBe(10 * 1024 * 1024);
   });
 
   test('returns storage and platform routing settings from fibe settings', () => {

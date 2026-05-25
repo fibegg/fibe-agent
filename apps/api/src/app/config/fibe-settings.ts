@@ -72,6 +72,10 @@ export interface FibeSettings {
   // UI / Chat
   /** Maximum simultaneous chat websocket connections before the oldest is evicted. */
   websocketMaxConnections?: number | string;
+  /** Maximum source image size, in bytes, converted to PNG before OCR. */
+  ocrConversionMaxBytes?: number | string;
+  /** Maximum converted PNG size, in bytes, accepted before OCR. */
+  ocrConversionMaxOutputBytes?: number | string;
   userAvatarUrl?: string;
   userAvatarBase64?: string;
   assistantAvatarUrl?: string;
@@ -201,6 +205,8 @@ function promoteToEnv(s: FibeSettings): void {
 
   // UI / Chat
   if (s.websocketMaxConnections !== undefined) set('WEBSOCKET_MAX_CONNECTIONS', String(s.websocketMaxConnections));
+  if (s.ocrConversionMaxBytes !== undefined) set('FIBE_OCR_CONVERSION_MAX_BYTES', String(s.ocrConversionMaxBytes));
+  if (s.ocrConversionMaxOutputBytes !== undefined) set('FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES', String(s.ocrConversionMaxOutputBytes));
   set('USER_AVATAR_URL', s.userAvatarUrl);
   set('USER_AVATAR_BASE64', s.userAvatarBase64);
   set('ASSISTANT_AVATAR_URL', s.assistantAvatarUrl);

@@ -4,6 +4,8 @@ import { loadFibeSettings, type FibeSettings } from './fibe-settings';
 import { DEFAULT_EFFORT, normalizeEffort, resolveEffort, type EffortValue } from '@shared/effort.constants';
 
 const DEFAULT_WEBSOCKET_MAX_CONNECTIONS = 5;
+export const DEFAULT_OCR_CONVERSION_MAX_BYTES = 10 * 1024 * 1024;
+export const DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES = 25 * 1024 * 1024;
 
 function sanitizeConversationId(id: string): string {
   const sanitized = id
@@ -149,6 +151,24 @@ export class ConfigService {
     }
     return parsePositiveInteger(this.settings.websocketMaxConnections) ??
       DEFAULT_WEBSOCKET_MAX_CONNECTIONS;
+  }
+
+  getOcrConversionMaxBytes(): number {
+    if (process.env.FIBE_OCR_CONVERSION_MAX_BYTES !== undefined) {
+      return parsePositiveInteger(process.env.FIBE_OCR_CONVERSION_MAX_BYTES) ??
+        DEFAULT_OCR_CONVERSION_MAX_BYTES;
+    }
+    return parsePositiveInteger(this.settings.ocrConversionMaxBytes) ??
+      DEFAULT_OCR_CONVERSION_MAX_BYTES;
+  }
+
+  getOcrConversionMaxOutputBytes(): number {
+    if (process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES !== undefined) {
+      return parsePositiveInteger(process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES) ??
+        DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES;
+    }
+    return parsePositiveInteger(this.settings.ocrConversionMaxOutputBytes) ??
+      DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES;
   }
 
   // ─── Gemma Router (local LLM pre-processor via Ollama) ───────────
