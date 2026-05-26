@@ -124,7 +124,10 @@ if (args[0] === 'serve') {
           role: 'assistant',
           tokens: { input: 3, output: 4, cache: { read: 0, write: 0 }, reasoning: 0 },
         },
-        parts: [{ id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text }],
+        parts: [
+          { id: 'prt_reason', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'reasoning', text: 'thinking' },
+          { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text },
+        ],
       });
       return;
     }
