@@ -11,6 +11,8 @@ import { ProviderConversationPaths } from './provider-conversation-paths';
 
 const GEMINI_API_KEY_ENV = 'GEMINI_API_KEY';
 const AUTH_REQUIRED_MESSAGE = 'Authentication required. Please sign in with Google.';
+const GEMINI_AUTH_TYPE_API_KEY = 'gemini-api-key';
+const GEMINI_AUTH_TYPE_OAUTH = 'oauth-personal';
 const GEMINI_WORKSPACE_SUBDIR = 'gemini_workspace';
 const SESSION_MARKER_FILE = '.gemini_session';
 const GEMINI_RESUME_LATEST = 'latest';
@@ -20,6 +22,11 @@ interface GeminiSessionFile {
   lastUpdatedMs: number;
   mtimeMs: number;
   content: string;
+}
+
+interface GeminiCapturedSession {
+  sessionId: string;
+  output: string | null;
 }
 
 /**
@@ -42,6 +49,7 @@ function getGeminiProcessEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEn
   return {
     ...getGeminiHomeEnv(),
     NO_BROWSER: 'true',
+    GEMINI_CLI_TRUST_WORKSPACE: 'true',
     ...process.env,
     ...extraEnv,
   };
@@ -227,7 +235,8 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         continue;
       }
       for (const file of chatFiles) {
-        if (!file.isFile() || !file.name.startsWith('session-') || !file.name.endsWith('.json')) continue;
+        if (!file.isFile() || !file.name.startsWith('session-')) continue;
+        if (!file.name.endsWith('.json') && !file.name.endsWith('.jsonl')) continue;
         const filePath = join(chatsDir, file.name);
         const parsed = this.readGeminiSessionFile(filePath);
         if (parsed) sessions.push(parsed);
@@ -239,7 +248,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
   private readGeminiSessionFile(filePath: string): GeminiSessionFile | null {
     try {
       const content = readFileSync(filePath, 'utf8');
-      const parsed = JSON.parse(content) as Record<string, unknown>;
+      const parsed = this.parseGeminiSessionHeader(content);
       const sessionId = typeof parsed.sessionId === 'string' ? parsed.sessionId.trim() : '';
       if (!sessionId) return null;
       const lastUpdated = typeof parsed.lastUpdated === 'string' ? Date.parse(parsed.lastUpdated) : Number.NaN;
@@ -256,12 +265,113 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     }
   }
 
-  private captureSessionIdAfterRun(
+  private parseGeminiSessionHeader(content: string): Record<string, unknown> {
+    const trimmed = content.trimStart();
+    if (!trimmed) return {};
+    try {
+      return JSON.parse(trimmed) as Record<string, unknown>;
+    } catch {
+      /* Fall through to JSONL header parsing. */
+    }
+    const firstLine = trimmed.split(/\r?\n/, 1)[0]?.trim();
+    if (!firstLine) return {};
+    return JSON.parse(firstLine) as Record<string, unknown>;
+  }
+
+  private parseGeminiSessionRecords(content: string): Record<string, unknown>[] {
+    const records: Record<string, unknown>[] = [];
+    const pushRecord = (value: unknown) => {
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        records.push(value as Record<string, unknown>);
+      }
+    };
+    try {
+      const parsed = JSON.parse(content) as Record<string, unknown>;
+      if (Array.isArray(parsed.messages)) {
+        for (const message of parsed.messages) pushRecord(message);
+      } else {
+        pushRecord(parsed);
+      }
+    } catch {
+      for (const line of content.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed) continue;
+        try {
+          pushRecord(JSON.parse(trimmed));
+        } catch {
+          /* ignore non-JSON session lines */
+        }
+      }
+    }
+
+    return records;
+  }
+
+  private geminiSessionRecordText(record: Record<string, unknown>): string | null {
+    const content = record.content;
+    if (typeof content === 'string') return content;
+    if (Array.isArray(content)) {
+      const chunks = content.map((part) => {
+        if (typeof part === 'string') return part;
+        if (!part || typeof part !== 'object') return '';
+        const item = part as Record<string, unknown>;
+        return typeof item.text === 'string' ? item.text : '';
+      });
+      const text = chunks.join('');
+      return text ? text : null;
+    }
+    if (typeof record.text === 'string') return record.text;
+    return null;
+  }
+
+  private isGeminiUserSessionRecord(record: Record<string, unknown>): boolean {
+    return record.type === 'user' || (record.type === 'message' && record.role === 'user');
+  }
+
+  private isGeminiAssistantSessionRecord(record: Record<string, unknown>): boolean {
+    return record.type === 'gemini' || (record.type === 'message' && record.role === 'assistant');
+  }
+
+  private extractGeminiSessionOutput(content: string, promptNeedle: string): string | null {
+    const records = this.parseGeminiSessionRecords(content);
+    const trimmedNeedle = promptNeedle.trim().slice(0, 512);
+
+    if (trimmedNeedle) {
+      for (let i = records.length - 1; i >= 0; i -= 1) {
+        const record = records[i];
+        if (!this.isGeminiUserSessionRecord(record)) continue;
+        const text = this.geminiSessionRecordText(record);
+        if (!text?.includes(trimmedNeedle)) continue;
+
+        const chunks: string[] = [];
+        for (let j = i + 1; j < records.length; j += 1) {
+          const responseRecord = records[j];
+          if (this.isGeminiUserSessionRecord(responseRecord)) break;
+          if (!this.isGeminiAssistantSessionRecord(responseRecord)) continue;
+          const responseText = this.geminiSessionRecordText(responseRecord);
+          if (responseText) chunks.push(responseText);
+        }
+        const output = chunks.join('').trim();
+        return output ? output : null;
+      }
+    }
+
+    for (let i = records.length - 1; i >= 0; i -= 1) {
+      const record = records[i];
+      if (!this.isGeminiAssistantSessionRecord(record)) continue;
+      const output = this.geminiSessionRecordText(record)?.trim();
+      if (output) return output;
+    }
+
+    return null;
+  }
+
+  private captureSessionAfterRun(
     workspaceDir: string,
     knownSessionIds: Set<string>,
     startedAtMs: number,
     promptNeedle: string
-  ): string | null {
+  ): GeminiCapturedSession | null {
     const cutoffMs = startedAtMs - 5_000;
     const sessions = this.readProjectSessions(workspaceDir)
       .filter((session) =>
@@ -275,12 +385,21 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     const trimmedNeedle = promptNeedle.trim().slice(0, 512);
     if (trimmedNeedle) {
       const matching = sessions.find((session) => session.content.includes(trimmedNeedle));
-      if (matching) return matching.sessionId;
+      if (matching) {
+        return {
+          sessionId: matching.sessionId,
+          output: this.extractGeminiSessionOutput(matching.content, promptNeedle),
+        };
+      }
     }
-    return sessions[0].sessionId;
+    const newest = sessions[0];
+    return {
+      sessionId: newest.sessionId,
+      output: this.extractGeminiSessionOutput(newest.content, promptNeedle),
+    };
   }
 
-  ensureSettings(): void {
+  ensureSettings(authType = GEMINI_AUTH_TYPE_OAUTH): void {
     const geminiConfigDir = getGeminiConfigDir();
     if (!existsSync(geminiConfigDir)) {
       mkdirSync(geminiConfigDir, { recursive: true });
@@ -295,15 +414,26 @@ export class GeminiStrategy extends AbstractCLIStrategy {
 
     const config = {
       ...existing,
-      security: { auth: { selectedType: "oauth-personal" } },
+      security: {
+        ...((existing.security as Record<string, unknown>) ?? {}),
+        auth: {
+          ...((((existing.security as Record<string, unknown>) ?? {}).auth as Record<string, unknown>) ?? {}),
+          selectedType: authType,
+        },
+      },
     };
     writeFileSync(settingsPath, JSON.stringify(config, null, 2));
+  }
+
+  private ensureRuntimeSettings(): void {
+    this.ensureSettings(this.useApiTokenMode ? GEMINI_AUTH_TYPE_API_KEY : GEMINI_AUTH_TYPE_OAUTH);
   }
 
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
 
     if (this.useApiTokenMode) {
+      this.ensureRuntimeSettings();
       const token = this.getApiToken();
       if (token && token.trim()) {
         this.currentConnection.sendAuthSuccess();
@@ -313,7 +443,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       return;
     }
 
-    this.ensureSettings();
+    this.ensureRuntimeSettings();
     let authUrlExtracted = false;
     let isCode42Expected = false;
     let consentAnswered = false;
@@ -468,12 +598,13 @@ export class GeminiStrategy extends AbstractCLIStrategy {
 
   checkAuthStatus(): Promise<boolean> {
     if (this.useApiTokenMode) {
+      this.ensureRuntimeSettings();
       const token = this.getApiToken();
       return Promise.resolve(Boolean(token));
     }
 
     return new Promise((resolve) => {
-      this.ensureSettings();
+      this.ensureRuntimeSettings();
       const geminiProcess = spawn('gemini', ['-p', ''], {
         env: getGeminiProcessEnv(),
         shell: false,
@@ -541,9 +672,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
-      if (!this.useApiTokenMode) {
-        this.ensureSettings();
-      }
+      this.ensureRuntimeSettings();
       const workspaceDir = this.getGeminiWorkspaceDir();
       this.prepareWorkingDir();
       const storedSessionId = this.readStoredSession();
@@ -630,8 +759,23 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
         }
-        const shouldInspectFailure = (code !== 0 && code !== null) || !hasEmittedOutput || Boolean(errorResult.trim());
-        if (shouldInspectFailure) {
+        if (lineCarryOver) {
+          const content = parseGeminiStreamJsonLine(lineCarryOver);
+          if (content !== null) {
+            hasEmittedOutput = true;
+            onChunk(content);
+          }
+          lineCarryOver = '';
+        }
+        const capturedSession = (code === 0 || code === null)
+          ? this.captureSessionAfterRun(workspaceDir, knownSessionIds, startedAtMs, finalPrompt)
+          : null;
+        if ((code === 0 || code === null) && !hasEmittedOutput && capturedSession?.output) {
+          hasEmittedOutput = true;
+          onChunk(capturedSession.output);
+        }
+        const failedOrEmpty = (code !== 0 && code !== null) || !hasEmittedOutput;
+        if (failedOrEmpty) {
           const authError = detectProviderAuthFailure('Gemini', [errorResult, stdoutBuffer].filter((s) => s.trim()).join('\n'));
           if (authError) {
             reject(authError);
@@ -641,7 +785,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         const modelNotFound =
           errorResult.includes('ModelNotFoundError') ||
           errorResult.includes('Requested entity was not found');
-        if (modelNotFound) {
+        if (failedOrEmpty && modelNotFound) {
           reject(new Error('Invalid model specified. Please check the model name and try again.'));
           return;
         }
@@ -649,7 +793,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           errorResult.includes('RESOURCE_EXHAUSTED') ||
           errorResult.includes('MODEL_CAPACITY_EXHAUSTED') ||
           errorResult.includes('status 429');
-        if (rateLimited) {
+        if (failedOrEmpty && rateLimited) {
           reject(
             new Error(
               'Model is currently overloaded (rate limited). Please try again in a few minutes or switch to a different model.'
@@ -668,7 +812,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         if (code === 0 || code === null) {
           const capturedSessionId = storedSessionId && storedSessionId !== GEMINI_RESUME_LATEST
             ? storedSessionId
-            : this.captureSessionIdAfterRun(workspaceDir, knownSessionIds, startedAtMs, finalPrompt);
+            : capturedSession?.sessionId;
           if (capturedSessionId) {
             this.writeStoredSession(capturedSessionId);
           } else {

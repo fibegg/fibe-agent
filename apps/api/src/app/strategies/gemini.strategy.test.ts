@@ -16,6 +16,7 @@ if (process.env.GEMINI_FAKE_ARGS_PATH) {
 if (process.env.GEMINI_FAKE_ENV_PATH) {
   fs.writeFileSync(process.env.GEMINI_FAKE_ENV_PATH, JSON.stringify({
     GEMINI_CLI_HOME: process.env.GEMINI_CLI_HOME,
+    GEMINI_CLI_TRUST_WORKSPACE: process.env.GEMINI_CLI_TRUST_WORKSPACE,
     NO_BROWSER: process.env.NO_BROWSER,
   }));
 }
@@ -41,12 +42,33 @@ function writeSessionFile() {
   const chatsDir = path.join(projectDir, 'chats');
   fs.mkdirSync(chatsDir, { recursive: true });
   fs.writeFileSync(path.join(projectDir, '.project_root'), path.resolve(process.cwd()));
+  const fakeMsg = process.env.GEMINI_FAKE_MESSAGE || 'fake response';
+  if (process.env.GEMINI_FAKE_SESSION_FORMAT === 'jsonl') {
+    const records = [
+      JSON.stringify({
+        sessionId,
+        projectHash: 'fake',
+        startTime: '2026-05-04T08:00:00.000Z',
+        lastUpdated: new Date().toISOString(),
+        kind: 'main',
+      }),
+    ];
+    if (process.env.GEMINI_FAKE_OLD_PROMPT || process.env.GEMINI_FAKE_OLD_MESSAGE) {
+      records.push(JSON.stringify({ type: 'user', content: [{ text: process.env.GEMINI_FAKE_OLD_PROMPT || 'old prompt' }] }));
+      records.push(JSON.stringify({ type: 'gemini', content: process.env.GEMINI_FAKE_OLD_MESSAGE || 'old response' }));
+    }
+    records.push(JSON.stringify({ type: 'user', content: [{ text: promptFromArgs() }] }));
+    records.push(JSON.stringify({ type: 'gemini', content: fakeMsg }));
+    records.push('');
+    fs.writeFileSync(path.join(chatsDir, 'session-2026-05-04T08-00-' + sessionId.slice(0, 8) + '.jsonl'), records.join('\\n'));
+    return;
+  }
   fs.writeFileSync(path.join(chatsDir, 'session-2026-05-04T08-00-' + sessionId.slice(0, 8) + '.json'), JSON.stringify({
     sessionId,
     projectHash: 'fake',
     startTime: '2026-05-04T08:00:00.000Z',
     lastUpdated: new Date().toISOString(),
-    messages: [{ type: 'user', content: promptFromArgs() }, { type: 'gemini', content: 'fake response' }],
+    messages: [{ type: 'user', content: promptFromArgs() }, { type: 'gemini', content: fakeMsg }],
     kind: 'main'
   }, null, 2));
 }
@@ -58,8 +80,13 @@ if (process.env.GEMINI_FAKE_MODE === 'empty') {
   process.exit(0);
 }
 writeSessionFile();
+if (process.env.GEMINI_FAKE_STDERR) {
+  console.error(process.env.GEMINI_FAKE_STDERR);
+}
 const fakeMsg = process.env.GEMINI_FAKE_MESSAGE || 'fake response';
-console.log(JSON.stringify({ type: 'message', role: 'assistant', content: fakeMsg, delta: true }));
+if (process.env.GEMINI_FAKE_STDOUT_EMPTY !== '1') {
+  console.log(JSON.stringify({ type: 'message', role: 'assistant', content: fakeMsg, delta: true }));
+}
 `, { mode: 0o755 });
   chmodSync(path, 0o755);
 }
@@ -342,6 +369,11 @@ describe('GeminiStrategy session recovery', () => {
     savedEnv.GEMINI_FAKE_MESSAGE = process.env.GEMINI_FAKE_MESSAGE;
     savedEnv.GEMINI_FAKE_SESSION_ID = process.env.GEMINI_FAKE_SESSION_ID;
     savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE = process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    savedEnv.GEMINI_FAKE_SESSION_FORMAT = process.env.GEMINI_FAKE_SESSION_FORMAT;
+    savedEnv.GEMINI_FAKE_STDOUT_EMPTY = process.env.GEMINI_FAKE_STDOUT_EMPTY;
+    savedEnv.GEMINI_FAKE_STDERR = process.env.GEMINI_FAKE_STDERR;
+    savedEnv.GEMINI_FAKE_OLD_PROMPT = process.env.GEMINI_FAKE_OLD_PROMPT;
+    savedEnv.GEMINI_FAKE_OLD_MESSAGE = process.env.GEMINI_FAKE_OLD_MESSAGE;
     savedEnv.GEMINI_CLI_HOME = process.env.GEMINI_CLI_HOME;
     savedEnv.NO_BROWSER = process.env.NO_BROWSER;
     savedEnv.SESSION_DIR = process.env.SESSION_DIR;
@@ -358,6 +390,11 @@ describe('GeminiStrategy session recovery', () => {
     delete process.env.GEMINI_FAKE_MESSAGE;
     delete process.env.GEMINI_FAKE_SESSION_ID;
     delete process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    delete process.env.GEMINI_FAKE_SESSION_FORMAT;
+    delete process.env.GEMINI_FAKE_STDOUT_EMPTY;
+    delete process.env.GEMINI_FAKE_STDERR;
+    delete process.env.GEMINI_FAKE_OLD_PROMPT;
+    delete process.env.GEMINI_FAKE_OLD_MESSAGE;
     delete process.env.GEMINI_CLI_HOME;
     delete process.env.NO_BROWSER;
     delete process.env.SESSION_DIR;
@@ -380,6 +417,16 @@ describe('GeminiStrategy session recovery', () => {
     else process.env.GEMINI_FAKE_SESSION_ID = savedEnv.GEMINI_FAKE_SESSION_ID;
     if (savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE === undefined) delete process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
     else process.env.GEMINI_FAKE_SKIP_SESSION_WRITE = savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    if (savedEnv.GEMINI_FAKE_SESSION_FORMAT === undefined) delete process.env.GEMINI_FAKE_SESSION_FORMAT;
+    else process.env.GEMINI_FAKE_SESSION_FORMAT = savedEnv.GEMINI_FAKE_SESSION_FORMAT;
+    if (savedEnv.GEMINI_FAKE_STDOUT_EMPTY === undefined) delete process.env.GEMINI_FAKE_STDOUT_EMPTY;
+    else process.env.GEMINI_FAKE_STDOUT_EMPTY = savedEnv.GEMINI_FAKE_STDOUT_EMPTY;
+    if (savedEnv.GEMINI_FAKE_STDERR === undefined) delete process.env.GEMINI_FAKE_STDERR;
+    else process.env.GEMINI_FAKE_STDERR = savedEnv.GEMINI_FAKE_STDERR;
+    if (savedEnv.GEMINI_FAKE_OLD_PROMPT === undefined) delete process.env.GEMINI_FAKE_OLD_PROMPT;
+    else process.env.GEMINI_FAKE_OLD_PROMPT = savedEnv.GEMINI_FAKE_OLD_PROMPT;
+    if (savedEnv.GEMINI_FAKE_OLD_MESSAGE === undefined) delete process.env.GEMINI_FAKE_OLD_MESSAGE;
+    else process.env.GEMINI_FAKE_OLD_MESSAGE = savedEnv.GEMINI_FAKE_OLD_MESSAGE;
     if (savedEnv.GEMINI_CLI_HOME === undefined) delete process.env.GEMINI_CLI_HOME;
     else process.env.GEMINI_CLI_HOME = savedEnv.GEMINI_CLI_HOME;
     if (savedEnv.NO_BROWSER === undefined) delete process.env.NO_BROWSER;
@@ -459,6 +506,77 @@ describe('GeminiStrategy session recovery', () => {
     ]);
   });
 
+  test('executePromptStreaming recovers visible output from current Gemini JSONL sessions', async () => {
+    process.env.GEMINI_CLI_HOME = join(testHome, 'gemini-home');
+    process.env.GEMINI_FAKE_SESSION_ID = 'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff';
+    process.env.GEMINI_FAKE_SESSION_FORMAT = 'jsonl';
+    process.env.GEMINI_FAKE_STDOUT_EMPTY = '1';
+    process.env.GEMINI_FAKE_MESSAGE = 'jsonl recovered response';
+
+    const convDir = join(testHome, 'jsonl-conv');
+    mkdirSync(convDir, { recursive: true });
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    await expect(
+      strategy.executePromptStreaming('recover from session', 'gemini-2.5-flash-lite', (chunk) => chunks.push(chunk)),
+    ).resolves.toBeUndefined();
+
+    expect(chunks).toEqual(['jsonl recovered response']);
+    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe('bbbbbbbb-cccc-4ddd-8eee-ffffffffffff');
+  });
+
+  test('executePromptStreaming recovers only the current Gemini JSONL turn output', async () => {
+    process.env.GEMINI_CLI_HOME = join(testHome, 'gemini-home');
+    process.env.GEMINI_FAKE_SESSION_ID = 'dddddddd-eeee-4fff-8aaa-bbbbbbbbbbbb';
+    process.env.GEMINI_FAKE_SESSION_FORMAT = 'jsonl';
+    process.env.GEMINI_FAKE_STDOUT_EMPTY = '1';
+    process.env.GEMINI_FAKE_OLD_PROMPT = 'previous turn';
+    process.env.GEMINI_FAKE_OLD_MESSAGE = 'old recovered response';
+    process.env.GEMINI_FAKE_MESSAGE = 'current recovered response';
+
+    const convDir = join(testHome, 'jsonl-current-turn-conv');
+    mkdirSync(convDir, { recursive: true });
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    await expect(
+      strategy.executePromptStreaming('current turn', 'gemini-2.5-flash-lite', (chunk) => chunks.push(chunk)),
+    ).resolves.toBeUndefined();
+
+    expect(chunks).toEqual(['current recovered response']);
+  });
+
+  test('executePromptStreaming trusts recovered output before classifying successful warning text as auth failure', async () => {
+    process.env.GEMINI_CLI_HOME = join(testHome, 'gemini-home');
+    process.env.GEMINI_FAKE_SESSION_ID = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
+    process.env.GEMINI_FAKE_SESSION_FORMAT = 'jsonl';
+    process.env.GEMINI_FAKE_STDOUT_EMPTY = '1';
+    process.env.GEMINI_FAKE_STDERR = 'warning: transient provider status 403 was recovered';
+    process.env.GEMINI_FAKE_MESSAGE = 'recovered despite warning';
+
+    const convDir = join(testHome, 'jsonl-warning-conv');
+    mkdirSync(convDir, { recursive: true });
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => convDir,
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    await expect(
+      strategy.executePromptStreaming('recover despite warning', 'gemini-2.5-flash-lite', (chunk) => chunks.push(chunk)),
+    ).resolves.toBeUndefined();
+
+    expect(chunks).toEqual(['recovered despite warning']);
+    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe('cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa');
+  });
+
   test('new UUID conversations do not inherit a legacy workspace latest marker', async () => {
     const argsPath = join(testHome, 'gemini-legacy-marker-args.json');
     process.env.GEMINI_FAKE_ARGS_PATH = argsPath;
@@ -520,8 +638,30 @@ describe('GeminiStrategy session recovery', () => {
     await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
       GEMINI_CLI_HOME: join(testHome, 'fibe-gemini-home'),
+      GEMINI_CLI_TRUST_WORKSPACE: 'true',
       NO_BROWSER: 'fibe-set',
     });
+  });
+
+  test('executePromptStreaming overwrites stale OAuth auth setting in api-token mode', async () => {
+    const geminiHome = join(testHome, 'stale-gemini-home');
+    const settingsDir = join(geminiHome, '.gemini');
+    mkdirSync(settingsDir, { recursive: true });
+    writeFileSync(
+      join(settingsDir, 'settings.json'),
+      JSON.stringify({ security: { auth: { selectedType: 'oauth-personal' } }, theme: 'dark' }, null, 2),
+    );
+    process.env.GEMINI_CLI_HOME = geminiHome;
+
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'stale-auth-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    const settings = JSON.parse(readFileSync(join(settingsDir, 'settings.json'), 'utf8'));
+    expect(settings.security.auth.selectedType).toBe('gemini-api-key');
+    expect(settings.theme).toBe('dark');
   });
 
   test('executePromptStreaming keeps legacy Gemini env fallback from SESSION_DIR', async () => {
@@ -538,6 +678,7 @@ describe('GeminiStrategy session recovery', () => {
     await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
       GEMINI_CLI_HOME: join(testHome, 'agent-data'),
+      GEMINI_CLI_TRUST_WORKSPACE: 'true',
       NO_BROWSER: 'true',
     });
   });
