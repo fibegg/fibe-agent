@@ -830,7 +830,21 @@ describe('OpenaiCodexStrategy', () => {
     strategy.ensureSettings();
     expect(existsSync(join(codexDir, 'auth.json'))).toBe(true);
     const content = readFileSync(join(codexDir, 'auth.json'), 'utf8');
-    expect(JSON.parse(content)).toEqual({ api_key: 'sk-env-key' });
+    expect(JSON.parse(content)).toEqual({ auth_mode: 'apikey', OPENAI_API_KEY: 'sk-env-key' });
+  });
+
+  test('ensureSettings in api-token mode migrates legacy api_key auth.json', () => {
+    const codexDir = join(TEST_HOME, '.codex');
+    process.env.SESSION_DIR = codexDir;
+    mkdirSync(codexDir, { recursive: true });
+    const authPath = join(codexDir, 'auth.json');
+    writeFileSync(authPath, JSON.stringify({ api_key: 'sk-legacy-key' }), { mode: 0o600 });
+    const strategy = new OpenaiCodexStrategy(true);
+    strategy.ensureSettings();
+    expect(JSON.parse(readFileSync(authPath, 'utf8'))).toEqual({
+      auth_mode: 'apikey',
+      OPENAI_API_KEY: 'sk-legacy-key',
+    });
   });
 
   test('ensureSettings in api-token mode does not write auth.json when OPENAI_API_KEY is empty', () => {

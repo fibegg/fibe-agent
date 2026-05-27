@@ -76,7 +76,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-function hasNonEmptyString(value: unknown): boolean {
+function hasNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
@@ -100,6 +100,33 @@ function hasCodexAuth(auth: unknown): boolean {
   }
 
   return false;
+}
+
+function codexApiKeyAuth(apiKey: string): Record<string, string> {
+  return {
+    auth_mode: 'apikey',
+    OPENAI_API_KEY: apiKey,
+  };
+}
+
+function extractCodexApiKey(auth: unknown): string | null {
+  const root = asRecord(auth);
+  if (!root) return null;
+
+  for (const key of ['OPENAI_API_KEY', 'api_key', 'token']) {
+    const value = root[key];
+    if (hasNonEmptyString(value)) return value.trim();
+  }
+
+  const nested = asRecord(root.OPENAI_API_KEY);
+  if (nested) {
+    for (const key of ['api_key', 'token', 'value']) {
+      const value = nested[key];
+      if (hasNonEmptyString(value)) return value.trim();
+    }
+  }
+
+  return null;
 }
 
 // eslint-disable-next-line no-control-regex
@@ -459,8 +486,20 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     if (this.useApiTokenMode) {
       const key = process.env[OPENAI_API_KEY_ENV]?.trim();
       const authPath = join(codexHome, 'auth.json');
-      if (key && !existsSync(authPath)) {
-        writeFileSync(authPath, JSON.stringify({ api_key: key }), { mode: 0o600 });
+      if (key) {
+        writeFileSync(authPath, JSON.stringify(codexApiKeyAuth(key)), { mode: 0o600 });
+        return;
+      }
+      if (existsSync(authPath)) {
+        try {
+          const parsed = JSON.parse(readFileSync(authPath, 'utf8'));
+          const migratedKey = extractCodexApiKey(parsed);
+          if (migratedKey && (parsed.auth_mode !== 'apikey' || parsed.OPENAI_API_KEY !== migratedKey)) {
+            writeFileSync(authPath, JSON.stringify(codexApiKeyAuth(migratedKey)), { mode: 0o600 });
+          }
+        } catch {
+          /* Invalid auth.json is handled by checkAuthStatus/executePromptStreaming. */
+        }
       }
     }
   }
