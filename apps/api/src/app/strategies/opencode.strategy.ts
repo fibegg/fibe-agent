@@ -24,6 +24,9 @@ const SESSION_MARKER_FILE = '.opencode_session';
 const OPENCODE_CONFIG_FILE = 'opencode.json';
 const OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS = 120_000;
 const OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 60 * 60 * 1000;
+const OPENCODE_APP_SERVER_TURN_TIMEOUT_ENV = 'OPENCODE_APP_SERVER_TURN_TIMEOUT_MS';
+const OPENCODE_APP_SERVER_EVENT_LOG_LIMIT = 5;
+const API_KEY_LOG_PATTERN = /\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{8,})\b/g;
 const MISSING_SESSION_ERROR_PATTERNS = [
   /No conversation found with session ID:/i,
   /\b(conversation|session)\b[^\n]*\b(not found|missing)\b/i,
@@ -54,6 +57,7 @@ const API_KEY_ENV_VARS = [
   'ANTHROPIC_API_KEY',
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
+  'GOOGLE_GENERATIVE_AI_API_KEY',
   'OPENROUTER_API_KEY',
 ] as const;
 
@@ -117,6 +121,7 @@ function useAppServerTransport(): boolean {
   if (explicitTransport === 'app-server' || explicitTransport === 'appserver') return true;
 
   const explicitFlag = (process.env.OPENCODE_USE_APP_SERVER ?? '').trim().toLowerCase();
+  if (['1', 'true', 'yes'].includes(explicitFlag)) return true;
   if (['0', 'false', 'no'].includes(explicitFlag)) return false;
   return true;
 }
@@ -149,6 +154,40 @@ function errorMessage(error: unknown): string {
     }
   }
   return JSON.stringify(error);
+}
+
+function sanitizeLogValue(value: string): string {
+  return value.replace(API_KEY_LOG_PATTERN, '[redacted]').slice(0, 500);
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && (error.name === 'AbortError' || /\babort(?:ed)?\b/i.test(error.message));
+}
+
+class OpenCodeAppServerTurnTimeoutError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'OpenCodeAppServerTurnTimeoutError';
+  }
+}
+
+type StoredProvider = 'openrouter' | 'anthropic' | 'openai' | 'gemini';
+
+function inferStoredProvider(key: string): StoredProvider {
+  if (/^sk-or-/.test(key)) return 'openrouter';
+  if (/^sk-ant-/.test(key)) return 'anthropic';
+  if (/^sk-/.test(key)) return 'openai';
+  if (/^AIza/.test(key)) return 'gemini';
+  return 'openrouter';
+}
+
+export function resolveOpencodeAppServerTurnTimeoutMs(): number {
+  const raw = process.env[OPENCODE_APP_SERVER_TURN_TIMEOUT_ENV]?.trim();
+  if (!raw) return OPENCODE_APP_SERVER_TURN_TIMEOUT_MS;
+
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return OPENCODE_APP_SERVER_TURN_TIMEOUT_MS;
+  return parsed;
 }
 
 interface OpenCodeSession {
@@ -212,11 +251,17 @@ interface OpenCodeEvent {
 
 interface OpenCodeEventState {
   sessionId: string;
+  startedAt: number;
+  providerID: string;
+  modelID: string;
+  resolvedModel: string;
   onChunk: (chunk: string) => void;
   callbacks?: StreamingCallbacks;
   errorResult: string;
   reasoningOpen: boolean;
   hasVisibleOutput: boolean;
+  idle: boolean;
+  eventTypes: string[];
   textByPartId: Map<string, string>;
   rawTextByPartId: Map<string, string>;
   partTypeById: Map<string, string>;
@@ -269,16 +314,26 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
   /**
    * Reads a manually stored API key from the auth file (set via auth modal).
    */
-  private getStoredApiKey(): string | null {
+  private getStoredAuth(): { apiKey: string; provider: StoredProvider } | null {
     const authFile = opencodeAuthFile();
     if (!existsSync(authFile)) return null;
     try {
       const content = readFileSync(authFile, 'utf8');
-      const auth = JSON.parse(content) as { api_key?: string };
-      return auth?.api_key?.trim() || null;
+      const auth = JSON.parse(content) as { api_key?: string; provider?: string };
+      const apiKey = auth?.api_key?.trim();
+      if (!apiKey) return null;
+      const provider = auth.provider?.trim() as StoredProvider | undefined;
+      if (provider && ['openrouter', 'anthropic', 'openai', 'gemini'].includes(provider)) {
+        return { apiKey, provider };
+      }
+      return { apiKey, provider: inferStoredProvider(apiKey) };
     } catch {
       return null;
     }
+  }
+
+  private getStoredApiKey(): string | null {
+    return this.getStoredAuth()?.apiKey ?? null;
   }
 
   /**
@@ -313,7 +368,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
       writeFileSync(
         opencodeAuthFile(),
-        JSON.stringify({ api_key: trimmed }),
+        JSON.stringify({ api_key: trimmed, provider: inferStoredProvider(trimmed) }),
         { mode: 0o600 }
       );
       if (this.currentConnection) {
@@ -348,10 +403,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     // When OpenRouter is the active provider, ensure the model ID has
     // the openrouter/ prefix that opencode expects (e.g. openrouter/openai/gpt-5.4).
     // This lets MODEL_OPTIONS and custom model input use short forms like openai/gpt-5.4.
-    if (
-      !resolved.startsWith('openrouter/') &&
-      (process.env.OPENROUTER_API_KEY?.trim() || this.isStoredKeyActive())
-    ) {
+    if (!resolved.startsWith('openrouter/') && this.isOpenRouterActive()) {
       resolved = `openrouter/${resolved}`;
     }
 
@@ -362,8 +414,9 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
    * Returns true when a manually-stored key is the only credential source
    * (meaning the user pasted an OpenRouter key via the auth modal).
    */
-  private isStoredKeyActive(): boolean {
-    return !hasEnvApiKey() && this.getStoredApiKey() !== null;
+  private isOpenRouterActive(): boolean {
+    if (process.env.OPENROUTER_API_KEY?.trim()) return true;
+    return !hasEnvApiKey() && this.getStoredAuth()?.provider === 'openrouter';
   }
 
   private static readonly LIST_MODELS_TIMEOUT_MS = 15_000;
@@ -416,16 +469,24 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       ...OpencodeStrategy.YOLO_ENV,
     };
     OpencodeStrategy.applyYoloConfigContent(env);
-    const storedKey = this.getStoredApiKey();
+    const storedAuth = this.getStoredAuth();
 
-    if (storedKey) {
-      for (const varName of API_KEY_ENV_VARS) {
-        if (!env[varName]?.trim()) {
-          env[varName] = storedKey;
-        }
-      }
-      if (!env['OPENAI_API_BASE']?.trim()) {
-        env['OPENAI_API_BASE'] = 'https://openrouter.ai/api/v1';
+    if (storedAuth) {
+      switch (storedAuth.provider) {
+        case 'openrouter':
+          if (!env.OPENROUTER_API_KEY?.trim()) env.OPENROUTER_API_KEY = storedAuth.apiKey;
+          if (!env.OPENAI_API_BASE?.trim()) env.OPENAI_API_BASE = 'https://openrouter.ai/api/v1';
+          break;
+        case 'anthropic':
+          if (!env.ANTHROPIC_API_KEY?.trim()) env.ANTHROPIC_API_KEY = storedAuth.apiKey;
+          break;
+        case 'openai':
+          if (!env.OPENAI_API_KEY?.trim()) env.OPENAI_API_KEY = storedAuth.apiKey;
+          break;
+        case 'gemini':
+          if (!env.GEMINI_API_KEY?.trim()) env.GEMINI_API_KEY = storedAuth.apiKey;
+          if (!env.GOOGLE_GENERATIVE_AI_API_KEY?.trim()) env.GOOGLE_GENERATIVE_AI_API_KEY = storedAuth.apiKey;
+          break;
       }
     }
 
@@ -746,14 +807,22 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     }
 
     const appServer = this.createAppServer();
+    const turn = this.resolveAppServerTurn(model);
+    const turnTimeoutMs = resolveOpencodeAppServerTurnTimeoutMs();
     this.appServer = appServer;
     const state: OpenCodeEventState = {
       sessionId: '',
+      startedAt: Date.now(),
+      providerID: turn.providerID,
+      modelID: turn.modelID,
+      resolvedModel: turn.resolvedModel,
       onChunk,
       callbacks,
       errorResult: '',
       reasoningOpen: false,
       hasVisibleOutput: false,
+      idle: false,
+      eventTypes: [],
       textByPartId: new Map(),
       rawTextByPartId: new Map(),
       partTypeById: new Map(),
@@ -764,22 +833,43 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     let eventStream: { stop: () => void; done: Promise<void> } | null = null;
     let existingSessionId = this.readStoredSession();
     try {
-      await appServer.start();
+      this.logAppServerPhase(state, 'starting');
+      try {
+        await appServer.start();
+      } catch (err) {
+        const message = errorMessage(err);
+        if (/\b(?:timed out|timeout)\b/i.test(message)) {
+          throw new OpenCodeAppServerTurnTimeoutError(
+            `OpenCode app-server startup timed out for ${this.describeAppServerTurn(state)}: ${sanitizeLogValue(message)}`,
+          );
+        }
+        throw new Error(`OpenCode app-server startup failed for ${this.describeAppServerTurn(state)}: ${sanitizeLogValue(message)}`);
+      }
+      this.logAppServerPhase(state, 'started');
       eventStream = await this.openAppServerEventStream(appServer, state);
+      this.logAppServerPhase(state, 'event_stream_connected');
       const sessionId = await this.ensureAppServerSession(appServer, existingSessionId);
       state.sessionId = sessionId;
       this.activeAppServerSessionId = sessionId;
+      this.logAppServerPhase(state, 'session_ready');
 
+      this.logAppServerPhase(state, 'message_post_start');
       const response = await this.postAppServerMessage(
         appServer,
+        state,
         sessionId,
         finalPrompt,
-        model,
         systemPrompt,
         runtimeOptions,
       );
-      for (const part of response.parts ?? []) this.handleOpenCodePart(state, part);
-      this.handleOpenCodeMessageInfo(state, response.info);
+      this.logAppServerPhase(state, 'message_post_complete', `response=${response ? 'json' : 'null'} parts=${response?.parts?.length ?? 0}`);
+      if (response) {
+        for (const part of response.parts ?? []) this.handleOpenCodePart(state, part);
+        this.handleOpenCodeMessageInfo(state, response.info);
+      }
+      if (!response || (!state.hasVisibleOutput && !state.errorResult.trim())) {
+        await this.waitForAppServerTurnEvents(state, turnTimeoutMs);
+      }
       this.endReasoning(state);
 
       if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
@@ -792,10 +882,15 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         throw new Error(state.errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.');
       }
       this.writeStoredSession(sessionId);
+      this.logAppServerPhase(state, 'turn_complete');
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
+      this.logAppServerPhase(state, 'turn_failed', `error=${sanitizeLogValue(message)}`);
       const authError = detectProviderAuthFailure('OpenCode', message);
       if (authError) throw authError;
+      if (err instanceof OpenCodeAppServerTurnTimeoutError && !state.hasVisibleOutput) {
+        this.clearStoredSession();
+      }
       if (existingSessionId && missingSessionError(message)) {
         this.clearStoredSession();
         existingSessionId = null;
@@ -868,34 +963,47 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
   private async postAppServerMessage(
     appServer: HttpAppServerProcess,
+    state: OpenCodeEventState,
     sessionId: string,
     prompt: string,
-    model: string,
     systemPrompt?: string,
     runtimeOptions?: AgentRuntimeOptions,
-  ): Promise<OpenCodeMessageResponse> {
+  ): Promise<OpenCodeMessageResponse | null> {
     const controller = new AbortController();
     this.activePromptAbort = controller;
-    const resolvedModel = this.resolveModelForApi(model);
+    const timeoutMs = resolveOpencodeAppServerTurnTimeoutMs();
     const body: Record<string, unknown> = {
       parts: [{ type: 'text', text: prompt }],
     };
-    const parsedModel = parseOpencodeModel(resolvedModel);
+    const parsedModel = parseOpencodeModel(state.resolvedModel);
     if (parsedModel) body.model = parsedModel;
     if (systemPrompt) body.system = systemPrompt;
     const variant = normalizeVariant(runtimeOptions?.effort);
     if (variant) body.variant = variant;
 
-    return await appServer.json<OpenCodeMessageResponse>(
-      `/session/${encodeURIComponent(sessionId)}/message`,
-      {
-        method: 'POST',
-        query: this.appServerQuery(),
-        body,
-        signal: controller.signal,
-        timeoutMs: OPENCODE_APP_SERVER_TURN_TIMEOUT_MS,
-      },
-    );
+    try {
+      return await appServer.json<OpenCodeMessageResponse | null>(
+        `/session/${encodeURIComponent(sessionId)}/message`,
+        {
+          method: 'POST',
+          query: this.appServerQuery(),
+          body,
+          signal: controller.signal,
+          timeoutMs,
+        },
+      );
+    } catch (err) {
+      if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
+      const message = errorMessage(err);
+      if (isAbortError(err) || /\btimed out\b/i.test(message)) {
+        this.activePromptAbort?.abort();
+        this.activeSseAbort?.abort();
+        throw new OpenCodeAppServerTurnTimeoutError(
+          `OpenCode app-server message POST timed out after ${timeoutMs}ms for ${this.describeAppServerTurn(state)}: ${sanitizeLogValue(message)}`,
+        );
+      }
+      throw err;
+    }
   }
 
   private resolveModelForApi(model: string): string {
@@ -905,15 +1013,72 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     return model;
   }
 
+  private resolveAppServerTurn(model: string): { resolvedModel: string; providerID: string; modelID: string } {
+    const resolvedModel = this.resolveModelForApi(model);
+    const parsedModel = parseOpencodeModel(resolvedModel);
+    const displayModel = resolvedModel && resolvedModel !== 'undefined' ? resolvedModel : '(default)';
+    return {
+      resolvedModel,
+      providerID: parsedModel?.providerID ?? '(default)',
+      modelID: parsedModel?.modelID ?? displayModel,
+    };
+  }
+
+  private describeAppServerTurn(state: OpenCodeEventState): string {
+    return `provider=${state.providerID} model=${state.modelID} session=${state.sessionId || '(pending)'} elapsed_ms=${Date.now() - state.startedAt}`;
+  }
+
+  private logAppServerPhase(state: OpenCodeEventState, phase: string, detail?: string): void {
+    this.logger.log(`OpenCode app-server ${phase}: ${this.describeAppServerTurn(state)}${detail ? ` ${detail}` : ''}`);
+  }
+
+  private async waitForAppServerTurnEvents(state: OpenCodeEventState, timeoutMs: number): Promise<void> {
+    const startedAt = Date.now();
+    while (
+      !state.idle
+      && !this.streamInterrupted
+      && !state.errorResult.trim()
+      && !state.hasVisibleOutput
+      && Date.now() - startedAt < timeoutMs
+    ) {
+      const elapsed = Date.now() - startedAt;
+      await new Promise((resolve) => setTimeout(resolve, Math.max(1, Math.min(100, timeoutMs - elapsed))));
+    }
+    if (!state.idle && !this.streamInterrupted && !state.errorResult.trim() && !state.hasVisibleOutput) {
+      this.activePromptAbort?.abort();
+      this.activeSseAbort?.abort();
+      const events = state.eventTypes.length ? state.eventTypes.join(',') : 'none';
+      throw new OpenCodeAppServerTurnTimeoutError(
+        `OpenCode app-server turn timed out after ${timeoutMs}ms for ${this.describeAppServerTurn(state)}: no assistant output, session.idle, or session.error received; events=${events}`,
+      );
+    }
+  }
+
   private async openAppServerEventStream(
     appServer: HttpAppServerProcess,
     state: OpenCodeEventState,
   ): Promise<{ stop: () => void; done: Promise<void> }> {
     const controller = new AbortController();
     this.activeSseAbort = controller;
-    const res = await fetch(appServer.url('/event', this.appServerQuery()), {
-      signal: controller.signal,
-    });
+    const timeout = setTimeout(() => controller.abort(), OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS);
+    timeout.unref?.();
+    let res: Response;
+    try {
+      res = await fetch(appServer.url('/event', this.appServerQuery()), {
+        signal: controller.signal,
+      });
+    } catch (err) {
+      if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
+      const message = errorMessage(err);
+      if (isAbortError(err)) {
+        throw new OpenCodeAppServerTurnTimeoutError(
+          `OpenCode app-server event stream did not connect after ${OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS}ms for ${this.describeAppServerTurn(state)}: ${sanitizeLogValue(message)}`,
+        );
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
     if (!res.ok) {
       const body = await res.text().catch(() => '');
       this.logger.error(`OpenCode event stream failed with ${res.status}: ${body}`);
@@ -965,6 +1130,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       return;
     }
     const props = event.properties ?? {};
+    if (event.type && state.eventTypes.length < OPENCODE_APP_SERVER_EVENT_LOG_LIMIT) {
+      state.eventTypes.push(event.type);
+      this.logAppServerPhase(state, 'event', `type=${event.type}`);
+    }
 
     switch (event.type) {
       case 'message.updated':
@@ -984,7 +1153,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         }
         break;
       case 'session.idle':
-        if (props.sessionID === state.sessionId) this.endReasoning(state);
+        if (props.sessionID === state.sessionId) {
+          state.idle = true;
+          this.endReasoning(state);
+        }
         break;
       default:
         break;

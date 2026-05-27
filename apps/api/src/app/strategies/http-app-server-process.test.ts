@@ -107,6 +107,27 @@ describe('HttpAppServerProcess', () => {
     fetchSpy.mockResolvedValue({ ok: true, status: 200, json: vi.fn().mockResolvedValue({}), text: vi.fn().mockResolvedValue('') } as unknown as Response);
   });
 
+  test('start() times out stalled health requests', async () => {
+    fetchSpy.mockImplementation(((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      const abort = () => {
+        const err = new Error('aborted');
+        err.name = 'AbortError';
+        reject(err);
+      };
+      if (signal?.aborted) abort();
+      else signal?.addEventListener('abort', abort, { once: true });
+    })) as typeof fetch);
+
+    const server = new HttpAppServerProcess('node', [], {
+      startupTimeoutMs: 10,
+      healthRequestTimeoutMs: 5,
+    });
+
+    await expect(server.start()).rejects.toThrow('Timed out waiting for HTTP app-server health');
+    expect(fakeProc.kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
   // ─── baseUrl() / url() ─────────────────────────────────────────────────────
 
   test('baseUrl() returns correct URL after start', async () => {

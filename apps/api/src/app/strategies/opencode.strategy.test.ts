@@ -2,7 +2,7 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { OpencodeStrategy, buildOpencodeRunArgs } from './opencode.strategy';
+import { OpencodeStrategy, buildOpencodeRunArgs, resolveOpencodeAppServerTurnTimeoutMs } from './opencode.strategy';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 
 const TEST_HOME = join(tmpdir(), `opencode-test-home-${process.pid}`);
@@ -101,6 +101,31 @@ if (args[0] === 'serve') {
       record({ type: 'message-body', sessionID: messageMatch[1], query: Object.fromEntries(url.searchParams.entries()), body });
       const text = process.env.OPENCODE_FAKE_MESSAGE || 'fake app-server response';
       const prompt = (body && body.parts && body.parts[0] && body.parts[0].text) || 'hello';
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'empty-no-idle') {
+        sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_user', sessionID: messageMatch[1], role: 'user' } } });
+        sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_assistant', sessionID: messageMatch[1], role: 'assistant' } } });
+        sendJson(res, 200, {
+          info: {
+            id: 'msg_assistant',
+            sessionID: messageMatch[1],
+            role: 'assistant',
+            tokens: { input: 3, output: 0, cache: { read: 0, write: 0 }, reasoning: 0 },
+          },
+          parts: [],
+        });
+        return;
+      }
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'session-error') {
+        sendJson(res, 200, null);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        sendEvent(clients, { type: 'session.error', properties: { sessionID: messageMatch[1], error: { message: 'fake provider failure' } } });
+        return;
+      }
+      const sendNullBeforeEvents = process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'null-before-events';
+      if (sendNullBeforeEvents) {
+        sendJson(res, 200, null);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      }
       // Simulate real opencode: user message first, then assistant
       sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_user', sessionID: messageMatch[1], role: 'user' } } });
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_user', sessionID: messageMatch[1], messageID: 'msg_user', type: 'text', text: '[MODE]Casting...[/MODE]\\n' + prompt } } });
@@ -117,6 +142,13 @@ if (args[0] === 'serve') {
         sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
       }
       sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } });
+      if (sendNullBeforeEvents) {
+        return;
+      }
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'null') {
+        sendJson(res, 200, null);
+        return;
+      }
       sendJson(res, 200, {
         info: {
           id: 'msg_assistant',
@@ -159,17 +191,20 @@ describe('OpencodeStrategy', () => {
     'ANTHROPIC_API_KEY',
     'OPENAI_API_KEY',
     'GEMINI_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
     'OPENROUTER_API_KEY',
     'OPENAI_API_BASE',
     'OPENCODE_FAKE_ARGS_PATH',
     'OPENCODE_FAKE_ENV_PATH',
     'OPENCODE_FAKE_MODE',
     'OPENCODE_FAKE_MESSAGE',
+    'OPENCODE_FAKE_MESSAGE_RESPONSE',
     'OPENCODE_FAKE_EVENT_ORDER',
     'OPENCODE_FAKE_REQUESTS_PATH',
     'OPENCODE_CONFIG_CONTENT',
     'OPENCODE_AGENT_TRANSPORT',
     'OPENCODE_USE_APP_SERVER',
+    'OPENCODE_APP_SERVER_TURN_TIMEOUT_MS',
   ] as const;
 
   beforeEach(() => {
@@ -179,15 +214,18 @@ describe('OpencodeStrategy', () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.GEMINI_API_KEY;
+    delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.OPENAI_API_BASE;
     delete process.env.OPENCODE_FAKE_ARGS_PATH;
     delete process.env.OPENCODE_FAKE_ENV_PATH;
     delete process.env.OPENCODE_FAKE_MODE;
     delete process.env.OPENCODE_FAKE_MESSAGE;
+    delete process.env.OPENCODE_FAKE_MESSAGE_RESPONSE;
     delete process.env.OPENCODE_FAKE_EVENT_ORDER;
     delete process.env.OPENCODE_FAKE_REQUESTS_PATH;
     delete process.env.OPENCODE_CONFIG_CONTENT;
+    delete process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS;
     process.env.OPENCODE_AGENT_TRANSPORT = 'run';
     delete process.env.OPENCODE_USE_APP_SERVER;
     if (existsSync(TEST_HOME)) {
@@ -272,6 +310,14 @@ describe('OpencodeStrategy', () => {
     expect(conn.calls).toContain('auth_success');
   });
 
+  test('executeAuth skips modal when GOOGLE_GENERATIVE_AI_API_KEY is set', () => {
+    process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-key';
+    const strategy = new OpencodeStrategy();
+    const conn = makeConnection();
+    strategy.executeAuth(conn);
+    expect(conn.calls).toContain('auth_success');
+  });
+
   // ─── Manual key submission ──────────────────────────────────────
 
   test('submitAuthCode writes auth file and signals success', () => {
@@ -282,6 +328,7 @@ describe('OpencodeStrategy', () => {
     expect(conn.calls).toContain('auth_success');
     const authFile = join(TEST_HOME, '.local', 'share', 'opencode', 'auth.json');
     expect(existsSync(authFile)).toBe(true);
+    expect(JSON.parse(readFileSync(authFile, 'utf8')).provider).toBe('openrouter');
   });
 
   test('submitAuthCode with empty string sends unauthenticated', () => {
@@ -394,6 +441,23 @@ describe('OpencodeStrategy', () => {
     strategy.interruptAgent();
   });
 
+  test('uses the default app-server turn timeout when no override is set', () => {
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 60 * 1000);
+  });
+
+  test('uses OPENCODE_APP_SERVER_TURN_TIMEOUT_MS when set to a positive integer', () => {
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '180000';
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(180000);
+  });
+
+  test('ignores invalid OPENCODE_APP_SERVER_TURN_TIMEOUT_MS values', () => {
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '0';
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 60 * 1000);
+
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 'not-a-number';
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 60 * 1000);
+  });
+
   test('constructor with conversationDataDir', () => {
     const strategy = new OpencodeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
@@ -402,15 +466,43 @@ describe('OpencodeStrategy', () => {
     expect(strategy).toBeDefined();
   });
 
-  test('getModelArgs auto-prefixes when stored key is active', () => {
-    // Submit a key to set stored key
+  test('getModelArgs auto-prefixes when stored OpenRouter key is active', () => {
     const strategy = new OpencodeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
-    strategy.submitAuthCode('test-openrouter-key');
-    // Should auto-prefix because stored key is active and no env keys
+    strategy.submitAuthCode('sk-or-test-openrouter-key');
     const args = strategy.getModelArgs('openai/gpt-5.4');
     expect(args).toEqual(['--model', 'openrouter/openai/gpt-5.4']);
+  });
+
+  test('getModelArgs does not prefix when stored OpenAI key is active', () => {
+    const strategy = new OpencodeStrategy();
+    const conn = makeConnection();
+    strategy.executeAuth(conn);
+    strategy.submitAuthCode('sk-test-openai-key');
+    const args = strategy.getModelArgs('openai/gpt-5.4');
+    expect(args).toEqual(['--model', 'openai/gpt-5.4']);
+  });
+
+  test('executePromptStreaming defaults to opencode app-server transport', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    delete process.env.OPENCODE_AGENT_TRANSPORT;
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const argsPath = join(TEST_HOME, 'opencode-default-args.json');
+    process.env.OPENCODE_FAKE_ARGS_PATH = argsPath;
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'default-transport-conv'),
+      getEncryptionKey: () => undefined,
+    });
+
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined);
+
+    expect(JSON.parse(readFileSync(argsPath, 'utf8'))[0]).toBe('serve');
   });
 
   test('clearCredentials is safe when no auth file exists', () => {
@@ -553,6 +645,100 @@ describe('OpencodeStrategy', () => {
     expect(chunks.join('')).toBe('fake app-server response');
   });
 
+  test('executePromptStreaming accepts null app-server message responses when SSE delivered output', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'null';
+    process.env.OPENCODE_FAKE_MESSAGE = 'sse-only response';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'null-message-response-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'null-message-response',
+      getEncryptionKey: () => undefined,
+    });
+
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    expect(chunks.join('')).toContain('sse-only response');
+  });
+
+  test('executePromptStreaming waits for SSE output when app-server responds before events', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'null-before-events';
+    process.env.OPENCODE_FAKE_MESSAGE = 'delayed sse response';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'delayed-null-message-response-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'delayed-null-message-response',
+      getEncryptionKey: () => undefined,
+    });
+
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    expect(chunks.join('')).toContain('delayed sse response');
+  });
+
+  test('executePromptStreaming times out and clears session when app-server returns no output or idle event', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'empty-no-idle';
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '50';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const convDir = join(TEST_HOME, 'empty-no-idle-conv');
+    mkdirSync(convDir, { recursive: true });
+    writeFileSync(join(convDir, '.opencode_session'), 'ses_existingOpenCodeSession');
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => convDir,
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'empty-no-idle',
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined)).rejects.toThrow(
+      'OpenCode app-server turn timed out after 50ms',
+    );
+    expect(existsSync(join(convDir, '.opencode_session'))).toBe(false);
+  });
+
+  test('executePromptStreaming surfaces app-server session errors', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'session-error';
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '1000';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'session-error-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'session-error',
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined)).rejects.toThrow(
+      'fake provider failure',
+    );
+  });
+
   test('executePromptStreaming posts one OpenCode app-server message per user turn', async () => {
     const fakeBinDir = join(TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
@@ -651,7 +837,7 @@ describe('OpencodeStrategy app-server SSE filtering', () => {
   const savedFilterEnv: Record<string, string | undefined> = {};
   const filterEnvKeys = [
     'HOME', 'PATH', 'ANTHROPIC_API_KEY', 'OPENCODE_AGENT_TRANSPORT',
-    'OPENCODE_FAKE_MESSAGE', 'OPENCODE_FAKE_ENV_PATH', 'OPENCODE_FAKE_ARGS_PATH',
+    'OPENCODE_FAKE_MESSAGE', 'OPENCODE_FAKE_MESSAGE_RESPONSE', 'OPENCODE_FAKE_ENV_PATH', 'OPENCODE_FAKE_ARGS_PATH',
     'OPENCODE_FAKE_MODE', 'OPENCODE_FAKE_REQUESTS_PATH', 'OPENCODE_CONFIG_CONTENT',
     'OPENCODE_USE_APP_SERVER', 'OPENCODE_FAKE_SESSION_ID',
   ] as const;
@@ -663,6 +849,7 @@ describe('OpencodeStrategy app-server SSE filtering', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
     delete process.env.OPENCODE_FAKE_MODE;
     delete process.env.OPENCODE_FAKE_MESSAGE;
+    delete process.env.OPENCODE_FAKE_MESSAGE_RESPONSE;
     if (existsSync(TEST_HOME)) rmSync(TEST_HOME, { recursive: true, force: true });
     mkdirSync(TEST_HOME, { recursive: true });
     const fakeBinDir = join(TEST_HOME, 'fake-bin');

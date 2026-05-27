@@ -9,6 +9,7 @@ export interface HttpAppServerOptions extends Omit<SpawnOptionsWithoutStdio, 'st
   healthPath?: string;
   logger?: Logger;
   startupTimeoutMs?: number;
+  healthRequestTimeoutMs?: number;
   requestTimeoutMs?: number;
 }
 
@@ -89,24 +90,32 @@ export class HttpAppServerProcess {
     const abortFromCaller = () => controller.abort(options.signal?.reason);
     if (options.signal?.aborted) abortFromCaller();
     else options.signal?.addEventListener('abort', abortFromCaller, { once: true });
-    const timeout = setTimeout(
-      () => controller.abort(),
-      options.timeoutMs ?? this.options.requestTimeoutMs ?? 120_000,
-    );
+    const timeoutMs = options.timeoutMs ?? this.options.requestTimeoutMs ?? 120_000;
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
     timeout.unref?.();
+    const method = options.method ?? (options.body === undefined ? 'GET' : 'POST');
     try {
       const res = await fetch(this.url(path, options.query), {
-        method: options.method ?? (options.body === undefined ? 'GET' : 'POST'),
+        method,
         headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
         body: options.body === undefined ? undefined : JSON.stringify(options.body),
         signal: controller.signal,
       });
       if (!res.ok) {
         const text = await res.text().catch(() => '');
-        throw new Error(text.trim() || `HTTP app-server request failed with ${res.status}`);
+        throw new Error(text.trim() || `HTTP app-server request failed with ${res.status}: ${method} ${path}`);
       }
       if (res.status === 204) return undefined as T;
       return await res.json() as T;
+    } catch (err) {
+      if (timedOut) {
+        throw new Error(`HTTP app-server request timed out after ${timeoutMs}ms: ${method} ${path}`);
+      }
+      throw err;
     } finally {
       clearTimeout(timeout);
       options.signal?.removeEventListener('abort', abortFromCaller);
@@ -121,14 +130,17 @@ export class HttpAppServerProcess {
 
   private async waitForHealthy(): Promise<void> {
     const timeoutMs = this.options.startupTimeoutMs ?? 15_000;
+    const healthRequestTimeoutMs = this.options.healthRequestTimeoutMs ?? 1_000;
     const startedAt = Date.now();
     const healthPath = this.options.healthPath ?? '/global/health';
     let lastError: unknown;
 
     while (Date.now() - startedAt < timeoutMs) {
       if (!this.proc) break;
+      const remainingMs = timeoutMs - (Date.now() - startedAt);
+      const requestTimeoutMs = Math.max(1, Math.min(healthRequestTimeoutMs, remainingMs));
       try {
-        const res = await fetch(this.url(healthPath));
+        const res = await this.fetchHealth(this.url(healthPath), requestTimeoutMs);
         if (res.ok) return;
         lastError = new Error(`health check returned ${res.status}`);
       } catch (err) {
@@ -141,6 +153,27 @@ export class HttpAppServerProcess {
     this.close();
     const suffix = detail ? `: ${detail}` : '';
     throw new Error(`Timed out waiting for HTTP app-server health${suffix || (lastError ? `: ${String(lastError)}` : '')}`);
+  }
+
+  private async fetchHealth(url: string, timeoutMs: number): Promise<Response> {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
+    timeout.unref?.();
+
+    try {
+      return await fetch(url, { signal: controller.signal });
+    } catch (err) {
+      if (timedOut) {
+        throw new Error(`health check request timed out after ${timeoutMs}ms`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   private findFreePort(host: string): Promise<number> {
