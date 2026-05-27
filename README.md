@@ -196,7 +196,6 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | `SESSION_DIR` | — | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) for credential injection |
 | `AGENT_CREDENTIALS_JSON` | — | JSON object of credential files injected at startup (set by Fibe) |
 | `FIBE_API_KEY` | — | Fibe platform API key for sync |
-| `FIBE_API_URL` | — | Fibe platform API URL |
 | `FIBE_SYNC_ENABLED` | — | Set to `true` to enable Fibe sync |
 | `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins |
 | `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` (restrict in production) |

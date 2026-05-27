@@ -128,7 +128,6 @@ Copy `.env.example` to `.env` before starting.
 | `AGENT_CREDENTIALS_JSON` | — | JSON map of credential file names to content, injected at startup |
 | `ENCRYPTION_KEY` | — | Optional 32-char key for AES-256-GCM data-at-rest encryption |
 | `FIBE_API_KEY` | — | Fibe platform API key for sync |
-| `FIBE_API_URL` | — | Fibe platform API URL |
 | `FIBE_SYNC_ENABLED` | — | Set to `true` to enable Fibe platform sync |
 | `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins (use `*` for open/iframe use) |
 | `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` — restrict in production |

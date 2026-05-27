@@ -23,6 +23,10 @@ function parsePositiveInteger(value: unknown): number | undefined {
   return Number.isSafeInteger(parsed) ? parsed : undefined;
 }
 
+function isIpLiteral(host: string): boolean {
+  return /^(\d{1,3}\.){3}\d{1,3}$/.test(host) || /^\[[0-9a-f:]+\]$/i.test(host) || /^[0-9a-f:]+$/i.test(host);
+}
+
 @Injectable()
 export class ConfigService {
   private readonly settings: Readonly<FibeSettings>;
@@ -87,13 +91,16 @@ export class ConfigService {
     return process.env.FIBE_API_KEY;
   }
 
-  // Derived from FIBE_DOMAIN — no more FIBE_API_URL env var
+  // Derived from FIBE_DOMAIN — no separate FIBE_API_URL env var
   getFibeApiUrl(): string | undefined {
-    const domain = process.env.FIBE_DOMAIN;
+    const domain = process.env.FIBE_DOMAIN?.trim();
     if (!domain) return undefined;
-    const host = domain.replace(/:\d+$/, '');
-    const protocol = host.includes('localhost') || host.endsWith('.test') ? 'http' : 'https';
-    return `${protocol}://${domain}`;
+
+    const withoutScheme = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    const host = withoutScheme.replace(/:\d+$/, '');
+    const localHost = host === 'localhost' || host.endsWith('.test') || !host.includes('.') || isIpLiteral(host);
+    const protocol = domain.match(/^https?:\/\//i)?.[0].replace('://', '') ?? (localHost ? 'http' : 'https');
+    return `${protocol}://${withoutScheme}`;
   }
 
   getFibeAgentId(): string | undefined {

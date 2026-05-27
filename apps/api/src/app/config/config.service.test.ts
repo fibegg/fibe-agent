@@ -1,5 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { ConfigService } from './config.service';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 /**
@@ -9,10 +11,13 @@ import { join } from 'node:path';
  */
 describe('ConfigService', () => {
   const envBackup: Record<string, string | undefined> = {};
+  const originalCwd = process.cwd();
+  let tempDir = '';
 
   beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'config-service-'));
+    process.chdir(tempDir);
     envBackup.FIBE_SETTINGS_JSON = process.env.FIBE_SETTINGS_JSON;
-    envBackup.FIBE_SETTINGS_YAML_PATHS = process.env.FIBE_SETTINGS_YAML_PATHS;
     envBackup.PLAYGROUNDS_DIR = process.env.PLAYGROUNDS_DIR;
     envBackup.FIBE_AGENT_ID = process.env.FIBE_AGENT_ID;
     envBackup.CONVERSATION_ID = process.env.CONVERSATION_ID;
@@ -30,7 +35,6 @@ describe('ConfigService', () => {
     envBackup.GEMMA_TIMEOUT_MS = process.env.GEMMA_TIMEOUT_MS;
     // Clear to avoid cross-test leakage
     delete process.env.FIBE_SETTINGS_JSON;
-    process.env.FIBE_SETTINGS_YAML_PATHS = join(process.cwd(), 'config-service-test-fibe.yml');
     delete process.env.FIBE_SYNC_ENABLED;
     delete process.env.WEBSOCKET_MAX_CONNECTIONS;
     delete process.env.FIBE_OCR_CONVERSION_MAX_BYTES;
@@ -44,10 +48,12 @@ describe('ConfigService', () => {
   });
 
   afterEach(() => {
+    process.chdir(originalCwd);
     for (const [key, value] of Object.entries(envBackup)) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   function withSettings(settings: Record<string, unknown>): ConfigService {
@@ -228,13 +234,28 @@ describe('ConfigService', () => {
   });
 
   test('getFibeApiUrl derives http for .test domains', () => {
-    process.env.FIBE_DOMAIN = 'rails.test:3000';
-    expect(new ConfigService().getFibeApiUrl()).toBe('http://rails.test:3000');
+    process.env.FIBE_DOMAIN = 'fibe.test:3000';
+    expect(new ConfigService().getFibeApiUrl()).toBe('http://fibe.test:3000');
   });
 
   test('getFibeApiUrl derives http for localhost', () => {
     process.env.FIBE_DOMAIN = 'localhost:3000';
     expect(new ConfigService().getFibeApiUrl()).toBe('http://localhost:3000');
+  });
+
+  test('getFibeApiUrl derives http for Docker service hostnames', () => {
+    process.env.FIBE_DOMAIN = 'app-playwright-web:3001';
+    expect(new ConfigService().getFibeApiUrl()).toBe('http://app-playwright-web:3001');
+  });
+
+  test('getFibeApiUrl derives http for Docker E2E callback IPs', () => {
+    process.env.FIBE_DOMAIN = '192.168.97.42:3001';
+    expect(new ConfigService().getFibeApiUrl()).toBe('http://192.168.97.42:3001');
+  });
+
+  test('getFibeApiUrl does not duplicate an explicit scheme', () => {
+    process.env.FIBE_DOMAIN = 'http://fibe.test:3000';
+    expect(new ConfigService().getFibeApiUrl()).toBe('http://fibe.test:3000');
   });
 
   test('getFibeApiUrl returns undefined when FIBE_DOMAIN not set', () => {
