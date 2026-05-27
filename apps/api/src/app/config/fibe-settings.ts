@@ -105,10 +105,6 @@ export function parseYaml(content: string): Record<string, unknown> {
 // ─── Readers ─────────────────────────────────────────────────────────────────
 
 function yamlCandidates(): string[] {
-  const override = process.env.FIBE_SETTINGS_YAML_PATHS;
-  if (override) {
-    return override.split(',').map((path) => path.trim()).filter(Boolean);
-  }
   return ['/app/fibe.yml', join(process.cwd(), 'fibe.yml')];
 }
 

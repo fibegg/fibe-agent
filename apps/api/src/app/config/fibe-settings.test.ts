@@ -1,5 +1,6 @@
 import { describe, it, test, expect, beforeEach, afterEach } from 'bun:test';
-import { rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseYaml, loadFibeSettings, applyFibeSettings } from './fibe-settings';
 
@@ -116,25 +117,26 @@ describe('parseYaml', () => {
 // ─── Helpers for file-based tests ────────────────────────────────────────────
 
 // ─── loadFibeSettings ────────────────────────────────────────────────────────
-// The loader checks '/app/fibe.yml' and './fibe.yml' (cwd).
-// We use cwd-based path by writing to process.cwd()/fibe.yml and then cleaning up.
-
 describe('loadFibeSettings', () => {
-  const MANAGED = ['FIBE_SETTINGS_JSON', 'FIBE_SETTINGS_YAML_PATHS'];
+  const MANAGED = ['FIBE_SETTINGS_JSON'];
   const savedEnv: Record<string, string | undefined> = {};
-  const localYml = join(process.cwd(), 'fibe-settings-test.yml');
+  const originalCwd = process.cwd();
+  let tempDir = '';
+  let localYml = '';
 
   beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'fibe-settings-'));
+    process.chdir(tempDir);
+    localYml = join(tempDir, 'fibe.yml');
     for (const k of MANAGED) { savedEnv[k] = process.env[k]; delete process.env[k]; }
-    process.env.FIBE_SETTINGS_YAML_PATHS = localYml;
   });
 
   afterEach(() => {
+    process.chdir(originalCwd);
     for (const [k, v] of Object.entries(savedEnv)) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
-    // Clean up temp fibe.yml if we created one
-    try { rmSync(localYml); } catch { /* may not exist */ }
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   test('returns empty object when no sources configured', () => {
@@ -186,7 +188,6 @@ describe('loadFibeSettings', () => {
 describe('applyFibeSettings', () => {
   const MANAGED_KEYS = [
     'FIBE_SETTINGS_JSON',
-    'FIBE_SETTINGS_YAML_PATHS',
     'AGENT_PROVIDER', 'AGENT_PASSWORD', 'AGENT_AUTH_MODE', 'MODEL_OPTIONS', 'DEFAULT_MODEL', 'CLAUDE_EFFORT',
     'DATA_DIR', 'SESSION_DIR', 'SYSTEM_PROMPT', 'ENCRYPTION_KEY', 'FIBE_AGENT_ID', 'CONVERSATION_ID',
     'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN', 'FIBE_API_KEY', 'POST_INIT_SCRIPT',
@@ -207,18 +208,23 @@ describe('applyFibeSettings', () => {
     'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
   ];
   const savedEnv: Record<string, string | undefined> = {};
-  const localYml = join(process.cwd(), 'fibe-settings-test.yml');
+  const originalCwd = process.cwd();
+  let tempDir = '';
+  let localYml = '';
 
   beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'fibe-settings-'));
+    process.chdir(tempDir);
+    localYml = join(tempDir, 'fibe.yml');
     for (const k of MANAGED_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
-    process.env.FIBE_SETTINGS_YAML_PATHS = localYml;
   });
 
   afterEach(() => {
+    process.chdir(originalCwd);
     for (const [k, v] of Object.entries(savedEnv)) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
-    try { rmSync(localYml); } catch { /* may not exist */ }
+    rmSync(tempDir, { recursive: true, force: true });
   });
 
   test('promotes agentProvider to AGENT_PROVIDER', () => {

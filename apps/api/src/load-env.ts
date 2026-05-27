@@ -16,7 +16,7 @@ export function loadDevEnv(): void {
 }
 
 /**
- * Apply unified fibe settings from FIBE_SETTINGS_JSON and /app/fibe.yml.
+ * Apply unified fibe settings from FIBE_SETTINGS_JSON and mounted fibe.yml.
  * Call after loadDevEnv() so .env values (which win) are already in process.env.
  */
 export { applyFibeSettings as loadFibeEnv };
