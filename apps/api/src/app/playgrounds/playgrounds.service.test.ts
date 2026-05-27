@@ -646,4 +646,13 @@ describe('PlaygroundsService', () => {
     const buffer = Buffer.from('test');
     await expect(service.uploadFile('../outside', 'file.txt', buffer)).rejects.toThrow(NotFoundException);
   });
+
+  test('uploadFile reports an unavailable playground root without leaking filesystem errors', async () => {
+    const rootFile = join(playgroundDir, 'not-a-directory');
+    writeFileSync(rootFile, 'not a directory');
+    const config = { getPlaygroundsDir: () => rootFile };
+    const service = new PlaygroundsService(config as never, {} as never);
+
+    await expect(service.uploadFile('', 'file.txt', Buffer.from('test'))).rejects.toThrow(NotFoundException);
+  });
 });

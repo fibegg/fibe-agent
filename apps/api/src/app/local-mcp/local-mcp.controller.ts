@@ -1,6 +1,8 @@
 import {
   Body,
   Controller,
+  HttpCode,
+  HttpStatus,
   Post,
   UseGuards,
 } from '@nestjs/common';
@@ -23,6 +25,7 @@ export class LocalMcpController {
   constructor(private readonly localMcp: LocalMcpService) {}
 
   @Post()
+  @HttpCode(HttpStatus.OK)
   async handleToolCall(
     @Body() body: LocalToolCallRequest,
   ): Promise<LocalToolCallResponse> {

@@ -1,4 +1,4 @@
-import { Controller, Get, Logger, Post, UseGuards } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus, Logger, Post, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { ConfigService } from '../config/config.service';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
@@ -19,6 +19,7 @@ export class ModelOptionsController {
   }
 
   @Post('model-options/refresh')
+  @HttpCode(HttpStatus.OK)
   async refreshOptions(): Promise<string[]> {
     const envModels = this.config.getModelOptions();
 

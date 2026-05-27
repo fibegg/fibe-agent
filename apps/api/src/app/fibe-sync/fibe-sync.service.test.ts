@@ -200,6 +200,35 @@ describe('FibeSyncService', () => {
     }
   });
 
+  test('treats authorization failures as terminal instead of retrying forever', async () => {
+    mockConfig.isFibeSyncEnabled = () => true;
+    mockConfig.getFibeApiUrl = () => 'https://fibe.test';
+    mockConfig.getFibeApiKey = () => 'key123';
+    mockConfig.getFibeAgentId = () => 'agent-1';
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock(async () =>
+      new Response('Unauthorized', { status: 401 })
+    ) as unknown as typeof fetch;
+
+    const service = new FibeSyncService(mockConfig as never);
+    try {
+      service.syncMessages(() => '{"kept":true}', 'conv-auth');
+      await new Promise((r) => setTimeout(r, 1800));
+
+      expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+      expect(globalThis.fetch).toHaveBeenLastCalledWith(
+        'https://fibe.test/api/agents/agent-1/messages',
+        expect.objectContaining({
+          body: JSON.stringify({ content: '{"kept":true}', conversation_id: 'conv-auth' }),
+        }),
+      );
+    } finally {
+      service.onModuleDestroy();
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('handles non-ok response without throwing', async () => {
     mockConfig.isFibeSyncEnabled = () => true;
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';

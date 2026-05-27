@@ -30,7 +30,8 @@ export async function loadFibeSettings(dir: string): Promise<ResolvedFibeSetting
     settings = JSON.parse(content) as FibeSettings;
   } catch (err: unknown) {
     // It's normal for the file to not exist
-    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
       logger.warn(`Failed to parse .fibe/settings.json in ${dir}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }

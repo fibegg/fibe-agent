@@ -473,9 +473,27 @@ export class PlaygroundsService {
     if (relDir.startsWith('..') || segments.some((seg) => settings.ignoredNames.has(seg))) {
       throw new NotFoundException('Invalid upload path');
     }
-    await mkdir(targetDir, { recursive: true });
+
+    try {
+      const baseStat = await stat(base).catch((err: NodeJS.ErrnoException) => {
+        if (err.code === 'ENOENT') return null;
+        throw err;
+      });
+      if (baseStat && !baseStat.isDirectory()) {
+        throw new NotFoundException('Playgrounds directory is unavailable');
+      }
+      await mkdir(targetDir, { recursive: true });
+    } catch (err) {
+      if (err instanceof NotFoundException) throw err;
+      throw new NotFoundException('Playgrounds directory is unavailable');
+    }
+
     const absPath = join(targetDir, safeName);
-    await writeFile(absPath, buffer);
+    try {
+      await writeFile(absPath, buffer);
+    } catch {
+      throw new NotFoundException('Playgrounds directory is unavailable');
+    }
     return relativeDir ? `${relDir}/${safeName}` : safeName;
   }
 
