@@ -121,6 +121,10 @@ if (args[0] === 'serve') {
         sendEvent(clients, { type: 'session.error', properties: { sessionID: messageMatch[1], error: { message: 'fake provider failure' } } });
         return;
       }
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'provider-log-quota') {
+        console.error('ERROR service=llm error={"name":"AI_APICallError","statusCode":429,"responseBody":{"error":{"status":"RESOURCE_EXHAUSTED","message":"Quota exceeded for prompt-body-that-must-not-leak sk-test-secret"}}} stream error');
+        return;
+      }
       const sendNullBeforeEvents = process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'null-before-events';
       if (sendNullBeforeEvents) {
         sendJson(res, 200, null);
@@ -137,12 +141,18 @@ if (args[0] === 'serve') {
       }
       // Emit delta events for the assistant text part
       sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(0, Math.ceil(text.length / 2)) } });
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'output-no-idle') {
+        return;
+      }
       sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(Math.ceil(text.length / 2)) } });
       if (!snapshotFirst) {
         sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
       }
       sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } });
       if (sendNullBeforeEvents) {
+        return;
+      }
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'hang-after-events') {
         return;
       }
       if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'null') {
@@ -442,7 +452,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('uses the default app-server turn timeout when no override is set', () => {
-    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 60 * 1000);
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 1000);
   });
 
   test('uses OPENCODE_APP_SERVER_TURN_TIMEOUT_MS when set to a positive integer', () => {
@@ -452,10 +462,10 @@ describe('OpencodeStrategy', () => {
 
   test('ignores invalid OPENCODE_APP_SERVER_TURN_TIMEOUT_MS values', () => {
     process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '0';
-    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 60 * 1000);
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 1000);
 
     process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 'not-a-number';
-    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 60 * 1000);
+    expect(resolveOpencodeAppServerTurnTimeoutMs()).toBe(60 * 1000);
   });
 
   test('constructor with conversationDataDir', () => {
@@ -502,7 +512,9 @@ describe('OpencodeStrategy', () => {
 
     await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined);
 
-    expect(JSON.parse(readFileSync(argsPath, 'utf8'))[0]).toBe('serve');
+    const args = JSON.parse(readFileSync(argsPath, 'utf8'));
+    expect(args[0]).toBe('serve');
+    expect(args).toContain('--print-logs');
   });
 
   test('clearCredentials is safe when no auth file exists', () => {
@@ -691,6 +703,54 @@ describe('OpencodeStrategy', () => {
     expect(chunks.join('')).toContain('delayed sse response');
   });
 
+  test('executePromptStreaming completes from SSE output when app-server message POST does not finish', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'hang-after-events';
+    process.env.OPENCODE_FAKE_MESSAGE = 'sse post hang response';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'hanging-message-post-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'hanging-message-post',
+      getEncryptionKey: () => undefined,
+    });
+
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    expect(chunks.join('')).toContain('sse post hang response');
+  });
+
+  test('executePromptStreaming waits for app-server idle after streamed output', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'output-no-idle';
+    process.env.OPENCODE_FAKE_MESSAGE = 'partial output without idle';
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '50';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'output-no-idle-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'output-no-idle',
+      getEncryptionKey: () => undefined,
+    });
+
+    const chunks: string[] = [];
+    await expect(strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) => chunks.push(chunk))).rejects.toThrow(
+      'no session.idle or session.error received after assistant output',
+    );
+    expect(chunks.join('')).toContain('partial output');
+  });
+
   test('executePromptStreaming times out and clears session when app-server returns no output or idle event', async () => {
     const fakeBinDir = join(TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
@@ -737,6 +797,34 @@ describe('OpencodeStrategy', () => {
     await expect(strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined)).rejects.toThrow(
       'fake provider failure',
     );
+  });
+
+  test('executePromptStreaming surfaces OpenCode app-server provider output failures without prompt leakage', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'provider-log-quota';
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '2000';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'provider-log-quota-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'provider-log-quota',
+      getEncryptionKey: () => undefined,
+    });
+
+    let message = '';
+    try {
+      await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain('OpenCode provider quota/rate limit exhausted');
+    expect(message).not.toContain('prompt-body-that-must-not-leak');
+    expect(message).not.toContain('sk-test-secret');
   });
 
   test('executePromptStreaming posts one OpenCode app-server message per user turn', async () => {

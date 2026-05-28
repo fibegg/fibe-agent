@@ -83,6 +83,7 @@ describe('OrchestratorService', () => {
       systemPrompt?: string;
       effort?: string;
     }>;
+    syncActivityContents: string[];
   }> {
     const config = {
       getDataDir: () => dataDir,
@@ -163,12 +164,13 @@ describe('OrchestratorService', () => {
       conversationManager,
     );
     const uploadsService = new UploadsService(config as never);
+    const syncActivityContents: string[] = [];
     const fibeSync = {
       syncMessages: (getContent: () => string) => {
         void getContent();
       },
       syncActivity: (getContent: () => string) => {
-        void getContent();
+        syncActivityContents.push(getContent());
       },
       hydrate: async () => null,
     } as unknown as import('../fibe-sync/fibe-sync.service').FibeSyncService;
@@ -230,7 +232,7 @@ describe('OrchestratorService', () => {
       ctx.cachedSystemPromptFromFile = options.cachedSystemPromptFromFile;
     }
     ctx.isAuthenticated = false;
-    return { orch, ctx, sessionRegistry, promptBuilds, strategyCalls };
+    return { orch, ctx, sessionRegistry, promptBuilds, strategyCalls, syncActivityContents };
   }
 
   async function waitForIdle(ctx: SessionContext): Promise<void> {
@@ -458,6 +460,38 @@ describe('OrchestratorService', () => {
           e.data.details === message,
       ),
     ).toBe(true);
+  });
+
+  test('provider turn failures persist error activity for sync', async () => {
+    const { orch, ctx, syncActivityContents } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    const message =
+      'OpenCode provider quota/rate limit exhausted for provider=google model=gemini-2.5-flash-lite session=ses_test (RESOURCE_EXHAUSTED).';
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(
+      async () => {
+        throw new Error(message);
+      },
+    );
+
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe((ev) => events.push(ev));
+    await orch.handleClientMessage(ctx, {
+      action: WS_ACTION.SEND_CHAT_MESSAGE,
+      text: 'hi',
+    });
+
+    const activities = lastActivityStore?.all() ?? [];
+    const errorEntry = activities
+      .flatMap((activity) => activity.story)
+      .find((entry) => entry.type === 'error');
+    expect(errorEntry?.message).toBe('Provider turn failed');
+    expect(errorEntry?.details).toBe(message);
+    expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_UPDATED)).toBe(true);
+    expect(syncActivityContents.at(-1)).toContain('RESOURCE_EXHAUSTED');
+    expect(orch.messages.all().filter((m) => m.role === 'assistant')).toEqual(
+      [],
+    );
   });
 
   test('handleClientMessage interrupt_agent when not processing returns a control failure', async () => {

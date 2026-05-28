@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
+import { detectProviderAuthFailure, detectProviderFailure, type ProviderFailure } from '@shared/provider-auth-errors';
 import type {
   AgentRuntimeOptions,
   AuthConnection,
@@ -15,7 +15,7 @@ import type {
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
-import { HttpAppServerProcess } from './http-app-server-process';
+import { HttpAppServerProcess, type HttpAppServerOutput } from './http-app-server-process';
 import { ProviderConversationPaths } from './provider-conversation-paths';
 
 const PLAYGROUND_DIR = join(process.cwd(), 'playground');
@@ -23,7 +23,7 @@ const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
 const SESSION_MARKER_FILE = '.opencode_session';
 const OPENCODE_CONFIG_FILE = 'opencode.json';
 const OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS = 120_000;
-const OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 60 * 60 * 1000;
+const OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 60 * 1000;
 const OPENCODE_APP_SERVER_TURN_TIMEOUT_ENV = 'OPENCODE_APP_SERVER_TURN_TIMEOUT_MS';
 const OPENCODE_APP_SERVER_EVENT_LOG_LIMIT = 5;
 const API_KEY_LOG_PATTERN = /\b(?:sk-[A-Za-z0-9_-]{8,}|AIza[A-Za-z0-9_-]{8,})\b/g;
@@ -249,6 +249,8 @@ interface OpenCodeEvent {
   };
 }
 
+type OpenCodeTurnSignal = 'visible_output' | 'idle';
+
 interface OpenCodeEventState {
   sessionId: string;
   startedAt: number;
@@ -261,6 +263,14 @@ interface OpenCodeEventState {
   reasoningOpen: boolean;
   hasVisibleOutput: boolean;
   idle: boolean;
+  completed: boolean;
+  turnResult: Promise<OpenCodeTurnSignal>;
+  resolveTurn: (signal: OpenCodeTurnSignal) => void;
+  rejectTurn: (error: Error) => void;
+  idleResult: Promise<void>;
+  resolveIdle: () => void;
+  rejectIdle: (error: Error) => void;
+  processOutputBuffer: string;
   eventTypes: string[];
   textByPartId: Map<string, string>;
   rawTextByPartId: Map<string, string>;
@@ -334,6 +344,73 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
   private getStoredApiKey(): string | null {
     return this.getStoredAuth()?.apiKey ?? null;
+  }
+
+  private createOpenCodeEventState(
+    turn: { resolvedModel: string; providerID: string; modelID: string },
+    onChunk: (chunk: string) => void,
+    callbacks?: StreamingCallbacks,
+  ): OpenCodeEventState {
+    let resolvePromise!: (signal: OpenCodeTurnSignal) => void;
+    let rejectPromise!: (error: Error) => void;
+    const turnResult = new Promise<OpenCodeTurnSignal>((resolve, reject) => {
+      resolvePromise = resolve;
+      rejectPromise = reject;
+    });
+    turnResult.catch(() => undefined);
+    let resolveIdlePromise!: () => void;
+    let rejectIdlePromise!: (error: Error) => void;
+    const idleResult = new Promise<void>((resolve, reject) => {
+      resolveIdlePromise = resolve;
+      rejectIdlePromise = reject;
+    });
+    idleResult.catch(() => undefined);
+
+    const state: OpenCodeEventState = {
+      sessionId: '',
+      startedAt: Date.now(),
+      providerID: turn.providerID,
+      modelID: turn.modelID,
+      resolvedModel: turn.resolvedModel,
+      onChunk,
+      callbacks,
+      errorResult: '',
+      reasoningOpen: false,
+      hasVisibleOutput: false,
+      idle: false,
+      completed: false,
+      turnResult,
+      resolveTurn: () => undefined,
+      rejectTurn: () => undefined,
+      idleResult,
+      resolveIdle: () => undefined,
+      rejectIdle: () => undefined,
+      processOutputBuffer: '',
+      eventTypes: [],
+      textByPartId: new Map(),
+      rawTextByPartId: new Map(),
+      partTypeById: new Map(),
+      emittedToolStateByPartId: new Map(),
+      messageRoleById: new Map(),
+    };
+
+    state.resolveTurn = (signal: OpenCodeTurnSignal) => {
+      if (state.completed) return;
+      state.completed = true;
+      resolvePromise(signal);
+    };
+    state.rejectTurn = (error: Error) => {
+      if (state.completed) return;
+      state.completed = true;
+      rejectPromise(error);
+    };
+    state.resolveIdle = () => {
+      resolveIdlePromise();
+    };
+    state.rejectIdle = (error: Error) => {
+      rejectIdlePromise(error);
+    };
+    return state;
   }
 
   /**
@@ -810,27 +887,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const turn = this.resolveAppServerTurn(model);
     const turnTimeoutMs = resolveOpencodeAppServerTurnTimeoutMs();
     this.appServer = appServer;
-    const state: OpenCodeEventState = {
-      sessionId: '',
-      startedAt: Date.now(),
-      providerID: turn.providerID,
-      modelID: turn.modelID,
-      resolvedModel: turn.resolvedModel,
-      onChunk,
-      callbacks,
-      errorResult: '',
-      reasoningOpen: false,
-      hasVisibleOutput: false,
-      idle: false,
-      eventTypes: [],
-      textByPartId: new Map(),
-      rawTextByPartId: new Map(),
-      partTypeById: new Map(),
-      emittedToolStateByPartId: new Map(),
-      messageRoleById: new Map(),
-    };
+    const state = this.createOpenCodeEventState(turn, onChunk, callbacks);
 
     let eventStream: { stop: () => void; done: Promise<void> } | null = null;
+    const unsubscribeAppServerOutput = appServer.onOutput((output) => this.handleAppServerOutput(state, output));
     let existingSessionId = this.readStoredSession();
     try {
       this.logAppServerPhase(state, 'starting');
@@ -867,7 +927,9 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         for (const part of response.parts ?? []) this.handleOpenCodePart(state, part);
         this.handleOpenCodeMessageInfo(state, response.info);
       }
-      if (!response || (!state.hasVisibleOutput && !state.errorResult.trim())) {
+      if (!response) {
+        await this.waitForAppServerTurnEvents(state, turnTimeoutMs, true);
+      } else if (!state.hasVisibleOutput && !state.errorResult.trim()) {
         await this.waitForAppServerTurnEvents(state, turnTimeoutMs);
       }
       this.endReasoning(state);
@@ -897,6 +959,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
       throw err;
     } finally {
+      unsubscribeAppServerOutput();
       eventStream?.stop();
       await eventStream?.done.catch(() => undefined);
       this.activeSseAbort = null;
@@ -917,6 +980,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         String(port),
         '--log-level',
         'ERROR',
+        '--print-logs',
       ],
       {
         env: this.buildOpencodeEnv(),
@@ -982,7 +1046,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (variant) body.variant = variant;
 
     try {
-      return await appServer.json<OpenCodeMessageResponse | null>(
+      const response = appServer.json<OpenCodeMessageResponse | null>(
         `/session/${encodeURIComponent(sessionId)}/message`,
         {
           method: 'POST',
@@ -992,6 +1056,20 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
           timeoutMs,
         },
       );
+      const result = await Promise.race([
+        response.then((value) => ({ type: 'response' as const, value })),
+        state.turnResult.then((reason) => ({
+          type: 'turn_signal' as const,
+          reason,
+        })),
+      ]);
+      if (result.type === 'turn_signal') {
+        controller.abort();
+        response.catch(() => undefined);
+        this.logAppServerPhase(state, 'message_post_aborted_after_turn_signal', `reason=${result.reason}`);
+        return null;
+      }
+      return result.value;
     } catch (err) {
       if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
       const message = errorMessage(err);
@@ -1003,6 +1081,9 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         );
       }
       throw err;
+    } finally {
+      controller.abort();
+      if (this.activePromptAbort === controller) this.activePromptAbort = null;
     }
   }
 
@@ -1032,25 +1113,84 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     this.logger.log(`OpenCode app-server ${phase}: ${this.describeAppServerTurn(state)}${detail ? ` ${detail}` : ''}`);
   }
 
-  private async waitForAppServerTurnEvents(state: OpenCodeEventState, timeoutMs: number): Promise<void> {
-    const startedAt = Date.now();
-    while (
-      !state.idle
-      && !this.streamInterrupted
-      && !state.errorResult.trim()
-      && !state.hasVisibleOutput
-      && Date.now() - startedAt < timeoutMs
-    ) {
-      const elapsed = Date.now() - startedAt;
-      await new Promise((resolve) => setTimeout(resolve, Math.max(1, Math.min(100, timeoutMs - elapsed))));
+  private markAppServerVisibleOutput(state: OpenCodeEventState): void {
+    state.hasVisibleOutput = true;
+    state.resolveTurn('visible_output');
+  }
+
+  private failAppServerTurn(state: OpenCodeEventState, message: string): void {
+    state.errorResult += state.errorResult ? `\n${message}` : message;
+    const error = new Error(message);
+    state.rejectTurn(error);
+    state.rejectIdle(error);
+  }
+
+  private handleAppServerOutput(state: OpenCodeEventState, output: HttpAppServerOutput): void {
+    state.processOutputBuffer = `${state.processOutputBuffer}${output.text}`.slice(-16 * 1024);
+    const failure = detectProviderFailure(state.processOutputBuffer);
+    if (!failure) return;
+
+    const message = this.appServerProviderFailureMessage(state, failure);
+    if (state.errorResult.includes(message)) return;
+    this.logAppServerPhase(
+      state,
+      'provider_failure',
+      `stream=${output.stream} kind=${failure.kind} reason=${sanitizeLogValue(failure.reason)}`,
+    );
+    this.failAppServerTurn(state, message);
+  }
+
+  private appServerProviderFailureMessage(state: OpenCodeEventState, failure: ProviderFailure): string {
+    const turn = this.describeAppServerTurn(state);
+    const reason = sanitizeLogValue(failure.reason);
+
+    switch (failure.kind) {
+      case 'quota':
+        return `OpenCode provider quota/rate limit exhausted for ${turn} (${reason}).`;
+      case 'rate_limit':
+        return `OpenCode provider rate limited for ${turn} (${reason}).`;
+      case 'auth':
+      case 'missing_credentials':
+        return `OpenCode provider authentication failed for ${turn} (${reason}).`;
+      case 'model_not_found':
+        return `OpenCode provider model not found for ${turn} (${reason}).`;
+      case 'missing_session':
+        return `OpenCode app-server session failed for ${turn} (${reason}).`;
+      case 'provider_error':
+      default:
+        return `OpenCode provider app-server request failed for ${turn} (${reason}).`;
     }
-    if (!state.idle && !this.streamInterrupted && !state.errorResult.trim() && !state.hasVisibleOutput) {
-      this.activePromptAbort?.abort();
-      this.activeSseAbort?.abort();
-      const events = state.eventTypes.length ? state.eventTypes.join(',') : 'none';
-      throw new OpenCodeAppServerTurnTimeoutError(
-        `OpenCode app-server turn timed out after ${timeoutMs}ms for ${this.describeAppServerTurn(state)}: no assistant output, session.idle, or session.error received; events=${events}`,
-      );
+  }
+
+  private async waitForAppServerTurnEvents(
+    state: OpenCodeEventState,
+    timeoutMs: number,
+    requireIdle = false,
+  ): Promise<void> {
+    if (state.errorResult.trim()) return;
+    if (requireIdle ? state.idle : (state.idle || state.hasVisibleOutput)) return;
+    if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
+
+    let timeout: NodeJS.Timeout | null = null;
+    const timeoutPromise = new Promise<never>((_resolve, reject) => {
+      timeout = setTimeout(() => {
+        this.activePromptAbort?.abort();
+        this.activeSseAbort?.abort();
+        const events = state.eventTypes.length ? state.eventTypes.join(',') : 'none';
+        const reason = requireIdle
+          ? 'no session.idle or session.error received after assistant output'
+          : 'no assistant output, session.idle, or session.error received';
+        reject(new OpenCodeAppServerTurnTimeoutError(
+          `OpenCode app-server turn timed out after ${timeoutMs}ms for ${this.describeAppServerTurn(state)}: ${reason}; events=${events}`,
+        ));
+      }, timeoutMs);
+      timeout.unref?.();
+    });
+
+    try {
+      await Promise.race([requireIdle ? state.idleResult : state.turnResult, timeoutPromise]);
+    } finally {
+      if (timeout) clearTimeout(timeout);
     }
   }
 
@@ -1148,7 +1288,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       case 'session.error':
         if (props.sessionID === state.sessionId && props.error) {
           const msg = errorMessage(props.error);
-          state.errorResult += msg;
+          this.failAppServerTurn(state, msg);
           state.onChunk(`⚠️ ${msg}`);
         }
         break;
@@ -1156,6 +1296,8 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         if (props.sessionID === state.sessionId) {
           state.idle = true;
           this.endReasoning(state);
+          state.resolveIdle();
+          state.resolveTurn('idle');
         }
         break;
       default:
@@ -1169,7 +1311,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (info.id && info.role) state.messageRoleById.set(info.id, info.role);
     if (info.error) {
       const msg = errorMessage(info.error);
-      state.errorResult += msg;
+      this.failAppServerTurn(state, msg);
       state.onChunk(`⚠️ ${msg}`);
     }
     if (info.role === 'assistant' && info.tokens && state.callbacks?.onUsage) {
@@ -1202,14 +1344,12 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         break;
       case 'step-start':
         this.startReasoning(state);
-        state.hasVisibleOutput = true;
         break;
       case 'step-finish':
         if (part.tokens && state.callbacks?.onUsage) {
           state.callbacks.onUsage(this.tokensFrom(part.tokens));
         }
         this.endReasoning(state);
-        state.hasVisibleOutput = true;
         break;
       default:
         break;
@@ -1257,11 +1397,11 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     state.textByPartId.set(props.partID, clean);
 
     if (!delta) return;
-    state.hasVisibleOutput = true;
     if (partType === 'reasoning') {
       this.startReasoning(state);
       state.callbacks?.onReasoningChunk?.(delta);
     } else {
+      this.markAppServerVisibleOutput(state);
       state.onChunk(delta);
     }
   }
@@ -1274,11 +1414,11 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const delta = text.startsWith(previous) ? text.slice(previous.length) : text;
     state.textByPartId.set(part.id, text);
     if (!delta) return;
-    state.hasVisibleOutput = true;
     if (target === 'reasoning') {
       this.startReasoning(state);
       state.callbacks?.onReasoningChunk?.(delta);
     } else {
+      this.markAppServerVisibleOutput(state);
       state.onChunk(delta);
     }
   }
@@ -1287,7 +1427,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const serialized = JSON.stringify(part.state ?? part);
     if (state.emittedToolStateByPartId.get(part.id) === serialized) return;
     state.emittedToolStateByPartId.set(part.id, serialized);
-    state.hasVisibleOutput = true;
+    this.markAppServerVisibleOutput(state);
     const toolEvent: ToolEvent = {
       kind: 'tool_call',
       name: part.tool ?? part.state?.title ?? 'tool',

@@ -1,7 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
-import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
+import { detectProviderAuthFailure, detectProviderFailure } from '@shared/provider-auth-errors';
 import type { AuthConnection, ConversationDataDirProvider, LogoutConnection, SteerAgentResult } from './strategy.types';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
@@ -775,31 +775,27 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           onChunk(capturedSession.output);
         }
         const failedOrEmpty = (code !== 0 && code !== null) || !hasEmittedOutput;
+        const combinedOutput = [errorResult, stdoutBuffer].filter((s) => s.trim()).join('\n');
         if (failedOrEmpty) {
-          const authError = detectProviderAuthFailure('Gemini', [errorResult, stdoutBuffer].filter((s) => s.trim()).join('\n'));
+          const authError = detectProviderAuthFailure('Gemini', combinedOutput);
           if (authError) {
             reject(authError);
             return;
           }
-        }
-        const modelNotFound =
-          errorResult.includes('ModelNotFoundError') ||
-          errorResult.includes('Requested entity was not found');
-        if (failedOrEmpty && modelNotFound) {
-          reject(new Error('Invalid model specified. Please check the model name and try again.'));
-          return;
-        }
-        const rateLimited =
-          errorResult.includes('RESOURCE_EXHAUSTED') ||
-          errorResult.includes('MODEL_CAPACITY_EXHAUSTED') ||
-          errorResult.includes('status 429');
-        if (failedOrEmpty && rateLimited) {
-          reject(
-            new Error(
-              'Model is currently overloaded (rate limited). Please try again in a few minutes or switch to a different model.'
-            )
-          );
-          return;
+
+          const providerFailure = detectProviderFailure(combinedOutput);
+          if (providerFailure?.kind === 'model_not_found') {
+            reject(new Error('Invalid model specified. Please check the model name and try again.'));
+            return;
+          }
+          if (providerFailure?.kind === 'quota' || providerFailure?.kind === 'rate_limit') {
+            reject(
+              new Error(
+                'Model is currently overloaded (rate limited). Please try again in a few minutes or switch to a different model.'
+              )
+            );
+            return;
+          }
         }
         if (code !== 0 && this.missingSessionError(errorResult)) {
           this.clearStoredSession();

@@ -4,6 +4,11 @@ import type { Logger } from '@nestjs/common';
 
 export type HttpAppServerArgs = string[] | ((port: number) => string[]);
 
+export interface HttpAppServerOutput {
+  stream: 'stdout' | 'stderr';
+  text: string;
+}
+
 export interface HttpAppServerOptions extends Omit<SpawnOptionsWithoutStdio, 'stdio'> {
   host?: string;
   healthPath?: string;
@@ -27,6 +32,7 @@ export class HttpAppServerProcess {
   private stopping = false;
   private stdoutBuffer = '';
   private stderrBuffer = '';
+  private readonly outputHandlers = new Set<(output: HttpAppServerOutput) => void>();
 
   constructor(
     private readonly command: string,
@@ -49,10 +55,14 @@ export class HttpAppServerProcess {
     });
 
     this.proc.stdout?.on('data', (chunk: Buffer | string) => {
-      this.stdoutBuffer += chunk.toString();
+      const text = chunk.toString();
+      this.stdoutBuffer += text;
+      this.emitOutput({ stream: 'stdout', text });
     });
     this.proc.stderr?.on('data', (chunk: Buffer | string) => {
-      this.stderrBuffer += chunk.toString();
+      const text = chunk.toString();
+      this.stderrBuffer += text;
+      this.emitOutput({ stream: 'stderr', text });
     });
     this.proc.on('error', (err) => {
       this.options.logger?.warn?.(`HTTP app-server process error: ${err.message}`);
@@ -68,6 +78,13 @@ export class HttpAppServerProcess {
     });
 
     await this.waitForHealthy();
+  }
+
+  onOutput(handler: (output: HttpAppServerOutput) => void): () => void {
+    this.outputHandlers.add(handler);
+    return () => {
+      this.outputHandlers.delete(handler);
+    };
   }
 
   baseUrl(): string {
@@ -173,6 +190,16 @@ export class HttpAppServerProcess {
       throw err;
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private emitOutput(output: HttpAppServerOutput): void {
+    for (const handler of this.outputHandlers) {
+      try {
+        handler(output);
+      } catch (err) {
+        this.options.logger?.warn?.(`HTTP app-server output handler failed: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
 

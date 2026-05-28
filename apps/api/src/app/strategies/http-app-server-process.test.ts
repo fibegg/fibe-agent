@@ -96,6 +96,23 @@ describe('HttpAppServerProcess', () => {
     expect(spawn).toHaveBeenCalledTimes(1);
   });
 
+  test('onOutput() receives stdout and stderr chunks until unsubscribed', async () => {
+    const server = new HttpAppServerProcess('node', []);
+    const outputs: Array<{ stream: string; text: string }> = [];
+    const unsubscribe = server.onOutput((output) => outputs.push(output));
+    await server.start();
+
+    fakeProc.stdout.emit('data', 'stdout chunk');
+    fakeProc.stderr.emit('data', Buffer.from('stderr chunk'));
+    unsubscribe();
+    fakeProc.stderr.emit('data', 'ignored');
+
+    expect(outputs).toEqual([
+      { stream: 'stdout', text: 'stdout chunk' },
+      { stream: 'stderr', text: 'stderr chunk' },
+    ]);
+  });
+
   test('start() throws when health check fails and proc exits', async () => {
     fetchSpy.mockRejectedValue(new Error('ECONNREFUSED'));
     const server = new HttpAppServerProcess('node', [], { startupTimeoutMs: 200 });

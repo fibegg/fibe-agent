@@ -1246,6 +1246,7 @@ export class OrchestratorService implements OnModuleInit {
           details: message,
           timestamp: new Date().toISOString(),
         });
+        this.persistAgentErrorActivity(ctx, message);
         if (ctx.reasoningTextAccumulated) {
           ctx.send(WS_EVENT.REASONING_END, {});
           ctx.reasoningTextAccumulated = '';
@@ -1275,6 +1276,33 @@ export class OrchestratorService implements OnModuleInit {
       });
       this.sessionRegistry.destroyIfDetachedAndIdle(ctx.sessionId);
     }
+  }
+
+  private persistAgentErrorActivity(ctx: SessionContext, message: string): void {
+    const { activityStore } = this.stores(ctx);
+    const activityId = ctx.currentActivityId;
+    if (!activityId) return;
+
+    activityStore.appendEntry(activityId, {
+      id: randomUUID(),
+      type: 'error',
+      message: 'Provider turn failed',
+      timestamp: new Date().toISOString(),
+      details: message,
+    });
+
+    const entry = activityStore.getById(activityId);
+    if (entry) {
+      this.sessionRegistry.broadcastToConversation(
+        ctx.conversationId,
+        WS_EVENT.ACTIVITY_UPDATED,
+        { entry },
+      );
+    }
+    void this.fibeSync.syncActivity(
+      () => JSON.stringify(activityStore.all()),
+      ctx.conversationId,
+    );
   }
 
   private async handleChatMessage(
