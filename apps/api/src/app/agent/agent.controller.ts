@@ -11,6 +11,7 @@ import {
   Post,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { SendMessageDto } from './dto/send-message.dto';
@@ -24,6 +25,7 @@ export class AgentController {
     private readonly orchestrator: OrchestratorService,
   ) {}
 
+  @Throttle({ default: { limit: 600, ttl: 60_000 } })
   @Get('status')
   getStatus(): {
     authenticated: boolean;
