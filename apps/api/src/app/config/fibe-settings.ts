@@ -54,6 +54,8 @@ export interface FibeSettings {
    * fibe-agent injects them into process.env for native CLI tools.
    */
   credentialEnv?: Record<string, string>;
+  opencodeConfig?: Record<string, unknown>;
+  opencodeConfigJson?: string;
 
   // MCP
   /** Equivalent to MCP_CONFIG_JSON (object form from YAML). */
@@ -187,6 +189,9 @@ function promoteToEnv(s: FibeSettings): void {
     }
   }
 
+  if (s.opencodeConfigJson !== undefined) mergeJsonEnv('OPENCODE_CONFIG_CONTENT', s.opencodeConfigJson);
+  else if (s.opencodeConfig !== undefined) mergeJsonEnv('OPENCODE_CONFIG_CONTENT', s.opencodeConfig);
+
   // MCP — accept both object (mcpConfig) and string (mcpConfigJson) forms
   if (s.mcpConfigJson !== undefined) set('MCP_CONFIG_JSON', s.mcpConfigJson);
   else if (s.mcpConfig !== undefined) set('MCP_CONFIG_JSON', JSON.stringify(s.mcpConfig));
@@ -209,6 +214,35 @@ function promoteToEnv(s: FibeSettings): void {
   set('ASSISTANT_AVATAR_BASE64', s.assistantAvatarBase64);
   if (s.lockChatModel !== undefined) set('LOCK_CHAT_MODEL', bool(s.lockChatModel));
   if (s.simplicate !== undefined) set('SIMPLICATE', bool(s.simplicate));
+}
+
+function jsonRecord(value: string | Record<string, unknown> | undefined): Record<string, unknown> {
+  if (value === undefined) return {};
+  if (typeof value !== 'string') return value;
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
+}
+
+function mergeRecords(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+  const merged: Record<string, unknown> = { ...base };
+  for (const [key, patchValue] of Object.entries(patch)) {
+    const baseValue = merged[key];
+    const baseRecord = baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue) ? baseValue as Record<string, unknown> : null;
+    const patchRecord = patchValue && typeof patchValue === 'object' && !Array.isArray(patchValue) ? patchValue as Record<string, unknown> : null;
+    merged[key] = baseRecord && patchRecord ? mergeRecords(baseRecord, patchRecord) : patchValue;
+  }
+  return merged;
+}
+
+function mergeJsonEnv(key: string, value: string | Record<string, unknown>): void {
+  const existing = jsonRecord(process.env[key]);
+  const incoming = jsonRecord(value);
+  process.env[key] = JSON.stringify(mergeRecords(incoming, existing));
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

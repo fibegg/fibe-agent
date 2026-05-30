@@ -197,7 +197,7 @@ describe('applyFibeSettings', () => {
     'WEBSOCKET_MAX_CONNECTIONS',
     'GEMMA_ROUTER_ENABLED', 'OLLAMA_URL', 'GEMMA_MODEL',
     'GEMMA_CONFIDENCE_THRESHOLD', 'GEMMA_TIMEOUT_MS',
-    'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON',
+    'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON', 'OPENCODE_CONFIG_CONTENT',
     'FIBE_SYNC_ENABLED',
     'CORS_ORIGINS', 'FRAME_ANCESTORS',
     'FIBE_OCR_CONVERSION_MAX_BYTES', 'FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES',
@@ -500,6 +500,32 @@ describe('applyFibeSettings', () => {
     });
     applyFibeSettings();
     expect(process.env.MCP_CONFIG_JSON).toBe(mcpJson);
+  });
+
+  test('merges opencodeConfig into OPENCODE_CONFIG_CONTENT', () => {
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ permission: 'allow' });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      opencodeConfig: {
+        provider: {
+          anthropic: {
+            options: {
+              baseURL: 'https://anthropic.example.test/v1',
+            },
+          },
+        },
+      },
+    });
+    applyFibeSettings();
+    expect(JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? '{}')).toEqual({
+      permission: 'allow',
+      provider: {
+        anthropic: {
+          options: {
+            baseURL: 'https://anthropic.example.test/v1',
+          },
+        },
+      },
+    });
   });
 
   test('promotes credentialEnv from YAML file', () => {

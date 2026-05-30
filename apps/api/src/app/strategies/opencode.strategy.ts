@@ -59,6 +59,7 @@ const API_KEY_ENV_VARS = [
   'GEMINI_API_KEY',
   'GOOGLE_GENERATIVE_AI_API_KEY',
   'OPENROUTER_API_KEY',
+  'DEEPSEEK_API_KEY',
 ] as const;
 
 function opencodeDataDir(): string {
@@ -171,13 +172,51 @@ class OpenCodeAppServerTurnTimeoutError extends Error {
   }
 }
 
-type StoredProvider = 'openrouter' | 'anthropic' | 'openai' | 'gemini';
+const STORED_PROVIDERS = [
+  'openrouter',
+  'anthropic',
+  'openai',
+  'gemini',
+  'deepseek',
+  'custom-openai-compatible',
+  'custom-anthropic',
+  'custom-gemini',
+] as const;
 
-function inferStoredProvider(key: string): StoredProvider {
-  if (/^sk-or-/.test(key)) return 'openrouter';
-  if (/^sk-ant-/.test(key)) return 'anthropic';
-  if (/^sk-/.test(key)) return 'openai';
-  if (/^AIza/.test(key)) return 'gemini';
+type StoredProvider = (typeof STORED_PROVIDERS)[number];
+
+interface StoredAuth {
+  apiKey: string;
+  provider: StoredProvider;
+  baseURL?: string;
+}
+
+const STORED_PROVIDER_ENV_KEYS: Record<StoredProvider, string[]> = {
+  openrouter: ['OPENROUTER_API_KEY'],
+  anthropic: ['ANTHROPIC_API_KEY'],
+  openai: ['OPENAI_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'],
+  deepseek: ['DEEPSEEK_API_KEY'],
+  'custom-openai-compatible': ['OPENAI_API_KEY'],
+  'custom-anthropic': ['ANTHROPIC_API_KEY'],
+  'custom-gemini': ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'],
+};
+
+const OPENCODE_PROVIDER_IDS: Record<StoredProvider, string> = {
+  openrouter: 'openrouter',
+  anthropic: 'anthropic',
+  openai: 'openai',
+  gemini: 'gemini',
+  deepseek: 'deepseek',
+  'custom-openai-compatible': 'openai',
+  'custom-anthropic': 'anthropic',
+  'custom-gemini': 'gemini',
+};
+
+function normalizeStoredProvider(provider?: string): StoredProvider {
+  const raw = provider?.trim();
+  if (raw === 'custom-openai') return 'custom-openai-compatible';
+  if (raw && (STORED_PROVIDERS as readonly string[]).includes(raw)) return raw as StoredProvider;
   return 'openrouter';
 }
 
@@ -324,19 +363,16 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
   /**
    * Reads a manually stored API key from the auth file (set via auth modal).
    */
-  private getStoredAuth(): { apiKey: string; provider: StoredProvider } | null {
+  private getStoredAuth(): StoredAuth | null {
     const authFile = opencodeAuthFile();
     if (!existsSync(authFile)) return null;
     try {
       const content = readFileSync(authFile, 'utf8');
-      const auth = JSON.parse(content) as { api_key?: string; provider?: string };
+      const auth = JSON.parse(content) as { api_key?: string; provider?: string; base_url?: string };
       const apiKey = auth?.api_key?.trim();
       if (!apiKey) return null;
-      const provider = auth.provider?.trim() as StoredProvider | undefined;
-      if (provider && ['openrouter', 'anthropic', 'openai', 'gemini'].includes(provider)) {
-        return { apiKey, provider };
-      }
-      return { apiKey, provider: inferStoredProvider(apiKey) };
+      const baseURL = auth.base_url?.trim();
+      return { apiKey, provider: normalizeStoredProvider(auth.provider), ...(baseURL ? { baseURL } : {}) };
     } catch {
       return null;
     }
@@ -445,7 +481,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
       writeFileSync(
         opencodeAuthFile(),
-        JSON.stringify({ api_key: trimmed, provider: inferStoredProvider(trimmed) }),
+        JSON.stringify({ api_key: trimmed, provider: 'openrouter' }),
         { mode: 0o600 }
       );
       if (this.currentConnection) {
@@ -515,27 +551,57 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     share: 'disabled',
   };
 
+  private static isRecord(value: unknown): value is Record<string, unknown> {
+    return !!value && typeof value === 'object' && !Array.isArray(value);
+  }
+
+  private static mergeRecords(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+    const merged: Record<string, unknown> = { ...base };
+    for (const [key, patchValue] of Object.entries(patch)) {
+      const baseValue = merged[key];
+      merged[key] = OpencodeStrategy.isRecord(baseValue) && OpencodeStrategy.isRecord(patchValue)
+        ? OpencodeStrategy.mergeRecords(baseValue, patchValue)
+        : patchValue;
+    }
+    return merged;
+  }
+
+  private static readConfigContent(env: NodeJS.ProcessEnv): Record<string, unknown> {
+    try {
+      if (!env.OPENCODE_CONFIG_CONTENT) return {};
+      const parsed = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
+      return OpencodeStrategy.isRecord(parsed) ? parsed : {};
+    } catch {
+      return {};
+    }
+  }
+
+  private static mergeConfigContent(env: NodeJS.ProcessEnv, patch: Record<string, unknown>): void {
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify(
+      OpencodeStrategy.mergeRecords(OpencodeStrategy.readConfigContent(env), patch),
+    );
+  }
+
   /**
    * OPENCODE_CONFIG_CONTENT is the highest-precedence config source. It may
    * already contain MCP servers injected at startup, so merge yolo defaults
    * instead of replacing it.
    */
   private static applyYoloConfigContent(env: NodeJS.ProcessEnv): void {
-    let existing: Record<string, unknown> = {};
-    try {
-      if (env.OPENCODE_CONFIG_CONTENT) {
-        const parsed = JSON.parse(env.OPENCODE_CONFIG_CONTENT);
-        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-          existing = parsed as Record<string, unknown>;
-        }
-      }
-    } catch {
-      existing = {};
-    }
+    OpencodeStrategy.mergeConfigContent(env, OpencodeStrategy.YOLO_CONFIG);
+  }
 
-    env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-      ...existing,
-      ...OpencodeStrategy.YOLO_CONFIG,
+  private static applyStoredProviderConfig(env: NodeJS.ProcessEnv, storedAuth: StoredAuth): void {
+    if (!storedAuth.baseURL) return;
+
+    OpencodeStrategy.mergeConfigContent(env, {
+      provider: {
+        [OPENCODE_PROVIDER_IDS[storedAuth.provider]]: {
+          options: {
+            baseURL: storedAuth.baseURL,
+          },
+        },
+      },
     });
   }
 
@@ -549,22 +615,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const storedAuth = this.getStoredAuth();
 
     if (storedAuth) {
-      switch (storedAuth.provider) {
-        case 'openrouter':
-          if (!env.OPENROUTER_API_KEY?.trim()) env.OPENROUTER_API_KEY = storedAuth.apiKey;
-          if (!env.OPENAI_API_BASE?.trim()) env.OPENAI_API_BASE = 'https://openrouter.ai/api/v1';
-          break;
-        case 'anthropic':
-          if (!env.ANTHROPIC_API_KEY?.trim()) env.ANTHROPIC_API_KEY = storedAuth.apiKey;
-          break;
-        case 'openai':
-          if (!env.OPENAI_API_KEY?.trim()) env.OPENAI_API_KEY = storedAuth.apiKey;
-          break;
-        case 'gemini':
-          if (!env.GEMINI_API_KEY?.trim()) env.GEMINI_API_KEY = storedAuth.apiKey;
-          if (!env.GOOGLE_GENERATIVE_AI_API_KEY?.trim()) env.GOOGLE_GENERATIVE_AI_API_KEY = storedAuth.apiKey;
-          break;
+      for (const key of STORED_PROVIDER_ENV_KEYS[storedAuth.provider]) {
+        if (!env[key]?.trim()) env[key] = storedAuth.apiKey;
       }
+      OpencodeStrategy.applyStoredProviderConfig(env, storedAuth);
     }
 
     return env;

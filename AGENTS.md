@@ -73,7 +73,7 @@ All strategies live under `apps/api/src/app/strategies/`:
 | `claude-sdk.strategy.ts` | Claude Code — `@anthropic-ai/claude-agent-sdk` in-process SDK; OAuth or `ANTHROPIC_API_KEY` |
 | `openai-codex.strategy.ts` | OpenAI Codex — OAuth or `OPENAI_API_KEY` |
 | `cursor.strategy.ts` | Cursor Agent CLI — `CURSOR_API_KEY`, stream-json |
-| `opencode.strategy.ts` | OpenCode — auto-detects key from env |
+| `opencode.strategy.ts` | OpenCode — provider-selected API key env and config |
 | `mock.strategy.ts` | No-op mock for local development |
 | `abstract-cli.strategy.ts` | Shared base for the CLI-process strategies |
 | `tool-use-to-event.ts` | Shared `toolUseToEvent` helper used by the Claude SDK strategy |
@@ -147,7 +147,7 @@ Copy `.env.example` to `.env` before starting.
 | Gemini | `GEMINI_API_KEY` |
 | Claude Code | `ANTHROPIC_API_KEY`, `CLAUDE_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` |
 | OpenAI Codex | `OPENAI_API_KEY` |
-| OpenCode (auto-detect) | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `OPENROUTER_API_KEY` |
+| OpenCode | `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, or `DEEPSEEK_API_KEY` |
 
 ### Chat app (`apps/chat`, served via `GET /api/runtime-config`)
 

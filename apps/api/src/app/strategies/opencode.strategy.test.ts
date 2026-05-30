@@ -203,6 +203,7 @@ describe('OpencodeStrategy', () => {
     'GEMINI_API_KEY',
     'GOOGLE_GENERATIVE_AI_API_KEY',
     'OPENROUTER_API_KEY',
+    'DEEPSEEK_API_KEY',
     'OPENAI_API_BASE',
     'OPENCODE_FAKE_ARGS_PATH',
     'OPENCODE_FAKE_ENV_PATH',
@@ -226,6 +227,7 @@ describe('OpencodeStrategy', () => {
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
+    delete process.env.DEEPSEEK_API_KEY;
     delete process.env.OPENAI_API_BASE;
     delete process.env.OPENCODE_FAKE_ARGS_PATH;
     delete process.env.OPENCODE_FAKE_ENV_PATH;
@@ -379,6 +381,38 @@ describe('OpencodeStrategy', () => {
     expect(await strategy.checkAuthStatus()).toBe(true);
   });
 
+  test('stored provider metadata selects the provider env key', () => {
+    const authDir = join(TEST_HOME, '.local', 'share', 'opencode');
+    mkdirSync(authDir, { recursive: true });
+    writeFileSync(join(authDir, 'auth.json'), JSON.stringify({
+      api_key: 'test-anthropic-key',
+      provider: 'anthropic',
+    }));
+
+    const strategy = new OpencodeStrategy();
+    const env = (strategy as unknown as { buildOpencodeEnv: () => NodeJS.ProcessEnv }).buildOpencodeEnv();
+
+    expect(env.ANTHROPIC_API_KEY).toBe('test-anthropic-key');
+    expect(env.OPENROUTER_API_KEY).toBeUndefined();
+  });
+
+  test('stored custom provider metadata applies base URL config', () => {
+    const authDir = join(TEST_HOME, '.local', 'share', 'opencode');
+    mkdirSync(authDir, { recursive: true });
+    writeFileSync(join(authDir, 'auth.json'), JSON.stringify({
+      api_key: 'test-custom-key',
+      provider: 'custom-anthropic',
+      base_url: 'https://anthropic-proxy.example.test/v1',
+    }));
+
+    const strategy = new OpencodeStrategy();
+    const env = (strategy as unknown as { buildOpencodeEnv: () => NodeJS.ProcessEnv }).buildOpencodeEnv();
+    const config = JSON.parse(env.OPENCODE_CONFIG_CONTENT ?? '{}');
+
+    expect(env.ANTHROPIC_API_KEY).toBe('test-custom-key');
+    expect(config.provider.anthropic.options.baseURL).toBe('https://anthropic-proxy.example.test/v1');
+  });
+
   // ─── cancelAuth / clearCredentials / logout ─────────────────────
 
   test('cancelAuth prevents subsequent submitAuthCode from signaling', () => {
@@ -486,10 +520,14 @@ describe('OpencodeStrategy', () => {
   });
 
   test('getModelArgs does not prefix when stored OpenAI key is active', () => {
+    const authDir = join(TEST_HOME, '.local', 'share', 'opencode');
+    mkdirSync(authDir, { recursive: true });
+    writeFileSync(join(authDir, 'auth.json'), JSON.stringify({
+      api_key: 'sk-test-openai-key',
+      provider: 'openai',
+    }));
+
     const strategy = new OpencodeStrategy();
-    const conn = makeConnection();
-    strategy.executeAuth(conn);
-    strategy.submitAuthCode('sk-test-openai-key');
     const args = strategy.getModelArgs('openai/gpt-5.4');
     expect(args).toEqual(['--model', 'openai/gpt-5.4']);
   });
