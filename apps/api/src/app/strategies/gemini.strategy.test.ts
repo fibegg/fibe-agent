@@ -667,6 +667,7 @@ describe('GeminiStrategy session recovery', () => {
   test('executePromptStreaming keeps legacy Gemini env fallback from SESSION_DIR', async () => {
     const envPath = join(testHome, 'gemini-fallback-env.json');
     const sessionDir = join(testHome, 'agent-data', '.gemini');
+    const geminiHome = join(testHome, 'agent-data');
     process.env.GEMINI_FAKE_ENV_PATH = envPath;
     process.env.SESSION_DIR = sessionDir;
 
@@ -677,7 +678,7 @@ describe('GeminiStrategy session recovery', () => {
 
     await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
-      GEMINI_CLI_HOME: join(testHome, 'agent-data'),
+      GEMINI_CLI_HOME: geminiHome,
       GEMINI_CLI_TRUST_WORKSPACE: 'true',
       NO_BROWSER: 'true',
     });

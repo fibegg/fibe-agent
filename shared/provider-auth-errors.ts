@@ -79,6 +79,14 @@ const MISSING_SESSION_PATTERNS = [
   /\b(failed|unable)\b[^\n]*\b(resume|continue)\b/i,
 ];
 
+const QUOTA_PATTERNS = [
+  /\b(?:RESOURCE_EXHAUSTED|MODEL_CAPACITY_EXHAUSTED|TerminalQuotaError)\b/i,
+  /\bquota (?:exceeded|will reset)\b/i,
+  /\bexhausted your (?:daily quota|capacity)\b/i,
+  /\bquota\/rate limit exhausted\b/i,
+  /\bgenerate_content_free_tier_requests\b/i,
+];
+
 // eslint-disable-next-line no-control-regex
 const ANSI_RE = /\x1b(?:\[[0-9;?]*[ -/]*[@-~]|\][^\x07]*(?:\x07|\x1b\\)|[PX^_][^\x1b]*(?:\x1b\\)|[()#][0-9A-Za-z]|[=>78])/g;
 
@@ -175,7 +183,7 @@ function statusCodeFrom(value: unknown, normalized: string): number | undefined 
     return Number.parseInt(structuredStatus, 10);
   }
 
-  const match = normalized.match(/\b(?:statusCode|status|HTTP)\b[^0-9]{0,20}(\d{3})\b/i);
+  const match = normalized.match(/\b(?:statusCode|status|HTTP|code)\b[^0-9]{0,20}(\d{3})\b/i);
   return match ? Number.parseInt(match[1], 10) : undefined;
 }
 
@@ -199,6 +207,14 @@ export function detectProviderFailure(output: string): ProviderFailure | null {
   const providerStatus = providerStatusFrom(structured, normalized);
   const baseReason = reasonFor(statusCode, providerStatus, 'provider request failed');
 
+  if (QUOTA_PATTERNS.some((pattern) => pattern.test(normalized))) {
+    return { kind: 'quota', reason: baseReason, statusCode, providerStatus };
+  }
+
+  if (statusCode === 429 || /\brate limit(?:ed)?\b/i.test(normalized)) {
+    return { kind: 'rate_limit', reason: baseReason, statusCode, providerStatus };
+  }
+
   const authMatch = AUTH_FAILURE_REASONS.find(({ pattern }) => pattern.test(normalized));
   if (authMatch) {
     return {
@@ -216,14 +232,6 @@ export function detectProviderFailure(output: string): ProviderFailure | null {
   if (/\b(?:ModelNotFoundError|model_not_found|requested entity was not found)\b/i.test(normalized)
     || /\bmodel\b[^\n]{0,100}\bnot found\b/i.test(normalized)) {
     return { kind: 'model_not_found', reason: 'model was not found', statusCode, providerStatus };
-  }
-
-  if (/\b(?:RESOURCE_EXHAUSTED|MODEL_CAPACITY_EXHAUSTED|quota exceeded)\b/i.test(normalized)) {
-    return { kind: 'quota', reason: baseReason, statusCode, providerStatus };
-  }
-
-  if (statusCode === 429 || /\brate limit(?:ed)?\b/i.test(normalized)) {
-    return { kind: 'rate_limit', reason: baseReason, statusCode, providerStatus };
   }
 
   if (PROVIDER_ERROR_PATTERNS.some((pattern) => pattern.test(normalized))) {

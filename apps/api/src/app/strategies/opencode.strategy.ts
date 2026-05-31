@@ -983,8 +983,8 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
       if (!response) {
         await this.waitForAppServerTurnEvents(state, turnTimeoutMs, true);
-      } else if (!state.hasVisibleOutput && !state.errorResult.trim()) {
-        await this.waitForAppServerTurnEvents(state, turnTimeoutMs);
+      } else if (!state.errorResult.trim()) {
+        await this.waitForAppServerTurnEvents(state, turnTimeoutMs, true);
       }
       this.endReasoning(state);
 

@@ -27,4 +27,27 @@ describe('provider failure classifier', () => {
     expect(authError?.message).toContain('Authentication failed for OpenCode');
     expect(authError?.message).toContain('credentials are missing');
   });
+
+  test('classifies Gemini terminal quota output before generic auth wording', () => {
+    const output = [
+      'TerminalQuotaError: You have exhausted your daily quota on this model.',
+      'code: 429',
+      'If using an API key, credentials are required for requests.',
+    ].join('\n');
+
+    const failure = detectProviderFailure(output);
+    expect(failure).toMatchObject({
+      kind: 'quota',
+      statusCode: 429,
+    });
+    expect(detectProviderAuthFailure('Gemini', output)).toBeNull();
+  });
+
+  test('classifies Gemini capacity exhaustion as quota', () => {
+    const failure = detectProviderFailure(
+      'TerminalQuotaError: You have exhausted your capacity on this model. Your quota will reset after 12h.'
+    );
+
+    expect(failure?.kind).toBe('quota');
+  });
 });

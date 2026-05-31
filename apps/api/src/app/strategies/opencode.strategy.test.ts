@@ -148,7 +148,11 @@ if (args[0] === 'serve') {
       if (!snapshotFirst) {
         sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
       }
-      sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } });
+      const delayTerminalEvent = process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-idle'
+        || process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-session-error';
+      if (!delayTerminalEvent) {
+        sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } });
+      }
       if (sendNullBeforeEvents) {
         return;
       }
@@ -171,6 +175,15 @@ if (args[0] === 'serve') {
           { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text },
         ],
       });
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-idle') {
+        setTimeout(() => sendEvent(clients, { type: 'session.idle', properties: { sessionID: messageMatch[1] } }), 75);
+      }
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-session-error') {
+        setTimeout(() => sendEvent(clients, {
+          type: 'session.error',
+          properties: { sessionID: messageMatch[1], error: { message: 'delayed provider failure' } },
+        }), 25);
+      }
       return;
     }
     sendJson(res, 404, { error: 'not found' });
@@ -787,6 +800,53 @@ describe('OpencodeStrategy', () => {
       'no session.idle or session.error received after assistant output',
     );
     expect(chunks.join('')).toContain('partial output');
+  });
+
+  test('executePromptStreaming waits for app-server idle after a JSON response', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'response-before-idle';
+    process.env.OPENCODE_FAKE_MESSAGE = 'json response before idle';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'response-before-idle-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'response-before-idle',
+      getEncryptionKey: () => undefined,
+    });
+
+    const startedAt = Date.now();
+    const chunks: string[] = [];
+    await strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    expect(chunks.join('')).toContain('json response before idle');
+    expect(Date.now() - startedAt).toBeGreaterThanOrEqual(50);
+  });
+
+  test('executePromptStreaming surfaces app-server session errors after a JSON response', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'response-before-session-error';
+    process.env.OPENCODE_FAKE_MESSAGE = 'json response before delayed error';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'response-before-session-error-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'response-before-session-error',
+      getEncryptionKey: () => undefined,
+    });
+
+    await expect(strategy.executePromptStreaming('hello', 'openai/gpt-5.4', () => undefined)).rejects.toThrow(
+      'delayed provider failure',
+    );
   });
 
   test('executePromptStreaming times out and clears session when app-server returns no output or idle event', async () => {

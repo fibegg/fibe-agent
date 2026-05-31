@@ -30,12 +30,9 @@ interface GeminiCapturedSession {
 }
 
 /**
- * Gemini CLI resolves its config dir as `${homedir()}/.gemini`, where
- * `homedir()` prefers the `GEMINI_CLI_HOME` env var over `os.homedir()`.
- * When SESSION_DIR is set (e.g. `/app/data/<id>/.gemini`) we point the CLI at
- * its parent so the CLI's lookup lands on our per-agent SESSION_DIR — which
- * already holds the `settings.json` + `oauth_creds.json` written by the
- * strategy and the credential injector.
+ * Gemini CLI treats `GEMINI_CLI_HOME` as a home directory and then appends
+ * `.gemini`. Rails still provides `SESSION_DIR` as the concrete config
+ * directory (`/app/data/<id>/.gemini`), so pass its parent to the CLI.
  */
 function getGeminiHomeEnv(): { GEMINI_CLI_HOME?: string } {
   if (process.env.GEMINI_CLI_HOME?.trim()) return {};
@@ -791,7 +788,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           if (providerFailure?.kind === 'quota' || providerFailure?.kind === 'rate_limit') {
             reject(
               new Error(
-                'Model is currently overloaded (rate limited). Please try again in a few minutes or switch to a different model.'
+                'Provider quota or rate limit exhausted for Gemini. Please try again later or switch to a different model.'
               )
             );
             return;
