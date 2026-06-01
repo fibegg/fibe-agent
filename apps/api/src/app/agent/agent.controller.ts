@@ -31,11 +31,15 @@ export class AgentController {
     authenticated: boolean;
     isProcessing: boolean;
     queueCount: number;
+    lastError?: string;
   } {
     return {
       authenticated: this.orchestrator.isAuthenticated,
       isProcessing: this.orchestrator.isProcessing,
       queueCount: this.orchestrator.queueCount,
+      ...(this.orchestrator.lastError
+        ? { lastError: this.orchestrator.lastError }
+        : {}),
     };
   }
 

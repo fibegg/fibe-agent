@@ -488,6 +488,8 @@ describe('OrchestratorService', () => {
       .find((entry) => entry.type === 'error');
     expect(errorEntry?.message).toBe('Provider turn failed');
     expect(errorEntry?.details).toBe(message);
+    expect(ctx.lastError).toBe(message);
+    expect(orch.lastError).toBe(message);
     expect(events.some((e) => e.type === WS_EVENT.ACTIVITY_UPDATED)).toBe(true);
     expect(syncActivityContents.at(-1)).toContain('RESOURCE_EXHAUSTED');
     expect(orch.messages.all().filter((m) => m.role === 'assistant')).toEqual(

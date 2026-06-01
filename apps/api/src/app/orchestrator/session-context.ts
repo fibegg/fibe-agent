@@ -37,6 +37,9 @@ export class SessionContext {
   /** Whether this session's agent is currently running a prompt. */
   isProcessing = false;
 
+  /** Last provider/runtime error observed for this session. Exposed via status for diagnostics. */
+  lastError: string | null = null;
+
   /** Whether a browser WebSocket is still attached to this runtime session. */
   isClientConnected = true;
 

@@ -206,6 +206,14 @@ export class OrchestratorService implements OnModuleInit {
       .all()
       .reduce((sum, s) => sum + s.queuedTurns.length, 0);
   }
+  get lastError(): string | null {
+    const latest = this.sessionRegistry
+      .all()
+      .find(
+        (s) => typeof s.lastError === 'string' && s.lastError.trim() !== '',
+      );
+    return latest?.lastError ?? null;
+  }
   /** Backward-compat: default conversation message store (used by REST /messages endpoint). */
   get messages(): MessageStoreService {
     return this.messageStore;
@@ -1007,6 +1015,7 @@ export class OrchestratorService implements OnModuleInit {
       status: 'processing',
       timestamp: new Date(),
     };
+    ctx.lastError = null;
     try {
       let systemPrompt = '';
       const configSystemPrompt = this.config.getSystemPrompt();
@@ -1240,6 +1249,7 @@ export class OrchestratorService implements OnModuleInit {
       } else {
         const message =
           raw.length > 500 ? raw.slice(0, 500).trim() + '...' : raw;
+        ctx.lastError = message;
         if (isProviderAuthFailureMessage(message)) {
           this.isAuthenticated = false;
         }
