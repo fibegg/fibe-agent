@@ -28,15 +28,22 @@ function makeConfig(dataDir: string) {
 describe('ActivityStoreService', () => {
   let dataDir: string;
   let service: ActivityStoreService;
+  let services: ActivityStoreService[];
+
+  function makeService(): ActivityStoreService {
+    const instance = new ActivityStoreService(makeConfig(dataDir));
+    services.push(instance);
+    return instance;
+  }
 
   beforeEach(() => {
     dataDir = tmpDir();
-    service = new ActivityStoreService(makeConfig(dataDir));
+    services = [];
+    service = makeService();
   });
 
   afterEach(async () => {
-    // Give the async JSON writer a chance to flush before we delete the dir
-    await new Promise((r) => setTimeout(r, 30));
+    await Promise.all(services.map((instance) => instance.onModuleDestroy()));
     rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -198,7 +205,7 @@ describe('ActivityStoreService', () => {
     service.createWithEntry({ id: 'e1', type: 'step', message: 'Loaded', timestamp: '2026-01-01T00:00:00Z' });
     await service.flush();
     // Second service instance reads the same file
-    const service2 = new ActivityStoreService(makeConfig(dataDir));
+    const service2 = makeService();
     const activities = service2.all();
     expect(activities.length).toBeGreaterThanOrEqual(1);
     expect(activities[0].story[0].message).toBe('Loaded');
@@ -206,13 +213,13 @@ describe('ActivityStoreService', () => {
 
   test('loads gracefully when activities file has corrupt JSON', () => {
     writeFileSync(join(dataDir, 'activity.json'), 'invalid-json-content');
-    const svc = new ActivityStoreService(makeConfig(dataDir));
+    const svc = makeService();
     expect(svc.all()).toEqual([]);
   });
 
   test('loads gracefully when activities file has non-array JSON', () => {
     writeFileSync(join(dataDir, 'activity.json'), '{"not":"array"}');
-    const svc = new ActivityStoreService(makeConfig(dataDir));
+    const svc = makeService();
     expect(svc.all()).toEqual([]);
   });
 
@@ -231,7 +238,7 @@ describe('ActivityStoreService', () => {
         },
       ])
     );
-    const svc = new ActivityStoreService(makeConfig(dataDir));
+    const svc = makeService();
     const activities = svc.all();
     expect(activities).toHaveLength(1);
     expect(activities[0].story).toHaveLength(2);
@@ -242,7 +249,7 @@ describe('ActivityStoreService', () => {
     service.createWithEntry({ id: 'e1', type: 'step', message: 'Shutdown', timestamp: '' });
     await service.onModuleDestroy();
 
-    const svc = new ActivityStoreService(makeConfig(dataDir));
+    const svc = makeService();
     expect(svc.all()[0].story[0].message).toBe('Shutdown');
   });
 
@@ -253,7 +260,7 @@ describe('ActivityStoreService', () => {
     expect(service.getById('act1')?.story[0].message).toBe('hydrated');
 
     await service.flush();
-    const svc = new ActivityStoreService(makeConfig(dataDir));
+    const svc = makeService();
     expect(svc.getById('act1')).toBeDefined();
   });
 });

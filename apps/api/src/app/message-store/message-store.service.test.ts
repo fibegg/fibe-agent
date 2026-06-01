@@ -6,21 +6,25 @@ import { MessageStoreService } from './message-store.service';
 
 describe('MessageStoreService', () => {
   let dataDir: string;
+  let services: MessageStoreService[];
 
   function makeService() {
     const config = {
       getConversationDataDir: () => dataDir,
       getEncryptionKey: () => undefined,
     };
-    return new MessageStoreService(config as never);
+    const service = new MessageStoreService(config as never);
+    services.push(service);
+    return service;
   }
 
   beforeEach(() => {
     dataDir = mkdtempSync(join(tmpdir(), 'msg-store-'));
+    services = [];
   });
 
   afterEach(async () => {
-    await new Promise((r) => setTimeout(r, 30));
+    await Promise.all(services.map((service) => service.onModuleDestroy()));
     rmSync(dataDir, { recursive: true, force: true });
   });
 

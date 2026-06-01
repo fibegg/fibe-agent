@@ -45,8 +45,9 @@ export class ProviderTrafficStoreService implements OnModuleDestroy {
     await Promise.all([...this.states.values()].map((state) => state.jsonWriter.flush()));
   }
 
-  onModuleDestroy(): Promise<void> {
-    return this.flush();
+  async onModuleDestroy(): Promise<void> {
+    await this.flush();
+    for (const state of this.states.values()) state.jsonWriter.destroy();
   }
 
   private stateFor(conversationId: string): TrafficState {

@@ -56,14 +56,22 @@ function makeSampleRecord(overrides?: Partial<CapturedProviderRequest>): Capture
 describe('ProviderTrafficStoreService', () => {
   let dataDir: string;
   let service: ProviderTrafficStoreService;
+  let services: ProviderTrafficStoreService[];
+
+  function makeService(): ProviderTrafficStoreService {
+    const instance = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    services.push(instance);
+    return instance;
+  }
 
   beforeEach(() => {
     dataDir = tmpDir();
-    service = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    services = [];
+    service = makeService();
   });
 
   afterEach(async () => {
-    await new Promise((r) => setTimeout(r, 50));
+    await Promise.all(services.map((instance) => instance.onModuleDestroy()));
     rmSync(dataDir, { recursive: true, force: true });
   });
 
@@ -102,7 +110,7 @@ describe('ProviderTrafficStoreService', () => {
     await service.flush();
 
     // Create new service instance pointing to same dir
-    const service2 = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    const service2 = makeService();
     expect(service2.all()).toHaveLength(1);
     expect(service2.all()[0].id).toBe('test-id-1');
   });
@@ -124,7 +132,7 @@ describe('ProviderTrafficStoreService', () => {
     service.append(makeSampleRecord());
     await service.onModuleDestroy();
 
-    const service2 = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    const service2 = makeService();
     expect(service2.all()).toHaveLength(1);
   });
 });

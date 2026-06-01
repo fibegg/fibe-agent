@@ -57,8 +57,9 @@ export class ModelStoreService implements OnModuleDestroy {
     return this.jsonWriter.flush();
   }
 
-  onModuleDestroy(): Promise<void> {
-    return this.flush();
+  async onModuleDestroy(): Promise<void> {
+    await this.flush();
+    this.jsonWriter.destroy();
   }
 
   private ensureDataDir(): void {
