@@ -45,7 +45,13 @@ for (const file of files) {
     process.exit(1);
   }
 
+  if (result.signal) {
+    console.error(`${file} terminated by signal ${result.signal}.`);
+    process.exit(1);
+  }
+
   if (result.status !== 0) {
+    console.error(`${file} exited with status ${result.status ?? 1}.`);
     process.exit(result.status ?? 1);
   }
 }
