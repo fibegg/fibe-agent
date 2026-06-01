@@ -973,6 +973,10 @@ export class OrchestratorService implements OnModuleInit {
       attachmentFilenames?.length ? attachmentFilenames : undefined,
     );
     await ctxMsgStore.flush();
+    void this.fibeSync.syncMessages(
+      () => JSON.stringify(ctxMsgStore.all()),
+      ctx.conversationId,
+    );
     this.sessionRegistry.broadcastToConversation(
       ctx.conversationId,
       WS_EVENT.MESSAGE,

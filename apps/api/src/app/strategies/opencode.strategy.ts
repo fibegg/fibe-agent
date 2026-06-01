@@ -293,6 +293,7 @@ type OpenCodeTurnSignal = 'visible_output' | 'idle';
 interface OpenCodeEventState {
   sessionId: string;
   startedAt: number;
+  promptText: string;
   providerID: string;
   modelID: string;
   resolvedModel: string;
@@ -311,6 +312,11 @@ interface OpenCodeEventState {
   rejectIdle: (error: Error) => void;
   processOutputBuffer: string;
   eventTypes: string[];
+  messagePostStarted: boolean;
+  currentTurnObserved: boolean;
+  currentUserMessageId: string | null;
+  preCurrentTurnMessageIds: Set<string>;
+  currentAssistantMessageIds: Set<string>;
   textByPartId: Map<string, string>;
   rawTextByPartId: Map<string, string>;
   partTypeById: Map<string, string>;
@@ -384,6 +390,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
   private createOpenCodeEventState(
     turn: { resolvedModel: string; providerID: string; modelID: string },
+    promptText: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
   ): OpenCodeEventState {
@@ -405,6 +412,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const state: OpenCodeEventState = {
       sessionId: '',
       startedAt: Date.now(),
+      promptText,
       providerID: turn.providerID,
       modelID: turn.modelID,
       resolvedModel: turn.resolvedModel,
@@ -423,6 +431,11 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       rejectIdle: () => undefined,
       processOutputBuffer: '',
       eventTypes: [],
+      messagePostStarted: false,
+      currentTurnObserved: false,
+      currentUserMessageId: null,
+      preCurrentTurnMessageIds: new Set(),
+      currentAssistantMessageIds: new Set(),
       textByPartId: new Map(),
       rawTextByPartId: new Map(),
       partTypeById: new Map(),
@@ -941,7 +954,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const turn = this.resolveAppServerTurn(model);
     const turnTimeoutMs = resolveOpencodeAppServerTurnTimeoutMs();
     this.appServer = appServer;
-    const state = this.createOpenCodeEventState(turn, onChunk, callbacks);
+    const state = this.createOpenCodeEventState(turn, finalPrompt, onChunk, callbacks);
 
     let eventStream: { stop: () => void; done: Promise<void> } | null = null;
     const unsubscribeAppServerOutput = appServer.onOutput((output) => this.handleAppServerOutput(state, output));
@@ -978,6 +991,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       );
       this.logAppServerPhase(state, 'message_post_complete', `response=${response ? 'json' : 'null'} parts=${response?.parts?.length ?? 0}`);
       if (response) {
+        this.markCurrentAssistantMessage(state, response.info?.id);
         for (const part of response.parts ?? []) this.handleOpenCodePart(state, part);
         this.handleOpenCodeMessageInfo(state, response.info);
       }
@@ -1100,6 +1114,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (variant) body.variant = variant;
 
     try {
+      state.messagePostStarted = true;
       const response = appServer.json<OpenCodeMessageResponse | null>(
         `/session/${encodeURIComponent(sessionId)}/message`,
         {
@@ -1170,6 +1185,44 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
   private markAppServerVisibleOutput(state: OpenCodeEventState): void {
     state.hasVisibleOutput = true;
     state.resolveTurn('visible_output');
+  }
+
+  private markCurrentUserMessage(state: OpenCodeEventState, messageId: string | undefined): void {
+    if (!messageId || state.currentUserMessageId) return;
+    state.preCurrentTurnMessageIds.delete(messageId);
+    state.currentUserMessageId = messageId;
+    state.currentTurnObserved = true;
+  }
+
+  private markCurrentAssistantMessage(state: OpenCodeEventState, messageId: string | undefined): void {
+    if (!messageId) return;
+    state.preCurrentTurnMessageIds.delete(messageId);
+    state.currentAssistantMessageIds.add(messageId);
+    state.currentTurnObserved = true;
+  }
+
+  private userPartMatchesCurrentPrompt(state: OpenCodeEventState, part: OpenCodePart): boolean {
+    if (!state.messagePostStarted || part.messageID === state.currentUserMessageId) return false;
+    const text = part.text ?? '';
+    if (!text) return false;
+    if (text.includes(state.promptText)) return true;
+
+    const normalizedPart = text.replace(/\s+/g, ' ').trim();
+    const normalizedPrompt = state.promptText.replace(/\s+/g, ' ').trim();
+    return Boolean(normalizedPrompt) && normalizedPart.includes(normalizedPrompt);
+  }
+
+  private assistantMessageBelongsToCurrentTurn(
+    state: OpenCodeEventState,
+    messageId: string | undefined,
+  ): boolean {
+    if (!messageId) return false;
+    if (state.currentAssistantMessageIds.has(messageId)) return true;
+    if (state.preCurrentTurnMessageIds.has(messageId)) return false;
+    if (!state.currentUserMessageId || messageId === state.currentUserMessageId) return false;
+
+    this.markCurrentAssistantMessage(state, messageId);
+    return true;
   }
 
   private failAppServerTurn(state: OpenCodeEventState, message: string): void {
@@ -1340,14 +1393,14 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         this.handleOpenCodePartDelta(state, props);
         break;
       case 'session.error':
-        if (props.sessionID === state.sessionId && props.error) {
+        if (props.sessionID === state.sessionId && state.messagePostStarted && props.error) {
           const msg = errorMessage(props.error);
           this.failAppServerTurn(state, msg);
           state.onChunk(`⚠️ ${msg}`);
         }
         break;
       case 'session.idle':
-        if (props.sessionID === state.sessionId) {
+        if (props.sessionID === state.sessionId && state.currentTurnObserved) {
           state.idle = true;
           this.endReasoning(state);
           state.resolveIdle();
@@ -1363,12 +1416,19 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (!info || info.sessionID !== state.sessionId) return;
     // Track the role of each message so we can skip user-message text parts
     if (info.id && info.role) state.messageRoleById.set(info.id, info.role);
+    if (info.id && !state.currentUserMessageId) state.preCurrentTurnMessageIds.add(info.id);
     if (info.error) {
+      if (info.role === 'assistant' && !this.assistantMessageBelongsToCurrentTurn(state, info.id)) return;
       const msg = errorMessage(info.error);
       this.failAppServerTurn(state, msg);
       state.onChunk(`⚠️ ${msg}`);
     }
-    if (info.role === 'assistant' && info.tokens && state.callbacks?.onUsage) {
+    if (
+      info.role === 'assistant'
+      && info.tokens
+      && state.callbacks?.onUsage
+      && this.assistantMessageBelongsToCurrentTurn(state, info.id)
+    ) {
       state.callbacks.onUsage(this.tokensFrom(info.tokens));
     }
   }
@@ -1376,6 +1436,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
   private handleOpenCodePart(state: OpenCodeEventState, part: OpenCodePart): void {
     if (part.sessionID !== state.sessionId) return;
     state.partTypeById.set(part.id, part.type);
+    if (!state.currentUserMessageId && part.messageID) state.preCurrentTurnMessageIds.add(part.messageID);
     // Track message role when we first see a part so we can filter by it
     // (messageID on the part is the parent message; we may not have seen its message.updated yet)
 
@@ -1384,16 +1445,29 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         // Skip user-message text parts — opencode echoes the user's question as a text part.
         // Guard 1: role map (populated by message.updated events)
         const parentRole = state.messageRoleById.get(part.messageID);
-        if (parentRole === 'user') break;
+        if (parentRole === 'user') {
+          if (this.userPartMatchesCurrentPrompt(state, part)) {
+            this.markCurrentUserMessage(state, part.messageID);
+          }
+          break;
+        }
         // Guard 2: user parts always start with [MODE] — assistant response parts never do
-        if ((part.text ?? '').startsWith('[MODE]')) break;
+        if ((part.text ?? '').startsWith('[MODE]')) {
+          if (this.userPartMatchesCurrentPrompt(state, part)) {
+            this.markCurrentUserMessage(state, part.messageID);
+          }
+          break;
+        }
+        if (!this.assistantMessageBelongsToCurrentTurn(state, part.messageID)) break;
         this.emitPartTextDelta(state, part, 'assistant');
         break;
       }
       case 'reasoning':
+        if (!this.assistantMessageBelongsToCurrentTurn(state, part.messageID)) break;
         this.emitPartTextDelta(state, part, 'reasoning');
         break;
       case 'tool':
+        if (!this.assistantMessageBelongsToCurrentTurn(state, part.messageID)) break;
         this.emitToolPart(state, part);
         break;
       case 'step-start':
@@ -1420,6 +1494,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     // Skip deltas for user-message parts (echoed question text)
     const parentRole = props.messageID ? state.messageRoleById.get(props.messageID) : undefined;
     if (parentRole === 'user') return;
+    if (!this.assistantMessageBelongsToCurrentTurn(state, props.messageID)) return;
 
     // Accumulate raw text, then strip MODE tags to find what's cleanly emittable
     const rawAccumulated = (state.rawTextByPartId.get(props.partID) ?? '') + props.delta;

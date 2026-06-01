@@ -164,10 +164,11 @@ describe('OrchestratorService', () => {
       conversationManager,
     );
     const uploadsService = new UploadsService(config as never);
+    const syncMessageContents: string[] = [];
     const syncActivityContents: string[] = [];
     const fibeSync = {
       syncMessages: (getContent: () => string) => {
-        void getContent();
+        syncMessageContents.push(getContent());
       },
       syncActivity: (getContent: () => string) => {
         syncActivityContents.push(getContent());
@@ -232,7 +233,7 @@ describe('OrchestratorService', () => {
       ctx.cachedSystemPromptFromFile = options.cachedSystemPromptFromFile;
     }
     ctx.isAuthenticated = false;
-    return { orch, ctx, sessionRegistry, promptBuilds, strategyCalls, syncActivityContents };
+    return { orch, ctx, sessionRegistry, promptBuilds, strategyCalls, syncMessageContents, syncActivityContents };
   }
 
   async function waitForIdle(ctx: SessionContext): Promise<void> {
@@ -991,7 +992,8 @@ describe('OrchestratorService', () => {
   });
 
   test('sendMessageFromApi returns accepted and messageId when authenticated', async () => {
-    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    const { orch, ctx, sessionRegistry, syncMessageContents } =
+      await createOrchestrator();
     ctx.isAuthenticated = true;
     orch.isAuthenticated = true;
     const result = await orch.sendMessageFromApi('ping');
@@ -1001,6 +1003,10 @@ describe('OrchestratorService', () => {
     expect(
       sessionRegistry.all().some((s) => s.conversationId === 'inbox'),
     ).toBe(true);
+    expect(syncMessageContents.length).toBeGreaterThan(0);
+    expect(JSON.parse(syncMessageContents[0] ?? '[]')).toMatchObject([
+      { role: 'user', body: 'ping' },
+    ]);
     await waitForIdle(ctx);
   });
 

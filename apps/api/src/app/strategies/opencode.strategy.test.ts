@@ -43,6 +43,7 @@ if (args[0] === 'serve') {
   const port = Number(args[args.indexOf('--port') + 1]);
   const clients = new Set();
   const sessionID = process.env.OPENCODE_FAKE_SESSION_ID || 'ses_fakeOpenCodeSession';
+  let messageCounter = 0;
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://127.0.0.1:' + port);
     record({ method: req.method, path: url.pathname, query: Object.fromEntries(url.searchParams.entries()) });
@@ -58,6 +59,11 @@ if (args[0] === 'serve') {
       });
       clients.add(res);
       res.write('data: {"type":"server.connected","properties":{}}\\n\\n');
+      if (process.env.OPENCODE_FAKE_REPLAY_PREVIOUS_EVENTS === '1') {
+        res.write('data: ' + JSON.stringify({ type: 'message.updated', properties: { info: { id: 'msg_old_assistant', sessionID, role: 'assistant' } } }) + '\\n\\n');
+        res.write('data: ' + JSON.stringify({ type: 'message.part.updated', properties: { part: { id: 'prt_old_text', sessionID, messageID: 'msg_old_assistant', type: 'text', text: 'stale replay response' } } }) + '\\n\\n');
+        res.write('data: ' + JSON.stringify({ type: 'session.idle', properties: { sessionID } }) + '\\n\\n');
+      }
       req.on('close', () => clients.delete(res));
       return;
     }
@@ -101,12 +107,18 @@ if (args[0] === 'serve') {
       record({ type: 'message-body', sessionID: messageMatch[1], query: Object.fromEntries(url.searchParams.entries()), body });
       const text = process.env.OPENCODE_FAKE_MESSAGE || 'fake app-server response';
       const prompt = (body && body.parts && body.parts[0] && body.parts[0].text) || 'hello';
+      const turnNumber = ++messageCounter;
+      const userMessageID = 'msg_user_' + turnNumber;
+      const assistantMessageID = 'msg_assistant_' + turnNumber;
+      const userPartID = 'prt_user_' + turnNumber;
+      const reasoningPartID = 'prt_reason_' + turnNumber;
+      const textPartID = 'prt_text_' + turnNumber;
       if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'empty-no-idle') {
-        sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_user', sessionID: messageMatch[1], role: 'user' } } });
-        sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_assistant', sessionID: messageMatch[1], role: 'assistant' } } });
+        sendEvent(clients, { type: 'message.updated', properties: { info: { id: userMessageID, sessionID: messageMatch[1], role: 'user' } } });
+        sendEvent(clients, { type: 'message.updated', properties: { info: { id: assistantMessageID, sessionID: messageMatch[1], role: 'assistant' } } });
         sendJson(res, 200, {
           info: {
-            id: 'msg_assistant',
+            id: assistantMessageID,
             sessionID: messageMatch[1],
             role: 'assistant',
             tokens: { input: 3, output: 0, cache: { read: 0, write: 0 }, reasoning: 0 },
@@ -131,22 +143,22 @@ if (args[0] === 'serve') {
         await new Promise((resolve) => setTimeout(resolve, 25));
       }
       // Simulate real opencode: user message first, then assistant
-      sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_user', sessionID: messageMatch[1], role: 'user' } } });
-      sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_user', sessionID: messageMatch[1], messageID: 'msg_user', type: 'text', text: '[MODE]Casting...[/MODE]\\n' + prompt } } });
-      sendEvent(clients, { type: 'message.updated', properties: { info: { id: 'msg_assistant', sessionID: messageMatch[1], role: 'assistant' } } });
-      sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_reason', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'reasoning', text: 'thinking' } } });
+      sendEvent(clients, { type: 'message.updated', properties: { info: { id: userMessageID, sessionID: messageMatch[1], role: 'user' } } });
+      sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: userPartID, sessionID: messageMatch[1], messageID: userMessageID, type: 'text', text: '[MODE]Casting...[/MODE]\\n' + prompt } } });
+      sendEvent(clients, { type: 'message.updated', properties: { info: { id: assistantMessageID, sessionID: messageMatch[1], role: 'assistant' } } });
+      sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: reasoningPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'reasoning', text: 'thinking' } } });
       const snapshotFirst = process.env.OPENCODE_FAKE_EVENT_ORDER === 'snapshot-first';
       if (snapshotFirst) {
-        sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
+        sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: textPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'text', text } } });
       }
       // Emit delta events for the assistant text part
-      sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(0, Math.ceil(text.length / 2)) } });
+      sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: assistantMessageID, partID: textPartID, field: 'text', delta: text.slice(0, Math.ceil(text.length / 2)) } });
       if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'output-no-idle') {
         return;
       }
-      sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: 'msg_assistant', partID: 'prt_text', field: 'text', delta: text.slice(Math.ceil(text.length / 2)) } });
+      sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: assistantMessageID, partID: textPartID, field: 'text', delta: text.slice(Math.ceil(text.length / 2)) } });
       if (!snapshotFirst) {
-        sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text } } });
+        sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: textPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'text', text } } });
       }
       const delayTerminalEvent = process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-idle'
         || process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-session-error';
@@ -165,14 +177,14 @@ if (args[0] === 'serve') {
       }
       sendJson(res, 200, {
         info: {
-          id: 'msg_assistant',
+          id: assistantMessageID,
           sessionID: messageMatch[1],
           role: 'assistant',
           tokens: { input: 3, output: 4, cache: { read: 0, write: 0 }, reasoning: 0 },
         },
         parts: [
-          { id: 'prt_reason', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'reasoning', text: 'thinking' },
-          { id: 'prt_text', sessionID: messageMatch[1], messageID: 'msg_assistant', type: 'text', text },
+          { id: reasoningPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'reasoning', text: 'thinking' },
+          { id: textPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'text', text },
         ],
       });
       if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'response-before-idle') {
@@ -224,6 +236,7 @@ describe('OpencodeStrategy', () => {
     'OPENCODE_FAKE_MESSAGE',
     'OPENCODE_FAKE_MESSAGE_RESPONSE',
     'OPENCODE_FAKE_EVENT_ORDER',
+    'OPENCODE_FAKE_REPLAY_PREVIOUS_EVENTS',
     'OPENCODE_FAKE_REQUESTS_PATH',
     'OPENCODE_CONFIG_CONTENT',
     'OPENCODE_AGENT_TRANSPORT',
@@ -248,6 +261,7 @@ describe('OpencodeStrategy', () => {
     delete process.env.OPENCODE_FAKE_MESSAGE;
     delete process.env.OPENCODE_FAKE_MESSAGE_RESPONSE;
     delete process.env.OPENCODE_FAKE_EVENT_ORDER;
+    delete process.env.OPENCODE_FAKE_REPLAY_PREVIOUS_EVENTS;
     delete process.env.OPENCODE_FAKE_REQUESTS_PATH;
     delete process.env.OPENCODE_CONFIG_CONTENT;
     delete process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS;
@@ -959,6 +973,39 @@ describe('OpencodeStrategy', () => {
     expect(messageRequests[1].body?.parts?.[0]?.text).toBe('second turn');
     expect(requests.filter((request) => request.type === 'create-session-body')).toHaveLength(1);
     expect(requests.some((request) => request.path === '/session/ses_fakeOpenCodeSession')).toBe(true);
+  });
+
+  test('executePromptStreaming ignores replayed app-server events before the current user turn', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_REPLAY_PREVIOUS_EVENTS = '1';
+    process.env.OPENCODE_FAKE_MESSAGE = 'current opencode response';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+    const requestsPath = join(TEST_HOME, 'opencode-replay-requests.jsonl');
+    process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'opencode-replay-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'opencode-replay',
+      getEncryptionKey: () => undefined,
+    });
+    const chunks: string[] = [];
+
+    await strategy.executePromptStreaming('current turn', 'openai/gpt-5.4', (chunk) => chunks.push(chunk));
+
+    const requests = readFileSync(requestsPath, 'utf8')
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { type?: string; body?: { parts?: Array<{ text?: string }> } });
+    const messageRequests = requests.filter((request) => request.type === 'message-body');
+    expect(chunks.join('')).toBe('current opencode response');
+    expect(chunks.join('')).not.toContain('stale replay response');
+    expect(messageRequests).toHaveLength(1);
+    expect(messageRequests[0].body?.parts?.[0]?.text).toBe('current turn');
   });
 
   test('executePromptStreaming app-server clears stale OpenCode session marker on missing session', async () => {
