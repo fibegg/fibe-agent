@@ -107,7 +107,8 @@ export function parseYaml(content: string): Record<string, unknown> {
 // ─── Readers ─────────────────────────────────────────────────────────────────
 
 function yamlCandidates(): string[] {
-  return ['/app/fibe.yml', join(process.cwd(), 'fibe.yml')];
+  const localPath = join(process.cwd(), 'fibe.yml');
+  return localPath === '/app/fibe.yml' ? [localPath] : [localPath, '/app/fibe.yml'];
 }
 
 function readYaml(): Record<string, unknown> {

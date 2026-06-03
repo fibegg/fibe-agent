@@ -86,11 +86,18 @@ RUN --mount=type=cache,target=/app/.nx/cache \
     NX_PARALLEL="${NX_PARALLEL:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
     npx nx run-many --targets=build --projects=api,chat --parallel="${NX_PARALLEL}"
 
+FROM golang:1.26.4-alpine AS gitea-mcp
+
+ARG GITEA_MCP_VERSION=1.1.0
+
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    /usr/local/go/bin/go install "gitea.com/gitea/gitea-mcp@v${GITEA_MCP_VERSION}"
+
 FROM node:24-slim AS runtime-base
 
 ARG BUILDKIT_INLINE_CACHE=1
 ARG GITHUB_MCP_VERSION=1.0.0
-ARG GITEA_MCP_VERSION=1.1.0
 ARG NPM_CONFIG_JOBS
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
@@ -150,15 +157,7 @@ RUN ARCH=$(uname -m) && \
     printf '#!/bin/sh\nexec /usr/local/bin/github-mcp-server stdio "$@"\n' > /usr/local/bin/mcp-github && \
     chmod +x /usr/local/bin/mcp-github
 
-# Official Gitea MCP server binary.
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then GITEA_MCP_ARCH="x86_64"; \
-    elif [ "$ARCH" = "aarch64" ]; then GITEA_MCP_ARCH="arm64"; \
-    else GITEA_MCP_ARCH="x86_64"; fi && \
-    curl -fsSL \
-      "https://gitea.com/gitea/gitea-mcp/releases/download/v${GITEA_MCP_VERSION}/gitea-mcp_Linux_${GITEA_MCP_ARCH}.tar.gz" | \
-      tar -xz -C /usr/local/bin gitea-mcp && \
-    chmod +x /usr/local/bin/gitea-mcp
+COPY --link --from=gitea-mcp /go/bin/gitea-mcp /usr/local/bin/gitea-mcp
 
 COPY --link --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
