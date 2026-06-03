@@ -26,7 +26,8 @@ RUN --mount=type=cache,target=/root/.npm \
     CODEX_VER=$(grep '"@openai/codex"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
     npm install -g "@openai/codex@${CODEX_VER:-latest}"; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
-    npm install -g opencode-ai; \
+    OPENCODE_VER=$(grep '"opencode-ai"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
+    npm install -g "opencode-ai@${OPENCODE_VER:-latest}"; \
     elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
     curl -fsSL -o /tmp/cursor-install.sh https://cursor.com/install; \
     bash /tmp/cursor-install.sh; \

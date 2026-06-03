@@ -41,6 +41,7 @@
         "marked": "^15.0.12",
         "node-forge": "^1.4.0",
         "node-pty": "^1.1.0",
+        "opencode-ai": "1.15.13",
         "path-to-regexp": "^8.4.2",
         "prismjs": "^1.30.0",
         "react": "^19.2.5",
@@ -2766,6 +2767,32 @@
     "onnxruntime-web": ["onnxruntime-web@1.25.0-dev.20260327-722743c0e2", "", { "dependencies": { "flatbuffers": "^25.1.24", "guid-typescript": "^1.0.9", "long": "^5.2.3", "onnxruntime-common": "1.24.0-dev.20251116-b39e144322", "platform": "^1.3.6", "protobufjs": "^7.2.4" } }, "sha512-8PXdZy4Ekhg10CLg+cFFt39b4tFDGMRJB6lGjnQL6eA+2boUQYDymZ0gtxiS+H6oIWoCjQp/ziyirvFbaFKfiw=="],
 
     "open": ["open@8.4.2", "", { "dependencies": { "define-lazy-prop": "^2.0.0", "is-docker": "^2.1.1", "is-wsl": "^2.2.0" } }, "sha512-7x81NCL719oNbsq/3mh+hVrAWmFuEYUqrq/Iw3kUzH8ReypT9QQ0BLoJS7/G9k6N81XjW4qHWtjWwe/9eLy1EQ=="],
+
+    "opencode-ai": ["opencode-ai@1.15.13", "", { "optionalDependencies": { "opencode-darwin-arm64": "1.15.13", "opencode-darwin-x64": "1.15.13", "opencode-darwin-x64-baseline": "1.15.13", "opencode-linux-arm64": "1.15.13", "opencode-linux-arm64-musl": "1.15.13", "opencode-linux-x64": "1.15.13", "opencode-linux-x64-baseline": "1.15.13", "opencode-linux-x64-baseline-musl": "1.15.13", "opencode-linux-x64-musl": "1.15.13", "opencode-windows-arm64": "1.15.13", "opencode-windows-x64": "1.15.13", "opencode-windows-x64-baseline": "1.15.13" }, "os": [ "linux", "win32", "darwin", ], "cpu": [ "x64", "arm64", ], "bin": { "opencode": "bin/opencode.exe" } }, "sha512-9LvgcILITiYPsKrBYSHQYR4ur/WBQYMHN5jEnboa/NVboPyl+WBGgvDHQ2SJasPpBmCAd2YTTorz2uMbcF7Hhw=="],
+
+    "opencode-darwin-arm64": ["opencode-darwin-arm64@1.15.13", "", { "os": "darwin", "cpu": "arm64" }, "sha512-/6LSBPUdhNdev0JwOOZePOS8QSrH5XPj2bCkZUeoSyab3i0VMFlbW1hyi93pvsyEFd68OwThoAcy9I4f6TGslQ=="],
+
+    "opencode-darwin-x64": ["opencode-darwin-x64@1.15.13", "", { "os": "darwin", "cpu": "x64" }, "sha512-Qzthj88M8ieMhzuhOi1al6MU0SVyBWWKLtKkmjDabotn+XSlg1dfA2T1Pap5RqV9Z8rH+6LEt4hP4SNFrJGaew=="],
+
+    "opencode-darwin-x64-baseline": ["opencode-darwin-x64-baseline@1.15.13", "", { "os": "darwin", "cpu": "x64" }, "sha512-8m+1YWHYWyL9/uCZdaSNqPfWIQGxXN0KFUIFFFa/Qa0U8SlJdQd3mjtfxXJ1dJ0oqTMscXiWhHxoNHorANxC1w=="],
+
+    "opencode-linux-arm64": ["opencode-linux-arm64@1.15.13", "", { "os": "linux", "cpu": "arm64" }, "sha512-+2FNiJZgINnJwR/+JKM2i4/BUJAqeVxcLK8z1smkBVjZ45u5m5S/cWijNunPvgETxP6ps1J410KQg1ci2OaixQ=="],
+
+    "opencode-linux-arm64-musl": ["opencode-linux-arm64-musl@1.15.13", "", { "os": "linux", "cpu": "arm64" }, "sha512-gj6Iv6Aui980vh3pXPijhvbAqfnEqjfnVUVGcjoBN5cUgQLt+gndMChlyMF47gnHuwsVAqQ5tKitYLhWl+iNuQ=="],
+
+    "opencode-linux-x64": ["opencode-linux-x64@1.15.13", "", { "os": "linux", "cpu": "x64" }, "sha512-gZrioSPE/aWPAZlaipWEN7GEhAzNEQAogikvbcvVP78nabzkzzl4UKBXemf1YzLG9nRWiWvvWX7uC2hcZGQ1iQ=="],
+
+    "opencode-linux-x64-baseline": ["opencode-linux-x64-baseline@1.15.13", "", { "os": "linux", "cpu": "x64" }, "sha512-2iqNlqtYLUp4ccmhEOAR8OkJnCyUp1AoJGRVkkYFhKIaPwx+kWdmkrr3V9j6uLO5KoPQmJf4M3m6jib+nMbH+w=="],
+
+    "opencode-linux-x64-baseline-musl": ["opencode-linux-x64-baseline-musl@1.15.13", "", { "os": "linux", "cpu": "x64" }, "sha512-qPrKsLg6mO3bkKAOiT4t3AstmOsjm4nNU/7M0dO0xWh61aNQyJOvRPks/bKD6SHqCRkdpRh1Y7ULSoXFsjArUQ=="],
+
+    "opencode-linux-x64-musl": ["opencode-linux-x64-musl@1.15.13", "", { "os": "linux", "cpu": "x64" }, "sha512-cU2eBXxn3Ols6lH5VaLaay03SpM7T63L0S/JGXOm1OsYdAjOpw2euziI14sXbWM1z7mkhsUTm/CKfSHyRaWEDA=="],
+
+    "opencode-windows-arm64": ["opencode-windows-arm64@1.15.13", "", { "os": "win32", "cpu": "arm64" }, "sha512-DUBCUL/l5oYHuiUEghYRVsrkMkEKtv9uJViwH+YYX/YA/tR+1WuLO+dss0sGyQOPh5NCzYDuPlkjUpFNKuNFkA=="],
+
+    "opencode-windows-x64": ["opencode-windows-x64@1.15.13", "", { "os": "win32", "cpu": "x64" }, "sha512-xGpnwI9QKG0p2BjJ/RGa8ZtTTa5crHfMhc/7RyC1K9Z8hGNA5w0Nl2KOMihzMDsj0vmc7TfTv1He5CIUdaC/oQ=="],
+
+    "opencode-windows-x64-baseline": ["opencode-windows-x64-baseline@1.15.13", "", { "os": "win32", "cpu": "x64" }, "sha512-tAuDGdrHU+ycmjk0kATf5xBKq/Y/4RmWToYbwXA0pE6/D9yObmvzIb1Qt2IShNC2zQujNCnTGRze2M9kXjBpzA=="],
 
     "opencollective-postinstall": ["opencollective-postinstall@2.0.3", "", { "bin": { "opencollective-postinstall": "index.js" } }, "sha512-8AV/sCtuzUeTo8gQK5qDZzARrulB3egtLzFgteqB2tcT4Mw7B8Kt7JcDHmltjz6FOAHsvTevk70gZEbhM4ZS9Q=="],
 

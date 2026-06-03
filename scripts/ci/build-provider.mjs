@@ -38,6 +38,7 @@ const imageTitle = `Fibe Agent (${providerName})`;
 const imageDescription = `Fibe Agent runtime image with ${providerName} for Fibe playgrounds and CI jobs.`;
 const imageVersion = `${tagName}-${gitSha}`;
 const imageCreated = await tryCaptureText('git', ['show', '-s', '--format=%cI', 'HEAD'], new Date().toISOString());
+const sourceDateEpoch = await tryCaptureText('git', ['show', '-s', '--format=%ct', 'HEAD'], `${Math.floor(Date.parse(imageCreated) / 1000)}`);
 const resultsDir = process.env.CI_RESULTS_DIR || '/results';
 const imageResultFile = path.join(resultsDir, 'images', `${process.env.CI_STEP_NAME || tagName}.txt`);
 
@@ -94,6 +95,8 @@ await run('docker', [
   `AGENT_PROVIDER=${provider}`,
   '--build-arg',
   `GIT_SHA=${gitSha}`,
+  '--build-arg',
+  `SOURCE_DATE_EPOCH=${sourceDateEpoch}`,
   '--build-arg',
   `NPM_CONFIG_JOBS=${buildConfig.npmJobs}`,
   '--build-arg',

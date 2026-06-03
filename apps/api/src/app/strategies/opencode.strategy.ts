@@ -58,6 +58,7 @@ const API_KEY_ENV_VARS = [
   'OPENAI_API_KEY',
   'GEMINI_API_KEY',
   'GOOGLE_GENERATIVE_AI_API_KEY',
+  'GOOGLE_API_KEY',
   'OPENROUTER_API_KEY',
   'DEEPSEEK_API_KEY',
 ] as const;
@@ -195,11 +196,11 @@ const STORED_PROVIDER_ENV_KEYS: Record<StoredProvider, string[]> = {
   openrouter: ['OPENROUTER_API_KEY'],
   anthropic: ['ANTHROPIC_API_KEY'],
   openai: ['OPENAI_API_KEY'],
-  gemini: ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'],
+  gemini: ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_API_KEY'],
   deepseek: ['DEEPSEEK_API_KEY'],
   'custom-openai-compatible': ['OPENAI_API_KEY'],
   'custom-anthropic': ['ANTHROPIC_API_KEY'],
-  'custom-gemini': ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY'],
+  'custom-gemini': ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_API_KEY'],
 };
 
 const OPENCODE_PROVIDER_IDS: Record<StoredProvider, string> = {

@@ -227,6 +227,7 @@ describe('OpencodeStrategy', () => {
     'OPENAI_API_KEY',
     'GEMINI_API_KEY',
     'GOOGLE_GENERATIVE_AI_API_KEY',
+    'GOOGLE_API_KEY',
     'OPENROUTER_API_KEY',
     'DEEPSEEK_API_KEY',
     'OPENAI_API_BASE',
@@ -252,6 +253,7 @@ describe('OpencodeStrategy', () => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.GEMINI_API_KEY;
     delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
     delete process.env.OPENROUTER_API_KEY;
     delete process.env.DEEPSEEK_API_KEY;
     delete process.env.OPENAI_API_BASE;
@@ -357,6 +359,14 @@ describe('OpencodeStrategy', () => {
     expect(conn.calls).toContain('auth_success');
   });
 
+  test('executeAuth skips modal when GOOGLE_API_KEY is set', () => {
+    process.env.GOOGLE_API_KEY = 'test-key';
+    const strategy = new OpencodeStrategy();
+    const conn = makeConnection();
+    strategy.executeAuth(conn);
+    expect(conn.calls).toContain('auth_success');
+  });
+
   // ─── Manual key submission ──────────────────────────────────────
 
   test('submitAuthCode writes auth file and signals success', () => {
@@ -421,6 +431,22 @@ describe('OpencodeStrategy', () => {
 
     expect(env.ANTHROPIC_API_KEY).toBe('test-anthropic-key');
     expect(env.OPENROUTER_API_KEY).toBeUndefined();
+  });
+
+  test('stored Gemini provider metadata sets all Google env aliases', () => {
+    const authDir = join(TEST_HOME, '.local', 'share', 'opencode');
+    mkdirSync(authDir, { recursive: true });
+    writeFileSync(join(authDir, 'auth.json'), JSON.stringify({
+      api_key: 'test-gemini-key',
+      provider: 'gemini',
+    }));
+
+    const strategy = new OpencodeStrategy();
+    const env = (strategy as unknown as { buildOpencodeEnv: () => NodeJS.ProcessEnv }).buildOpencodeEnv();
+
+    expect(env.GEMINI_API_KEY).toBe('test-gemini-key');
+    expect(env.GOOGLE_GENERATIVE_AI_API_KEY).toBe('test-gemini-key');
+    expect(env.GOOGLE_API_KEY).toBe('test-gemini-key');
   });
 
   test('stored custom provider metadata applies base URL config', () => {

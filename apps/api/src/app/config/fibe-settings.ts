@@ -141,10 +141,15 @@ function readJson(): Record<string, unknown> {
  * Promotes merged settings into process.env.
  * Existing env vars are NEVER overwritten (individual vars always win).
  */
-function promoteToEnv(s: FibeSettings): void {
+function promoteToEnv(s: FibeSettings): string[] {
+  const promotedCredentialEnvKeys: string[] = [];
   // Only set if the env var is not already present
-  const set = (key: string, value: string | null | undefined): void => {
-    if (value !== undefined && value !== null && !process.env[key]) process.env[key] = value;
+  const set = (key: string, value: string | null | undefined): boolean => {
+    if (value !== undefined && value !== null && !process.env[key]) {
+      process.env[key] = value;
+      return true;
+    }
+    return false;
   };
   const bool = (v: boolean) => (v ? 'true' : 'false');
 
@@ -185,7 +190,7 @@ function promoteToEnv(s: FibeSettings): void {
   // Credential env — pre-computed by Rails, injected for native CLI tools
   if (s.credentialEnv) {
     for (const [k, v] of Object.entries(s.credentialEnv)) {
-      set(k, v);
+      if (set(k, v)) promotedCredentialEnvKeys.push(k);
     }
   }
 
@@ -214,6 +219,8 @@ function promoteToEnv(s: FibeSettings): void {
   set('ASSISTANT_AVATAR_BASE64', s.assistantAvatarBase64);
   if (s.lockChatModel !== undefined) set('LOCK_CHAT_MODEL', bool(s.lockChatModel));
   if (s.simplicate !== undefined) set('SIMPLICATE', bool(s.simplicate));
+
+  return promotedCredentialEnvKeys.sort();
 }
 
 function jsonRecord(value: string | Record<string, unknown> | undefined): Record<string, unknown> {
@@ -267,5 +274,8 @@ export function loadFibeSettings(): FibeSettings {
  *   3. /app/fibe.yml  (or ./fibe.yml in dev)
  */
 export function applyFibeSettings(): void {
-  promoteToEnv(loadFibeSettings());
+  const promotedCredentialEnvKeys = promoteToEnv(loadFibeSettings());
+  if (promotedCredentialEnvKeys.length > 0) {
+    console.info(`[fibe-settings] Promoted credential env keys: ${promotedCredentialEnvKeys.join(', ')}`);
+  }
 }

@@ -204,7 +204,8 @@ describe('applyFibeSettings', () => {
     'FIBE_CLI_VERSION', 'PROVIDER_ARGS', 'SKILL_TOGGLES', 'SYSCHECK_ENABLED',
     'AGENT_CREDENTIALS_JSON', 'AGENT_RUNTIME_FILES_JSON',
     // Credential env keys injected from credentialEnv
-    'GEMINI_API_KEY', 'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'CURSOR_API_KEY',
+    'GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_API_KEY',
+    'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'CURSOR_API_KEY',
     'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
   ];
   const savedEnv: Record<string, string | undefined> = {};
@@ -468,12 +469,23 @@ describe('applyFibeSettings', () => {
   });
 
   test('promotes credentialEnv entries to process.env', () => {
+    const originalInfo = console.info;
+    const infoMessages: string[] = [];
+    console.info = (message?: unknown) => { infoMessages.push(String(message)); };
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({
-      credentialEnv: { GEMINI_API_KEY: 'AIza-test', ANTHROPIC_API_KEY: 'sk-ant-test' },
+      credentialEnv: { GEMINI_API_KEY: 'AIza-test', GOOGLE_API_KEY: 'AIza-test', ANTHROPIC_API_KEY: 'sk-ant-test' },
     });
-    applyFibeSettings();
+    try {
+      applyFibeSettings();
+    } finally {
+      console.info = originalInfo;
+    }
     expect(process.env.GEMINI_API_KEY).toBe('AIza-test');
+    expect(process.env.GOOGLE_API_KEY).toBe('AIza-test');
     expect(process.env.ANTHROPIC_API_KEY).toBe('sk-ant-test');
+    expect(infoMessages.join('\n')).toContain('ANTHROPIC_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY');
+    expect(infoMessages.join('\n')).not.toContain('AIza-test');
+    expect(infoMessages.join('\n')).not.toContain('sk-ant-test');
   });
 
   test('credentialEnv does not overwrite existing env vars', () => {
