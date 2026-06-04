@@ -133,6 +133,27 @@ if (args[0] === 'serve') {
         sendEvent(clients, { type: 'session.error', properties: { sessionID: messageMatch[1], error: { message: 'fake provider failure' } } });
         return;
       }
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'structured-session-quota') {
+        sendJson(res, 200, null);
+        await new Promise((resolve) => setTimeout(resolve, 25));
+        sendEvent(clients, {
+          type: 'session.error',
+          properties: {
+            sessionID: messageMatch[1],
+            error: {
+              message: 'Provider authentication failed',
+              statusCode: 429,
+              responseBody: {
+                error: {
+                  status: 'RESOURCE_EXHAUSTED',
+                  message: 'Quota exceeded for prompt-body-that-must-not-leak sk-test-secret',
+                },
+              },
+            },
+          },
+        });
+        return;
+      }
       if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'provider-log-quota') {
         console.error('ERROR service=llm error={"name":"AI_APICallError","statusCode":429,"responseBody":{"error":{"status":"RESOURCE_EXHAUSTED","message":"Quota exceeded for prompt-body-that-must-not-leak sk-test-secret"}}} stream error');
         return;
@@ -961,6 +982,35 @@ describe('OpencodeStrategy', () => {
       message = err instanceof Error ? err.message : String(err);
     }
     expect(message).toContain('OpenCode provider quota/rate limit exhausted');
+    expect(message).not.toContain('prompt-body-that-must-not-leak');
+    expect(message).not.toContain('sk-test-secret');
+  });
+
+  test('executePromptStreaming classifies structured app-server quota errors before auth-like messages', async () => {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'structured-session-quota';
+    process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '2000';
+    process.env.ANTHROPIC_API_KEY = 'test-key';
+
+    const strategy = new OpencodeStrategy({
+      getConversationDataDir: () => join(TEST_HOME, 'structured-session-quota-conv'),
+      getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+      getConversationId: () => 'structured-session-quota',
+      getEncryptionKey: () => undefined,
+    });
+
+    let message = '';
+    try {
+      await strategy.executePromptStreaming('hello', 'google/gemini-2.5-flash-lite', () => undefined);
+    } catch (err) {
+      message = err instanceof Error ? err.message : String(err);
+    }
+    expect(message).toContain('OpenCode provider quota/rate limit exhausted');
+    expect(message).not.toContain('OpenCode provider authentication failed');
     expect(message).not.toContain('prompt-body-that-must-not-leak');
     expect(message).not.toContain('sk-test-secret');
   });

@@ -158,6 +158,18 @@ function errorMessage(error: unknown): string {
   return JSON.stringify(error);
 }
 
+function errorDetectionText(error: unknown): string {
+  const parts = [errorMessage(error)];
+  if (error && typeof error === 'object' && !(error instanceof Error)) {
+    try {
+      parts.push(JSON.stringify(error));
+    } catch {
+      // Ignore non-serializable provider payloads; the short message is still available.
+    }
+  }
+  return parts.join('\n');
+}
+
 function sanitizeLogValue(value: string): string {
   return value.replace(API_KEY_LOG_PATTERN, '[redacted]').slice(0, 500);
 }
@@ -1233,6 +1245,15 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     state.rejectIdle(error);
   }
 
+  private failAppServerProviderError(state: OpenCodeEventState, error: unknown): string {
+    const failure = detectProviderFailure(errorDetectionText(error));
+    const message = failure
+      ? this.appServerProviderFailureMessage(state, failure)
+      : errorMessage(error);
+    this.failAppServerTurn(state, message);
+    return message;
+  }
+
   private handleAppServerOutput(state: OpenCodeEventState, output: HttpAppServerOutput): void {
     state.processOutputBuffer = `${state.processOutputBuffer}${output.text}`.slice(-16 * 1024);
     const failure = detectProviderFailure(state.processOutputBuffer);
@@ -1395,8 +1416,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         break;
       case 'session.error':
         if (props.sessionID === state.sessionId && state.messagePostStarted && props.error) {
-          const msg = errorMessage(props.error);
-          this.failAppServerTurn(state, msg);
+          const msg = this.failAppServerProviderError(state, props.error);
           state.onChunk(`⚠️ ${msg}`);
         }
         break;
@@ -1420,8 +1440,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (info.id && !state.currentUserMessageId) state.preCurrentTurnMessageIds.add(info.id);
     if (info.error) {
       if (info.role === 'assistant' && !this.assistantMessageBelongsToCurrentTurn(state, info.id)) return;
-      const msg = errorMessage(info.error);
-      this.failAppServerTurn(state, msg);
+      const msg = this.failAppServerProviderError(state, info.error);
       state.onChunk(`⚠️ ${msg}`);
     }
     if (
