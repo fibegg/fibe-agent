@@ -16,6 +16,42 @@ DEV_DEPS_LOCK_DIR="${DEV_DEPS_LOCK_DIR:-/app/.nx/dev-deps-install.lock}"
 DEV_DEPS_LOCK_TIMEOUT_SECONDS="${DEV_DEPS_LOCK_TIMEOUT_SECONDS:-600}"
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
 
+runtime_fibe_config_version() {
+  for candidate in \
+    "${FIBE_SETTINGS_PATH:-}" \
+    "${DATA_DIR:-/app/data}/fibe.yml" \
+    /app/data/fibe.yml
+  do
+    [ -n "$candidate" ] || continue
+    [ -f "$candidate" ] || continue
+
+    awk '
+      /^[[:space:]]*cliVersion[[:space:]]*:/ {
+        value = $0
+        sub(/^[^:]*:[[:space:]]*/, "", value)
+        sub(/[[:space:]]+#.*$/, "", value)
+        gsub(/^[[:space:]"\047]+|[[:space:]"\047]+$/, "", value)
+        if (value != "") {
+          print value
+          exit
+        }
+      }
+    ' "$candidate"
+    return
+  done
+}
+
+copy_baked_runtime_fibe() {
+  echo "[entrypoint] Using baked runtime fibe from /usr/local/bin/fibe"
+  cp /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"
+  chmod +x "$RUNTIME_FIBE_BIN"
+  if [ "$(id -u)" = "0" ]; then
+    chown -R node:node "${DATA_DIR:-/app/data}/.fibe" 2>/dev/null || true
+  fi
+  installed_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
+  echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
+}
+
 start_secret_service() {
   [ "${AGENT_PROVIDER:-}" = "antigravity" ] || [ -n "${ANTIGRAVITY_HOME:-}" ] || return 0
   command -v dbus-launch >/dev/null 2>&1 || return 0
@@ -238,12 +274,27 @@ ensure_runtime_fibe() {
   if [ -x "$RUNTIME_FIBE_BIN" ]; then
     current_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
   fi
+  baked_version=""
+  if [ -x /usr/local/bin/fibe ]; then
+    baked_version=$(/usr/local/bin/fibe version 2>/dev/null | awk 'NR==1 { print $2 }')
+  fi
 
-  desired_version="${FIBE_VERSION:-}"
+  desired_version="${FIBE_VERSION:-${FIBE_CLI_VERSION:-}}"
+  if [ -z "$desired_version" ]; then
+    desired_version="$(runtime_fibe_config_version)"
+  fi
+  if [ "$desired_version" = "latest" ]; then
+    desired_version=""
+  fi
   normalized_desired="${desired_version#v}"
 
   if [ -n "$normalized_desired" ] && [ "$current_version" = "$normalized_desired" ]; then
     echo "[entrypoint] Using cached runtime fibe ${current_version}"
+    return
+  fi
+
+  if [ -n "$normalized_desired" ] && [ "$baked_version" = "$normalized_desired" ]; then
+    copy_baked_runtime_fibe
     return
   fi
 
