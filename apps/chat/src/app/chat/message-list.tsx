@@ -121,12 +121,13 @@ function schedulePrismHighlightForRoot(
   });
 }
 
-const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} chat-user-markdown-body [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 min-w-0 [&_.markdown-body]:min-w-0 [&_pre]:block [&_pre]:w-full [&_pre]:min-w-0 [&_pre]:shrink-0 [&_pre]:basis-full [&_pre]:bg-background [&_pre]:text-foreground [&_pre]:border-border [&_pre_code]:text-foreground [&_pre]:mt-2`;
+const USER_MESSAGE_MARKDOWN_CLASS =
+  'chat-user-markdown-body max-w-none min-w-0 text-sm sm:text-[14px] leading-relaxed break-words text-user-bubble-foreground [&_p]:inline [&_p]:my-0 [&_ul]:my-1 [&_ol]:my-1 [&_pre]:block [&_pre]:w-full [&_pre]:min-w-0 [&_pre]:shrink-0 [&_pre]:basis-full [&_pre]:bg-background [&_pre]:text-foreground [&_pre]:border-border [&_pre_code]:text-foreground [&_pre]:mt-2';
 
 const COPY_SUCCESS_FEEDBACK_MS = 2000;
 
 const COPY_BUTTON_CLASS_USER =
-  'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-white/90 hover:text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/50';
+  'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-user-bubble-foreground/75 hover:text-user-bubble-foreground hover:bg-black/10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-user-bubble-foreground/50';
 const COPY_BUTTON_CLASS_ASSISTANT =
   'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
 
@@ -269,7 +270,7 @@ function MessageBodyWithMentions({
           return (
             <span
               key={`${i}-${part.path}`}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium bg-white/20 border border-white/30 text-primary shadow-sm"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium bg-black/10 border border-black/15 text-user-bubble-foreground shadow-sm"
               title={part.path}
             >
               <MentionChipIcon path={part.path} />
@@ -512,11 +513,11 @@ const MessageRow = memo(
                 ) : (
                   <MessageBodyWithMentions body={msg.body} messageId={msg.id} />
                 )}
-                <div className="text-xs mt-1.5 sm:mt-2 text-white/85 flex items-center justify-between gap-2 min-h-[1.25rem]">
+                <div className="text-xs mt-1.5 sm:mt-2 text-user-bubble-foreground/75 flex items-center justify-between gap-2 min-h-[1.25rem]">
                   <p className="flex flex-wrap items-center gap-1.5 min-w-0">
                     {formatTime(msg.created_at, locale)}
                     {(msg.queued || msg.queueStatus) && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/15 border border-white/25 text-white text-[10px] font-medium leading-none">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-black/10 border border-black/15 text-user-bubble-foreground text-[10px] font-medium leading-none">
                         {msg.queueStatus === 'next' ||
                         msg.queueStatus === 'steering' ? (
                           <CornerDownRight className="size-2.5" aria-hidden />

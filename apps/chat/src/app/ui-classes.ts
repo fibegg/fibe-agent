@@ -72,7 +72,7 @@ export const BUBBLE_ASSISTANT =
   'rounded-2xl rounded-tl-md bg-card/60 backdrop-blur-md border border-border/50 shadow-sm text-card-foreground';
 export const BUBBLE_TYPING = 'rounded-2xl rounded-tl-md bg-card border border-border text-card-foreground';
 export const BUBBLE_USER =
-  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-primary to-secondary text-white shadow-md shadow-primary/15';
+  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-user-bubble-from to-user-bubble-to text-user-bubble-foreground shadow-md shadow-primary/15';
 
 export const PROSE_MESSAGE =
   'markdown-body prose prose-sm max-w-none min-w-0 dark:prose-invert text-sm sm:text-[14px] break-words';

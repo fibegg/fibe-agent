@@ -40,6 +40,9 @@
     --chart-3: #0f9f8d;
     --chart-4: #3c9f42;
     --chart-5: #c85134;
+    --user-bubble-from: #8fcb51;
+    --user-bubble-to: #d9a927;
+    --user-bubble-foreground: #191c14;
     --radius: 0.75rem;
     --radius-xl: 1rem;
     --radius-lg: 0.75rem;
@@ -105,6 +108,9 @@
     --chart-3: #56d8c0;
     --chart-4: #7fec9f;
     --chart-5: #e26a44;
+    --user-bubble-from: #79d44e;
+    --user-bubble-to: #e2b33a;
+    --user-bubble-foreground: #191c14;
     --scrollbar-track: rgba(121, 212, 78, 0.08);
     --scrollbar-thumb: rgba(121, 212, 78, 0.34);
     --scrollbar-thumb-hover: rgba(146, 223, 98, 0.52);
@@ -592,6 +598,34 @@ body {
 }
 
 .dark .markdown-body code {
+  color: var(--foreground);
+}
+
+.chat-user-markdown-body,
+.chat-user-markdown-body p,
+.chat-user-markdown-body li,
+.chat-user-markdown-body h1,
+.chat-user-markdown-body h2,
+.chat-user-markdown-body h3,
+.chat-user-markdown-body h4,
+.chat-user-markdown-body a,
+.chat-user-markdown-body strong {
+  color: var(--user-bubble-foreground);
+}
+
+.chat-user-markdown-body a {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.chat-user-markdown-body code:not(pre code) {
+  color: var(--user-bubble-foreground);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.chat-user-markdown-body pre,
+.chat-user-markdown-body pre code {
   color: var(--foreground);
 }
 

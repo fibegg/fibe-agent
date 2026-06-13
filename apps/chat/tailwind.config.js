@@ -39,6 +39,9 @@ module.exports = {
         'chart-3': 'var(--chart-3)',
         'chart-4': 'var(--chart-4)',
         'chart-5': 'var(--chart-5)',
+        'user-bubble-from': 'var(--user-bubble-from)',
+        'user-bubble-to': 'var(--user-bubble-to)',
+        'user-bubble-foreground': 'var(--user-bubble-foreground)',
         primary: {
           DEFAULT: 'var(--primary)',
           foreground: 'var(--primary-foreground)',

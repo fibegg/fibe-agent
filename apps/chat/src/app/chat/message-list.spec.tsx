@@ -73,6 +73,24 @@ describe('MessageList', () => {
     expect(screen.getByText(/\d{1,2}:\d{2} (AM|PM)/)).toBeTruthy();
   });
 
+  it('keeps user message markdown on bubble foreground colors', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'user',
+        body: 'Readable text',
+        created_at: '2025-03-11T17:00:00.000Z',
+      },
+    ];
+    const { container } = render(
+      <MessageList messages={messages} streamingText="" isStreaming={false} />,
+    );
+    const markdownBody = container.querySelector('.chat-user-markdown-body');
+    expect(markdownBody).toBeTruthy();
+    expect(markdownBody?.className).toContain('text-user-bubble-foreground');
+    expect(markdownBody?.className).not.toContain('prose');
+    expect(markdownBody?.className).not.toContain('dark:prose-invert');
+  });
+
   it('renders assistant message with body and timestamp', () => {
     const messages: ChatMessage[] = [
       {
@@ -463,7 +481,10 @@ describe('MessageList', () => {
       <MessageList messages={messages} streamingText="" isStreaming={false} />,
     );
     expect(screen.getByText('readme.md')).toBeTruthy();
-    expect(screen.getByTitle('apps/chat/readme.md')).toBeTruthy();
+    const mentionChip = screen.getByTitle('apps/chat/readme.md');
+    expect(mentionChip).toBeTruthy();
+    expect(mentionChip.className).toContain('text-user-bubble-foreground');
+    expect(mentionChip.className).not.toContain('text-primary');
   });
 
   it('renders multiple @mentions as separate badges', () => {
