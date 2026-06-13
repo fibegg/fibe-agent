@@ -158,6 +158,27 @@ function codexBearerTokenEnvVar(entry: McpServerEntry): string | null {
   return null;
 }
 
+function opencodeAuthorizationHeader(entry: McpServerEntry): string | null {
+  if (entry.bearerTokenEnvVar) {
+    return `Bearer {env:${entry.bearerTokenEnvVar}}`;
+  }
+  if (!entry.authHeader) {
+    return null;
+  }
+
+  const envPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  if (envPlaceholder) {
+    return `Bearer {env:${envPlaceholder[1]}}`;
+  }
+
+  const rawPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  if (rawPlaceholder) {
+    return `Bearer {env:${rawPlaceholder[1]}}`;
+  }
+
+  return entry.authHeader;
+}
+
 function stripManagedCodexBlocks(content: string, serverNames: string[]): string {
   if (!content.trim()) {
     return '';
@@ -403,7 +424,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   /**
    * OpenCode: injects MCP servers into the OPENCODE_CONFIG_CONTENT env var.
    * OpenCode reads config exclusively from this env var (highest precedence).
-   * The strategy's YOLO_ENV already sets base config; we merge mcpServers into it.
+   * The strategy's YOLO_ENV already sets base config; we merge MCP servers into it.
    */
   opencode: (servers) => {
     const existingRaw = process.env.OPENCODE_CONFIG_CONTENT;
@@ -414,25 +435,26 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
       /* start fresh */
     }
 
-    // opencode v1.14.38 config schema:
+    // Current OpenCode config schema:
     //   - top-level key is "mcp" (NOT "mcpServers")
-    //   - local stdio servers: { type: "local", enabled: true, command, args, env? }
-    //   - remote HTTP servers: { type: "remote", enabled: true, url }
+    //   - local stdio servers: { type: "local", enabled: true, command: string[], environment? }
+    //   - remote HTTP servers: { type: "remote", enabled: true, url, headers? }
     const nativeServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
       if (entry.command) {
         nativeServers[name] = {
           type: 'local',
           enabled: true,
-          command: entry.command,
-          args: entry.args ?? [],
-          ...(entry.env ? { env: entry.env } : {}),
+          command: [entry.command, ...(entry.args ?? [])],
+          ...(entry.env ? { environment: entry.env } : {}),
         };
       } else if (entry.serverUrl) {
+        const authorization = opencodeAuthorizationHeader(entry);
         nativeServers[name] = {
           type: 'remote',
           enabled: true,
           url: entry.serverUrl,
+          ...(authorization ? { headers: { Authorization: authorization } } : {}),
         };
       }
     }

@@ -679,8 +679,12 @@ describe('OpencodeStrategy', () => {
     process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
     process.env.ANTHROPIC_API_KEY = 'test-key';
     process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
-      mcpServers: {
-        fibe: { command: 'fibe', args: ['mcp', 'serve'] },
+      mcp: {
+        fibe: {
+          type: 'local',
+          enabled: true,
+          command: ['fibe', 'mcp', 'serve'],
+        },
       },
     });
 
@@ -698,7 +702,11 @@ describe('OpencodeStrategy', () => {
     expect(config.permission).toBe('allow');
     expect(config.autoupdate).toBe(false);
     expect(config.share).toBe('disabled');
-    expect(config.mcpServers.fibe).toEqual({ command: 'fibe', args: ['mcp', 'serve'] });
+    expect(config.mcp.fibe).toEqual({
+      type: 'local',
+      enabled: true,
+      command: ['fibe', 'mcp', 'serve'],
+    });
   });
 
   test('executePromptStreaming uses OpenCode serve app-server with shared workspace and per-conversation session marker', async () => {

@@ -528,11 +528,29 @@ describe('writeMcpConfig', () => {
     expect(() => writeMcpConfig()).not.toThrow();
   });
 
-  it('opencode writer mutates process.env.OPENCODE_CONFIG_CONTENT globally', () => {
+  it('opencode writer emits current local stdio MCP schema and preserves existing config', () => {
     process.env.AGENT_PROVIDER = 'opencode';
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      permission: 'ask',
+      share: 'manual',
+      provider: {
+        openai: {
+          options: {
+            baseURL: 'https://llm.example.test/v1',
+          },
+        },
+      },
+    });
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
-        'test-server': { serverUrl: 'https://example.com/mcp' },
+        'fibe': {
+          command: 'fibe',
+          args: ['mcp', 'serve', '--tools', 'core', '--yolo'],
+          env: {
+            FIBE_API_KEY: 'fibe-key',
+            FIBE_DOMAIN: 'http://rails.test:3000',
+          },
+        },
       },
     });
 
@@ -541,11 +559,62 @@ describe('writeMcpConfig', () => {
     expect(process.env.OPENCODE_CONFIG_CONTENT).toBeDefined();
     const configContent = process.env.OPENCODE_CONFIG_CONTENT ?? '{}';
     const config = JSON.parse(configContent);
-    // opencode uses "mcp" key (not "mcpServers") with type: "remote" and enabled: true
-    expect(config.mcp['test-server']).toBeDefined();
-    expect(config.mcp['test-server'].type).toBe('remote');
-    expect(config.mcp['test-server'].enabled).toBe(true);
-    expect(config.mcp['test-server'].url).toBe('https://example.com/mcp');
+    expect(config.permission).toBe('ask');
+    expect(config.share).toBe('manual');
+    expect(config.provider.openai.options.baseURL).toBe('https://llm.example.test/v1');
+    expect(config.mcp['fibe']).toEqual({
+      type: 'local',
+      enabled: true,
+      command: ['fibe', 'mcp', 'serve', '--tools', 'core', '--yolo'],
+      environment: {
+        FIBE_API_KEY: 'fibe-key',
+        FIBE_DOMAIN: 'http://rails.test:3000',
+      },
+    });
+    expect(config.mcp['fibe'].args).toBeUndefined();
+    expect(config.mcp['fibe'].env).toBeUndefined();
+  });
+
+  it('opencode writer emits remote MCP headers for raw and env-backed auth', () => {
+    process.env.AGENT_PROVIDER = 'opencode';
+    process.env.MCP_CONFIG_JSON = JSON.stringify({
+      mcpServers: {
+        'raw-auth': {
+          serverUrl: 'https://raw.example.test/mcp',
+          authHeader: 'Bearer raw-token',
+        },
+        'explicit-env': {
+          serverUrl: 'https://env.example.test/mcp',
+          bearerTokenEnvVar: 'MCP_TOKEN',
+        },
+        'legacy-env-placeholder': {
+          serverUrl: 'https://legacy-env.example.test/mcp',
+          authHeader: 'Bearer ${env:LEGACY_TOKEN}',
+        },
+        'legacy-raw-placeholder': {
+          serverUrl: 'https://legacy-raw.example.test/mcp',
+          authHeader: 'Bearer ${RAW_TOKEN}',
+        },
+      },
+    });
+
+    writeMcpConfig();
+
+    const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp['raw-auth']).toEqual({
+      type: 'remote',
+      enabled: true,
+      url: 'https://raw.example.test/mcp',
+      headers: { Authorization: 'Bearer raw-token' },
+    });
+    expect(config.mcp['explicit-env']).toEqual({
+      type: 'remote',
+      enabled: true,
+      url: 'https://env.example.test/mcp',
+      headers: { Authorization: 'Bearer {env:MCP_TOKEN}' },
+    });
+    expect(config.mcp['legacy-env-placeholder'].headers.Authorization).toBe('Bearer {env:LEGACY_TOKEN}');
+    expect(config.mcp['legacy-raw-placeholder'].headers.Authorization).toBe('Bearer {env:RAW_TOKEN}');
   });
 
   it('normalizes provider name with underscores to hyphens', () => {
