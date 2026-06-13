@@ -39,7 +39,7 @@ export function TypingText({
       {visible}
       {showCursor && uiEffectsEnabled && (
         <span
-          className="inline-block w-2 h-4 ml-0.5 -mb-0.5 bg-violet-400 align-middle animate-typing-cursor"
+          className="inline-block w-2 h-4 ml-0.5 -mb-0.5 bg-primary align-middle animate-typing-cursor"
           aria-hidden
         />
       )}

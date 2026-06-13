@@ -30,7 +30,7 @@ export const SidebarReasoningPanel = memo(function SidebarReasoningPanel({
       className={`${ACTIVITY_BLOCK_VARIANTS.reasoning} ${ACTIVITY_BLOCK_BASE} ${isStreaming ? 'animate-pulse' : ''} min-h-0 flex flex-col shrink-0`}
       style={reasoningMaxHeightPx != null ? { maxHeight: reasoningMaxHeightPx } : undefined}
     >
-      <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide shrink-0">
+      <p className="text-[10px] font-semibold text-primary uppercase tracking-wide shrink-0">
         Response
       </p>
       <div className={`${ACTIVITY_MONO} flex-1 min-h-0 overflow-y-auto`}>

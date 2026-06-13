@@ -150,8 +150,8 @@ export function TerminalButton({
       onClick={onToggle}
       className={`${className} rounded-md flex items-center justify-center transition-colors shrink-0 ${
         open
-          ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
-          : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+          ? 'bg-primary/20 text-primary hover:bg-primary/30'
+          : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
       }`}
       title={label}
       aria-label={label}

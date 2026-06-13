@@ -18,9 +18,9 @@ describe('useMobileBrainClasses', () => {
     expect(result.current).toEqual({ brain: 'text-cyan-400', accent: 'text-cyan-300' });
   });
 
-  it('returns idle (violet) when not streaming and no complete state', () => {
+  it('returns idle primary accent when not streaming and no complete state', () => {
     const { result } = renderHook(() => useMobileBrainClasses(false, null));
-    expect(result.current).toEqual({ brain: 'text-violet-400', accent: 'text-violet-300' });
+    expect(result.current).toEqual({ brain: 'text-primary', accent: 'text-primary' });
   });
 
   it('switches to complete then idle after stream end with fake timers', async () => {
@@ -34,7 +34,7 @@ describe('useMobileBrainClasses', () => {
     await act(async () => {
       vi.advanceTimersByTime(BRAIN_COMPLETE_TO_IDLE_MS);
     });
-    expect(result.current.brain).toBe('text-violet-400');
+    expect(result.current.brain).toBe('text-primary');
   });
 
   it('returns complete when last story item is task_complete', () => {

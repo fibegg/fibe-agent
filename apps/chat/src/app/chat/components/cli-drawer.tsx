@@ -43,7 +43,7 @@ export function CliDrawerContent({ onSelectCommand }: CliDrawerContentProps) {
       {CLI_COMMANDS.map((cat) => (
         <div key={cat.categoryKey} className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-foreground font-medium">
-            <span className="text-violet-400">{cat.icon}</span>
+            <span className="text-primary">{cat.icon}</span>
             {t(cat.categoryKey)}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -52,9 +52,9 @@ export function CliDrawerContent({ onSelectCommand }: CliDrawerContentProps) {
                 key={item.command}
                 type="button"
                 onClick={() => onSelectCommand(item.command)}
-                className="flex flex-col items-start gap-1 p-3 rounded-xl border border-border/50 bg-card hover:bg-violet-500/10 hover:border-violet-500/30 transition-all text-left group"
+                className="flex flex-col items-start gap-1 p-3 rounded-xl border border-border/50 bg-card hover:bg-primary/10 hover:border-primary/30 transition-all text-left group"
               >
-                <div className="text-sm font-semibold text-foreground group-hover:text-violet-300 transition-colors">
+                <div className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                   {t(item.nameKey)}
                 </div>
                 <div className="font-mono text-xs text-muted-foreground/80 bg-background/50 px-1.5 py-0.5 rounded">

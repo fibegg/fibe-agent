@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   SCROLL_AT_BOTTOM_THRESHOLD_PX,
   isScrollAtBottom,
+  nextNewMessageCount,
 } from './use-scroll-to-bottom';
 
 describe('isScrollAtBottom', () => {
@@ -30,6 +31,25 @@ describe('isScrollAtBottom', () => {
 
   it('returns true when content fits (no scroll)', () => {
     expect(isScrollAtBottom(500, 0, 500, 80)).toBe(true);
+  });
+});
+
+describe('nextNewMessageCount', () => {
+  it('does not increment when streaming text changes without a new visible item', () => {
+    expect(nextNewMessageCount(0, 3, 3)).toBe(0);
+  });
+
+  it('increments by the visible item delta', () => {
+    expect(nextNewMessageCount(2, 3, 5)).toBe(4);
+  });
+
+  it('does not decrement when the visible item count is reset lower', () => {
+    expect(nextNewMessageCount(7, 5, 1)).toBe(7);
+  });
+
+  it('marks one current item update without accumulating every update', () => {
+    expect(nextNewMessageCount(0, 3, 3, true)).toBe(1);
+    expect(nextNewMessageCount(1, 3, 3, true)).toBe(1);
   });
 });
 

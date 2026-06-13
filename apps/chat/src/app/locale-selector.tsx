@@ -114,8 +114,8 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
                     }`
                   : `flex h-8 w-full items-center justify-between gap-3 rounded-md px-2.5 text-left text-sm transition-colors ${
                       option === locale
-                        ? 'bg-violet-500/15 text-violet-200'
-                        : 'text-foreground hover:bg-violet-500/10 hover:text-violet-300'
+                        ? 'bg-primary/15 text-primary'
+                        : 'text-foreground hover:bg-primary/10 hover:text-primary'
                     }`
               }
             >
@@ -148,8 +148,8 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
                 onClick={() => selectLocale(option)}
                 className={`h-8 rounded-md border px-2 text-xs font-medium transition-colors ${
                   option === locale
-                    ? 'border-violet-400/60 bg-violet-500/20 text-violet-200'
-                    : 'border-border/50 bg-background/40 text-muted-foreground hover:bg-violet-500/10 hover:text-foreground'
+                    ? 'border-primary/60 bg-primary/20 text-primary'
+                    : 'border-border/50 bg-background/40 text-muted-foreground hover:bg-primary/10 hover:text-foreground'
                 }`}
                 aria-pressed={option === locale}
               >
@@ -175,7 +175,7 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
                 type="button"
                 onClick={() => selectLocale(option)}
                 className={`h-7 min-w-10 rounded-md px-2 text-xs font-semibold transition-colors ${
-                  option === locale ? 'bg-violet-500 text-white' : 'text-muted-foreground hover:text-foreground'
+                  option === locale ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'
                 }`}
                 aria-label={t('locale.current', { locale: localeLabel(option) })}
                 aria-pressed={option === locale}

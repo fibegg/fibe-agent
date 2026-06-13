@@ -14,7 +14,7 @@ const StarkReasoningPage = lazy(() => import('./pages/stark-reasoning-page').the
 function PageFallback() {
   const t = useT();
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-violet-950/10">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/10">
       <span className="text-muted-foreground">{t('common.loading')}</span>
     </div>
   );

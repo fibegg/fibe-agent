@@ -17,11 +17,11 @@ const TERMINAL_OPTIONS = {
   allowProposedApi: true,
   scrollback:       5000,
   theme: {
-    background:      '#0d0d14',
-    foreground:      '#e2e8f0',
-    cursor:          '#a78bfa',
-    cursorAccent:    '#0d0d14',
-    selectionBackground: '#7c3aed55',
+    background:      '#191c14',
+    foreground:      '#e5e2cf',
+    cursor:          '#79d44e',
+    cursorAccent:    '#191c14',
+    selectionBackground: '#79d44e55',
     black:           '#1e293b',
     red:             '#f87171',
     green:           '#4ade80',
@@ -147,10 +147,10 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
   }, []);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#0d0d14]">
+    <div className="flex flex-col h-full min-h-0 bg-[#191c14]">
       {/* ── Sub-header: shell info bar ────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-1 bg-[#0d0d14]/90 border-b border-violet-500/10 shrink-0">
-        <span className="text-[10px] font-medium text-violet-300/70 tracking-wide">bash</span>
+      <div className="flex items-center gap-2 px-3 py-1 bg-[#191c14]/90 border-b border-primary/10 shrink-0">
+        <span className="text-[10px] font-medium text-primary/70 tracking-wide">bash</span>
         <span className="text-[10px] text-muted-foreground/40">·</span>
         <span className="text-[10px] text-muted-foreground/50">fibe-agent</span>
       </div>
@@ -159,7 +159,7 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
       <div
         ref={containerRef}
         className="flex-1 min-h-0 overflow-hidden px-2 py-1"
-        style={{ background: '#0d0d14' }}
+        style={{ background: '#191c14' }}
         aria-label={t('header.terminal')}
       />
     </div>

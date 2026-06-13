@@ -358,7 +358,7 @@ export function ChatSettingsModal({
               onTypeFilterChange={setTypeFilter}
             />
           </div>
-          <div className="space-y-2.5 border-t border-border/30 pt-4">
+          <div className="space-y-2.5 border-t border-border pt-4">
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.interface')}</span>
             {onSimplicateModeChange && !simplicateMode && (
               <div className="flex min-h-10 items-center justify-between gap-3 rounded-lg border border-border/40 bg-background/35 px-3 py-2">
@@ -382,7 +382,7 @@ export function ChatSettingsModal({
               />
             </div>
           </div>
-          <div className="space-y-2.5 border-t border-border/30 pt-4">
+          <div className="space-y-2.5 border-t border-border pt-4">
             <div className="flex items-center justify-between gap-3">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.fibeSync')}</span>
               {syncSaving && <Loader2 className="size-3.5 animate-spin text-muted-foreground" aria-label={t('common.saving')} />}
@@ -414,13 +414,13 @@ export function ChatSettingsModal({
             </div>
           </div>
           {onResetConversation && state !== CHAT_STATES.AWAITING_RESPONSE && (
-            <div className="space-y-2.5 border-t border-border/30 pt-4">
+            <div className="space-y-2.5 border-t border-border pt-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.conversation')}</span>
               <ResetConversationButton onReset={onResetConversation} />
             </div>
           )}
           {isStandalone && (
-            <div className="space-y-2.5 border-t border-border/30 pt-4">
+            <div className="space-y-2.5 border-t border-border pt-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.dataPrivacy')}</span>
               <div className="flex flex-col gap-2">
                 <button
@@ -443,7 +443,7 @@ export function ChatSettingsModal({
             </div>
           )}
           {isStandalone && (state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED || state === CHAT_STATES.AWAITING_RESPONSE) && (
-            <div className="border-t border-border/30 pt-4 space-y-2.5">
+            <div className="border-t border-border pt-4 space-y-2.5">
               {(state === CHAT_STATES.UNAUTHENTICATED || state === CHAT_STATES.AUTHENTICATED) && (
                 <button
                   type="button"
@@ -467,7 +467,7 @@ export function ChatSettingsModal({
             </div>
           )}
           {isStandalone && initStatus && (
-            <div className="border-t border-border/30 pt-4 space-y-3">
+            <div className="border-t border-border pt-4 space-y-3">
               <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-2.5">
                 <div className="flex items-center gap-2 text-sm">
                   <span className="font-medium text-foreground">{t('settings.postInit')}</span>

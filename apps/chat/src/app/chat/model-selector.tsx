@@ -14,7 +14,7 @@ const PANEL_MIN_WIDTH_PX = 220;
 const PANEL_MAX_WIDTH_PX = 340;
 
 const TRIGGER_CLASS_BASE =
-  'flex items-center gap-1.5 min-w-0 h-8 px-2 sm:px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-violet-500/40 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-colors';
+  'flex items-center gap-1.5 min-w-0 h-8 px-2 sm:px-3 rounded-lg border border-border bg-[var(--input-background)] text-[10px] sm:text-xs text-foreground hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors';
 const TRIGGER_CLASS_BY_VARIANT = {
   compact: 'max-w-[120px] sm:max-w-[180px]',
   settings: 'w-full max-w-none justify-between',
@@ -258,7 +258,7 @@ export function ModelSelector({
                 }}
                 onBlur={handleCustomSubmit}
                 placeholder={t('modelSelector.name')}
-                className="w-full h-8 px-2.5 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                className="w-full h-8 px-2.5 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                 aria-label={t('modelSelector.customName')}
               />
             </div>
@@ -275,7 +275,7 @@ export function ModelSelector({
                     if (e.key === 'Escape') { setSearchQuery(''); setOpen(false); }
                   }}
                   placeholder={t('modelSelector.searchPlaceholder')}
-                  className="flex-1 h-7 px-2 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+                  className="flex-1 h-7 px-2 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
                   aria-label={t('modelSelector.search')}
                 />
                 {onRefresh && (
@@ -283,12 +283,12 @@ export function ModelSelector({
                     type="button"
                     onClick={(e) => { e.stopPropagation(); if (!refreshing) onRefresh(); }}
                     disabled={refreshing}
-                    className="size-7 shrink-0 flex items-center justify-center rounded-md border border-border hover:bg-violet-500/10 hover:border-violet-500/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="size-7 shrink-0 flex items-center justify-center rounded-md border border-border hover:bg-primary/10 hover:border-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title={t('modelSelector.refreshFromProvider')}
                     aria-label={t('modelSelector.refresh')}
                   >
                     {refreshing
-                      ? <Loader2 className="size-3.5 animate-spin text-violet-400" aria-hidden />
+                      ? <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden />
                       : <RefreshCw className="size-3.5 text-muted-foreground" aria-hidden />
                     }
                   </button>
@@ -302,7 +302,7 @@ export function ModelSelector({
                   role="option"
                   aria-selected={!trimmed}
                   onClick={() => handleSelect(defaultLabel)}
-                  className={`${OPTION_CLASS_BASE} ${!trimmed ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-violet-500/10'}`}
+                  className={`${OPTION_CLASS_BASE} ${!trimmed ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-primary/10'}`}
                 >
                   {defaultLabel}
                 </button>
@@ -318,7 +318,7 @@ export function ModelSelector({
                     role="option"
                     aria-selected={trimmed === opt}
                     onClick={() => handleSelect(opt)}
-                    className={`${OPTION_CLASS_BASE} ${trimmed === opt ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-violet-500/10 hover:text-violet-400'}`}
+                    className={`${OPTION_CLASS_BASE} ${trimmed === opt ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-primary/10 hover:text-primary'}`}
                   >
                     {opt}
                   </button>
@@ -328,7 +328,7 @@ export function ModelSelector({
                   role="option"
                   aria-selected={false}
                   onClick={() => setCustomMode(true)}
-                  className={`${OPTION_CLASS_BASE} text-muted-foreground hover:bg-violet-500/10 hover:text-violet-400 border-t border-border/50 mt-1 pt-2`}
+                  className={`${OPTION_CLASS_BASE} text-muted-foreground hover:bg-primary/10 hover:text-primary border-t border-border/50 mt-1 pt-2`}
                 >
                   {t('modelSelector.custom')}
                 </button>

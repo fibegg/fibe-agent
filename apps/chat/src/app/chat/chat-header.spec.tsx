@@ -16,7 +16,7 @@ const DEFAULT_PROPS = {
   sessionTimeMs: 0,
   mobileSessionStats: { totalActions: 0, completed: 0, processing: 0 },
   sessionTokenUsage: null,
-  mobileBrainClasses: { brain: 'text-violet-500', accent: 'text-violet-400' },
+  mobileBrainClasses: { brain: 'text-primary', accent: 'text-primary' },
   statusClass: 'text-green-500',
   searchQuery: '',
   filteredMessagesCount: 0,
@@ -473,7 +473,7 @@ describe('ChatHeader', () => {
     expect(screen.queryByRole('menuitem', { name: /reset conversation/i })).toBeNull();
   });
 
-  describe('simplicate header keyboard tracking', () => {
+  describe('mobile header keyboard tracking', () => {
     function setVisualViewport(offsetTop: number) {
       Object.defineProperty(window, 'visualViewport', {
         configurable: true,
@@ -521,13 +521,28 @@ describe('ChatHeader', () => {
       expect(header?.style.transform).toBe('');
     });
 
-    it('does not translate the non-simplicate header even when visualViewport.offsetTop is set', () => {
+    it('translates the regular mobile header by visualViewport.offsetTop', () => {
       setVisualViewport(120);
       const { container } = render(
         <MemoryRouter>
           <ChatHeader
             {...DEFAULT_PROPS}
             isMobile={true}
+            simplicateMode={false}
+          />
+        </MemoryRouter>,
+      );
+      const header = container.querySelector('header');
+      expect(header?.style.transform).toBe('translateY(120px)');
+    });
+
+    it('does not translate the desktop header even when visualViewport.offsetTop is set', () => {
+      setVisualViewport(120);
+      const { container } = render(
+        <MemoryRouter>
+          <ChatHeader
+            {...DEFAULT_PROPS}
+            isMobile={false}
             simplicateMode={false}
           />
         </MemoryRouter>,

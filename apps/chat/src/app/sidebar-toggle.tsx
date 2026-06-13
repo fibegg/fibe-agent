@@ -32,7 +32,7 @@ export function SidebarToggle({
     <button
       type="button"
       onClick={onClick}
-      className={`sidebar-toggle absolute top-1/2 -translate-y-1/2 z-50
+      className={`sidebar-toggle absolute top-1/2 -translate-y-1/2 z-20
         ${positionClass}
         size-8 md:size-9 lg:size-8
         rounded-full
@@ -49,21 +49,21 @@ export function SidebarToggle({
       aria-label={ariaLabel}
     >
       <div
-        className="absolute inset-0 rounded-full bg-violet-400 opacity-0 group-hover:opacity-10 transition-opacity duration-300"
+        className="absolute inset-0 rounded-full bg-primary opacity-0 group-hover:opacity-10 transition-opacity duration-300"
         aria-hidden
       />
       <div className="relative z-10">
         {isLeft ? (
           isCollapsed ? (
-            <ChevronRight className="size-4 text-muted-foreground group-hover:text-violet-500 transition-all group-hover:translate-x-0.5" />
+            <ChevronRight className="size-4 text-muted-foreground group-hover:text-primary transition-all group-hover:translate-x-0.5" />
           ) : (
-            <ChevronLeft className="size-4 text-muted-foreground group-hover:text-violet-500 transition-all group-hover:-translate-x-0.5" />
+            <ChevronLeft className="size-4 text-muted-foreground group-hover:text-primary transition-all group-hover:-translate-x-0.5" />
           )
         ) : (
           isCollapsed ? (
-            <ChevronLeft className="size-4 text-muted-foreground group-hover:text-violet-500 transition-all group-hover:-translate-x-0.5" />
+            <ChevronLeft className="size-4 text-muted-foreground group-hover:text-primary transition-all group-hover:-translate-x-0.5" />
           ) : (
-            <ChevronRight className="size-4 text-muted-foreground group-hover:text-violet-500 transition-all group-hover:translate-x-0.5" />
+            <ChevronRight className="size-4 text-muted-foreground group-hover:text-primary transition-all group-hover:translate-x-0.5" />
           )
         )}
       </div>

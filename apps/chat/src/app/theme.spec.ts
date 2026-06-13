@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
+  getEffectiveTheme,
   getStoredTheme,
   setStoredTheme,
   isDark,
+  normalizeTheme,
   toggleTheme,
   initTheme,
   isSetThemeMessage,
@@ -27,6 +29,20 @@ function resetStorage() {
   store = {};
 }
 
+function stubMatchMedia(matches: boolean) {
+  const mockMediaQueryList = {
+    matches,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  };
+  Object.defineProperty(window, 'matchMedia', {
+    writable: true,
+    configurable: true,
+    value: vi.fn().mockReturnValue(mockMediaQueryList),
+  });
+  return mockMediaQueryList;
+}
+
 describe('getStoredTheme', () => {
   beforeEach(() => {
     resetStorage();
@@ -44,6 +60,18 @@ describe('getStoredTheme', () => {
   it('returns dark when stored', () => {
     localStorage.setItem(STORAGE_KEY, 'dark');
     expect(getStoredTheme()).toBe('dark');
+  });
+
+  it('normalizes legacy winter storage to light', () => {
+    localStorage.setItem(STORAGE_KEY, 'winter');
+    expect(getStoredTheme()).toBe('light');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
+  });
+
+  it('normalizes legacy halloween storage to dark', () => {
+    localStorage.setItem(STORAGE_KEY, 'halloween');
+    expect(getStoredTheme()).toBe('dark');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
   });
 
   it('returns dracula when stored', () => {
@@ -85,6 +113,51 @@ describe('setStoredTheme', () => {
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(document.documentElement.dataset.theme).toBe('dracula');
   });
+
+  it('normalizes legacy winter input before storing', () => {
+    setStoredTheme('winter');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  it('normalizes legacy halloween input before storing', () => {
+    setStoredTheme('halloween');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+});
+
+describe('normalizeTheme', () => {
+  it('keeps canonical themes unchanged', () => {
+    expect(normalizeTheme('light')).toBe('light');
+    expect(normalizeTheme('dark')).toBe('dark');
+    expect(normalizeTheme('dracula')).toBe('dracula');
+  });
+
+  it('maps legacy themes to canonical themes', () => {
+    expect(normalizeTheme('winter')).toBe('light');
+    expect(normalizeTheme('halloween')).toBe('dark');
+  });
+
+  it('rejects invalid themes', () => {
+    expect(normalizeTheme('system')).toBeNull();
+  });
+});
+
+describe('getEffectiveTheme', () => {
+  beforeEach(() => {
+    resetStorage();
+  });
+
+  it('defaults to dark without a stored theme or light system preference', () => {
+    stubMatchMedia(false);
+    expect(getEffectiveTheme()).toBe('dark');
+  });
+
+  it('uses light when the system prefers light and no theme is stored', () => {
+    stubMatchMedia(true);
+    expect(getEffectiveTheme()).toBe('light');
+  });
 });
 
 describe('isDark', () => {
@@ -106,6 +179,7 @@ describe('toggleTheme', () => {
   beforeEach(() => {
     resetStorage();
     document.documentElement.classList.remove('dark');
+    stubMatchMedia(false);
   });
 
   it('switches to dark and returns dark when currently light', () => {
@@ -141,6 +215,11 @@ describe('isSetThemeMessage', () => {
 
   it('returns true for valid named theme message', () => {
     expect(isSetThemeMessage({ action: 'set_theme', theme: 'dracula' })).toBe(true);
+  });
+
+  it('returns true for legacy theme messages', () => {
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'winter' })).toBe(true);
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'halloween' })).toBe(true);
   });
 
   it('returns false for null', () => {

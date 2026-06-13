@@ -105,6 +105,20 @@ describe('SidebarToggle', () => {
     expect(container.querySelector('button')?.className).toContain('-left-4');
   });
 
+  it('stays below modal overlays while remaining above the main pane', () => {
+    const { container } = render(
+      <SidebarToggle
+        isCollapsed={false}
+        onClick={vi.fn()}
+        side="left"
+        ariaLabel="Toggle"
+      />
+    );
+    const button = container.querySelector('button');
+    expect(button?.className).toContain('z-20');
+    expect(button?.className).not.toContain('z-50');
+  });
+
   it('shows Collapse label for right side when not collapsed', () => {
     render(
       <SidebarToggle

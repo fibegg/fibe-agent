@@ -5,15 +5,15 @@ import type { BrowseEntry } from './use-playground-selector';
 import { useT } from '../i18n';
 
 const TRIGGER_CLASS =
-  'flex items-center justify-center size-8 rounded-lg border border-border bg-[var(--input-background)] text-foreground hover:border-fuchsia-500/40 focus:outline-none focus:ring-2 focus:ring-fuchsia-500/20 focus:border-fuchsia-500 transition-colors group';
+  'flex items-center justify-center size-8 rounded-lg border border-border bg-[var(--input-background)] text-foreground hover:border-primary/40 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors group';
 const MENU_TRIGGER_CLASS =
-  'flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 group';
+  'flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 group';
 const PANEL_CLASS =
   'min-w-[220px] max-w-[320px] max-h-[420px] overflow-hidden rounded-lg border border-border bg-card shadow-lg z-[100] flex flex-col p-1';
 const ENTRY_CLASS_BASE =
   'w-full px-3 py-2 text-left text-xs transition-colors flex items-center gap-2 rounded-sm';
 const PANEL_DATA_ATTR = 'data-playground-selector-panel';
-const ENTRY_HOVER_CLASS = 'text-foreground hover:bg-violet-500/10 hover:text-violet-400';
+const ENTRY_HOVER_CLASS = 'text-foreground hover:bg-primary/10 hover:text-primary';
 const LINKED_CLASS = 'text-emerald-400 bg-emerald-500/10';
 const PANEL_WIDTH_PX = 320;
 const PANEL_GUTTER_PX = 8;
@@ -140,7 +140,7 @@ export function PlaygroundSelector({
         aria-label={triggerLabel}
         title={triggerLabel}
       >
-        <Sparkles className="size-4 shrink-0 text-fuchsia-400 group-hover:text-fuchsia-300 transition-colors" aria-hidden />
+        <Sparkles className="size-4 shrink-0 text-primary group-hover:text-primary transition-colors" aria-hidden />
         {variant === 'menu' && <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>}
       </button>
       {open &&
@@ -162,7 +162,7 @@ export function PlaygroundSelector({
             <div className="overflow-auto flex-1 min-h-0">
               {loading && (
                 <div className="flex items-center justify-center gap-2 py-6">
-                  <Loader2 className="size-4 animate-spin text-fuchsia-400" aria-hidden />
+                  <Loader2 className="size-4 animate-spin text-primary" aria-hidden />
                   <span className="text-xs text-muted-foreground">{t('playground.loading')}</span>
                 </div>
               )}
@@ -189,9 +189,9 @@ export function PlaygroundSelector({
                       className={`${ENTRY_CLASS_BASE} ${isLinked ? LINKED_CLASS : ENTRY_HOVER_CLASS} disabled:opacity-50`}
                     >
                       {linking ? (
-                         <Loader2 className="size-3.5 shrink-0 animate-spin text-fuchsia-400" aria-hidden />
+                         <Loader2 className="size-3.5 shrink-0 animate-spin text-primary" aria-hidden />
                       ) : (
-                         <Sparkles className={`size-3.5 shrink-0 ${isLinked ? 'text-emerald-400' : 'text-fuchsia-400/50 group-hover:text-fuchsia-400'}`} aria-hidden />
+                         <Sparkles className={`size-3.5 shrink-0 ${isLinked ? 'text-emerald-400' : 'text-primary/50 group-hover:text-primary'}`} aria-hidden />
                       )}
                       <span className="truncate">{entry.name}</span>
                     </button>

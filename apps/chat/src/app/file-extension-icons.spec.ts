@@ -11,10 +11,10 @@ describe('getFileIconInfo', () => {
     expect(getFileIconInfo('src/app.ts', true).iconId).toBe('folder');
   });
 
-  it('returns folder with violet color class', () => {
+  it('returns folder with primary color class', () => {
     const r = getFileIconInfo('docs');
     expect(r.iconId).toBe('folder');
-    expect(r.colorClass).toContain('violet');
+    expect(r.colorClass).toContain('primary');
   });
 
   it('returns file-code for ts, js, css, scss, html', () => {

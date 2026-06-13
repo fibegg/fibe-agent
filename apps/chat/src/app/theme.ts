@@ -4,8 +4,14 @@ const STORAGE_KEY = 'chat-theme';
 const THEME_CHANGED_EVENT = 'fibe_theme_changed';
 
 export type Theme = 'light' | 'dark' | 'dracula' | 'midnight' | 'contrast';
+export type LegacyTheme = 'winter' | 'halloween';
+export type ThemeInput = Theme | LegacyTheme;
 
 export const THEMES = ['light', 'dark', 'dracula', 'midnight', 'contrast'] as const;
+const LEGACY_THEME_ALIASES: Record<LegacyTheme, Theme> = {
+  winter: 'light',
+  halloween: 'dark',
+};
 
 export interface ThemeOption {
   value: Theme;
@@ -20,25 +26,31 @@ export interface ThemeOption {
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { value: 'light', labelKey: 'theme.option.light', dark: false, accent: '#7c3aed' },
-  { value: 'dark', labelKey: 'theme.option.dark', dark: true, accent: '#a78bfa' },
+  { value: 'light', labelKey: 'theme.option.light', dark: false, accent: '#5cb43a' },
+  { value: 'dark', labelKey: 'theme.option.dark', dark: true, accent: '#79d44e' },
   { value: 'dracula', labelKey: 'theme.option.dracula', dark: true, accent: '#bd93f9' },
   { value: 'midnight', labelKey: 'theme.option.midnight', dark: true, accent: '#38bdf8' },
   { value: 'contrast', labelKey: 'theme.option.contrast', dark: true, accent: '#facc15' },
 ];
 
-export function isSetThemeMessage(data: unknown): data is { action: 'set_theme'; theme: Theme } {
+export function isSetThemeMessage(data: unknown): data is { action: 'set_theme'; theme: ThemeInput } {
   const o = data as Record<string, unknown> | null;
   return (
     o !== null &&
     typeof o === 'object' &&
     o.action === 'set_theme' &&
-    isTheme(o.theme)
+    normalizeTheme(o.theme) !== null
   );
 }
 
 export function isTheme(value: unknown): value is Theme {
   return typeof value === 'string' && THEMES.includes(value as Theme);
+}
+
+export function normalizeTheme(value: unknown): Theme | null {
+  if (isTheme(value)) return value;
+  if (value === 'winter' || value === 'halloween') return LEGACY_THEME_ALIASES[value];
+  return null;
 }
 
 function initFrameThemeListener(): void {
@@ -54,22 +66,24 @@ export function getStoredTheme(): Theme | null {
   if (typeof window === 'undefined') return null;
   try {
     const s = localStorage.getItem(STORAGE_KEY);
-    return isTheme(s) ? s : null;
+    const theme = normalizeTheme(s);
+    if (theme && s !== theme) localStorage.setItem(STORAGE_KEY, theme);
+    return theme;
   } catch {
     return null;
   }
 }
 
-function prefersDark(): boolean {
+function prefersLight(): boolean {
   if (typeof window === 'undefined') return false;
-  const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)');
+  const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)');
   return m ? m.matches : false;
 }
 
 export function getEffectiveTheme(): Theme {
   const stored = getStoredTheme();
   if (stored) return stored;
-  return prefersDark() ? 'dark' : 'light';
+  return prefersLight() ? 'light' : 'dark';
 }
 
 function getEffectiveDark(): boolean {
@@ -83,15 +97,17 @@ function applyTheme(): void {
   document.documentElement.dataset.theme = theme;
 }
 
-export function setStoredTheme(theme: Theme): void {
+export function setStoredTheme(theme: ThemeInput): void {
   if (typeof window === 'undefined') return;
+  const normalized = normalizeTheme(theme);
+  if (!normalized) return;
   try {
-    localStorage.setItem(STORAGE_KEY, theme);
+    localStorage.setItem(STORAGE_KEY, normalized);
   } catch {
     // localStorage can be unavailable in restrictive embed contexts.
   }
   applyTheme();
-  window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme } }));
+  window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme: normalized } }));
 }
 
 export function isDark(): boolean {
@@ -116,7 +132,7 @@ export function initTheme(): void {
   if (typeof window === 'undefined') return;
   applyTheme();
   initFrameThemeListener();
-  const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)');
+  const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)');
   if (m) m.addEventListener('change', () => {
     if (getStoredTheme() === null) applyTheme();
   });

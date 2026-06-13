@@ -145,7 +145,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
         {/* Conversations — pinned to the bottom half of the panel */}
         {showConversations && (
           <div
-            className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
+            className="shrink-0 border-t border-border overflow-hidden flex flex-col"
             style={conversationsCollapsed ? undefined : { height: hasFileSection ? '45%' : '100%', minHeight: 180 }}
           >
             <ConversationSidebar

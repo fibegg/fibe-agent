@@ -12,11 +12,29 @@ export function isScrollAtBottom(
   return scrollHeight - scrollTop - clientHeight <= thresholdPx;
 }
 
-export function useScrollToBottom(whenToScroll: unknown) {
+export function nextNewMessageCount(
+  currentCount: number,
+  previousVisibleItemCount: number,
+  visibleItemCount: number,
+  currentItemUpdated = false,
+): number {
+  const newItemCount = Math.max(0, visibleItemCount - previousVisibleItemCount);
+  if (newItemCount > 0) return currentCount + newItemCount;
+  return currentItemUpdated ? Math.max(currentCount, 1) : currentCount;
+}
+
+export function useScrollToBottom(
+  whenToScroll: unknown,
+  visibleItemCount = 0,
+  resetKey?: unknown,
+  currentItemUpdated = false,
+) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const userWasAtBottomRef = useRef(true);
   const userJustSentRef = useRef(false);
+  const visibleItemCountRef = useRef(visibleItemCount);
+  const resetKeyRef = useRef(resetKey);
   const [isAtBottom, setIsAtBottom] = useState(true);
   const [newMessageCount, setNewMessageCount] = useState(0);
 
@@ -49,16 +67,39 @@ export function useScrollToBottom(whenToScroll: unknown) {
   const mountedRef = useRef(false);
 
   useEffect(() => {
+    if (resetKeyRef.current !== resetKey) {
+      resetKeyRef.current = resetKey;
+      visibleItemCountRef.current = visibleItemCount;
+      userWasAtBottomRef.current = true;
+      prevAtBottomRef.current = true;
+      setIsAtBottom(true);
+      setNewMessageCount(0);
+      return;
+    }
+
     // Skip the initial mount — there's nothing to scroll to yet
     if (!mountedRef.current) {
       mountedRef.current = true;
+      visibleItemCountRef.current = visibleItemCount;
       return;
     }
+
+    const previousVisibleItemCount = visibleItemCountRef.current;
+    visibleItemCountRef.current = visibleItemCount;
+
     if (!userWasAtBottomRef.current && !userJustSentRef.current) {
       // Scrolled up — count new arrivals
-      setNewMessageCount((n) => n + 1);
+      setNewMessageCount((n) =>
+        nextNewMessageCount(
+          n,
+          previousVisibleItemCount,
+          visibleItemCount,
+          currentItemUpdated,
+        ),
+      );
       return;
     }
+
     // Defer past current render so the DOM has finished updating
     const id = setTimeout(() => {
       safeScrollIntoView(endRef.current, { behavior: 'smooth' });
@@ -70,7 +111,7 @@ export function useScrollToBottom(whenToScroll: unknown) {
       }
     }, 0);
     return () => clearTimeout(id);
-  }, [whenToScroll]);
+  }, [whenToScroll, visibleItemCount, resetKey, currentItemUpdated]);
 
   const onScroll = useCallback(() => {
     checkAtBottom();
@@ -90,5 +131,3 @@ export function useScrollToBottom(whenToScroll: unknown) {
     markJustSent,
   };
 }
-
-

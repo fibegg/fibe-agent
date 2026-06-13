@@ -77,7 +77,7 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
           disabled={downloadAnimating}
         >
           {downloadAnimating ? (
-            <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
+            <span className="inline-flex items-center justify-center text-primary" aria-hidden>
               <Brain className="size-8 brain-download-anim" />
             </span>
           ) : (
@@ -157,7 +157,7 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
             <>
               <span className="text-muted-foreground/70">·</span>
               <span
-                className="text-violet-300/90"
+                className="text-primary/90"
                 title={t('header.tokenUsage')}
               >
                 <CountUpNumber value={sessionTokenUsage.inputTokens} format="compact" /> {t('header.inputShort')} / <CountUpNumber value={sessionTokenUsage.outputTokens} format="compact" /> {t('header.outputShort')}

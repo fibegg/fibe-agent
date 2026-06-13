@@ -44,7 +44,7 @@ function fileStatusInfo(index: string, worktree: string) {
   if (combined.includes('A')) return { labelKey: 'diff.status.added' as const,     color: 'text-emerald-400', Icon: FilePlus };
   if (combined.includes('D')) return { labelKey: 'diff.status.deleted' as const,   color: 'text-red-400',     Icon: FileMinus };
   if (combined.includes('R')) return { labelKey: 'diff.status.renamed' as const,   color: 'text-blue-400',    Icon: FileText };
-  return                                { labelKey: 'diff.status.modified' as const, color: 'text-violet-400',  Icon: FileText };
+  return                                { labelKey: 'diff.status.modified' as const, color: 'text-primary',  Icon: FileText };
 }
 
 /**
@@ -219,10 +219,10 @@ export function DiffPanel() {
   return (
     <div className="flex flex-col h-full min-h-0 bg-[#0d0d14] text-[13px] font-mono">
       {/* ── Sub-header ─────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#0d0d14]/90 border-b border-violet-500/10 shrink-0">
+      <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#0d0d14]/90 border-b border-primary/10 shrink-0">
         <div className="flex items-center gap-2">
-          <GitCompareArrows className="size-3.5 text-violet-400 shrink-0" aria-hidden />
-          <span className="text-[10px] font-medium text-violet-300/70 tracking-wide">
+          <GitCompareArrows className="size-3.5 text-primary shrink-0" aria-hidden />
+          <span className="text-[10px] font-medium text-primary/70 tracking-wide">
             {result?.branch ? `git · ${result.branch}` : 'git diff HEAD'}
           </span>
           {result && (
@@ -238,7 +238,7 @@ export function DiffPanel() {
               type="button"
               onClick={() => { void handleCommit(); }}
               disabled={!canCommit || loading}
-              className="flex items-center gap-1 text-[10px] text-violet-300/80 hover:text-violet-200 transition-colors disabled:opacity-40 shrink-0 rounded px-1.5 py-0.5 hover:bg-violet-500/10"
+              className="flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary transition-colors disabled:opacity-40 shrink-0 rounded px-1.5 py-0.5 hover:bg-primary/10"
               aria-label={t('diff.commitSelected')}
               title={t('diff.commitSelected')}
             >
@@ -285,7 +285,7 @@ export function DiffPanel() {
             type="button"
             onClick={() => { void fetchDiff(); }}
             disabled={loading}
-            className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-violet-300 transition-colors disabled:opacity-40 shrink-0"
+            className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-primary transition-colors disabled:opacity-40 shrink-0"
             aria-label={t('diff.refreshDiff')}
             title={t('diff.refresh')}
           >
@@ -297,7 +297,7 @@ export function DiffPanel() {
 
       {/* ── Operation result toast ─────────────────────────────────────── */}
       {operationResult && (
-        <div className={`px-3 py-1.5 text-[11px] font-medium shrink-0 border-b border-violet-500/10 ${
+        <div className={`px-3 py-1.5 text-[11px] font-medium shrink-0 border-b border-primary/10 ${
           operationResult.ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
         }`}>
           {operationResult.message}
@@ -329,13 +329,13 @@ export function DiffPanel() {
 
       {/* ── Changed files strip ─────────────────────────────────────────── */}
       {result?.files && result.files.length > 0 && (
-        <div className="shrink-0 border-b border-violet-500/10 bg-[#0d0d14]/80 px-3 py-1.5 flex flex-col gap-0.5 max-h-36 overflow-y-auto">
+        <div className="shrink-0 border-b border-primary/10 bg-[#0d0d14]/80 px-3 py-1.5 flex flex-col gap-0.5 max-h-36 overflow-y-auto">
           <div className="flex items-center gap-2 pb-1">
             <input
               value={commitMessage}
               onChange={(event) => setCommitMessage(event.currentTarget.value)}
               placeholder={t('drawer.gitPushCommitMessage')}
-              className="min-w-0 flex-1 rounded border border-violet-500/15 bg-black/20 px-2 py-1 text-[11px] text-foreground outline-none focus:border-violet-400/50"
+              className="min-w-0 flex-1 rounded border border-primary/15 bg-black/20 px-2 py-1 text-[11px] text-foreground outline-none focus:border-primary/50"
             />
             <span className="text-[10px] text-muted-foreground/50 shrink-0">
               {t('diff.selectedFiles', { count: selectedFiles.size })}
@@ -350,11 +350,11 @@ export function DiffPanel() {
                 key={f.path}
                 type="button"
                 onClick={() => toggleFile(f.path)}
-                className="flex items-center gap-2 min-w-0 rounded px-1 py-0.5 text-left hover:bg-violet-500/10"
+                className="flex items-center gap-2 min-w-0 rounded px-1 py-0.5 text-left hover:bg-primary/10"
                 aria-pressed={selected}
               >
                 {selected
-                  ? <CheckSquare className="size-3 shrink-0 text-violet-300" aria-hidden />
+                  ? <CheckSquare className="size-3 shrink-0 text-primary" aria-hidden />
                   : <Square className="size-3 shrink-0 text-muted-foreground/50" aria-hidden />
                 }
                 <Icon className={`size-3 shrink-0 ${color}`} aria-hidden />

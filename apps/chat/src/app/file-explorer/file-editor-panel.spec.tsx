@@ -247,7 +247,7 @@ describe('FileEditorPanel', () => {
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
 
     expect(document.querySelector('iframe')?.getAttribute('src')).toContain('/api/playgrounds/file/raw?path=cosmetics.html');
-    expect(screen.getByRole('button', { name: 'Preview' }).className).toContain('bg-violet-500/20');
+    expect(screen.getByRole('button', { name: 'Preview' }).className).toContain('bg-primary/20');
   });
 
   it('switches HTML preview to code before searching file content', async () => {
@@ -261,7 +261,7 @@ describe('FileEditorPanel', () => {
 
     await waitFor(() => expect(screen.getByTestId('cm-mock')).toBeTruthy());
     await waitFor(() => expect(searchInFileMock).toHaveBeenCalledWith('Zoo', 'next'));
-    expect(screen.getByRole('button', { name: 'Code' }).className).toContain('bg-violet-500/20');
+    expect(screen.getByRole('button', { name: 'Code' }).className).toContain('bg-primary/20');
     expect(document.querySelector('iframe')).toBeNull();
   });
 

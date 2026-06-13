@@ -48,7 +48,7 @@ export function FileExplorerTabs({
               'relative flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5',
               'text-[11px] font-semibold tracking-wide uppercase',
               'rounded-[5px] transition-all duration-200 ease-out',
-              'focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40',
+              'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
               isActive
                 ? 'bg-background text-foreground shadow-sm'
                 : 'text-muted-foreground hover:text-foreground/80',

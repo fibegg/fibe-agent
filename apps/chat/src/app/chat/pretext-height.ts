@@ -11,8 +11,8 @@ import { layout, prepare } from '@chenglou/pretext';
 
 // ─── Design constants — must match the CSS applied to message bubbles ─────────
 
-/** Font spec matching the chat body text (Inter / system-ui at 14 px). */
-const BODY_FONT = '14px "Inter", "system-ui", sans-serif';
+/** Font spec matching the chat body text (Plus Jakarta Sans / system-ui at 14 px). */
+const BODY_FONT = '14px "Plus Jakarta Sans", "system-ui", sans-serif';
 
 /** Line-height in px — Tailwind `leading-relaxed` at `text-sm`. */
 const LINE_HEIGHT = 22;

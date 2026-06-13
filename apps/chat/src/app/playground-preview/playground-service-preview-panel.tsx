@@ -85,8 +85,8 @@ export function PlaygroundServicePreviewPanel({
                   onClick={() => setSelectedId(service.id)}
                   className={`max-w-28 truncate rounded px-2 py-1 text-[11px] font-medium transition-colors ${
                     selected?.id === service.id
-                      ? 'bg-violet-500/20 text-violet-200'
-                      : 'text-muted-foreground hover:bg-violet-500/10 hover:text-foreground'
+                      ? 'bg-primary/20 text-primary'
+                      : 'text-muted-foreground hover:bg-primary/10 hover:text-foreground'
                   }`}
                   aria-pressed={selected?.id === service.id}
                   title={service.name}
@@ -105,7 +105,7 @@ export function PlaygroundServicePreviewPanel({
               setDiagnostics(null);
               setFrameKey((key) => key + 1);
             }}
-            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300"
+            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
             aria-label={t('preview.reload')}
             title={t('preview.reload')}
           >
@@ -116,7 +116,7 @@ export function PlaygroundServicePreviewPanel({
               href={selected.url}
               target="_blank"
               rel="noreferrer"
-              className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300"
+              className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
               aria-label={t('preview.openExternal')}
               title={t('preview.openExternal')}
             >
@@ -126,7 +126,7 @@ export function PlaygroundServicePreviewPanel({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300"
+            className="grid size-8 place-items-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
             aria-label={t('common.close')}
             title={t('common.close')}
           >

@@ -55,8 +55,8 @@ export function SimplicateSwitch({
       aria-checked={checked}
       aria-label={t('header.simplicate')}
       onClick={() => onChange(!checked)}
-      className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${
-        checked ? 'border-violet-400/70 bg-violet-500' : 'border-muted-foreground/50 bg-background/80'
+      className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 ${
+        checked ? 'border-primary/70 bg-primary' : 'border-muted-foreground/50 bg-background/80'
       } ${checked ? 'justify-end' : 'justify-start'}`}
     >
       <span
@@ -100,7 +100,7 @@ export function EffortRange({
         step={1}
         value={selectedIndex}
         onChange={(e) => handleChange(e.target.value)}
-        className="h-2 w-full cursor-pointer accent-violet-500"
+        className="h-2 w-full cursor-pointer accent-primary"
         aria-label={t('header.effort')}
         aria-valuetext={selectedLabel}
       />
@@ -108,7 +108,7 @@ export function EffortRange({
         {EFFORT_OPTIONS.map((effort) => (
           <span
             key={effort}
-            className={`truncate text-center ${effort === selectedEffort ? 'font-medium text-violet-300' : ''}`}
+            className={`truncate text-center ${effort === selectedEffort ? 'font-medium text-primary' : ''}`}
           >
             {t(`effort.${effort}` as TranslationKey)}
           </span>
@@ -211,7 +211,7 @@ export function ProviderModelMenu({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className={`${triggerClassName} rounded-md transition-colors hover:bg-violet-500/10 focus:outline-none focus:ring-2 focus:ring-violet-500/30`}
+        className={`${triggerClassName} rounded-md transition-colors hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30`}
         aria-haspopup="dialog"
         aria-expanded={open}
         aria-label={panelLabel}
@@ -371,7 +371,7 @@ export function MoreActionsMenu({
         ref={triggerRef}
         type="button"
         onClick={() => setOpen((value) => !value)}
-        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:size-9"
+        className="flex size-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 sm:size-9"
         title={t('header.moreActions')}
         aria-label={t('header.moreActions')}
         aria-haspopup="menu"
@@ -418,7 +418,7 @@ export function MoreActionsMenu({
                   onClick={() => runAndClose(onToggleTerminal)}
                   className={`${MORE_MENU_ITEM_CLASS} ${terminalOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
-                  <TerminalSquare className="size-4 shrink-0 text-violet-300" />
+                  <TerminalSquare className="size-4 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 truncate">{t('header.terminal')}</span>
                 </button>
               )}
@@ -454,7 +454,7 @@ export function MoreActionsMenu({
                   onClick={() => runAndClose(onStartAuth)}
                   className={MORE_MENU_ITEM_CLASS}
                 >
-                  <Sparkles className="size-4 shrink-0 text-violet-300" />
+                  <Sparkles className="size-4 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 truncate">{t('header.startAuth')}</span>
                 </button>
               )}
@@ -598,10 +598,10 @@ export function CompactConversationPicker({
         type="button"
         onClick={open ? () => setOpen(false) : openPicker}
         aria-label={t('header.switchConversation')}
-        className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-500/30 ${open ? 'bg-violet-500/15 text-violet-300' : ''}`}
+        className={`inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30 ${open ? 'bg-primary/15 text-primary' : ''}`}
         title={label}
       >
-        <MessageSquare className="size-4 shrink-0 text-violet-400" aria-hidden />
+        <MessageSquare className="size-4 shrink-0 text-primary" aria-hidden />
       </button>
       {open && rect && createPortal(
         <div
@@ -620,7 +620,7 @@ export function CompactConversationPicker({
                 onClick={() => handleSelect(c.id)}
                 className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
                   c.id === activeId
-                    ? 'bg-violet-500/15 text-violet-300'
+                    ? 'bg-primary/15 text-primary'
                     : 'text-foreground hover:bg-muted/50'
                 }`}
               >
@@ -635,7 +635,7 @@ export function CompactConversationPicker({
                 type="button"
                 role="menuitem"
                 onClick={handleCreate}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-violet-400 hover:bg-violet-500/10 transition-colors"
+                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors"
               >
                 <Plus className="size-3.5 shrink-0" />
                 <span>{t('conversation.newChat')}</span>

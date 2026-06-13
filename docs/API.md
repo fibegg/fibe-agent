@@ -128,7 +128,7 @@ When the chat app is loaded inside an iframe (e.g. Fibe frame), the following ap
 ### postMessage: parent → chat iframe
 
 - **Auto-auth:** `{ action: 'auto_auth', password: '<internal_password>' }` — chat calls `POST /api/auth/login` and stores the token.
-- **Set theme:** `{ action: 'set_theme', theme: 'light' | 'dark' }` — applied when `VITE_THEME_SOURCE=frame`. Theme is also persisted to `localStorage` so it survives refresh.
+- **Set theme:** `{ action: 'set_theme', theme: 'light' | 'dark' }` — applied when `VITE_THEME_SOURCE=frame`. Legacy `winter` and `halloween` values are accepted and normalized to `light` and `dark`. Theme is persisted to `localStorage` under the canonical name so it survives refresh.
 
 ## Agent providers and auth modes
 

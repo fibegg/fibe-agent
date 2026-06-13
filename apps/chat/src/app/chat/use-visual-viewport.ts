@@ -7,9 +7,15 @@ import { useEffect } from 'react';
  *   soft keyboard). Used as a reliable full-height value on iOS Safari.
  *
  * - `--keyboard-height`: the height in pixels that the software keyboard
- *   currently occupies (= `window.innerHeight - visualViewport.height`).
+ *   currently occupies below the visual viewport
+ *   (= `window.innerHeight - visualViewport.height - visualViewport.offsetTop`).
  *   Zero when no keyboard is shown. Use this to push the chat input area
  *   above the keyboard without shrinking the whole layout.
+ *
+ * - `--visual-viewport-offset-top`: the visual viewport's top offset within
+ *   the layout viewport. iOS/PWA can move the visual viewport while focusing
+ *   an input, which otherwise leaves fixed app chrome slightly above the
+ *   visible area.
  *
  * This is the Telegram / WhatsApp approach: the layout container stays at
  * the full window height (`100dvh`) and only the input area's bottom padding
@@ -24,10 +30,12 @@ export function useVisualViewport(): void {
     function update(): void {
       const vv = window.visualViewport;
       const vvHeight = vv?.height ?? window.innerHeight;
+      const vvOffsetTop = vv?.offsetTop ?? 0;
       // 1% of the visual viewport height (shrinks when keyboard is open)
       document.documentElement.style.setProperty('--vh', `${vvHeight * 0.01}px`);
+      document.documentElement.style.setProperty('--visual-viewport-offset-top', `${vvOffsetTop}px`);
       // Height of the software keyboard (0 when closed)
-      const keyboardHeight = Math.max(0, window.innerHeight - vvHeight);
+      const keyboardHeight = Math.max(0, window.innerHeight - vvHeight - vvOffsetTop);
       document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
     }
 

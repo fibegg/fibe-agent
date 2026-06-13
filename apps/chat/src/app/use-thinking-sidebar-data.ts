@@ -11,8 +11,8 @@ import type { StoryEntry, SessionActivityEntry, StoryEntryWithActivityId } from 
 const HIDDEN_WHEN_IDLE_TYPES = new Set(['stream_start', 'step']);
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const BRAIN_IDLE = 'text-violet-400';
-const BRAIN_IDLE_ACCENT = 'text-violet-300';
+const BRAIN_IDLE = 'text-primary';
+const BRAIN_IDLE_ACCENT = 'text-primary';
 const BRAIN_WORKING = 'text-cyan-400';
 const BRAIN_WORKING_ACCENT = 'text-cyan-300';
 const BRAIN_COMPLETE = 'text-emerald-400';

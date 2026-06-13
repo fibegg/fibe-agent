@@ -18,10 +18,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/HIPAA-Ready-blueviolet.svg" alt="HIPAA Ready" />
-  <img src="https://img.shields.io/badge/SOC%202-Compliant-blueviolet.svg" alt="SOC 2 Compliant" />
-  <img src="https://img.shields.io/badge/GDPR-Ready-blueviolet.svg" alt="GDPR Ready" />
-  <img src="https://img.shields.io/badge/CCPA-Ready-blueviolet.svg" alt="CCPA Ready" />
+  <img src="https://img.shields.io/badge/HIPAA-Ready-5cb43a.svg" alt="HIPAA Ready" />
+  <img src="https://img.shields.io/badge/SOC%202-Compliant-5cb43a.svg" alt="SOC 2 Compliant" />
+  <img src="https://img.shields.io/badge/GDPR-Ready-5cb43a.svg" alt="GDPR Ready" />
+  <img src="https://img.shields.io/badge/CCPA-Ready-5cb43a.svg" alt="CCPA Ready" />
   <img src="https://img.shields.io/badge/OWASP-Secured-informational.svg" alt="OWASP" />
   <img src="https://img.shields.io/badge/SCS-Scanned-informational.svg" alt="Supply Chain Security" />
 </p>
@@ -298,7 +298,7 @@ Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `op
 The chat can run inside a `<iframe>` in another app (e.g. Fibe):
 
 - **Auto-auth:** parent posts `{ action: 'auto_auth', password: '…' }` → chat logs in automatically.
-- **Theme control:** parent posts `{ action: 'set_theme', theme: 'light'|'dark' }` (requires `VITE_THEME_SOURCE=frame`).
+- **Theme control:** parent posts `{ action: 'set_theme', theme: 'light'|'dark' }` (requires `VITE_THEME_SOURCE=frame`). Legacy `winter` and `halloween` inputs are accepted and normalized to `light` and `dark`.
 
 ## License
 

@@ -36,7 +36,7 @@ export function ChatLayout({
 }: ChatLayoutProps) {
   return (
     <div
-      className={`flex w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-violet-950/10 relative ${isDragOver ? 'ring-2 ring-inset ring-violet-500 ring-offset-2 ring-offset-background' : ''}`}
+      className={`flex w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-primary/10 relative ${isDragOver ? 'ring-2 ring-inset ring-primary ring-offset-2 ring-offset-background' : ''}`}
       style={{
         ...(isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : {}),
         // Keep the layout at full window height — the keyboard overlays the

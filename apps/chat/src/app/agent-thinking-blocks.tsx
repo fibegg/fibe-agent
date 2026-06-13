@@ -113,7 +113,7 @@ const SUSPICIOUS_SEGMENT_CLASS =
 const AGREEMENT_SEGMENT_CLASS =
   'bg-emerald-500/25 text-emerald-200 border-b border-emerald-500/50 rounded-sm px-0.5';
 const UNCERTAINTY_SEGMENT_CLASS =
-  'bg-amber-400/20 text-violet-100 border-b border-amber-400/40 rounded-sm px-0.5';
+  'bg-amber-400/20 text-primary border-b border-amber-400/40 rounded-sm px-0.5';
 const QUESTION_SEGMENT_CLASS =
   'bg-sky-500/25 text-sky-200 border-b border-sky-500/50 rounded-sm px-0.5';
 

@@ -120,7 +120,7 @@ export function FileMentionDropdown({
             title={entry.path}
             className={`flex w-full items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
               i === highlightIndex
-                ? 'bg-violet-500/15 text-foreground'
+                ? 'bg-primary/15 text-foreground'
                 : 'text-foreground hover:bg-muted/60'
             }`}
             onMouseEnter={() => setHighlightIndex(i)}

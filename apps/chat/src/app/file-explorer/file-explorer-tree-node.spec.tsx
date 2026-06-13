@@ -167,7 +167,7 @@ describe('TreeNode', () => {
       />
     );
     const btn = container.querySelector('button');
-    expect(btn?.className).toContain('bg-violet-500/10');
+    expect(btn?.className).toContain('bg-primary/10');
   });
 
   it('keeps the click target to the visible row content instead of the full empty row', () => {
@@ -321,7 +321,7 @@ describe('TreeNode', () => {
     );
     const nameSpans = screen.getAllByText('index.ts');
     const nameSpan = nameSpans.find((el) => el.className.includes('truncate'));
-    expect(nameSpan?.className).toContain('text-violet-400');
+    expect(nameSpan?.className).toContain('text-primary');
     expect(nameSpan?.className).not.toContain('text-amber-500/90');
   });
 

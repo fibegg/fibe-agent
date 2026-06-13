@@ -12,7 +12,7 @@ export function ThemeToggle() {
     const sync = () => setTheme(getEffectiveTheme());
     sync();
     const offTheme = onThemeChanged(sync);
-    const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)');
+    const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)');
     const handler = () => {
       if (getStoredTheme() === null) sync();
     };

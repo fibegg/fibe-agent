@@ -83,7 +83,7 @@ export const TreeNode = memo(function TreeNode({
   const isGitDeleted = entry.gitStatus === 'deleted';
   const isGitRenamed = entry.gitStatus === 'renamed';
 
-  let nameColorClass = isSelected ? 'text-violet-400' : 'text-foreground';
+  let nameColorClass = isSelected ? 'text-primary' : 'text-foreground';
   if (!isSelected) {
     if (isGitModified) nameColorClass = 'text-amber-500/90 dark:text-amber-400/90';
     else if (isGitAddedOrUntracked) nameColorClass = 'text-green-500/90 dark:text-green-400/90';
@@ -95,7 +95,7 @@ export const TreeNode = memo(function TreeNode({
       <button
         type="button"
         onClick={handleClick}
-        className={`${TREE_NODE_BASE} !w-fit max-w-full ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-violet-500/5'}`}
+        className={`${TREE_NODE_BASE} !w-fit max-w-full ${isSelected ? TREE_NODE_SELECTED : 'text-foreground hover:bg-muted/50 focus:bg-primary/5'}`}
         style={{
           paddingLeft: `${0.5 + depth * 0.75}rem`,
         }}
@@ -113,9 +113,9 @@ export const TreeNode = memo(function TreeNode({
         </span>
         {isDir ? (
           isExpanded ? (
-            <FolderOpen className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+            <FolderOpen className="size-3.5 shrink-0 text-primary" aria-hidden />
           ) : (
-            <Folder className="size-3.5 shrink-0 text-violet-400" aria-hidden />
+            <Folder className="size-3.5 shrink-0 text-primary" aria-hidden />
           )
         ) : isImageFile ? (
           <ImageThumbnail entry={entry} />

@@ -110,30 +110,30 @@ function buildTheme(dark: boolean): Extension {
   if (dark) {
     return EditorView.theme({
       '&': { backgroundColor: 'transparent', height: '100%', fontSize: '13px', fontFamily: FONT_FAMILY },
-      '.cm-content': { padding: '8px 0', caretColor: '#a78bfa' },
+      '.cm-content': { padding: '8px 0', caretColor: '#79d44e' },
       '.cm-focused': { outline: 'none' },
-      '&.cm-focused .cm-cursor': { borderLeftColor: '#a78bfa' },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'rgba(124,58,237,0.3)' },
+      '&.cm-focused .cm-cursor': { borderLeftColor: '#79d44e' },
+      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: 'rgba(92,180,58,0.3)' },
       '.cm-gutters': { backgroundColor: 'rgba(0,0,0,0.2)', color: '#5a5a7a', border: 'none', borderRight: '1px solid rgba(255,255,255,0.06)', paddingRight: '8px', minWidth: '48px' },
       '.cm-lineNumbers': { color: '#4a4a6a' },
-      '.cm-activeLine': { backgroundColor: 'rgba(124,58,237,0.06)' },
-      '.cm-activeLineGutter': { backgroundColor: 'rgba(124,58,237,0.12)', color: '#c4c4dc' },
+      '.cm-activeLine': { backgroundColor: 'rgba(92,180,58,0.06)' },
+      '.cm-activeLineGutter': { backgroundColor: 'rgba(92,180,58,0.12)', color: '#c4c4dc' },
       '.cm-foldGutter span': { color: '#5a5a7a' },
-      '.cm-matchingBracket': { backgroundColor: 'rgba(124,58,237,0.2)', outline: '1px solid rgba(167,139,250,0.4)' },
+      '.cm-matchingBracket': { backgroundColor: 'rgba(92,180,58,0.2)', outline: '1px solid rgba(121,212,78,0.4)' },
     }, { dark: true });
   }
   return EditorView.theme({
     '&': { backgroundColor: 'transparent', height: '100%', fontSize: '13px', fontFamily: FONT_FAMILY },
-    '.cm-content': { padding: '8px 0', caretColor: '#7c3aed' },
+    '.cm-content': { padding: '8px 0', caretColor: '#5cb43a' },
     '.cm-focused': { outline: 'none' },
-    '&.cm-focused .cm-cursor': { borderLeftColor: '#7c3aed' },
+    '&.cm-focused .cm-cursor': { borderLeftColor: '#5cb43a' },
     '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': { backgroundColor: '#ddd6fe' },
     '.cm-gutters': { backgroundColor: 'hsl(var(--card)/0.5)', color: 'hsl(var(--muted-foreground))', border: 'none', borderRight: '1px solid hsl(var(--border)/0.5)', paddingRight: '8px', minWidth: '48px' },
     '.cm-lineNumbers': { color: 'hsl(var(--muted-foreground)/0.7)' },
     '.cm-activeLine': { backgroundColor: 'hsl(var(--muted)/0.3)' },
     '.cm-activeLineGutter': { backgroundColor: 'hsl(var(--muted)/0.4)', color: 'hsl(var(--foreground))' },
     '.cm-foldGutter span': { color: 'hsl(var(--muted-foreground))' },
-    '.cm-matchingBracket': { backgroundColor: '#7c3aed22', outline: '1px solid #7c3aed55' },
+    '.cm-matchingBracket': { backgroundColor: '#5cb43a22', outline: '1px solid #5cb43a55' },
   }, { dark: false });
 }
 

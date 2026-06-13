@@ -196,7 +196,7 @@ vi.mock('../chat/use-chat-display-state', () => ({
     pastActivityFromMessages: [],
     sessionTimeMs: 0,
     mobileSessionStats: { totalActions: 0, completed: 0, processing: 0 },
-    mobileBrainClasses: { brain: 'text-violet-500', accent: 'text-violet-400' },
+    mobileBrainClasses: { brain: 'text-primary', accent: 'text-primary' },
     sessionTokenUsage: null,
   }),
 }));
@@ -670,6 +670,75 @@ describe('ChatPage', () => {
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(mockScrollToBottom).toHaveBeenCalledWith('smooth');
+  });
+
+  it('renders an opaque scroll-to-bottom button with capped count', () => {
+    vi.mocked(useScrollToBottom).mockReturnValue({
+      scrollRef: { current: null },
+      endRef: { current: null },
+      isAtBottom: false,
+      newMessageCount: 120,
+      onScroll: vi.fn(),
+      scrollToBottom: mockScrollToBottom,
+      markJustSent: vi.fn(),
+    });
+    render(<ChatPage />, { wrapper });
+    const btn = screen.getByRole('button', { name: /jump to latest messages/i });
+
+    expect(btn.className).toContain('bg-card');
+    expect(btn.className).not.toContain('bg-card/');
+    expect(screen.getByText('99+')).toBeTruthy();
+  });
+
+  it('counts only visible chat bubbles and the live response for the latest badge', () => {
+    vi.mocked(useChatInitialData).mockReturnValue({
+      messages: [
+        { kind: 'reset_separator', resetAt: '2026-01-01T00:00:00.000Z' },
+        {
+          role: 'user',
+          body: 'hello',
+          created_at: '2026-01-01T00:01:00.000Z',
+        },
+      ],
+      setMessages: vi.fn(),
+      messagesLoaded: true,
+      messagesLoadError: false,
+      modelOptions: ['claude-3'],
+      refreshingModels: false,
+      refreshModelOptions: vi.fn(),
+      loadMessages: vi.fn(),
+      agentProvider: 'claude-code',
+    });
+    vi.mocked(useChatWebSocket).mockReturnValue({
+      state: CHAT_STATES.AWAITING_RESPONSE,
+      agentMode: 'Working',
+      errorMessage: null,
+      authModal: { authUrl: null, deviceCode: null, isManualToken: false },
+      sessionActivity: [],
+      sessionCount: 1,
+      anyProcessing: true,
+      send: vi.fn(),
+      reconnect: vi.fn(),
+      startAuth: vi.fn(),
+      cancelAuth: vi.fn(),
+      submitAuthCode: vi.fn(),
+      reauthenticate: vi.fn(),
+      logout: vi.fn(),
+      dismissError: vi.fn(),
+      interruptAgent: vi.fn(),
+      setState: vi.fn(),
+      setErrorMessage: vi.fn(),
+      setAuthModal: vi.fn(),
+    });
+
+    render(<ChatPage />, { wrapper });
+
+    expect(useScrollToBottom).toHaveBeenLastCalledWith(
+      expect.any(String),
+      2,
+      'default',
+      true,
+    );
   });
 
   it('renders mobile file explorer sidebar when isMobile=true and sidebarOpen=true', () => {

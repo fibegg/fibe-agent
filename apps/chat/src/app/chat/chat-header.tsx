@@ -182,11 +182,11 @@ export function ChatHeader({
   const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
   const menuButtonLabel = t('header.openMenu');
   const compactShowsProviderModel = state === CHAT_STATES.AUTHENTICATED;
-  const simplicateHeaderRef = useRef<HTMLElement>(null);
+  const mobileHeaderRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    if (!isMobile || !compactMode) return;
-    const el = simplicateHeaderRef.current;
+    if (!isMobile) return;
+    const el = mobileHeaderRef.current;
     if (!el) return;
     const update = () => {
       const offsetTop = window.visualViewport?.offsetTop ?? 0;
@@ -206,15 +206,15 @@ export function ChatHeader({
   if (compactMode) {
     return (
       <header
-        ref={simplicateHeaderRef}
-        className="border-b border-border/30 bg-card/60 px-3 pb-2 backdrop-blur-xl shrink-0 sm:px-4 relative z-30"
+        ref={mobileHeaderRef}
+        className="border-b border-border bg-card/60 px-3 pb-2 backdrop-blur-xl shrink-0 sm:px-4 relative z-30"
         style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))', willChange: 'transform' }}
       >
         <div className="flex h-10 items-center justify-between gap-2">
           <button
             type="button"
             onClick={onOpenMenu}
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent text-violet-500 transition-colors hover:bg-violet-500/10 active:scale-[0.98] sm:size-9"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-transparent text-primary transition-colors hover:bg-primary/10 active:scale-[0.98] sm:size-9"
             aria-label={menuButtonLabel}
             title={menuButtonLabel}
           >
@@ -274,7 +274,7 @@ export function ChatHeader({
               )}
               {sessionCount > 1 && (
                 <span
-                  className="shrink-0 flex items-center gap-1 rounded-full bg-violet-500/10 px-2 py-0.5 text-[10px] font-medium text-violet-400 border border-violet-500/20"
+                  className="shrink-0 flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary border border-primary/20"
                   title={t('header.tabsConnected', { count: sessionCount })}
                 >
                   {t('header.tabCount', { count: sessionCount })}
@@ -288,7 +288,7 @@ export function ChatHeader({
               <button
                 type="button"
                 onClick={onReconnect}
-                className="h-8 rounded-lg bg-gradient-to-r from-violet-600 to-purple-600 px-2.5 text-xs font-medium text-white shadow-lg shadow-violet-500/25 transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-violet-500/30 sm:h-9 sm:px-3"
+                className="h-8 rounded-lg bg-gradient-to-r from-primary to-secondary px-2.5 text-xs font-medium text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:h-9 sm:px-3"
               >
                 {t('header.reconnect')}
               </button>
@@ -321,8 +321,9 @@ export function ChatHeader({
 
   return (
     <header
-      className={`border-b border-border/30 bg-card/60 backdrop-blur-xl shrink-0 px-4 pb-3`}
-      style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
+      ref={mobileHeaderRef}
+      className={`border-b border-border bg-card/60 backdrop-blur-xl shrink-0 px-4 pb-3`}
+      style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))', willChange: 'transform' }}
     >
       {isMobile && (
         <style>{`
@@ -343,7 +344,7 @@ export function ChatHeader({
             <button
               type="button"
               onClick={onOpenMenu}
-              className="flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-violet-500 hover:bg-violet-500/10 transition-all active:scale-[0.98]"
+              className="flex items-center gap-1.5 rounded-xl bg-transparent p-1.5 text-primary hover:bg-primary/10 transition-all active:scale-[0.98]"
               aria-label={t('header.openMenu')}
             >
               <Menu className="size-4 sm:size-5 shrink-0" />
@@ -411,7 +412,7 @@ export function ChatHeader({
               {sessionTokenUsage && (
                 <>
                   <span className="text-muted-foreground/70">·</span>
-                  <span className="text-violet-300/90" title={t('header.tokenUsage')}>
+                  <span className="text-primary/90" title={t('header.tokenUsage')}>
                     {formatCompactInteger(sessionTokenUsage.inputTokens)} {t('header.inputShort')} / {formatCompactInteger(sessionTokenUsage.outputTokens)} {t('header.outputShort')}
                   </span>
                 </>
@@ -423,7 +424,7 @@ export function ChatHeader({
               type="button"
               style={{ display: 'none' }}
               onClick={onOpenActivity}
-              className="size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-violet-500/10 transition-colors shrink-0 relative"
+              className="size-8 sm:size-9 rounded-md flex items-center justify-center hover:bg-primary/10 transition-colors shrink-0 relative"
               title={t('header.agentActivity')}
               aria-label={t('header.openAgentActivity')}
             >
@@ -439,7 +440,7 @@ export function ChatHeader({
             <button
               type="button"
               onClick={onReconnect}
-              className="px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-primary to-secondary text-white border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-opacity"
             >
               {t('header.reconnect')}
             </button>
@@ -463,8 +464,8 @@ export function ChatHeader({
               onClick={onToggleConversations}
               className={`hidden sm:flex size-9 rounded-md items-center justify-center transition-colors shrink-0 ${
                 conversationsOpen
-                  ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
-                  : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+                  ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                  : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
               }`}
               title={t('header.conversations')}
               aria-label={t('header.toggleConversations')}
@@ -484,8 +485,8 @@ export function ChatHeader({
               onClick={onTogglePreview}
               className={`hidden sm:flex size-9 rounded-md items-center justify-center transition-colors shrink-0 ${
                 previewOpen
-                  ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
-                  : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+                  ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                  : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
               }`}
               title={t('preview.title')}
               aria-label={t('preview.toggle')}
@@ -506,7 +507,7 @@ export function ChatHeader({
             <button
               type="button"
               onClick={onStartAuth}
-              className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-violet-600 to-purple-600 text-white border-0 shadow-lg shadow-violet-500/30 hover:opacity-90 transition-opacity"
+              className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-primary to-secondary text-white border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-opacity"
             >
               {t('header.startAuth')}
             </button>
@@ -548,8 +549,8 @@ export function ChatHeader({
             onClick={onTogglePreview}
             className={`sm:hidden size-8 rounded-md items-center justify-center transition-colors shrink-0 ${
               previewOpen
-                ? 'bg-violet-500/20 text-violet-300 hover:bg-violet-500/30'
-                : 'text-muted-foreground hover:bg-violet-500/10 hover:text-violet-300'
+                ? 'bg-primary/20 text-primary hover:bg-primary/30'
+                : 'text-muted-foreground hover:bg-primary/10 hover:text-primary'
             }`}
             title={t('preview.title')}
             aria-label={t('preview.toggle')}

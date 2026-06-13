@@ -21,6 +21,7 @@ import {
   type MessageListHandle,
   type ConversationResetSeparator,
   type ChatMessage,
+  type ChatListItem,
 } from '../chat/message-list';
 import { WS_ACTION } from '@shared/ws-constants';
 import { useChatWebSocket } from '../chat/use-chat-websocket';
@@ -126,6 +127,24 @@ interface PendingMessageFocus {
 }
 
 const SIMPLICATE_STORAGE_KEY = 'simplicate-mode';
+
+function isConversationResetSeparator(
+  item: ChatListItem,
+): item is ConversationResetSeparator {
+  return (item as ConversationResetSeparator).kind === 'reset_separator';
+}
+
+function visibleChatItemCount(
+  messages: ChatListItem[],
+  isStreaming: boolean,
+): number {
+  return (
+    messages.reduce(
+      (count, item) => count + (isConversationResetSeparator(item) ? 0 : 1),
+      0,
+    ) + (isStreaming ? 1 : 0)
+  );
+}
 
 function readStoredSimplicateMode(): boolean | null {
   try {
@@ -694,8 +713,6 @@ export function ChatPage() {
     handleStreamAbort();
   }, [handleStreamAbort]);
 
-  const scroll = useScrollToBottom([messages, streamingText]);
-
   const {
     state,
     agentMode,
@@ -725,6 +742,19 @@ export function ChatPage() {
     activeConversationId,
     handleStreamAbortWithTimer,
     handleConversationDeleted,
+  );
+
+  const agentIsStreaming = state === CHAT_STATES.AWAITING_RESPONSE;
+  const visibleMessageCount = useMemo(
+    () => visibleChatItemCount(messages, agentIsStreaming),
+    [messages, agentIsStreaming],
+  );
+  const scrollVersion = `${messages.length}:${streamingText.length}:${agentIsStreaming ? 1 : 0}`;
+  const scroll = useScrollToBottom(
+    scrollVersion,
+    visibleMessageCount,
+    activeConversationId,
+    agentIsStreaming || streamingText.length > 0,
   );
 
   useEffect(() => {
@@ -1222,7 +1252,7 @@ export function ChatPage() {
               onClick={closeMobileSidebar}
             />
             <div
-              className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-violet-950/5 border border-violet-500/20 flex flex-col`}
+              className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-primary/5 border border-primary/20 flex flex-col`}
             >
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <FileExplorer
@@ -1258,7 +1288,7 @@ export function ChatPage() {
               </div>
               {/* Conversations — always visible at bottom on mobile too */}
               <div
-                className="shrink-0 border-t border-border/30 overflow-hidden flex flex-col"
+                className="shrink-0 border-t border-border overflow-hidden flex flex-col"
                 style={
                   conversationSidebarCollapsed
                     ? undefined
@@ -1468,7 +1498,7 @@ export function ChatPage() {
             <button
               type="button"
               onClick={() => setCompactFileBrowserOpen(true)}
-              className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/90 text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md transition-all hover:scale-105 hover:bg-card hover:text-violet-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+              className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/90 text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md transition-all hover:scale-105 hover:bg-card hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               aria-label={t('fileExplorer.expand')}
               title={t('fileExplorer.expand')}
             >
@@ -1487,11 +1517,9 @@ export function ChatPage() {
                   ref={messageListRef}
                   messages={filteredMessages}
                   streamingText={streamingText}
-                  isStreaming={state === CHAT_STATES.AWAITING_RESPONSE}
+                  isStreaming={agentIsStreaming}
                   lastUserMessage={
-                    state === CHAT_STATES.AWAITING_RESPONSE
-                      ? lastUserMessage
-                      : null
+                    agentIsStreaming ? lastUserMessage : null
                   }
                   scrollRef={scroll.scrollRef}
                   bothSidebarsCollapsed={
@@ -1553,13 +1581,13 @@ export function ChatPage() {
             <button
               type="button"
               onClick={() => scroll.scrollToBottom('smooth')}
-              className="absolute bottom-4 right-4 sm:right-6 md:right-8 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-card/95 border border-border shadow-lg text-sm font-medium text-foreground hover:bg-violet-500/10 hover:border-violet-500/30 focus:outline-none focus:ring-2 focus:ring-violet-500/40 focus:ring-offset-2 focus:ring-offset-background transition-colors"
+              className="absolute bottom-4 right-4 sm:right-6 md:right-8 z-10 flex items-center gap-1.5 px-3 py-2 rounded-full bg-card border border-border shadow-lg text-sm font-medium text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-offset-2 focus:ring-offset-background transition-colors"
               aria-label={t('header.jumpLatest')}
             >
               <ChevronDown className="size-4 shrink-0" aria-hidden />
               <span>{t('header.latest')}</span>
               {scroll.newMessageCount > 0 && (
-                <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-500 px-1 text-[10px] font-bold text-white animate-pulse">
+                <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white animate-pulse">
                   {scroll.newMessageCount > 99 ? '99+' : scroll.newMessageCount}
                 </span>
               )}
@@ -1668,7 +1696,7 @@ export function ChatPage() {
         <Suspense
           fallback={
             <div className="flex-1 flex items-center justify-center bg-[#0d0d14]">
-              <Loader2 className="size-5 animate-spin text-violet-400 mr-2" />
+              <Loader2 className="size-5 animate-spin text-primary mr-2" />
               <span className="text-sm text-muted-foreground">
                 {t('drawer.startingTerminal')}
               </span>

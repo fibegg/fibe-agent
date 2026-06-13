@@ -13,7 +13,7 @@ export interface FileIconInfo {
   colorClass: string;
 }
 
-const FOLDER_COLOR = 'text-violet-600 dark:text-violet-400';
+const FOLDER_COLOR = 'text-primary dark:text-primary';
 const IMAGE_COLOR = 'text-pink-400';
 const CODE_COLOR = 'text-green-400';
 const JSON_COLOR = 'text-amber-500';

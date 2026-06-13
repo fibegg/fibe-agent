@@ -77,7 +77,7 @@ function StatusBar({ language, lines, isDirty, isSaving }: { language: string; l
       </div>
       <div className="flex items-center gap-2">
         {isSaving && (
-          <span className="flex items-center gap-1 text-violet-400">
+          <span className="flex items-center gap-1 text-primary">
             <Loader2 className="size-3 animate-spin" />
             {t('fileEditor.saving')}
           </span>
@@ -125,7 +125,7 @@ function FilePreviewRail({ content, onJumpToLine }: { content: string; onJumpToL
       tabIndex={0}
       onPointerDown={jumpFromPointer}
       onKeyDown={jumpFromKeyboard}
-      className="group hidden w-24 shrink-0 cursor-pointer overflow-y-auto overflow-x-hidden border-l border-border/50 bg-background/80 px-1.5 py-2 outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-violet-500/60 lg:block"
+      className="group hidden w-24 shrink-0 cursor-pointer overflow-y-auto overflow-x-hidden border-l border-border/50 bg-background/80 px-1.5 py-2 outline-none transition-colors hover:bg-muted/35 focus-visible:ring-2 focus-visible:ring-primary/60 lg:block"
     >
       <pre className="select-none whitespace-pre text-[3px] leading-[4px] text-muted-foreground/50 transition-colors group-hover:text-muted-foreground/70">
         {preview}
@@ -450,7 +450,7 @@ export function FileEditorPanel({
     ? 'min-h-10 flex-shrink-0 flex-wrap sm:flex-nowrap'
     : HEADER_FIRST_ROW;
   const logoClasses = inline
-    ? 'size-8 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-500/30 shrink-0'
+    ? 'size-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0'
     : LOGO_ICON_BOX;
 
   return (
@@ -511,7 +511,7 @@ export function FileEditorPanel({
                   <button
                     type="button"
                     onClick={() => setPreviewMode('preview')}
-                    className={`grid size-8 place-items-center ${previewMode === 'preview' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`grid size-8 place-items-center ${previewMode === 'preview' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     title={t('fileEditor.preview')}
                     aria-label={t('fileEditor.preview')}
                   >
@@ -520,7 +520,7 @@ export function FileEditorPanel({
                   <button
                     type="button"
                     onClick={() => setPreviewMode('split')}
-                    className={`grid size-8 place-items-center ${previewMode === 'split' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`grid size-8 place-items-center ${previewMode === 'split' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     title={t('fileEditor.split')}
                     aria-label={t('fileEditor.split')}
                   >
@@ -529,7 +529,7 @@ export function FileEditorPanel({
                   <button
                     type="button"
                     onClick={() => setPreviewMode('code')}
-                    className={`grid size-8 place-items-center ${previewMode === 'code' ? 'bg-violet-500/20 text-violet-300' : 'text-muted-foreground hover:text-foreground'}`}
+                    className={`grid size-8 place-items-center ${previewMode === 'code' ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'}`}
                     title={t('fileEditor.code')}
                     aria-label={t('fileEditor.code')}
                   >
@@ -543,7 +543,7 @@ export function FileEditorPanel({
                     type="button"
                     onClick={() => void handleSave()}
                     disabled={!isDirty || isSaving}
-                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${isDirty ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${isDirty ? 'text-primary hover:text-primary' : ''}`}
                     title={t('fileEditor.saveTitle')}
                   >
                     {isSaving ? (
@@ -574,7 +574,7 @@ export function FileEditorPanel({
                       setFileSearchOpen(nextSearchOpen);
                       setTimeout(() => fileSearchInputRef.current?.focus(), 0);
                     }}
-                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${fileSearchOpen ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${fileSearchOpen ? 'text-primary hover:text-primary' : ''}`}
                     title={t('fileEditor.searchTitle')}
                     aria-label={t('fileEditor.search')}
                     aria-pressed={fileSearchOpen}
@@ -586,7 +586,7 @@ export function FileEditorPanel({
                   <button
                     type="button"
                     onClick={() => setShowFilePreview((value) => !value)}
-                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${showFilePreview ? 'text-violet-400 hover:text-violet-300' : ''}`}
+                    className={`${BUTTON_GHOST_ACCENT} shrink-0 ${showFilePreview ? 'text-primary hover:text-primary' : ''}`}
                     title={t('fileEditor.filePreview')}
                     aria-label={t('fileEditor.filePreview')}
                     aria-pressed={showFilePreview}
@@ -652,7 +652,7 @@ export function FileEditorPanel({
                 <button
                   type="button"
                   onClick={() => setImageFit('fit')}
-                  className={`${BUTTON_ICON_MUTED} size-8 ${imageFit === 'fit' ? 'text-violet-300 bg-violet-500/15' : ''}`}
+                  className={`${BUTTON_ICON_MUTED} size-8 ${imageFit === 'fit' ? 'text-primary bg-primary/15' : ''}`}
                   title={t('fileEditor.fit')}
                   aria-label={t('fileEditor.fit')}
                 >
@@ -661,7 +661,7 @@ export function FileEditorPanel({
                 <button
                   type="button"
                   onClick={() => setImageFit('actual')}
-                  className={`${BUTTON_ICON_MUTED} size-8 ${imageFit === 'actual' ? 'text-violet-300 bg-violet-500/15' : ''}`}
+                  className={`${BUTTON_ICON_MUTED} size-8 ${imageFit === 'actual' ? 'text-primary bg-primary/15' : ''}`}
                   title={t('fileEditor.actualSize')}
                   aria-label={t('fileEditor.actualSize')}
                 >
@@ -723,7 +723,7 @@ export function FileEditorPanel({
                 }
               }}
               placeholder={t('fileEditor.searchPlaceholder')}
-              className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20"
+              className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground">
               {fileSearchResult ? `${fileSearchResult.current}/${fileSearchResult.total}` : ''}

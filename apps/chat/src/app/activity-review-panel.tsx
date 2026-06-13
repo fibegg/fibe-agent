@@ -218,15 +218,15 @@ function CommandGroupListRow({
         }}
         className={`${TREE_NODE_BASE} ${
           isAnySelected
-            ? 'bg-violet-400/15 text-violet-300'
-            : 'text-amber-400/80 hover:bg-violet-400/10 hover:text-violet-300'
+            ? 'bg-primary/15 text-primary'
+            : 'text-amber-400/80 hover:bg-primary/10 hover:text-primary'
         }`}
         aria-expanded={expanded}
       >
         {expanded
-          ? <ChevronDown className="size-3.5 shrink-0 text-violet-500" />
-          : <ChevronRight className="size-3.5 shrink-0 text-violet-500" />}
-        <Terminal className="size-3.5 shrink-0 text-violet-500" />
+          ? <ChevronDown className="size-3.5 shrink-0 text-primary" />
+          : <ChevronRight className="size-3.5 shrink-0 text-primary" />}
+        <Terminal className="size-3.5 shrink-0 text-primary" />
         <span className="flex-1 truncate text-left text-xs">
           {t('activity.commandsCount', { count: n })}
         </span>
@@ -241,7 +241,7 @@ function CommandGroupListRow({
               key={story.id}
               type="button"
               onClick={onSelectFirst}
-              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-violet-400/10 transition-colors"
+              className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-primary/10 transition-colors"
             >
               <span className="text-amber-400/60 shrink-0 text-[10px] font-mono select-none">$</span>
               <span className="text-[11px] font-mono text-green-300/80 truncate">
@@ -344,8 +344,8 @@ export function ActivityStoryDetailPanel({
   const t = useT();
   const isWorking = brainState === 'working';
   const isComplete = brainState === 'complete';
-  const brainColor = isWorking ? 'text-cyan-400' : isComplete ? 'text-emerald-400' : 'text-violet-400';
-  const accentColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-300' : 'text-violet-300';
+  const brainColor = isWorking ? 'text-cyan-400' : isComplete ? 'text-emerald-400' : 'text-primary';
+  const accentColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-300' : 'text-primary';
   const statColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-400' : 'text-foreground';
   const liveResponseRef = useRef<HTMLDivElement>(null);
 
@@ -387,7 +387,7 @@ export function ActivityStoryDetailPanel({
               aria-label={t('activity.copyToClipboard')}
             >
               {copyAnimating ? (
-                <span className="inline-flex items-center justify-center text-violet-400" aria-hidden>
+                <span className="inline-flex items-center justify-center text-primary" aria-hidden>
                   <Brain className="size-8 brain-download-anim" />
                 </span>
               ) : (
@@ -477,13 +477,13 @@ export function ActivityStoryDetailPanel({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
         {liveResponseText && (
-          <div ref={liveResponseRef} className="mb-4 rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm shadow-violet-500/10">
+          <div ref={liveResponseRef} className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm shadow-primary/10">
             <div className="flex items-center gap-2 shrink-0">
               <span className="relative flex size-2 shrink-0">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-violet-400 opacity-75" />
-                <span className="relative inline-flex rounded-full size-2 bg-violet-500" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex rounded-full size-2 bg-primary" />
               </span>
-              <p className="text-[10px] font-semibold text-violet-300 uppercase tracking-wide">
+              <p className="text-[10px] font-semibold text-primary uppercase tracking-wide">
                 {t('activity.latestResponse')}
               </p>
             </div>

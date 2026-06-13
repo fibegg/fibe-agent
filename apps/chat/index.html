@@ -35,7 +35,7 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     <meta name="description" content="fibe — AI-powered agent interface. Elegant, fast, and intuitive." />
-    <meta name="theme-color" content="#0d0d0d" />
+    <meta name="theme-color" content="#191c14" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="fibe — AI Agent" />
@@ -49,14 +49,21 @@
     <link rel="icon" type="image/png" href="/phoenix.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
     <script>
       (function () {
         var s = localStorage.getItem('chat-theme');
-        var dark = s === 'dark' || (s !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (s === 'winter') s = 'light';
+        if (s === 'halloween') s = 'dark';
+        var valid = s === 'light' || s === 'dark' || s === 'dracula' || s === 'midnight' || s === 'contrast';
+        var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
+        var theme = valid ? s : (prefersLight ? 'light' : 'dark');
+        try { localStorage.setItem('chat-theme', theme); } catch (_) {}
+        var dark = theme !== 'light';
+        document.documentElement.dataset.theme = theme;
         document.documentElement.classList.toggle('dark', dark);
       })();
     </script>

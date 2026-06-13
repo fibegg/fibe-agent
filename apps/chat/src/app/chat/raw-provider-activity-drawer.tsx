@@ -55,7 +55,7 @@ function JsonSection({ title, value }: { title: string; value: string }) {
 
   return (
     <section className="overflow-hidden rounded-lg border border-border/40 bg-background/45">
-      <div className="flex items-center justify-between gap-3 border-b border-border/30 px-3 py-2">
+      <div className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</h3>
         <button
           type="button"

@@ -42,12 +42,12 @@ const REASONING_MAX_HEIGHT_RATIO = 0.75;
 
 const ACTIVITY_DOT_COLOR: Record<string, string> = {
   stream_start: 'bg-blue-500',
-  reasoning: 'bg-violet-500',
+  reasoning: 'bg-primary',
   step: 'bg-zinc-500',
   tool_call: 'bg-amber-500',
   file_created: 'bg-green-500',
   task_complete: 'bg-green-500',
-  default: 'bg-violet-500',
+  default: 'bg-primary',
 };
 
 
@@ -65,12 +65,12 @@ const ACTIVITY_CIRCLE_LETTER: Record<string, string> = {
 
 const ACTIVITY_COLOR_HEX: Record<string, string> = {
   stream_start: '#3b82f6',
-  reasoning: '#8b5cf6',
+  reasoning: '#79d44e',
   step: '#71717a',
   tool_call: '#f59e0b',
   file_created: '#22c55e',
   task_complete: '#22c55e',
-  default: '#8b5cf6',
+  default: '#79d44e',
 };
 
 

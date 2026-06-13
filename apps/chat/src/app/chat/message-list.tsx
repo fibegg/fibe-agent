@@ -126,7 +126,7 @@ const USER_MESSAGE_MARKDOWN_CLASS = `${PROSE_MESSAGE} chat-user-markdown-body [&
 const COPY_SUCCESS_FEEDBACK_MS = 2000;
 
 const COPY_BUTTON_CLASS_USER =
-  'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-violet-200/90 hover:text-violet-50 hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-violet-200/50';
+  'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-white/90 hover:text-white hover:bg-white/15 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-white/50';
 const COPY_BUTTON_CLASS_ASSISTANT =
   'inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground hover:text-foreground hover:bg-muted/60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring';
 
@@ -269,7 +269,7 @@ function MessageBodyWithMentions({
           return (
             <span
               key={`${i}-${part.path}`}
-              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium bg-white/20 border border-white/30 text-violet-100 shadow-sm"
+              className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium bg-white/20 border border-white/30 text-primary shadow-sm"
               title={part.path}
             >
               <MentionChipIcon path={part.path} />
@@ -444,7 +444,7 @@ const MessageRow = memo(
         data-message-id={msg.id}
         data-message-created-at={msg.created_at}
         data-conversation-id={conversationId}
-        className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-violet-500/10 shadow-[0_0_0_2px_rgba(139,92,246,0.35)]' : ''}`}
+        className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-primary/10 shadow-[0_0_0_2px_rgba(121,212,78,0.35)]' : ''}`}
       >
         <div className="flex-shrink-0">
           {msg.role === 'user' ? (
@@ -512,11 +512,11 @@ const MessageRow = memo(
                 ) : (
                   <MessageBodyWithMentions body={msg.body} messageId={msg.id} />
                 )}
-                <div className="text-xs mt-1.5 sm:mt-2 text-violet-200 flex items-center justify-between gap-2 min-h-[1.25rem]">
+                <div className="text-xs mt-1.5 sm:mt-2 text-white/85 flex items-center justify-between gap-2 min-h-[1.25rem]">
                   <p className="flex flex-wrap items-center gap-1.5 min-w-0">
                     {formatTime(msg.created_at, locale)}
                     {(msg.queued || msg.queueStatus) && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-violet-400/20 border border-amber-400/30 text-violet-300 text-[10px] font-medium leading-none">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-white/15 border border-white/25 text-white text-[10px] font-medium leading-none">
                         {msg.queueStatus === 'next' ||
                         msg.queueStatus === 'steering' ? (
                           <CornerDownRight className="size-2.5" aria-hidden />

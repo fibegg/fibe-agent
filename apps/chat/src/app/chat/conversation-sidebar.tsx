@@ -90,14 +90,14 @@ const ConversationItem = memo(function ConversationItem({
       onClick={onSelect}
       className={`group relative flex items-start gap-2.5 rounded-lg px-3 py-2.5 cursor-pointer transition-all duration-150
         ${isActive
-          ? 'bg-violet-500/15 border border-violet-500/30 text-foreground'
+          ? 'bg-primary/15 border border-primary/30 text-foreground'
           : 'hover:bg-muted/50 border border-transparent text-muted-foreground hover:text-foreground'
         }`}
     >
       <div className="relative mt-0.5 shrink-0">
-        <MessageSquare className={`h-3.5 w-3.5 ${isActive ? 'text-violet-400' : 'text-muted-foreground/50'}`} />
+        <MessageSquare className={`h-3.5 w-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`} />
         {conv.isProcessing && (
-          <span className="absolute -right-1 -top-1 size-2 rounded-full bg-violet-400 shadow-[0_0_8px_rgba(167,139,250,0.75)]" />
+          <span className="absolute -right-1 -top-1 size-2 rounded-full bg-primary shadow-[0_0_8px_rgba(121,212,78,0.75)]" />
         )}
       </div>
       <div className="min-w-0 flex-1">
@@ -108,7 +108,7 @@ const ConversationItem = memo(function ConversationItem({
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') cancelEdit(); }}
-              className="w-full rounded bg-background/80 px-1.5 py-0.5 text-xs text-foreground outline-none ring-1 ring-violet-500/40"
+              className="w-full rounded bg-background/80 px-1.5 py-0.5 text-xs text-foreground outline-none ring-1 ring-primary/40"
               autoFocus
             />
             <button onClick={commitEdit} className="shrink-0 text-green-400 hover:text-green-300 transition-colors">
@@ -129,7 +129,7 @@ const ConversationItem = memo(function ConversationItem({
         <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden items-center gap-1 group-hover:flex">
           <button
             onClick={handleShare}
-            className="rounded p-0.5 text-muted-foreground/60 hover:text-violet-400 transition-colors"
+            className="rounded p-0.5 text-muted-foreground/60 hover:text-primary transition-colors"
             title={copied ? t('common.copied') : t('conversation.shareLink')}
             aria-label={copied ? t('common.copied') : t('conversation.shareLink')}
           >
@@ -188,11 +188,11 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Header + New Chat */}
-      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border/30 shrink-0">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-border shrink-0">
         <button
           type="button"
           onClick={() => onCollapsedChange?.(!collapsed)}
-          className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-violet-500/10 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
+          className="flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5 text-left transition-colors hover:bg-primary/10 focus:outline-none focus:ring-2 focus:ring-primary/30"
           aria-expanded={!collapsed}
           aria-label={toggleLabel}
           title={toggleLabel}
@@ -209,7 +209,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
         <button
           type="button"
           onClick={onCreate}
-          className="flex items-center gap-1 rounded-md bg-violet-500/15 border border-violet-500/25 px-2 py-1 text-[10px] font-medium text-violet-400 hover:bg-violet-500/25 transition-colors"
+          className="flex items-center gap-1 rounded-md bg-primary/15 border border-primary/25 px-2 py-1 text-[10px] font-medium text-primary hover:bg-primary/25 transition-colors"
           title={t('conversation.newChat')}
           aria-label={t('conversation.newChat')}
           id="conversation-sidebar-new-btn"
@@ -255,8 +255,8 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               </div>
             ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-3 px-4 text-center">
-                <div className="rounded-full bg-violet-500/10 border border-violet-500/20 p-3">
-                  <MessageSquare className="h-5 w-5 text-violet-400/60" />
+                <div className="rounded-full bg-primary/10 border border-primary/20 p-3">
+                  <MessageSquare className="h-5 w-5 text-primary/60" />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-foreground/70">{t('conversation.emptyTitle')}</p>
@@ -265,7 +265,7 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                 <button
                   type="button"
                   onClick={onCreate}
-                  className="flex items-center gap-1.5 rounded-md bg-violet-500/20 border border-violet-500/30 px-3 py-1.5 text-xs font-medium text-violet-400 hover:bg-violet-500/30 transition-colors"
+                  className="flex items-center gap-1.5 rounded-md bg-primary/20 border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/30 transition-colors"
                 >
                   <Plus className="h-3 w-3" />
                   {t('conversation.newConversation')}

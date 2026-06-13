@@ -161,7 +161,7 @@ These variables are consumed at **runtime** (not build time) — the frontend fe
 | `ASSISTANT_AVATAR_BASE64` | Base64-encoded SVG/PNG for the AI avatar (takes precedence over URL) |
 | `USER_AVATAR_URL` | URL for the user avatar image |
 | `USER_AVATAR_BASE64` | Base64-encoded SVG/PNG for the user avatar (takes precedence over URL) |
-| `VITE_THEME_SOURCE` | `localStorage` (default) or `frame` — drive theme from parent via `postMessage` |
+| `VITE_THEME_SOURCE` | `localStorage` (default) or `frame` — drive theme from parent via `postMessage`; `set_theme` uses canonical `light`/`dark` values, with legacy `winter`/`halloween` accepted only as normalized inputs |
 | `VITE_HIDE_THEME_SWITCH` | `1` / `true` — hide the in-app theme toggle |
 | `SIMPLICATE` | `1` / `true` — start with Simplicate switched on, using the compact chat header |
 

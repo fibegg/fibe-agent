@@ -6,7 +6,7 @@ import type { StoryEntry } from './agent-thinking-utils';
 
 const emptyStats = { totalActions: 0, completed: 0, processing: 0, sessionTimeMs: 0 };
 const filledStats = { totalActions: 10, completed: 8, processing: 1, sessionTimeMs: 5000 };
-const brainClasses = { brain: 'text-violet-400', accent: 'text-violet-300' };
+const brainClasses = { brain: 'text-primary', accent: 'text-primary' };
 
 describe('SidebarStatsBar', () => {
   beforeEach(() => {

@@ -69,10 +69,10 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
         style={{ backgroundColor: 'var(--card)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border-subtle bg-gradient-to-br from-violet-500/5 to-transparent">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border-subtle bg-gradient-to-br from-primary/5 to-transparent">
           <h3 className="text-base sm:text-lg font-semibold text-card-foreground flex items-center gap-2">
-            <span className="p-1.5 rounded-lg bg-violet-500/10 border border-violet-500/20">
-              <KeyIcon className="size-4 text-violet-400" />
+            <span className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
+              <KeyIcon className="size-4 text-primary" />
             </span>
             {t('auth.connect')}
           </h3>
@@ -88,7 +88,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
         <div className="p-4 sm:p-5 space-y-4">
           {isWaitingForUrl && (
             <div className="flex flex-col items-center gap-3 py-4 text-center">
-              <span className="size-7 border-2 border-violet-500/30 border-t-violet-400 rounded-full animate-spin" />
+              <span className="size-7 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
               <p className="text-sm font-medium text-foreground">{t('auth.waitingForUrl')}</p>
               <p className="text-xs text-muted-foreground max-w-xs">{t('auth.generatingUrl')}</p>
             </div>
@@ -139,7 +139,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                   <button
                     type="button"
                     onClick={handleCopyDeviceCode}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-violet-500/10 text-violet-400 hover:bg-violet-500/20 transition-colors"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-md text-[10px] font-medium bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
                     title={t('auth.copyDeviceCode')}
                   >
                     {copied ? `✓ ${t('common.copied')}` : t('common.copy')}
@@ -151,7 +151,7 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-violet-500/20 disabled:opacity-50`}
+                  className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-primary/20 disabled:opacity-50`}
                 >
                   {submitting ? (
                     <span className="flex items-center justify-center gap-2">

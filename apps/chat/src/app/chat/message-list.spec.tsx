@@ -582,7 +582,7 @@ describe('MessageList', () => {
 
     await waitFor(() => {
       const target = container.querySelector('[data-message-id="target"]');
-      expect(target?.className).toContain('bg-violet-500/10');
+      expect(target?.className).toContain('bg-primary/10');
     });
   });
 

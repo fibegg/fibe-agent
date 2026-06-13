@@ -113,8 +113,8 @@ describe('useThinkingSidebarData', () => {
 
   it('returns brain idle classes when not streaming and no recent activity', () => {
     const { result } = renderHook(() => useThinkingSidebarData(baseProps));
-    expect(result.current.brainClasses.brain).toBe('text-violet-400');
-    expect(result.current.brainClasses.accent).toBe('text-violet-300');
+    expect(result.current.brainClasses.brain).toBe('text-primary');
+    expect(result.current.brainClasses.accent).toBe('text-primary');
   });
 
   it('returns brain working classes when streaming', () => {

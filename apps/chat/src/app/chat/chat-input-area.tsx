@@ -129,7 +129,7 @@ export function ChatInputArea({
 
   return (
     <div
-      className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border/30 bg-card/30 backdrop-blur-sm"
+      className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-card/30 backdrop-blur-sm"
       style={{
         paddingBottom:
           'max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px)))',
@@ -223,16 +223,16 @@ export function ChatInputArea({
           </div>
         )}
         {isWorking && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-violet-500/20 bg-violet-500/[0.07] px-3 py-2 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/20 bg-primary/[0.07] px-3 py-2 text-xs">
             <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-violet-500/15 text-violet-300">
+              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                 <Timer className="size-3" aria-hidden />
               </span>
               <span className="min-w-0 truncate">
                 {t('chat.input.agentWorking')}
               </span>
               <span
-                className="shrink-0 font-mono tabular-nums text-violet-200"
+                className="shrink-0 font-mono tabular-nums text-primary"
                 title={t('chat.input.workingTime')}
               >
                 {formatSessionDurationMs(workingElapsedMs)}
@@ -252,7 +252,7 @@ export function ChatInputArea({
             </div>
           </div>
         )}
-        <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border/60 p-2 sm:p-3 shadow-xl shadow-violet-500/[0.04] transition-shadow duration-300 focus-within:shadow-violet-500/[0.08]">
+        <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border/60 p-2 sm:p-3 shadow-xl shadow-primary/[0.04] transition-shadow duration-300 focus-within:shadow-primary/[0.08]">
           <input
             ref={fileInputRef}
             type="file"
@@ -265,7 +265,7 @@ export function ChatInputArea({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             disabled={!canAttach}
-            className="size-8 sm:size-9 rounded-md flex items-center justify-center text-violet-400 hover:text-violet-500 hover:bg-violet-500/10 transition-colors shrink-0 disabled:opacity-50"
+            className="size-8 sm:size-9 rounded-md flex items-center justify-center text-primary hover:text-primary hover:bg-primary/10 transition-colors shrink-0 disabled:opacity-50"
             title={t('chat.input.attachFiles')}
             aria-label={t('chat.input.attachFiles')}
           >
@@ -316,7 +316,7 @@ export function ChatInputArea({
               className={`rounded-md flex items-center justify-center transition-colors shrink-0 ${
                 voiceRecorder.isRecording
                   ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-white'
-                  : 'size-8 sm:size-9 text-violet-400 hover:text-violet-500 hover:bg-violet-500/10'
+                  : 'size-8 sm:size-9 text-primary hover:text-primary hover:bg-primary/10'
               }`}
               title={
                 voiceRecorder.isRecording
@@ -354,7 +354,7 @@ export function ChatInputArea({
                   onRequestInputFocus();
                 }}
                 disabled={!inputValue.trim()}
-                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 bg-gradient-to-r from-violet-600 to-purple-600 px-2.5 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-30 transition-opacity"
+                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 bg-gradient-to-r from-primary to-secondary px-2.5 hover:from-primary hover:to-secondary text-white disabled:opacity-30 transition-opacity"
                 aria-label={t('chat.input.queueMessage')}
                 title={t('chat.input.queueMessageTitle')}
               >
@@ -371,7 +371,7 @@ export function ChatInputArea({
                   onRequestInputFocus();
                 }}
                 disabled={!inputValue.trim()}
-                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 border border-violet-500/40 bg-violet-500/10 px-2.5 hover:bg-violet-500/20 text-violet-300 disabled:opacity-30 transition-opacity"
+                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 border border-primary/40 bg-primary/10 px-2.5 hover:bg-primary/20 text-primary disabled:opacity-30 transition-opacity"
                 aria-label={t(
                   steerIsLive
                     ? 'chat.input.steerMessage'
@@ -410,7 +410,7 @@ export function ChatInputArea({
                 onRequestInputFocus();
               }}
               disabled={!isReady}
-              className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
+              className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
               aria-label={t('chat.input.send')}
             >
               <Send className="size-3.5 sm:size-4" />
