@@ -2,7 +2,8 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { Controller, Get, Param, Post, Query, Req, Res, UseGuards } from '@nestjs/common';
 import { createReadStream } from 'node:fs';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
-import { contentTypeFromFilename, processUploadFile, type MultipartFileResult } from './uploads-handler';
+import { contentTypeFromFilename, processUploadFile } from './uploads-handler';
+import { readMultipartUploadFile } from './uploads-request';
 import { UploadsService } from './uploads.service';
 
 @Controller('uploads')
@@ -31,7 +32,7 @@ export class UploadsController {
     @Req() req: FastifyRequest,
     @Query('conversationId') conversationId?: string,
   ): Promise<{ filename: string }> {
-    const data = await (req as unknown as { file: () => Promise<MultipartFileResult> }).file();
+    const data = await readMultipartUploadFile(req);
     return processUploadFile(data, (buffer, mimetype) =>
       this.uploads.saveFileFromBuffer(buffer, mimetype, conversationId)
     );
