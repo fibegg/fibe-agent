@@ -95,50 +95,48 @@ Every provider implements `AgentStrategy` from `strategy.types.ts`:
 | `executePromptStreaming(prompt, model, onChunk, callbacks?, systemPrompt?, runtimeOptions?)` | ✓ | Stream a response; call `onChunk` per text chunk |
 | `ensureSettings?()` | optional | Write provider config files before first run |
 | `getWorkingDir?()` | optional | Working directory override for the CLI process |
+| `prepareWorkingDir?()` | optional | Prepare or sync the provider working directory before a run |
 | `getModelArgs?(model)` | optional | Translate a model name to CLI args |
 | `listModels?()` | optional | Return available model names |
 | `interruptAgent?()` | optional | Kill the running CLI process |
+| `steerAgent?(message)` | optional | Natively steer or queue a message while the provider is busy |
+| `hasNativeSessionSupport?()` | optional | Report whether the provider can resume a native conversation/session |
 
 ---
 
 ## Environment variables
 
-Copy `.env.example` to `.env` before starting.
+Use [`fibe.example.yml`](fibe.example.yml) as the complete settings reference. `.env.example` is still useful for local process env and `FIBE_SETTINGS_JSON`, but settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `marqueeRoot`, and `postInitScript` are read from `fibe.yml` / `FIBE_SETTINGS_JSON` and then promoted to env for child processes.
 
 ### API (`apps/api`)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | API listen port |
-| `AGENT_PROVIDER` | `gemini` | Active provider: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
-| `AGENT_AUTH_MODE` | `oauth` | `oauth` — interactive browser/device flow; `api-token` — env-var key only |
-| `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` or `?token=<password>` |
-| `MODEL_OPTIONS` | — | Comma-separated model names shown in the selector (e.g. `flash-lite,flash,pro`) |
-| `DEFAULT_MODEL` | first in `MODEL_OPTIONS` | Pre-selected model on startup |
-| `CLAUDE_EFFORT` | `max` | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`) |
-| `DATA_DIR` | `./data` | Base data directory for persistence |
-| `FIBE_AGENT_ID` | — | Conversation id set by Fibe; data stored at `DATA_DIR/<id>/` |
-| `CONVERSATION_ID` | — | Fallback conversation id for non-Fibe multi-conversation use |
-| `SYSTEM_PROMPT` | — | Inline system prompt (overrides file) |
-| `SYSTEM_PROMPT_PATH` | `dist/assets/SYSTEM_PROMPT.md` | Path to a custom system prompt file |
-| `PLAYGROUNDS_DIR` | `./playground` | Root for the file explorer and shell sessions |
-| `MARQUEE_ROOT` | `/opt/fibe` | Root directory for Marquee local data; the playground selector reads its `playgrounds` subdirectory |
-| `POST_INIT_SCRIPT` | — | Shell script run once on first boot; state at `GET /api/init-status` |
-| `SESSION_DIR` | — | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) |
-| `AGENT_CREDENTIALS_JSON` | — | JSON map of credential file names to content, injected at startup |
-| `ENCRYPTION_KEY` | — | Optional 32-char key for AES-256-GCM data-at-rest encryption |
-| `FIBE_API_KEY` | — | Fibe platform API key for sync |
-| `FIBE_SYNC_ENABLED` | — | Set to `true` to enable Fibe platform sync |
-| `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins (use `*` for open/iframe use) |
-| `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` — restrict in production |
-| `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
-| `MCP_CONFIG_JSON` | — | JSON object `{ mcpServers: { "<name>": { serverUrl?, authHeader?, bearerTokenEnvVar?, command?, args?, env? } } }` — stdio/HTTP MCP servers injected into provider config at startup. In Fibe deployments this always includes the canonical built-in Fibe MCP entry `fibe mcp serve --yolo` with `FIBE_API_KEY` and `FIBE_DOMAIN`. Keep that built-in Fibe server unique per environment; avoid exposing duplicate Fibe MCPs over multiple transports to the same agent. |
-| `DOCKER_MCP_CONFIG_JSON` | — | Same format as `MCP_CONFIG_JSON`; merged with it. Typically carries Docker-specific MCP servers (e.g. docker MCP toolkit) |
-| `GEMMA_ROUTER_ENABLED` | `false` | Enable the local Gemma intent router via Ollama (`true`/`false`) |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint for the Gemma router |
-| `GEMMA_MODEL` | `gemma3:4b` | Ollama model name for intent classification |
-| `GEMMA_CONFIDENCE_THRESHOLD` | `0.80` | Minimum confidence score (0–1) for injecting a tool hint into the prompt |
-| `GEMMA_TIMEOUT_MS` | `30000` | Per-request timeout (ms) for Ollama calls. Allow 30s+ — `gemma3:4b` may need time to load into VRAM on first request |
+| Name | Default | Source | Description |
+|------|---------|--------|-------------|
+| `PORT` | `3000` | env | API listen port |
+| `AGENT_PROVIDER` / `agentProvider` | `claude-code` | env or setting | Active provider: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
+| `AGENT_AUTH_MODE` / `agentAuthMode` | `oauth` | env or setting | `oauth` browser/device flow, or `api-token` env-key mode |
+| `agentPassword` | — | setting | Enables `/api` and `/ws` bearer-token auth; promoted to `AGENT_PASSWORD` for child processes |
+| `modelOptions` | — | setting | Model names shown in the selector, as a comma-separated string or YAML/JSON list |
+| `defaultModel` | first `modelOptions` entry | setting | Pre-selected model on startup |
+| `claudeEffort` / `CLAUDE_EFFORT` | `max` | setting or env | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`) |
+| `dataDir` | `<cwd>/data` | setting | Base data directory for persistence |
+| `FIBE_AGENT_ID` | — | env | Default conversation storage id set by Fibe |
+| `CONVERSATION_ID` | — | env | Fallback default conversation storage id |
+| `systemPrompt` | bundled prompt | setting | Inline system prompt content. If unset, `dist/assets/SYSTEM_PROMPT.md` is loaded. |
+| `PLAYGROUNDS_DIR` | `./playground` | env | Root for the file explorer and shell sessions |
+| `marqueeRoot` | `/opt/fibe` | setting | Root directory for Marquee local data; the Fibe CLI receives its `playgrounds` subdirectory |
+| `postInitScript` | — | setting | Shell script run once on first boot; state at `GET /api/init-status` |
+| `SESSION_DIR` / `sessionDir` | provider default | env or setting | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) |
+| `AGENT_CREDENTIALS_JSON` / `agentCredentials` | — | env or setting | JSON map of credential file names to content, injected at startup |
+| `encryptionKey` | — | setting | Optional key for AES-256-GCM data-at-rest encryption |
+| `FIBE_API_KEY` | — | env | Fibe platform API key for sync |
+| `fibeSyncEnabled` / `FIBE_SYNC_ENABLED` | `false` | setting or env | Enable Fibe platform sync |
+| `CORS_ORIGINS` | `localhost:3100,localhost:4300` | env | Comma-separated allowed CORS origins |
+| `FRAME_ANCESTORS` | `*` | env | CSP `frame-ancestors`; restrict in production |
+| `LOG_LEVEL` | `info` | env | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
+| `MCP_CONFIG_JSON` / `mcpConfig` | — | env or setting | Stdio/HTTP MCP servers injected into provider config. Fibe deployments include the canonical local `fibe mcp serve --tools core --yolo` entry with `FIBE_API_KEY` and `FIBE_DOMAIN`; keep it unique per environment. |
+| `DOCKER_MCP_CONFIG_JSON` | — | env | Additional Docker-specific MCP servers merged with `MCP_CONFIG_JSON` |
+| `gemmaRouterEnabled`, `ollamaUrl`, `gemmaModel`, `gemmaConfidenceThreshold`, `gemmaTimeoutMs` | see `fibe.example.yml` | setting or env | Optional local Gemma intent router via Ollama |
 
 ### Provider API keys (`AGENT_AUTH_MODE=api-token`)
 
@@ -147,7 +145,8 @@ Copy `.env.example` to `.env` before starting.
 | Gemini | `GEMINI_API_KEY` |
 | Claude Code | `ANTHROPIC_API_KEY`, `CLAUDE_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` |
 | OpenAI Codex | `OPENAI_API_KEY` |
-| OpenCode | `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, or `DEEPSEEK_API_KEY` |
+| Cursor | `CURSOR_API_KEY` |
+| OpenCode | `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GOOGLE_API_KEY`, or `DEEPSEEK_API_KEY` |
 
 ### Chat app (`apps/chat`, served via `GET /api/runtime-config`)
 
@@ -253,30 +252,36 @@ When `AGENT_AUTH_MODE=api-token`:
 
 ## Conversation context & persistence
 
-All agent state (messages, activities, model/effort choice, uploads, steering, init-status, and provider session dirs) is scoped by a **conversation id**:
+All agent state (messages, activities, uploads, init-status, and provider session markers) is scoped by a **conversation id**. Model and effort are global agent settings unless changed through the runtime stores.
 
 | Env var | Description |
 |---------|-------------|
 | `FIBE_AGENT_ID` | Primary: set by Fibe when attaching a stored agent |
 | `CONVERSATION_ID` | Fallback for non-Fibe multi-conversation setups |
 
-When neither is set the conversation id is `default` and data lands directly in `DATA_DIR/`.
+When neither is set the default storage id is `default`, so the default conversation data lands under `dataDir/default/`.
 
-When set, each conversation gets its own subdirectory:
+The legacy/default conversation stores state under `ConfigService.getConversationDataDir()`, which resolves to `dataDir/<FIBE_AGENT_ID or CONVERSATION_ID or default>/`. User-created conversations are tracked separately under `dataDir/conversations/<id>/`:
 
 ```
-DATA_DIR/
-└── <conversation-id>/
-    ├── messages.json
-    ├── activity.json
-    ├── model.json
-    ├── effort.json
-    ├── uploads/
-    ├── steering/
-    └── init-status/
+dataDir/
+├── <default-storage-id>/
+│   ├── messages.json
+│   ├── activity.json
+│   ├── model.json
+│   ├── effort.json
+│   ├── uploads/
+│   └── init-status/
+└── conversations/
+    ├── index.json
+    └── <conversation-id>/
+        ├── messages.json
+        ├── activity.json
+        ├── uploads/
+        └── provider session marker files
 ```
 
-Provider sessions (e.g. `--continue` for Claude, `--resume` for Gemini, Codex/OpenCode session dirs) are also scoped so the same agent id always resumes the same conversation after restarts.
+Provider workspaces are shared from the default conversation data dir where supported, while provider session marker files are conversation-scoped so each Fibe conversation can resume its native provider thread.
 
 ---
 
@@ -288,7 +293,9 @@ The agent framework supports **Native Interrupt Steering**. Instead of relying o
 
 ## Prompts
 
-All system prompts are stored under the [`prompts/`](prompts/) directory — the single source of truth for what the AI agent is told at the start of every session.
+The runtime system prompt comes from the Fibe setting `systemPrompt` in `fibe.yml` / `FIBE_SETTINGS_JSON`, or from the bundled `dist/assets/SYSTEM_PROMPT.md` fallback. The [`prompts/`](prompts/) directory is an authoring/reference library for prompt variants; it is not loaded by setting a prompt path env var.
+
+Prompt content for Rails-managed Fibe runtimes is owned by Fibe/Rails and passed in through `systemPrompt`; git prompt files in this repository are not the runtime source of truth. Provider strategies intentionally run in full-allowed modes where applicable, so safety policy is runtime/provider configuration plus the injected prompt, not enforcement from these reference prompt files.
 
 ### Directory layout
 
@@ -310,21 +317,20 @@ prompts/
 
 The `OrchestratorService` resolves the active system prompt in this priority order:
 
-1. **`SYSTEM_PROMPT` env var** — inline string; highest priority, overrides everything.
-2. **`SYSTEM_PROMPT_PATH` env var** — path to a `.md` file; loaded once at startup.
-3. **Built-in fallback** — `dist/assets/SYSTEM_PROMPT.md` bundled into the Docker image.
+1. **`systemPrompt` Fibe setting** - inline prompt content from `fibe.yml` or `FIBE_SETTINGS_JSON`.
+2. **Built-in fallback** - `dist/assets/SYSTEM_PROMPT.md` bundled into the Docker image.
 
 ### Wiring a prompt
 
+```yaml
+# fibe.yml
+systemPrompt: |
+  You are a TypeScript expert.
+  Work only in src/.
+```
+
 ```sh
-# Use the provider-agnostic base prompt (recommended default)
-SYSTEM_PROMPT_PATH=./prompts/base/code-playground.md
-
-# Use a provider-tuned prompt
-SYSTEM_PROMPT_PATH=./prompts/providers/gemini.md
-
-# Inline override (takes precedence over SYSTEM_PROMPT_PATH)
-SYSTEM_PROMPT="You are a TypeScript expert. Work only in src/."
+FIBE_SETTINGS_JSON='{"systemPrompt":"You are a TypeScript expert. Work only in src/."}'
 ```
 
 ### Provider-specific prompts
@@ -335,8 +341,8 @@ Each file in `prompts/providers/` extends the base code-playground behaviour wit
 |------|----------|------------------|
 | `providers/gemini.md` | `gemini` | `--yolo` mode, `--resume` sessions, output-length advice |
 | `providers/antigravity.md` | `antigravity` | `agy --prompt=<text>` headless mode, `--conversation` sessions, OAuth code flow |
-| `providers/claude-code.md` | `claude-code` | Native file-edit tools, `--continue` sessions, extended thinking |
-| `providers/openai-codex.md` | `openai-codex` | Sandbox approval policy, full-file writes, o-series reasoning |
+| `providers/claude-code.md` | `claude-code` | Native file-edit tools, SDK resume sessions, extended thinking |
+| `providers/openai-codex.md` | `openai-codex` | Codex execution transport notes, full-file writes, o-series reasoning |
 | `providers/cursor.md` | `cursor` | `cursor-agent --print --output-format stream-json --force`, API-key auth |
 | `providers/opencode.md` | `opencode` | API auto-detection, MCP tool usage, monorepo commands |
 
@@ -390,16 +396,18 @@ Chat UI (QuestionCard / ConfirmCard)
 
 ## WebSocket protocol (`/ws`)
 
-**URL:** `ws://localhost:3000/ws` (or `wss://` in production)  
-**Auth:** `?token=<password>` when `AGENT_PASSWORD` is set  
-**Session:** single-active-session — a new connection displaces the existing one with close code `4002`
+**URL:** `ws://localhost:3000/ws` (or `wss://` in production)
+**Auth:** `?token=<password>` when `agentPassword` is configured
+**Conversation:** `conversation_id` or `c` query param binds the session to a conversation; default is `default`
+**Session:** multi-session up to `websocketMaxConnections` / `WEBSOCKET_MAX_CONNECTIONS` (default `5`); at the cap, the oldest connected client is evicted with close code `4002`
 
 **Close codes:**
 
 | Code | Meaning |
 |------|---------|
 | `4001` | Unauthorized (wrong or missing token) |
-| `4002` | Session taken over by another client |
+| `4002` | Oldest session evicted because the connection cap was reached |
+| `4004` | Unknown `conversation_id` |
 
 ### Client → Server
 
@@ -432,6 +440,8 @@ All messages are JSON objects with a `type` field.
 | `type` | Extra fields | Description |
 |--------|-------------|-------------|
 | `auth_status` | `status`, `isProcessing` | `authenticated` \| `unauthenticated` |
+| `conversation_id` | `conversationId` | Conversation id for this session, sent immediately after connect |
+| `sessions_updated` | `count` | Current connected chat WebSocket count |
 | `auth_url_generated` | `url` | OAuth URL to open |
 | `auth_device_code` | `code` | Device code to display to user |
 | `auth_manual_token` | — | Prompt user to paste a token (Claude) |
@@ -453,7 +463,6 @@ All messages are JSON objects with a `type` field.
 | `activity_appended` | `entry` | New activity added |
 | `activity_updated` | `entry` | Existing activity updated |
 | `playground_changed` | — | Playground directory changed |
-| `queue_updated` | `count` | Number of queued messages |
 | `model_updated` | `model` | Current model name changed |
 | `effort_updated` | `effort` | Current Claude effort changed |
 | `agent_mode_updated` | `mode` | Current agent mode display string (e.g. `Exploring...`) |
@@ -488,13 +497,12 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 
 ## REST API
 
-**Base URL:** `http://localhost:3000/api`  
-**Auth:** `Authorization: Bearer <password>` or `?token=<password>` when `AGENT_PASSWORD` is set.  
+**Base URL:** `http://localhost:3000/api`
+**Auth:** `Authorization: Bearer <password>` or `?token=<password>` when `agentPassword` is configured.
 **Rate limit:** 100 requests per minute per client.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api` | No | `{ message: 'Hello API' }` |
 | `GET` | `/api/health` | No | `{ status: 'ok' }` — readiness / liveness probe |
 | `POST` | `/api/auth/login` | No | `{ password? }` → `{ success, token? }` |
 | `GET` | `/api/messages` | Bearer | Full message history |
@@ -503,18 +511,38 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `GET` | `/api/activities/:activityId/:storyId` | Bearer | Deep link to a story entry |
 | `GET` | `/api/activities/by-entry/:entryId` | Bearer | Activity containing a story entry |
 | `GET` | `/api/model-options` | Bearer | Available model names array |
+| `POST` | `/api/model-options/refresh` | Bearer | Configured models plus provider-discovered models |
 | `GET` | `/api/playgrounds` | Bearer | Playground file tree |
 | `GET` | `/api/playgrounds/file?path=…` | Bearer | Read a playground file → `{ content }` |
 | `PUT` | `/api/playgrounds/file` | Bearer | `{ path, content }` — save a playground file → `{ ok }` |
 | `GET` | `/api/playgrounds/stats` | Bearer | Playground directory stats |
-| `GET` | `/api/playrooms/browse?path=…` | Bearer | Browse local playgrounds under `MARQUEE_ROOT` |
-| `POST` | `/api/playrooms/link` | Bearer | `{ path }` — symlink a playroom as `./playground` → `{ ok, linkedPath }` |
-| `GET` | `/api/playrooms/current` | Bearer | Current linked playroom path → `{ current }` |
+| `GET` | `/api/playrooms/browse?path=…` | Bearer | Flat local playground names from `fibe --output json local playgrounds info --view names`; non-empty `path` returns `[]` |
+| `POST` | `/api/playrooms/link` | Bearer | `{ path }` — delegates linking to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>` |
+| `GET` | `/api/playrooms/current` | Bearer | Current `.current_playground` value → `{ current }` |
 | `GET` | `/api/agent-files` | Bearer | Agent-generated file tree |
 | `GET` | `/api/agent-files/file?path=…` | Bearer | Read an agent-generated file |
 | `POST` | `/api/uploads` | Bearer | Upload file (multipart, ≤ 20 MB) → `{ filename }` |
 | `GET` | `/api/uploads/:filename` | Bearer | Serve an uploaded file |
-| `POST` | `/api/agent/send-message` | Bearer | `{ text, images?, attachmentFilenames? }` → `202 { accepted, messageId }` |
+| `GET` | `/api/agent/status` | Bearer | Auth, processing, queue count, and last error for the default conversation |
+| `POST` | `/api/agent/send-message` | Bearer | `{ text, images?, attachmentFilenames?, conversationId?, busyPolicy? }` → `202 { accepted, messageId, conversationId?, resolvedPolicy? }` |
+| `POST` | `/api/agent/interrupt` | Bearer | Interrupt the active provider turn |
+| `DELETE` | `/api/agent/queue/:turnId` | Bearer | Remove a queued turn |
+| `PATCH` | `/api/agent/queue/:turnId` | Bearer | Update queued turn text/policy |
+| `POST` | `/api/agent/queue/reorder` | Bearer | Reorder queued turns |
+| `GET` | `/api/conversations` | Bearer | List visible conversations |
+| `POST` | `/api/conversations` | Bearer | Create or upsert a conversation |
+| `PATCH` | `/api/conversations/:id` | Bearer | Update conversation metadata |
+| `PATCH` | `/api/conversations/:id/title` | Bearer | Rename a conversation |
+| `DELETE` | `/api/conversations/:id` | Bearer | Delete a user-created conversation |
+| `GET` | `/api/conversations/:id/messages` | Bearer | Messages for one conversation |
+| `GET` | `/api/conversations/:id/activities` | Bearer | Activity log for one conversation |
+| `GET` | `/api/conversations/:id/live` | Bearer | Non-durable live state for one conversation |
+| `GET` | `/api/conversations/:id/provider-traffic` | Bearer | Raw provider traffic for one conversation |
+| `POST` | `/api/conversations/:id/agent/send-message` | Bearer | Send a turn to a specific conversation |
+| `POST` | `/api/conversations/:id/agent/interrupt` | Bearer | Interrupt a specific conversation |
+| `DELETE` | `/api/conversations/:id/queue/:turnId` | Bearer | Remove a queued turn for one conversation |
+| `PATCH` | `/api/conversations/:id/queue/:turnId` | Bearer | Update a queued turn for one conversation |
+| `POST` | `/api/conversations/:id/queue/reorder` | Bearer | Reorder one conversation's queue |
 | `GET` | `/api/init-status` | Bearer | Post-init script state |
 | `GET` | `/api/data-privacy/export` | Bearer | Export conversation data as JSON |
 | `DELETE` | `/api/data-privacy` | Bearer | Permanently delete conversation data |
@@ -523,7 +551,7 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `POST` | `/api/agent-mode` | Bearer | `{ mode }` — set mode by key or display string → `{ success, mode }`. Valid keys: `exploring`, `casting`, `overseeing`, `build`. Returns 400 for unknown values. |
 | `POST` | `/api/local-tool-call` | Bearer | Internal loopback endpoint called by the local MCP stdio child process. Forwards tool calls (`ask_user`, `confirm_action`, etc.) to `LocalMcpService`. Not intended for external callers. |
 
-**`POST /api/agent/send-message`** is designed for webhooks and integrations (e.g. Sentry). It returns `400` (empty text), `403` (need auth), or `409` (agent busy).
+**`POST /api/agent/send-message`** is designed for webhooks and integrations (e.g. Sentry). It returns `400` (empty text), `403` (need auth), `404` (unknown conversation), or `409` (agent busy / busy policy rejected).
 
 **`PUT /api/playgrounds/file`** is used by the CodeMirror editor to persist file edits without leaving the chat UI.
 
@@ -531,7 +559,7 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 
 ## Docker images
 
-CI publishes multi-arch (`linux/amd64`, `linux/arm64`) images to GHCR on every push to `main` or `dev`:
+The root Compose CI pipeline publishes multi-arch (`linux/amd64`, `linux/arm64`) images to GHCR when its `ci-build-<provider>` services run:
 
 ```
 ghcr.io/<owner>/fibe-agent:gemini-latest
@@ -714,4 +742,4 @@ flowchart LR
 3. **Update the Dockerfile** — add an `elif` branch to install your CLI in the `cli` and final stages; add a session directory `mkdir` in the final stage.
 4. **Document provider keys** in `.env.example` and add them to the table in this file.
 5. **Write tests** — add `<name>.strategy.test.ts` with the same coverage pattern as the existing strategies.
-6. **Add a CI matrix entry** in `.github/workflows/ci.yml` under `strategy.matrix.provider`.
+6. **Add a provider build service** to the root Compose CI file [`ci.yml`](ci.yml), following the existing `ci-build-<provider>` service pattern. The GitHub Actions workflow is currently disabled as `.github/workflows/ci.yml.disabled`.

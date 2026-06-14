@@ -21,9 +21,8 @@ The short version:
 : A Fibe-owned thread. This is what the UI lists and switches between.
 
 `default`
-: The first normal user conversation. It uses the legacy root conversation data
-  directory for backward compatibility. It is visible, writable, and
-  non-deletable.
+: The first normal user conversation. It uses `DATA_DIR/default` for
+  conversation-scoped state. It is visible, writable, and non-deletable.
 
 `inbox`
 : The system conversation. It is the target for API/system sends when no
@@ -58,7 +57,7 @@ Current IDs:
 
 | Conversation | ID | Storage | UI | Delete |
 | --- | --- | --- | --- | --- |
-| Default | `default` | legacy root conversation data dir | visible, writable | no |
+| Default | `default` | `DATA_DIR/default` | visible, writable | no |
 | Inbox | `inbox` | `DATA_DIR/conversations/inbox` | hidden while empty, read-only | no |
 | User-created | UUID | `DATA_DIR/conversations/<uuid>` | visible, writable | yes |
 
@@ -157,7 +156,12 @@ DELETE /api/conversations/:id
 GET    /api/conversations/:id/messages
 GET    /api/conversations/:id/activities
 GET    /api/conversations/:id/provider-traffic
+GET    /api/conversations/:id/live
 POST   /api/conversations/:id/agent/send-message
+POST   /api/conversations/:id/agent/interrupt
+DELETE /api/conversations/:id/queue/:turnId
+PATCH  /api/conversations/:id/queue/:turnId
+POST   /api/conversations/:id/queue/reorder
 ```
 
 Flat legacy/system send:
@@ -876,7 +880,7 @@ DATA_DIR/conversations/index.json
 Default conversation data:
 
 ```text
-DATA_DIR/
+DATA_DIR/default/
 ```
 
 Inbox data:
@@ -894,7 +898,11 @@ DATA_DIR/conversations/<uuid>/
 Provider markers:
 
 ```text
-DATA_DIR/.claude_session
+DATA_DIR/default/.claude_session
+DATA_DIR/default/.codex_session
+DATA_DIR/default/.opencode_session
+DATA_DIR/default/.gemini_session
+DATA_DIR/default/.antigravity_session
 DATA_DIR/conversations/<uuid>/.claude_session
 DATA_DIR/conversations/<uuid>/.codex_session
 DATA_DIR/conversations/<uuid>/.opencode_session

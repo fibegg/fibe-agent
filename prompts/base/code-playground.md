@@ -4,7 +4,7 @@
   use-case:  code-playground (provider-agnostic)
   purpose:   Drive an AI coding agent inside a fibe-agent session to analyze
              repositories in the playground directory and implement changes.
-  wiring:    SYSTEM_PROMPT_PATH=./prompts/base/code-playground.md
+  wiring:    reference only; runtime prompt comes from fibe.yml systemPrompt / FIBE_SETTINGS_JSON
 -->
 
 You are an expert software engineer operating inside a **code playground** environment managed by fibe-agent.

@@ -9,7 +9,6 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/fibegg/fibe-agent/actions/workflows/ci.yml"><img src="https://github.com/fibegg/fibe-agent/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
   <img src="https://img.shields.io/github/package-json/v/fibegg/fibe-agent" alt="Version" />
   <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage 100%" />
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.3.11-000?logo=bun&logoColor=white" alt="Bun" /></a>
@@ -46,7 +45,7 @@
 | **`@`-mention files** | Type `@` in the chat input to reference playground files; the API injects their contents into the agent prompt. |
 | **Conversation persistence** | Messages, activities, model/effort choice, uploads, and provider session state scoped by conversation id (`FIBE_AGENT_ID` / `CONVERSATION_ID`). |
 | **Fibe integration** | `FibeSyncService`, `postMessage` auto-auth, and iframe embed support with parent-controlled theming. |
-| **Security** | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), JWT-style bearer token auth, multipart validation. |
+| **Security** | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), shared-password bearer token auth, multipart validation. |
 | **Structured logging** | One JSON object per line to stdout; request IDs, HTTP and WebSocket context, configurable via `LOG_LEVEL`. |
 | **100% unit coverage** | Every module has co-located spec files; Playwright e2e for API and Chat. |
 | **Docker** | Multi-arch (`linux/amd64`, `linux/arm64`) images published to GHCR per provider on every push to `main` / `dev`. |
@@ -121,7 +120,7 @@ AGENT_PROVIDER=mock bunx nx serve api
 API_URL=http://localhost:3000 bunx nx serve chat
 ```
 
-**Password-protected?** Set `AGENT_PASSWORD` and sign in from the chat UI before sending messages.
+**Password-protected?** Configure `agentPassword` in `fibe.yml` or `FIBE_SETTINGS_JSON`, then sign in from the chat UI before sending messages. A bare `AGENT_PASSWORD` env var alone does not enable API/WebSocket auth.
 
 When the container is launched by Fibe, it receives a mandatory built-in Fibe MCP definition through `MCP_CONFIG_JSON`. That canonical entry is intentionally local stdio (`fibe mcp serve --yolo`) and is parameterized with `FIBE_API_KEY` and `FIBE_DOMAIN`, so the shipped `fibe` binary inside the container and the MCP surface stay aligned without needing a separate daemon. Additional remote MCP servers can be layered on top per provider, but Fibe should be exposed only once per environment to avoid duplicate tool surfaces.
 
@@ -173,38 +172,33 @@ fibe-agent/
 
 ## Environment
 
-Copy `.env.example` to `.env` and fill in the relevant keys.
+Use [`fibe.example.yml`](fibe.example.yml) as the complete settings reference. Local `.env` files are still useful for true process env inputs and for `FIBE_SETTINGS_JSON`, but settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `marqueeRoot`, and `postInitScript` are read from `fibe.yml` / `FIBE_SETTINGS_JSON` and then promoted to env for child processes.
 
 ### API
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3000` | API listen port |
-| `AGENT_PROVIDER` | `gemini` | Active agent: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
-| `AGENT_AUTH_MODE` | `oauth` | `oauth` — interactive browser/device flow; `api-token` — env-var key only |
-| `AGENT_PASSWORD` | — | When set, all `/api` and `/ws` endpoints require `Authorization: Bearer <password>` |
-| `MODEL_OPTIONS` | — | Comma-separated model names shown in the model selector (e.g. `flash-lite,flash,pro`) |
-| `DEFAULT_MODEL` | first in `MODEL_OPTIONS` | Pre-selected model |
-| `CLAUDE_EFFORT` | `max` | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`) |
-| `DATA_DIR` | `./data` | Base data directory |
-| `FIBE_AGENT_ID` | — | Conversation id (set by Fibe); data stored at `DATA_DIR/<id>/` |
-| `CONVERSATION_ID` | — | Fallback conversation id for non-Fibe multi-conversation setups |
-| `SYSTEM_PROMPT_PATH` | built-in | Path to custom system prompt file |
-| `SYSTEM_PROMPT` | — | Inline system prompt (overrides file) |
-| `PLAYGROUNDS_DIR` | `./playground` | Root for the file explorer and shell sessions |
-| `POST_INIT_SCRIPT` | — | Shell script run once on first boot; state exposed at `/api/init-status` |
-| `SESSION_DIR` | — | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) for credential injection |
-| `AGENT_CREDENTIALS_JSON` | — | JSON object of credential files injected at startup (set by Fibe) |
-| `FIBE_API_KEY` | — | Fibe platform API key for sync |
-| `FIBE_SYNC_ENABLED` | — | Set to `true` to enable Fibe sync |
-| `CORS_ORIGINS` | `localhost:3100,localhost:4300` | Comma-separated allowed CORS origins |
-| `FRAME_ANCESTORS` | `*` | CSP `frame-ancestors` (restrict in production) |
-| `LOG_LEVEL` | `info` | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
-| `GEMMA_ROUTER_ENABLED` | `false` | Enable local LLM MCP routing via Ollama (`true`/`false`) |
-| `OLLAMA_URL` | `http://localhost:11434` | Ollama API endpoint for the Gemma router |
-| `GEMMA_MODEL` | `gemma3:4b` | Model to use for intent classification |
-| `GEMMA_CONFIDENCE_THRESHOLD` | `0.80` | Min confidence (0–1) required to inject a tool hint |
-| `GEMMA_TIMEOUT_MS` | `30000` | Per-request timeout in ms for the Ollama call |
+| Name | Default | Source | Description |
+|------|---------|--------|-------------|
+| `PORT` | `3000` | env | API listen port |
+| `AGENT_PROVIDER` / `agentProvider` | `claude-code` | env or setting | Active agent: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
+| `AGENT_AUTH_MODE` / `agentAuthMode` | `oauth` | env or setting | `oauth` browser/device flow, or `api-token` env-key mode |
+| `agentPassword` | — | setting | Enables `/api` and `/ws` bearer-token auth; promoted to `AGENT_PASSWORD` for child processes |
+| `modelOptions` | — | setting | Model names shown in the selector, as a comma-separated string or YAML/JSON list |
+| `defaultModel` | first `modelOptions` entry | setting | Pre-selected model |
+| `claudeEffort` / `CLAUDE_EFFORT` | `max` | setting or env | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`) |
+| `dataDir` | `<cwd>/data` | setting | Base persistence directory |
+| `FIBE_AGENT_ID` | — | env | Default conversation storage id set by Fibe |
+| `CONVERSATION_ID` | — | env | Fallback default conversation storage id |
+| `systemPrompt` | bundled prompt | setting | Inline prompt content. If unset, `dist/assets/SYSTEM_PROMPT.md` is loaded. |
+| `PLAYGROUNDS_DIR` | `./playground` | env | Root for the file explorer and shell sessions |
+| `postInitScript` | — | setting | Shell script run once on first boot; state exposed at `/api/init-status` |
+| `SESSION_DIR` / `sessionDir` | provider default | env or setting | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) for credential injection |
+| `AGENT_CREDENTIALS_JSON` / `agentCredentials` | — | env or setting | Credential files injected at startup |
+| `FIBE_API_KEY` | — | env | Fibe platform API key for sync |
+| `fibeSyncEnabled` / `FIBE_SYNC_ENABLED` | `false` | setting or env | Enable Fibe sync |
+| `CORS_ORIGINS` | `localhost:3100,localhost:4300` | env | Comma-separated allowed CORS origins |
+| `FRAME_ANCESTORS` | `*` | env | CSP `frame-ancestors` (restrict in production) |
+| `LOG_LEVEL` | `info` | env | `error` \| `warn` \| `info` \| `debug` \| `verbose` |
+| `gemmaRouterEnabled`, `ollamaUrl`, `gemmaModel`, `gemmaConfidenceThreshold`, `gemmaTimeoutMs` | see `fibe.example.yml` | setting or env | Optional local LLM MCP routing via Ollama |
 
 **Provider API keys** (used when `AGENT_AUTH_MODE=api-token`):
 
@@ -213,7 +207,7 @@ Copy `.env.example` to `.env` and fill in the relevant keys.
 | Gemini | `GEMINI_API_KEY` |
 | Claude Code | `ANTHROPIC_API_KEY`, `CLAUDE_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN` |
 | OpenAI Codex | `OPENAI_API_KEY` |
-| OpenCode | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `OPENROUTER_API_KEY` |
+| OpenCode | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, or `OPENROUTER_API_KEY` |
 
 ### Chat (Vite, optional)
 
@@ -235,13 +229,17 @@ Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSo
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/health` | No | Health / readiness probe |
-| `POST` | `/api/auth/login` | No | Password login → `{ token }` |
+| `POST` | `/api/auth/login` | No | Password login → `{ success, token? }`; token is present only when `agentPassword` is configured |
 | `GET` | `/api/messages` | Bearer | Conversation message history |
 | `GET` | `/api/activities` | Bearer | Activity timeline list |
 | `GET` | `/api/activities/:id` | Bearer | Single activity |
 | `GET` | `/api/model-options` | Bearer | Available model names |
+| `POST` | `/api/model-options/refresh` | Bearer | Configured models plus provider-discovered models |
 | `GET` | `/api/playgrounds` | Bearer | Playground file tree |
 | `GET` | `/api/playgrounds/file?path=…` | Bearer | Read a playground file |
+| `GET` | `/api/playrooms/browse` | Bearer | Flat Fibe CLI local playground list |
+| `POST` | `/api/playrooms/link` | Bearer | Link a named local playground through the Fibe CLI |
+| `GET` | `/api/playrooms/current` | Bearer | Current `.current_playground` selection |
 | `POST` | `/api/uploads` | Bearer | Upload file (≤ 20 MB) |
 | `GET` | `/api/uploads/:filename` | Bearer | Serve uploaded file |
 | `POST` | `/api/agent/send-message` | Bearer | Async message (webhooks/integrations) → `202` |
@@ -251,7 +249,7 @@ Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSo
 
 ### WebSocket `/ws`
 
-Connect with `?token=<password>` when `AGENT_PASSWORD` is set. Only one active session at a time; a new connection displaces the old one (close code `4002`).
+Connect with `?token=<password>` when `agentPassword` is configured. Pass `conversation_id` (or `c`) to bind a session to a conversation. Up to `websocketMaxConnections` / `WEBSOCKET_MAX_CONNECTIONS` chat clients may be connected at once (default `5`); when the cap is reached, the oldest client is closed with code `4002`.
 
 **Key client→server actions:** `send_chat_message`, `interrupt_agent`, `set_model`, `set_effort`, `initiate_auth`, `submit_auth_code`, `cancel_auth`, `reauthenticate`, `logout`.
 
@@ -281,7 +279,7 @@ The repo keeps **`bun.lock`** (Bun, CI, Docker) and **`package-lock.json`** (npm
 
 ## Container images
 
-CI builds and pushes multi-arch (`linux/amd64`, `linux/arm64`) images on every push to `main` or `dev`:
+The root Compose CI pipeline builds and pushes multi-arch (`linux/amd64`, `linux/arm64`) provider images when its `ci-build-<provider>` services run:
 
 ```
 ghcr.io/<owner>/fibe-agent:<provider>-latest
@@ -291,7 +289,7 @@ ghcr.io/<owner>/fibe-agent:<provider>-<git-sha>
 ghcr.io/<owner>/fibe-agent:<provider>-latest-dev
 ```
 
-Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and [ci.yml](.github/workflows/ci.yml).
+Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and the root Compose CI file [ci.yml](ci.yml). The GitHub Actions workflow is currently disabled as `.github/workflows/ci.yml.disabled`.
 
 ## Embedding (iframe)
 

@@ -5,7 +5,7 @@
   provider:  cursor  (AGENT_PROVIDER=cursor)
   purpose:   Provider-specific extensions on top of the base code-playground
              prompt, tuned for Cursor CLI behaviour.
-  wiring:    SYSTEM_PROMPT_PATH=./prompts/providers/cursor.md
+  wiring:    reference only; runtime prompt comes from fibe.yml systemPrompt / FIBE_SETTINGS_JSON
   note:      Prepended to the user prompt as a combined effective prompt.
 -->
 

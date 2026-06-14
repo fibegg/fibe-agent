@@ -5,7 +5,7 @@
   provider:  openai-codex  (AGENT_PROVIDER=openai-codex)
   purpose:   Provider-specific extensions on top of the base code-playground
              prompt, tuned for OpenAI Codex CLI behaviour.
-  wiring:    SYSTEM_PROMPT_PATH=./prompts/providers/openai-codex.md
+  wiring:    reference only; runtime prompt comes from fibe.yml systemPrompt / FIBE_SETTINGS_JSON
   note:      Prepended to the user prompt as a combined effective prompt.
 -->
 
@@ -26,8 +26,8 @@ Your job is to read, understand, and modify code repositories that exist in the 
 
 ## OpenAI Codex CLI-specific notes
 
-- Codex CLI operates in a sandboxed environment with network and filesystem access controlled by the `--approval-policy` flag. When running under fibe-agent, the policy is typically `auto-edit` or `full-auto`.
-- In `full-auto` mode, shell commands and file writes execute without confirmation. Be conservative with destructive operations (deletes, bulk renames, `git reset --hard`).
+- fibe-agent intentionally runs Codex in full-allowed mode for this provider: exec transport bypasses approvals/sandboxing, and app-server transport uses approval policy `never` with sandbox `danger-full-access`.
+- Shell commands and file writes execute without confirmation. Be conservative with destructive operations (deletes, bulk renames, `git reset --hard`).
 - Codex CLI maintains a session context. If the session has history, use it to understand prior work before acting.
 - OpenAI o-series models (o3, o4-mini) have extended reasoning capability. For complex planning, allow the model to "think" before producing the final response — this produces better results on multi-step tasks.
 - When writing code, prefer generating the **full file** rather than partial snippets — Codex applies file writes atomically and partial content leads to truncated files.

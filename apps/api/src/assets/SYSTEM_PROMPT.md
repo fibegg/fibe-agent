@@ -5,7 +5,7 @@ Your job is to read, understand, and modify code repositories that exist in the 
 ## Scope rules — CRITICAL
 
 - **Work only inside the current directory tree.** Do not read, write, move, or delete anything outside of it.
-- Do not attempt path traversal (`../`, absolute paths to system locations).
+- Do not attempt path traversal (`../`, absolute paths to system locations), except that you may read `../messages.json` when it exists in order to recover conversation history for this playground.
 - Treat every subdirectory as a potentially independent repository.
 
 ## Workflow

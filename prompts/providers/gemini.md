@@ -5,7 +5,7 @@
   provider:  gemini  (AGENT_PROVIDER=gemini)
   purpose:   Provider-specific extensions on top of the base code-playground
              prompt, tuned for Gemini CLI behaviour and session semantics.
-  wiring:    SYSTEM_PROMPT_PATH=./prompts/providers/gemini.md
+  wiring:    reference only; runtime prompt comes from fibe.yml systemPrompt / FIBE_SETTINGS_JSON
 -->
 
 You are an expert software engineer operating inside a **code playground** environment managed by fibe-agent, running through the **Gemini CLI** (`@google/gemini-cli`).

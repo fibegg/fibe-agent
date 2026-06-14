@@ -5,7 +5,7 @@
   provider:  opencode  (AGENT_PROVIDER=opencode)
   purpose:   Provider-specific extensions on top of the base code-playground
              prompt, tuned for OpenCode CLI behaviour.
-  wiring:    SYSTEM_PROMPT_PATH=./prompts/providers/opencode.md
+  wiring:    reference only; runtime prompt comes from fibe.yml systemPrompt / FIBE_SETTINGS_JSON
   note:      Prepended to the user prompt as a combined effective prompt.
 -->
 

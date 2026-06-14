@@ -1,8 +1,10 @@
 # Prompts
 
-This directory is the single source of truth for all **system prompts** used by the fibe-agent AI providers.
+This directory is an authoring/reference library for **system prompt** variants used by fibe-agent AI providers.
 
-Prompts are plain Markdown files. They are loaded at runtime via the `SYSTEM_PROMPT_PATH` environment variable and injected into the agent before each conversation run.
+Runtime prompt content is managed by Fibe/Rails and delivered to fibe-agent through the `systemPrompt` setting in `fibe.yml` or `FIBE_SETTINGS_JSON`. If that setting is absent, fibe-agent loads the bundled fallback at `dist/assets/SYSTEM_PROMPT.md`.
+
+The Markdown files here are not loaded automatically by path. To use one, copy its contents into the runtime-managed `systemPrompt` value.
 
 ---
 
@@ -30,29 +32,27 @@ Provider-agnostic prompts that work across all supported agents. Start here when
 
 ### `providers/`
 
-Provider-specific prompts that extend the base behaviour with tweaks for a particular CLI tool (flag handling, session semantics, known quirks, etc.). Use these as the `SYSTEM_PROMPT_PATH` when you know which provider will run, or as a reference when tuning a base prompt.
+Provider-specific prompts that extend the base behaviour with tweaks for a particular CLI tool (flag handling, session semantics, known quirks, etc.). Use these as reference material when tuning a runtime-managed prompt for a known provider.
 
 ---
 
 ## How to wire a prompt
 
-Set `SYSTEM_PROMPT_PATH` in your `.env` (or Docker environment) to the path of the desired prompt file **relative to the working directory** of the API process:
+Set the `systemPrompt` Fibe setting in `fibe.yml`:
 
-```sh
-# Use the base code-playground prompt
-SYSTEM_PROMPT_PATH=./prompts/base/code-playground.md
-
-# Use the Gemini-specific prompt
-SYSTEM_PROMPT_PATH=./prompts/providers/gemini.md
+```yaml
+systemPrompt: |
+  You are a TypeScript expert.
+  Focus only on the src/ directory.
 ```
 
-Alternatively, inline a short prompt directly via `SYSTEM_PROMPT` (takes precedence over the file):
+For env-only local runs, put the same value in `FIBE_SETTINGS_JSON`:
 
 ```sh
-SYSTEM_PROMPT="You are a TypeScript expert. Focus only on the src/ directory."
+FIBE_SETTINGS_JSON='{"systemPrompt":"You are a TypeScript expert. Focus only on the src/ directory."}'
 ```
 
-> **Note:** The built-in fallback prompt is `apps/api/src/assets/SYSTEM_PROMPT.md`, which is bundled into the Docker image at `dist/assets/SYSTEM_PROMPT.md`. It is used when neither `SYSTEM_PROMPT` nor `SYSTEM_PROMPT_PATH` point to an existing file.
+> **Note:** The built-in fallback prompt is `apps/api/src/assets/SYSTEM_PROMPT.md`, which is bundled into the Docker image at `dist/assets/SYSTEM_PROMPT.md`. It is used when no `systemPrompt` setting is configured.
 
 ---
 
@@ -60,7 +60,7 @@ SYSTEM_PROMPT="You are a TypeScript expert. Focus only on the src/ directory."
 
 1. Create a `.md` file in the appropriate subdirectory (`base/` for generic, `providers/` for provider-specific).
 2. Write the prompt in plain Markdown — the agent CLI reads it as raw text.
-3. Test it locally by setting `SYSTEM_PROMPT_PATH` and running `bun run dev`.
+3. Test it locally by copying the prompt content into `systemPrompt` in `fibe.yml` or `FIBE_SETTINGS_JSON`, then running `bun run dev`.
 4. Document any notable behaviour differences in a comment block at the top of the file.
 
 ### Naming conventions
