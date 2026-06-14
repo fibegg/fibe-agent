@@ -229,6 +229,7 @@ describe('attachWebSocketServer — session takeover', () => {
     const server = new EventEmitter();
     // Create a local registry mock that tracks sessions so all() returns them
     const localSessions: Array<{ sessionId: string; outbound$: Subject<{ type: string; data: Record<string, unknown> }>; destroy: ReturnType<typeof mock> }> = [];
+    const sockets: ReturnType<typeof makeWsStub>[] = [];
     let sessionCounter = 0;
     const localRegistry = {
       all: () => localSessions,
@@ -261,18 +262,24 @@ describe('attachWebSocketServer — session takeover', () => {
     );
 
     // Connect 5 clients
-    for (let i = 0; i < 5; i++) wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    for (let i = 0; i < 5; i++) {
+      const stub = makeWsStub();
+      sockets.push(stub);
+      wss.emit('connection', stub, makeReq('/ws'));
+    }
     expect(localSessions).toHaveLength(5);
     const oldestId = localSessions[0].sessionId;
 
     // 6th connection should evict the oldest
     wss.emit('connection', makeWsStub(), makeReq('/ws'));
     expect(localRegistry.destroy).toHaveBeenCalledWith(oldestId);
+    expect(ws(sockets[0]).close).toHaveBeenCalledWith(4002, 'Session taken over by another client');
   });
 
   it('uses configured chat websocket connection limit', () => {
     const server = new EventEmitter();
     const localSessions: Array<{ sessionId: string; outbound$: Subject<{ type: string; data: Record<string, unknown> }>; destroy: ReturnType<typeof mock> }> = [];
+    const sockets: ReturnType<typeof makeWsStub>[] = [];
     let sessionCounter = 0;
     const localRegistry = {
       all: () => localSessions,
@@ -304,13 +311,17 @@ describe('attachWebSocketServer — session takeover', () => {
       makeFastify(server), makeConfig(undefined, 2), orchestrator, localRegistry, playgroundWatcher, terminalService, mockConversationManager,
     );
 
-    wss.emit('connection', makeWsStub(), makeReq('/ws'));
-    wss.emit('connection', makeWsStub(), makeReq('/ws'));
+    for (let i = 0; i < 2; i++) {
+      const stub = makeWsStub();
+      sockets.push(stub);
+      wss.emit('connection', stub, makeReq('/ws'));
+    }
     expect(localSessions).toHaveLength(2);
     const oldestId = localSessions[0].sessionId;
 
     wss.emit('connection', makeWsStub(), makeReq('/ws'));
     expect(localRegistry.destroy).toHaveBeenCalledWith(oldestId);
+    expect(ws(sockets[0]).close).toHaveBeenCalledWith(4002, 'Session taken over by another client');
     expect(localSessions).toHaveLength(2);
   });
 });

@@ -73,6 +73,8 @@ function attachChatWs(
     sessionRegistry.broadcast(WS_EVENT.PLAYGROUND_CHANGED, {})
   );
 
+  const clientsBySession = new Map<string, WebSocket>();
+
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
     // Parse URL once for all downstream consumers
     const params = parseConnectionParams(req);
@@ -85,6 +87,10 @@ function attachChatWs(
     if (allSessions.length >= maxConnections) {
       const oldest = allSessions[0];
       logWs({ event: 'disconnect', closeCode: WS_CLOSE.SESSION_TAKEN_OVER, error: 'Max connections reached — oldest session evicted' });
+      const oldestWs = clientsBySession.get(oldest.sessionId);
+      if (oldestWs?.readyState === WebSocket.OPEN) {
+        oldestWs.close(WS_CLOSE.SESSION_TAKEN_OVER, 'Session taken over by another client');
+      }
       sessionRegistry.destroy(oldest.sessionId);
     }
 
@@ -98,6 +104,7 @@ function attachChatWs(
 
     // Create an isolated session for this connection, bound to the requested conversation
     const ctx = sessionRegistry.create(conversationId);
+    clientsBySession.set(ctx.sessionId, ws);
     logWs({ event: 'connect' });
 
     // Tell the client which conversation it's in right away
@@ -136,6 +143,7 @@ function attachChatWs(
     ws.on('close', (code?: number) => {
       clearInterval(resetInterval);
       sub.unsubscribe();
+      clientsBySession.delete(ctx.sessionId);
       sessionRegistry.detach(ctx.sessionId);
       logWs({ event: 'disconnect', closeCode: code });
     });
