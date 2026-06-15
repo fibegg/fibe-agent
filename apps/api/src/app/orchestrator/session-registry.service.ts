@@ -272,7 +272,16 @@ export class SessionRegistryService {
     for (const s of sessions) {
       const isProcessing =
         s.isProcessing || this.isConversationProcessing(s.conversationId, s.sessionId);
-      s.send('auth_status', { status, isProcessing, anyProcessing, ...extraData });
+      const liveState = isProcessing
+        ? this.liveConversationState(s.conversationId)
+        : null;
+      s.send('auth_status', {
+        status,
+        isProcessing,
+        anyProcessing,
+        startedAt: liveState?.startedAt ?? null,
+        ...extraData,
+      });
     }
   }
 

@@ -385,12 +385,16 @@ export class OrchestratorService implements OnModuleInit {
         ctx.conversationId,
         ctx.sessionId,
       );
+    const liveState = isConversationProcessing
+      ? this.sessionRegistry.liveConversationState(ctx.conversationId)
+      : null;
     ctx.send(WS_EVENT.AUTH_STATUS, {
       status: ctx.isAuthenticated
         ? AUTH_STATUS_VAL.AUTHENTICATED
         : AUTH_STATUS_VAL.UNAUTHENTICATED,
       isProcessing: isConversationProcessing,
       anyProcessing,
+      startedAt: liveState?.startedAt ?? null,
     });
     ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, {
       activity: this.stores(ctx).activityStore.all(),
@@ -414,12 +418,16 @@ export class OrchestratorService implements OnModuleInit {
           s.conversationId,
           s.sessionId,
         );
+      const liveState = isConversationProcessing
+        ? this.sessionRegistry.liveConversationState(s.conversationId)
+        : null;
       s.send(WS_EVENT.AUTH_STATUS, {
         status: authenticated
           ? AUTH_STATUS_VAL.AUTHENTICATED
           : AUTH_STATUS_VAL.UNAUTHENTICATED,
         isProcessing: isConversationProcessing,
         anyProcessing,
+        startedAt: liveState?.startedAt ?? null,
       });
     }
   }
@@ -1110,22 +1118,23 @@ export class OrchestratorService implements OnModuleInit {
         .all()
         .filter((message) => message.role === 'assistant')
         .map((message) => message.body);
+      const streamStartedAt = new Date().toISOString();
+      ctx.streamTextAccumulated = '';
+      ctx.streamStartedAt = streamStartedAt;
+      ctx.lastStreamText = '';
+      ctx.lastStreamStartedAt = null;
+      ctx.lastStreamFinishedAt = null;
       // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(
         ctx.conversationId,
         WS_EVENT.STREAM_START,
-        { model },
+        { model, startedAt: streamStartedAt },
       );
-      ctx.streamTextAccumulated = '';
-      ctx.streamStartedAt = new Date().toISOString();
-      ctx.lastStreamText = '';
-      ctx.lastStreamStartedAt = null;
-      ctx.lastStreamFinishedAt = null;
       const streamStartEntry: StoredStoryEntry = {
         id: randomUUID(),
         type: 'stream_start',
         message: 'Response started',
-        timestamp: new Date().toISOString(),
+        timestamp: streamStartedAt,
         details: model ? `Model: ${model}` : undefined,
       };
       const { activityStore: rAct } = this.stores(ctx);
@@ -1659,12 +1668,15 @@ export class OrchestratorService implements OnModuleInit {
   ): Promise<void> {
     this.logger.log(`[GemmaRouter] executing CLI directly: ${command}`);
     const model = 'CLI Router';
-    ctx.send(WS_EVENT.STREAM_START, { model });
+    const streamStartedAt = new Date().toISOString();
+    ctx.streamStartedAt = streamStartedAt;
+    ctx.streamTextAccumulated = '';
+    ctx.send(WS_EVENT.STREAM_START, { model, startedAt: streamStartedAt });
     const streamStartEntry: StoredStoryEntry = {
       id: randomUUID(),
       type: 'stream_start',
       message: 'Response started',
-      timestamp: new Date().toISOString(),
+      timestamp: streamStartedAt,
       details: `Model: ${model}`,
     };
     const { activityStore: cliAct } = this.stores(ctx);

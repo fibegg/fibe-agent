@@ -274,6 +274,20 @@ describe('OrchestratorService', () => {
     expect(events[4].type).toBe(WS_EVENT.EFFORT_UPDATED);
   });
 
+  test('handleClientConnected includes the active turn start time', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.isProcessing = true;
+    ctx.streamStartedAt = '2026-06-15T06:26:11.125Z';
+    ctx.outbound$.subscribe((ev) => events.push(ev));
+
+    orch.handleClientConnected(ctx);
+
+    expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
+    expect(events[0].data.isProcessing).toBe(true);
+    expect(events[0].data.startedAt).toBe('2026-06-15T06:26:11.125Z');
+  });
+
   test('handleClientMessage get_model sends model_updated', async () => {
     const { orch, ctx } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
@@ -355,9 +369,11 @@ describe('OrchestratorService', () => {
     expect(events[0].type).toBe(WS_EVENT.AUTH_STATUS);
     expect(events[0].data.isProcessing).toBe(true);
     expect(events[0].data.anyProcessing).toBe(true);
+    expect(events[0].data.startedAt).toBeNull();
     expect(secondEvents).toHaveLength(1);
     expect(secondEvents[0].data.isProcessing).toBe(false);
     expect(secondEvents[0].data.anyProcessing).toBe(true);
+    expect(secondEvents[0].data.startedAt).toBeNull();
   });
 
   test('handleClientMessage send_chat_message with audioFilename streams response', async () => {
@@ -417,6 +433,8 @@ describe('OrchestratorService', () => {
     const streamStart = events.find((e) => e.type === WS_EVENT.STREAM_START);
     expect(streamStart).toBeDefined();
     expect(streamStart?.data.model).toBeDefined();
+    expect(typeof streamStart?.data.startedAt).toBe('string');
+    expect(Number.isNaN(Date.parse(String(streamStart?.data.startedAt)))).toBe(false);
     const thinkingStep = events.find((e) => e.type === WS_EVENT.THINKING_STEP);
     expect(thinkingStep).toBeDefined();
     expect(thinkingStep?.data.title).toBe('Generating response');

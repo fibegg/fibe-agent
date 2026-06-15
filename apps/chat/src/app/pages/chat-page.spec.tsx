@@ -1,6 +1,6 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatPage } from './chat-page';
 import { isAuthenticated } from '../api-url';
@@ -300,7 +300,12 @@ vi.mock('../chat/chat-error-banner', () => ({
 }));
 
 vi.mock('../chat/chat-input-area', () => ({
-  ChatInputArea: () => <div data-testid="chat-input-area" />,
+  ChatInputArea: (props: { workingElapsedMs?: number }) => (
+    <div
+      data-testid="chat-input-area"
+      data-working-elapsed-ms={String(props.workingElapsedMs ?? 0)}
+    />
+  ),
 }));
 
 vi.mock('../chat/drag-drop-overlay', () => ({
@@ -433,6 +438,7 @@ describe('ChatPage', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    vi.useRealTimers();
     localStorage.clear();
   });
 
@@ -739,6 +745,54 @@ describe('ChatPage', () => {
       'default',
       true,
     );
+  });
+
+  it('uses server processing start time for the working timer after refresh', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-06-15T06:30:11.125Z'));
+    let onProcessingState:
+      | ((data: { isProcessing: boolean; startedAt: string | null }) => void)
+      | undefined;
+
+    vi.mocked(useChatWebSocket).mockImplementation((...args: unknown[]) => {
+      onProcessingState = args[11] as typeof onProcessingState;
+      return {
+        state: CHAT_STATES.AWAITING_RESPONSE,
+        agentMode: 'Working',
+        errorMessage: null,
+        authModal: { authUrl: null, deviceCode: null, isManualToken: false },
+        sessionActivity: [],
+        sessionCount: 1,
+        anyProcessing: true,
+        send: vi.fn(),
+        reconnect: vi.fn(),
+        startAuth: vi.fn(),
+        cancelAuth: vi.fn(),
+        submitAuthCode: vi.fn(),
+        reauthenticate: vi.fn(),
+        logout: vi.fn(),
+        dismissError: vi.fn(),
+        interruptAgent: vi.fn(),
+        setState: vi.fn(),
+        setErrorMessage: vi.fn(),
+        setAuthModal: vi.fn(),
+      };
+    });
+
+    render(<ChatPage />, { wrapper });
+
+    act(() => {
+      onProcessingState?.({
+        isProcessing: true,
+        startedAt: '2026-06-15T06:26:11.125Z',
+      });
+    });
+
+    expect(
+      screen
+        .getByTestId('chat-input-area')
+        .getAttribute('data-working-elapsed-ms'),
+    ).toBe('240000');
   });
 
   it('renders mobile file explorer sidebar when isMobile=true and sidebarOpen=true', () => {

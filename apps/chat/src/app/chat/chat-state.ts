@@ -109,6 +109,7 @@ export interface ServerMessage {
   mode?: string;
   details?: string;
   timestamp?: string;
+  startedAt?: string | null;
   name?: string;
   path?: string;
   summary?: string;

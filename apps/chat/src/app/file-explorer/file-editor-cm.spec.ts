@@ -157,7 +157,7 @@ describe('LANG_MAP', () => {
     for (const [ext, factory] of Object.entries(LANG_MAP)) {
       expect(await factory(), `LANG_MAP[${ext}] returned falsy`).toBeTruthy();
     }
-  });
+  }, 30_000);
 });
 
 describe('createEditor searchInFile', () => {

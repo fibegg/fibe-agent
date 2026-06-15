@@ -119,6 +119,12 @@ interface RuntimeConfigResponse {
   simplicate?: boolean;
 }
 
+function timestampMs(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 interface PendingMessageFocus {
   messageId?: string;
   timestamp?: string;
@@ -690,9 +696,9 @@ export function ChatPage() {
   } = useChatStreaming({ onStreamEndCallback, resetForNewStream });
 
   const handleStreamStartWithTimer = useCallback(
-    (data?: { model?: string }) => {
+    (data?: { model?: string; startedAt?: string }) => {
       const now = Date.now();
-      setWorkingStartedAt(now);
+      setWorkingStartedAt(timestampMs(data?.startedAt) ?? now);
       setWorkingNow(now);
       handleStreamStart(data);
     },
@@ -712,6 +718,22 @@ export function ChatPage() {
     setWorkingNow(Date.now());
     handleStreamAbort();
   }, [handleStreamAbort]);
+
+  const handleProcessingState = useCallback(
+    (data: { isProcessing: boolean; startedAt: string | null }) => {
+      if (!data.isProcessing) {
+        setWorkingStartedAt(null);
+        setWorkingNow(Date.now());
+        return;
+      }
+
+      const now = Date.now();
+      const serverStartedAt = timestampMs(data.startedAt);
+      setWorkingStartedAt((current) => serverStartedAt ?? current ?? now);
+      setWorkingNow(now);
+    },
+    [],
+  );
 
   const {
     state,
@@ -742,6 +764,7 @@ export function ChatPage() {
     activeConversationId,
     handleStreamAbortWithTimer,
     handleConversationDeleted,
+    handleProcessingState,
   );
 
   const agentIsStreaming = state === CHAT_STATES.AWAITING_RESPONSE;

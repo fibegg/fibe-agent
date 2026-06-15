@@ -22,6 +22,12 @@ describe('ThinkingState', () => {
     expect(text).toBeTruthy();
   });
 
+  it('keeps the thinking line visible without a fade-out animation', () => {
+    render(<ThinkingState />);
+    const text = screen.getByText(/\.\.\.$/);
+    expect(text.className).not.toContain('animate-thinking-fade');
+  });
+
   it('renders bounce dots', () => {
     const { container } = render(<ThinkingState />);
     const dots = container.querySelectorAll('.animate-thinking-bounce');

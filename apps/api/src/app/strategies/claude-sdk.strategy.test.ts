@@ -603,6 +603,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   let closedCalls: number[];
   let receivedPrompts: string[];
   let failResumedSessionOnce: boolean;
+  let hangBeforeFirstEvent: boolean;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'claude-turns-'));
@@ -610,6 +611,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     closedCalls = [];
     receivedPrompts = [];
     failResumedSessionOnce = false;
+    hangBeforeFirstEvent = false;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
     ).records.clear();
@@ -645,6 +647,12 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
               errors: ['pty_exited: code=1'],
               result: 'pty_exited: code=1',
             };
+            return;
+          }
+          if (hangBeforeFirstEvent) {
+            await new Promise<never>(() => {
+              /* never resolves */
+            });
             return;
           }
           yield {
@@ -690,6 +698,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     delete process.env.CONVERSATION_ID;
     delete process.env.PORT;
     delete process.env.SESSION_DIR;
+    delete process.env.CLAUDE_SDK_EVENT_TIMEOUT_MS;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
     ).records.clear();
@@ -842,6 +851,27 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(text).toContain('[Operator Interruption]');
     expect(text).toContain('change direction');
     expect(text).toContain('continue work');
+  });
+
+  test('fails a turn when Claude SDK produces no events', async () => {
+    process.env.CLAUDE_SDK_EVENT_TIMEOUT_MS = '5';
+    hangBeforeFirstEvent = true;
+    const strategy = makeStrategy(
+      false,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
+
+    await expect(
+      strategy.executePromptStreaming('stalled turn', 'haiku', () => undefined),
+    ).rejects.toThrow(
+      'Claude Code produced no SDK events for 5ms; the provider turn appears stuck.',
+    );
+
+    expect(receivedPrompts).toHaveLength(1);
+    expect(closedCalls).toEqual([0]);
+    expect(existsSync(join(tmpDir, '.claude_session'))).toBe(false);
   });
 
   test('requests prompt history injection when june1815 shim mode is enabled', () => {

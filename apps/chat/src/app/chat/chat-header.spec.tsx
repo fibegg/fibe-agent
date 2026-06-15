@@ -356,6 +356,23 @@ describe('ChatHeader', () => {
     expect(screen.queryByText('haiku')).toBeNull();
   });
 
+  it('keeps compact browser-tab count before the changing status text', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        state={CHAT_STATES.AUTH_PENDING}
+        simplicateMode
+        sessionCount={2}
+      />,
+    );
+
+    const tabBadge = screen.getByTitle('2 browser tabs connected');
+    const status = screen.getByText('Authentication in progress...');
+    const relation = tabBadge.compareDocumentPosition(status);
+    expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(tabBadge.textContent).toBe('2 browser tabs');
+  });
+
   it('opens provider/model dropdown from standard header with model and effort controls', () => {
     const onEffortSelect = vi.fn();
     render(

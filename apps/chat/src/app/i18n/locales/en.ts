@@ -91,7 +91,7 @@ export const en = {
   'header.closeCommands': 'Close Commands',
   'header.busyInAnotherTab': 'busy in another tab',
   'header.tabsConnected': '{count} browser tabs connected',
-  'header.tabCount': '{count} tabs',
+  'header.tabCount': '{count} browser tabs',
   'header.files': 'Files',
   'header.gitDiff': 'Git diff',
   'header.startAuth': 'Start Auth',

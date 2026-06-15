@@ -10,6 +10,7 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
   const t = useT();
   const lines = getThinkingLineKeys(lastUserMessage).map((key) => t(key));
   const [index, setIndex] = useState(0);
+  const line = lines[index] ?? lines[0] ?? t('chat.state.working');
 
   useEffect(() => {
     const id = setInterval(() => {
@@ -36,9 +37,9 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
       </div>
       <span
         key={index}
-        className="text-sm text-muted-foreground animate-thinking-fade"
+        className="text-sm text-muted-foreground"
       >
-        {lines[index]}
+        {line}
       </span>
     </div>
   );

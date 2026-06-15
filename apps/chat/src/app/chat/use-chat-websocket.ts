@@ -61,7 +61,7 @@ export interface ThinkingCallbacks {
 export function useChatWebSocket(
   onMessage?: (data: ServerMessage) => void,
   onStreamChunk?: (text: string) => void,
-  onStreamStart?: (data?: { model?: string }) => void,
+  onStreamStart?: (data?: { model?: string; startedAt?: string }) => void,
   onStreamEnd?: (usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void,
@@ -71,6 +71,7 @@ export function useChatWebSocket(
   conversationId = 'default',
   onStreamAbort?: () => void,
   onConversationDeleted?: (conversationId: string) => void,
+  onProcessingState?: (data: { isProcessing: boolean; startedAt: string | null }) => void,
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
@@ -97,6 +98,7 @@ export function useChatWebSocket(
   const onConversationResetRef = useStableRef(onConversationReset);
   const onConversationDeletedRef = useStableRef(onConversationDeleted);
   const onStreamAbortRef = useStableRef(onStreamAbort);
+  const onProcessingStateRef = useStableRef(onProcessingState);
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -181,10 +183,18 @@ export function useChatWebSocket(
         if (d.status === 'authenticated') {
           setErrorMessage(null);
           if (d.isProcessing) {
+            onProcessingStateRef.current?.({
+              isProcessing: true,
+              startedAt: typeof d.startedAt === 'string' ? d.startedAt : null,
+            });
             setState(CHAT_STATES.AWAITING_RESPONSE);
             startResponseTimer();
           } else {
             clearResponseTimer();
+            onProcessingStateRef.current?.({
+              isProcessing: false,
+              startedAt: null,
+            });
             onStreamAbortRef.current?.();
             setState(CHAT_STATES.AUTHENTICATED);
           }
@@ -236,7 +246,15 @@ export function useChatWebSocket(
         setErrorMessage(null);
         setState(CHAT_STATES.AWAITING_RESPONSE);
         startResponseTimer();
-        onStreamStartRef.current?.({ model: d.model });
+        const streamStartData =
+          typeof d.startedAt === 'string'
+            ? { model: d.model, startedAt: d.startedAt }
+            : { model: d.model };
+        onProcessingStateRef.current?.({
+          isProcessing: true,
+          startedAt: typeof d.startedAt === 'string' ? d.startedAt : null,
+        });
+        onStreamStartRef.current?.(streamStartData);
         thinkingRef.current?.onStreamStartData?.({ model: d.model });
       },
       stream_chunk: (d) => {
@@ -352,7 +370,25 @@ export function useChatWebSocket(
     ws.onerror = () => {
       /* ignore */
     };
-  }, [conversationId, navigate, send, clearResponseTimer, startResponseTimer, setAuthModal]);
+  }, [
+    conversationId,
+    navigate,
+    send,
+    clearResponseTimer,
+    startResponseTimer,
+    setAuthModal,
+    onProcessingStateRef,
+    onMessageRef,
+    onStreamChunkRef,
+    onStreamStartRef,
+    onStreamEndRef,
+    thinkingRef,
+    onPlaygroundChangedRef,
+    onLocalToolEventRef,
+    onConversationResetRef,
+    onConversationDeletedRef,
+    onStreamAbortRef,
+  ]);
 
   const dismissError = useCallback(() => {
     const shouldRequireAuth = isProviderAuthFailureMessage(errorMessage);
@@ -388,7 +424,7 @@ export function useChatWebSocket(
     clearResponseTimer();
     onStreamAbortRef.current?.();
     setState(CHAT_STATES.INITIALIZING);
-  }, [conversationId, clearResponseTimer]);
+  }, [conversationId, clearResponseTimer, onStreamAbortRef]);
 
   useEffect(() => {
     const handleAutoAuthSuccess = () => reconnect();

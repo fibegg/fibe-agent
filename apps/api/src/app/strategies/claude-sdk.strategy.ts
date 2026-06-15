@@ -41,6 +41,7 @@ const SESSION_MARKER_FILE = '.claude_session';
 const CLAUDE_SDK_CLIENT_APP = 'fibe-agent/claude-sdk';
 const SDK_INTERRUPTED_ERROR_NAME = 'AbortError';
 const CLAUDE_INTERRUPT_FORCE_CLOSE_MS = 2_000;
+const DEFAULT_CLAUDE_SDK_EVENT_TIMEOUT_MS = 180_000;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -229,6 +230,12 @@ function isRecoverableResumeExit(message: string): boolean {
 
 function truthyEnv(value: string | undefined): boolean {
   return value === '1' || value?.toLowerCase() === 'true';
+}
+
+function claudeSdkEventTimeoutMs(): number {
+  const configured = Number(process.env.CLAUDE_SDK_EVENT_TIMEOUT_MS);
+  if (Number.isFinite(configured) && configured >= 0) return configured;
+  return DEFAULT_CLAUDE_SDK_EVENT_TIMEOUT_MS;
 }
 
 class AsyncMessageQueue<T> implements AsyncIterable<T>, AsyncIterator<T> {
@@ -732,10 +739,36 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     callbacks?: StreamingCallbacks,
   ): Promise<void> {
     while (true) {
-      const { value, done } = await record.iterator.next();
+      const { value, done } = await this.nextSdkMessage(record);
       if (done) break;
       this.handleSdkMessage(value, state, onChunk, callbacks);
       if (value.type === 'result') break;
+    }
+  }
+
+  private async nextSdkMessage(
+    record: ClaudeSdkConversationRecord,
+  ): Promise<IteratorResult<SDKMessage>> {
+    const timeoutMs = claudeSdkEventTimeoutMs();
+    if (timeoutMs === 0) return record.iterator.next();
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => {
+        this.closeRecord(record);
+        reject(
+          new Error(
+            `Claude Code produced no SDK events for ${timeoutMs}ms; the provider turn appears stuck.`,
+          ),
+        );
+      }, timeoutMs);
+      timer.unref?.();
+    });
+
+    try {
+      return await Promise.race([record.iterator.next(), timeout]);
+    } finally {
+      if (timer) clearTimeout(timer);
     }
   }
 

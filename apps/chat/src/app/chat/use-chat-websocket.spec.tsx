@@ -411,8 +411,9 @@ describe('useChatWebSocket message handlers', () => {
 
   it('handles auth_status authenticated (processing and not processing)', async () => {
     const onStreamAbort = vi.fn();
+    const onProcessingState = vi.fn();
     const { result } = renderHook(() =>
-      useChatWebSocket(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'default', onStreamAbort),
+      useChatWebSocket(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'default', onStreamAbort, undefined, onProcessingState),
       { wrapper }
     );
     await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
@@ -426,13 +427,21 @@ describe('useChatWebSocket message handlers', () => {
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
     expect(result.current.errorMessage).toBeNull();
+    expect(onProcessingState).toHaveBeenCalledWith({
+      isProcessing: false,
+      startedAt: null,
+    });
     expect(onStreamAbort).toHaveBeenCalled();
 
     // Processing
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: true }) } as MessageEvent);
+      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: true, startedAt: '2026-06-15T06:26:11.125Z' }) } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
+    expect(onProcessingState).toHaveBeenCalledWith({
+      isProcessing: true,
+      startedAt: '2026-06-15T06:26:11.125Z',
+    });
   });
 
   it('triggers response timeout if isProcessing but no response', async () => {
@@ -657,10 +666,13 @@ describe('useChatWebSocket message handlers', () => {
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'stale error' }) } as MessageEvent));
     expect(result.current.errorMessage).toBe('stale error');
     
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_start', model: 'gpt' }) } as MessageEvent));
+    act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_start', model: 'gpt', startedAt: '2026-06-15T06:26:11.125Z' }) } as MessageEvent));
     expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
     expect(result.current.errorMessage).toBeNull();
-    expect(onStreamStart).toHaveBeenCalledWith({ model: 'gpt' });
+    expect(onStreamStart).toHaveBeenCalledWith({
+      model: 'gpt',
+      startedAt: '2026-06-15T06:26:11.125Z',
+    });
     expect(thinkingCb.onStreamStartData).toHaveBeenCalledWith({ model: 'gpt' });
 
     act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_chunk', text: 'hi' }) } as MessageEvent));
@@ -879,12 +891,12 @@ describe('useChatWebSocket message handlers', () => {
   });
 
   it('handles optional chaining and state fallbacks gracefully', () => {
-    let messageHandler: any;
-    let closeHandler: any;
+    let messageHandler: ((event: MessageEvent) => void) | null = null;
+    let closeHandler: ((event: CloseEvent) => void) | null = null;
     vi.stubGlobal('WebSocket', class MockWS {
       readyState = 1; send = vi.fn(); close = vi.fn(); addEventListener = vi.fn(); removeEventListener = vi.fn();
-      set onmessage(handler: any) { messageHandler = handler; }
-      set onclose(handler: any) { closeHandler = handler; }
+      set onmessage(handler: ((event: MessageEvent) => void) | null) { messageHandler = handler; }
+      set onclose(handler: ((event: CloseEvent) => void) | null) { closeHandler = handler; }
     });
     const onMessage = vi.fn();
     const onStreamEnd = vi.fn();

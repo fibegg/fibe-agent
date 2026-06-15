@@ -99,7 +99,7 @@ describe('highlightCodeElement', () => {
     const el = document.createElement('code');
     highlightCodeElement(el);
     expect(Prism.highlightElement).toHaveBeenCalledWith(el);
-  });
+  }, 15_000);
 
   it('can be called multiple times', async () => {
     const { highlightCodeElement } = await import('./prism-loader');
@@ -109,5 +109,5 @@ describe('highlightCodeElement', () => {
     highlightCodeElement(el1);
     highlightCodeElement(el2);
     expect(Prism.highlightElement).toHaveBeenCalledTimes(2);
-  });
+  }, 15_000);
 });

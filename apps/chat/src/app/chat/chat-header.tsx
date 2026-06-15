@@ -183,6 +183,22 @@ export function ChatHeader({
   const menuButtonLabel = t('header.openMenu');
   const compactShowsProviderModel = state === CHAT_STATES.AUTHENTICATED;
   const mobileHeaderRef = useRef<HTMLElement>(null);
+  const busyBadge =
+    anyProcessing && state !== CHAT_STATES.AWAITING_RESPONSE ? (
+      <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20 animate-pulse">
+        <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+        {t('header.busyInAnotherTab')}
+      </span>
+    ) : null;
+  const sessionBadge =
+    sessionCount > 1 ? (
+      <span
+        className="shrink-0 flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary border border-primary/20"
+        title={t('header.tabsConnected', { count: sessionCount })}
+      >
+        {t('header.tabCount', { count: sessionCount })}
+      </span>
+    ) : null;
 
   useEffect(() => {
     if (!isMobile) return;
@@ -232,6 +248,7 @@ export function ChatHeader({
                   onCreate={onConversationCreate}
                 />
               )}
+              {sessionBadge}
               {compactShowsProviderModel ? (
                 <ProviderModelMenu
                   triggerClassName="-ml-1 inline-flex min-w-0 max-w-[62vw] items-center gap-1.5 px-1 py-0.5 text-left sm:max-w-[360px]"
@@ -265,21 +282,7 @@ export function ChatHeader({
                   {statusContent}
                 </span>
               )}
-              {/* Multi-session indicators */}
-              {anyProcessing && state !== CHAT_STATES.AWAITING_RESPONSE && (
-                <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20 animate-pulse">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                  {t('header.busyInAnotherTab')}
-                </span>
-              )}
-              {sessionCount > 1 && (
-                <span
-                  className="shrink-0 flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary border border-primary/20"
-                  title={t('header.tabsConnected', { count: sessionCount })}
-                >
-                  {t('header.tabCount', { count: sessionCount })}
-                </span>
-              )}
+              {busyBadge}
             </div>
           </div>
 

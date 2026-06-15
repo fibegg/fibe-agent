@@ -93,7 +93,7 @@ export const uk: Record<TranslationKey, string> = {
   'header.closeCommands': 'Закрити команди',
   'header.busyInAnotherTab': 'зайнятий в іншій вкладці',
   'header.tabsConnected': '{count} вкладок браузера підключено',
-  'header.tabCount': '{count} вкл.',
+  'header.tabCount': '{count} вкл. браузера',
   'header.files': 'Файли',
   'header.gitDiff': 'Git-зміни',
   'header.startAuth': 'Почати автентифікацію',
