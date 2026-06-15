@@ -13,7 +13,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
@@ -602,12 +602,14 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   }>;
   let closedCalls: number[];
   let receivedPrompts: string[];
+  let failResumedSessionOnce: boolean;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'claude-turns-'));
     queryCalls = [];
     closedCalls = [];
     receivedPrompts = [];
+    failResumedSessionOnce = false;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
     ).records.clear();
@@ -633,6 +635,18 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
           const turn = await input.next();
           const text = JSON.stringify(turn.value ?? {});
           receivedPrompts.push(text);
+          if (failResumedSessionOnce && options.resume) {
+            failResumedSessionOnce = false;
+            yield {
+              type: 'result',
+              session_id: options.resume,
+              subtype: 'error',
+              is_error: true,
+              errors: ['pty_exited: code=1'],
+              result: 'pty_exited: code=1',
+            };
+            return;
+          }
           yield {
             type: 'assistant',
             session_id: `session-${callIndex}`,
@@ -736,6 +750,34 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(queryCalls[1].options.model).toBe('sonnet');
     expect(queryCalls[1].options.effort).toBe('max');
     expect(queryCalls[1].options.resume).toBe('session-0');
+  });
+
+  test('clears a stale resume marker and retries the same turn once fresh', async () => {
+    writeFileSync(join(tmpDir, '.claude_session'), 'stale-session');
+    failResumedSessionOnce = true;
+    const strategy = makeStrategy(
+      false,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
+    const chunks: string[] = [];
+
+    await strategy.executePromptStreaming('recover turn', 'opus', (chunk) =>
+      chunks.push(chunk),
+    );
+
+    expect(chunks).toEqual(['answer-1:first']);
+    expect(queryCalls).toHaveLength(2);
+    expect(queryCalls[0].options.resume).toBe('stale-session');
+    expect(queryCalls[1].options.resume).toBeUndefined();
+    expect(receivedPrompts).toHaveLength(2);
+    expect(receivedPrompts[0]).toContain('recover turn');
+    expect(receivedPrompts[1]).toContain('recover turn');
+    expect(existsSync(join(tmpDir, '.claude_session'))).toBe(true);
+    expect(readFileSync(join(tmpDir, '.claude_session'), 'utf8')).toBe(
+      'session-1',
+    );
   });
 
   test('routes fibe-local through non-secret inline MCP config and conversation env', async () => {

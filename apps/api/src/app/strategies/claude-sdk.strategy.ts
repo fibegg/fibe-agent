@@ -220,6 +220,13 @@ function assistantText(message: SDKMessage): string | null {
   return text || null;
 }
 
+function isRecoverableResumeExit(message: string): boolean {
+  return (
+    /\bpty_exited:\s*code=1\b/i.test(message) ||
+    /No conversation found with session ID/i.test(message)
+  );
+}
+
 class AsyncMessageQueue<T> implements AsyncIterable<T>, AsyncIterator<T> {
   private readonly queued: T[] = [];
   private waiter: ((value: IteratorResult<T>) => void) | null = null;
@@ -526,62 +533,77 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     const workspaceDir = this.getClaudeWorkspaceDir();
     this.prepareWorkingDir();
 
-    const record = await this.getOrCreateRecord(
-      workspaceDir,
-      model,
-      systemPrompt,
-      runtimeOptions,
-    );
-    if (record.busy) {
-      throw new Error('AGENT_BUSY');
-    }
-
-    record.busy = true;
-    this.activeRecord = record;
-
     const pendingMessages = this.consumePendingMessages();
     const finalPrompt = pendingMessages
       ? `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`
       : prompt;
+    let allowResumeRecovery = true;
 
-    const state: StreamTurnState = {
-      inThinking: false,
-      currentToolBlock: null,
-      usage: null,
-      emittedVisibleOutput: false,
-      emittedTextDelta: false,
-      errorText: '',
-      sessionId: record.sessionId,
-    };
+    while (true) {
+      const record = await this.getOrCreateRecord(
+        workspaceDir,
+        model,
+        systemPrompt,
+        runtimeOptions,
+      );
+      if (record.busy) {
+        throw new Error('AGENT_BUSY');
+      }
 
-    try {
-      record.input.enqueue(userTextMessage(finalPrompt, record.sessionId));
-      await this.readUntilTurnComplete(record, state, onChunk, callbacks);
-      if (state.errorText.trim()) {
-        throw new Error(state.errorText.trim());
+      record.busy = true;
+      this.activeRecord = record;
+
+      const state: StreamTurnState = {
+        inThinking: false,
+        currentToolBlock: null,
+        usage: null,
+        emittedVisibleOutput: false,
+        emittedTextDelta: false,
+        errorText: '',
+        sessionId: record.sessionId,
+      };
+
+      try {
+        record.input.enqueue(userTextMessage(finalPrompt, record.sessionId));
+        await this.readUntilTurnComplete(record, state, onChunk, callbacks);
+        if (state.errorText.trim()) {
+          throw new Error(state.errorText.trim());
+        }
+        if (!state.emittedVisibleOutput) {
+          throw new Error(
+            'Agent process completed successfully but returned no output. Session not saved to prevent corruption.',
+          );
+        }
+        if (state.sessionId) {
+          record.sessionId = state.sessionId;
+          this.writeSessionMarker(workspaceDir, state.sessionId);
+        }
+        return;
+      } catch (err) {
+        const raw = err instanceof Error ? err.message : String(err);
+        if (this.streamInterrupted || raw === SDK_INTERRUPTED_ERROR_NAME) {
+          throw new Error(INTERRUPTED_MESSAGE);
+        }
+        const authError = detectProviderAuthFailure('Claude Code', raw);
+        if (authError) throw authError;
+        if (
+          allowResumeRecovery &&
+          record.sessionId &&
+          isRecoverableResumeExit(raw)
+        ) {
+          allowResumeRecovery = false;
+          this.clearSessionMarker(workspaceDir);
+          this.logger.warn(
+            'Claude resume session was rejected; cleared marker and retrying once with a fresh session',
+          );
+          continue;
+        }
+        throw err;
+      } finally {
+        record.busy = false;
+        if (this.activeRecord === record) this.activeRecord = null;
+        this.closeRecord(record);
       }
-      if (!state.emittedVisibleOutput) {
-        throw new Error(
-          'Agent process completed successfully but returned no output. Session not saved to prevent corruption.',
-        );
-      }
-      if (state.sessionId) {
-        record.sessionId = state.sessionId;
-        this.writeSessionMarker(workspaceDir, state.sessionId);
-      }
-    } catch (err) {
-      const raw = err instanceof Error ? err.message : String(err);
-      if (this.streamInterrupted || raw === SDK_INTERRUPTED_ERROR_NAME) {
-        throw new Error(INTERRUPTED_MESSAGE);
-      }
-      const authError = detectProviderAuthFailure('Claude Code', raw);
-      if (authError) throw authError;
-      this.closeRecord(record);
-      throw err;
-    } finally {
-      record.busy = false;
-      if (this.activeRecord === record) this.activeRecord = null;
-      this.closeRecord(record);
     }
   }
 
@@ -874,6 +896,21 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       writeFileSync(markerPath, sessionId);
     } catch {
       /* ignore */
+    }
+  }
+
+  private clearSessionMarker(workspaceDir: string): void {
+    if (!this.conversationDataDir) return;
+    const paths = new Set<string>();
+    const markerPath = this.getSessionMarkerPath();
+    if (markerPath) paths.add(markerPath);
+    paths.add(join(workspaceDir, SESSION_MARKER_FILE));
+    for (const path of paths) {
+      try {
+        rmSync(path, { force: true });
+      } catch {
+        /* ignore */
+      }
     }
   }
 
