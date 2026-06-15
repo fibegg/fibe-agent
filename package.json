@@ -13,7 +13,7 @@
     "test:integration": "echo 'No integration tests configured'",
     "typecheck": "nx run-many -t typecheck",
     "e2e": "nx run-many -t e2e",
-    "ci": "nx run-many -t lint,build,typecheck,test",
+    "ci": "sh scripts/ci/entrypoint-config.test.sh && nx run-many -t lint,build,typecheck,test",
     "ci:notest": "nx run-many -t lint,build,typecheck"
   },
   "private": true,

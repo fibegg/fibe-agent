@@ -14,7 +14,7 @@ To prevent unexpected API changes or output format drift from breaking the agent
 ## 2. Should this be configured by user in fibe-agent-standalone / rails-managed?
 **Decision: Provider versions are tied to agent releases.**
 By default, the agent expects the pinned version to guarantee stability. However, advanced users running `fibe-agent-standalone` can manually install a different version globally. If version behavior deviates, they might encounter parsing or connectivity issues.
-`cliVersion` is already present in `FibeSettings`, promoted to `FIBE_CLI_VERSION`, and exposed through `ConfigService.getCliVersion()`. Runtime binary selection based on that value is still future work; no strategy currently switches binaries or invokes `npx @provider/cli@<version>` dynamically.
+`cliVersion` controls the runtime `fibe` CLI, not the provider CLI. The Docker entrypoint reads `FIBE_VERSION`, `FIBE_CLI_VERSION`, or `cliVersion` from `fibe.yml` and installs or reuses that `fibe` version before the API starts. No strategy currently switches provider binaries or invokes `npx @provider/cli@<version>` dynamically.
 
 ## 3. E2E tests for versions compatibility (matrix)
 **Decision: Add compatibility matrix to CI (Planned).**

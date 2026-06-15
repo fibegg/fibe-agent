@@ -16,16 +16,25 @@ DEV_DEPS_LOCK_DIR="${DEV_DEPS_LOCK_DIR:-/app/.nx/dev-deps-install.lock}"
 DEV_DEPS_LOCK_TIMEOUT_SECONDS="${DEV_DEPS_LOCK_TIMEOUT_SECONDS:-600}"
 export PATH="${RUNTIME_FIBE_BIN_DIR}:$PATH"
 
-runtime_fibe_config_version() {
-  for candidate in \
+runtime_fibe_config_candidates() {
+  if [ -n "${FIBE_ENTRYPOINT_CONFIG_CANDIDATES:-}" ]; then
+    printf '%s\n' "$FIBE_ENTRYPOINT_CONFIG_CANDIDATES"
+    return
+  fi
+
+  printf '%s\n' \
     "${FIBE_SETTINGS_PATH:-}" \
     "${DATA_DIR:-/app/data}/fibe.yml" \
-    /app/data/fibe.yml
-  do
+    /app/data/fibe.yml \
+    /app/fibe.yml
+}
+
+runtime_fibe_config_version() {
+  runtime_fibe_config_candidates | while IFS= read -r candidate; do
     [ -n "$candidate" ] || continue
     [ -f "$candidate" ] || continue
 
-    awk '
+    version="$(awk '
       /^[[:space:]]*cliVersion[[:space:]]*:/ {
         value = $0
         sub(/^[^:]*:[[:space:]]*/, "", value)
@@ -36,8 +45,11 @@ runtime_fibe_config_version() {
           exit
         }
       }
-    ' "$candidate"
-    return
+    ' "$candidate")"
+    if [ -n "$version" ]; then
+      printf '%s\n' "$version"
+      return
+    fi
   done
 }
 
@@ -335,6 +347,10 @@ ensure_runtime_fibe() {
   installed_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
   echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
 }
+
+if [ "${FIBE_AGENT_ENTRYPOINT_SOURCE_ONLY:-0}" = "1" ]; then
+  return 0 2>/dev/null || exit 0
+fi
 
 ensure_runtime_fibe
 
