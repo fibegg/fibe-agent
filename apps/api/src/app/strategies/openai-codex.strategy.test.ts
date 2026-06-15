@@ -661,6 +661,7 @@ describe('OpenaiCodexStrategy', () => {
     process.env.HOME = TEST_HOME;
     process.env.SESSION_DIR = join(TEST_HOME, '.codex');
     process.env.CODEX_AGENT_TRANSPORT = 'exec';
+    delete process.env.OPENAI_API_KEY;
     delete process.env.CODEX_HOME;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
