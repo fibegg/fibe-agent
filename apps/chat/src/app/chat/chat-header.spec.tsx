@@ -498,7 +498,7 @@ describe('ChatHeader', () => {
     expect(screen.queryByRole('menuitem', { name: /reset conversation/i })).toBeNull();
   });
 
-  describe('mobile header keyboard tracking', () => {
+  describe('mobile header viewport anchoring', () => {
     function setVisualViewport(offsetTop: number) {
       Object.defineProperty(window, 'visualViewport', {
         configurable: true,
@@ -519,7 +519,7 @@ describe('ChatHeader', () => {
       Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: undefined });
     });
 
-    it('translates the simplicate header by visualViewport.offsetTop on mobile', () => {
+    it('does not translate the simplicate header because the app root follows the visual viewport', () => {
       setVisualViewport(120);
       const { container } = render(
         <ChatHeader
@@ -530,7 +530,7 @@ describe('ChatHeader', () => {
       );
       const header = container.querySelector('header');
       expect(header).toBeTruthy();
-      expect(header?.style.transform).toBe('translateY(120px)');
+      expect(header?.style.transform).toBe('');
     });
 
     it('does not translate the simplicate header when visualViewport.offsetTop is 0', () => {
@@ -546,7 +546,7 @@ describe('ChatHeader', () => {
       expect(header?.style.transform).toBe('');
     });
 
-    it('translates the regular mobile header by visualViewport.offsetTop', () => {
+    it('does not translate the regular mobile header because the app root follows the visual viewport', () => {
       setVisualViewport(120);
       const { container } = render(
         <MemoryRouter>
@@ -558,7 +558,7 @@ describe('ChatHeader', () => {
         </MemoryRouter>,
       );
       const header = container.querySelector('header');
-      expect(header?.style.transform).toBe('translateY(120px)');
+      expect(header?.style.transform).toBe('');
     });
 
     it('does not translate the desktop header even when visualViewport.offsetTop is set', () => {

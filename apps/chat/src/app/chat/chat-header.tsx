@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import {
   Brain,
   Loader2,
@@ -182,7 +182,6 @@ export function ChatHeader({
   const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
   const menuButtonLabel = t('header.openMenu');
   const compactShowsProviderModel = state === CHAT_STATES.AUTHENTICATED;
-  const mobileHeaderRef = useRef<HTMLElement>(null);
   const busyBadge =
     anyProcessing && state !== CHAT_STATES.AWAITING_RESPONSE ? (
       <span className="shrink-0 flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-400 border border-amber-500/20 animate-pulse">
@@ -200,33 +199,12 @@ export function ChatHeader({
       </span>
     ) : null;
 
-  useEffect(() => {
-    if (!isMobile) return;
-    const el = mobileHeaderRef.current;
-    if (!el) return;
-    const update = () => {
-      const offsetTop = window.visualViewport?.offsetTop ?? 0;
-      el.style.transform = offsetTop ? `translateY(${offsetTop}px)` : '';
-    };
-    update();
-    const vv = window.visualViewport;
-    vv?.addEventListener('scroll', update);
-    vv?.addEventListener('resize', update);
-    return () => {
-      vv?.removeEventListener('scroll', update);
-      vv?.removeEventListener('resize', update);
-      if (el) el.style.transform = '';
-    };
-  }, [isMobile, compactMode]);
-
   if (compactMode) {
     return (
       <header
-        ref={mobileHeaderRef}
         className="border-b border-border bg-[var(--pwa-safe-area-bg)] px-3 pb-2 shrink-0 sm:px-4 relative z-30"
         style={{
           paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
-          willChange: 'transform',
         }}
       >
         <div className="flex h-10 items-center justify-between gap-2">
@@ -327,12 +305,10 @@ export function ChatHeader({
 
   return (
     <header
-      ref={mobileHeaderRef}
       className="border-b border-border bg-[var(--pwa-safe-area-bg)] shrink-0 px-4 pb-3"
       style={{
         minHeight: PANEL_HEADER_MIN_HEIGHT_PX,
         paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
-        willChange: 'transform',
       }}
     >
       {isMobile && (

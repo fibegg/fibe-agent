@@ -6,15 +6,20 @@ describe('parent viewport bridge', () => {
     document.documentElement.style.removeProperty('--parent-visual-height');
     document.documentElement.style.removeProperty('--parent-visual-width');
     document.documentElement.style.removeProperty('--parent-visual-offset-top');
+    document.documentElement.style.removeProperty('--parent-visual-offset-left');
+    document.documentElement.style.removeProperty('--parent-visual-frame-top');
+    document.documentElement.style.removeProperty('--parent-visual-frame-left');
     document.documentElement.style.removeProperty('--parent-visual-page-top');
+    document.documentElement.style.removeProperty('--parent-visual-page-left');
   });
 
   it('recognizes valid parent viewport messages', async () => {
     const { isParentViewportMessage } = await import('./parent-viewport');
 
-    expect(isParentViewportMessage({ type: 'viewport', height: 640, width: 390 })).toBe(true);
+    expect(isParentViewportMessage({ type: 'viewport', height: 640, width: 390, frameTop: 24 })).toBe(true);
     expect(isParentViewportMessage({ type: 'viewport', height: 0 })).toBe(false);
     expect(isParentViewportMessage({ type: 'viewport', height: Number.NaN })).toBe(false);
+    expect(isParentViewportMessage({ type: 'viewport', height: 640, frameTop: -1 })).toBe(false);
     expect(isParentViewportMessage({ type: 'set_theme', height: 640 })).toBe(false);
   });
 
@@ -26,13 +31,21 @@ describe('parent viewport bridge', () => {
       height: 612.5,
       width: 375,
       offsetTop: 12,
+      offsetLeft: 2,
+      frameTop: 96,
+      frameLeft: 4,
       pageTop: 48,
+      pageLeft: 6,
     });
 
     expect(document.documentElement.style.getPropertyValue('--parent-visual-height')).toBe('612.5px');
     expect(document.documentElement.style.getPropertyValue('--parent-visual-width')).toBe('375px');
     expect(document.documentElement.style.getPropertyValue('--parent-visual-offset-top')).toBe('12px');
+    expect(document.documentElement.style.getPropertyValue('--parent-visual-offset-left')).toBe('2px');
+    expect(document.documentElement.style.getPropertyValue('--parent-visual-frame-top')).toBe('96px');
+    expect(document.documentElement.style.getPropertyValue('--parent-visual-frame-left')).toBe('4px');
     expect(document.documentElement.style.getPropertyValue('--parent-visual-page-top')).toBe('48px');
+    expect(document.documentElement.style.getPropertyValue('--parent-visual-page-left')).toBe('6px');
   });
 
   it('listens for parent viewport messages only when embedded', async () => {

@@ -4,6 +4,8 @@ export interface ParentViewportMessage {
   width?: number;
   offsetTop?: number;
   offsetLeft?: number;
+  frameTop?: number;
+  frameLeft?: number;
   pageTop?: number;
   pageLeft?: number;
 }
@@ -38,6 +40,8 @@ export function isParentViewportMessage(data: unknown): data is ParentViewportMe
     isOptionalPositiveViewportNumber(o.width) &&
     isOptionalViewportOffset(o.offsetTop) &&
     isOptionalViewportOffset(o.offsetLeft) &&
+    isOptionalViewportOffset(o.frameTop) &&
+    isOptionalViewportOffset(o.frameLeft) &&
     isOptionalScrollNumber(o.pageTop) &&
     isOptionalScrollNumber(o.pageLeft)
   );
@@ -55,6 +59,8 @@ export function applyParentViewport(message: ParentViewportMessage): void {
   setOptionalPixelProperty('--parent-visual-width', message.width);
   setOptionalPixelProperty('--parent-visual-offset-top', message.offsetTop);
   setOptionalPixelProperty('--parent-visual-offset-left', message.offsetLeft);
+  setOptionalPixelProperty('--parent-visual-frame-top', message.frameTop);
+  setOptionalPixelProperty('--parent-visual-frame-left', message.frameLeft);
   setOptionalPixelProperty('--parent-visual-page-top', message.pageTop);
   setOptionalPixelProperty('--parent-visual-page-left', message.pageLeft);
 }

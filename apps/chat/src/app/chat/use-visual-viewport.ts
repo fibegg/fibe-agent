@@ -34,10 +34,14 @@ export function useVisualViewport(): void {
     function update(): void {
       const vv = window.visualViewport;
       const vvHeight = vv?.height ?? window.innerHeight;
+      const vvWidth = vv?.width ?? window.innerWidth;
       const vvOffsetTop = vv?.offsetTop ?? 0;
+      const vvOffsetLeft = vv?.offsetLeft ?? 0;
       document.documentElement.style.setProperty('--vh', `${vvHeight * 0.01}px`);
       document.documentElement.style.setProperty('--local-visual-height', `${vvHeight}px`);
+      document.documentElement.style.setProperty('--local-visual-width', `${vvWidth}px`);
       document.documentElement.style.setProperty('--visual-viewport-offset-top', `${vvOffsetTop}px`);
+      document.documentElement.style.setProperty('--visual-viewport-offset-left', `${vvOffsetLeft}px`);
       const keyboardHeight = Math.max(0, window.innerHeight - vvHeight - vvOffsetTop);
       document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
     }

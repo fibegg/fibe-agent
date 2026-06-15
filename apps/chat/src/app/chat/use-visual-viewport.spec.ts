@@ -17,8 +17,10 @@ describe('useVisualViewport', () => {
     });
     document.documentElement.style.removeProperty('--vh');
     document.documentElement.style.removeProperty('--local-visual-height');
+    document.documentElement.style.removeProperty('--local-visual-width');
     document.documentElement.style.removeProperty('--keyboard-height');
     document.documentElement.style.removeProperty('--visual-viewport-offset-top');
+    document.documentElement.style.removeProperty('--visual-viewport-offset-left');
     vi.useRealTimers();
   });
 
@@ -34,6 +36,7 @@ describe('useVisualViewport', () => {
 
     expect(document.documentElement.style.getPropertyValue('--vh')).toBe('8px');
     expect(document.documentElement.style.getPropertyValue('--local-visual-height')).toBe('800px');
+    expect(document.documentElement.style.getPropertyValue('--local-visual-width')).toBe(`${window.innerWidth}px`);
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   });
 
@@ -41,6 +44,7 @@ describe('useVisualViewport', () => {
     const listeners: Record<string, EventListener> = {};
     const vv = {
       height: 600,
+      width: 360,
       addEventListener: vi.fn((type: string, fn: EventListener) => { listeners[type] = fn; }),
       removeEventListener: vi.fn(),
     };
@@ -51,6 +55,7 @@ describe('useVisualViewport', () => {
 
     expect(document.documentElement.style.getPropertyValue('--vh')).toBe('6px');
     expect(document.documentElement.style.getPropertyValue('--local-visual-height')).toBe('600px');
+    expect(document.documentElement.style.getPropertyValue('--local-visual-width')).toBe('360px');
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   });
 
@@ -74,6 +79,7 @@ describe('useVisualViewport', () => {
     const vv = {
       height: 400,
       offsetTop: 120,
+      offsetLeft: 8,
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     };
@@ -83,6 +89,7 @@ describe('useVisualViewport', () => {
     renderHook(() => useVisualViewport());
 
     expect(document.documentElement.style.getPropertyValue('--visual-viewport-offset-top')).toBe('120px');
+    expect(document.documentElement.style.getPropertyValue('--visual-viewport-offset-left')).toBe('8px');
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('280px');
   });
 
