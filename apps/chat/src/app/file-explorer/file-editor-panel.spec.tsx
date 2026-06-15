@@ -282,7 +282,7 @@ describe('FileEditorPanel', () => {
     render(<FileEditorPanel entry={ENTRY} onClose={mockClose} apiBasePath="/api/agent-files/file?conversationId=thread-a" />);
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
 
-    const editor = screen.getByTestId('cm-mock') as HTMLTextAreaElement;
+    const editor = await screen.findByTestId('cm-mock') as HTMLTextAreaElement;
     fireEvent.input(editor, { target: { value: 'updated' } });
     fireEvent.click(screen.getByRole('button', { name: /save/i }));
 
@@ -309,6 +309,7 @@ describe('FileEditorPanel', () => {
     (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'line 1\nline 2\nline 3\nline 4' }) });
     render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    await screen.findByTestId('cm-mock');
 
     fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
     const rail = screen.getByRole('complementary', { name: 'File preview' });
@@ -322,6 +323,7 @@ describe('FileEditorPanel', () => {
     (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content }) });
     render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    await screen.findByTestId('cm-mock');
 
     fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
     const rail = screen.getByRole('complementary', { name: 'File preview' });
@@ -349,6 +351,7 @@ describe('FileEditorPanel', () => {
     (apiRequest as Mock).mockResolvedValue({ ok: true, json: async () => ({ content: 'line 1\nline 2' }) });
     render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
     await waitFor(() => expect(screen.queryByText('Loading…')).toBeNull());
+    await screen.findByTestId('cm-mock');
 
     fireEvent.click(screen.getByRole('button', { name: 'File preview' }));
     fireEvent.keyDown(screen.getByRole('complementary', { name: 'File preview' }), { key: 'Enter' });
