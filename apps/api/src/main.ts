@@ -22,14 +22,22 @@ import { ContainerLoggerService, logRequest } from './container-logger';
 import { loadInjectedCredentials } from './credential-injector';
 import { writeRuntimeFiles } from './runtime-files-writer';
 import { runPostInitOnce } from './post-init-runner';
+import { ensureJune1815Bootstrap } from './june1815-bootstrap';
 import { TerminalService } from './app/terminal/terminal.service';
 import { ConversationManagerService } from './app/conversation/conversation-manager.service';
 
+if (process.env.FIBE_LOCAL_MCP_SERVER === '1') {
+  void import('./app/local-mcp/local-mcp.server.js').catch((err) => {
+    console.error(err instanceof Error ? err.stack : String(err));
+    process.exit(1);
+  });
+} else {
 // Must be called before any service reads process.env
 loadDevEnv();
 // Apply unified settings from FIBE_SETTINGS_JSON and /app/fibe.yml
 // (after dotenv so .env values — which win — are already in process.env)
 loadFibeEnv();
+ensureJune1815Bootstrap();
 
 const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
 const DEFAULT_PORT = 3000;
@@ -134,3 +142,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+}

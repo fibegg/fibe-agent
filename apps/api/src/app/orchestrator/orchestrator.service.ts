@@ -106,16 +106,13 @@ export class OrchestratorService implements OnModuleInit {
   async onModuleInit(): Promise<void> {
     // Build the fibe-local entry here, where we already hold a reference to the
     // LocalMcpService and can use __dirname-based resolution without touching webpack.
-    const localServerPath = this.localMcp.getServerScriptPath();
+    const localServer = this.localMcp.getServerLaunch();
     writeMcpConfig({
       'fibe-local': {
-        command: process.execPath,
-        args: [localServerPath],
+        command: localServer.command,
+        args: localServer.args,
         env: {
-          PORT: process.env['PORT'] ?? '3000',
-          ...(process.env['AGENT_PASSWORD']
-            ? { AGENT_PASSWORD: process.env['AGENT_PASSWORD'] }
-            : {}),
+          ...localServer.env,
         },
       },
     });

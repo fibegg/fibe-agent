@@ -13,7 +13,7 @@
  */
 
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
@@ -595,6 +595,9 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
       resume?: string;
       sessionId?: string;
       env?: Record<string, string | undefined>;
+      model?: string;
+      effort?: string;
+      mcpServers?: Record<string, { env?: Record<string, string> }>;
     };
   }>;
   let closedCalls: number[];
@@ -618,6 +621,9 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
           resume?: string;
           sessionId?: string;
           env?: Record<string, string | undefined>;
+          model?: string;
+          effort?: string;
+          mcpServers?: Record<string, { env?: Record<string, string> }>;
         };
       }) => {
         const callIndex = queryCalls.length;
@@ -666,6 +672,9 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.CLAUDE_API_KEY;
     delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.AGENT_PASSWORD;
+    delete process.env.CONVERSATION_ID;
+    delete process.env.PORT;
     delete process.env.SESSION_DIR;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
@@ -693,6 +702,83 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(queryCalls[0].options.resume).toBeUndefined();
     expect(queryCalls[1].options.resume).toBe('session-0');
     expect(closedCalls).toEqual([0, 1]);
+  });
+
+  test('applies model and effort changes to the next fresh provider turn', async () => {
+    const strategy = makeStrategy(
+      false,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
+
+    await strategy.executePromptStreaming(
+      'first turn',
+      'opus',
+      () => undefined,
+      undefined,
+      undefined,
+      { effort: 'low' },
+    );
+    await strategy.executePromptStreaming(
+      'second turn',
+      'sonnet',
+      () => undefined,
+      undefined,
+      undefined,
+      { effort: 'max' },
+    );
+
+    expect(queryCalls).toHaveLength(2);
+    expect(queryCalls[0].options.model).toBe('opus');
+    expect(queryCalls[0].options.effort).toBe('low');
+    expect(queryCalls[0].options.resume).toBeUndefined();
+    expect(queryCalls[1].options.model).toBe('sonnet');
+    expect(queryCalls[1].options.effort).toBe('max');
+    expect(queryCalls[1].options.resume).toBe('session-0');
+  });
+
+  test('routes fibe-local through non-secret inline MCP config and conversation env', async () => {
+    process.env.AGENT_PASSWORD = 'agent-secret';
+    const strategy = makeStrategy(
+      false,
+      tmpDir,
+      undefined,
+      'likeable-project-1',
+    );
+    const workspaceDir = strategy.getWorkingDir();
+    mkdirSync(workspaceDir, { recursive: true });
+    writeFileSync(
+      join(workspaceDir, '.mcp.json'),
+      JSON.stringify({
+        mcpServers: {
+          fibe: {
+            type: 'stdio',
+            command: 'fibe',
+            args: ['mcp', 'serve'],
+            env: { FIBE_API_KEY: 'secret-token' },
+          },
+        },
+      }),
+    );
+
+    await strategy.executePromptStreaming('first turn', 'opus', () => undefined);
+
+    expect(queryCalls).toHaveLength(1);
+    expect(queryCalls[0].options.env?.CONVERSATION_ID).toBe('likeable-project-1');
+    expect(queryCalls[0].options.mcpServers).toEqual({
+      'fibe-local': {
+        type: 'stdio',
+        command: process.execPath,
+        args: [expect.stringContaining('main.js')],
+        env: {
+          FIBE_LOCAL_MCP_SERVER: '1',
+          PORT: '3000',
+        },
+      },
+    });
+    expect(JSON.stringify(queryCalls[0].options.mcpServers)).not.toContain('secret-token');
+    expect(JSON.stringify(queryCalls[0].options.mcpServers)).not.toContain('agent-secret');
   });
 
   test('folds pending steer text into the next fresh provider turn', async () => {

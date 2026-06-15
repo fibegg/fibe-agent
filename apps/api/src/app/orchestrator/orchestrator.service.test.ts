@@ -56,6 +56,11 @@ describe('OrchestratorService', () => {
       resolveQuestion: (id: string, payload: unknown) => {
         resolved.set(id, payload);
       },
+      getServerLaunch: () => ({
+        command: process.execPath,
+        args: ['/dev/null/local-mcp.server.js'],
+        env: { PORT: '3000' },
+      }),
       getServerScriptPath: () => '/dev/null/local-mcp.server.js',
     } as unknown as LocalMcpService;
     return { service, resolved };

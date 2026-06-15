@@ -40,12 +40,20 @@ describe('resolveClaude', () => {
     expect(resolveClaude()).toBe(fakeClaude);
   });
 
-  test('ignores CLAUDE_PATH override when file does not exist', () => {
+  test('throws when CLAUDE_PATH override does not exist', () => {
     process.env.CLAUDE_PATH = join(TEST_TMP, 'non-existent-claude');
-    // Should not throw — falls through to other strategies
-    const result = resolveClaude();
-    expect(typeof result).toBe('string');
-    expect(result.length).toBeGreaterThan(0);
+    expect(() => resolveClaude()).toThrow('CLAUDE_PATH is set but does not exist');
+  });
+
+  test('throws when CLAUDE_PATH override is not executable', () => {
+    const fakeBin = join(TEST_TMP, 'not-executable-bin');
+    mkdirSync(fakeBin, { recursive: true });
+    const fakeClaude = join(fakeBin, 'claude');
+    writeFileSync(fakeClaude, '#!/bin/sh\nexit 0\n', { mode: 0o644 });
+    chmodSync(fakeClaude, 0o644);
+
+    process.env.CLAUDE_PATH = fakeClaude;
+    expect(() => resolveClaude()).toThrow('CLAUDE_PATH is set but is not executable');
   });
 
   test('caches result and returns same value on second call', () => {
@@ -82,7 +90,6 @@ describe('resolveClaude', () => {
   });
 
   test('falls back to "claude" string when binary cannot be found anywhere', () => {
-    process.env.CLAUDE_PATH = join(TEST_TMP, 'missing');
     // Strip PATH so command -v fails; nvm + system dirs won't have claude in tmp
     process.env.PATH = TEST_TMP;
 

@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from 'node:fs';
+import { accessSync, constants, existsSync, readdirSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
 
@@ -7,6 +7,15 @@ const ORIG_HOME = process.env.HOME?.trim() ?? '';
 const ORIG_NVM_DIR = process.env.NVM_DIR?.trim() || (ORIG_HOME ? join(ORIG_HOME, '.nvm') : '');
 
 let _cachedPath: string | null | undefined = undefined;
+
+function isExecutable(path: string): boolean {
+  try {
+    accessSync(path, constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Returns nvm bin directories sorted newest-version-first.
@@ -41,6 +50,10 @@ function nvmBinDirs(): string[] {
  *  4. Common system locations (`~/.npm/bin`, `/usr/local/bin`, Homebrew)
  *  5. Bare `'claude'` fallback — lets spawn produce a clear ENOENT
  *
+ * When `CLAUDE_PATH` is set it is fail-closed: the exact executable must
+ * exist, otherwise startup of a Claude turn fails instead of silently using a
+ * different `claude` from PATH.
+ *
  * Result is cached for the process lifetime.
  * Call `_resetResolveClaudeCache()` in tests that change `CLAUDE_PATH`.
  */
@@ -49,8 +62,15 @@ export function resolveClaude(): string {
 
   // 1. Explicit override
   const override = process.env['CLAUDE_PATH']?.trim();
-  if (override && existsSync(override)) {
+  if (override && isExecutable(override)) {
     return (_cachedPath = override);
+  }
+  if (override) {
+    throw new Error(
+      existsSync(override)
+        ? `CLAUDE_PATH is set but is not executable: ${override}`
+        : `CLAUDE_PATH is set but does not exist: ${override}`,
+    );
   }
 
   // 2. Shell lookup (respects the running process PATH)
@@ -59,7 +79,7 @@ export function resolveClaude(): string {
       encoding: 'utf8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    if (found && existsSync(found)) return (_cachedPath = found);
+    if (found && isExecutable(found)) return (_cachedPath = found);
   } catch {
     /* not on PATH — fall through */
   }
@@ -75,7 +95,7 @@ export function resolveClaude(): string {
     ...nvmBinDirs().map((d) => join(d, 'claude')),
     ...staticCandidates,
   ]) {
-    if (existsSync(candidate)) return (_cachedPath = candidate);
+    if (isExecutable(candidate)) return (_cachedPath = candidate);
   }
 
   // 5. Fallback

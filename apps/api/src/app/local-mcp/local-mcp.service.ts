@@ -4,8 +4,7 @@ import {
   OnModuleDestroy,
   OnModuleInit,
 } from '@nestjs/common';
-import { ChildProcess, fork } from 'node:child_process';
-import { join } from 'node:path';
+import { ChildProcess, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { Subject } from 'rxjs';
 
@@ -22,6 +21,7 @@ import {
 } from '@shared/agent-mode.constants';
 import { WS_EVENT } from '@shared/ws-constants';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
+import { resolveLocalMcpLaunch, type LocalMcpLaunch } from './local-mcp-launch';
 
 export interface OutboundEvent {
   type: string;
@@ -84,12 +84,11 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
   // ─── Child process ──────────────────────────────────────────────────────────
 
   private spawnServer(): void {
-    const serverPath = this.getServerScriptPath();
+    const launch = this.getServerLaunch();
     try {
-      this.child = fork(serverPath, [], {
-        env: { ...process.env, PORT: process.env['PORT'] ?? '3000' },
+      this.child = spawn(launch.command, launch.args, {
+        env: { ...process.env, ...launch.env },
         stdio: 'pipe',
-        silent: true,
       });
       this.child.on('error', (err) =>
         this.logger.error(`Local MCP server error: ${err.message}`),
@@ -304,8 +303,13 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     p.resolve(payload);
   }
 
-  /** Path to the compiled stdio server script (used by OrchestratorService). */
+  /** Launch command for the stdio MCP server (used by OrchestratorService). */
+  getServerLaunch(): LocalMcpLaunch {
+    return resolveLocalMcpLaunch();
+  }
+
+  /** Path to the compiled stdio server script. Kept for older tests/stubs. */
   getServerScriptPath(): string {
-    return join(__dirname, 'local-mcp.server.js');
+    return this.getServerLaunch().args.at(-1) ?? '';
   }
 }

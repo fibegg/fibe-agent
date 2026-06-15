@@ -24,6 +24,7 @@ import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 import { getEnrichedPath, resolveClaude } from './resolve-claude';
 import { toolUseToEvent } from './tool-use-to-event';
+import { resolveLocalMcpLaunch } from '../local-mcp/local-mcp-launch';
 import type {
   McpServerConfig,
   Options as ClaudeSdkOptions,
@@ -105,52 +106,22 @@ function getTokenFilePath(): string {
   return join(getClaudeConfigDir(), 'agent_token.txt');
 }
 
-function parseMcpServers(
-  path: string,
-): Record<string, McpServerConfig> | undefined {
-  if (!existsSync(path)) return undefined;
-  try {
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as {
-      mcpServers?: Record<string, McpServerConfig>;
-    };
-    if (parsed.mcpServers && typeof parsed.mcpServers === 'object') {
-      return parsed.mcpServers;
-    }
-  } catch {
-    /* ignore malformed MCP config; Claude will still load user/project settings */
-  }
-  return undefined;
-}
-
-function localMcpServer(conversationId?: string): McpServerConfig {
-  const localServerPath = join(
-    __dirname,
-    '..',
-    'local-mcp',
-    'local-mcp.server.js',
-  );
-  const env: Record<string, string> = {
-    PORT: process.env['PORT'] ?? '3000',
-  };
-  if (process.env['AGENT_PASSWORD'])
-    env.AGENT_PASSWORD = process.env['AGENT_PASSWORD'];
-  if (conversationId) env.CONVERSATION_ID = conversationId;
+function localMcpServer(): McpServerConfig {
+  const launch = resolveLocalMcpLaunch({
+    PORT: process.env['PORT'],
+  });
 
   return {
     type: 'stdio',
-    command: process.execPath,
-    args: [localServerPath],
-    env,
+    command: launch.command,
+    args: launch.args,
+    env: launch.env,
   };
 }
 
-function mcpServersForConversation(
-  workspaceDir: string,
-  conversationId?: string,
-): Record<string, McpServerConfig> {
+function inlineMcpServers(): Record<string, McpServerConfig> {
   return {
-    ...(parseMcpServers(join(workspaceDir, '.mcp.json')) ?? {}),
-    'fibe-local': localMcpServer(conversationId),
+    'fibe-local': localMcpServer(),
   };
 }
 
@@ -674,14 +645,16 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       !markerSessionId && fibeConversationId && UUID_RE.test(fibeConversationId)
         ? fibeConversationId
         : undefined;
-    const mcpServers = mcpServersForConversation(
-      workspaceDir,
-      fibeConversationId,
-    );
+    if (fibeConversationId) {
+      envOverrides.CONVERSATION_ID = fibeConversationId;
+    }
+    const mcpServers = inlineMcpServers();
+    const claudeExecutable = resolveClaude();
+    this.logger.log(`Using Claude executable: ${claudeExecutable}`);
     const options: ClaudeSdkOptions = {
       cwd: workspaceDir,
       env: this.getClaudeProcessEnv(envOverrides),
-      pathToClaudeCodeExecutable: resolveClaude(),
+      pathToClaudeCodeExecutable: claudeExecutable,
       model: model.trim() || undefined,
       effort: resolveEffort(
         runtimeOptions?.effort ?? process.env.CLAUDE_EFFORT,

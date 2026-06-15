@@ -7,6 +7,7 @@ const getSessionDir = () => process.env.SESSION_DIR;
 const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const logger = new Logger('McpConfigWriter');
+const CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY = 'skipDangerousModePermissionPrompt';
 
 /**
  * A single MCP server entry — either streamable-HTTP or stdio.
@@ -107,6 +108,14 @@ function getDataDir(): string {
 function getConversationId(): string {
   const raw = process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim() || '';
   return raw || 'default';
+}
+
+function truthy(value: string | undefined): boolean {
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
+function june1815Enabled(): boolean {
+  return truthy(process.env.JUNE1815_ENABLED);
 }
 
 function getClaudeProjectMcpConfigPath(): string {
@@ -374,6 +383,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
 
     const settingsConfig = {
       ...settingsExisting,
+      ...(june1815Enabled() ? { [CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY]: true } : {}),
       mcpServers: {
         ...((settingsExisting.mcpServers as Record<string, unknown>) ?? {}),
         ...nativeServers,

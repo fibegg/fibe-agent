@@ -265,6 +265,23 @@ describe('writeMcpConfig', () => {
       expect(config.mcpServers['fibe']).toBeDefined();
     });
 
+    it('forces dangerous-mode prompt skip in Claude settings when june1815 is enabled', () => {
+      process.env.JUNE1815_ENABLED = '1';
+      const claudeDir = join(testHome, '.claude');
+      mkdirSync(claudeDir, { recursive: true });
+      writeFileSync(
+        join(claudeDir, 'settings.json'),
+        JSON.stringify({ skipDangerousModePermissionPrompt: false, theme: 'dark' }),
+      );
+
+      writeMcpConfig();
+
+      const config = JSON.parse(readFileSync(join(claudeDir, 'settings.json'), 'utf8'));
+      expect(config.theme).toBe('dark');
+      expect(config.skipDangerousModePermissionPrompt).toBe(true);
+      expect(config.mcpServers['fibe']).toBeDefined();
+    });
+
     it('writes project .mcp.json with stdio type when FIBE_AGENT_ID is available', () => {
       process.env.DATA_DIR = join(testHome, 'data');
       process.env.FIBE_AGENT_ID = 'agent/claude';
