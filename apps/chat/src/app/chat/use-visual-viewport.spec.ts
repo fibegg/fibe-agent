@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
-import { useVisualViewport } from './use-visual-viewport';
+import { VIEWPORT_SETTLE_DELAYS_MS, useVisualViewport } from './use-visual-viewport';
 
 describe('useVisualViewport', () => {
   let originalVisualViewport: VisualViewport | null;
@@ -16,8 +16,10 @@ describe('useVisualViewport', () => {
       writable: true,
     });
     document.documentElement.style.removeProperty('--vh');
+    document.documentElement.style.removeProperty('--local-visual-height');
     document.documentElement.style.removeProperty('--keyboard-height');
     document.documentElement.style.removeProperty('--visual-viewport-offset-top');
+    vi.useRealTimers();
   });
 
   it('sets --vh CSS variable on mount using window.innerHeight fallback', () => {
@@ -31,6 +33,7 @@ describe('useVisualViewport', () => {
     renderHook(() => useVisualViewport());
 
     expect(document.documentElement.style.getPropertyValue('--vh')).toBe('8px');
+    expect(document.documentElement.style.getPropertyValue('--local-visual-height')).toBe('800px');
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   });
 
@@ -47,6 +50,7 @@ describe('useVisualViewport', () => {
     renderHook(() => useVisualViewport());
 
     expect(document.documentElement.style.getPropertyValue('--vh')).toBe('6px');
+    expect(document.documentElement.style.getPropertyValue('--local-visual-height')).toBe('600px');
     expect(document.documentElement.style.getPropertyValue('--keyboard-height')).toBe('0px');
   });
 
@@ -95,5 +99,26 @@ describe('useVisualViewport', () => {
 
     expect(vv.removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
     expect(vv.removeEventListener).toHaveBeenCalledWith('scroll', expect.any(Function));
+  });
+
+  it('resamples after focus so first keyboard animation settle is captured', () => {
+    vi.useFakeTimers();
+    const vv = {
+      height: 700,
+      offsetTop: 0,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    };
+    Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true, writable: true });
+    Object.defineProperty(window, 'innerHeight', { value: 700, configurable: true });
+
+    renderHook(() => useVisualViewport());
+    expect(document.documentElement.style.getPropertyValue('--local-visual-height')).toBe('700px');
+
+    document.dispatchEvent(new FocusEvent('focusin'));
+    vv.height = 430;
+    vi.advanceTimersByTime(VIEWPORT_SETTLE_DELAYS_MS[0]);
+
+    expect(document.documentElement.style.getPropertyValue('--local-visual-height')).toBe('430px');
   });
 });

@@ -10,7 +10,7 @@
     --text-lg: 1.125rem;
     --text-xl: 1.25rem;
     --text-2xl: 1.5rem;
-    --app-visual-height: var(--parent-visual-height, calc(var(--vh, 1dvh) * 100));
+    --app-visual-height: min(var(--parent-visual-height, 100dvh), var(--local-visual-height, 100dvh));
     --background: #f5f0e6;
     --pwa-safe-area-bg: #f5f0e6;
     --foreground: #2d2a24;

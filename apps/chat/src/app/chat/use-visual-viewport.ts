@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+export const VIEWPORT_SETTLE_DELAYS_MS = [50, 150, 300, 600, 1000] as const;
+
 /**
  * Sets CSS custom properties on `:root` for mobile keyboard awareness:
  *
@@ -22,40 +24,76 @@ import { useEffect } from 'react';
  * `visualViewport.height` already shrink while the keyboard is open.
  *
  * Usage:
- *   `height: calc(var(--vh, 1svh) * 100)` // full visual-viewport height
+ *   `height: var(--local-visual-height, 100dvh)` // full visual-viewport height
  */
 export function useVisualViewport(): void {
   useEffect(() => {
+    let frame: number | null = null;
+    let timers: number[] = [];
+
     function update(): void {
       const vv = window.visualViewport;
       const vvHeight = vv?.height ?? window.innerHeight;
       const vvOffsetTop = vv?.offsetTop ?? 0;
-      // 1% of the visual viewport height (shrinks when keyboard is open)
       document.documentElement.style.setProperty('--vh', `${vvHeight * 0.01}px`);
+      document.documentElement.style.setProperty('--local-visual-height', `${vvHeight}px`);
       document.documentElement.style.setProperty('--visual-viewport-offset-top', `${vvOffsetTop}px`);
-      // Height of the software keyboard (0 when closed)
       const keyboardHeight = Math.max(0, window.innerHeight - vvHeight - vvOffsetTop);
       document.documentElement.style.setProperty('--keyboard-height', `${keyboardHeight}px`);
     }
 
-    update();
+    function cancelScheduledUpdates(): void {
+      if (frame !== null) {
+        cancelAnimationFrame(frame);
+        frame = null;
+      }
+      for (const timer of timers) window.clearTimeout(timer);
+      timers = [];
+    }
+
+    function scheduleUpdate(): void {
+      cancelScheduledUpdates();
+      update();
+      frame = requestAnimationFrame(() => {
+        frame = null;
+        update();
+      });
+      timers = VIEWPORT_SETTLE_DELAYS_MS.map((delay) =>
+        window.setTimeout(update, delay),
+      );
+    }
+
+    scheduleUpdate();
 
     const vv = window.visualViewport;
     if (vv) {
-      vv.addEventListener('resize', update);
-      vv.addEventListener('scroll', update);
+      vv.addEventListener('resize', scheduleUpdate);
+      vv.addEventListener('scroll', scheduleUpdate);
     } else {
-      window.addEventListener('resize', update);
+      window.addEventListener('resize', scheduleUpdate);
     }
+    window.addEventListener('resize', scheduleUpdate);
+    window.addEventListener('orientationchange', scheduleUpdate);
+    window.addEventListener('pageshow', scheduleUpdate);
+    document.addEventListener('focusin', scheduleUpdate, true);
+    document.addEventListener('focusout', scheduleUpdate, true);
+    document.addEventListener('visibilitychange', scheduleUpdate);
 
     return () => {
+      cancelScheduledUpdates();
       const vv2 = window.visualViewport;
       if (vv2) {
-        vv2.removeEventListener('resize', update);
-        vv2.removeEventListener('scroll', update);
+        vv2.removeEventListener('resize', scheduleUpdate);
+        vv2.removeEventListener('scroll', scheduleUpdate);
       } else {
-        window.removeEventListener('resize', update);
+        window.removeEventListener('resize', scheduleUpdate);
       }
+      window.removeEventListener('resize', scheduleUpdate);
+      window.removeEventListener('orientationchange', scheduleUpdate);
+      window.removeEventListener('pageshow', scheduleUpdate);
+      document.removeEventListener('focusin', scheduleUpdate, true);
+      document.removeEventListener('focusout', scheduleUpdate, true);
+      document.removeEventListener('visibilitychange', scheduleUpdate);
     };
   }, []);
 }
