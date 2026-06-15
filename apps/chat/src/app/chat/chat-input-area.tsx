@@ -132,7 +132,7 @@ export function ChatInputArea({
       className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-[var(--pwa-safe-area-bg)]"
       style={{
         paddingBottom:
-          'max(0.75rem, calc(env(safe-area-inset-bottom, 0px) + var(--keyboard-height, 0px)))',
+          'max(0.75rem, env(safe-area-inset-bottom, 0px))',
       }}
     >
       <div className="flex flex-col gap-2">

@@ -19,12 +19,12 @@ const PWA_THEME_COLORS: Record<Theme, string> = {
   midnight: '#07111f',
   contrast: '#000000',
 };
-const PWA_STATUS_BAR_STYLES: Record<Theme, 'default' | 'black-translucent'> = {
+const PWA_STATUS_BAR_STYLES: Record<Theme, 'default' | 'black'> = {
   light: 'default',
-  dark: 'black-translucent',
-  dracula: 'black-translucent',
-  midnight: 'black-translucent',
-  contrast: 'black-translucent',
+  dark: 'black',
+  dracula: 'black',
+  midnight: 'black',
+  contrast: 'black',
 };
 
 export interface ThemeOption {

@@ -1,6 +1,8 @@
 import { type ReactNode } from 'react';
 import { MAIN_CONTENT_MIN_WIDTH_PX } from '../layout-constants';
 
+export const CHAT_LAYOUT_HEIGHT = 'var(--app-visual-height, 100dvh)';
+
 export interface ChatLayoutProps {
   isDragOver?: boolean;
   onDragOver?: (e: React.DragEvent) => void;
@@ -39,11 +41,9 @@ export function ChatLayout({
       className={`flex w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-primary/10 relative ${isDragOver ? 'ring-2 ring-inset ring-primary ring-offset-2 ring-offset-background' : ''}`}
       style={{
         ...(isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : {}),
-        // Keep the layout at full window height — the keyboard overlays the
-        // content rather than shrinking it (Telegram / WhatsApp approach).
-        // The chat input area uses `padding-bottom: var(--keyboard-height)`
-        // to stay pinned above the soft keyboard on mobile.
-        height: '100dvh',
+        // Match the active visual viewport so iOS PWA keyboards shrink the
+        // chat column instead of leaving the composer behind the keyboard.
+        height: CHAT_LAYOUT_HEIGHT,
       }}
       onDragOver={onDragOver}
       onDragEnter={onDragEnter}
