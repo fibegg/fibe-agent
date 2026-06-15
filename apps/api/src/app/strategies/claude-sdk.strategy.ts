@@ -227,6 +227,10 @@ function isRecoverableResumeExit(message: string): boolean {
   );
 }
 
+function truthyEnv(value: string | undefined): boolean {
+  return value === '1' || value?.toLowerCase() === 'true';
+}
+
 class AsyncMessageQueue<T> implements AsyncIterable<T>, AsyncIterator<T> {
   private readonly queued: T[] = [];
   private waiter: ((value: IteratorResult<T>) => void) | null = null;
@@ -633,6 +637,10 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
 
   hasNativeSessionSupport(): boolean {
     return true;
+  }
+
+  shouldInjectPromptHistory(): boolean {
+    return truthyEnv(process.env.JUNE1815_ENABLED);
   }
 
   private async getOrCreateRecord(

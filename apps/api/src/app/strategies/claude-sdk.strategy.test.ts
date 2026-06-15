@@ -844,6 +844,22 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(text).toContain('continue work');
   });
 
+  test('requests prompt history injection when june1815 shim mode is enabled', () => {
+    const previous = process.env.JUNE1815_ENABLED;
+    try {
+      delete process.env.JUNE1815_ENABLED;
+      const direct = makeStrategy(false, tmpDir);
+      expect(direct.shouldInjectPromptHistory?.()).toBe(false);
+
+      process.env.JUNE1815_ENABLED = '1';
+      const shim = makeStrategy(false, tmpDir);
+      expect(shim.shouldInjectPromptHistory?.()).toBe(true);
+    } finally {
+      if (previous === undefined) delete process.env.JUNE1815_ENABLED;
+      else process.env.JUNE1815_ENABLED = previous;
+    }
+  });
+
   test('api-token mode does not copy Anthropic API keys into the OAuth token env', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-api-token';
     process.env.CLAUDE_CODE_OAUTH_TOKEN = 'stale-oauth-token';

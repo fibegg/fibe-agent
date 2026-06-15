@@ -1021,18 +1021,24 @@ export class OrchestratorService implements OnModuleInit {
       } else if (ctx.cachedSystemPromptFromFile !== null) {
         systemPrompt = ctx.cachedSystemPromptFromFile;
       }
-      // Only inject prompt-level history for strategies without native session support.
-      // Strategies like Claude Code use --resume which restores full context natively.
-      const historyMessages = ctx.strategy.hasNativeSessionSupport?.()
-        ? undefined
-        : (() => {
+      // Most native-session strategies restore context through their own resume
+      // primitive. Some wrappers, like june1815, intentionally start a fresh
+      // provider query per turn so model/effort changes apply; they request a
+      // prompt-level history bridge even when the underlying provider has a
+      // native session concept.
+      const injectPromptHistory =
+        ctx.strategy.shouldInjectPromptHistory?.() ??
+        !ctx.strategy.hasNativeSessionSupport?.();
+      const historyMessages = injectPromptHistory
+        ? (() => {
             const allMessages = this.stores(ctx).messageStore.all();
             return allMessages.length > 1
               ? allMessages
                   .slice(0, -1)
                   .map((m) => ({ role: m.role, body: m.body }))
               : undefined;
-          })();
+          })()
+        : undefined;
 
       // Gemma pre-pass: classify user intent → inject MCP tool hints into the prompt.
       // Runs only when GEMMA_ROUTER_ENABLED=true and Ollama is reachable.
