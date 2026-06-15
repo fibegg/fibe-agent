@@ -150,6 +150,13 @@ describe('ChatHeader', () => {
     expect(screen.getByRole('button', { name: /open menu/i })).toBeTruthy();
   });
 
+  it('paints the mobile safe-area header with the PWA theme surface', () => {
+    const { container } = render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} />);
+    const header = container.querySelector('header');
+    expect(header?.className).toContain('bg-[var(--pwa-safe-area-bg)]');
+    expect(header?.className).not.toContain('bg-card/60');
+  });
+
   it('calls onOpenMenu when menu button clicked', () => {
     const onOpenMenu = vi.fn();
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenMenu={onOpenMenu} />);
@@ -268,7 +275,7 @@ describe('ChatHeader', () => {
   // ─── Simplicate mode ──────────────────────────────────────────────────────
 
   it('renders compact header when Simplicate is on with sidebar menu and no idle status/search', () => {
-    render(
+    const { container } = render(
       <ChatHeader
         {...DEFAULT_PROPS}
         agentProviderLabel="Claude"
@@ -279,6 +286,7 @@ describe('ChatHeader', () => {
 
     expect(screen.getByRole('button', { name: /open menu/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /more actions/i })).toBeTruthy();
+    expect(container.querySelector('header')?.className).toContain('bg-[var(--pwa-safe-area-bg)]');
     expect(screen.getByText('Claude')).toBeTruthy();
     expect(screen.getByText('haiku')).toBeTruthy();
     expect(screen.queryByText('Ready')).toBeNull();

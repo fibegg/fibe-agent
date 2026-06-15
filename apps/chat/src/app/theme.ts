@@ -12,6 +12,20 @@ const LEGACY_THEME_ALIASES: Record<LegacyTheme, Theme> = {
   winter: 'light',
   halloween: 'dark',
 };
+const PWA_THEME_COLORS: Record<Theme, string> = {
+  light: '#f5f0e6',
+  dark: '#191c14',
+  dracula: '#282a36',
+  midnight: '#07111f',
+  contrast: '#000000',
+};
+const PWA_STATUS_BAR_STYLES: Record<Theme, 'default' | 'black-translucent'> = {
+  light: 'default',
+  dark: 'black-translucent',
+  dracula: 'black-translucent',
+  midnight: 'black-translucent',
+  contrast: 'black-translucent',
+};
 
 export interface ThemeOption {
   value: Theme;
@@ -90,11 +104,30 @@ function getEffectiveDark(): boolean {
   return THEME_OPTIONS.find((option) => option.value === getEffectiveTheme())?.dark ?? false;
 }
 
+function setMetaContent(name: string, content: string): void {
+  let meta = document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (!meta) {
+    meta = document.createElement('meta');
+    meta.setAttribute('name', name);
+    document.head.appendChild(meta);
+  }
+  meta.setAttribute('content', content);
+}
+
+function applyBrowserTheme(theme: Theme): void {
+  const color = PWA_THEME_COLORS[theme];
+  document.documentElement.style.backgroundColor = color;
+  if (document.body) document.body.style.backgroundColor = color;
+  setMetaContent('theme-color', color);
+  setMetaContent('apple-mobile-web-app-status-bar-style', PWA_STATUS_BAR_STYLES[theme]);
+}
+
 function applyTheme(): void {
   if (typeof document === 'undefined') return;
   const theme = getEffectiveTheme();
   document.documentElement.classList.toggle('dark', getEffectiveDark());
   document.documentElement.dataset.theme = theme;
+  applyBrowserTheme(theme);
 }
 
 export function setStoredTheme(theme: ThemeInput): void {

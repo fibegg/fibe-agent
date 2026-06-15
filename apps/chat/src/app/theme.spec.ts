@@ -29,6 +29,20 @@ function resetStorage() {
   store = {};
 }
 
+function resetDocumentTheme() {
+  document.documentElement.classList.remove('dark');
+  document.documentElement.removeAttribute('data-theme');
+  document.documentElement.style.backgroundColor = '';
+  document.body.style.backgroundColor = '';
+  document
+    .querySelectorAll('meta[name="theme-color"], meta[name="apple-mobile-web-app-status-bar-style"]')
+    .forEach((node) => node.remove());
+}
+
+function metaContent(name: string): string | null {
+  return document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.getAttribute('content') ?? null;
+}
+
 function stubMatchMedia(matches: boolean) {
   const mockMediaQueryList = {
     matches,
@@ -42,6 +56,10 @@ function stubMatchMedia(matches: boolean) {
   });
   return mockMediaQueryList;
 }
+
+beforeEach(() => {
+  resetDocumentTheme();
+});
 
 describe('getStoredTheme', () => {
   beforeEach(() => {
@@ -100,11 +118,27 @@ describe('setStoredTheme', () => {
     expect(document.documentElement.dataset.theme).toBe('light');
   });
 
+  it('updates browser theme metadata for light PWAs', () => {
+    setStoredTheme('light');
+    expect(metaContent('theme-color')).toBe('#f5f0e6');
+    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('default');
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(245, 240, 230)');
+    expect(document.body.style.backgroundColor).toBe('rgb(245, 240, 230)');
+  });
+
   it('stores dark and adds dark class', () => {
     setStoredTheme('dark');
     expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
     expect(document.documentElement.dataset.theme).toBe('dark');
+  });
+
+  it('updates browser theme metadata for dark PWAs', () => {
+    setStoredTheme('dark');
+    expect(metaContent('theme-color')).toBe('#191c14');
+    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black-translucent');
+    expect(document.documentElement.style.backgroundColor).toBe('rgb(25, 28, 20)');
+    expect(document.body.style.backgroundColor).toBe('rgb(25, 28, 20)');
   });
 
   it('stores dracula and keeps dark class for dark-compatible styles', () => {

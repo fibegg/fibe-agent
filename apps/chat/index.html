@@ -36,6 +36,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
     <meta name="description" content="fibe — AI-powered agent interface. Elegant, fast, and intuitive." />
     <meta name="theme-color" content="#191c14" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="fibe — AI Agent" />
@@ -55,7 +58,22 @@
   <body>
     <script>
       (function () {
-        var s = localStorage.getItem('chat-theme');
+        var colors = {
+          light: '#f5f0e6',
+          dark: '#191c14',
+          dracula: '#282a36',
+          midnight: '#07111f',
+          contrast: '#000000'
+        };
+        var statusBarStyles = {
+          light: 'default',
+          dark: 'black-translucent',
+          dracula: 'black-translucent',
+          midnight: 'black-translucent',
+          contrast: 'black-translucent'
+        };
+        var s = null;
+        try { s = localStorage.getItem('chat-theme'); } catch (_) {}
         if (s === 'winter') s = 'light';
         if (s === 'halloween') s = 'dark';
         var valid = s === 'light' || s === 'dark' || s === 'dracula' || s === 'midnight' || s === 'contrast';
@@ -63,8 +81,16 @@
         var theme = valid ? s : (prefersLight ? 'light' : 'dark');
         try { localStorage.setItem('chat-theme', theme); } catch (_) {}
         var dark = theme !== 'light';
+        var color = colors[theme] || colors.dark;
+        var statusBarStyle = statusBarStyles[theme] || statusBarStyles.dark;
         document.documentElement.dataset.theme = theme;
         document.documentElement.classList.toggle('dark', dark);
+        document.documentElement.style.backgroundColor = color;
+        document.body.style.backgroundColor = color;
+        var themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        var statusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        if (themeColorMeta) themeColorMeta.setAttribute('content', color);
+        if (statusBarMeta) statusBarMeta.setAttribute('content', statusBarStyle);
       })();
     </script>
     <div id="root"></div>

@@ -82,6 +82,13 @@ describe('ChatInputArea', () => {
     expect(screen.getByPlaceholderText('Type a message...')).toBeTruthy();
   });
 
+  it('paints the bottom safe-area shell with the PWA theme surface', () => {
+    const { container } = render(<ChatInputArea {...BASE_PROPS} />);
+    const shell = container.firstElementChild as HTMLElement | null;
+    expect(shell?.className).toContain('bg-[var(--pwa-safe-area-bg)]');
+    expect(shell?.className).not.toContain('bg-card/30');
+  });
+
   it('renders Send button when state is AUTHENTICATED', () => {
     render(<ChatInputArea {...BASE_PROPS} />);
     expect(screen.getByRole('button', { name: /send/i })).toBeTruthy();

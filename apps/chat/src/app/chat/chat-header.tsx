@@ -223,8 +223,11 @@ export function ChatHeader({
     return (
       <header
         ref={mobileHeaderRef}
-        className="border-b border-border bg-card/60 px-3 pb-2 backdrop-blur-xl shrink-0 sm:px-4 relative z-30"
-        style={{ paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))', willChange: 'transform' }}
+        className="border-b border-border bg-[var(--pwa-safe-area-bg)] px-3 pb-2 shrink-0 sm:px-4 relative z-30"
+        style={{
+          paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
+          willChange: 'transform',
+        }}
       >
         <div className="flex h-10 items-center justify-between gap-2">
           <button
@@ -325,8 +328,12 @@ export function ChatHeader({
   return (
     <header
       ref={mobileHeaderRef}
-      className={`border-b border-border bg-card/60 backdrop-blur-xl shrink-0 px-4 pb-3`}
-      style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))', willChange: 'transform' }}
+      className="border-b border-border bg-[var(--pwa-safe-area-bg)] shrink-0 px-4 pb-3"
+      style={{
+        minHeight: PANEL_HEADER_MIN_HEIGHT_PX,
+        paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
+        willChange: 'transform',
+      }}
     >
       {isMobile && (
         <style>{`

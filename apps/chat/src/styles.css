@@ -11,6 +11,7 @@
     --text-xl: 1.25rem;
     --text-2xl: 1.5rem;
     --background: #f5f0e6;
+    --pwa-safe-area-bg: #f5f0e6;
     --foreground: #2d2a24;
     --card: #fbf7ed;
     --card-foreground: #2d2a24;
@@ -72,6 +73,7 @@
 
   .dark {
     --background: #191c14;
+    --pwa-safe-area-bg: #191c14;
     --foreground: #e5e2cf;
     --card: #252a1e;
     --card-foreground: #e5e2cf;
@@ -122,6 +124,7 @@
 
   .dark[data-theme='dracula'] {
     --background: #282a36;
+    --pwa-safe-area-bg: #282a36;
     --foreground: #f8f8f2;
     --card: #21222c;
     --card-foreground: #f8f8f2;
@@ -169,6 +172,7 @@
 
   .dark[data-theme='midnight'] {
     --background: #07111f;
+    --pwa-safe-area-bg: #07111f;
     --foreground: #e6f1ff;
     --card: #0b1727;
     --card-foreground: #e6f1ff;
@@ -205,6 +209,7 @@
 
   .dark[data-theme='contrast'] {
     --background: #000000;
+    --pwa-safe-area-bg: #000000;
     --foreground: #ffffff;
     --card: #0b0b0b;
     --card-foreground: #ffffff;
@@ -410,6 +415,7 @@ html {
   position: fixed;
   overflow: hidden;
   border-color: var(--border);
+  background-color: var(--pwa-safe-area-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -427,7 +433,7 @@ body {
   overflow: hidden;
   min-height: 0;
   margin: 0;
-  background-color: var(--background);
+  background-color: var(--pwa-safe-area-bg);
 }
 
 * {
@@ -467,6 +473,7 @@ body {
   position: fixed;
   overflow: hidden;
   min-height: 0;
+  background-color: var(--background);
 }
 
 .chat-messages-scroll {
