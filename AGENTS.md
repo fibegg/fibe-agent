@@ -516,7 +516,7 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `GET` | `/api/playgrounds/file?path=…` | Bearer | Read a playground file → `{ content }` |
 | `PUT` | `/api/playgrounds/file` | Bearer | `{ path, content }` — save a playground file → `{ ok }` |
 | `GET` | `/api/playgrounds/stats` | Bearer | Playground directory stats |
-| `GET` | `/api/playrooms/browse?path=…` | Bearer | Flat local playground names from `fibe --output json local playgrounds info --view names`; non-empty `path` returns `[]` |
+| `GET` | `/api/playrooms/browse?path=…` | Bearer | Flat local playground names from `fibe --output json local playgrounds info --view names`, limited to selector-visible playgrounds with source mounts; non-empty `path` returns `[]` |
 | `POST` | `/api/playrooms/link` | Bearer | `{ path }` — delegates linking to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>` |
 | `GET` | `/api/playrooms/current` | Bearer | Current `.current_playground` value → `{ current }` |
 | `GET` | `/api/agent-files` | Bearer | Agent-generated file tree |

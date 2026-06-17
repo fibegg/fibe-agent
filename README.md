@@ -237,7 +237,7 @@ Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSo
 | `POST` | `/api/model-options/refresh` | Bearer | Configured models plus provider-discovered models |
 | `GET` | `/api/playgrounds` | Bearer | Playground file tree |
 | `GET` | `/api/playgrounds/file?path=…` | Bearer | Read a playground file |
-| `GET` | `/api/playrooms/browse` | Bearer | Flat Fibe CLI local playground list |
+| `GET` | `/api/playrooms/browse` | Bearer | Flat Fibe CLI local playground list, limited to selector-visible playgrounds with source mounts |
 | `POST` | `/api/playrooms/link` | Bearer | Link a named local playground through the Fibe CLI |
 | `GET` | `/api/playrooms/current` | Bearer | Current `.current_playground` selection |
 | `POST` | `/api/uploads` | Bearer | Upload file (≤ 20 MB) |

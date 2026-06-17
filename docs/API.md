@@ -58,7 +58,7 @@ All paths below include the `/api` global prefix.
 | POST | `/api/playgrounds/git-branch` | Bearer | Body `{ create }`. Create or inspect branch state. |
 | POST | `/api/playgrounds/git-push` | Bearer | Body `{ remote?, branch?, confirm }`. Push playground git changes. |
 | POST | `/api/playgrounds/git-pr` | Bearer | Body `{ title?, body?, confirm }`. Create a draft PR with `gh`. |
-| GET | `/api/playrooms/browse?path=...` | Bearer | Flat Fibe CLI listing from `fibe --output json local playgrounds info --view names`. Any non-empty `path` currently returns `[]`; `404` means the CLI/listing is unavailable. |
+| GET | `/api/playrooms/browse?path=...` | Bearer | Flat Fibe CLI listing from `fibe --output json local playgrounds info --view names`; only selector-visible playgrounds with source mounts are returned. Any non-empty `path` currently returns `[]`; `404` means the CLI/listing is unavailable. |
 | POST | `/api/playrooms/link` | Bearer | Body `{ path }`, where `path` is the Fibe local playground name. Delegates to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>`. Missing/invalid `path` returns `404`; CLI/link failure returns `400`. |
 | GET | `/api/playrooms/current` | Bearer | Returns `{ current }` from `PLAYGROUNDS_DIR/.current_playground`, or `null`. |
 | GET | `/api/agent-files` | Bearer | Agent-generated file tree, optionally scoped by `?conversationId=`. |

@@ -92,10 +92,9 @@ describe('PlayroomBrowserService', () => {
       expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(join(rootDir, 'playgrounds'));
     });
 
-    test('keeps static-only playgrounds visible from CLI list output', async () => {
+    test('trusts the CLI names view to return only mountable playgrounds', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
         stdout: JSON.stringify([
-          { id: '24', name: 'static-site--24', playspec: 'static-site' },
           { id: '23', name: 'source-app--23', playspec: 'source-app' },
         ]),
       });
@@ -103,7 +102,6 @@ describe('PlayroomBrowserService', () => {
       const entries = await service.browse('');
 
       expect(entries).toEqual([
-        { name: 'static-site', path: 'static-site--24', type: 'directory' },
         { name: 'source-app', path: 'source-app--23', type: 'directory' },
       ]);
     });
