@@ -47,20 +47,22 @@ All paths below include the `/api` global prefix.
 | GET | `/api/playgrounds` | Bearer | File tree rooted at `PLAYGROUNDS_DIR` or `./playground`. |
 | GET | `/api/playgrounds/stats` | Bearer | Size/count stats for the active playground directory. |
 | GET | `/api/playgrounds/urls` | Bearer | Detected playground service URLs. |
+| GET | `/api/playgrounds/repos` | Bearer | Canonical linked playground repos from `fibe local playgrounds info --view repos`, including `repo_root` for explicit git operations. |
 | GET | `/api/playgrounds/preview-diagnostics?url=...` | Bearer | Preview URL diagnostics; `400` for missing/invalid URL. |
-| GET | `/api/playgrounds/diff?file=...` | Bearer | Git diff for a playground file, or broader diff when omitted. |
+| GET | `/api/playgrounds/diff?repo=...&file=...` | Bearer | Git diff for an explicitly selected linked repo. `repo` may be service, prop, id, link path, or repo root; required when multiple repos are linked. |
 | GET | `/api/playgrounds/file?path=...` | Bearer | Read a playground file. Empty path returns `{ content: '' }`. |
 | GET | `/api/playgrounds/file/raw?path=...` | Bearer | Stream a playground file with inferred content type. |
 | PUT | `/api/playgrounds/file` | Bearer | Body `{ path, content }`. Creates or overwrites a file in the playground. |
 | POST | `/api/playgrounds/upload?dir=...` | Bearer | Multipart playground upload. Returns `{ ok: true, path }`. |
-| POST | `/api/playgrounds/git-stage` | Bearer | Body `{ files, confirm }`. Stage git files. |
-| POST | `/api/playgrounds/git-commit` | Bearer | Body `{ message, confirm }`. Commit staged playground changes. |
-| POST | `/api/playgrounds/git-branch` | Bearer | Body `{ create }`. Create or inspect branch state. |
-| POST | `/api/playgrounds/git-push` | Bearer | Body `{ remote?, branch?, confirm }`. Push playground git changes. |
-| POST | `/api/playgrounds/git-pr` | Bearer | Body `{ title?, body?, confirm }`. Create a draft PR with `gh`. |
+| POST | `/api/playgrounds/git-stage` | Bearer | Body `{ files, confirm, repo? }`. Stage git files in the selected repo; `repo` is required when multiple repos are linked. |
+| POST | `/api/playgrounds/git-commit` | Bearer | Body `{ message, confirm, repo? }`. Commit staged playground changes in the selected repo. |
+| POST | `/api/playgrounds/git-branch` | Bearer | Body `{ create, repo? }`. Create or inspect branch state in the selected repo. |
+| POST | `/api/playgrounds/git-push` | Bearer | Body `{ remote?, branch?, confirm, repo? }`. Push playground git changes from the selected repo. |
+| POST | `/api/playgrounds/git-pr` | Bearer | Body `{ title?, body?, confirm, repo? }`. Create a draft PR with `gh` from the selected repo. |
 | GET | `/api/playrooms/browse?path=...` | Bearer | Flat Fibe CLI listing from `fibe --output json local playgrounds info --view names`; only selector-visible playgrounds with source mounts are returned. Any non-empty `path` currently returns `[]`; `404` means the CLI/listing is unavailable. |
 | POST | `/api/playrooms/link` | Bearer | Body `{ path }`, where `path` is the Fibe local playground name. Delegates to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>`. Missing/invalid `path` returns `404`; CLI/link failure returns `400`. |
-| GET | `/api/playrooms/current` | Bearer | Returns `{ current }` from `PLAYGROUNDS_DIR/.current_playground`, or `null`. |
+| POST | `/api/playrooms/unlink` | Bearer | Body `{ confirm: true }`. Clears the current `PLAYGROUNDS_DIR` link directory while preserving the directory itself, so a playground can be linked again from the UI. |
+| GET | `/api/playrooms/current` | Bearer | Returns `{ current }` from `PLAYGROUNDS_DIR/.current_playground.json`, or `null`. |
 | GET | `/api/agent-files` | Bearer | Agent-generated file tree, optionally scoped by `?conversationId=`. |
 | GET | `/api/agent-files/stats` | Bearer | Agent-generated file stats. |
 | GET | `/api/agent-files/file?path=...` | Bearer | Read an agent-generated file. |

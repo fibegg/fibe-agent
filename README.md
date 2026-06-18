@@ -239,7 +239,7 @@ Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSo
 | `GET` | `/api/playgrounds/file?path=…` | Bearer | Read a playground file |
 | `GET` | `/api/playrooms/browse` | Bearer | Flat Fibe CLI local playground list, limited to selector-visible playgrounds with source mounts |
 | `POST` | `/api/playrooms/link` | Bearer | Link a named local playground through the Fibe CLI |
-| `GET` | `/api/playrooms/current` | Bearer | Current `.current_playground` selection |
+| `GET` | `/api/playrooms/current` | Bearer | Current `.current_playground.json` selection |
 | `POST` | `/api/uploads` | Bearer | Upload file (≤ 20 MB) |
 | `GET` | `/api/uploads/:filename` | Bearer | Serve uploaded file |
 | `POST` | `/api/agent/send-message` | Bearer | Async message (webhooks/integrations) → `202` |

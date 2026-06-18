@@ -31,12 +31,38 @@ describe('PlaygroundsService', () => {
 
   beforeEach(() => {
     playgroundDir = mkdtempSync(join(tmpdir(), 'playground-'));
-    mockExecFileAsync.mockClear();
+    mockExecFileAsync.mockReset();
+    mockExecFileAsync.mockResolvedValue({ stdout: '[]', stderr: '' });
   });
 
   afterEach(() => {
     rmSync(playgroundDir, { recursive: true, force: true });
   });
+
+  function configFor(dir = playgroundDir) {
+    return {
+      getPlaygroundsDir: () => dir,
+      getMarqueeRoot: () => '/opt/fibe',
+      getMarqueeRootDomain: () => undefined,
+    };
+  }
+
+  function repoEntry(repoRoot = playgroundDir, overrides: Record<string, unknown> = {}) {
+    return {
+      id: '1',
+      service: 'web',
+      prop: 'web',
+      branch: 'main',
+      link_path: repoRoot,
+      target: repoRoot,
+      repo_root: repoRoot,
+      ...overrides,
+    };
+  }
+
+  function mockRepoList(repos: Record<string, unknown>[]) {
+    mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(repos), stderr: '' });
+  }
 
   test('getTree returns empty array when directory is empty', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
@@ -264,7 +290,7 @@ describe('PlaygroundsService', () => {
     writeFileSync(join(playgroundDir, 'real.txt'), 'line1\nline2\n');
     symlinkSync(join(playgroundDir, 'real.txt'), join(playgroundDir, 'link.txt'));
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    const config = configFor();
     const service = new PlaygroundsService(config as never);
     const stats = await service.getStats();
 
@@ -273,19 +299,19 @@ describe('PlaygroundsService', () => {
   });
 
   test('getStats reports hasGitRepo=true when playground root is a git repository', async () => {
-    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never);
     const stats = await service.getStats();
 
     expect(stats.hasGitRepo).toBe(true);
   });
 
-  test('getStats reports hasGitRepo=true when a child directory is a git repository', async () => {
+  test('getStats reports hasGitRepo=true when canonical state lists a child repository', async () => {
     const nested = join(playgroundDir, 'project');
     mkdirSync(nested);
-    execSync('git init', { cwd: nested, stdio: 'ignore' });
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(nested, { service: 'project', link_path: nested })]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never);
     const stats = await service.getStats();
 
@@ -389,6 +415,89 @@ describe('PlaygroundsService', () => {
     expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT_DOMAIN).toBe('example.test');
   });
 
+  test('getUrls uses current playground inferred by the browser service', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getMarqueeRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => 'alice' };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync.mockResolvedValueOnce({
+      stdout: JSON.stringify([
+        { service: 'api', url: 'http://alice-api.phoenix.test' },
+        { service: 'frontend', url: 'http://alice.phoenix.test' },
+      ]),
+    });
+
+    const urls = await service.getUrls();
+
+    expect(urls).toEqual(['api|http://alice-api.phoenix.test', 'frontend|http://alice.phoenix.test']);
+    expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+      '--output',
+      'json',
+      'local',
+      'playgrounds',
+      'info',
+      '--view',
+      'urls',
+      '--playground',
+      'alice',
+    ]);
+  });
+
+  test('getUrls uses the explicit selected playground before current discovery', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getMarqueeRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: mock(async () => 'bob') };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync.mockResolvedValueOnce({
+      stdout: JSON.stringify([
+        { service: 'api', url: 'api-alice.example.test' },
+        { service: 'frontend', url: 'alice.example.test' },
+      ]),
+    });
+
+    const urls = await service.getUrls('alice');
+
+    expect(urls).toEqual(['api|api-alice.example.test', 'frontend|alice.example.test']);
+    expect(playroomBrowser.getCurrentLink).not.toHaveBeenCalled();
+    expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+      '--output',
+      'json',
+      'local',
+      'playgrounds',
+      'info',
+      '--view',
+      'urls',
+      '--playground',
+      'alice',
+    ]);
+  });
+
+  test('getUrls deduplicates repeated service-url rows from the CLI', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getMarqueeRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => 'project' };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync.mockResolvedValueOnce({
+      stdout: JSON.stringify([
+        { service: 'api', url: 'api.example.test' },
+        { service: 'api', url: 'api.example.test' },
+        { service: 'frontend', url: 'frontend.example.test' },
+      ]),
+    });
+
+    const urls = await service.getUrls();
+
+    expect(urls).toEqual(['api|api.example.test', 'frontend|frontend.example.test']);
+  });
+
   test('getUrls accepts a static-only playground as the current selection', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
@@ -414,7 +523,7 @@ describe('PlaygroundsService', () => {
     ]);
   });
 
-  test('getUrls lists playgrounds and combines urls when no current link exists', async () => {
+  test('getUrls uses the single local playground when no current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
       getMarqueeRoot: () => '/opt/fibe',
@@ -422,17 +531,32 @@ describe('PlaygroundsService', () => {
     const playroomBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(config as never, playroomBrowser as never);
     mockExecFileAsync
-      .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }, { id: '2', name: 'pg2', playspec: 'spec2' }]) })
-      .mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web1.example.test' }]) })
-      .mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'api', url: 'api2.example.test' }]) });
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }]) })
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web1.example.test' }]) });
 
     const urls = await service.getUrls();
 
-    expect(urls).toEqual(['web|web1.example.test', 'api|api2.example.test']);
-    expect(mockExecFileAsync).toHaveBeenCalledTimes(3);
+    expect(urls).toEqual(['web|web1.example.test']);
+    expect(mockExecFileAsync).toHaveBeenCalledTimes(2);
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
     expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'urls', '--playground', '1']);
-    expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'urls', '--playground', '2']);
+  });
+
+  test('getUrls returns empty urls when multiple playgrounds exist without a current link', async () => {
+    const config = {
+      getPlaygroundsDir: () => playgroundDir,
+      getMarqueeRoot: () => '/opt/fibe',
+    };
+    const playroomBrowser = { getCurrentLink: async () => null };
+    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    mockExecFileAsync
+      .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }, { id: '2', name: 'pg2', playspec: 'spec2' }]) });
+
+    const urls = await service.getUrls();
+
+    expect(urls).toEqual([]);
+    expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
   });
 
   test('getUrls returns empty array when local playgrounds directory is missing', async () => {
@@ -469,7 +593,7 @@ describe('PlaygroundsService', () => {
   });
 
   test('getDiff returns isGitRepo=false for a non-git directory', async () => {
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
     expect(result.isGitRepo).toBe(false);
@@ -493,7 +617,8 @@ describe('PlaygroundsService', () => {
     execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
 
@@ -514,7 +639,8 @@ describe('PlaygroundsService', () => {
     // Modify the file
     writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 2;');
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
 
@@ -528,7 +654,7 @@ describe('PlaygroundsService', () => {
     expect(result.diff).toContain('+const x = 2;');
   }, 15000);
 
-  test('getDiff uses a nested git repository when playground root is not a repo', async () => {
+  test('getDiff uses the canonical nested repo root from local playground state', async () => {
     const nested = join(playgroundDir, 'project');
     mkdirSync(nested);
     execSync('git init', { cwd: nested, stdio: 'ignore' });
@@ -539,7 +665,8 @@ describe('PlaygroundsService', () => {
     execSync('git commit -m "init"', { cwd: nested, stdio: 'ignore' });
     writeFileSync(join(nested, 'app.ts'), 'const x = 2;');
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(nested, { service: 'project', link_path: nested })]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
 
@@ -560,7 +687,8 @@ describe('PlaygroundsService', () => {
     // Add a new untracked file
     writeFileSync(join(playgroundDir, 'new.ts'), 'export const a = 1;');
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
 
@@ -569,6 +697,26 @@ describe('PlaygroundsService', () => {
     const newFile = result.files.find((f) => f.path === 'new.ts');
     expect(newFile).toBeDefined();
     expect(newFile?.worktree).toBe('?');
+    expect(result.diff).toContain('new.ts');
+    expect(result.diff).toContain('+export const a = 1;');
+  }, 15000);
+
+  test('getGitFileDiff includes untracked file content', async () => {
+    execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'existing.ts'), 'export {};');
+    execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
+    writeFileSync(join(playgroundDir, 'new.ts'), 'export const a = 1;');
+
+    mockRepoList([repoEntry(playgroundDir)]);
+    const service = new PlaygroundsService(configFor() as never, {} as never);
+    const result = await service.getGitFileDiff('new.ts');
+
+    expect(result.hasDiff).toBe(true);
+    expect(result.diff).toContain('new.ts');
+    expect(result.diff).toContain('+export const a = 1;');
   }, 15000);
 
   test('stageGitFiles and commitGit require confirmation', async () => {
@@ -589,7 +737,8 @@ describe('PlaygroundsService', () => {
     writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 2;');
     writeFileSync(join(playgroundDir, 'skip.ts'), 'export const skip = true;');
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
 
     const stageResult = await service.stageGitFiles(['app.ts'], true);
@@ -604,18 +753,20 @@ describe('PlaygroundsService', () => {
 
   test('getGitFileDiff rejects unsafe paths', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     await expect(service.getGitFileDiff('../outside.ts')).rejects.toThrow(/Unsafe git path/);
   });
 
-  test('getDiff handles repository with no commits (status works, diff falls back to empty)', async () => {
+  test('getDiff handles repository with no commits and includes untracked content', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
     writeFileSync(join(playgroundDir, 'file.ts'), 'hello');
 
-    const config = { getPlaygroundsDir: () => playgroundDir };
+    mockRepoList([repoEntry(playgroundDir)]);
+    const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
 
@@ -623,8 +774,29 @@ describe('PlaygroundsService', () => {
     expect(result.isGitRepo).toBe(true);
     // untracked file appears in status
     expect(result.files.some((f) => f.path === 'file.ts')).toBe(true);
-    // diff against HEAD fails gracefully (no commits) — diff is empty string
-    expect(result.diff).toBe('');
+    expect(result.diff).toContain('file.ts');
+    expect(result.diff).toContain('+hello');
+  }, 15000);
+
+  test('getDiff requires explicit repo selection when multiple repos are linked', async () => {
+    const web = join(playgroundDir, 'web');
+    const api = join(playgroundDir, 'api');
+    mkdirSync(web);
+    mkdirSync(api);
+    execSync('git init', { cwd: web, stdio: 'ignore' });
+    execSync('git init', { cwd: api, stdio: 'ignore' });
+    mockRepoList([
+      repoEntry(web, { id: 'web-id', service: 'web', prop: 'web', link_path: web }),
+      repoEntry(api, { id: 'api-id', service: 'api', prop: 'api', link_path: api }),
+    ]);
+
+    const service = new PlaygroundsService(configFor() as never, {} as never);
+
+    await expect(service.getDiff()).rejects.toThrow(/Multiple repositories/);
+    const result = await service.getDiff('api');
+    expect(result.isGitRepo).toBe(true);
+    expect(result.repoRoot).toBe(api);
+    expect(result.repo?.service).toBe('api');
   }, 15000);
 
   test('uploadFile sanitizes filename and writes to target directory', async () => {

@@ -10,6 +10,7 @@ export const API_PATHS = {
   PLAYGROUNDS_FILE_RAW: '/api/playgrounds/file/raw',
   PLAYGROUNDS_STATS: '/api/playgrounds/stats',
   PLAYGROUNDS_URLS: '/api/playgrounds/urls',
+  PLAYGROUNDS_REPOS: '/api/playgrounds/repos',
   PLAYGROUNDS_PREVIEW_DIAGNOSTICS: '/api/playgrounds/preview-diagnostics',
   PLAYGROUNDS_DIFF: '/api/playgrounds/diff',
   AGENT_FILES: '/api/agent-files',
@@ -26,6 +27,7 @@ export const API_PATHS = {
   AGENT_SEND_MESSAGE: '/api/agent/send-message',
   PLAYROOMS_BROWSE: '/api/playrooms/browse',
   PLAYROOMS_LINK: '/api/playrooms/link',
+  PLAYROOMS_UNLINK: '/api/playrooms/unlink',
   PLAYROOMS_CURRENT: '/api/playrooms/current',
 } as const;
 

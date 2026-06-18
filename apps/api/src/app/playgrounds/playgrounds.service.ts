@@ -29,6 +29,18 @@ function execFileAsync(
   });
 }
 
+function execFileAllowNonZero(
+  file: string,
+  args: string[],
+  options: { cwd?: string; maxBuffer?: number } = {},
+): Promise<{ stdout: string; stderr: string }> {
+  return new Promise((resolvePromise) => {
+    execFile(file, args, { ...options, encoding: 'utf8' }, (_error, stdout, stderr) => {
+      resolvePromise({ stdout: String(stdout ?? ''), stderr: String(stderr ?? '') });
+    });
+  });
+}
+
 export interface PlaygroundEntry {
   name: string;
   path: string;
@@ -62,6 +74,8 @@ export interface PlaygroundDiffResult {
   branch?: string;
   upstream?: string | null;
   counts?: { staged: number; unstaged: number; untracked: number };
+  repo?: LocalPlaygroundRepo;
+  repos?: LocalPlaygroundRepo[];
 }
 
 export interface GitOperationResult {
@@ -89,15 +103,35 @@ interface LocalPlaygroundUrl {
   url: string;
 }
 
+export interface LocalPlaygroundRepo {
+  id?: string;
+  service: string;
+  prop?: string;
+  branch?: string;
+  link_path: string;
+  target: string;
+  repo_root: string;
+}
+
 function parseLocalPlaygroundNames(stdout: string): LocalPlaygroundName[] {
   return JSON.parse(stdout) as LocalPlaygroundName[];
 }
 
 function parseLocalPlaygroundUrls(stdout: string): string[] {
   const entries = JSON.parse(stdout) as LocalPlaygroundUrl[];
+  const seen = new Set<string>();
   return entries
     .filter((entry) => entry.service && entry.url)
-    .map((entry) => `${entry.service}|${entry.url}`);
+    .map((entry) => `${entry.service}|${entry.url}`)
+    .filter((entry) => {
+      if (seen.has(entry)) return false;
+      seen.add(entry);
+      return true;
+    });
+}
+
+function parseLocalPlaygroundRepos(stdout: string): LocalPlaygroundRepo[] {
+  return JSON.parse(stdout) as LocalPlaygroundRepo[];
 }
 
 @Injectable()
@@ -120,24 +154,33 @@ export class PlaygroundsService {
     const dir = this.config.getPlaygroundsDir();
     const settings = await loadFibeSettings(dir);
     const ig = await loadGitignore(dir);
-    const [counts, gitRepoDir] = await Promise.all([
+    const [counts, repos] = await Promise.all([
       this.countStats(dir, ig, settings),
-      this.findFirstGitRepoDir(dir, ig, settings),
+      this.getRepos().catch(() => []),
     ]);
-    return { ...counts, hasGitRepo: gitRepoDir !== null };
+    return { ...counts, hasGitRepo: repos.length > 0 };
   }
 
-  async getDiff(): Promise<PlaygroundDiffResult> {
+  async getRepos(): Promise<LocalPlaygroundRepo[]> {
+    try {
+      const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'repos', '--link-dir', this.config.getPlaygroundsDir()]);
+      return parseLocalPlaygroundRepos(stdout).filter((repo) => repo.repo_root);
+    } catch (err: unknown) {
+      if (isLocalPlaygroundsUnavailableError(err)) return [];
+      throw err;
+    }
+  }
+
+  async getDiff(repo?: string): Promise<PlaygroundDiffResult> {
     const dir = this.config.getPlaygroundsDir();
     const empty: PlaygroundDiffResult = { files: [], diff: '', hasDiff: false, isGitRepo: false };
     if (!dir) return empty;
 
-    const settings = await loadFibeSettings(dir);
-    const ig = await loadGitignore(dir);
-    const repoDir = await this.findFirstGitRepoDir(dir, ig, settings);
-    if (!repoDir) {
+    const resolved = await this.resolveRepo(repo);
+    if (!resolved) {
       return empty;
     }
+    const repoDir = resolved.repo.repo_root;
 
     const [statusResult, diffResult, branchResult, upstreamResult] = await Promise.all([
       execAsync('git status --short -unormal', { cwd: repoDir }).catch(() => ({ stdout: '' })),
@@ -154,7 +197,8 @@ export class PlaygroundsService {
       if (path) files.push({ path, index: line[0], worktree: line[1] });
     }
 
-    const diff = diffResult.stdout;
+    const untrackedDiff = await this.untrackedDiff(repoDir, files);
+    const diff = [diffResult.stdout, untrackedDiff].filter(Boolean).join('\n');
     const counts = files.reduce(
       (acc, file) => {
         if (file.index && file.index !== ' ' && file.index !== '?') acc.staged += 1;
@@ -173,42 +217,49 @@ export class PlaygroundsService {
       branch: branchResult.stdout.trim() || 'HEAD',
       upstream: upstreamResult.stdout.trim() || null,
       counts,
+      repo: resolved.repo,
+      repos: resolved.repos,
     };
   }
 
-  async getGitFileDiff(file?: string): Promise<PlaygroundDiffResult> {
-    if (!file) return this.getDiff();
-    const repoDir = await this.getRepoDir();
-    if (!repoDir) return { files: [], diff: '', hasDiff: false, isGitRepo: false };
+  async getGitFileDiff(file?: string, repo?: string): Promise<PlaygroundDiffResult> {
+    if (!file) return this.getDiff(repo);
+    const resolved = await this.resolveRepo(repo);
+    if (!resolved) return { files: [], diff: '', hasDiff: false, isGitRepo: false };
+    const repoDir = resolved.repo.repo_root;
     const safePath = this.requireSafeGitPath(file);
     const [statusResult, diffResult] = await Promise.all([
       execFileAsync('git', ['status', '--short', '-unormal', '--', safePath], { cwd: repoDir }).catch(() => ({ stdout: '', stderr: '' })),
       execFileAsync('git', ['diff', 'HEAD', '--', safePath], { cwd: repoDir, maxBuffer: 5 * 1024 * 1024 }).catch(() => ({ stdout: '', stderr: '' })),
     ]);
     const files = this.parseGitStatus(statusResult.stdout);
+    const untrackedDiff = await this.untrackedDiff(repoDir, files);
+    const diff = [diffResult.stdout, untrackedDiff].filter(Boolean).join('\n');
     return {
       files,
-      diff: diffResult.stdout,
-      hasDiff: files.length > 0 || diffResult.stdout.length > 0,
+      diff,
+      hasDiff: files.length > 0 || diff.length > 0,
       isGitRepo: true,
       repoRoot: repoDir,
+      repo: resolved.repo,
+      repos: resolved.repos,
     };
   }
 
-  async stageGitFiles(files: string[], confirm: boolean): Promise<GitOperationResult> {
+  async stageGitFiles(files: string[], confirm: boolean, repo?: string): Promise<GitOperationResult> {
     if (!confirm) throw new Error('stage requires confirm=true');
     if (!Array.isArray(files) || files.length === 0) throw new Error('stage requires at least one file');
-    const repoDir = await this.requireRepoDir();
+    const repoDir = await this.requireRepoDir(repo);
     const safeFiles = files.map((file) => this.requireSafeGitPath(file));
     const result = await execFileAsync('git', ['add', '--', ...safeFiles], { cwd: repoDir });
     return { ok: true, message: `Staged ${safeFiles.length} file(s)`, ...result };
   }
 
-  async commitGit(message: string, confirm: boolean): Promise<GitOperationResult> {
+  async commitGit(message: string, confirm: boolean, repo?: string): Promise<GitOperationResult> {
     if (!confirm) throw new Error('commit requires confirm=true');
     const trimmed = message?.trim();
     if (!trimmed) throw new Error('commit requires a non-empty message');
-    const repoDir = await this.requireRepoDir();
+    const repoDir = await this.requireRepoDir(repo);
     const staged = this.parseGitStatus((await execFileAsync('git', ['status', '--short', '-unormal'], { cwd: repoDir })).stdout)
       .filter((file) => file.index && file.index !== ' ' && file.index !== '?');
     if (staged.length === 0) throw new Error('commit requires staged files');
@@ -216,8 +267,8 @@ export class PlaygroundsService {
     return { ok: true, message: `Committed ${staged.length} file(s)`, ...result };
   }
 
-  async branchGit(create?: string): Promise<GitOperationResult> {
-    const repoDir = await this.requireRepoDir();
+  async branchGit(create?: string, repo?: string): Promise<GitOperationResult> {
+    const repoDir = await this.requireRepoDir(repo);
     if (create?.trim()) {
       const branch = this.requireSafeBranchName(create);
       const result = await execFileAsync('git', ['switch', '-c', branch], { cwd: repoDir });
@@ -227,18 +278,18 @@ export class PlaygroundsService {
     return { ok: true, message: result.stdout.trim() || 'HEAD', branch: result.stdout.trim() || 'HEAD', ...result };
   }
 
-  async pushGit(confirm: boolean, remote = 'origin', branch?: string): Promise<GitOperationResult> {
+  async pushGit(confirm: boolean, remote = 'origin', branch?: string, repo?: string): Promise<GitOperationResult> {
     if (!confirm) throw new Error('push requires confirm=true');
-    const repoDir = await this.requireRepoDir();
+    const repoDir = await this.requireRepoDir(repo);
     const safeRemote = this.requireSafeRemoteName(remote || 'origin');
-    const safeBranch = this.requireSafeBranchName(branch?.trim() || (await this.branchGit()).branch || 'HEAD');
+    const safeBranch = this.requireSafeBranchName(branch?.trim() || (await this.branchGit(undefined, repo)).branch || 'HEAD');
     const result = await execFileAsync('git', ['push', '-u', safeRemote, safeBranch], { cwd: repoDir, maxBuffer: 2 * 1024 * 1024 });
     return { ok: true, message: `Pushed ${safeRemote}/${safeBranch}`, branch: safeBranch, ...result };
   }
 
-  async createDraftPrWithGh(confirm: boolean, title?: string, body?: string): Promise<GitOperationResult> {
+  async createDraftPrWithGh(confirm: boolean, title?: string, body?: string, repo?: string): Promise<GitOperationResult> {
     if (!confirm) throw new Error('PR handoff requires confirm=true');
-    const repoDir = await this.requireRepoDir();
+    const repoDir = await this.requireRepoDir(repo);
     const args = ['pr', 'create', '--draft', '--fill'];
     if (title?.trim()) args.push('--title', title.trim());
     if (body?.trim()) args.push('--body', body.trim());
@@ -246,8 +297,14 @@ export class PlaygroundsService {
     return { ok: true, message: 'Draft PR created', ...result };
   }
 
-  async getUrls(): Promise<string[]> {
+  async getUrls(playground?: string): Promise<string[]> {
     try {
+      const selectedPlayground = playground?.trim();
+      if (selectedPlayground) {
+        const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'urls', '--playground', selectedPlayground]);
+        return parseLocalPlaygroundUrls(stdout);
+      }
+
       const currentLink = await this.playroomBrowser.getCurrentLink();
       if (currentLink) {
         const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'urls', '--playground', currentLink]);
@@ -258,14 +315,11 @@ export class PlaygroundsService {
       const playgrounds = parseLocalPlaygroundNames(listStdout)
         .map((playground) => playground.id || playground.name)
         .filter(Boolean);
-      const urls: string[] = [];
 
-      for (const playground of playgrounds) {
-        const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'urls', '--playground', playground]);
-        urls.push(...parseLocalPlaygroundUrls(stdout));
-      }
+      if (playgrounds.length !== 1) return [];
 
-      return urls;
+      const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'urls', '--playground', playgrounds[0]]);
+      return parseLocalPlaygroundUrls(stdout);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (isLocalPlaygroundsUnavailableError(err)) {
@@ -287,18 +341,60 @@ export class PlaygroundsService {
     return files;
   }
 
-  private async getRepoDir(): Promise<string | null> {
-    const dir = this.config.getPlaygroundsDir();
-    if (!dir) return null;
-    const settings = await loadFibeSettings(dir);
-    const ig = await loadGitignore(dir);
-    return this.findFirstGitRepoDir(dir, ig, settings);
+  private async untrackedDiff(repoDir: string, files: ChangedFile[]): Promise<string> {
+    const chunks: string[] = [];
+    for (const file of files) {
+      if (file.index !== '?' && file.worktree !== '?') continue;
+      const safePath = this.requireSafeGitPath(file.path);
+      try {
+        const info = await stat(join(repoDir, safePath));
+        if (!info.isFile()) continue;
+      } catch {
+        continue;
+      }
+      const result = await execFileAllowNonZero('git', ['diff', '--no-index', '--', '/dev/null', safePath], {
+        cwd: repoDir,
+        maxBuffer: 5 * 1024 * 1024,
+      });
+      if (result.stdout.trim()) chunks.push(result.stdout);
+    }
+    return chunks.join('\n');
   }
 
-  private async requireRepoDir(): Promise<string> {
-    const repoDir = await this.getRepoDir();
-    if (!repoDir) throw new Error('No git repository found in playgrounds directory');
-    return repoDir;
+  private async resolveRepo(selector?: string): Promise<{ repo: LocalPlaygroundRepo; repos: LocalPlaygroundRepo[] } | null> {
+    const repos = await this.getRepos();
+    if (repos.length === 0) return null;
+    const trimmed = selector?.trim();
+    if (!trimmed) {
+      if (repos.length === 1) return { repo: repos[0], repos };
+      throw new Error('Multiple repositories are linked; pass repo as service, prop, id, link path, or repo root');
+    }
+    const matches = repos.filter((repo) => this.repoMatches(repo, trimmed));
+    if (matches.length === 1) return { repo: matches[0], repos };
+    if (matches.length > 1) throw new Error(`Repository selector "${trimmed}" is ambiguous`);
+    throw new Error(`Repository selector "${trimmed}" did not match any linked repository`);
+  }
+
+  private async requireRepoDir(selector?: string): Promise<string> {
+    const resolved = await this.resolveRepo(selector);
+    if (!resolved) throw new Error('No git repository found in current playground state');
+    return resolved.repo.repo_root;
+  }
+
+  private repoMatches(repo: LocalPlaygroundRepo, selector: string): boolean {
+    const normalized = selector.trim();
+    const values = [
+      repo.id,
+      repo.service,
+      repo.prop,
+      repo.branch,
+      repo.link_path,
+      repo.target,
+      repo.repo_root,
+      basename(repo.link_path || ''),
+      basename(repo.repo_root || ''),
+    ].filter(Boolean).map((value) => String(value));
+    return values.some((value) => value === normalized);
   }
 
   private requireSafeGitPath(file: string): string {
@@ -369,58 +465,6 @@ export class PlaygroundsService {
       }
     } catch { /* dir not accessible */ }
     return { fileCount, totalLines };
-  }
-
-  private async findFirstGitRepoDir(
-    absPath: string,
-    parentIg: GitignoreFilter,
-    settings: ResolvedFibeSettings,
-    depth = 0,
-  ): Promise<string | null> {
-    if (depth > MAX_DEPTH) return null;
-
-    try {
-      await stat(join(absPath, '.git'));
-      return absPath;
-    } catch {
-      // Continue scanning child directories.
-    }
-
-    try {
-      const ig = await loadGitignore(absPath, parentIg);
-      const entries = await readdir(absPath, { withFileTypes: true });
-      for (const e of entries) {
-        const name = typeof e.name === 'string' ? e.name : String(e.name);
-        if (
-          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
-          settings.ignoredNames.has(name)
-        ) {
-          continue;
-        }
-        if (ig.ignores(name)) continue;
-
-        const childAbs = join(absPath, name);
-        let isDir = e.isDirectory();
-
-        if (e.isSymbolicLink()) {
-          try {
-            const st = await stat(childAbs);
-            isDir = st.isDirectory();
-          } catch {
-            continue;
-          }
-        }
-
-        if (!isDir) continue;
-
-        const repoDir = await this.findFirstGitRepoDir(childAbs, ig, settings, depth + 1);
-        if (repoDir) return repoDir;
-      }
-    } catch {
-      return null;
-    }
-
-    return null;
   }
 
   async getFileContent(relativePath: string): Promise<string> {

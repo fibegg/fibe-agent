@@ -26,9 +26,15 @@ export class PlaygroundsController {
   }
 
   @Get('playgrounds/urls')
-  async getUrls() {
-    const urls = await this.playgrounds.getUrls();
+  async getUrls(@Query('playground') playground?: string) {
+    const urls = await this.playgrounds.getUrls(playground);
     return { urls };
+  }
+
+  @Get('playgrounds/repos')
+  async getRepos() {
+    const repos = await this.playgrounds.getRepos();
+    return { repos };
   }
 
   @Get('playgrounds/preview-diagnostics')
@@ -44,38 +50,38 @@ export class PlaygroundsController {
   }
 
   @Get('playgrounds/diff')
-  async getDiff(@Query('file') file?: string) {
-    return this.playgrounds.getGitFileDiff(file);
+  async getDiff(@Query('file') file?: string, @Query('repo') repo?: string) {
+    return this.playgrounds.getGitFileDiff(file, repo);
   }
 
   @Post('playgrounds/git-stage')
   @HttpCode(HttpStatus.OK)
-  async stageGitFiles(@Body() body: { files?: string[]; confirm?: boolean }) {
-    return this.playgrounds.stageGitFiles(body?.files ?? [], body?.confirm === true);
+  async stageGitFiles(@Body() body: { files?: string[]; confirm?: boolean; repo?: string }) {
+    return this.gitOperation(() => this.playgrounds.stageGitFiles(body?.files ?? [], body?.confirm === true, body?.repo));
   }
 
   @Post('playgrounds/git-commit')
   @HttpCode(HttpStatus.OK)
-  async commitGit(@Body() body: { message?: string; confirm?: boolean }) {
-    return this.playgrounds.commitGit(body?.message ?? '', body?.confirm === true);
+  async commitGit(@Body() body: { message?: string; confirm?: boolean; repo?: string }) {
+    return this.gitOperation(() => this.playgrounds.commitGit(body?.message ?? '', body?.confirm === true, body?.repo));
   }
 
   @Post('playgrounds/git-branch')
   @HttpCode(HttpStatus.OK)
-  async branchGit(@Body() body: { create?: string }) {
-    return this.playgrounds.branchGit(body?.create);
+  async branchGit(@Body() body: { create?: string; repo?: string }) {
+    return this.gitOperation(() => this.playgrounds.branchGit(body?.create, body?.repo));
   }
 
   @Post('playgrounds/git-push')
   @HttpCode(HttpStatus.OK)
-  async pushGit(@Body() body: { remote?: string; branch?: string; confirm?: boolean }) {
-    return this.playgrounds.pushGit(body?.confirm === true, body?.remote, body?.branch);
+  async pushGit(@Body() body: { remote?: string; branch?: string; confirm?: boolean; repo?: string }) {
+    return this.gitOperation(() => this.playgrounds.pushGit(body?.confirm === true, body?.remote, body?.branch, body?.repo));
   }
 
   @Post('playgrounds/git-pr')
   @HttpCode(HttpStatus.OK)
-  async createDraftPr(@Body() body: { title?: string; body?: string; confirm?: boolean }) {
-    return this.playgrounds.createDraftPrWithGh(body?.confirm === true, body?.title, body?.body);
+  async createDraftPr(@Body() body: { title?: string; body?: string; confirm?: boolean; repo?: string }) {
+    return this.gitOperation(() => this.playgrounds.createDraftPrWithGh(body?.confirm === true, body?.title, body?.body, body?.repo));
   }
 
   @Get('playgrounds/file')
@@ -141,10 +147,25 @@ export class PlaygroundsController {
     return { ok: true, ...result };
   }
 
+  @Post('playrooms/unlink')
+  @HttpCode(HttpStatus.OK)
+  async unlinkPlayroom(@Body() body: { confirm?: boolean }) {
+    await this.playroomBrowser.unlinkPlayground(body?.confirm === true);
+    return { ok: true };
+  }
+
   @Get('playrooms/current')
   async getCurrentPlayroom() {
     const current = await this.playroomBrowser.getCurrentLink();
     return { current };
+  }
+
+  private async gitOperation<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      throw new BadRequestException(error instanceof Error ? error.message : 'Git operation failed');
+    }
   }
 }
 

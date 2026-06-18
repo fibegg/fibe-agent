@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readdirSync, rmSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -72,7 +72,7 @@ describe('PlayroomBrowserService', () => {
       expect(await service.browse('sub')).toEqual([]);
     });
 
-    test('parses stdout into BrowseEntry array', async () => {
+    test('parses stdout into playground-name BrowseEntry array', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
         stdout: JSON.stringify([
           { id: '1', name: 'proj1', playspec: 'fibe.gg/play1', path: `${rootDir}/playgrounds/proj1` },
@@ -83,8 +83,8 @@ describe('PlayroomBrowserService', () => {
       const entries = await service.browse('');
 
       expect(entries).toHaveLength(2);
-      expect(entries[0]).toEqual({ name: 'fibe.gg/play1', path: 'proj1', type: 'directory' });
-      expect(entries[1]).toEqual({ name: 'fibe.gg/play2', path: 'proj2', type: 'directory' });
+      expect(entries[0]).toEqual({ name: 'proj1', path: 'proj1', type: 'directory' });
+      expect(entries[1]).toEqual({ name: 'proj2', path: 'proj2', type: 'directory' });
 
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
       expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
@@ -102,15 +102,34 @@ describe('PlayroomBrowserService', () => {
       const entries = await service.browse('');
 
       expect(entries).toEqual([
-        { name: 'source-app', path: 'source-app--23', type: 'directory' },
+        { name: 'source-app--23', path: 'source-app--23', type: 'directory' },
+      ]);
+    });
+
+    test('deduplicates repeated playground records and ignores missing names', async () => {
+      mockExecFileAsync.mockResolvedValueOnce({
+        stdout: JSON.stringify([
+          { id: '1', name: 'alice2', playspec: 'eotm-2' },
+          { id: '1', name: 'alice2', playspec: 'eotm-2' },
+          { id: '2', name: '', playspec: 'eotm-2' },
+          { id: '3', name: 'alice3', playspec: 'eotm-2' },
+        ]),
+      });
+
+      const entries = await service.browse('');
+
+      expect(entries).toEqual([
+        { name: 'alice2', path: 'alice2', type: 'directory' },
+        { name: 'alice3', path: 'alice3', type: 'directory' },
       ]);
     });
 
     test('throws NotFoundException on execution failure', async () => {
       mockExecFileAsync.mockRejectedValueOnce(new Error('Script failed'));
 
-      await expect(service.browse('')).rejects.toThrow(NotFoundException);
-      await expect(service.browse('')).rejects.toThrow('Cannot execute Fibe local playgrounds command.');
+      const promise = service.browse('');
+      await expect(promise).rejects.toThrow(NotFoundException);
+      await expect(promise).rejects.toThrow('Cannot execute Fibe local playgrounds command.');
     });
   });
 
@@ -157,20 +176,117 @@ describe('PlayroomBrowserService', () => {
   });
 
   // -------------------------------------------------------------------------
+  // unlinkPlayground()
+  // -------------------------------------------------------------------------
+
+  describe('unlinkPlayground()', () => {
+    test('requires explicit confirmation', async () => {
+      writeFileSync(join(playgroundDir, '.current_playground.json'), '{}');
+
+      await expect(service.unlinkPlayground(false)).rejects.toThrow(BadRequestException);
+      await expect(service.unlinkPlayground(false)).rejects.toThrow('unlink requires confirm=true');
+      expect(existsSync(join(playgroundDir, '.current_playground.json'))).toBe(true);
+    });
+
+    test('clears link directory entries and preserves the directory itself', async () => {
+      const target = join(rootDir, 'playgrounds', 'project', 'backend');
+      mkdirSync(target, { recursive: true });
+      symlinkSync(target, join(playgroundDir, 'backend'));
+      writeFileSync(join(playgroundDir, '.current_playground.json'), '{}');
+      writeFileSync(join(playgroundDir, 'stale.txt'), 'old');
+      mkdirSync(join(playgroundDir, 'stale-dir'), { recursive: true });
+      writeFileSync(join(playgroundDir, 'stale-dir', 'nested.txt'), 'old');
+
+      await service.unlinkPlayground(true);
+
+      expect(existsSync(playgroundDir)).toBe(true);
+      expect(readdirSync(playgroundDir)).toEqual([]);
+      expect(existsSync(target)).toBe(true);
+    });
+
+    test('rejects when configured link path is a symlink', async () => {
+      const realDir = join(rootDir, 'real-playground');
+      const linkDir = join(rootDir, 'playground-link');
+      mkdirSync(realDir, { recursive: true });
+      symlinkSync(realDir, linkDir);
+      service = makeService(rootDir, linkDir);
+
+      await expect(service.unlinkPlayground(true)).rejects.toThrow(BadRequestException);
+      await expect(service.unlinkPlayground(true)).rejects.toThrow('is not a directory');
+    });
+
+    test('rejects when configured link path is a regular file', async () => {
+      const filePath = join(rootDir, 'playground-file');
+      writeFileSync(filePath, 'not a directory');
+      service = makeService(rootDir, filePath);
+
+      await expect(service.unlinkPlayground(true)).rejects.toThrow(BadRequestException);
+      await expect(service.unlinkPlayground(true)).rejects.toThrow('is not a directory');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // getCurrentLink()
   // -------------------------------------------------------------------------
 
   describe('getCurrentLink()', () => {
-    test('returns content of .current_playground', async () => {
-      writeFileSync(join(playgroundDir, '.current_playground'), 'my-project\n');
+    test('returns current playground name from .current_playground.json before id', async () => {
+      writeFileSync(join(playgroundDir, '.current_playground.json'), JSON.stringify({ id: '42', name: 'my-project' }));
 
       const link = await service.getCurrentLink();
       expect(link).toBe('my-project');
     });
 
-    test('returns null if .current_playground does not exist', async () => {
+    test('falls back to current playground name from .current_playground.json', async () => {
+      writeFileSync(join(playgroundDir, '.current_playground.json'), JSON.stringify({ name: 'my-project' }));
+
+      const link = await service.getCurrentLink();
+      expect(link).toBe('my-project');
+    });
+
+    test('returns null if .current_playground.json does not exist', async () => {
       const link = await service.getCurrentLink();
       expect(link).toBeNull();
+    });
+
+    test('infers current playground from mounted targets when state file is missing', async () => {
+      const aliceBackend = join(rootDir, 'playgrounds', 'alice--10', 'backend');
+      const aliceFrontend = join(rootDir, 'playgrounds', 'alice--10', 'frontend');
+      const bobBackend = join(rootDir, 'playgrounds', 'bob--11', 'backend');
+      const bobFrontend = join(rootDir, 'playgrounds', 'bob--11', 'frontend');
+      mkdirSync(aliceBackend, { recursive: true });
+      mkdirSync(aliceFrontend, { recursive: true });
+      mkdirSync(bobBackend, { recursive: true });
+      mkdirSync(bobFrontend, { recursive: true });
+      symlinkSync(aliceBackend, join(playgroundDir, 'backend'));
+      symlinkSync(aliceFrontend, join(playgroundDir, 'frontend'));
+
+      mockExecFileAsync
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([
+            { id: '10', name: 'alice', playspec: 'eotm-2' },
+            { id: '11', name: 'bob', playspec: 'eotm-2' },
+          ]),
+        })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([
+            { service: 'api', mount: aliceBackend },
+            { service: 'frontend', mount: aliceFrontend },
+          ]),
+        })
+        .mockResolvedValueOnce({
+          stdout: JSON.stringify([
+            { service: 'api', mount: bobBackend },
+            { service: 'frontend', mount: bobFrontend },
+          ]),
+        });
+
+      const link = await service.getCurrentLink();
+
+      expect(link).toBe('alice');
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
+      expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'mounts', '--playground', 'alice']);
+      expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'mounts', '--playground', 'bob']);
     });
   });
 });
