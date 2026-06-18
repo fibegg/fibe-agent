@@ -321,6 +321,10 @@ export const en = {
   'playground.loading': 'Loading…',
   'playground.none': 'No playgrounds available',
   'playground.linked': 'Linked: {path}',
+  'playground.unlink': 'Unlink',
+  'playground.unlinking': 'Unlinking…',
+  'playground.unlinkConfirm': 'Unlink the current playground?',
+  'playground.unlinkFailed': 'Failed to unlink playground',
 
   'preview.title': 'Preview',
   'preview.toggle': 'Toggle preview',

@@ -41,6 +41,23 @@ describe('usePlaygroundSelector', () => {
     expect(result.current.currentLink).toBe('some/link');
   });
 
+  it('refreshCurrentLink fetches the linked playground without opening the selector', async () => {
+    mockApiRequest.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ current: 'alice' }),
+    });
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    await act(async () => {
+      await result.current.refreshCurrentLink();
+    });
+
+    expect(result.current.currentLink).toBe('alice');
+    expect(result.current.entries).toEqual([]);
+    expect(mockApiRequest).toHaveBeenCalledWith('/api/playrooms/current');
+  });
+
   it('browseTo navigates to a subdirectory and updates breadcrumbs', async () => {
     const rootEntries = [{ name: 'sub', path: 'sub', type: 'directory' }];
     const subEntries = [{ name: 'file.ts', path: 'sub/file.ts', type: 'file' }];
@@ -142,6 +159,59 @@ describe('usePlaygroundSelector', () => {
     expect(result.current.error).toBeTruthy();
   });
 
+  it('unlinkPlayground sends POST and clears currentLink', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, linkedPath: 'project' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    await act(async () => {
+      await result.current.linkPlayground('project');
+    });
+
+    expect(result.current.currentLink).toBe('project');
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.unlinkPlayground();
+    });
+
+    expect(success).toBe(true);
+    expect(result.current.currentLink).toBeNull();
+    expect(mockApiRequest).toHaveBeenCalledWith(
+      '/api/playrooms/unlink',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ confirm: true }),
+      }),
+    );
+  });
+
+  it('unlinkPlayground sets error on failure', async () => {
+    mockApiRequest.mockResolvedValueOnce({ ok: false, status: 500 });
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    let success: boolean | undefined;
+    await act(async () => {
+      success = await result.current.unlinkPlayground();
+    });
+
+    expect(success).toBe(false);
+    expect(result.current.error).toBe('Failed to unlink playground');
+  });
+
   it('sets error when browse request fails', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: false, status: 404 }) // fetchEntries -> browse
@@ -221,6 +291,50 @@ describe('usePlaygroundSelector', () => {
     });
 
     expect(result.current.currentLink).toBe('dir');
+  });
+
+  it('open() does not smartMount after a manual unlink', async () => {
+    mockApiRequest
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true, linkedPath: 'project' }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([]),
+      });
+
+    const { result } = renderHook(() => usePlaygroundSelector());
+
+    await act(async () => {
+      await result.current.linkPlayground('project');
+      await result.current.unlinkPlayground();
+    });
+
+    mockApiRequest.mockClear();
+    mockApiRequest
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve([{ name: 'dir', path: 'dir', type: 'directory' }]),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: null }),
+      });
+
+    await act(async () => {
+      await result.current.open();
+    });
+
+    expect(result.current.currentLink).toBeNull();
+    expect(mockApiRequest).not.toHaveBeenCalledWith(
+      '/api/playrooms/link',
+      expect.anything(),
+    );
   });
 
   it('goToRoot resets path history and fetches root', async () => {

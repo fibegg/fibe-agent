@@ -326,6 +326,10 @@ export const uk: Record<TranslationKey, string> = {
   'playground.loading': 'Завантаження…',
   'playground.none': 'Немає доступних майданчиків',
   'playground.linked': 'Прив’язано: {path}',
+  'playground.unlink': 'Відв’язати',
+  'playground.unlinking': 'Відв’язування…',
+  'playground.unlinkConfirm': 'Відв’язати поточний майданчик?',
+  'playground.unlinkFailed': 'Не вдалося відв’язати майданчик',
 
   'preview.title': 'Превʼю',
   'preview.toggle': 'Перемкнути превʼю',

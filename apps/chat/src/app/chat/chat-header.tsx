@@ -72,6 +72,7 @@ export interface ChatHeaderProps {
   playgroundError?: string | null;
   playgroundCurrentLink?: string | null;
   playgroundLinking?: boolean;
+  playgroundUnlinking?: boolean;
   playgroundCanGoBack?: boolean;
   playgroundBreadcrumbs?: string[];
   onPlaygroundOpen?: () => void;
@@ -79,7 +80,9 @@ export interface ChatHeaderProps {
   onPlaygroundGoBack?: () => void;
   onPlaygroundGoToRoot?: () => void;
   onPlaygroundLink?: (path: string) => Promise<boolean>;
+  onPlaygroundUnlink?: () => Promise<boolean>;
   onPlaygroundLinked?: () => void;
+  onPlaygroundUnlinked?: () => void;
   onPlaygroundSmartMount?: () => void;
   /** When provided, shows a Reset button in the MoreActionsMenu. */
   onResetConversation?: () => void;

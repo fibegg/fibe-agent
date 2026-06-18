@@ -15,8 +15,10 @@ export function usePlaygroundSelector() {
   const [error, setError] = useState<string | null>(null);
   const [currentLink, setCurrentLink] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
+  const [unlinking, setUnlinking] = useState(false);
   const [pathHistory, setPathHistory] = useState<string[]>([]);
   const autoMountedRef = useRef(false);
+  const manualUnlinkedRef = useRef(false);
 
   const fetchEntries = useCallback(async (path: string) => {
     setLoading(true);
@@ -44,6 +46,7 @@ export function usePlaygroundSelector() {
       if (res.ok) {
         const data = (await res.json()) as { current: string | null };
         setCurrentLink(data.current);
+        if (data.current) manualUnlinkedRef.current = false;
         return data.current;
       }
     } catch { /* ignore */ }
@@ -81,6 +84,7 @@ export function usePlaygroundSelector() {
         setError(res.status === 404 ? 'Target not found' : 'Failed to link playground');
         return false;
       }
+      manualUnlinkedRef.current = false;
       setCurrentLink(path);
       return true;
     } catch (e) {
@@ -120,6 +124,7 @@ export function usePlaygroundSelector() {
         throw new Error('Failed to smart mount target');
       }
 
+      manualUnlinkedRef.current = false;
       setCurrentLink(targetPath);
       void fetchEntries(browsePath);
       return true;
@@ -131,10 +136,35 @@ export function usePlaygroundSelector() {
     }
   }, [linking, browsePath, fetchEntries]);
 
+  const unlinkPlayground = useCallback(async (): Promise<boolean> => {
+    setUnlinking(true);
+    setError(null);
+    try {
+      const res = await apiRequest(API_PATHS.PLAYROOMS_UNLINK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: true }),
+      });
+      if (!res.ok) {
+        setError('Failed to unlink playground');
+        return false;
+      }
+      manualUnlinkedRef.current = true;
+      setCurrentLink(null);
+      void fetchEntries(browsePath);
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to unlink playground');
+      return false;
+    } finally {
+      setUnlinking(false);
+    }
+  }, [browsePath, fetchEntries]);
+
   const open = useCallback(async () => {
     void fetchEntries('');
     const link = await fetchCurrentLink();
-    if (!link && !autoMountedRef.current) {
+    if (!link && !manualUnlinkedRef.current && !autoMountedRef.current) {
       autoMountedRef.current = true;
       void smartMount();
     }
@@ -153,13 +183,16 @@ export function usePlaygroundSelector() {
     error,
     currentLink,
     linking,
+    unlinking,
     canGoBack,
     breadcrumbs,
     browseTo,
     goBack,
     goToRoot,
     linkPlayground,
+    unlinkPlayground,
     smartMount,
+    refreshCurrentLink: fetchCurrentLink,
     open,
   };
 }

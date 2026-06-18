@@ -22,16 +22,17 @@ function renderSelector(overrides: Partial<Parameters<typeof PlaygroundSelector>
 // ─── smartCutLabel unit tests ────────────────────────────────────────────────
 
 describe('smartCutLabel', () => {
-  it('strips the org prefix before the first dash', () => {
-    expect(smartCutLabel('orgs/example-backend')).toBe('backend');
+  it('strips a trailing playground numeric suffix', () => {
+    expect(smartCutLabel('alice--10')).toBe('alice');
+    expect(smartCutLabel('playgrounds/bob--11')).toBe('bob');
   });
 
-  it('returns the full segment when there is no dash', () => {
+  it('returns the full segment when there is no trailing playground suffix', () => {
     expect(smartCutLabel('playzones/myproject')).toBe('myproject');
   });
 
-  it('handles a path with no slashes (bare segment)', () => {
-    expect(smartCutLabel('example-frontend')).toBe('frontend');
+  it('does not strip ordinary dashed names', () => {
+    expect(smartCutLabel('example-frontend')).toBe('example-frontend');
   });
 
   it('falls back to "Playground" for an empty string', () => {
@@ -40,7 +41,7 @@ describe('smartCutLabel', () => {
 
   it('handles trailing slash gracefully', () => {
     // last non-empty segment picked via filter(Boolean)
-    expect(smartCutLabel('orgs/example-backend/')).toBe('backend');
+    expect(smartCutLabel('playgrounds/alice--10/')).toBe('alice');
   });
 });
 
@@ -77,7 +78,7 @@ describe('PlaygroundSelector', () => {
   it('renders entries and calls onLink on click', async () => {
     const onLink = vi.fn().mockResolvedValue(true);
     const entries: BrowseEntry[] = [
-      { name: 'project-a', path: 'project-a', type: 'directory' },
+      { name: 'project-a--42', path: 'project-a--42', type: 'directory' },
       { name: 'readme.md', path: 'readme.md', type: 'file' },
     ];
     renderSelector({ entries, onLink });
@@ -85,9 +86,10 @@ describe('PlaygroundSelector', () => {
     
     const entryButton = screen.getByRole('option', { name: /project-a/ });
     expect(entryButton).toBeTruthy();
+    expect(screen.queryByText('project-a--42')).toBeNull();
     fireEvent.click(entryButton);
     
-    expect(onLink).toHaveBeenCalledWith('project-a');
+    expect(onLink).toHaveBeenCalledWith('project-a--42');
     
     await waitFor(() => {
       expect(screen.queryByRole('listbox')).toBeNull();
@@ -121,9 +123,32 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows current link footer when a link is set', () => {
-    renderSelector({ currentLink: 'playgrounds/myproject' });
+    renderSelector({ currentLink: 'playgrounds/myproject--44' });
     fireEvent.click(screen.getByRole('button', { name: 'Link Playground' }));
     expect(screen.getByText(/Linked:/)).toBeTruthy();
-    expect(screen.getByText('playgrounds/myproject')).toBeTruthy();
+    expect(screen.getByText('myproject')).toBeTruthy();
+    expect(screen.queryByText('playgrounds/myproject--44')).toBeNull();
+  });
+
+  it('renders unlink control for current link and calls onUnlink after confirmation', async () => {
+    const onUnlink = vi.fn().mockResolvedValue(true);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+    renderSelector({ currentLink: 'my-project', onUnlink });
+    fireEvent.click(screen.getByRole('button', { name: 'Link Playground' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Unlink' }));
+
+    await waitFor(() => {
+      expect(onUnlink).toHaveBeenCalledOnce();
+    });
+    expect(confirm).toHaveBeenCalledWith('Unlink the current playground?');
+
+    confirm.mockRestore();
+  });
+
+  it('does not render unlink control without a current link', () => {
+    renderSelector({ onUnlink: vi.fn().mockResolvedValue(true) });
+    fireEvent.click(screen.getByRole('button', { name: 'Link Playground' }));
+    expect(screen.queryByRole('button', { name: 'Unlink' })).toBeNull();
   });
 });

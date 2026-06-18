@@ -255,7 +255,7 @@ export function ChatPage() {
     services: previewServices,
     loading: previewServicesLoading,
     refresh: refreshPreviewServices,
-  } = usePlaygroundServices();
+  } = usePlaygroundServices(pgSelector.currentLink);
   const playgroundSelector = (
     <PlaygroundSelector
       entries={pgSelector.entries}
@@ -263,13 +263,21 @@ export function ChatPage() {
       error={pgSelector.error}
       currentLink={pgSelector.currentLink}
       linking={pgSelector.linking}
+      unlinking={pgSelector.unlinking}
       onOpen={pgSelector.open}
       onLink={pgSelector.linkPlayground}
+      onUnlink={pgSelector.unlinkPlayground}
       onLinked={refetchPlaygrounds}
+      onUnlinked={refetchPlaygrounds}
       visible={true}
       variant="icon"
     />
   );
+
+  useEffect(() => {
+    void pgSelector.refreshCurrentLink();
+  }, [pgSelector.refreshCurrentLink]);
+
   const [standaloneMode, setStandaloneMode] = useState(() =>
     isStandaloneMode(),
   );
@@ -1494,6 +1502,17 @@ export function ChatPage() {
               }
               sessionCount={sessionCount}
               anyProcessing={anyProcessing}
+              playgroundEntries={pgSelector.entries}
+              playgroundLoading={pgSelector.loading}
+              playgroundError={pgSelector.error}
+              playgroundCurrentLink={pgSelector.currentLink}
+              playgroundLinking={pgSelector.linking}
+              playgroundUnlinking={pgSelector.unlinking}
+              onPlaygroundOpen={pgSelector.open}
+              onPlaygroundLink={pgSelector.linkPlayground}
+              onPlaygroundUnlink={pgSelector.unlinkPlayground}
+              onPlaygroundLinked={refetchPlaygrounds}
+              onPlaygroundUnlinked={refetchPlaygrounds}
               conversations={compactMode ? conversations : undefined}
               activeConversationId={
                 compactMode ? activeConversationId : undefined

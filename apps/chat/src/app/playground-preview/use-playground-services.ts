@@ -12,23 +12,27 @@ type ParentPreviewMessage = {
   urls?: unknown;
 };
 
-export function usePlaygroundServices() {
+export function usePlaygroundServices(selectedPlayground?: string | null) {
   const [services, setServices] = useState<PlaygroundPreviewService[]>([]);
   const [loading, setLoading] = useState(true);
   const parentProvidedRef = useRef(false);
+  const playground = selectedPlayground?.trim() ?? '';
 
   const refresh = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
     try {
-      const res = await apiRequest(API_PATHS.PLAYGROUNDS_URLS, { signal }).catch(() => null);
+      const path = playground
+        ? `${API_PATHS.PLAYGROUNDS_URLS}?playground=${encodeURIComponent(playground)}`
+        : API_PATHS.PLAYGROUNDS_URLS;
+      const res = await apiRequest(path, { signal }).catch(() => null);
       if (!res?.ok) return;
       const data = await res.json();
-      if (parentProvidedRef.current) return;
+      if (parentProvidedRef.current && !playground) return;
       setServices(normalizePlaygroundServices(data?.services ?? data?.urls, 'cli'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [playground]);
 
   useEffect(() => {
     const ac = new AbortController();

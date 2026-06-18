@@ -60,9 +60,12 @@ export function PlaygroundSelectorSlot({
         error={props.playgroundError ?? null}
         currentLink={props.playgroundCurrentLink ?? null}
         linking={props.playgroundLinking ?? false}
+        unlinking={props.playgroundUnlinking ?? false}
         onOpen={props.onPlaygroundOpen}
         onLink={props.onPlaygroundLink}
+        onUnlink={props.onPlaygroundUnlink}
         onLinked={props.onPlaygroundLinked}
+        onUnlinked={props.onPlaygroundUnlinked}
         visible={true}
         variant={variant}
       />
