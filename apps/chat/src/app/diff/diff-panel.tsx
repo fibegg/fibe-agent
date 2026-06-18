@@ -33,6 +33,18 @@ interface DiffResult {
   branch?: string;
   upstream?: string | null;
   counts?: { staged: number; unstaged: number; untracked: number };
+  repo?: LocalRepo;
+  repos?: LocalRepo[];
+}
+
+interface LocalRepo {
+  id?: string;
+  service: string;
+  prop?: string;
+  branch?: string;
+  link_path: string;
+  target: string;
+  repo_root: string;
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -94,6 +106,29 @@ function DiffLine({ line, idx }: { line: string; idx: number }) {
   );
 }
 
+function repoKey(repo: LocalRepo): string {
+  return repo.id || repo.service || repo.prop || repo.repo_root;
+}
+
+function repoLabel(repo: LocalRepo): string {
+  const base = repo.prop || repo.service || repo.id || repo.repo_root.split('/').pop() || repo.repo_root;
+  return repo.branch ? `${base}:${repo.branch}` : base;
+}
+
+async function responseErrorMessage(res: Response): Promise<string> {
+  const text = await res.text().catch(() => '');
+  if (!text) return `HTTP ${res.status}`;
+  try {
+    const payload = JSON.parse(text) as { message?: unknown; error?: unknown };
+    if (Array.isArray(payload.message)) return payload.message.join('\n');
+    if (typeof payload.message === 'string' && payload.message.trim()) return payload.message;
+    if (typeof payload.error === 'string' && payload.error.trim()) return payload.error;
+  } catch {
+    // Fall through to raw text.
+  }
+  return text;
+}
+
 // ─── Auto-refresh interval while drawer is open ───────────────────────────────
 
 const POLL_MS = 5000;
@@ -109,16 +144,59 @@ export function DiffPanel() {
   const [operationResult, setOperationResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set());
   const [commitMessage, setCommitMessage] = useState('');
+  const [repos, setRepos] = useState<LocalRepo[]>([]);
+  const [reposLoaded, setReposLoaded] = useState(false);
+  const [selectedRepo, setSelectedRepo] = useState('');
   const abortRef = useRef<AbortController | null>(null);
 
+  const onlyRepo = repos.length === 1 ? repos[0] : undefined;
+  const repoSelector = selectedRepo || (onlyRepo ? repoKey(onlyRepo) : '');
+
+  const fetchRepos = useCallback(async () => {
+    setReposLoaded(false);
+    try {
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS_REPOS);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { repos?: LocalRepo[] };
+      const nextRepos = data.repos ?? [];
+      setRepos(nextRepos);
+      setSelectedRepo((current) => {
+        if (current && nextRepos.some((repo) => repoKey(repo) === current)) return current;
+        const nextOnlyRepo = nextRepos.length === 1 ? nextRepos[0] : undefined;
+        return nextOnlyRepo ? repoKey(nextOnlyRepo) : '';
+      });
+    } catch {
+      setRepos([]);
+      setSelectedRepo('');
+    } finally {
+      setReposLoaded(true);
+    }
+  }, []);
+
   const fetchDiff = useCallback(async () => {
+    if (!reposLoaded) return;
+    if (repos.length === 0) {
+      setError(null);
+      setResult({ files: [], diff: '', hasDiff: false, isGitRepo: false });
+      setSelectedFiles(new Set());
+      return;
+    }
+    if (repos.length > 1 && !repoSelector) {
+      setError(null);
+      setResult(null);
+      setSelectedFiles(new Set());
+      return;
+    }
     abortRef.current?.abort();
     const ac = new AbortController();
     abortRef.current = ac;
     setLoading(true);
     setError(null);
     try {
-      const res = await apiRequest(API_PATHS.PLAYGROUNDS_DIFF, { signal: ac.signal });
+      const path = repoSelector
+        ? `${API_PATHS.PLAYGROUNDS_DIFF}?repo=${encodeURIComponent(repoSelector)}`
+        : API_PATHS.PLAYGROUNDS_DIFF;
+      const res = await apiRequest(path, { signal: ac.signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = (await res.json()) as DiffResult;
       setResult(data);
@@ -133,12 +211,16 @@ export function DiffPanel() {
     } finally {
       setLoading(false);
     }
-  }, [t]);
+  }, [repoSelector, repos.length, reposLoaded, t]);
 
   // Initial fetch
   useEffect(() => {
-    void fetchDiff();
+    void fetchRepos();
     return () => { abortRef.current?.abort(); };
+  }, [fetchRepos]);
+
+  useEffect(() => {
+    void fetchDiff();
   }, [fetchDiff]);
 
   // Auto-refresh every 5 s while mounted (panel is open)
@@ -175,8 +257,7 @@ export function DiffPanel() {
     try {
       const res = await request();
       if (!res.ok) {
-        const text = await res.text().catch(() => '');
-        throw new Error(text || `HTTP ${res.status}`);
+        throw new Error(await responseErrorMessage(res));
       }
       const data = (await res.json()) as { message?: string };
       setOperationResult({ ok: true, message: data.message ?? t('diff.gitOperationSuccess') });
@@ -189,30 +270,30 @@ export function DiffPanel() {
   }, [fetchDiff, t]);
 
   const handleCommit = useCallback(() => runGitAction('commit', async () => {
-    const stageRes = await apiRequest('/api/playgrounds/git-stage', {
+      const stageRes = await apiRequest('/api/playgrounds/git-stage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files: selected, confirm: true }),
+      body: JSON.stringify({ files: selected, confirm: true, repo: repoSelector }),
     });
     if (!stageRes.ok) return stageRes;
     return apiRequest('/api/playgrounds/git-commit', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: commitMessage, confirm: true }),
+      body: JSON.stringify({ message: commitMessage, confirm: true, repo: repoSelector }),
     });
-  }), [commitMessage, runGitAction, selected]);
+  }), [commitMessage, repoSelector, runGitAction, selected]);
 
   const handlePush = useCallback(() => runGitAction('push', () => apiRequest('/api/playgrounds/git-push', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ confirm: true, branch: result?.branch }),
-  })), [result?.branch, runGitAction]);
+    body: JSON.stringify({ confirm: true, branch: result?.branch, repo: repoSelector }),
+  })), [repoSelector, result?.branch, runGitAction]);
 
   const handleDraftPr = useCallback(() => runGitAction('pr', () => apiRequest('/api/playgrounds/git-pr', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ confirm: true }),
-  })), [runGitAction]);
+    body: JSON.stringify({ confirm: true, repo: repoSelector }),
+  })), [repoSelector, runGitAction]);
 
   const lines = result?.diff.split('\n') ?? [];
 
@@ -223,7 +304,7 @@ export function DiffPanel() {
         <div className="flex items-center gap-2">
           <GitCompareArrows className="size-3.5 text-primary shrink-0" aria-hidden />
           <span className="text-[10px] font-medium text-primary/70 tracking-wide">
-            {result?.branch ? `git · ${result.branch}` : 'git diff HEAD'}
+            {result?.branch ? `git · ${result.branch}` : repos.length > 1 && !repoSelector ? t('diff.selectRepo') : 'git diff HEAD'}
           </span>
           {result && (
             <span className="text-[10px] text-muted-foreground/40">
@@ -233,6 +314,22 @@ export function DiffPanel() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          {repos.length > 1 && (
+            <select
+              value={repoSelector}
+              onChange={(event) => setSelectedRepo(event.currentTarget.value)}
+              className="max-w-40 rounded border border-primary/15 bg-black/20 px-1.5 py-0.5 text-[10px] text-foreground outline-none"
+              aria-label={t('diff.repository')}
+              title={t('diff.repository')}
+            >
+              <option value="">{t('diff.selectRepo')}</option>
+              {repos.map((repo) => (
+                <option key={repoKey(repo)} value={repoKey(repo)}>
+                  {repoLabel(repo)}
+                </option>
+              ))}
+            </select>
+          )}
           {result?.hasDiff && (
             <button
               type="button"
@@ -319,8 +416,15 @@ export function DiffPanel() {
         </div>
       )}
 
+      {!loading && !error && repos.length > 1 && !repoSelector && (
+        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground/50 px-6 text-center">
+          <GitCompareArrows className="size-8 opacity-30" />
+          <p className="text-xs">{t('diff.selectRepoPrompt')}</p>
+        </div>
+      )}
+
       {/* ── No changes ─────────────────────────────────────────────────── */}
-      {!loading && !error && result?.isGitRepo && !result.hasDiff && (
+      {!loading && !error && !(repos.length > 1 && !repoSelector) && result?.isGitRepo && !result.hasDiff && (
         <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground/40 px-6 text-center">
           <GitCompareArrows className="size-8 opacity-20" />
           <p className="text-xs">{t('diff.noChanges')}</p>
