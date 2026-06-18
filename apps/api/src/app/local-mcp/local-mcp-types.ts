@@ -27,13 +27,6 @@ export const LOCAL_TOOL = {
   GET_MODE: 'get_mode',
   NOTIFY: 'notify',
   SET_TITLE: 'set_title',
-  GIT_STATUS: 'fibe_local_git_status',
-  GIT_DIFF: 'fibe_local_git_diff',
-  GIT_STAGE: 'fibe_local_git_stage',
-  GIT_COMMIT: 'fibe_local_git_commit',
-  GIT_BRANCH: 'fibe_local_git_branch',
-  GIT_PUSH: 'fibe_local_git_push',
-  GH_DRAFT_PR: 'fibe_local_gh_draft_pr',
 } as const;
 
 export type LocalToolName = (typeof LOCAL_TOOL)[keyof typeof LOCAL_TOOL];

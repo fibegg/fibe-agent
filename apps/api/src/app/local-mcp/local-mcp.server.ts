@@ -17,8 +17,6 @@
  *   get_mode            — return current agent mode
  *   notify              — show a toast notification (fire-and-forget)
  *   set_title           — update the run title in the sidebar (fire-and-forget)
- *   fibe_local_git_*    — safe local git status/diff/stage/commit/branch/push
- *   fibe_local_gh_draft_pr — create a draft PR with gh
  */
 
 import { createInterface } from 'node:readline';
@@ -165,83 +163,6 @@ const TOOL_DEFINITIONS = [
         title: { type: 'string', description: 'New title to display.' },
       },
       required: ['title'],
-    },
-  },
-  {
-    name: LOCAL_TOOL.GIT_STATUS,
-    description: 'Read-only local git status for the active playground repository. Returns branch, upstream, counts, changed files, and diff metadata.',
-    annotations: { readOnlyHint: true },
-    inputSchema: { type: 'object', properties: {} },
-  },
-  {
-    name: LOCAL_TOOL.GIT_DIFF,
-    description: 'Read-only local git diff for the active playground repository, optionally limited to one relative file path.',
-    annotations: { readOnlyHint: true },
-    inputSchema: {
-      type: 'object',
-      properties: {
-        file: { type: 'string', description: 'Optional repository-relative path to diff.' },
-      },
-    },
-  },
-  {
-    name: LOCAL_TOOL.GIT_STAGE,
-    description: 'Stage selected repository-relative files. Requires confirm=true. Destructive git operations are not supported.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        files: { type: 'array', items: { type: 'string' }, description: 'Repository-relative files to stage.' },
-        confirm: { type: 'boolean', description: 'Must be true.' },
-      },
-      required: ['files', 'confirm'],
-    },
-  },
-  {
-    name: LOCAL_TOOL.GIT_COMMIT,
-    description: 'Commit already-staged files with a message. Requires confirm=true.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        message: { type: 'string', description: 'Commit message.' },
-        confirm: { type: 'boolean', description: 'Must be true.' },
-      },
-      required: ['message', 'confirm'],
-    },
-  },
-  {
-    name: LOCAL_TOOL.GIT_BRANCH,
-    description: 'Show the current branch or create and switch to a new branch. Does not reset, rebase, stash, or clean.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        create: { type: 'string', description: 'Optional new branch name.' },
-      },
-    },
-  },
-  {
-    name: LOCAL_TOOL.GIT_PUSH,
-    description: 'Push the current branch to a remote. Requires confirm=true. Force push is not supported.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        remote: { type: 'string', description: 'Remote name, default origin.' },
-        branch: { type: 'string', description: 'Branch name, default current branch.' },
-        confirm: { type: 'boolean', description: 'Must be true.' },
-      },
-      required: ['confirm'],
-    },
-  },
-  {
-    name: LOCAL_TOOL.GH_DRAFT_PR,
-    description: 'Create a draft GitHub pull request using gh pr create. Requires confirm=true.',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        title: { type: 'string', description: 'Optional PR title; gh --fill is used by default.' },
-        body: { type: 'string', description: 'Optional PR body.' },
-        confirm: { type: 'boolean', description: 'Must be true.' },
-      },
-      required: ['confirm'],
     },
   },
 ];

@@ -20,7 +20,6 @@ import {
   resolveAgentMode,
 } from '@shared/agent-mode.constants';
 import { WS_EVENT } from '@shared/ws-constants';
-import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import { resolveLocalMcpLaunch, type LocalMcpLaunch } from './local-mcp-launch';
 
 export interface OutboundEvent {
@@ -55,7 +54,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
   private child: ChildProcess | null = null;
   private readonly askTimeoutMs: number;
 
-  constructor(private readonly playgrounds?: PlaygroundsService) {
+  constructor() {
     this.askTimeoutMs =
       parseInt(process.env['ASK_USER_TIMEOUT_MS'] ?? '0', 10) ||
       DEFAULT_ASK_TIMEOUT_MS;
@@ -176,43 +175,9 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
         return { ok: true, mode: resolved };
       }
 
-      case LOCAL_TOOL.GIT_STATUS:
-        return this.requirePlaygrounds().getDiff();
-
-      case LOCAL_TOOL.GIT_DIFF:
-        return this.requirePlaygrounds().getGitFileDiff(str('file'));
-
-      case LOCAL_TOOL.GIT_STAGE:
-        return this.requirePlaygrounds().stageGitFiles(this.strArray(args['files']), args['confirm'] === true);
-
-      case LOCAL_TOOL.GIT_COMMIT:
-        return this.requirePlaygrounds().commitGit(str('message') ?? '', args['confirm'] === true);
-
-      case LOCAL_TOOL.GIT_BRANCH:
-        return this.requirePlaygrounds().branchGit(str('create'));
-
-      case LOCAL_TOOL.GIT_PUSH:
-        return this.requirePlaygrounds().pushGit(args['confirm'] === true, str('remote'), str('branch'));
-
-      case LOCAL_TOOL.GH_DRAFT_PR:
-        return this.requirePlaygrounds().createDraftPrWithGh(args['confirm'] === true, str('title'), str('body'));
-
       default:
         throw new Error(`Unknown local tool: ${String(tool)}`);
     }
-  }
-
-  private requirePlaygrounds(): PlaygroundsService {
-    if (!this.playgrounds) {
-      throw new Error('PlaygroundsService is unavailable for local git tools');
-    }
-    return this.playgrounds;
-  }
-
-  private strArray(value: unknown): string[] {
-    if (Array.isArray(value)) return value.map((entry) => String(entry));
-    if (typeof value === 'string' && value.trim()) return [value];
-    return [];
   }
 
   // ─── Tool handlers ──────────────────────────────────────────────────────────

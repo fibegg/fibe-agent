@@ -53,9 +53,6 @@ interface JsonRpcResponse {
 const LOCAL_TOOL_NAMES = [
   'ask_user', 'confirm_action', 'show_image',
   'set_mode', 'get_mode', 'notify', 'set_title',
-  'fibe_local_git_status', 'fibe_local_git_diff', 'fibe_local_git_stage',
-  'fibe_local_git_commit', 'fibe_local_git_branch', 'fibe_local_git_push',
-  'fibe_local_gh_draft_pr',
 ];
 
 // Minimal in-process replica of the server handler for unit testing.
@@ -140,10 +137,10 @@ describe('local-mcp.server — JSON-RPC handler', () => {
     expect(res?.result).toEqual({});
   });
 
-  test('tools/list returns interactive and local git tool definitions', async () => {
+  test('tools/list returns interactive tool definitions only', async () => {
     const res = await handleMessage({ jsonrpc: '2.0', id: 3, method: 'tools/list' });
     const tools = (res?.result as { tools: { name: string }[] }).tools;
-    expect(tools).toHaveLength(14);
+    expect(tools).toHaveLength(7);
     const names = tools.map((t) => t.name);
     expect(names).toContain('ask_user');
     expect(names).toContain('confirm_action');
@@ -152,11 +149,8 @@ describe('local-mcp.server — JSON-RPC handler', () => {
     expect(names).toContain('get_mode');
     expect(names).toContain('notify');
     expect(names).toContain('set_title');
-    expect(names).toContain('fibe_local_git_status');
-    expect(names).toContain('fibe_local_git_diff');
-    expect(names).toContain('fibe_local_git_commit');
-    expect(names).toContain('fibe_local_git_push');
-    expect(names).toContain('fibe_local_gh_draft_pr');
+    expect(names).not.toContain('fibe_local_git_status');
+    expect(names).not.toContain('fibe_local_git_commit');
   });
 
   test('tools/call for a known tool calls the API and returns content', async () => {
