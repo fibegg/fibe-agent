@@ -701,7 +701,12 @@ export function ChatPage() {
     handleStreamChunk,
     handleStreamEnd,
     handleStreamAbort,
-  } = useChatStreaming({ onStreamEndCallback, resetForNewStream });
+    restorePersistedStream,
+  } = useChatStreaming({
+    onStreamEndCallback,
+    resetForNewStream,
+    persistenceKey: `conversation:${activeConversationId}`,
+  });
 
   const handleStreamStartWithTimer = useCallback(
     (data?: { model?: string; startedAt?: string }) => {
@@ -736,11 +741,12 @@ export function ChatPage() {
       }
 
       const now = Date.now();
+      restorePersistedStream();
       const serverStartedAt = timestampMs(data.startedAt);
       setWorkingStartedAt((current) => serverStartedAt ?? current ?? now);
       setWorkingNow(now);
     },
-    [],
+    [restorePersistedStream],
   );
 
   const {
@@ -811,11 +817,12 @@ export function ChatPage() {
   }, [state]);
 
   useEffect(() => {
-    handleStreamAbortWithTimer();
+    setWorkingStartedAt(null);
+    setWorkingNow(Date.now());
     resetActivityState();
     setLastSentMessage(null);
     setLocalToolItems([]);
-  }, [activeConversationId, handleStreamAbortWithTimer, resetActivityState]);
+  }, [activeConversationId, resetActivityState]);
 
   const handleConversationSelect = useCallback(
     (id: string): void => {

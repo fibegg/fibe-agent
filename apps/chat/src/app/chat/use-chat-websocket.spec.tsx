@@ -472,6 +472,39 @@ describe('useChatWebSocket message handlers', () => {
     expect(wsSendMock).toHaveBeenCalledWith(JSON.stringify({ action: 'initiate_auth' }));
   });
 
+  it('does not abort stream state on initial conversation binding', async () => {
+    const onStreamAbort = vi.fn();
+    const { rerender } = renderHook(
+      ({ conversationId }) =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          conversationId,
+          onStreamAbort,
+        ),
+      { wrapper, initialProps: { conversationId: 'thread-a' } },
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(onStreamAbort).not.toHaveBeenCalled();
+
+    rerender({ conversationId: 'thread-b' });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(onStreamAbort).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores messages from a superseded websocket after conversation switch', async () => {
     const sockets: Array<{
       readyState: number;

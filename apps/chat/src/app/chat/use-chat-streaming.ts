@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface UseChatStreamingProps {
   onStreamEndCallback: (
@@ -8,16 +8,54 @@ export interface UseChatStreamingProps {
     streamModel?: string | null
   ) => void;
   resetForNewStream: (data?: { model?: string }) => void;
+  persistenceKey?: string | null;
+}
+
+const STREAM_DRAFT_STORAGE_PREFIX = 'fibe-agent:stream-draft:';
+
+function storageKeyFor(persistenceKey?: string | null): string | null {
+  const key = persistenceKey?.trim();
+  return key ? `${STREAM_DRAFT_STORAGE_PREFIX}${key}` : null;
+}
+
+function readPersistedDraft(storageKey: string | null): string {
+  if (!storageKey || typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem(storageKey) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function writePersistedDraft(storageKey: string | null, text: string): void {
+  if (!storageKey || typeof window === 'undefined') return;
+  try {
+    if (text) {
+      window.sessionStorage.setItem(storageKey, text);
+    } else {
+      window.sessionStorage.removeItem(storageKey);
+    }
+  } catch {
+    // Storage may be disabled in private or embedded browser contexts.
+  }
 }
 
 export function useChatStreaming({
   onStreamEndCallback,
   resetForNewStream,
+  persistenceKey,
 }: UseChatStreamingProps) {
-  const [streamingText, setStreamingText] = useState('');
+  const draftStorageKey = useMemo(
+    () => storageKeyFor(persistenceKey),
+    [persistenceKey]
+  );
+  const [streamingText, setStreamingText] = useState(() =>
+    readPersistedDraft(draftStorageKey)
+  );
   const streamBufferRef = useRef('');
   const timeoutIdRef = useRef<number | null>(null);
   const streamModelRef = useRef<string | null>(null);
+  const finalTextRef = useRef(streamingText);
 
   const flushStreamBuffer = useCallback(() => {
     timeoutIdRef.current = null;
@@ -36,7 +74,16 @@ export function useChatStreaming({
     };
   }, []);
 
-  const finalTextRef = useRef('');
+  useEffect(() => {
+    if (timeoutIdRef.current !== null) {
+      cancelAnimationFrame(timeoutIdRef.current);
+      timeoutIdRef.current = null;
+    }
+    streamBufferRef.current = '';
+    const restored = readPersistedDraft(draftStorageKey);
+    finalTextRef.current = restored;
+    setStreamingText(restored);
+  }, [draftStorageKey]);
 
   const handleStreamStart = useCallback(
     (data?: { model?: string }) => {
@@ -48,22 +95,24 @@ export function useChatStreaming({
       finalTextRef.current = '';
       setStreamingText('');
       streamModelRef.current = data?.model ?? null;
+      writePersistedDraft(draftStorageKey, '');
       resetForNewStream(data);
     },
-    [resetForNewStream]
+    [draftStorageKey, resetForNewStream]
   );
 
   const handleStreamChunk = useCallback(
     (chunk: string) => {
       streamBufferRef.current += chunk;
       finalTextRef.current += chunk;
+      writePersistedDraft(draftStorageKey, finalTextRef.current);
       if (timeoutIdRef.current === null) {
         // Align flushes to the display refresh cycle. rAF pauses automatically
         // when the tab is hidden, saving wasted renders and timer drift.
         timeoutIdRef.current = requestAnimationFrame(flushStreamBuffer);
       }
     },
-    [flushStreamBuffer]
+    [draftStorageKey, flushStreamBuffer]
   );
 
   const handleStreamEnd = useCallback(
@@ -71,9 +120,10 @@ export function useChatStreaming({
       usage?: { inputTokens: number; outputTokens: number },
       model?: string
     ) => {
+      writePersistedDraft(draftStorageKey, '');
       onStreamEndCallback(finalTextRef.current, usage, model, streamModelRef.current);
     },
-    [onStreamEndCallback]
+    [draftStorageKey, onStreamEndCallback]
   );
 
   const handleStreamAbort = useCallback(() => {
@@ -87,11 +137,21 @@ export function useChatStreaming({
     setStreamingText('');
   }, []);
 
+  const restorePersistedStream = useCallback(() => {
+    const restored = readPersistedDraft(draftStorageKey);
+    if (!restored) return '';
+    streamBufferRef.current = '';
+    finalTextRef.current = restored;
+    setStreamingText(restored);
+    return restored;
+  }, [draftStorageKey]);
+
   return {
     streamingText,
     handleStreamStart,
     handleStreamChunk,
     handleStreamEnd,
     handleStreamAbort,
+    restorePersistedStream,
   };
 }

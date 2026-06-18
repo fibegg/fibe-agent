@@ -99,6 +99,7 @@ export function useChatWebSocket(
   const onConversationDeletedRef = useStableRef(onConversationDeleted);
   const onStreamAbortRef = useStableRef(onStreamAbort);
   const onProcessingStateRef = useStableRef(onProcessingState);
+  const previousConversationIdRef = useRef(conversationId);
 
   const clearResponseTimer = useCallback(() => {
     if (responseTimerRef.current) {
@@ -418,11 +419,15 @@ export function useChatWebSocket(
   }, [connect, clearResponseTimer]);
 
   useEffect(() => {
+    const conversationChanged = previousConversationIdRef.current !== conversationId;
+    previousConversationIdRef.current = conversationId;
     messageQueueRef.current = [];
     setSessionActivity([]);
     setErrorMessage(null);
     clearResponseTimer();
-    onStreamAbortRef.current?.();
+    if (conversationChanged) {
+      onStreamAbortRef.current?.();
+    }
     setState(CHAT_STATES.INITIALIZING);
   }, [conversationId, clearResponseTimer, onStreamAbortRef]);
 

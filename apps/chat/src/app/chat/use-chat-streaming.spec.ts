@@ -5,9 +5,11 @@ import { useChatStreaming } from './use-chat-streaming';
 describe('useChatStreaming', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    window.sessionStorage.clear();
   });
 
   afterEach(() => {
+    window.sessionStorage.clear();
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -17,6 +19,23 @@ describe('useChatStreaming', () => {
       useChatStreaming({ onStreamEndCallback: vi.fn(), resetForNewStream: vi.fn() })
     );
     expect(result.current.streamingText).toBe('');
+  });
+
+  it('restores persisted streaming text for the active conversation', () => {
+    window.sessionStorage.setItem(
+      'fibe-agent:stream-draft:conversation:abc',
+      'Already streamed text'
+    );
+
+    const { result } = renderHook(() =>
+      useChatStreaming({
+        onStreamEndCallback: vi.fn(),
+        resetForNewStream: vi.fn(),
+        persistenceKey: 'conversation:abc',
+      })
+    );
+
+    expect(result.current.streamingText).toBe('Already streamed text');
   });
 
   it('handleStreamStart clears text and calls resetForNewStream', () => {
@@ -63,6 +82,48 @@ describe('useChatStreaming', () => {
 
     expect(result.current.streamingText).toBe('Hello ');
     rafSpy.mockRestore();
+  });
+
+  it('persists chunks before the animation frame renders them', () => {
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(1 as unknown as ReturnType<typeof requestAnimationFrame>);
+    const { result } = renderHook(() =>
+      useChatStreaming({
+        onStreamEndCallback: vi.fn(),
+        resetForNewStream: vi.fn(),
+        persistenceKey: 'conversation:abc',
+      })
+    );
+
+    act(() => {
+      result.current.handleStreamChunk('Partial');
+    });
+
+    expect(result.current.streamingText).toBe('');
+    expect(window.sessionStorage.getItem('fibe-agent:stream-draft:conversation:abc')).toBe('Partial');
+  });
+
+  it('can restore persisted text after an abort/reconnect path', () => {
+    vi.spyOn(globalThis, 'requestAnimationFrame').mockReturnValue(1 as unknown as ReturnType<typeof requestAnimationFrame>);
+    const { result } = renderHook(() =>
+      useChatStreaming({
+        onStreamEndCallback: vi.fn(),
+        resetForNewStream: vi.fn(),
+        persistenceKey: 'conversation:abc',
+      })
+    );
+
+    act(() => {
+      result.current.handleStreamChunk('Partial response');
+      result.current.handleStreamAbort();
+    });
+
+    expect(result.current.streamingText).toBe('');
+
+    act(() => {
+      result.current.restorePersistedStream();
+    });
+
+    expect(result.current.streamingText).toBe('Partial response');
   });
 
   it('multiple chunks merge into one flush', () => {
@@ -122,6 +183,25 @@ describe('useChatStreaming', () => {
       'claude-3',
       null
     );
+  });
+
+  it('handleStreamEnd clears the persisted draft', () => {
+    const onStreamEndCallback = vi.fn();
+    const { result } = renderHook(() =>
+      useChatStreaming({
+        onStreamEndCallback,
+        resetForNewStream: vi.fn(),
+        persistenceKey: 'conversation:abc',
+      })
+    );
+
+    act(() => {
+      result.current.handleStreamChunk('Done');
+      result.current.handleStreamEnd();
+    });
+
+    expect(window.sessionStorage.getItem('fibe-agent:stream-draft:conversation:abc')).toBeNull();
+    expect(onStreamEndCallback).toHaveBeenCalledWith('Done', undefined, undefined, null);
   });
 
   it('handleStreamEnd passes model from handleStreamStart', () => {
