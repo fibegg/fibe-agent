@@ -231,7 +231,7 @@ details below.
 
 | Provider | Current transport | Native conversation isolation | True steer | Queue fallback | Shared workspace |
 | --- | --- | --- | --- | --- | --- |
-| Claude SDK | Anthropic Claude Agent SDK | yes | yes | yes | yes |
+| Claude SDK | Anthropic Claude Agent SDK | yes | interruption/queued next turn | yes | yes |
 | Claude CLI | `claude -p` / `--resume` | yes | partial/interruption style | yes | yes |
 | Codex | `codex app-server` by default | yes | yes via `turn/steer` | yes | yes |
 | OpenCode | `opencode serve` by default | yes | no | yes | yes |
@@ -251,8 +251,9 @@ Transport:
 
 - Uses `@anthropic-ai/claude-agent-sdk`.
 - Uses SDK `query({ prompt: asyncQueue, options })`.
-- Keeps an SDK query/iterator record per Fibe conversation.
-- Sends follow-up turns by enqueueing SDK user messages into the same SDK query.
+- Starts a fresh SDK query for each completed user turn.
+- Resumes the saved native Claude session id on follow-up turns.
+- The SDK query/iterator is kept only while the active turn is running.
 
 Workspace/session:
 
@@ -273,9 +274,11 @@ Session id rules:
 Steer:
 
 - `interruptAgent()` calls the SDK query interrupt flow.
-- Claude SDK supports real in-flight interruption/steering behavior through the
-  SDK query object and queued input.
-- `steerAgent` is treated as true steer for Claude SDK.
+- `steerAgent` stores the operator text and interrupts the active turn.
+- The next provider turn folds the stored text into the prompt as an operator
+  interruption.
+- This preserves user intent, but it is not a same-query follow-up after the
+  interrupted turn completes.
 
 Native session support:
 
@@ -297,6 +300,9 @@ Notes:
   shared.
 - Conversation isolation comes from separate SDK sessions/markers, not separate
   workspaces.
+- Inline stdio MCP servers, including `fibe-local`, are recreated with each
+  fresh SDK query. Do not rely on MCP server process state surviving between
+  turns; persist required state in files, Fibe APIs, or the provider session.
 
 
 When possible, prefer the Claude SDK strategy for multi-conversation Claude.
