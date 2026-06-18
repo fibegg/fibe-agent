@@ -526,6 +526,18 @@ describe('ChatPage', () => {
     expect(screen.getByTestId('conversation-sidebar')).toBeTruthy();
   });
 
+  it('restores the compact file browser open state from localStorage', () => {
+    localStorage.setItem('simplicate-mode', 'true');
+    localStorage.setItem('fibe-compact-file-browser-open', 'true');
+
+    render(<ChatPage />, { wrapper });
+
+    expect(screen.getByTestId('conversation-sidebar')).toBeTruthy();
+    expect(
+      screen.queryByRole('button', { name: /expand file explorer/i }),
+    ).toBeNull();
+  });
+
   it('redirects to login when not authenticated (returns null)', () => {
     // Since isAuthenticated is mocked at module level, we test the null render path
     // by checking that when auth check fails, nothing is rendered

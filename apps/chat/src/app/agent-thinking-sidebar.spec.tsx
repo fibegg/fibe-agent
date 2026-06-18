@@ -60,6 +60,13 @@ describe('AgentThinkingSidebar', () => {
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
+  it('does not render the sidebar toggle when hideToggle is true', () => {
+    render(
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} hideToggle />
+    );
+    expect(screen.queryByRole('button', { name: 'Collapse thinking panel' })).toBeNull();
+  });
+
   it('shows expand label when collapsed', () => {
     const onToggle = vi.fn();
     render(

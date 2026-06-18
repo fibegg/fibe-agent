@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { RIGHT_DRAWER_OVERLAY, RIGHT_DRAWER_PANEL } from './ui-classes';
 import { useT } from './i18n';
@@ -122,7 +123,7 @@ export function RightDrawer({
         visibility: open ? 'visible' : 'hidden',
       };
 
-  return (
+  const drawer = (
     <>
       {/* ── Backdrop ──────────────────────────────────────────────────────── */}
       <div
@@ -193,5 +194,8 @@ export function RightDrawer({
       </div>
     </>
   );
-}
 
+  if (typeof document === 'undefined') return drawer;
+
+  return createPortal(drawer, document.body);
+}

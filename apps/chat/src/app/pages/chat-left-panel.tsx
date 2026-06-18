@@ -28,6 +28,7 @@ interface ChatLeftPanelProps {
   agentWorkspaceAvailable?: boolean;
   onSettingsClick: () => void;
   onToggleCollapse: () => void;
+  hideToggle?: boolean;
   onFileSelect: (entry: PlaygroundEntry) => void;
   onResizeStart: (e: PanelResizeStartEvent) => void;
   selectedPath: string | null;
@@ -68,6 +69,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   agentWorkspaceAvailable,
   onSettingsClick,
   onToggleCollapse,
+  hideToggle = false,
   onFileSelect,
   onResizeStart,
   selectedPath,
@@ -164,7 +166,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
 
         {/* Collapse/expand toggle — absolute on the aside so it centers over
             the FULL panel height (file explorer + conversations combined) */}
-        {hasAnyFiles && onToggleCollapse && (
+        {hasAnyFiles && onToggleCollapse && !hideToggle && (
           <SidebarToggle
             isCollapsed={isCollapsed}
             onClick={onToggleCollapse}

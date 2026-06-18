@@ -6,9 +6,11 @@ export const SIDEBAR_MIN_WIDTH_PX = 180;
 export const SIDEBAR_MAX_WIDTH_PX = 520;
 export const MAIN_CONTENT_MIN_WIDTH_PX = 260;
 export const PANEL_HEADER_MIN_HEIGHT_PX = 128;
+export const SIDEBAR_OPEN_STORAGE_KEY = 'fibe-sidebar-open';
 export const SIDEBAR_COLLAPSE_STORAGE_KEY = 'fibe-sidebar-collapsed';
 export const SIDEBAR_WIDTH_STORAGE_KEY = 'fibe-sidebar-width';
 export const CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY = 'fibe-conversations-collapsed';
+export const COMPACT_FILE_BROWSER_OPEN_STORAGE_KEY = 'fibe-compact-file-browser-open';
 
 export const RIGHT_SIDEBAR_WIDTH_PX = 280;
 export const RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX = 48;
@@ -17,67 +19,63 @@ export const RIGHT_SIDEBAR_MAX_WIDTH_PX = 560;
 export const RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY = 'fibe-right-sidebar-collapsed';
 export const RIGHT_SIDEBAR_WIDTH_STORAGE_KEY = 'fibe-right-sidebar-width';
 
-export function getInitialSidebarCollapsed(): boolean {
+function readStoredBoolean(key: string, fallback: boolean): boolean {
   try {
-    return JSON.parse(
-      localStorage.getItem(SIDEBAR_COLLAPSE_STORAGE_KEY) ?? 'false'
-    ) as boolean;
+    const parsed = JSON.parse(
+      localStorage.getItem(key) ?? JSON.stringify(fallback)
+    ) as unknown;
+    return typeof parsed === 'boolean' ? parsed : fallback;
   } catch {
-    return false;
+    return fallback;
   }
+}
+
+function persistStoredBoolean(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getInitialSidebarOpen(): boolean {
+  return readStoredBoolean(SIDEBAR_OPEN_STORAGE_KEY, false);
+}
+
+export function persistSidebarOpen(open: boolean): void {
+  persistStoredBoolean(SIDEBAR_OPEN_STORAGE_KEY, open);
+}
+
+export function getInitialSidebarCollapsed(): boolean {
+  return readStoredBoolean(SIDEBAR_COLLAPSE_STORAGE_KEY, false);
 }
 
 export function persistSidebarCollapsed(collapsed: boolean): void {
-  try {
-    localStorage.setItem(
-      SIDEBAR_COLLAPSE_STORAGE_KEY,
-      JSON.stringify(collapsed)
-    );
-  } catch {
-    /* ignore */
-  }
+  persistStoredBoolean(SIDEBAR_COLLAPSE_STORAGE_KEY, collapsed);
 }
 
 export function getInitialConversationSidebarCollapsed(): boolean {
-  try {
-    return JSON.parse(
-      localStorage.getItem(CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY) ?? 'true'
-    ) as boolean;
-  } catch {
-    return true;
-  }
+  return readStoredBoolean(CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY, true);
 }
 
 export function persistConversationSidebarCollapsed(collapsed: boolean): void {
-  try {
-    localStorage.setItem(
-      CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY,
-      JSON.stringify(collapsed)
-    );
-  } catch {
-    /* ignore */
-  }
+  persistStoredBoolean(CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY, collapsed);
+}
+
+export function getInitialCompactFileBrowserOpen(): boolean {
+  return readStoredBoolean(COMPACT_FILE_BROWSER_OPEN_STORAGE_KEY, false);
+}
+
+export function persistCompactFileBrowserOpen(open: boolean): void {
+  persistStoredBoolean(COMPACT_FILE_BROWSER_OPEN_STORAGE_KEY, open);
 }
 
 export function getInitialRightSidebarCollapsed(): boolean {
-  try {
-    return JSON.parse(
-      localStorage.getItem(RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY) ?? 'false'
-    ) as boolean;
-  } catch {
-    return false;
-  }
+  return readStoredBoolean(RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY, false);
 }
 
 export function persistRightSidebarCollapsed(collapsed: boolean): void {
-  try {
-    localStorage.setItem(
-      RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY,
-      JSON.stringify(collapsed)
-    );
-  } catch {
-    /* ignore */
-  }
+  persistStoredBoolean(RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY, collapsed);
 }
 
 export function getInitialSidebarWidth(): number {

@@ -10,6 +10,7 @@ vi.mock('../agent-thinking-sidebar', () => ({
       data-testid="thinking-sidebar"
       data-collapsed={String(props.isCollapsed)}
       data-streaming={String(props.isStreaming)}
+      data-hide-toggle={String(props.hideToggle)}
     />
   ),
 }));
@@ -75,5 +76,14 @@ describe('ChatRightPanel', () => {
       </MemoryRouter>
     );
     expect(getByTestId('thinking-sidebar')).toBeTruthy();
+  });
+
+  it('forwards hideToggle to AgentThinkingSidebar', () => {
+    const { getByTestId } = render(
+      <MemoryRouter>
+        <ChatRightPanel {...baseProps} hideToggle />
+      </MemoryRouter>
+    );
+    expect(getByTestId('thinking-sidebar').getAttribute('data-hide-toggle')).toBe('true');
   });
 });

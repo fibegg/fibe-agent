@@ -115,6 +115,15 @@ describe('ChatLeftPanel', () => {
     expect(toggle.getAttribute('data-collapsed')).toBe('false');
   });
 
+  it('does not render SidebarToggle when hideToggle is true', () => {
+    render(
+      <MemoryRouter>
+        <ChatLeftPanel {...baseProps} hasAnyFiles={true} hideToggle />
+      </MemoryRouter>
+    );
+    expect(screen.queryByTestId('sidebar-toggle')).toBeNull();
+  });
+
   it('renders SidebarToggle in collapsed state when sidebarCollapsed=true', () => {
     render(
       <MemoryRouter>

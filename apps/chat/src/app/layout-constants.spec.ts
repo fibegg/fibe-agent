@@ -7,18 +7,24 @@ import {
   SIDEBAR_WIDTH_PX,
   SIDEBAR_MIN_WIDTH_PX,
   SIDEBAR_MAX_WIDTH_PX,
+  SIDEBAR_OPEN_STORAGE_KEY,
   SIDEBAR_WIDTH_STORAGE_KEY,
   CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY,
+  COMPACT_FILE_BROWSER_OPEN_STORAGE_KEY,
   RIGHT_SIDEBAR_COLLAPSED_WIDTH_PX,
   RIGHT_SIDEBAR_COLLAPSE_STORAGE_KEY,
   RIGHT_SIDEBAR_WIDTH_PX,
   RIGHT_SIDEBAR_MIN_WIDTH_PX,
   RIGHT_SIDEBAR_MAX_WIDTH_PX,
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
+  getInitialSidebarOpen,
+  persistSidebarOpen,
   getInitialSidebarCollapsed,
   persistSidebarCollapsed,
   getInitialConversationSidebarCollapsed,
   persistConversationSidebarCollapsed,
+  getInitialCompactFileBrowserOpen,
+  persistCompactFileBrowserOpen,
   getInitialRightSidebarCollapsed,
   persistRightSidebarCollapsed,
   getInitialSidebarWidth,
@@ -47,6 +53,10 @@ describe('layout-constants', () => {
     expect(SIDEBAR_COLLAPSE_STORAGE_KEY).toBe('fibe-sidebar-collapsed');
   });
 
+  it('exports storage key for sidebar open state', () => {
+    expect(SIDEBAR_OPEN_STORAGE_KEY).toBe('fibe-sidebar-open');
+  });
+
   it('exports storage key for sidebar width', () => {
     expect(SIDEBAR_WIDTH_STORAGE_KEY).toBe('fibe-sidebar-width');
   });
@@ -54,6 +64,12 @@ describe('layout-constants', () => {
   it('exports storage key for conversation sidebar collapse', () => {
     expect(CONVERSATION_SIDEBAR_COLLAPSE_STORAGE_KEY).toBe(
       'fibe-conversations-collapsed'
+    );
+  });
+
+  it('exports storage key for compact file browser open state', () => {
+    expect(COMPACT_FILE_BROWSER_OPEN_STORAGE_KEY).toBe(
+      'fibe-compact-file-browser-open'
     );
   });
 
@@ -72,6 +88,68 @@ describe('layout-constants', () => {
 
   it('exports storage key for right sidebar width', () => {
     expect(RIGHT_SIDEBAR_WIDTH_STORAGE_KEY).toBe('fibe-right-sidebar-width');
+  });
+});
+
+describe('getInitialSidebarOpen', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns false when key is missing', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    expect(getInitialSidebarOpen()).toBe(false);
+  });
+
+  it('returns true when key is "true"', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue('true');
+    expect(getInitialSidebarOpen()).toBe(true);
+  });
+
+  it('returns false when value is not a boolean', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue('"true"');
+    expect(getInitialSidebarOpen()).toBe(false);
+  });
+
+  it('returns false when localStorage throws', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('storage unavailable');
+    });
+    expect(getInitialSidebarOpen()).toBe(false);
+  });
+});
+
+describe('persistSidebarOpen', () => {
+  const key = SIDEBAR_OPEN_STORAGE_KEY;
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('writes the open state', () => {
+    persistSidebarOpen(true);
+    expect(localStorage.setItem).toHaveBeenCalledWith(key, 'true');
+  });
+
+  it('does not throw when localStorage throws', () => {
+    (localStorage.setItem as ReturnType<typeof vi.fn>).mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+    expect(() => persistSidebarOpen(true)).not.toThrow();
   });
 });
 
@@ -187,6 +265,54 @@ describe('persistSidebarCollapsed', () => {
       throw new Error('quota exceeded');
     });
     expect(() => persistSidebarCollapsed(true)).not.toThrow();
+  });
+});
+
+describe('getInitialCompactFileBrowserOpen', () => {
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns false when key is missing', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue(null);
+    expect(getInitialCompactFileBrowserOpen()).toBe(false);
+  });
+
+  it('returns true when key is "true"', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue('true');
+    expect(getInitialCompactFileBrowserOpen()).toBe(true);
+  });
+
+  it('returns false when value is invalid JSON', () => {
+    (localStorage.getItem as ReturnType<typeof vi.fn>).mockReturnValue('invalid');
+    expect(getInitialCompactFileBrowserOpen()).toBe(false);
+  });
+});
+
+describe('persistCompactFileBrowserOpen', () => {
+  const key = COMPACT_FILE_BROWSER_OPEN_STORAGE_KEY;
+
+  beforeEach(() => {
+    vi.stubGlobal('localStorage', {
+      getItem: vi.fn(),
+      setItem: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('writes the open state', () => {
+    persistCompactFileBrowserOpen(true);
+    expect(localStorage.setItem).toHaveBeenCalledWith(key, 'true');
   });
 });
 

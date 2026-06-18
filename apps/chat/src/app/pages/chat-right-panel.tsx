@@ -19,6 +19,7 @@ interface ChatRightPanelProps {
   sessionTokenUsage: { inputTokens: number; outputTokens: number } | null;
   width: number;
   isDraggingResize?: boolean;
+  hideToggle?: boolean;
   panelRef: React.RefObject<HTMLDivElement | null>;
   onResizeStart: (e: PanelResizeStartEvent) => void;
 }
@@ -36,6 +37,7 @@ export const ChatRightPanel = memo(function ChatRightPanel({
   sessionTokenUsage,
   width,
   isDraggingResize = false,
+  hideToggle = false,
   panelRef,
   onResizeStart,
 }: ChatRightPanelProps) {
@@ -55,6 +57,7 @@ export const ChatRightPanel = memo(function ChatRightPanel({
       sessionTokenUsage={sessionTokenUsage}
       width={width}
       isDraggingResize={isDraggingResize}
+      hideToggle={hideToggle}
       panelRef={panelRef}
       onResizeStart={onResizeStart}
       onActivityClick={(payload) => navigate(getActivityPath(payload))}

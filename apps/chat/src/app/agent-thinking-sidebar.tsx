@@ -88,6 +88,7 @@ interface AgentThinkingSidebarProps {
   mobileOverlay?: boolean;
   width?: number;
   isDraggingResize?: boolean;
+  hideToggle?: boolean;
   panelRef?: React.RefObject<HTMLDivElement | null>;
   onResizeStart?: (e: PanelResizeStartEvent) => void;
   onActivityClick?: (payload: { activityId: string; storyId?: string }) => void;
@@ -107,6 +108,7 @@ export function AgentThinkingSidebar({
   mobileOverlay = false,
   width,
   isDraggingResize = false,
+  hideToggle = false,
   panelRef,
   onResizeStart,
   onActivityClick,
@@ -297,14 +299,16 @@ export function AgentThinkingSidebar({
         ...(isDraggingResize ? { transition: 'none' } : {}),
       }}
     >
+      {!hideToggle && (
         <SidebarToggle
-        isCollapsed={isCollapsed}
-        onClick={onToggle}
-        side="right"
-        ariaLabel={
-          isCollapsed ? t('activity.expandThinking') : t('activity.collapseThinking')
-        }
-      />
+          isCollapsed={isCollapsed}
+          onClick={onToggle}
+          side="right"
+          ariaLabel={
+            isCollapsed ? t('activity.expandThinking') : t('activity.collapseThinking')
+          }
+        />
+      )}
       {!isCollapsed && !mobileOverlay && onResizeStart && (
         <PanelResizeHandle
           side="right"

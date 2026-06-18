@@ -122,8 +122,8 @@ export const BUTTON_PRIMARY_ROUNDED =
 
 /** Full-screen translucent backdrop behind the right drawer. */
 export const RIGHT_DRAWER_OVERLAY =
-  'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm';
+  'fixed inset-0 z-[240] bg-black/60 backdrop-blur-sm';
 
 /** The sliding drawer panel itself — positioned at the right edge of the viewport. */
 export const RIGHT_DRAWER_PANEL =
-  'fixed top-0 bottom-0 right-0 z-50 flex flex-col bg-background border-l border-primary/20 shadow-2xl shadow-black/40 will-change-transform';
+  'fixed top-0 bottom-0 right-0 z-[250] flex flex-col bg-background border-l border-primary/20 shadow-2xl shadow-black/40 will-change-transform';

@@ -73,6 +73,8 @@ import {
   RIGHT_SIDEBAR_MAX_WIDTH_PX,
   RIGHT_SIDEBAR_WIDTH_PX,
   RIGHT_SIDEBAR_WIDTH_STORAGE_KEY,
+  getInitialCompactFileBrowserOpen,
+  persistCompactFileBrowserOpen,
 } from '../layout-constants';
 
 import { getActivityPath } from '../activity-path';
@@ -290,9 +292,12 @@ export function ChatPage() {
   const [simplicateMode, setSimplicateMode] = useState(
     () => readStoredSimplicateMode() ?? false,
   );
-  const [compactFileBrowserOpen, setCompactFileBrowserOpen] = useState(false);
+  const [compactFileBrowserOpen, setCompactFileBrowserOpen] = useState(
+    getInitialCompactFileBrowserOpen,
+  );
   const compactMode = simplicateMode;
   const canShowDiff = playgroundStats.hasGitRepo;
+  const drawerOpen = terminalOpen || cliOpen || (canShowDiff && diffOpen);
   const openServicePreview = useCallback((service?: PlaygroundPreviewService) => {
     setViewingFile(null);
     if (service) setSelectedPreviewServiceId(service.id);
@@ -427,8 +432,8 @@ export function ChatPage() {
   const handleSimplicateModeChange = useCallback(
     (enabled: boolean) => {
       setSimplicateMode(enabled);
-      setCompactFileBrowserOpen(false);
       if (!enabled) {
+        setCompactFileBrowserOpen(false);
         setSidebarOpen(false);
         setRightSidebarOpen(false);
       }
@@ -439,6 +444,11 @@ export function ChatPage() {
       }
     },
     [setRightSidebarOpen, setSidebarOpen],
+  );
+
+  useEffect(
+    () => persistCompactFileBrowserOpen(compactFileBrowserOpen),
+    [compactFileBrowserOpen],
   );
 
   const toggleFileBrowser = useCallback(() => {
@@ -1393,6 +1403,7 @@ export function ChatPage() {
             playgroundStats={playgroundStats}
             agentStats={agentStats}
             onSettingsClick={openSettings}
+            hideToggle={drawerOpen}
             onToggleCollapse={() => {
               if (compactMode) {
                 setCompactFileBrowserOpen(false);
@@ -1444,6 +1455,7 @@ export function ChatPage() {
             sessionTokenUsage={sessionTokenUsage}
             width={rightResize.width}
             isDraggingResize={rightResize.isDragging}
+            hideToggle={drawerOpen}
             panelRef={rightResize.panelRef}
             onResizeStart={rightResize.startResize}
           />
@@ -1543,7 +1555,8 @@ export function ChatPage() {
           !servicePreviewOpen &&
           !isMobile &&
           compactMode &&
-          !compactFileBrowserOpen && (
+          !compactFileBrowserOpen &&
+          !drawerOpen && (
             <button
               type="button"
               onClick={() => setCompactFileBrowserOpen(true)}

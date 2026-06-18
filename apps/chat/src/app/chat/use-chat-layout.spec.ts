@@ -6,6 +6,7 @@ describe('useChatLayout', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     localStorage.clear();
+    Object.defineProperty(window, 'innerWidth', { writable: true, value: 1280 });
   });
 
   it('initializes with expected defaults', () => {
@@ -86,6 +87,21 @@ describe('useChatLayout', () => {
     const { result } = renderHook(() => useChatLayout(false, false));
     act(() => { result.current.setConversationSidebarCollapsed(false); });
     expect(localStorage.getItem('fibe-conversations-collapsed')).toBe('false');
+  });
+
+  it('initializes sidebar open state from localStorage on mobile', () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, value: 600 });
+    localStorage.setItem('fibe-sidebar-open', 'true');
+    const { result } = renderHook(() => useChatLayout(false, false));
+    expect(result.current.isMobile).toBe(true);
+    expect(result.current.sidebarOpen).toBe(true);
+  });
+
+  it('persists sidebar open state', () => {
+    Object.defineProperty(window, 'innerWidth', { writable: true, value: 600 });
+    const { result } = renderHook(() => useChatLayout(false, false));
+    act(() => { result.current.setSidebarOpen(true); });
+    expect(localStorage.getItem('fibe-sidebar-open')).toBe('true');
   });
 
   it('auto-expands sidebar when playground files first appear', () => {

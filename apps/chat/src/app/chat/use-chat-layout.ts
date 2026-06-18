@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  getInitialSidebarOpen,
   getInitialSidebarCollapsed,
   getInitialConversationSidebarCollapsed,
   getInitialRightSidebarCollapsed,
+  persistSidebarOpen,
   persistSidebarCollapsed,
   persistConversationSidebarCollapsed,
   persistRightSidebarCollapsed,
@@ -10,9 +12,13 @@ import {
 
 const MOBILE_BREAKPOINT_PX = 1024;
 
+function getInitialIsMobile(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT_PX;
+}
+
 export function useChatLayout(hasPlaygroundFiles: boolean, playgroundLoading: boolean) {
-  const [isMobile, setIsMobile] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(getInitialIsMobile);
+  const [sidebarOpen, setSidebarOpen] = useState(getInitialSidebarOpen);
   const [rightSidebarOpen, setRightSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(getInitialSidebarCollapsed);
   const [conversationSidebarCollapsed, setConversationSidebarCollapsed] = useState(
@@ -25,6 +31,7 @@ export function useChatLayout(hasPlaygroundFiles: boolean, playgroundLoading: bo
   const [searchQuery, setSearchQuery] = useState('');
   const prevHasPlaygroundFilesRef = useRef(hasPlaygroundFiles);
 
+  useEffect(() => persistSidebarOpen(sidebarOpen), [sidebarOpen]);
   useEffect(() => persistSidebarCollapsed(sidebarCollapsed), [sidebarCollapsed]);
   useEffect(
     () => persistConversationSidebarCollapsed(conversationSidebarCollapsed),
