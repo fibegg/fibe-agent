@@ -86,7 +86,8 @@ describe('preview diagnostics', () => {
     const result = await diagnosePreviewUrl('https://app.example.test');
 
     expect(result.reachable).toBe(false);
-    expect(result.issues[0]).toEqual(expect.objectContaining({ code: 'preview_unreachable' }));
+    expect(result.issues.map((issue) => issue.code)).toContain('preview_tls_untrusted_in_agent_container');
+    expect(result.issues.map((issue) => issue.code)).toContain('preview_unreachable');
   });
 });
 

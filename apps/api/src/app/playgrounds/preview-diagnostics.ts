@@ -55,16 +55,19 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
         },
       });
     } catch (error) {
+      const detail = error instanceof Error ? error.message : 'The preview URL could not be fetched.';
+      const certIssue = diagnoseCertificateFailure(detail);
       return {
         ...base,
         finalUrl: currentUrl,
         issues: [
           ...base.issues,
+          ...(certIssue ? [certIssue] : []),
           {
             code: 'preview_unreachable',
             severity: 'error',
             title: 'Preview is unreachable',
-            detail: error instanceof Error ? error.message : 'The preview URL could not be fetched.',
+            detail,
           },
         ],
       };
@@ -102,6 +105,18 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
     displayable: !displayBlocked,
     redirects: base.redirects,
     issues,
+  };
+}
+
+function diagnoseCertificateFailure(message: string): PreviewDiagnosticIssue | null {
+  if (!/(certificate|cert|self-signed|unable to get local issuer|unknown ca|expired)/i.test(message)) {
+    return null;
+  }
+  return {
+    code: 'preview_tls_untrusted_in_agent_container',
+    severity: 'warning',
+    title: 'Preview TLS is not trusted inside the agent container',
+    detail: 'Local development HTTPS may use a certificate the agent container does not trust. Disable local HTTPS for development or install the local CA in the container.',
   };
 }
 

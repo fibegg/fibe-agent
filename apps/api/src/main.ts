@@ -85,17 +85,18 @@ async function bootstrap() {
   });
 
   const ancestors = getFrameAncestors(process.env);
-  const isHttp = ancestors.some((a) => a.startsWith('http://'));
+  const hasHttpFrameAncestor = ancestors.some((a) => a.startsWith('http://'));
 
   await fastify.register(helmet, {
     frameguard: false,
+    ...(hasHttpFrameAncestor ? { strictTransportSecurity: false } : {}),
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
         frameAncestors: ancestors,
         scriptSrc: ["'self'", "'unsafe-inline'"],
         imgSrc: ["'self'", 'data:', 'https:'],
-        ...(isHttp ? { upgradeInsecureRequests: null } : {}),
+        ...(hasHttpFrameAncestor ? { upgradeInsecureRequests: null } : {}),
       },
     },
   });
