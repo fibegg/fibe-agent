@@ -20,7 +20,7 @@ describe('useChatWebSocket', () => {
         close = vi.fn();
         addEventListener = vi.fn();
         removeEventListener = vi.fn();
-      }
+      },
     );
   });
 
@@ -87,7 +87,7 @@ describe('useChatWebSocket thinking callbacks', () => {
         get onmessage(): (e: MessageEvent) => void {
           return messageHandler ?? (() => undefined);
         }
-      }
+      },
     );
   });
 
@@ -105,7 +105,7 @@ describe('useChatWebSocket thinking callbacks', () => {
         useChatWebSocket(undefined, undefined, undefined, undefined, {
           onReasoningChunk,
         }),
-      { wrapper }
+      { wrapper },
     );
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
@@ -129,7 +129,7 @@ describe('useChatWebSocket thinking callbacks', () => {
         useChatWebSocket(undefined, undefined, undefined, undefined, {
           onThinkingStep,
         }),
-      { wrapper }
+      { wrapper },
     );
     await act(async () => {
       await new Promise((r) => setTimeout(r, 0));
@@ -154,7 +154,10 @@ describe('useChatWebSocket thinking callbacks', () => {
 });
 
 describe('useChatWebSocket close codes', () => {
-  let lastWs: { onclose?: (e: CloseEvent) => void; onopen?: () => void } | null = null;
+  let lastWs: {
+    onclose?: (e: CloseEvent) => void;
+    onopen?: () => void;
+  } | null = null;
 
   beforeEach(() => {
     lastWs = null;
@@ -167,10 +170,12 @@ describe('useChatWebSocket close codes', () => {
         removeEventListener = vi.fn();
         send = vi.fn();
         set onclose(handler: (e: CloseEvent) => void) {
-          (this as unknown as { _onclose: (e: CloseEvent) => void })._onclose = handler;
+          (this as unknown as { _onclose: (e: CloseEvent) => void })._onclose =
+            handler;
         }
         get onclose() {
-          return (this as unknown as { _onclose: (e: CloseEvent) => void })._onclose;
+          return (this as unknown as { _onclose: (e: CloseEvent) => void })
+            ._onclose;
         }
         set onopen(handler: () => void) {
           (this as unknown as { _onopen: () => void })._onopen = handler;
@@ -181,7 +186,7 @@ describe('useChatWebSocket close codes', () => {
         constructor() {
           lastWs = this as unknown as typeof lastWs;
         }
-      }
+      },
     );
   });
 
@@ -202,7 +207,9 @@ describe('useChatWebSocket close codes', () => {
       ws._onclose({ code: WS_CLOSE.ANOTHER_SESSION_ACTIVE } as CloseEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.ERROR);
-    expect(result.current.errorMessage).toBe('Another session is already active');
+    expect(result.current.errorMessage).toBe(
+      'Another session is already active',
+    );
   });
 
   it('sets ERROR and message when closed with 4002', async () => {
@@ -218,7 +225,9 @@ describe('useChatWebSocket close codes', () => {
       ws._onclose({ code: WS_CLOSE.SESSION_TAKEN_OVER } as CloseEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.ERROR);
-    expect(result.current.errorMessage).toBe('Your session was taken over by another client');
+    expect(result.current.errorMessage).toBe(
+      'Your session was taken over by another client',
+    );
   });
 
   it('clears token when closed with 4001', async () => {
@@ -261,7 +270,7 @@ describe('useChatWebSocket actions (startAuth, cancelAuth, submitAuthCode, dismi
         constructor() {
           lastWs = this as typeof lastWs;
         }
-      }
+      },
     );
   });
 
@@ -276,40 +285,68 @@ describe('useChatWebSocket actions (startAuth, cancelAuth, submitAuthCode, dismi
 
   it('startAuth sends initiate_auth and sets AUTH_PENDING state', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.startAuth(); });
+    act(() => {
+      result.current.startAuth();
+    });
 
-    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'initiate_auth' }));
+    expect(lastWs?.send).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'initiate_auth' }),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
   });
 
   it('cancelAuth clears authModal and sends cancel_auth', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.cancelAuth(); });
+    act(() => {
+      result.current.cancelAuth();
+    });
 
-    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'cancel_auth' }));
-    expect(result.current.authModal).toEqual({ authUrl: null, deviceCode: null, isManualToken: false });
+    expect(lastWs?.send).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'cancel_auth' }),
+    );
+    expect(result.current.authModal).toEqual({
+      authUrl: null,
+      deviceCode: null,
+      isManualToken: false,
+    });
     expect(result.current.state).toBe(CHAT_STATES.UNAUTHENTICATED);
   });
 
   it('submitAuthCode sends submit_auth_code with trimmed code', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.submitAuthCode('  mycode  '); });
+    act(() => {
+      result.current.submitAuthCode('  mycode  ');
+    });
 
-    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'submit_auth_code', code: 'mycode' }));
+    expect(lastWs?.send).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'submit_auth_code', code: 'mycode' }),
+    );
   });
 
   it('dismissError clears errorMessage and sets AUTHENTICATED state', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.setErrorMessage('Some error'); });
-    act(() => { result.current.dismissError(); });
+    act(() => {
+      result.current.setErrorMessage('Some error');
+    });
+    act(() => {
+      result.current.dismissError();
+    });
 
     expect(result.current.errorMessage).toBeNull();
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
@@ -317,53 +354,81 @@ describe('useChatWebSocket actions (startAuth, cancelAuth, submitAuthCode, dismi
 
   it('interruptAgent sends interrupt_agent', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.interruptAgent(); });
+    act(() => {
+      result.current.interruptAgent();
+    });
 
-    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'interrupt_agent' }));
+    expect(lastWs?.send).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'interrupt_agent' }),
+    );
   });
 
   it('reauthenticate sends reauthenticate when user confirms', async () => {
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.reauthenticate(); });
+    act(() => {
+      result.current.reauthenticate();
+    });
 
-    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'reauthenticate' }));
+    expect(lastWs?.send).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'reauthenticate' }),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
   });
 
   it('reauthenticate does nothing when user cancels confirm', async () => {
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    const callCountBefore = (lastWs?.send as ReturnType<typeof vi.fn>).mock.calls.length;
-    act(() => { result.current.reauthenticate(); });
-    const callCountAfter = (lastWs?.send as ReturnType<typeof vi.fn>).mock.calls.length;
+    const callCountBefore = (lastWs?.send as ReturnType<typeof vi.fn>).mock
+      .calls.length;
+    act(() => {
+      result.current.reauthenticate();
+    });
+    const callCountAfter = (lastWs?.send as ReturnType<typeof vi.fn>).mock.calls
+      .length;
     expect(callCountAfter).toBe(callCountBefore);
   });
 
   it('logout sends logout when user confirms', async () => {
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => { result.current.logout(); });
+    act(() => {
+      result.current.logout();
+    });
 
-    expect(lastWs?.send).toHaveBeenCalledWith(JSON.stringify({ action: 'logout' }));
+    expect(lastWs?.send).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'logout' }),
+    );
     expect(result.current.state).toBe(CHAT_STATES.LOGGING_OUT);
   });
 
   it('logout does nothing when user cancels confirm', async () => {
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
     const initState = result.current.state;
-    act(() => { result.current.logout(); });
+    act(() => {
+      result.current.logout();
+    });
     expect(result.current.state).toBe(initState);
   });
 });
@@ -396,7 +461,7 @@ describe('useChatWebSocket message handlers', () => {
         set onopen(handler: () => void) {
           handler(); // Auto-call open to trigger setup
         }
-      }
+      },
     );
   });
 
@@ -412,18 +477,43 @@ describe('useChatWebSocket message handlers', () => {
   it('handles auth_status authenticated (processing and not processing)', async () => {
     const onStreamAbort = vi.fn();
     const onProcessingState = vi.fn();
-    const { result } = renderHook(() =>
-      useChatWebSocket(undefined, undefined, undefined, undefined, undefined, undefined, undefined, undefined, 'default', onStreamAbort, undefined, onProcessingState),
-      { wrapper }
+    const { result } = renderHook(
+      () =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'default',
+          onStreamAbort,
+          undefined,
+          onProcessingState,
+        ),
+      { wrapper },
     );
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'stale error' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'error', message: 'stale error' }),
+      } as MessageEvent),
+    );
     expect(result.current.errorMessage).toBe('stale error');
 
-    // Not processing
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: false }) } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_status',
+          status: 'authenticated',
+          isProcessing: false,
+        }),
+      } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
     expect(result.current.errorMessage).toBeNull();
@@ -433,9 +523,15 @@ describe('useChatWebSocket message handlers', () => {
     });
     expect(onStreamAbort).toHaveBeenCalled();
 
-    // Processing
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: true, startedAt: '2026-06-15T06:26:11.125Z' }) } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_status',
+          status: 'authenticated',
+          isProcessing: true,
+          startedAt: '2026-06-15T06:26:11.125Z',
+        }),
+      } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
     expect(onProcessingState).toHaveBeenCalledWith({
@@ -447,29 +543,46 @@ describe('useChatWebSocket message handlers', () => {
   it('triggers response timeout if isProcessing but no response', async () => {
     vi.useFakeTimers();
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => process.nextTick(r)); });
-    
+    await act(async () => {
+      await new Promise((r) => process.nextTick(r));
+    });
+
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: true }) } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_status',
+          status: 'authenticated',
+          isProcessing: true,
+        }),
+      } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
-    
+
     act(() => {
       vi.runAllTimers();
     });
-    
+
     expect(result.current.state).toBe(CHAT_STATES.ERROR);
     expect(result.current.errorMessage).toContain('timed out');
   });
 
   it('handles auth_status unauthenticated', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'unauthenticated' }) } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_status',
+          status: 'unauthenticated',
+        }),
+      } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.UNAUTHENTICATED);
-    expect(wsSendMock).toHaveBeenCalledWith(JSON.stringify({ action: 'initiate_auth' }));
+    expect(wsSendMock).toHaveBeenCalledWith(
+      JSON.stringify({ action: 'initiate_auth' }),
+    );
   });
 
   it('does not abort stream state on initial conversation binding', async () => {
@@ -531,33 +644,40 @@ describe('useChatWebSocket message handlers', () => {
         set onopen(handler: () => void) {
           (this as unknown as (typeof sockets)[number])._onopen = handler;
         }
-      }
+      },
     );
     const onStreamStart = vi.fn();
     const { result, rerender } = renderHook(
-      ({ conversationId }) => useChatWebSocket(
-        undefined,
-        undefined,
-        onStreamStart,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        conversationId,
-      ),
+      ({ conversationId }) =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          onStreamStart,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          conversationId,
+        ),
       { wrapper, initialProps: { conversationId: 'thread-a' } },
     );
 
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(sockets).toHaveLength(1);
 
     rerender({ conversationId: 'thread-b' });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(sockets).toHaveLength(2);
 
     act(() => {
-      sockets[0]._onmessage?.({ data: JSON.stringify({ type: 'stream_start' }) } as MessageEvent);
+      sockets[0]._onmessage?.({
+        data: JSON.stringify({ type: 'stream_start' }),
+      } as MessageEvent);
     });
 
     expect(onStreamStart).not.toHaveBeenCalled();
@@ -586,29 +706,35 @@ describe('useChatWebSocket message handlers', () => {
         set onopen(handler: () => void) {
           (this as unknown as (typeof sockets)[number])._onopen = handler;
         }
-      }
+      },
     );
     const { result, rerender } = renderHook(
-      ({ conversationId }) => useChatWebSocket(
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        conversationId,
-      ),
+      ({ conversationId }) =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          conversationId,
+        ),
       { wrapper, initialProps: { conversationId: 'thread-a' } },
     );
 
     act(() => {
-      result.current.send({ action: 'send_chat_message', text: 'belongs to thread-a' });
+      result.current.send({
+        action: 'send_chat_message',
+        text: 'belongs to thread-a',
+      });
     });
 
     rerender({ conversationId: 'thread-b' });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     sockets[1].readyState = 1;
 
     act(() => {
@@ -616,45 +742,93 @@ describe('useChatWebSocket message handlers', () => {
     });
 
     expect(sockets[1].send).not.toHaveBeenCalledWith(
-      JSON.stringify({ action: 'send_chat_message', text: 'belongs to thread-a' }),
+      JSON.stringify({
+        action: 'send_chat_message',
+        text: 'belongs to thread-a',
+      }),
     );
   });
 
   it('handles auth_url_generated, auth_device_code, auth_manual_token, auth_success', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'auth_url_generated', url: 'http://test' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_url_generated',
+          url: 'http://test',
+        }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
     expect(result.current.authModal.authUrl).toBe('http://test');
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'auth_device_code', code: '123' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'auth_device_code', code: '123' }),
+      } as MessageEvent),
+    );
     expect(result.current.authModal.deviceCode).toBe('123');
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'auth_manual_token' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'auth_manual_token' }),
+      } as MessageEvent),
+    );
     expect(result.current.authModal.isManualToken).toBe(true);
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'auth_success' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'auth_success' }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
     expect(result.current.authModal.isManualToken).toBe(false);
   });
 
   it('handles logout_success', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'logout_success' }) } as MessageEvent));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'logout_success' }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.UNAUTHENTICATED);
   });
 
   it('handles error events', async () => {
     const onStreamAbort = vi.fn();
     const onStreamEnd = vi.fn();
-    const { result } = renderHook(() =>
-      useChatWebSocket(undefined, undefined, undefined, onStreamEnd, undefined, undefined, undefined, undefined, 'default', onStreamAbort),
-      { wrapper }
+    const { result } = renderHook(
+      () =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          onStreamEnd,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'default',
+          onStreamAbort,
+        ),
+      { wrapper },
     );
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'test error' }) } as MessageEvent));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'error', message: 'test error' }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.ERROR);
     expect(result.current.errorMessage).toBe('test error');
     expect(onStreamAbort).toHaveBeenCalled();
@@ -663,7 +837,9 @@ describe('useChatWebSocket message handlers', () => {
 
   it('dismisses provider authentication failures back to unauthenticated state', async () => {
     const { result } = renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     act(() =>
       messageHandler?.({
         data: JSON.stringify({
@@ -671,7 +847,7 @@ describe('useChatWebSocket message handlers', () => {
           message:
             'Authentication failed for Claude Code: the API key or token is invalid. Check the configured Claude Code credentials, then reconnect or re-authenticate.',
         }),
-      } as MessageEvent)
+      } as MessageEvent),
     );
     expect(result.current.state).toBe(CHAT_STATES.ERROR);
     act(() => result.current.dismissError());
@@ -681,9 +857,21 @@ describe('useChatWebSocket message handlers', () => {
 
   it('handles message events (assistant sets AUTHENTICATED)', async () => {
     const onMessage = vi.fn();
-    const { result } = renderHook(() => useChatWebSocket(onMessage), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'message', role: 'assistant', text: 'hi' }) } as MessageEvent));
+    const { result } = renderHook(() => useChatWebSocket(onMessage), {
+      wrapper,
+    });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'message',
+          role: 'assistant',
+          text: 'hi',
+        }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
     expect(onMessage).toHaveBeenCalled();
   });
@@ -693,13 +881,37 @@ describe('useChatWebSocket message handlers', () => {
     const onStreamChunk = vi.fn();
     const onStreamEnd = vi.fn();
     const thinkingCb = { onStreamStartData: vi.fn() };
-    const { result } = renderHook(() => useChatWebSocket(undefined, onStreamChunk, onStreamStart, onStreamEnd, thinkingCb), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    const { result } = renderHook(
+      () =>
+        useChatWebSocket(
+          undefined,
+          onStreamChunk,
+          onStreamStart,
+          onStreamEnd,
+          thinkingCb,
+        ),
+      { wrapper },
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'error', message: 'stale error' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'error', message: 'stale error' }),
+      } as MessageEvent),
+    );
     expect(result.current.errorMessage).toBe('stale error');
-    
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_start', model: 'gpt', startedAt: '2026-06-15T06:26:11.125Z' }) } as MessageEvent));
+
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'stream_start',
+          model: 'gpt',
+          startedAt: '2026-06-15T06:26:11.125Z',
+        }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AWAITING_RESPONSE);
     expect(result.current.errorMessage).toBeNull();
     expect(onStreamStart).toHaveBeenCalledWith({
@@ -708,15 +920,34 @@ describe('useChatWebSocket message handlers', () => {
     });
     expect(thinkingCb.onStreamStartData).toHaveBeenCalledWith({ model: 'gpt' });
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_chunk', text: 'hi' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'stream_chunk', text: 'hi' }),
+      } as MessageEvent),
+    );
     expect(onStreamChunk).toHaveBeenCalledWith('hi');
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_end', usage: { inputTokens: 10, outputTokens: 20 }, model: 'gpt' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'stream_end',
+          usage: { inputTokens: 10, outputTokens: 20 },
+          model: 'gpt',
+        }),
+      } as MessageEvent),
+    );
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
-    expect(onStreamEnd).toHaveBeenCalledWith({ inputTokens: 10, outputTokens: 20 }, 'gpt');
-    
+    expect(onStreamEnd).toHaveBeenCalledWith(
+      { inputTokens: 10, outputTokens: 20 },
+      'gpt',
+    );
+
     // Also test stream_end missing variables properly handles fallback
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'stream_end' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'stream_end' }),
+      } as MessageEvent),
+    );
     expect(onStreamEnd).toHaveBeenCalledWith(undefined, undefined);
   });
 
@@ -726,68 +957,162 @@ describe('useChatWebSocket message handlers', () => {
       onReasoningEnd: vi.fn(),
       onToolOrFile: vi.fn(),
     };
-    renderHook(() => useChatWebSocket(undefined, undefined, undefined, undefined, thinkingCb), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    renderHook(
+      () =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          thinkingCb,
+        ),
+      { wrapper },
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'reasoning_start' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'reasoning_start' }),
+      } as MessageEvent),
+    );
     expect(thinkingCb.onReasoningStart).toHaveBeenCalled();
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'reasoning_end' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'reasoning_end' }),
+      } as MessageEvent),
+    );
     expect(thinkingCb.onReasoningEnd).toHaveBeenCalled();
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'tool_call', name: 'myTool' }) } as MessageEvent));
-    expect(thinkingCb.onToolOrFile).toHaveBeenCalledWith(expect.objectContaining({ kind: 'tool_call', name: 'myTool' }));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'tool_call', name: 'myTool' }),
+      } as MessageEvent),
+    );
+    expect(thinkingCb.onToolOrFile).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'tool_call', name: 'myTool' }),
+    );
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'file_created', name: 'myFile' }) } as MessageEvent));
-    expect(thinkingCb.onToolOrFile).toHaveBeenCalledWith(expect.objectContaining({ kind: 'file_created', name: 'myFile' }));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'file_created', name: 'myFile' }),
+      } as MessageEvent),
+    );
+    expect(thinkingCb.onToolOrFile).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'file_created', name: 'myFile' }),
+    );
   });
 
   it('handles activity events and queue_updated', async () => {
     const onPlaygroundChanged = vi.fn();
-    const { result } = renderHook(() => useChatWebSocket(undefined, undefined, undefined, undefined, undefined, onPlaygroundChanged), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    const { result } = renderHook(
+      () =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          onPlaygroundChanged,
+        ),
+      { wrapper },
+    );
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'activity_snapshot', activity: [{ id: '1' }] }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_snapshot',
+          activity: [{ id: '1' }],
+        }),
+      } as MessageEvent),
+    );
     expect(result.current.sessionActivity).toEqual([{ id: '1' }]);
-    
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'activity_snapshot', activity: {} }) } as MessageEvent));
+
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'activity_snapshot', activity: {} }),
+      } as MessageEvent),
+    );
     expect(result.current.sessionActivity).toEqual([]);
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'activity_appended', entry: { id: '2' } }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'activity_appended', entry: { id: '2' } }),
+      } as MessageEvent),
+    );
     expect(result.current.sessionActivity).toEqual([{ id: '2' }]);
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'activity_updated', entry: { id: '2', val: 'updated' } }) } as MessageEvent));
-    expect(result.current.sessionActivity).toEqual([{ id: '2', val: 'updated' }]);
-    
-    // update non-existing, verifies the append fallback logic
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'activity_updated', entry: { id: '3', val: 'new' } }) } as MessageEvent));
-    expect(result.current.sessionActivity).toEqual([{ id: '2', val: 'updated' }, { id: '3', val: 'new' }]);
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_updated',
+          entry: { id: '2', val: 'updated' },
+        }),
+      } as MessageEvent),
+    );
+    expect(result.current.sessionActivity).toEqual([
+      { id: '2', val: 'updated' },
+    ]);
 
-    // Removed queue_updated logic
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_updated',
+          entry: { id: '3', val: 'new' },
+        }),
+      } as MessageEvent),
+    );
+    expect(result.current.sessionActivity).toEqual([
+      { id: '2', val: 'updated' },
+      { id: '3', val: 'new' },
+    ]);
 
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'playground_changed' }) } as MessageEvent));
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'playground_changed' }),
+      } as MessageEvent),
+    );
     expect(onPlaygroundChanged).toHaveBeenCalled();
   });
-  
+
   it('handles model_updated', async () => {
     const onMessage = vi.fn();
     renderHook(() => useChatWebSocket(onMessage), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'model_updated', model: 'gpt-4' }) } as MessageEvent));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'model_updated', model: 'gpt-4' }),
+      } as MessageEvent),
+    );
     expect(onMessage).toHaveBeenCalled();
   });
 
   it('handles effort_updated', async () => {
     const onMessage = vi.fn();
     renderHook(() => useChatWebSocket(onMessage), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    act(() => messageHandler?.({ data: JSON.stringify({ type: 'effort_updated', effort: 'high' }) } as MessageEvent));
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    act(() =>
+      messageHandler?.({
+        data: JSON.stringify({ type: 'effort_updated', effort: 'high' }),
+      } as MessageEvent),
+    );
     expect(onMessage).toHaveBeenCalled();
   });
-  
+
   it('handles invalid json payload safely', async () => {
     renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
     expect(() => {
       act(() => messageHandler?.({ data: 'invalid json' } as MessageEvent));
     }).not.toThrow();
@@ -797,78 +1122,90 @@ describe('useChatWebSocket message handlers', () => {
     const { isAuthenticated } = await import('../api-url');
     // @ts-expect-error Mock
     isAuthenticated.mockReturnValue(false);
-    
+
     let constructed = false;
-    vi.stubGlobal('WebSocket', class MockWS { close = vi.fn(); constructor() { constructed = true; } });
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWS {
+        close = vi.fn();
+        constructor() {
+          constructed = true;
+        }
+      },
+    );
 
     renderHook(() => useChatWebSocket(), { wrapper });
-    await act(async () => { await new Promise((r) => setTimeout(r, 0)); });
-    
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
     expect(constructed).toBe(false); // It won't have created a WebSocket because isAuthenticated is false
     // @ts-expect-error Reset mock
     isAuthenticated.mockReturnValue(true);
   });
 
-
   it('schedules reconnect on unknown close code, and clears timer on open/unmount/reconnect', () => {
     vi.useFakeTimers();
-    
+
     class MockWS {
-      readyState = 1; send = vi.fn(); close = vi.fn(); addEventListener = vi.fn(); removeEventListener = vi.fn();
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      addEventListener = vi.fn();
+      removeEventListener = vi.fn();
       _onopen?: () => void;
       _onclose?: (e: { code: number }) => void;
       constructor() {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         createdWs = this;
       }
-      set onopen(handler: () => void) { this._onopen = handler; }
-      set onclose(handler: (e: { code: number }) => void) { this._onclose = handler; }
+      set onopen(handler: () => void) {
+        this._onopen = handler;
+      }
+      set onclose(handler: (e: { code: number }) => void) {
+        this._onclose = handler;
+      }
     }
     let createdWs: MockWS | undefined;
 
     vi.stubGlobal('WebSocket', MockWS);
 
-    const { result, unmount } = renderHook(() => useChatWebSocket(), { wrapper });
-    
+    const { result, unmount } = renderHook(() => useChatWebSocket(), {
+      wrapper,
+    });
+
     // Unknown close -> triggers reconnect timeout
     act(() => {
       createdWs?._onclose?.({ code: 1006 });
     });
     expect(result.current.state).toBe(CHAT_STATES.INITIALIZING);
 
-    // Call reconnect while the timer is STILL active (hits lines 300-301)
     act(() => {
       result.current.reconnect();
     });
 
-    // Reconnecting sets state to init, and recreates ws. Let's close it again.
     act(() => {
       createdWs?._onclose?.({ code: 1006 });
     });
 
-    // Advance timers so the setTimeout callback runs (hits lines 266-267)
     act(() => {
       vi.runAllTimers();
     });
-    
+
     expect(result.current.state).toBe(CHAT_STATES.AGENT_OFFLINE);
 
-    // It reconnects, so wait for the next open
     act(() => {
       createdWs?._onclose?.({ code: 1006 }); // Trigger again
     });
 
-    // Open clears the active timer (hits lines 134-135)
     act(() => {
       createdWs?._onopen?.();
     });
 
-    // Trigger one last time
     act(() => {
       createdWs?._onclose?.({ code: 1006 });
     });
 
-    // Unmount clears the active timer (hits line 281)
     unmount();
 
     vi.useRealTimers();
@@ -880,43 +1217,50 @@ describe('useChatWebSocket message handlers', () => {
     getAuthTokenForRequest.mockReturnValueOnce('mock-token');
 
     let capturedUrl = '';
-    vi.stubGlobal('WebSocket', class MockWS {
-      constructor(url: string) {
-        capturedUrl = url;
-      }
-      close = vi.fn();
-      addEventListener = vi.fn();
-      removeEventListener = vi.fn();
-    });
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWS {
+        constructor(url: string) {
+          capturedUrl = url;
+        }
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+      },
+    );
 
     renderHook(() => useChatWebSocket(), { wrapper });
-    
+
     expect(capturedUrl).toContain('token=mock-token');
   });
 
   it('connects with conversation_id for non-default conversations', () => {
     let capturedUrl = '';
-    vi.stubGlobal('WebSocket', class MockWS {
-      constructor(url: string) {
-        capturedUrl = url;
-      }
-      close = vi.fn();
-      addEventListener = vi.fn();
-      removeEventListener = vi.fn();
-    });
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWS {
+        constructor(url: string) {
+          capturedUrl = url;
+        }
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+      },
+    );
 
     renderHook(
-      () => useChatWebSocket(
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        'thread-123',
-      ),
+      () =>
+        useChatWebSocket(
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          undefined,
+          'thread-123',
+        ),
       { wrapper },
     );
 
@@ -926,11 +1270,22 @@ describe('useChatWebSocket message handlers', () => {
   it('handles optional chaining and state fallbacks gracefully', () => {
     let messageHandler: ((event: MessageEvent) => void) | null = null;
     let closeHandler: ((event: CloseEvent) => void) | null = null;
-    vi.stubGlobal('WebSocket', class MockWS {
-      readyState = 1; send = vi.fn(); close = vi.fn(); addEventListener = vi.fn(); removeEventListener = vi.fn();
-      set onmessage(handler: ((event: MessageEvent) => void) | null) { messageHandler = handler; }
-      set onclose(handler: ((event: CloseEvent) => void) | null) { closeHandler = handler; }
-    });
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWS {
+        readyState = 1;
+        send = vi.fn();
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+        set onmessage(handler: ((event: MessageEvent) => void) | null) {
+          messageHandler = handler;
+        }
+        set onclose(handler: ((event: CloseEvent) => void) | null) {
+          closeHandler = handler;
+        }
+      },
+    );
     const onMessage = vi.fn();
     const onStreamEnd = vi.fn();
     const onThinkingCallbacks = {
@@ -940,63 +1295,140 @@ describe('useChatWebSocket message handlers', () => {
       onThinkingStep: vi.fn(),
       onToolOrFile: vi.fn(),
     };
-    
-    // Unmount previous and mount with callbacks
-    const { result } = renderHook(() => useChatWebSocket(
-      onMessage,
-      undefined,
-      undefined,
-      onStreamEnd,
-      onThinkingCallbacks,
-      vi.fn()
-    ), { wrapper });
+
+    const { result } = renderHook(
+      () =>
+        useChatWebSocket(
+          onMessage,
+          undefined,
+          undefined,
+          onStreamEnd,
+          onThinkingCallbacks,
+          vi.fn(),
+        ),
+      { wrapper },
+    );
 
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_url_generated' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_device_code' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'error' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'stream_chunk' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'reasoning_start' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'reasoning_end' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'reasoning_chunk', text: 'chunk' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'reasoning_chunk' }) } as MessageEvent); // branch: d.text ?? ''
-      messageHandler?.({ data: JSON.stringify({ type: 'thinking_step', id: '1' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'thinking_step' }) } as MessageEvent); // branch: d.id ?? ''
-      messageHandler?.({ data: JSON.stringify({ type: 'tool_call', name: 'tool' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'tool_call' }) } as MessageEvent); // branch: d.name ?? ''
-      messageHandler?.({ data: JSON.stringify({ type: 'file_created', name: 'file' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'file_created' }) } as MessageEvent); // branch: d.name ?? ''
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_snapshot', activity: [{ id: '1' }] }) } as MessageEvent);
-      // Removed queue_updated test
-      messageHandler?.({ data: JSON.stringify({ type: 'stream_end' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_appended', entry: { id: '2' } }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_appended' }) } as MessageEvent); // no entry branch
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_updated' }) } as MessageEvent); // no entry
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_updated', entry: { id: '1', updated: true } }) } as MessageEvent); // matched ID
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_updated', entry: { id: 'unknown' } }) } as MessageEvent); // unmatched ID
-      messageHandler?.({ data: JSON.stringify({ type: 'message', role: 'assistant' }) } as MessageEvent); // test role assistant
-      messageHandler?.({ data: JSON.stringify({ type: 'message', role: 'user' }) } as MessageEvent); // test role user
-      messageHandler?.({ data: JSON.stringify({ type: 'playground_changed' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'activity_snapshot', activity: 'not-an-array' }) } as MessageEvent); // snapshot not array branch
+      messageHandler?.({
+        data: JSON.stringify({ type: 'auth_url_generated' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'auth_device_code' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'error' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'stream_chunk' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'reasoning_start' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'reasoning_end' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'reasoning_chunk', text: 'chunk' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'reasoning_chunk' }),
+      } as MessageEvent); // branch: d.text ?? ''
+      messageHandler?.({
+        data: JSON.stringify({ type: 'thinking_step', id: '1' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'thinking_step' }),
+      } as MessageEvent); // branch: d.id ?? ''
+      messageHandler?.({
+        data: JSON.stringify({ type: 'tool_call', name: 'tool' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'tool_call' }),
+      } as MessageEvent); // branch: d.name ?? ''
+      messageHandler?.({
+        data: JSON.stringify({ type: 'file_created', name: 'file' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'file_created' }),
+      } as MessageEvent); // branch: d.name ?? ''
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_snapshot',
+          activity: [{ id: '1' }],
+        }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'stream_end' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'activity_appended', entry: { id: '2' } }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'activity_appended' }),
+      } as MessageEvent); // no entry branch
+      messageHandler?.({
+        data: JSON.stringify({ type: 'activity_updated' }),
+      } as MessageEvent); // no entry
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_updated',
+          entry: { id: '1', updated: true },
+        }),
+      } as MessageEvent); // matched ID
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_updated',
+          entry: { id: 'unknown' },
+        }),
+      } as MessageEvent); // unmatched ID
+      messageHandler?.({
+        data: JSON.stringify({ type: 'message', role: 'assistant' }),
+      } as MessageEvent); // test role assistant
+      messageHandler?.({
+        data: JSON.stringify({ type: 'message', role: 'user' }),
+      } as MessageEvent); // test role user
+      messageHandler?.({
+        data: JSON.stringify({ type: 'playground_changed' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'activity_snapshot',
+          activity: 'not-an-array',
+        }),
+      } as MessageEvent); // snapshot not array branch
     });
 
     act(() => {
-      // test existing reconnectTimer condition
       closeHandler?.({ code: 1006 } as CloseEvent);
       closeHandler?.({ code: 1006 } as CloseEvent); // already has reconnectTimerRef
     });
 
-    // Test AUTH_PENDING state fallback
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_url_generated' }) } as MessageEvent); 
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'unauthenticated' }) } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'auth_url_generated' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_status',
+          status: 'unauthenticated',
+        }),
+      } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTH_PENDING);
 
     // Server auth status is authoritative on reconnect and clears stale awaiting state.
     act(() => {
-      messageHandler?.({ data: JSON.stringify({ type: 'stream_start' }) } as MessageEvent);
-      messageHandler?.({ data: JSON.stringify({ type: 'auth_status', status: 'authenticated', isProcessing: false }) } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({ type: 'stream_start' }),
+      } as MessageEvent);
+      messageHandler?.({
+        data: JSON.stringify({
+          type: 'auth_status',
+          status: 'authenticated',
+          isProcessing: false,
+        }),
+      } as MessageEvent);
     });
     expect(result.current.state).toBe(CHAT_STATES.AUTHENTICATED);
   });

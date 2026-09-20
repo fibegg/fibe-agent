@@ -53,12 +53,13 @@ export function usePlaygroundFiles(): {
   const [tree, setTree] = useState<PlaygroundTreeEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<PlaygroundStats>({ fileCount: 0, totalLines: 0, hasGitRepo: false });
+  const [stats, setStats] = useState<PlaygroundStats>({
+    fileCount: 0,
+    totalLines: 0,
+    hasGitRepo: false,
+  });
 
-  const entries = useMemo(
-    () => sortEntries(flattenEntries(tree)),
-    [tree]
-  );
+  const entries = useMemo(() => sortEntries(flattenEntries(tree)), [tree]);
 
   const refetch = useCallback(async () => {
     setLoading(true);
@@ -90,26 +91,26 @@ export function usePlaygroundFiles(): {
     return () => clearInterval(id);
   }, [tree.length, loading, refetch]);
 
-  // Regular polling for live updates
   useEffect(() => {
     if (tree.length === 0) return;
     const id = setInterval(() => void refetch(), POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [tree.length, refetch]);
 
-  // Stats fetching
   const fetchStats = useCallback(async () => {
     try {
       const res = await apiRequest(API_PATHS.PLAYGROUNDS_STATS);
       if (res.ok) {
-        const data = await res.json() as Partial<PlaygroundStats>;
+        const data = (await res.json()) as Partial<PlaygroundStats>;
         setStats({
           fileCount: data.fileCount ?? 0,
           totalLines: data.totalLines ?? 0,
           hasGitRepo: data.hasGitRepo === true,
         });
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   useEffect(() => {

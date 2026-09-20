@@ -1,5 +1,11 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type {
@@ -16,7 +22,10 @@ import { INTERRUPTED_MESSAGE } from './strategy.types';
 import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { runAuthProcess } from './auth-process-helper';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
-import { JsonLineRpcProcess, type JsonLineRpcMessage } from './json-line-rpc-process';
+import {
+  JsonLineRpcProcess,
+  type JsonLineRpcMessage,
+} from './json-line-rpc-process';
 import { ProviderConversationPaths } from './provider-conversation-paths';
 
 const DEFAULT_CODEX_HOME = join(process.env.HOME ?? '/home/node', '.codex');
@@ -35,7 +44,7 @@ const CODEX_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
     '--color': 'never',
   },
   blockedArgs: {
-    // Critical: non-interactive mode, always enforced
+    // Always enforce non-interactive mode.
     '--dangerously-bypass-approvals-and-sandbox': true,
     // Output format, always enforced
     '--json': true,
@@ -44,10 +53,19 @@ const CODEX_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   },
 };
 
-const CODEX_REASONING_EFFORTS = new Set(['none', 'minimal', 'low', 'medium', 'high', 'xhigh']);
+const CODEX_REASONING_EFFORTS = new Set([
+  'none',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+]);
 
 function getCodexHome(): string {
-  return process.env.CODEX_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME;
+  return (
+    process.env.CODEX_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CODEX_HOME
+  );
 }
 
 function getCodexCommand(): string {
@@ -84,13 +102,25 @@ function hasCodexAuth(auth: unknown): boolean {
   const root = asRecord(auth);
   if (!root) return false;
 
-  const directTokenKeys = ['access_token', 'token', 'api_key', 'OPENAI_API_KEY'];
+  const directTokenKeys = [
+    'access_token',
+    'token',
+    'api_key',
+    'OPENAI_API_KEY',
+  ];
   if (directTokenKeys.some((key) => hasNonEmptyString(root[key]))) return true;
 
   const tokens = asRecord(root.tokens);
   if (tokens) {
-    const nestedTokenKeys = ['access_token', 'token', 'api_key', 'id_token', 'refresh_token'];
-    if (nestedTokenKeys.some((key) => hasNonEmptyString(tokens[key]))) return true;
+    const nestedTokenKeys = [
+      'access_token',
+      'token',
+      'api_key',
+      'id_token',
+      'refresh_token',
+    ];
+    if (nestedTokenKeys.some((key) => hasNonEmptyString(tokens[key])))
+      return true;
   }
 
   const apiKey = asRecord(root.OPENAI_API_KEY);
@@ -133,11 +163,16 @@ function extractCodexApiKey(auth: unknown): string | null {
 const stripAnsi = (s: string) => s.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '');
 
 function useAppServerTransport(): boolean {
-  const explicitTransport = (process.env.CODEX_AGENT_TRANSPORT ?? '').trim().toLowerCase();
+  const explicitTransport = (process.env.CODEX_AGENT_TRANSPORT ?? '')
+    .trim()
+    .toLowerCase();
   if (explicitTransport === 'exec' || explicitTransport === 'cli') return false;
-  if (explicitTransport === 'app-server' || explicitTransport === 'appserver') return true;
+  if (explicitTransport === 'app-server' || explicitTransport === 'appserver')
+    return true;
 
-  const explicitFlag = (process.env.CODEX_USE_APP_SERVER ?? '').trim().toLowerCase();
+  const explicitFlag = (process.env.CODEX_USE_APP_SERVER ?? '')
+    .trim()
+    .toLowerCase();
   if (['0', 'false', 'no'].includes(explicitFlag)) return false;
   return true;
 }
@@ -147,19 +182,23 @@ function normalizeEffort(effort?: string): string | null {
   return CODEX_REASONING_EFFORTS.has(effort) ? effort : null;
 }
 
-function codexUserInput(text: string): Array<{ type: 'text'; text: string; text_elements: [] }> {
+function codexUserInput(
+  text: string,
+): Array<{ type: 'text'; text: string; text_elements: [] }> {
   return [{ type: 'text', text, text_elements: [] }];
 }
 
-/* ------------------------------------------------------------------ */
 /*  Structured JSONL parser for `codex exec --json`                   */
-/* ------------------------------------------------------------------ */
 
 interface CodexJsonEvent {
   type?: string;
   message?: string;
   thread_id?: string;
-  usage?: { input_tokens?: number; cached_input_tokens?: number; output_tokens?: number };
+  usage?: {
+    input_tokens?: number;
+    cached_input_tokens?: number;
+    output_tokens?: number;
+  };
   error?: { message?: string };
   item?: {
     id?: string;
@@ -240,24 +279,11 @@ interface CodexThreadItem {
   content?: string[];
 }
 
-/**
- * Parse a single JSONL line from `codex exec --json` and route into callbacks.
- *
- * Event flow:
- *   turn.started        → onReasoningStart  (opens activity entry)
- *   item: reasoning     → onReasoningChunk
- *   item: agent_message → onReasoningChunk (preview) + onReasoningEnd + onChunk
- *   item: command_exec  → onReasoningChunk + onTool
- *   item: file_change   → onReasoningChunk + onTool
- *   thread.started      → onThreadId
- *   turn.completed      → onReasoningEnd + onUsage
- *   error / turn.failed → onChunk (prefixed with ⚠️)
- *   non-JSON            → onChunk (ANSI stripped)
- */
+/** Routes one `codex exec --json` line to output, reasoning, tool, usage, or error callbacks. */
 export function handleCodexExecJsonLine(
   line: string,
   state: CodexExecJsonState,
-  handlers: CodexExecJsonHandlers
+  handlers: CodexExecJsonHandlers,
 ): void {
   line = line.trim();
   if (!line) return;
@@ -295,9 +321,10 @@ export function handleCodexExecJsonLine(
         case 'agent_message':
         case 'message': {
           if (!item.text) break;
-          const preview = item.text.length > RESPONSE_PREVIEW_MAX
-            ? item.text.slice(0, RESPONSE_PREVIEW_MAX) + '…'
-            : item.text;
+          const preview =
+            item.text.length > RESPONSE_PREVIEW_MAX
+              ? item.text.slice(0, RESPONSE_PREVIEW_MAX) + '…'
+              : item.text;
           state.hasEmittedOutput = true;
           handlers.onReasoningChunk?.(preview);
           endReasoning();
@@ -323,7 +350,10 @@ export function handleCodexExecJsonLine(
             name: 'command',
             command: item.command,
             summary: item.aggregated_output?.slice(0, RESPONSE_PREVIEW_MAX),
-            details: JSON.stringify({ command: item.command, output: item.aggregated_output }),
+            details: JSON.stringify({
+              command: item.command,
+              output: item.aggregated_output,
+            }),
           });
           break;
         }
@@ -333,7 +363,9 @@ export function handleCodexExecJsonLine(
             if (!change.path) continue;
             state.hasEmittedOutput = true;
             const fileName = change.path.split(/[/\\]/).pop() ?? 'file';
-            handlers.onReasoningChunk?.(`${change.kind ?? 'changed'}: ${change.path}\n`);
+            handlers.onReasoningChunk?.(
+              `${change.kind ?? 'changed'}: ${change.path}\n`,
+            );
             handlers.onTool?.({
               kind: 'file_created',
               name: fileName,
@@ -386,7 +418,8 @@ export function handleCodexExecJsonLine(
     }
 
     if (type === 'error') {
-      const msg = event.message ?? event.error?.message ?? 'Unknown codex error';
+      const msg =
+        event.message ?? event.error?.message ?? 'Unknown codex error';
       state.errorResult += msg;
       handlers.onChunk(`⚠️ ${msg}`);
       return;
@@ -400,9 +433,7 @@ export function handleCodexExecJsonLine(
   }
 }
 
-/* ------------------------------------------------------------------ */
 /*  Strategy class                                                     */
-/* ------------------------------------------------------------------ */
 
 export class OpenaiCodexStrategy extends AbstractCLIStrategy {
   private readonly paths: ProviderConversationPaths;
@@ -412,7 +443,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
   private activeAppServerThreadId: string | null = null;
   private activeAppServerTurnId: string | null = null;
 
-  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
+  constructor(
+    useApiTokenMode = false,
+    conversationDataDir?: ConversationDataDirProvider,
+  ) {
     super(OpenaiCodexStrategy.name, useApiTokenMode, conversationDataDir);
     this.paths = new ProviderConversationPaths({
       conversationDataDir,
@@ -451,7 +485,11 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     return ['-m', model];
   }
 
-  private buildExecArgs(prompt: string, model: string, sessionId: string | null): string[] {
+  private buildExecArgs(
+    prompt: string,
+    model: string,
+    sessionId: string | null,
+  ): string[] {
     const modelArgs = this.getModelArgs(model);
     const providerTokens = buildProviderArgs(CODEX_PROVIDER_ARGS_CONFIG);
     if (sessionId) {
@@ -465,13 +503,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         prompt,
       ];
     }
-    return [
-      'exec',
-      ...modelArgs,
-      ...providerTokens,
-      '--',
-      prompt,
-    ];
+    return ['exec', ...modelArgs, ...providerTokens, '--', prompt];
   }
 
   hasNativeSessionSupport(): boolean {
@@ -487,15 +519,25 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       const key = process.env[OPENAI_API_KEY_ENV]?.trim();
       const authPath = join(codexHome, 'auth.json');
       if (key) {
-        writeFileSync(authPath, JSON.stringify(codexApiKeyAuth(key)), { mode: 0o600 });
+        writeFileSync(authPath, JSON.stringify(codexApiKeyAuth(key)), {
+          mode: 0o600,
+        });
         return;
       }
       if (existsSync(authPath)) {
         try {
           const parsed = JSON.parse(readFileSync(authPath, 'utf8'));
           const migratedKey = extractCodexApiKey(parsed);
-          if (migratedKey && (parsed.auth_mode !== 'apikey' || parsed.OPENAI_API_KEY !== migratedKey)) {
-            writeFileSync(authPath, JSON.stringify(codexApiKeyAuth(migratedKey)), { mode: 0o600 });
+          if (
+            migratedKey &&
+            (parsed.auth_mode !== 'apikey' ||
+              parsed.OPENAI_API_KEY !== migratedKey)
+          ) {
+            writeFileSync(
+              authPath,
+              JSON.stringify(codexApiKeyAuth(migratedKey)),
+              { mode: 0o600 },
+            );
           }
         } catch {
           /* Invalid auth.json is handled by checkAuthStatus/executePromptStreaming. */
@@ -519,51 +561,57 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     const env = { ...process.env, CODEX_HOME: codexHome };
 
     const codexCmd = getCodexCommand();
-    const { process: proc, cancel } = runAuthProcess(codexCmd, ['login', '--device-auth'], {
-      env,
-      onData: (output) => {
-        // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
-        const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
-        const urlMatch = clean.match(/https:\/\/[^\s"'> ]+/);
-        if (urlMatch && !authUrlExtracted) {
-          authUrlExtracted = true;
-          this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
-        }
-        const codeMatch = clean.match(/\b([A-Z0-9]{3,5}-[A-Z0-9]{3,5})\b/);
-        if (codeMatch && !deviceCodeExtracted) {
-          deviceCodeExtracted = true;
-          this.currentConnection?.sendDeviceCode(codeMatch[1]);
-        }
-      },
-      onClose: (code) => {
-        if (this.currentConnection) {
-          if (code === 0) {
-            this.currentConnection.sendAuthSuccess();
-          } else {
-            this.currentConnection.sendAuthStatus('unauthenticated');
+    const { process: proc, cancel } = runAuthProcess(
+      codexCmd,
+      ['login', '--device-auth'],
+      {
+        env,
+        onData: (output) => {
+          // eslint-disable-next-line no-control-regex -- strip ANSI escape codes
+          const clean = output.replace(/\x1b\[[0-9;]*m/g, '');
+          const urlMatch = clean.match(/https:\/\/[^\s"'> ]+/);
+          if (urlMatch && !authUrlExtracted) {
+            authUrlExtracted = true;
+            this.currentConnection?.sendAuthUrlGenerated(urlMatch[0]);
           }
-        }
-        this.activeAuthProcess = null;
-        this.currentConnection = null;
+          const codeMatch = clean.match(/\b([A-Z0-9]{3,5}-[A-Z0-9]{3,5})\b/);
+          if (codeMatch && !deviceCodeExtracted) {
+            deviceCodeExtracted = true;
+            this.currentConnection?.sendDeviceCode(codeMatch[1]);
+          }
+        },
+        onClose: (code) => {
+          if (this.currentConnection) {
+            if (code === 0) {
+              this.currentConnection.sendAuthSuccess();
+            } else {
+              this.currentConnection.sendAuthStatus('unauthenticated');
+            }
+          }
+          this.activeAuthProcess = null;
+          this.currentConnection = null;
+        },
+        onError: (err) => {
+          this.activeAuthProcess = null;
+          this.authCancel = null;
+          const isNotFound = (err as NodeJS.ErrnoException)?.code === 'ENOENT';
+          if (isNotFound) {
+            this.logger.warn(
+              'Codex CLI not found. Install @openai/codex or add codex to PATH.',
+            );
+            this.currentConnection?.sendError(
+              'Codex CLI not found. Install the app dependency or add codex to PATH.',
+            );
+          } else {
+            this.logger.error('Codex Auth Process error', err);
+          }
+        },
       },
-      onError: (err) => {
-        this.activeAuthProcess = null;
-        this.authCancel = null;
-        const isNotFound = (err as NodeJS.ErrnoException)?.code === 'ENOENT';
-        if (isNotFound) {
-          this.logger.warn('Codex CLI not found. Install @openai/codex or add codex to PATH.');
-          this.currentConnection?.sendError('Codex CLI not found. Install the app dependency or add codex to PATH.');
-        } else {
-          this.logger.error('Codex Auth Process error', err);
-        }
-      },
-    });
+    );
 
     this.activeAuthProcess = proc;
     this.authCancel = cancel;
   }
-
-
 
   submitAuthCode(code: string): void {
     const trimmed = (code ?? '').trim();
@@ -580,9 +628,13 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
 
   executeLogout(connection: LogoutConnection): void {
     const env = { ...process.env, CODEX_HOME: this.getCodexHomeForSession() };
-    const logoutProcess = spawn(getCodexCommand(), ['logout'], { env, shell: false });
+    const logoutProcess = spawn(getCodexCommand(), ['logout'], {
+      env,
+      shell: false,
+    });
 
-    const handleOutput = (data: Buffer | string) => connection.sendLogoutOutput(data.toString());
+    const handleOutput = (data: Buffer | string) =>
+      connection.sendLogoutOutput(data.toString());
     logoutProcess.stdout?.on('data', handleOutput);
     logoutProcess.stderr?.on('data', handleOutput);
 
@@ -603,7 +655,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     }
     return new Promise((resolve) => {
       const authFile = join(this.getCodexHomeForSession(), 'auth.json');
-      if (!existsSync(authFile)) { resolve(false); return; }
+      if (!existsSync(authFile)) {
+        resolve(false);
+        return;
+      }
       try {
         resolve(hasCodexAuth(JSON.parse(readFileSync(authFile, 'utf8'))));
       } catch {
@@ -612,14 +667,14 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     });
   }
 
-
-
   override interruptAgent(): void {
     this.streamInterrupted = true;
     const threadId = this.activeAppServerThreadId;
     const turnId = this.activeAppServerTurnId;
     if (this.appServer && threadId && turnId) {
-      void this.appServer.request('turn/interrupt', { threadId, turnId }, 5_000).catch(() => undefined);
+      void this.appServer
+        .request('turn/interrupt', { threadId, turnId }, 5_000)
+        .catch(() => undefined);
     }
     this.shutdownAppServer();
     this.currentStreamProcess?.kill();
@@ -639,7 +694,9 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         );
         return 'handled';
       } catch (err) {
-        this.logger.warn(`Codex app-server steer failed; queueing for next turn: ${err}`);
+        this.logger.warn(
+          `Codex app-server steer failed; queueing for next turn: ${err}`,
+        );
         this.pendingSteerMessages.push(trimmed);
         return 'queued';
       }
@@ -654,12 +711,25 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
     systemPrompt?: string,
-    runtimeOptions?: AgentRuntimeOptions
+    runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
     if (useAppServerTransport()) {
-      return this.executePromptStreamingAppServer(prompt, model, onChunk, callbacks, systemPrompt, runtimeOptions);
+      return this.executePromptStreamingAppServer(
+        prompt,
+        model,
+        onChunk,
+        callbacks,
+        systemPrompt,
+        runtimeOptions,
+      );
     }
-    return this.executePromptStreamingExec(prompt, model, onChunk, callbacks, systemPrompt);
+    return this.executePromptStreamingExec(
+      prompt,
+      model,
+      onChunk,
+      callbacks,
+      systemPrompt,
+    );
   }
 
   private executePromptStreamingExec(
@@ -667,7 +737,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     model: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
@@ -681,21 +751,35 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       if (pendingMessages) {
         finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
       }
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
+      const effectivePrompt = systemPrompt
+        ? `${systemPrompt}\n${finalPrompt}`
+        : finalPrompt;
       const existingSessionId = this.readSessionId();
-      const args = this.buildExecArgs(effectivePrompt, model, existingSessionId);
-      const codexProcess = spawn(
-        getCodexCommand(),
-        args,
-        { env: { ...process.env, ...this.getProxyEnv(), CODEX_HOME: this.getCodexHomeForSession() }, cwd: playgroundDir, shell: false }
+      const args = this.buildExecArgs(
+        effectivePrompt,
+        model,
+        existingSessionId,
       );
+      const codexProcess = spawn(getCodexCommand(), args, {
+        env: {
+          ...process.env,
+          ...this.getProxyEnv(),
+          CODEX_HOME: this.getCodexHomeForSession(),
+        },
+        cwd: playgroundDir,
+        shell: false,
+      });
       this.currentStreamProcess = codexProcess;
 
       let errorResult = '';
       let lineBuffer = '';
       let stderrReasoningStarted = false;
       let capturedThreadId: string | null = null;
-      const jsonState: CodexExecJsonState = { errorResult: '', inReasoning: false, hasEmittedOutput: false };
+      const jsonState: CodexExecJsonState = {
+        errorResult: '',
+        inReasoning: false,
+        hasEmittedOutput: false,
+      };
 
       const handleJsonLine = (raw: string) => {
         handleCodexExecJsonLine(raw, jsonState, {
@@ -735,11 +819,21 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       codexProcess.on('close', (code) => {
         this.currentStreamProcess = null;
         if (lineBuffer.trim()) handleJsonLine(lineBuffer);
-        if (jsonState.inReasoning || stderrReasoningStarted) callbacks?.onReasoningEnd?.();
-        if (this.streamInterrupted) { reject(new Error(INTERRUPTED_MESSAGE)); return; }
-        const shouldInspectFailure = (code !== 0 && code !== null) || !jsonState.hasEmittedOutput || Boolean(errorResult.trim());
+        if (jsonState.inReasoning || stderrReasoningStarted)
+          callbacks?.onReasoningEnd?.();
+        if (this.streamInterrupted) {
+          reject(new Error(INTERRUPTED_MESSAGE));
+          return;
+        }
+        const shouldInspectFailure =
+          (code !== 0 && code !== null) ||
+          !jsonState.hasEmittedOutput ||
+          Boolean(errorResult.trim());
         if (shouldInspectFailure) {
-          const authError = detectProviderAuthFailure('OpenAI Codex', errorResult);
+          const authError = detectProviderAuthFailure(
+            'OpenAI Codex',
+            errorResult,
+          );
           if (authError) {
             reject(authError);
             return;
@@ -747,14 +841,21 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         }
         if ((code === 0 || code === null) && !jsonState.hasEmittedOutput) {
           if (!existingSessionId) this.clearSessionId();
-          reject(new Error(errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved.'));
+          reject(
+            new Error(
+              errorResult.trim() ||
+                'Agent process completed successfully but returned no output. Session not saved.',
+            ),
+          );
           return;
         }
         if (code !== 0 && code !== null) {
           if (this.missingSessionError(errorResult)) {
             this.clearSessionId();
           }
-          reject(new Error(errorResult.trim() || `Process exited with code ${code}`));
+          reject(
+            new Error(errorResult.trim() || `Process exited with code ${code}`),
+          );
         } else {
           if (capturedThreadId) {
             this.writeSessionId(capturedThreadId);
@@ -776,7 +877,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
     systemPrompt?: string,
-    runtimeOptions?: AgentRuntimeOptions
+    runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
     this.streamInterrupted = false;
     if (this.useApiTokenMode) this.ensureSettings();
@@ -787,12 +888,16 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     if (pendingMessages) {
       finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
     }
-    const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
+    const effectivePrompt = systemPrompt
+      ? `${systemPrompt}\n${finalPrompt}`
+      : finalPrompt;
     const existingSessionId = this.readSessionId();
     const appServer = this.createAppServer();
     this.appServer = appServer;
 
-    const unsubscribe = appServer.onNotification((message) => this.handleAppServerNotification(message));
+    const unsubscribe = appServer.onNotification((message) =>
+      this.handleAppServerNotification(message),
+    );
     let capturedThreadId: string | null = null;
     try {
       await this.initializeAppServer(appServer);
@@ -802,13 +907,22 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       capturedThreadId = threadId;
       this.activeAppServerThreadId = threadId;
 
-      await this.runAppServerTurn(appServer, threadId, effectivePrompt, model, onChunk, callbacks, runtimeOptions);
+      await this.runAppServerTurn(
+        appServer,
+        threadId,
+        effectivePrompt,
+        model,
+        onChunk,
+        callbacks,
+        runtimeOptions,
+      );
       if (capturedThreadId) this.writeSessionId(capturedThreadId);
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       const authError = detectProviderAuthFailure('OpenAI Codex', message);
       if (authError) throw authError;
-      if (existingSessionId && this.missingSessionError(message)) this.clearSessionId();
+      if (existingSessionId && this.missingSessionError(message))
+        this.clearSessionId();
       if (!existingSessionId && capturedThreadId) this.clearSessionId();
       throw err;
     } finally {
@@ -826,7 +940,11 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       getCodexCommand(),
       ['app-server', '--listen', 'stdio://'],
       {
-        env: { ...process.env, ...this.getProxyEnv(), CODEX_HOME: this.getCodexHomeForSession() },
+        env: {
+          ...process.env,
+          ...this.getProxyEnv(),
+          CODEX_HOME: this.getCodexHomeForSession(),
+        },
         cwd: this.getWorkingDir(),
         logger: this.logger,
         requestTimeoutMs: CODEX_APP_SERVER_REQUEST_TIMEOUT_MS,
@@ -834,7 +952,9 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     );
   }
 
-  private async initializeAppServer(appServer: JsonLineRpcProcess): Promise<void> {
+  private async initializeAppServer(
+    appServer: JsonLineRpcProcess,
+  ): Promise<void> {
     await appServer.request('initialize', {
       clientInfo: { name: 'fibe-agent', title: 'Fibe Agent', version: '1' },
       capabilities: { experimentalApi: true },
@@ -842,20 +962,33 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     appServer.notify('initialized');
   }
 
-  private async startAppServerThread(appServer: JsonLineRpcProcess, model: string): Promise<string> {
-    const response = await appServer.request<CodexThreadResponse>('thread/start', {
-      ...this.appServerThreadParams(model),
-      experimentalRawEvents: false,
-    });
+  private async startAppServerThread(
+    appServer: JsonLineRpcProcess,
+    model: string,
+  ): Promise<string> {
+    const response = await appServer.request<CodexThreadResponse>(
+      'thread/start',
+      {
+        ...this.appServerThreadParams(model),
+        experimentalRawEvents: false,
+      },
+    );
     return response.thread.id;
   }
 
-  private async resumeAppServerThread(appServer: JsonLineRpcProcess, threadId: string, model: string): Promise<string> {
-    const response = await appServer.request<CodexThreadResponse>('thread/resume', {
-      ...this.appServerThreadParams(model),
-      threadId,
-      excludeTurns: true,
-    });
+  private async resumeAppServerThread(
+    appServer: JsonLineRpcProcess,
+    threadId: string,
+    model: string,
+  ): Promise<string> {
+    const response = await appServer.request<CodexThreadResponse>(
+      'thread/resume',
+      {
+        ...this.appServerThreadParams(model),
+        threadId,
+        excludeTurns: true,
+      },
+    );
     return response.thread.id;
   }
 
@@ -878,13 +1011,16 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     callbacks?: StreamingCallbacks,
     runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
-    const turnResponse = await appServer.request<CodexTurnResponse>('turn/start', {
-      threadId,
-      input: codexUserInput(prompt),
-      cwd: this.getWorkingDir(),
-      model: model || null,
-      effort: normalizeEffort(runtimeOptions?.effort),
-    });
+    const turnResponse = await appServer.request<CodexTurnResponse>(
+      'turn/start',
+      {
+        threadId,
+        input: codexUserInput(prompt),
+        cwd: this.getWorkingDir(),
+        model: model || null,
+        effort: normalizeEffort(runtimeOptions?.effort),
+      },
+    );
     const turnId = turnResponse.turn.id;
     this.activeAppServerTurnId = turnId;
 
@@ -892,7 +1028,9 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       let unsubscribeClose: () => void = () => undefined;
       const timer = setTimeout(() => {
         unsubscribeClose();
-        reject(new Error('Timed out waiting for Codex app-server turn completion'));
+        reject(
+          new Error('Timed out waiting for Codex app-server turn completion'),
+        );
       }, CODEX_APP_SERVER_TURN_TIMEOUT_MS);
       timer.unref?.();
       const state: CodexAppServerTurnState = {
@@ -920,7 +1058,9 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       unsubscribeClose = appServer.onClose((error) => {
         if (state.completed) return;
         state.completed = true;
-        state.reject(this.streamInterrupted ? new Error(INTERRUPTED_MESSAGE) : error);
+        state.reject(
+          this.streamInterrupted ? new Error(INTERRUPTED_MESSAGE) : error,
+        );
       });
       const pending = this.pendingAppServerNotifications.splice(0);
       for (const message of pending) this.handleAppServerNotification(message);
@@ -936,8 +1076,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       return;
     }
 
-    const threadId = typeof params.threadId === 'string' ? params.threadId : undefined;
-    const turnId = typeof params.turnId === 'string' ? params.turnId : undefined;
+    const threadId =
+      typeof params.threadId === 'string' ? params.threadId : undefined;
+    const turnId =
+      typeof params.turnId === 'string' ? params.turnId : undefined;
     if (threadId && threadId !== turn.threadId) return;
     if (turnId && turnId !== turn.turnId) return;
 
@@ -956,7 +1098,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       case 'item/commandExecution/outputDelta':
       case 'item/fileChange/outputDelta':
         this.openAppServerReasoning(turn);
-        this.emitAppServerReasoning(turn, typeof params.delta === 'string' ? params.delta : '');
+        this.emitAppServerReasoning(
+          turn,
+          typeof params.delta === 'string' ? params.delta : '',
+        );
         return;
       case 'item/started':
       case 'item/completed':
@@ -976,13 +1121,21 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     }
   }
 
-  private handleAppServerItem(turn: CodexAppServerTurnState, params: Record<string, unknown>, completed: boolean): void {
+  private handleAppServerItem(
+    turn: CodexAppServerTurnState,
+    params: Record<string, unknown>,
+    completed: boolean,
+  ): void {
     const item = params.item as CodexThreadItem | undefined;
     if (!item?.type) return;
 
     if (item.type === 'agentMessage' && completed && item.text) {
-      const emitted = item.id ? turn.assistantTextByItemId.get(item.id) ?? '' : '';
-      const delta = item.text.startsWith(emitted) ? item.text.slice(emitted.length) : item.text;
+      const emitted = item.id
+        ? (turn.assistantTextByItemId.get(item.id) ?? '')
+        : '';
+      const delta = item.text.startsWith(emitted)
+        ? item.text.slice(emitted.length)
+        : item.text;
       if (delta) {
         this.closeAppServerReasoning(turn);
         turn.hasVisibleOutput = true;
@@ -1046,19 +1199,31 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     }
   }
 
-  private emitAppServerAssistantDelta(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+  private emitAppServerAssistantDelta(
+    turn: CodexAppServerTurnState,
+    params: Record<string, unknown>,
+  ): void {
     const delta = typeof params.delta === 'string' ? params.delta : '';
     if (!delta) return;
-    const itemId = typeof params.itemId === 'string' ? params.itemId : undefined;
+    const itemId =
+      typeof params.itemId === 'string' ? params.itemId : undefined;
     if (itemId) {
-      turn.assistantTextByItemId.set(itemId, (turn.assistantTextByItemId.get(itemId) ?? '') + delta);
+      turn.assistantTextByItemId.set(
+        itemId,
+        (turn.assistantTextByItemId.get(itemId) ?? '') + delta,
+      );
     }
     turn.hasVisibleOutput = true;
     turn.onChunk(delta);
   }
 
-  private handleAppServerUsage(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
-    const tokenUsage = params.tokenUsage as { last?: { inputTokens?: number; outputTokens?: number } } | undefined;
+  private handleAppServerUsage(
+    turn: CodexAppServerTurnState,
+    params: Record<string, unknown>,
+  ): void {
+    const tokenUsage = params.tokenUsage as
+      | { last?: { inputTokens?: number; outputTokens?: number } }
+      | undefined;
     if (!tokenUsage?.last) return;
     turn.callbacks?.onUsage?.({
       inputTokens: tokenUsage.last.inputTokens ?? 0,
@@ -1066,7 +1231,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     });
   }
 
-  private handleAppServerError(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+  private handleAppServerError(
+    turn: CodexAppServerTurnState,
+    params: Record<string, unknown>,
+  ): void {
     const error = params.error as { message?: string } | undefined;
     const message = error?.message ?? 'Codex app-server turn failed';
     turn.errorResult += message;
@@ -1077,9 +1245,14 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     }
   }
 
-  private handleAppServerTurnCompleted(turn: CodexAppServerTurnState, params: Record<string, unknown>): void {
+  private handleAppServerTurnCompleted(
+    turn: CodexAppServerTurnState,
+    params: Record<string, unknown>,
+  ): void {
     if (turn.completed) return;
-    const completedTurn = params.turn as { status?: string; error?: { message?: string } | null } | undefined;
+    const completedTurn = params.turn as
+      | { status?: string; error?: { message?: string } | null }
+      | undefined;
     this.closeAppServerReasoning(turn);
     turn.completed = true;
 
@@ -1088,11 +1261,21 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       return;
     }
     if (completedTurn?.status === 'failed') {
-      turn.reject(new Error(completedTurn.error?.message ?? (turn.errorResult.trim() || 'Codex app-server turn failed')));
+      turn.reject(
+        new Error(
+          completedTurn.error?.message ??
+            (turn.errorResult.trim() || 'Codex app-server turn failed'),
+        ),
+      );
       return;
     }
     if (!turn.hasVisibleOutput) {
-      turn.reject(new Error(turn.errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved.'));
+      turn.reject(
+        new Error(
+          turn.errorResult.trim() ||
+            'Agent process completed successfully but returned no output. Session not saved.',
+        ),
+      );
       return;
     }
     turn.resolve();
@@ -1104,7 +1287,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     turn.callbacks?.onReasoningStart?.();
   }
 
-  private emitAppServerReasoning(turn: CodexAppServerTurnState, text: string): void {
+  private emitAppServerReasoning(
+    turn: CodexAppServerTurnState,
+    text: string,
+  ): void {
     if (!text) return;
     turn.callbacks?.onReasoningChunk?.(text);
   }

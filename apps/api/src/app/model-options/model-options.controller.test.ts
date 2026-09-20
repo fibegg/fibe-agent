@@ -24,36 +24,49 @@ function mergeModelOptions({ envModels, providerModels }: MergeOpts): string[] {
   return merged;
 }
 
-describe('ModelOptionsController — merge logic', () => {
+describe('ModelOptionsController: merge logic', () => {
   test('returns env models when provider list is empty', () => {
-    expect(mergeModelOptions({ envModels: ['a'], providerModels: [] })).toEqual(['a']);
+    expect(mergeModelOptions({ envModels: ['a'], providerModels: [] })).toEqual(
+      ['a'],
+    );
   });
 
   test('merges env and provider models', () => {
     expect(
-      mergeModelOptions({ envModels: ['a', 'b'], providerModels: ['b', 'c', 'd'] })
+      mergeModelOptions({
+        envModels: ['a', 'b'],
+        providerModels: ['b', 'c', 'd'],
+      }),
     ).toEqual(['a', 'b', 'c', 'd']);
   });
 
-  test('deduplicates — env models come first', () => {
+  test('deduplicates: env models come first', () => {
     expect(
-      mergeModelOptions({ envModels: ['z', 'a'], providerModels: ['a', 'z', 'm'] })
+      mergeModelOptions({
+        envModels: ['z', 'a'],
+        providerModels: ['a', 'z', 'm'],
+      }),
     ).toEqual(['z', 'a', 'm']);
   });
 
   test('returns empty when both sources are empty', () => {
-    expect(mergeModelOptions({ envModels: [], providerModels: [] })).toEqual([]);
+    expect(mergeModelOptions({ envModels: [], providerModels: [] })).toEqual(
+      [],
+    );
   });
 
   test('returns provider models only when no env models', () => {
     expect(
-      mergeModelOptions({ envModels: [], providerModels: ['p1', 'p2'] })
+      mergeModelOptions({ envModels: [], providerModels: ['p1', 'p2'] }),
     ).toEqual(['p1', 'p2']);
   });
 
   test('preserves order within each group', () => {
     expect(
-      mergeModelOptions({ envModels: ['c', 'a'], providerModels: ['b', 'a', 'd'] })
+      mergeModelOptions({
+        envModels: ['c', 'a'],
+        providerModels: ['b', 'a', 'd'],
+      }),
     ).toEqual(['c', 'a', 'b', 'd']);
   });
 

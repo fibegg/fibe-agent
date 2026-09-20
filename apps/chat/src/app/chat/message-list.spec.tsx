@@ -20,19 +20,17 @@ vi.mock('../api-url', () => ({
 }));
 
 vi.mock('../avatar-config-context', () => ({
-  useAvatarConfig: vi
-    .fn()
-    .mockReturnValue({
-      userAvatarUrl: undefined,
-      assistantAvatarUrl: undefined,
-    }),
+  useAvatarConfig: vi.fn().mockReturnValue({
+    userAvatarUrl: undefined,
+    assistantAvatarUrl: undefined,
+  }),
 }));
 
 vi.mock('../file-explorer/prism-loader', () => ({
   highlightCodeElement: vi.fn(),
 }));
 
-// Pretext.js measures canvas glyphs — JSDOM has no canvas implementation.
+// Pretext.js measures canvas glyphs: JSDOM has no canvas implementation.
 // Return deterministic fixed heights so virtualizer and streaming-bubble tests
 // are stable and do not depend on the real layout engine.
 vi.mock('./pretext-height', () => ({
@@ -44,12 +42,10 @@ vi.mock('./pretext-height', () => ({
 }));
 
 vi.mock('./use-local-tts', () => ({
-  useLocalTts: vi
-    .fn()
-    .mockReturnValue({
-      stop: vi.fn(),
-      speak: vi.fn().mockResolvedValue(undefined),
-    }),
+  useLocalTts: vi.fn().mockReturnValue({
+    stop: vi.fn(),
+    speak: vi.fn().mockResolvedValue(undefined),
+  }),
 }));
 
 describe('MessageList', () => {
@@ -251,7 +247,6 @@ describe('MessageList', () => {
     expect(userImg).toBeTruthy();
     expect(botImg).toBeTruthy();
 
-    // Reset for other tests
     vi.mocked(useAvatarConfig).mockReturnValue({
       userAvatarUrl: undefined,
       assistantAvatarUrl: undefined,
@@ -299,7 +294,6 @@ describe('MessageList', () => {
         isStreaming={true}
       />,
     );
-    // The streaming bubble wrapper should have an inline min-height style.
     const bubbles = container.querySelectorAll('[style*="min-height"]');
     expect(bubbles.length).toBeGreaterThan(0);
   });
@@ -319,7 +313,6 @@ describe('MessageList', () => {
     const { container } = render(
       <MessageList messages={messages} streamingText="" isStreaming={false} />,
     );
-    // computeTightBubbleWidth mock returns 200 — the bubble div should have maxWidth:200px
     const bubble = container.querySelector('[style*="max-width"]');
     expect(bubble).toBeTruthy();
   });
@@ -335,7 +328,7 @@ describe('MessageList', () => {
     const { container } = render(
       <MessageList messages={messages} streamingText="" isStreaming={false} />,
     );
-    // Code-block messages bypass tight bubble — no inline max-width style expected
+    // Code-block messages bypass tight bubble: no inline max-width style expected
     const styledBubble = container.querySelector('[style*="max-width"]');
     expect(styledBubble).toBeNull();
   });
@@ -796,9 +789,6 @@ describe('MessageList', () => {
     });
   });
 
-  // ───────────────────────────────────────
-  // ConversationResetSeparator
-  // ───────────────────────────────────────
   describe('ConversationResetSeparator', () => {
     function sep(ts: string): ConversationResetSeparator {
       return { kind: 'reset_separator', resetAt: ts };

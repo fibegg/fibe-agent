@@ -2,14 +2,16 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>fibe — AI Agent</title>
+    <title>fibe AI Agent</title>
     <base href="/" />
     <script>
       (function () {
         try {
           var raw = new URLSearchParams(window.location.search).get('locale');
-          var locale = raw && String(raw).trim().toLowerCase().replace(/_/g, '-');
-          if (locale && !/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/.test(locale)) locale = null;
+          var locale =
+            raw && String(raw).trim().toLowerCase().replace(/_/g, '-');
+          if (locale && !/^[a-z]{2,3}(-[a-z0-9]{2,8})*$/.test(locale))
+            locale = null;
           if (!locale) return;
           window.__FIBE_BOOT_LOCALE__ = locale;
           document.documentElement.lang = locale;
@@ -20,39 +22,59 @@
     <script>
       // Make external links open in the parent window when inside an iframe,
       // and in a new tab when in standalone mode.
-      document.addEventListener('click', function(e) {
+      document.addEventListener('click', function (e) {
         var link = e.target.closest('a');
         // Only modify target for links inside chat messages (.prose)
-        if (link && link.closest('.prose') && link.href && link.origin !== window.location.origin) {
+        if (
+          link &&
+          link.closest('.prose') &&
+          link.href &&
+          link.origin !== window.location.origin
+        ) {
           if (window !== window.parent) {
-             link.target = '_parent';
+            link.target = '_parent';
           } else if (!link.target) {
-             link.target = '_blank';
+            link.target = '_blank';
           }
         }
       });
     </script>
 
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover" />
-    <meta name="description" content="fibe — AI-powered agent interface. Elegant, fast, and intuitive." />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="Chat, edit code, use a terminal, and control your Fibe agent."
+    />
     <meta name="theme-color" content="#191c14" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:title" content="fibe — AI Agent" />
-    <meta property="og:description" content="fibe — AI-powered agent interface. Elegant, fast, and intuitive." />
+    <meta property="og:title" content="fibe AI Agent" />
+    <meta
+      property="og:description"
+      content="Chat, edit code, use a terminal, and control your Fibe agent."
+    />
     <meta property="og:locale" content="en_US" />
 
     <meta name="twitter:card" content="summary" />
-    <meta name="twitter:title" content="fibe — AI Agent" />
-    <meta name="twitter:description" content="fibe — AI-powered agent interface. Elegant, fast, and intuitive." />
+    <meta name="twitter:title" content="fibe AI Agent" />
+    <meta
+      name="twitter:description"
+      content="Chat, edit code, use a terminal, and control your Fibe agent."
+    />
 
     <link rel="icon" type="image/png" href="/phoenix.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
@@ -63,23 +85,34 @@
           dark: '#191c14',
           dracula: '#282a36',
           midnight: '#07111f',
-          contrast: '#000000'
+          contrast: '#000000',
         };
         var statusBarStyles = {
           light: 'default',
           dark: 'black',
           dracula: 'black',
           midnight: 'black',
-          contrast: 'black'
+          contrast: 'black',
         };
         var s = null;
-        try { s = localStorage.getItem('chat-theme'); } catch (_) {}
+        try {
+          s = localStorage.getItem('chat-theme');
+        } catch (_) {}
         if (s === 'winter') s = 'light';
         if (s === 'halloween') s = 'dark';
-        var valid = s === 'light' || s === 'dark' || s === 'dracula' || s === 'midnight' || s === 'contrast';
-        var prefersLight = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;
-        var theme = valid ? s : (prefersLight ? 'light' : 'dark');
-        try { localStorage.setItem('chat-theme', theme); } catch (_) {}
+        var valid =
+          s === 'light' ||
+          s === 'dark' ||
+          s === 'dracula' ||
+          s === 'midnight' ||
+          s === 'contrast';
+        var prefersLight =
+          window.matchMedia &&
+          window.matchMedia('(prefers-color-scheme: light)').matches;
+        var theme = valid ? s : prefersLight ? 'light' : 'dark';
+        try {
+          localStorage.setItem('chat-theme', theme);
+        } catch (_) {}
         var dark = theme !== 'light';
         var color = colors[theme] || colors.dark;
         var statusBarStyle = statusBarStyles[theme] || statusBarStyles.dark;
@@ -88,9 +121,12 @@
         document.documentElement.style.backgroundColor = color;
         document.body.style.backgroundColor = color;
         var themeColorMeta = document.querySelector('meta[name="theme-color"]');
-        var statusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+        var statusBarMeta = document.querySelector(
+          'meta[name="apple-mobile-web-app-status-bar-style"]',
+        );
         if (themeColorMeta) themeColorMeta.setAttribute('content', color);
-        if (statusBarMeta) statusBarMeta.setAttribute('content', statusBarStyle);
+        if (statusBarMeta)
+          statusBarMeta.setAttribute('content', statusBarStyle);
       })();
     </script>
     <div id="root"></div>

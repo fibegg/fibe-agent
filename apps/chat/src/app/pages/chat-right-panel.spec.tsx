@@ -3,7 +3,6 @@ import { render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatRightPanel } from './chat-right-panel';
 
-// Mock the heavy child component
 vi.mock('../agent-thinking-sidebar', () => ({
   AgentThinkingSidebar: (props: Record<string, unknown>) => (
     <div
@@ -36,7 +35,7 @@ describe('ChatRightPanel', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(getByTestId('thinking-sidebar')).toBeTruthy();
   });
@@ -45,18 +44,22 @@ describe('ChatRightPanel', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} rightSidebarCollapsed={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(getByTestId('thinking-sidebar').getAttribute('data-collapsed')).toBe('true');
+    expect(getByTestId('thinking-sidebar').getAttribute('data-collapsed')).toBe(
+      'true',
+    );
   });
 
   it('passes isStreaming prop correctly', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} isStreaming={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(getByTestId('thinking-sidebar').getAttribute('data-streaming')).toBe('true');
+    expect(getByTestId('thinking-sidebar').getAttribute('data-streaming')).toBe(
+      'true',
+    );
   });
 
   it('forwards sessionTokenUsage when provided', () => {
@@ -64,7 +67,7 @@ describe('ChatRightPanel', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} sessionTokenUsage={usage} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(getByTestId('thinking-sidebar')).toBeTruthy();
   });
@@ -73,7 +76,7 @@ describe('ChatRightPanel', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} width={400} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(getByTestId('thinking-sidebar')).toBeTruthy();
   });
@@ -82,8 +85,10 @@ describe('ChatRightPanel', () => {
     const { getByTestId } = render(
       <MemoryRouter>
         <ChatRightPanel {...baseProps} hideToggle />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(getByTestId('thinking-sidebar').getAttribute('data-hide-toggle')).toBe('true');
+    expect(
+      getByTestId('thinking-sidebar').getAttribute('data-hide-toggle'),
+    ).toBe('true');
   });
 });

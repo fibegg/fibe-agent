@@ -44,7 +44,9 @@ describe('MessageStoreService', () => {
 
   test('add persists attachment filenames', () => {
     const service = makeService();
-    const msg = service.add('user', 'review files', undefined, undefined, ['notes.zip']);
+    const msg = service.add('user', 'review files', undefined, undefined, [
+      'notes.zip',
+    ]);
     expect(msg.attachmentFilenames).toEqual(['notes.zip']);
     expect(service.all()[0].attachmentFilenames).toEqual(['notes.zip']);
   });
@@ -61,7 +63,12 @@ describe('MessageStoreService', () => {
     service.add('user', 'hi');
     service.add('assistant', 'hello');
     const story = [
-      { id: '1', type: 'step', message: 'Thinking', timestamp: new Date().toISOString() },
+      {
+        id: '1',
+        type: 'step',
+        message: 'Thinking',
+        timestamp: new Date().toISOString(),
+      },
     ];
     service.finalizeLastAssistant(story);
     const all = service.all();
@@ -72,7 +79,9 @@ describe('MessageStoreService', () => {
   test('finalizeLastAssistant does nothing when last message is not assistant', () => {
     const service = makeService();
     service.add('user', 'hi');
-    service.finalizeLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
+    service.finalizeLastAssistant([
+      { id: '1', type: 'x', message: 'm', timestamp: '' },
+    ]);
     expect(service.all()[0].story).toBeUndefined();
   });
 
@@ -85,7 +94,9 @@ describe('MessageStoreService', () => {
 
   test('finalizeLastAssistant does nothing when messages is empty', () => {
     const service = makeService();
-    service.finalizeLastAssistant([{ id: '1', type: 'x', message: 'm', timestamp: '' }]);
+    service.finalizeLastAssistant([
+      { id: '1', type: 'x', message: 'm', timestamp: '' },
+    ]);
     expect(service.all()).toHaveLength(0);
   });
 
@@ -107,10 +118,6 @@ describe('MessageStoreService', () => {
     const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
     expect(JSON.parse(raw)[0].body).toBe('shutdown-safe');
   });
-
-  // ──────────────────────────────────────────────
-  // reset()
-  // ──────────────────────────────────────────────
 
   test('reset clears the active message list', () => {
     const service = makeService();
@@ -142,11 +149,12 @@ describe('MessageStoreService', () => {
     const service = makeService();
     service.add('user', 'first');
     service.reset();
-    // second reset with new messages
     service.add('user', 'second');
     service.reset();
     await service.flush();
-    const prev = JSON.parse(readFileSync(join(dataDir, 'messages.previous.json'), 'utf8'));
+    const prev = JSON.parse(
+      readFileSync(join(dataDir, 'messages.previous.json'), 'utf8'),
+    );
     expect(prev).toHaveLength(1);
     expect(prev[0].body).toBe('second');
   });
@@ -163,7 +171,9 @@ describe('MessageStoreService', () => {
   test('hydrate overwrites messages and schedules write', async () => {
     const service = makeService();
 
-    service.hydrate([{ id: '1', role: 'user', body: 'hydrated', created_at: 'now' }]);
+    service.hydrate([
+      { id: '1', role: 'user', body: 'hydrated', created_at: 'now' },
+    ]);
     expect(service.all()).toHaveLength(1);
     expect(service.all()[0].body).toBe('hydrated');
 

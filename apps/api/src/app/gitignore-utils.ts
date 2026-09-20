@@ -48,10 +48,12 @@ function parseGitignoreLine(line: string): Rule | null {
 
   if (hasSlash || anchored) {
     const parts = trimmed.split('**');
-    const regexStr = parts.map((part) => {
-      const subParts = part.split('*');
-      return subParts.map(escapeRegExp).join('[^/]*');
-    }).join('.*');
+    const regexStr = parts
+      .map((part) => {
+        const subParts = part.split('*');
+        return subParts.map(escapeRegExp).join('[^/]*');
+      })
+      .join('.*');
     return { pattern: new RegExp(`^${regexStr}(/|$)`), negated, dirOnly };
   }
 
@@ -92,14 +94,16 @@ const EMPTY_FILTER: GitignoreFilter = { ignores: () => false };
 
 /**
  * Load .gitignore from a directory and optionally merge with a parent filter.
- * This supports nested .gitignore files — each directory can contribute rules.
+ * This supports nested .gitignore files: each directory can contribute rules.
  */
-export async function loadGitignore(dir: string, parent?: GitignoreFilter): Promise<GitignoreFilter> {
+export async function loadGitignore(
+  dir: string,
+  parent?: GitignoreFilter,
+): Promise<GitignoreFilter> {
   try {
     const content = await readFile(join(dir, '.gitignore'), 'utf-8');
     const localRules = parseGitignoreContent(content);
     if (parent && parent !== EMPTY_FILTER) {
-      // Combine: parent rules check first, then local rules
       return {
         ignores(relativePath: string) {
           if (parent.ignores(relativePath)) return true;

@@ -16,8 +16,9 @@ describe('postmessage-greeting', () => {
   it('does not attach listener when window === window.parent (default jsdom)', async () => {
     const addSpy = vi.spyOn(window, 'addEventListener');
     await import('./postmessage-greeting');
-    const messageCalls = addSpy.mock.calls.filter(([type]) => type === 'message');
-    // In jsdom, window.parent === window — no listener should be attached
+    const messageCalls = addSpy.mock.calls.filter(
+      ([type]) => type === 'message',
+    );
     expect(messageCalls).toHaveLength(0);
   });
 
@@ -28,7 +29,9 @@ describe('postmessage-greeting', () => {
     const { consumeGreeting } = await import('./postmessage-greeting');
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'initial_greeting', text: '[SYSCHECK]' } })
+      new MessageEvent('message', {
+        data: { action: 'initial_greeting', text: '[SYSCHECK]' },
+      }),
     );
 
     expect(consumeGreeting()).toBe('[SYSCHECK]');
@@ -41,7 +44,9 @@ describe('postmessage-greeting', () => {
     const { consumeGreeting } = await import('./postmessage-greeting');
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'initial_greeting', text: '[SYSCHECK]' } })
+      new MessageEvent('message', {
+        data: { action: 'initial_greeting', text: '[SYSCHECK]' },
+      }),
     );
 
     expect(consumeGreeting()).toBe('[SYSCHECK]');
@@ -55,10 +60,14 @@ describe('postmessage-greeting', () => {
     const { consumeGreeting } = await import('./postmessage-greeting');
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'initial_greeting', text: 'first' } })
+      new MessageEvent('message', {
+        data: { action: 'initial_greeting', text: 'first' },
+      }),
     );
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'initial_greeting', text: 'second' } })
+      new MessageEvent('message', {
+        data: { action: 'initial_greeting', text: 'second' },
+      }),
     );
 
     expect(consumeGreeting()).toBe('first');
@@ -71,7 +80,9 @@ describe('postmessage-greeting', () => {
     const { consumeGreeting } = await import('./postmessage-greeting');
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', text: '[SYSCHECK]' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', text: '[SYSCHECK]' },
+      }),
     );
 
     expect(consumeGreeting()).toBeNull();
@@ -84,7 +95,9 @@ describe('postmessage-greeting', () => {
     const { consumeGreeting } = await import('./postmessage-greeting');
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'initial_greeting', text: 42 } })
+      new MessageEvent('message', {
+        data: { action: 'initial_greeting', text: 42 },
+      }),
     );
 
     expect(consumeGreeting()).toBeNull();
@@ -105,10 +118,14 @@ describe('postmessage-greeting', () => {
     const fakeParent = {} as Window;
     vi.stubGlobal('parent', fakeParent);
 
-    const { peekGreeting, consumeGreeting } = await import('./postmessage-greeting');
+    const { peekGreeting, consumeGreeting } = await import(
+      './postmessage-greeting'
+    );
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'initial_greeting', text: '[SYSCHECK]' } })
+      new MessageEvent('message', {
+        data: { action: 'initial_greeting', text: '[SYSCHECK]' },
+      }),
     );
 
     expect(peekGreeting()).toBe('[SYSCHECK]');

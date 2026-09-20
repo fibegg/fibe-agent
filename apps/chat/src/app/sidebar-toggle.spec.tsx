@@ -18,7 +18,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle sidebar"
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: 'Toggle sidebar' })).toBeTruthy();
   });
@@ -31,7 +31,7 @@ describe('SidebarToggle', () => {
         onClick={onClick}
         side="left"
         ariaLabel="Toggle sidebar"
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button'));
     expect(onClick).toHaveBeenCalledTimes(1);
@@ -44,12 +44,14 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle"
-      />
+      />,
     );
     const button = container.querySelector('button');
     expect(button?.className).toContain('animate-pulse');
 
-    act(() => { vi.advanceTimersByTime(5001); });
+    act(() => {
+      vi.advanceTimersByTime(5001);
+    });
 
     expect(button?.className).not.toContain('animate-pulse');
   });
@@ -61,9 +63,8 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle"
-      />
+      />,
     );
-    // ChevronLeft SVG should be present
     const svgs = container.querySelectorAll('svg');
     expect(svgs.length).toBeGreaterThan(0);
   });
@@ -75,7 +76,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle"
-      />
+      />,
     );
     const svgs = container.querySelectorAll('svg');
     expect(svgs.length).toBeGreaterThan(0);
@@ -88,7 +89,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle"
-      />
+      />,
     );
     expect(container.querySelector('button')?.className).toContain('-right-4');
   });
@@ -100,7 +101,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="right"
         ariaLabel="Toggle"
-      />
+      />,
     );
     expect(container.querySelector('button')?.className).toContain('-left-4');
   });
@@ -112,7 +113,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle"
-      />
+      />,
     );
     const button = container.querySelector('button');
     expect(button?.className).toContain('z-20');
@@ -126,7 +127,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="right"
         ariaLabel="Toggle"
-      />
+      />,
     );
     expect(screen.getByText('Collapse')).toBeTruthy();
   });
@@ -138,7 +139,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="right"
         ariaLabel="Toggle"
-      />
+      />,
     );
     expect(screen.getByText('Expand')).toBeTruthy();
   });
@@ -150,7 +151,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="left"
         ariaLabel="Toggle"
-      />
+      />,
     );
     const tooltip = screen.getByText('Collapse');
     expect(tooltip.style.left).toBe('100%');
@@ -164,7 +165,7 @@ describe('SidebarToggle', () => {
         onClick={vi.fn()}
         side="right"
         ariaLabel="Toggle"
-      />
+      />,
     );
     const tooltip = screen.getByText('Collapse');
     expect(tooltip.style.right).toBe('100%');

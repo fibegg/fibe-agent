@@ -47,7 +47,7 @@ export class MessageStoreService implements OnModuleDestroy {
       this.storePath,
       () => this.messages,
       this.config.getEncryptionKey(),
-      200, // debounce — rapid successive writes coalesce into one atomic flush
+      200, // debounce: rapid successive writes coalesce into one atomic flush
     );
 
     if (existsSync(this.storePath)) {
@@ -76,7 +76,13 @@ export class MessageStoreService implements OnModuleDestroy {
     return this.indexById.get(id);
   }
 
-  add(role: 'user' | 'assistant', body: string, imageUrls?: string[], model?: string, attachmentFilenames?: string[]): StoredMessage {
+  add(
+    role: 'user' | 'assistant',
+    body: string,
+    imageUrls?: string[],
+    model?: string,
+    attachmentFilenames?: string[],
+  ): StoredMessage {
     const msg: StoredMessage = {
       id: randomUUID(),
       role,
@@ -85,7 +91,8 @@ export class MessageStoreService implements OnModuleDestroy {
     };
     if (imageUrls?.length) msg.imageUrls = imageUrls;
     if (model) msg.model = model;
-    if (attachmentFilenames?.length) msg.attachmentFilenames = attachmentFilenames;
+    if (attachmentFilenames?.length)
+      msg.attachmentFilenames = attachmentFilenames;
 
     this.messages.push(msg);
     this.indexById.set(msg.id, msg);
@@ -125,7 +132,11 @@ export class MessageStoreService implements OnModuleDestroy {
   reset(): void {
     if (this.messages.length > 0) {
       try {
-        writeFileSync(this.previousMessagesPath, JSON.stringify(this.messages, null, 2), 'utf8');
+        writeFileSync(
+          this.previousMessagesPath,
+          JSON.stringify(this.messages, null, 2),
+          'utf8',
+        );
       } catch (err) {
         console.error('Failed to archive messages to previous:', err);
       }

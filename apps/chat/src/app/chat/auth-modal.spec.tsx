@@ -21,7 +21,7 @@ describe('AuthModal', () => {
         authModal={DEFAULT_AUTH_MODAL}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -33,9 +33,9 @@ describe('AuthModal', () => {
         authModal={DEFAULT_AUTH_MODAL}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
-    expect(screen.getByText(/connect to provider/i)).toBeTruthy();
+    expect(screen.getByText('Connect provider')).toBeTruthy();
   });
 
   it('calls onClose when close button clicked', () => {
@@ -46,7 +46,7 @@ describe('AuthModal', () => {
         authModal={DEFAULT_AUTH_MODAL}
         onClose={onClose}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalled();
@@ -60,9 +60,8 @@ describe('AuthModal', () => {
         authModal={DEFAULT_AUTH_MODAL}
         onClose={onClose}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
-    // Click the outer overlay div (first child)
     fireEvent.click(container.firstChild as Element);
     expect(onClose).toHaveBeenCalled();
   });
@@ -75,10 +74,9 @@ describe('AuthModal', () => {
         authModal={DEFAULT_AUTH_MODAL}
         onClose={onClose}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
-    // Click the heading inside the modal — should not trigger onClose
-    fireEvent.click(screen.getByText(/connect to provider/i));
+    fireEvent.click(screen.getByText('Connect provider'));
     expect(onClose).not.toHaveBeenCalled();
   });
 
@@ -86,12 +84,16 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: null,
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
-    expect(screen.getByText(/open authentication url/i)).toBeTruthy();
+    expect(screen.getByText('Open authorization link')).toBeTruthy();
   });
 
   it('shows waiting-for-url spinner when no authUrl, deviceCode, or isManualToken', () => {
@@ -101,9 +103,9 @@ describe('AuthModal', () => {
         authModal={DEFAULT_AUTH_MODAL}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
-    expect(screen.getByText(/generating authorization link/i)).toBeTruthy();
+    expect(screen.getByText('Creating authorization link…')).toBeTruthy();
     expect(screen.queryByRole('button', { name: /submit/i })).toBeNull();
   });
 
@@ -111,10 +113,14 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: null,
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /submit/i })).toBeTruthy();
   });
@@ -124,12 +130,18 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: null,
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
-      />
+      />,
     );
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'my-auth-code' } });
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: 'my-auth-code' },
+    });
     fireEvent.click(screen.getByRole('button', { name: /submit/i }));
     expect(onSubmitCode).toHaveBeenCalledWith('my-auth-code');
   });
@@ -139,10 +151,14 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: null,
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /submit/i }));
     expect(onSubmitCode).not.toHaveBeenCalled();
@@ -153,10 +169,14 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: null,
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
-      />
+      />,
     );
     const input = screen.getByRole('textbox');
     fireEvent.change(input, { target: { value: 'code' } });
@@ -169,10 +189,14 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: null, isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: null,
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={onSubmitCode}
-      />
+      />,
     );
     const input = screen.getByRole('textbox');
     fireEvent.change(input, { target: { value: 'code' } });
@@ -184,10 +208,14 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: null, deviceCode: 'ABCD-1234', isManualToken: false }}
+        authModal={{
+          authUrl: null,
+          deviceCode: 'ABCD-1234',
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTitle(/copy device code/i)).toBeTruthy();
     expect(screen.getByDisplayValue('ABCD-1234')).toBeTruthy();
@@ -200,7 +228,7 @@ describe('AuthModal', () => {
         authModal={{ authUrl: null, deviceCode: null, isManualToken: true }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/paste api key or token/i)).toBeTruthy();
   });
@@ -213,10 +241,14 @@ describe('AuthModal', () => {
     render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: null, deviceCode: 'ABCD-1234', isManualToken: false }}
+        authModal={{
+          authUrl: null,
+          deviceCode: 'ABCD-1234',
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
 
     await act(async () => {
@@ -225,7 +257,9 @@ describe('AuthModal', () => {
 
     expect(writeText).toHaveBeenCalledWith('ABCD-1234');
 
-    act(() => { vi.advanceTimersByTime(2001); });
+    act(() => {
+      vi.advanceTimersByTime(2001);
+    });
     vi.useRealTimers();
     vi.unstubAllGlobals();
   });
@@ -234,12 +268,15 @@ describe('AuthModal', () => {
     const { container } = render(
       <AuthModal
         open={true}
-        authModal={{ authUrl: 'https://auth.example.com', deviceCode: 'ABCD-1234', isManualToken: false }}
+        authModal={{
+          authUrl: 'https://auth.example.com',
+          deviceCode: 'ABCD-1234',
+          isManualToken: false,
+        }}
         onClose={vi.fn()}
         onSubmitCode={vi.fn()}
-      />
+      />,
     );
-    // The border-t div acts as separator
     expect(container.querySelector('.border-t')).toBeTruthy();
   });
 });

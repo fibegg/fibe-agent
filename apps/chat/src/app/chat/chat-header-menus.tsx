@@ -1,11 +1,3 @@
-/**
- * Floating-panel menu components used in the ChatHeader:
- * - SimplicateSwitch
- * - EffortRange
- * - ProviderModelMenu
- * - MoreActionsMenu
- * - CompactConversationPicker
- */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
@@ -26,7 +18,11 @@ import { CHAT_STATES } from './chat-state';
 import { ModelSelector } from './model-selector';
 import { LocaleSelector } from '../locale-selector';
 import { useT, type TranslationKey } from '../i18n';
-import { INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
+import {
+  INPUT_SEARCH,
+  SEARCH_ICON_POSITION,
+  CLEAR_BUTTON_POSITION,
+} from '../ui-classes';
 import {
   computeFloatingPanelRect,
   MORE_MENU_PANEL_ATTR,
@@ -35,10 +31,11 @@ import {
   MORE_MENU_ITEM_ACTIVE_CLASS,
   type FloatingPanelRect,
 } from './chat-header-utils';
-import { StarkGlassesIcon, PlaygroundSelectorSlot } from './chat-header-controls';
+import {
+  StarkGlassesIcon,
+  PlaygroundSelectorSlot,
+} from './chat-header-controls';
 import type { ChatHeaderProps } from './chat-header';
-
-// ─── SimplicateSwitch ─────────────────────────────────────────────────────────
 
 export function SimplicateSwitch({
   checked,
@@ -56,19 +53,21 @@ export function SimplicateSwitch({
       aria-label={t('header.simplicate')}
       onClick={() => onChange(!checked)}
       className={`inline-flex h-5 w-9 shrink-0 items-center rounded-full border p-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/30 ${
-        checked ? 'border-primary/70 bg-primary' : 'border-muted-foreground/50 bg-background/80'
+        checked
+          ? 'border-primary/70 bg-primary'
+          : 'border-muted-foreground/50 bg-background/80'
       } ${checked ? 'justify-end' : 'justify-start'}`}
     >
       <span
         className={`pointer-events-none block size-4 rounded-full border shadow-sm transition-colors ${
-          checked ? 'border-white/70 bg-white' : 'border-muted-foreground/50 bg-muted-foreground'
+          checked
+            ? 'border-white/70 bg-white'
+            : 'border-muted-foreground/50 bg-muted-foreground'
         }`}
       />
     </button>
   );
 }
-
-// ─── EffortRange ──────────────────────────────────────────────────────────────
 
 export function EffortRange({
   currentEffort,
@@ -83,15 +82,22 @@ export function EffortRange({
   const selectedLabel = t(`effort.${selectedEffort}` as TranslationKey);
 
   const handleChange = (value: string) => {
-    const index = Math.max(0, Math.min(EFFORT_OPTIONS.length - 1, Number(value)));
+    const index = Math.max(
+      0,
+      Math.min(EFFORT_OPTIONS.length - 1, Number(value)),
+    );
     onEffortSelect(EFFORT_OPTIONS[index]);
   };
 
   return (
     <div className="space-y-2 rounded-lg border border-border/40 bg-background/35 p-3">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('header.effort')}</span>
-        <span className="text-xs font-medium text-foreground">{selectedLabel}</span>
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {t('header.effort')}
+        </span>
+        <span className="text-xs font-medium text-foreground">
+          {selectedLabel}
+        </span>
       </div>
       <input
         type="range"
@@ -117,8 +123,6 @@ export function EffortRange({
     </div>
   );
 }
-
-// ─── ProviderModelMenu ────────────────────────────────────────────────────────
 
 export interface ProviderModelMenuProps {
   children: React.ReactNode;
@@ -155,7 +159,8 @@ export function ProviderModelMenu({
   const [open, setOpen] = useState(false);
   const [panelRect, setPanelRect] = useState<FloatingPanelRect | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
-  const hasModelControls = showModelSelector && Boolean(onModelSelect && onModelInputChange);
+  const hasModelControls =
+    showModelSelector && Boolean(onModelSelect && onModelInputChange);
   const hasEffortControls = Boolean(onEffortSelect);
   const hasControls = hasModelControls || hasEffortControls;
 
@@ -237,7 +242,9 @@ export function ProviderModelMenu({
           >
             {hasModelControls && onModelSelect && onModelInputChange && (
               <div className="space-y-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('header.model')}</span>
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  {t('header.model')}
+                </span>
                 <ModelSelector
                   currentModel={currentModel}
                   options={modelOptions}
@@ -253,7 +260,10 @@ export function ProviderModelMenu({
               </div>
             )}
             {onEffortSelect && (
-              <EffortRange currentEffort={currentEffort} onEffortSelect={onEffortSelect} />
+              <EffortRange
+                currentEffort={currentEffort}
+                onEffortSelect={onEffortSelect}
+              />
             )}
           </div>,
           document.body,
@@ -261,8 +271,6 @@ export function ProviderModelMenu({
     </>
   );
 }
-
-// ─── MoreActionsMenu ──────────────────────────────────────────────────────────
 
 export interface MoreActionsMenuProps {
   playgroundProps: ChatHeaderProps;
@@ -405,7 +413,9 @@ export function MoreActionsMenu({
                   title={t('header.tonyStark')}
                 >
                   <StarkGlassesIcon className="size-4 shrink-0 text-cyan-400" />
-                  <span className="min-w-0 flex-1 truncate">{t('header.tonyStark')}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('header.tonyStark')}
+                  </span>
                 </Link>
               )}
 
@@ -419,7 +429,9 @@ export function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} ${terminalOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
                   <TerminalSquare className="size-4 shrink-0 text-primary" />
-                  <span className="min-w-0 flex-1 truncate">{t('header.terminal')}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('header.terminal')}
+                  </span>
                 </button>
               )}
 
@@ -431,7 +443,9 @@ export function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} ${cliOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
                   <Command className="size-4 shrink-0 text-blue-300" />
-                  <span className="min-w-0 flex-1 truncate">{t('header.commands')}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('header.commands')}
+                  </span>
                 </button>
               )}
 
@@ -443,7 +457,9 @@ export function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} ${diffOpen ? MORE_MENU_ITEM_ACTIVE_CLASS : ''}`}
                 >
                   <GitCompareArrows className="size-4 shrink-0 text-emerald-300" />
-                  <span className="min-w-0 flex-1 truncate">{t('header.gitDiff')}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('header.gitDiff')}
+                  </span>
                 </button>
               )}
 
@@ -455,7 +471,9 @@ export function MoreActionsMenu({
                   className={MORE_MENU_ITEM_CLASS}
                 >
                   <Sparkles className="size-4 shrink-0 text-primary" />
-                  <span className="min-w-0 flex-1 truncate">{t('header.startAuth')}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('header.startAuth')}
+                  </span>
                 </button>
               )}
 
@@ -468,14 +486,18 @@ export function MoreActionsMenu({
                   className={`${MORE_MENU_ITEM_CLASS} text-rose-400/80 hover:bg-rose-500/10 hover:text-rose-300`}
                 >
                   <RefreshCcw className="size-4 shrink-0" />
-                  <span className="min-w-0 flex-1 truncate">{t('settings.resetTitle')}</span>
+                  <span className="min-w-0 flex-1 truncate">
+                    {t('settings.resetTitle')}
+                  </span>
                 </button>
               )}
 
               {onSimplicateModeChange && (
                 <div className="mt-1 border-t border-border/40 pt-1">
                   <div className="flex h-9 items-center justify-between gap-3 rounded-md px-2.5 text-sm text-foreground">
-                    <span className="min-w-0 flex-1 truncate">{t('header.simplicate')}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                      {t('header.simplicate')}
+                    </span>
                     <SimplicateSwitch
                       checked={simplicateMode}
                       onChange={onSimplicateModeChange}
@@ -533,9 +555,6 @@ export function MoreActionsMenu({
   );
 }
 
-// ─── CompactConversationPicker ────────────────────────────────────────────────
-
-/** Small inline conversation switcher shown in the simplicate (compact) header. */
 export function CompactConversationPicker({
   conversations,
   activeId,
@@ -551,7 +570,11 @@ export function CompactConversationPicker({
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [rect, setRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
 
   const activeConv = conversations.find((c) => c.id === activeId);
   const label = activeConv?.title ?? t('header.conversations');
@@ -572,7 +595,9 @@ export function CompactConversationPicker({
       if (menuRef.current?.contains(target)) return;
       setOpen(false);
     };
-    const esc = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
     document.addEventListener('mousedown', close);
     document.addEventListener('keydown', esc);
     return () => {
@@ -581,10 +606,13 @@ export function CompactConversationPicker({
     };
   }, [open]);
 
-  const handleSelect = useCallback((id: string) => {
-    onSelect(id);
-    setOpen(false);
-  }, [onSelect]);
+  const handleSelect = useCallback(
+    (id: string) => {
+      onSelect(id);
+      setOpen(false);
+    },
+    [onSelect],
+  );
 
   const handleCreate = useCallback(async () => {
     setOpen(false);
@@ -603,48 +631,52 @@ export function CompactConversationPicker({
       >
         <MessageSquare className="size-4 shrink-0 text-primary" aria-hidden />
       </button>
-      {open && rect && createPortal(
-        <div
-          ref={menuRef}
-          role="menu"
-          aria-label={t('header.conversations')}
-          className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card/95 shadow-xl shadow-black/30 backdrop-blur-xl py-1"
-          style={{ top: rect.top, left: rect.left, width: rect.width }}
-        >
-          <div className="max-h-60 overflow-y-auto">
-            {conversations.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                role="menuitem"
-                onClick={() => handleSelect(c.id)}
-                className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
-                  c.id === activeId
-                    ? 'bg-primary/15 text-primary'
-                    : 'text-foreground hover:bg-muted/50'
-                }`}
-              >
-                <MessageSquare className="size-3 shrink-0 text-muted-foreground/60" />
-                <span className="min-w-0 flex-1 truncate font-medium">{c.title}</span>
-              </button>
-            ))}
-          </div>
-          {onCreate && (
-            <div className="border-t border-border/40 px-1 pt-1">
-              <button
-                type="button"
-                role="menuitem"
-                onClick={handleCreate}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors"
-              >
-                <Plus className="size-3.5 shrink-0" />
-                <span>{t('conversation.newChat')}</span>
-              </button>
+      {open &&
+        rect &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            aria-label={t('header.conversations')}
+            className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card/95 shadow-xl shadow-black/30 backdrop-blur-xl py-1"
+            style={{ top: rect.top, left: rect.left, width: rect.width }}
+          >
+            <div className="max-h-60 overflow-y-auto">
+              {conversations.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  role="menuitem"
+                  onClick={() => handleSelect(c.id)}
+                  className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors ${
+                    c.id === activeId
+                      ? 'bg-primary/15 text-primary'
+                      : 'text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  <MessageSquare className="size-3 shrink-0 text-muted-foreground/60" />
+                  <span className="min-w-0 flex-1 truncate font-medium">
+                    {c.title}
+                  </span>
+                </button>
+              ))}
             </div>
-          )}
-        </div>,
-        document.body,
-      )}
+            {onCreate && (
+              <div className="border-t border-border/40 px-1 pt-1">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={handleCreate}
+                  className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-xs text-primary hover:bg-primary/10 transition-colors"
+                >
+                  <Plus className="size-3.5 shrink-0" />
+                  <span>{t('conversation.newChat')}</span>
+                </button>
+              </div>
+            )}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }

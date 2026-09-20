@@ -37,7 +37,10 @@ describe('SessionRegistryService', () => {
 
   beforeEach(() => {
     strategyRegistry = makeStrategyRegistry();
-    registry = new SessionRegistryService(strategyRegistry, makeConversationManager());
+    registry = new SessionRegistryService(
+      strategyRegistry,
+      makeConversationManager(),
+    );
   });
 
   it('starts with zero sessions', () => {
@@ -81,7 +84,9 @@ describe('SessionRegistryService', () => {
 
     expect(registry.isConversationProcessing('thread-a')).toBe(true);
     expect(registry.isConversationProcessing('thread-b')).toBe(false);
-    expect(registry.isConversationProcessing('thread-a', active.sessionId)).toBe(false);
+    expect(
+      registry.isConversationProcessing('thread-a', active.sessionId),
+    ).toBe(false);
     expect(idle.isProcessing).toBe(false);
   });
 
@@ -92,7 +97,16 @@ describe('SessionRegistryService', () => {
     active.streamTextAccumulated = 'partial assistant output';
     active.streamStartedAt = '2026-05-07T20:00:00.000Z';
     active.currentActivityId = 'activity-1';
-    active.queuedTurns.push({ id: 'turn-1', messageId: 'msg-1', text: 'next', imageUrls: [], audioFilename: null, policy: 'queue', attachmentFilenames: ['notes.zip'], createdAt: '2026-05-07T20:00:01.000Z' });
+    active.queuedTurns.push({
+      id: 'turn-1',
+      messageId: 'msg-1',
+      text: 'next',
+      imageUrls: [],
+      audioFilename: null,
+      policy: 'queue',
+      attachmentFilenames: ['notes.zip'],
+      createdAt: '2026-05-07T20:00:01.000Z',
+    });
 
     expect(registry.liveConversationState('thread-a')).toEqual({
       conversationId: 'thread-a',
@@ -100,7 +114,16 @@ describe('SessionRegistryService', () => {
       streamText: 'partial assistant output',
       currentActivityId: 'activity-1',
       queuedTurns: 1,
-      queue: [{ id: 'turn-1', messageId: 'msg-1', text: 'next', policy: 'queue', attachmentFilenames: ['notes.zip'], createdAt: '2026-05-07T20:00:01.000Z' }],
+      queue: [
+        {
+          id: 'turn-1',
+          messageId: 'msg-1',
+          text: 'next',
+          policy: 'queue',
+          attachmentFilenames: ['notes.zip'],
+          createdAt: '2026-05-07T20:00:01.000Z',
+        },
+      ],
       startedAt: '2026-05-07T20:00:00.000Z',
       finishedAt: null,
     });
@@ -256,7 +279,6 @@ describe('SessionRegistryService', () => {
     registry.destroy(ctx.sessionId);
     registry.broadcast('after_destroy', {});
 
-    // stream was completed on destroy — no new events
     expect(events).toHaveLength(0);
   });
 
@@ -280,7 +302,9 @@ describe('SessionRegistryService', () => {
 
     registry.broadcastToConversation('thread-a', 'message', { body: 'hello' });
 
-    expect(eventsA).toEqual([{ type: 'message', data: { conversationId: 'thread-a', body: 'hello' } }]);
+    expect(eventsA).toEqual([
+      { type: 'message', data: { conversationId: 'thread-a', body: 'hello' } },
+    ]);
     expect(eventsB).toEqual([]);
   });
 

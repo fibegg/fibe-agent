@@ -1,16 +1,27 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  act,
+  waitFor,
+} from '@testing-library/react';
 import { AgentThinkingSidebar } from './agent-thinking-sidebar';
 
 vi.mock('@tanstack/react-virtual', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@tanstack/react-virtual')>();
+  const actual =
+    await importOriginal<typeof import('@tanstack/react-virtual')>();
   return {
     ...actual,
     useVirtualizer: (options: any) => {
       return {
         getVirtualItems: () => {
           if (options.count > 15) {
-            return Array.from({ length: 5 }).map((_, i) => ({ index: i, start: i * 32, measureElement: vi.fn() }));
+            return Array.from({ length: 5 }).map((_, i) => ({
+              index: i,
+              start: i * 32,
+              measureElement: vi.fn(),
+            }));
           }
           return [];
         },
@@ -25,7 +36,7 @@ vi.mock('./sidebar-activity-tooltip', () => ({
   SidebarActivityTooltip: ({ tooltip }: any) => {
     if (!tooltip) return null;
     return <div role="tooltip">{tooltip.content}</div>;
-  }
+  },
 }));
 
 describe('AgentThinkingSidebar', () => {
@@ -35,44 +46,67 @@ describe('AgentThinkingSidebar', () => {
 
   it('renders stats line and activity (brain) button when expanded', () => {
     const sessionActivity = [
-      { id: 'e1', created_at: new Date().toISOString(), story: [{ id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() }] },
+      {
+        id: 'e1',
+        created_at: new Date().toISOString(),
+        story: [
+          {
+            id: 's1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      },
     ];
     render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} sessionActivity={sessionActivity} />
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+      />,
     );
-    expect(screen.getByRole('button', { name: 'Activity', hidden: true })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Activity', hidden: true }),
+    ).toBeTruthy();
     expect(screen.getByTitle('Total actions')).toBeTruthy();
   });
 
   it('does not show stats row when collapsed', () => {
-    render(
-      <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />
-    );
-    expect(screen.queryByRole('button', { name: 'Activity', hidden: true })).toBeNull();
+    render(<AgentThinkingSidebar isCollapsed onToggle={vi.fn()} />);
+    expect(
+      screen.queryByRole('button', { name: 'Activity', hidden: true }),
+    ).toBeNull();
   });
 
   it('calls onToggle when sidebar toggle is clicked', () => {
     const onToggle = vi.fn();
-    render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={onToggle} />
+    render(<AgentThinkingSidebar isCollapsed={false} onToggle={onToggle} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Collapse thinking panel' }),
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Collapse thinking panel' }));
     expect(onToggle).toHaveBeenCalledTimes(1);
   });
 
   it('does not render the sidebar toggle when hideToggle is true', () => {
     render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} hideToggle />
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        hideToggle
+      />,
     );
-    expect(screen.queryByRole('button', { name: 'Collapse thinking panel' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Collapse thinking panel' }),
+    ).toBeNull();
   });
 
   it('shows expand label when collapsed', () => {
     const onToggle = vi.fn();
-    render(
-      <AgentThinkingSidebar isCollapsed onToggle={onToggle} />
-    );
-    expect(screen.getByRole('button', { name: 'Expand thinking panel' })).toBeTruthy();
+    render(<AgentThinkingSidebar isCollapsed onToggle={onToggle} />);
+    expect(
+      screen.getByRole('button', { name: 'Expand thinking panel' }),
+    ).toBeTruthy();
   });
 
   it('shows reasoning text in scrollable area', () => {
@@ -81,7 +115,7 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         reasoningText="Considering the best approach..."
-      />
+      />,
     );
     expect(screen.getByText(/Considering the best approach/)).toBeTruthy();
   });
@@ -92,7 +126,7 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         streamingResponseText="Streaming chunk one..."
-      />
+      />,
     );
     expect(screen.getByText(/Streaming chunk one/)).toBeTruthy();
   });
@@ -104,7 +138,7 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         reasoningText="Internal reasoning"
         streamingResponseText="Streaming output"
-      />
+      />,
     );
     expect(screen.getByText(/Internal reasoning/)).toBeTruthy();
     expect(screen.queryByText(/Streaming output/)).toBeNull();
@@ -121,7 +155,7 @@ describe('AgentThinkingSidebar', () => {
       {
         id: '2',
         type: 'step',
-        message: 'Generating response – processing',
+        message: 'Generating response: processing',
         timestamp: new Date().toISOString(),
       },
     ];
@@ -131,7 +165,7 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming
-      />
+      />,
     );
     expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.getByText(/Generating response/)).toBeTruthy();
@@ -152,14 +186,19 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
-      />
+      />,
     );
     expect(screen.getByText('npm install')).toBeTruthy();
   });
 
   it('highlights suspicious failure phrases in reasoning activity block', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
       {
         id: '2',
         type: 'reasoning_start',
@@ -169,9 +208,15 @@ describe('AgentThinkingSidebar', () => {
       },
     ];
     render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+      />,
     );
-    const mark = document.querySelector('mark[title="Possible failure — check token or access"]');
+    const mark = document.querySelector(
+      'mark[title="Possible failure: check token or access"]',
+    );
     expect(mark).toBeTruthy();
     expect(mark?.textContent).toContain('authentication fails');
   });
@@ -190,25 +235,40 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
-      />
+      />,
     );
     expect(screen.getByText('Bash')).toBeTruthy();
     expect(screen.queryByText(/Ran Bash/)).toBeNull();
   });
 
   it('shows empty state message when no activity', () => {
-    render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
-    );
-    expect(screen.getByText(/are not the droids you deepseek/)).toBeTruthy();
+    render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />);
+    expect(
+      screen.getByText('Activity will appear here when the agent responds.'),
+    ).toBeTruthy();
   });
 
   it('shows stat tooltips when expanded', () => {
     const sessionActivity = [
-      { id: 'e1', created_at: new Date().toISOString(), story: [{ id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() }] },
+      {
+        id: 'e1',
+        created_at: new Date().toISOString(),
+        story: [
+          {
+            id: 's1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      },
     ];
     render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} sessionActivity={sessionActivity} />
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+      />,
     );
     expect(screen.getByTitle('Total actions')).toBeTruthy();
     expect(screen.getByTitle('Completed')).toBeTruthy();
@@ -217,8 +277,19 @@ describe('AgentThinkingSidebar', () => {
 
   it('shows Task complete block when not streaming and story items exist', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-      { id: '2', type: 'tool_call', message: 'Ran command', timestamp: new Date().toISOString(), command: 'echo ok' },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran command',
+        timestamp: new Date().toISOString(),
+        command: 'echo ok',
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -226,15 +297,26 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming={false}
-      />
+      />,
     );
     expect(screen.getByText('Task complete')).toBeTruthy();
   });
 
   it('shows task complete indicator in collapsed chain when not streaming and story items exist', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo ok' },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo ok',
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -242,14 +324,19 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming={false}
-      />
+      />,
     );
     expect(screen.getByTitle('Task complete')).toBeTruthy();
   });
 
   it('does not show Task complete block when streaming', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -257,7 +344,7 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming
-      />
+      />,
     );
     expect(screen.queryByText('Task complete')).toBeNull();
   });
@@ -268,8 +355,18 @@ describe('AgentThinkingSidebar', () => {
         id: 'e1',
         created_at: '2026-03-14T23:32:47.170Z',
         story: [
-          { id: 's1', type: 'stream_start', message: 'Started', timestamp: '2026-03-14T23:32:43.237Z' },
-          { id: 's2', type: 'tool_call', message: 'Ran Bash', timestamp: '2026-03-14T23:32:45.000Z' },
+          {
+            id: 's1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: '2026-03-14T23:32:43.237Z',
+          },
+          {
+            id: 's2',
+            type: 'tool_call',
+            message: 'Ran Bash',
+            timestamp: '2026-03-14T23:32:45.000Z',
+          },
         ],
       },
     ];
@@ -278,7 +375,7 @@ describe('AgentThinkingSidebar', () => {
         isCollapsed={false}
         onToggle={vi.fn()}
         sessionActivity={sessionActivity}
-      />
+      />,
     );
     expect(screen.getAllByText('2').length).toBeGreaterThanOrEqual(1);
   });
@@ -290,9 +387,11 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         reasoningText="Final reasoning content"
         isStreaming={false}
-      />
+      />,
     );
-    const block = screen.getByText(/Final reasoning content/).closest('div')?.parentElement;
+    const block = screen
+      .getByText(/Final reasoning content/)
+      .closest('div')?.parentElement;
     expect(block?.classList.contains('animate-pulse')).toBe(false);
   });
 
@@ -303,15 +402,21 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         reasoningText="Thinking..."
         isStreaming
-      />
+      />,
     );
-    const block = screen.getByText(/Thinking\.\.\./).closest('div')?.parentElement;
+    const block = screen
+      .getByText(/Thinking\.\.\./)
+      .closest('div')?.parentElement;
     expect(block?.classList.contains('animate-pulse')).toBe(true);
   });
 
   it('applies full width and solid background when mobileOverlay is true', () => {
     const { container } = render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} mobileOverlay />
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        mobileOverlay
+      />,
     );
     const panel = container.firstChild as HTMLElement;
     expect(panel.style.width).toBe('100%');
@@ -320,7 +425,7 @@ describe('AgentThinkingSidebar', () => {
 
   it('uses fixed width when mobileOverlay is false', () => {
     const { container } = render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />
+      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} />,
     );
     const panel = container.firstChild as HTMLElement;
     expect(panel.style.width).not.toBe('100%');
@@ -328,9 +433,24 @@ describe('AgentThinkingSidebar', () => {
 
   it('does not show AskUserQuestion entries in activity list', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-      { id: '2', type: 'AskUserQuestion', message: 'Ask user', timestamp: new Date().toISOString() },
-      { id: '3', type: 'step', message: 'Step done', timestamp: new Date().toISOString() },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        type: 'AskUserQuestion',
+        message: 'Ask user',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '3',
+        type: 'step',
+        message: 'Step done',
+        timestamp: new Date().toISOString(),
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -338,7 +458,7 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming
-      />
+      />,
     );
     expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.getByText(/Step done/)).toBeTruthy();
@@ -347,9 +467,25 @@ describe('AgentThinkingSidebar', () => {
 
   it('hides Started and step (GENERATING RESPONSE) when not streaming', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-      { id: '2', type: 'step', message: 'GENERATING RESPONSE – PROCESSING', timestamp: new Date().toISOString() },
-      { id: '3', type: 'tool_call', message: 'Ran command', timestamp: new Date().toISOString(), command: 'npm run build' },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        type: 'step',
+        message: 'GENERATING RESPONSE: PROCESSING',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '3',
+        type: 'tool_call',
+        message: 'Ran command',
+        timestamp: new Date().toISOString(),
+        command: 'npm run build',
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -357,7 +493,7 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming={false}
-      />
+      />,
     );
     expect(screen.queryByText('Started')).toBeNull();
     expect(screen.queryByText(/GENERATING RESPONSE/)).toBeNull();
@@ -366,8 +502,18 @@ describe('AgentThinkingSidebar', () => {
 
   it('shows stream_start and step when streaming', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-      { id: '2', type: 'step', message: 'GENERATING RESPONSE – PROCESSING', timestamp: new Date().toISOString() },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        type: 'step',
+        message: 'GENERATING RESPONSE: PROCESSING',
+        timestamp: new Date().toISOString(),
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -375,7 +521,7 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         isStreaming
-      />
+      />,
     );
     expect(screen.getByText('Thinking...')).toBeTruthy();
     expect(screen.getByText(/GENERATING RESPONSE/)).toBeTruthy();
@@ -383,16 +529,34 @@ describe('AgentThinkingSidebar', () => {
 
   it('groups 3+ consecutive tool_calls into one collapsible commands block', () => {
     const storyItems = [
-      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
-      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
-      { id: '3', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo c' },
+      {
+        id: '1',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo a',
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo b',
+      },
+      {
+        id: '3',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo c',
+      },
     ];
     render(
       <AgentThinkingSidebar
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
-      />
+      />,
     );
     expect(screen.getByText(/3 commands/)).toBeTruthy();
     expect(screen.queryByText('echo a')).toBeNull();
@@ -402,15 +566,27 @@ describe('AgentThinkingSidebar', () => {
 
   it('shows 2 tool_calls as separate blocks (no group)', () => {
     const storyItems = [
-      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
-      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
+      {
+        id: '1',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo a',
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo b',
+      },
     ];
     render(
       <AgentThinkingSidebar
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
-      />
+      />,
     );
     expect(screen.getByText('echo a')).toBeTruthy();
     expect(screen.getByText('echo b')).toBeTruthy();
@@ -419,16 +595,34 @@ describe('AgentThinkingSidebar', () => {
 
   it('expanded commands group shows list of commands', () => {
     const storyItems = [
-      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
-      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
-      { id: '3', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo c' },
+      {
+        id: '1',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo a',
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo b',
+      },
+      {
+        id: '3',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo c',
+      },
     ];
     render(
       <AgentThinkingSidebar
         isCollapsed={false}
         onToggle={vi.fn()}
         storyItems={storyItems}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /3 commands/ }));
     expect(screen.getByText('echo a')).toBeTruthy();
@@ -442,13 +636,28 @@ describe('AgentThinkingSidebar', () => {
         id: 'e1',
         created_at: new Date().toISOString(),
         story: [
-          { id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-          { id: 's2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'ls' },
+          {
+            id: 's1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: new Date().toISOString(),
+          },
+          {
+            id: 's2',
+            type: 'tool_call',
+            message: 'Ran',
+            timestamp: new Date().toISOString(),
+            command: 'ls',
+          },
         ],
       },
     ];
     render(
-      <AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} sessionActivity={sessionActivity} />
+      <AgentThinkingSidebar
+        isCollapsed={false}
+        onToggle={vi.fn()}
+        sessionActivity={sessionActivity}
+      />,
     );
     const scrollArea = document.querySelector('.overflow-y-auto');
     expect(scrollArea).toBeTruthy();
@@ -457,11 +666,27 @@ describe('AgentThinkingSidebar', () => {
 
   it('collapsed panel with activity has scrollable summary container', () => {
     const storyItems = [
-      { id: '1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'pwd' },
+      {
+        id: '1',
+        type: 'stream_start',
+        message: 'Started',
+        timestamp: new Date().toISOString(),
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'pwd',
+      },
     ];
     const { container } = render(
-      <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} storyItems={storyItems} isStreaming={false} />
+      <AgentThinkingSidebar
+        isCollapsed
+        onToggle={vi.fn()}
+        storyItems={storyItems}
+        isStreaming={false}
+      />,
     );
     const summary = container.querySelector('[aria-label="Activity summary"]');
     expect(summary).toBeTruthy();
@@ -475,8 +700,19 @@ describe('AgentThinkingSidebar', () => {
         id: 'act-uuid-1',
         created_at: new Date().toISOString(),
         story: [
-          { id: 's1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
-          { id: 's2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'ls' },
+          {
+            id: 's1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: new Date().toISOString(),
+          },
+          {
+            id: 's2',
+            type: 'tool_call',
+            message: 'Ran',
+            timestamp: new Date().toISOString(),
+            command: 'ls',
+          },
         ],
       },
     ];
@@ -486,12 +722,15 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         sessionActivity={sessionActivity}
         onActivityClick={onActivityClick}
-      />
+      />,
     );
     const lsButton = screen.getByText('ls').closest('button');
     if (lsButton) fireEvent.click(lsButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
-    expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'act-uuid-1', storyId: 's2' });
+    expect(onActivityClick).toHaveBeenCalledWith({
+      activityId: 'act-uuid-1',
+      storyId: 's2',
+    });
   });
 
   it('calls onActivityClick with activityId and storyId when clicking stream_start entry in list', () => {
@@ -501,7 +740,12 @@ describe('AgentThinkingSidebar', () => {
         id: 'latest-act',
         created_at: new Date().toISOString(),
         story: [
-          { id: 'e1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+          {
+            id: 'e1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: new Date().toISOString(),
+          },
         ],
       },
     ];
@@ -512,13 +756,16 @@ describe('AgentThinkingSidebar', () => {
         sessionActivity={sessionActivity}
         isStreaming
         onActivityClick={onActivityClick}
-      />
+      />,
     );
     const thinkingButtons = screen.getAllByText('Thinking...');
     const listEntryButton = thinkingButtons[0].closest('button');
     if (listEntryButton) fireEvent.click(listEntryButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
-    expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'latest-act', storyId: 'e1' });
+    expect(onActivityClick).toHaveBeenCalledWith({
+      activityId: 'latest-act',
+      storyId: 'e1',
+    });
   });
 
   it('calls onActivityClick with activityId only when clicking bottom reasoning block', () => {
@@ -528,7 +775,12 @@ describe('AgentThinkingSidebar', () => {
         id: 'act-1',
         created_at: new Date().toISOString(),
         story: [
-          { id: 'e1', type: 'stream_start', message: 'Started', timestamp: new Date().toISOString() },
+          {
+            id: 'e1',
+            type: 'stream_start',
+            message: 'Started',
+            timestamp: new Date().toISOString(),
+          },
         ],
       },
     ];
@@ -539,9 +791,11 @@ describe('AgentThinkingSidebar', () => {
         sessionActivity={sessionActivity}
         reasoningText="Current reasoning content"
         onActivityClick={onActivityClick}
-      />
+      />,
     );
-    const reasoningButton = screen.getByText(/Current reasoning content/).closest('button');
+    const reasoningButton = screen
+      .getByText(/Current reasoning content/)
+      .closest('button');
     if (reasoningButton) fireEvent.click(reasoningButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
     expect(onActivityClick).toHaveBeenCalledWith({ activityId: 'act-1' });
@@ -550,9 +804,27 @@ describe('AgentThinkingSidebar', () => {
   it('calls onActivityClick with activityId and storyId when clicking command group wrapper', () => {
     const onActivityClick = vi.fn();
     const storyItems = [
-      { id: '1', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo a' },
-      { id: '2', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo b' },
-      { id: '3', type: 'tool_call', message: 'Ran', timestamp: new Date().toISOString(), command: 'echo c' },
+      {
+        id: '1',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo a',
+      },
+      {
+        id: '2',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo b',
+      },
+      {
+        id: '3',
+        type: 'tool_call',
+        message: 'Ran',
+        timestamp: new Date().toISOString(),
+        command: 'echo c',
+      },
     ];
     render(
       <AgentThinkingSidebar
@@ -560,18 +832,28 @@ describe('AgentThinkingSidebar', () => {
         onToggle={vi.fn()}
         storyItems={storyItems}
         onActivityClick={onActivityClick}
-      />
+      />,
     );
     const innerExpandButton = screen.getByText(/3 commands/).closest('button');
-    const outerWrapperButton = innerExpandButton?.parentElement?.parentElement as HTMLButtonElement;
+    const outerWrapperButton = innerExpandButton?.parentElement
+      ?.parentElement as HTMLButtonElement;
     fireEvent.click(outerWrapperButton);
     expect(onActivityClick).toHaveBeenCalledTimes(1);
-    expect(onActivityClick).toHaveBeenCalledWith({ activityId: '1', storyId: '1' });
+    expect(onActivityClick).toHaveBeenCalledWith({
+      activityId: '1',
+      storyId: '1',
+    });
   });
 
   describe('Search and Activity Filtering', () => {
     it('updates search query and clears it', () => {
-      render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={[]} />);
+      render(
+        <AgentThinkingSidebar
+          isCollapsed={false}
+          onToggle={vi.fn()}
+          storyItems={[]}
+        />,
+      );
       const input = screen.getByPlaceholderText('Search activity...');
       fireEvent.change(input, { target: { value: 'test search' } });
       expect(input).toHaveProperty('value', 'test search');
@@ -582,9 +864,22 @@ describe('AgentThinkingSidebar', () => {
     });
 
     it('shows no activity matches text when search yields no results', () => {
-      const storyItems = [{ id: '1', type: 'tool_call', message: 'xyz123', timestamp: new Date().toISOString() }];
-      render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />);
-      
+      const storyItems = [
+        {
+          id: '1',
+          type: 'tool_call',
+          message: 'xyz123',
+          timestamp: new Date().toISOString(),
+        },
+      ];
+      render(
+        <AgentThinkingSidebar
+          isCollapsed={false}
+          onToggle={vi.fn()}
+          storyItems={storyItems}
+        />,
+      );
+
       const input = screen.getByPlaceholderText('Search activity...');
       fireEvent.change(input, { target: { value: 'notfound' } });
       expect(screen.getByText(/No activity matches "notfound"/)).toBeTruthy();
@@ -593,9 +888,21 @@ describe('AgentThinkingSidebar', () => {
 
   describe('Collapsed view tooltips', () => {
     it('sets tooltip on mouse enter and clears on mouse leave', async () => {
-      const storyItems = [{ id: '1', type: 'tool_call', message: 'Command', timestamp: new Date().toISOString(), command: 'Step content' }];
+      const storyItems = [
+        {
+          id: '1',
+          type: 'tool_call',
+          message: 'Command',
+          timestamp: new Date().toISOString(),
+          command: 'Step content',
+        },
+      ];
       const { container } = render(
-        <AgentThinkingSidebar isCollapsed onToggle={vi.fn()} storyItems={storyItems} />
+        <AgentThinkingSidebar
+          isCollapsed
+          onToggle={vi.fn()}
+          storyItems={storyItems}
+        />,
       );
       const dot = container.querySelector('span[title="$ Step content"]');
       expect(dot).toBeTruthy();
@@ -618,7 +925,10 @@ describe('AgentThinkingSidebar', () => {
     beforeEach(() => {
       vi.useFakeTimers();
       writeTextMock = vi.fn().mockResolvedValue(true);
-      Object.defineProperty(navigator, 'clipboard', { value: { writeText: writeTextMock }, writable: true });
+      Object.defineProperty(navigator, 'clipboard', {
+        value: { writeText: writeTextMock },
+        writable: true,
+      });
     });
 
     afterEach(() => {
@@ -627,10 +937,26 @@ describe('AgentThinkingSidebar', () => {
     });
 
     it('copies payload to clipboard and runs animation when completely collapsed', async () => {
-      const sessionActivity = [{ id: 'e1', created_at: '2025', story: [{ id: '1', type: 'step', message: 'Test', timestamp: '2025' }] }];
-      render(<AgentThinkingSidebar isCollapsed onToggle={vi.fn()} sessionActivity={sessionActivity} />);
-      
-      const btn = screen.getByRole('button', { name: 'Copy activity to clipboard' });
+      const sessionActivity = [
+        {
+          id: 'e1',
+          created_at: '2025',
+          story: [
+            { id: '1', type: 'step', message: 'Test', timestamp: '2025' },
+          ],
+        },
+      ];
+      render(
+        <AgentThinkingSidebar
+          isCollapsed
+          onToggle={vi.fn()}
+          sessionActivity={sessionActivity}
+        />,
+      );
+
+      const btn = screen.getByRole('button', {
+        name: 'Copy activity to clipboard',
+      });
       await act(async () => {
         fireEvent.click(btn);
         await Promise.resolve();
@@ -640,11 +966,11 @@ describe('AgentThinkingSidebar', () => {
       const payload = JSON.parse(writeTextMock.mock.calls[0][0]);
       expect(payload.sessionStats.totalActions).toBe(1);
 
-      // Verify button is disabled during animation
       expect(btn.hasAttribute('disabled')).toBe(true);
 
-      // Fast forward to clear animation
-      act(() => { vi.advanceTimersByTime(2500); });
+      act(() => {
+        vi.advanceTimersByTime(2500);
+      });
       expect(btn.hasAttribute('disabled')).toBe(false);
     });
   });
@@ -652,9 +978,18 @@ describe('AgentThinkingSidebar', () => {
   describe('Virtualized rendering', () => {
     it('renders natively without virtualization when items are few', () => {
       const storyItems = Array.from({ length: 5 }).map((_, i) => ({
-        id: `id${i}`, type: 'step', message: `msg${i}`, timestamp: new Date().toISOString()
+        id: `id${i}`,
+        type: 'step',
+        message: `msg${i}`,
+        timestamp: new Date().toISOString(),
       }));
-      const { container } = render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />);
+      const { container } = render(
+        <AgentThinkingSidebar
+          isCollapsed={false}
+          onToggle={vi.fn()}
+          storyItems={storyItems}
+        />,
+      );
       // Should not use absolute positioning when not virtualized
       const rows = container.querySelectorAll('.absolute.left-0.w-full');
       expect(rows.length).toBe(0);
@@ -662,14 +997,25 @@ describe('AgentThinkingSidebar', () => {
 
     it('uses virtualizer and renders correct window when items exceed threshold of 15', async () => {
       const storyItems = Array.from({ length: 20 }).map((_, i) => ({
-        id: `id${i}`, type: i % 2 === 0 ? 'tool_call' : 'file_created', message: `msg${i}`, timestamp: new Date().toISOString(), command: `cmd${i}`
+        id: `id${i}`,
+        type: i % 2 === 0 ? 'tool_call' : 'file_created',
+        message: `msg${i}`,
+        timestamp: new Date().toISOString(),
+        command: `cmd${i}`,
       }));
 
-      // In JSDOM with our mock, components exceeding 15 items will render exactly 5 absolute-positioned rows
-      const { container } = render(<AgentThinkingSidebar isCollapsed={false} onToggle={vi.fn()} storyItems={storyItems} />);
-      
+      const { container } = render(
+        <AgentThinkingSidebar
+          isCollapsed={false}
+          onToggle={vi.fn()}
+          storyItems={storyItems}
+        />,
+      );
+
       await waitFor(() => {
-        const virtualRows = container.querySelectorAll('.absolute.left-0.w-full');
+        const virtualRows = container.querySelectorAll(
+          '.absolute.left-0.w-full',
+        );
         expect(virtualRows.length).toBe(5);
       });
     });

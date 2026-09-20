@@ -1,18 +1,8 @@
 # syntax=docker/dockerfile:1
-# ─────────────────────────────────────────────────────────────────────────────
-# Dockerfile.dev — Development-only build for fibe-agent.
-#
-# Mirrors the main Dockerfile's runtime stage exactly (same system deps, same
-# tools, same MCP servers, same entrypoint) but SKIPS the builder stage.
-#
-# In dev mode the source tree is volume-mounted at /app and the entrypoint
-# detects this (no dist/main.js), installs deps, and runs the compose command.
-# There is no need to compile dist/ during the Docker build.
-#
+# Development image: the production runtime without its builder stage.
+# The source mounts at /app, and the entrypoint installs dependencies when dist/main.js is absent.
 # Keep this file in sync with the runtime stage of the main Dockerfile.
-# ─────────────────────────────────────────────────────────────────────────────
 
-# ── Stage 1: CLI — provider-specific agent CLI binary ──────────────────────
 FROM node:24-slim AS cli
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -60,7 +50,6 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     /usr/local/go/bin/go install "gitea.com/gitea/gitea-mcp@v${GITEA_MCP_VERSION}"
 
-# ── Stage 2: Runtime — identical to production, minus dist/ ────────────────
 FROM node:24-slim
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -71,7 +60,7 @@ COPY --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-# Unconditional packages — cached across all provider variants
+# Unconditional packages: cached across all provider variants
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
@@ -162,9 +151,8 @@ RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then \
     fi; \
     fi
 
-# ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
 # In dev mode, package.json is volume-mounted. We still install production
-# deps in the image as a warm cache layer — the entrypoint's npm install
+# deps in the image as a warm cache layer: the entrypoint's npm install
 # will be a fast no-op when deps haven't changed.
 COPY apps/api/package.json ./package.json
 
@@ -207,12 +195,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 ENV CHROME_BIN=/opt/google/chrome/chrome \
     GOOGLE_CHROME_BIN=/opt/google/chrome/chrome
 
-# ---- FIX FILE DESCRIPTOR LIMITS ----
-# Ensures su/sudo sessions inherit high nofile — prevents EMFILE in dev mode
+# Ensures su/sudo sessions inherit high nofile: prevents EMFILE in dev mode
 RUN mkdir -p /etc/security/limits.d \
     && printf "*  soft  nofile  1048576\n*  hard  nofile  1048576\n" > /etc/security/limits.d/99-nofile.conf
 
-# ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
@@ -238,29 +224,23 @@ RUN npx -y playwright install chromium && /opt/google/chrome/chrome --version
 
 USER root
 
-# ---- MCP REMOTE RECONNECTION WRAPPER ----
 COPY scripts/mcp-remote-wrapper.sh /usr/local/bin/mcp-remote-wrapper
 RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 
-# ---- SMART ENTRYPOINT ----
 # Detects prod (dist/ present) vs dev (source code mounted, no dist/) at runtime.
 # In dev mode it installs deps then runs the compose command so the container works
 # when the entire project root is volume-mounted (e.g. local Rails orchestration).
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# ---- MODE HELPER (agent mode switcher) ----
 COPY mode /app/mode
 RUN chmod +x /app/mode
 
-# ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
     && /usr/local/bin/fibe local playgrounds --help >/dev/null
-
-# ── NO builder stage dist/ copy — dev mode runs from source ──
 
 # Inject git SHA at the last possible moment so it doesn't bust previous caches
 ARG GIT_SHA

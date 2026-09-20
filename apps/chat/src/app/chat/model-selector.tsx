@@ -4,8 +4,6 @@ import { ChevronDown, RefreshCw, Loader2 } from 'lucide-react';
 import { MODEL_OPTION_SELECTED } from '../ui-classes';
 import { useT } from '../i18n';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 const MOBILE_BREAKPOINT_PX = 640;
 const PANEL_GUTTER_PX = 8;
 const PANEL_MAX_HEIGHT_PX = 384;
@@ -25,22 +23,29 @@ const OPTION_CLASS_BASE =
   'w-full px-3 py-2 text-left text-xs transition-colors truncate flex items-center gap-2';
 const PANEL_DATA_ATTR = 'data-model-selector-panel';
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
 /** True when the visual width is below the `sm` Tailwind breakpoint (640 px). */
 function isMobileViewport(): boolean {
   return window.innerWidth < MOBILE_BREAKPOINT_PX;
 }
 
 type PanelRect =
-  | { anchorBottom: false; top: number; left: number; width?: number; maxHeight: number }
+  | {
+      anchorBottom: false;
+      top: number;
+      left: number;
+      width?: number;
+      maxHeight: number;
+    }
   | { anchorBottom: true; bottom: number; left: number; maxHeight: number };
 
 function clampPanelHeight(value: number): number {
   return Math.max(PANEL_MIN_HEIGHT_PX, Math.min(PANEL_MAX_HEIGHT_PX, value));
 }
 
-function computePanelRect(el: HTMLElement, placement: 'auto' | 'bottom'): PanelRect {
+function computePanelRect(
+  el: HTMLElement,
+  placement: 'auto' | 'bottom',
+): PanelRect {
   const r = el.getBoundingClientRect();
   const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
@@ -53,13 +58,18 @@ function computePanelRect(el: HTMLElement, placement: 'auto' | 'bottom'): PanelR
   if (placement === 'bottom') {
     return {
       anchorBottom: false,
-      top: Math.min(r.bottom + 6, viewportHeight - PANEL_GUTTER_PX - PANEL_MIN_HEIGHT_PX),
+      top: Math.min(
+        r.bottom + 6,
+        viewportHeight - PANEL_GUTTER_PX - PANEL_MIN_HEIGHT_PX,
+      ),
       left: Math.min(
         Math.max(PANEL_GUTTER_PX, r.left),
         Math.max(PANEL_GUTTER_PX, viewportWidth - panelWidth - PANEL_GUTTER_PX),
       ),
       width: panelWidth,
-      maxHeight: clampPanelHeight(viewportHeight - r.bottom - PANEL_GUTTER_PX - 6),
+      maxHeight: clampPanelHeight(
+        viewportHeight - r.bottom - PANEL_GUTTER_PX - 6,
+      ),
     };
   }
 
@@ -76,11 +86,11 @@ function computePanelRect(el: HTMLElement, placement: 'auto' | 'bottom'): PanelR
     anchorBottom: false,
     top: r.bottom + 6,
     left: r.left,
-    maxHeight: clampPanelHeight(viewportHeight - r.bottom - PANEL_GUTTER_PX - 6),
+    maxHeight: clampPanelHeight(
+      viewportHeight - r.bottom - PANEL_GUTTER_PX - 6,
+    ),
   };
 }
-
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ModelSelectorProps {
   currentModel: string;
@@ -94,8 +104,6 @@ interface ModelSelectorProps {
   variant?: keyof typeof TRIGGER_CLASS_BY_VARIANT;
   dropdownPlacement?: 'auto' | 'bottom';
 }
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function ModelSelector({
   currentModel,
@@ -123,15 +131,14 @@ export function ModelSelector({
   const trimmed = currentModel.trim();
   const defaultLabel = t('modelSelector.default');
   const displayLabel = trimmed || defaultLabel;
-  const allOptions = trimmed && !options.includes(trimmed) ? [trimmed, ...options] : options;
+  const allOptions =
+    trimmed && !options.includes(trimmed) ? [trimmed, ...options] : options;
   const triggerClass = `${TRIGGER_CLASS_BASE} ${TRIGGER_CLASS_BY_VARIANT[variant]}`;
 
   const query = searchQuery.trim().toLowerCase();
   const filteredOptions = query
     ? allOptions.filter((opt) => opt.toLowerCase().includes(query))
     : allOptions;
-
-  // ── Panel positioning ──────────────────────────────────────────────────────
 
   useEffect(() => {
     if (!open) {
@@ -156,8 +163,6 @@ export function ModelSelector({
     };
   }, [open, dropdownPlacement]);
 
-  // ── Close on outside tap/click ─────────────────────────────────────────────
-
   useEffect(() => {
     if (!open) return;
     const handleClose = (e: MouseEvent | TouchEvent) => {
@@ -174,8 +179,6 @@ export function ModelSelector({
     };
   }, [open]);
 
-  // ── Focus management ───────────────────────────────────────────────────────
-
   useEffect(() => {
     if (customMode) customInputRef.current?.focus();
   }, [customMode]);
@@ -186,8 +189,6 @@ export function ModelSelector({
     return () => clearTimeout(id);
   }, [open, customMode]);
 
-  // ── Event handlers ─────────────────────────────────────────────────────────
-
   const handleSelect = (value: string) => {
     onSelect(value === defaultLabel ? '' : value);
     setOpen(false);
@@ -196,19 +197,23 @@ export function ModelSelector({
 
   const handleCustomSubmit = () => {
     const v = customValue.trim();
-    if (v) { onInputChange(v); onSelect(v); }
+    if (v) {
+      onInputChange(v);
+      onSelect(v);
+    }
     setCustomValue('');
     setCustomMode(false);
     setOpen(false);
   };
 
-  // ── Render ─────────────────────────────────────────────────────────────────
-
   if (!visible) return null;
 
   if (modelLocked) {
     return (
-      <div className={`${triggerClass} cursor-default opacity-90 border-border-subtle`} aria-label={t('modelSelector.inUse')}>
+      <div
+        className={`${triggerClass} cursor-default opacity-90 border-border-subtle`}
+        aria-label={t('modelSelector.inUse')}
+      >
         <span className="truncate">{displayLabel}</span>
       </div>
     );
@@ -216,12 +221,26 @@ export function ModelSelector({
 
   const panelStyle: React.CSSProperties = panelRect
     ? panelRect.anchorBottom
-      ? { position: 'fixed', bottom: panelRect.bottom, left: panelRect.left, right: panelRect.left, maxWidth: 'calc(100vw - 16px)' }
-      : { position: 'fixed', top: panelRect.top, left: panelRect.left, width: panelRect.width }
+      ? {
+          position: 'fixed',
+          bottom: panelRect.bottom,
+          left: panelRect.left,
+          right: panelRect.left,
+          maxWidth: 'calc(100vw - 16px)',
+        }
+      : {
+          position: 'fixed',
+          top: panelRect.top,
+          left: panelRect.left,
+          width: panelRect.width,
+        }
     : {};
 
   return (
-    <div ref={containerRef} className={variant === 'settings' ? 'relative w-full' : 'relative'}>
+    <div
+      ref={containerRef}
+      className={variant === 'settings' ? 'relative w-full' : 'relative'}
+    >
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
@@ -237,107 +256,128 @@ export function ModelSelector({
         />
       </button>
 
-      {open && panelRect && createPortal(
-        <div
-          data-model-selector-panel
-          className={PANEL_CLASS}
-          role="listbox"
-          aria-label={t('modelSelector.options')}
-          style={{ ...panelStyle, maxHeight: panelRect.maxHeight }}
-        >
-          {customMode ? (
-            <div className="p-2 border-b border-border/50">
-              <input
-                ref={customInputRef}
-                type="text"
-                value={customValue}
-                onChange={(e) => setCustomValue(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleCustomSubmit();
-                  if (e.key === 'Escape') { setCustomMode(false); setCustomValue(''); setOpen(false); }
-                }}
-                onBlur={handleCustomSubmit}
-                placeholder={t('modelSelector.name')}
-                className="w-full h-8 px-2.5 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                aria-label={t('modelSelector.customName')}
-              />
-            </div>
-          ) : (
-            <>
-              {/* Search + Refresh toolbar */}
-              <div className="flex items-center gap-1.5 p-2 border-b border-border/50 shrink-0">
+      {open &&
+        panelRect &&
+        createPortal(
+          <div
+            data-model-selector-panel
+            className={PANEL_CLASS}
+            role="listbox"
+            aria-label={t('modelSelector.options')}
+            style={{ ...panelStyle, maxHeight: panelRect.maxHeight }}
+          >
+            {customMode ? (
+              <div className="p-2 border-b border-border/50">
                 <input
-                  ref={searchInputRef}
+                  ref={customInputRef}
                   type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={customValue}
+                  onChange={(e) => setCustomValue(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === 'Escape') { setSearchQuery(''); setOpen(false); }
-                  }}
-                  placeholder={t('modelSelector.searchPlaceholder')}
-                  className="flex-1 h-7 px-2 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  aria-label={t('modelSelector.search')}
-                />
-                {onRefresh && (
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); if (!refreshing) onRefresh(); }}
-                    disabled={refreshing}
-                    className="size-7 shrink-0 flex items-center justify-center rounded-md border border-border hover:bg-primary/10 hover:border-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title={t('modelSelector.refreshFromProvider')}
-                    aria-label={t('modelSelector.refresh')}
-                  >
-                    {refreshing
-                      ? <Loader2 className="size-3.5 animate-spin text-primary" aria-hidden />
-                      : <RefreshCw className="size-3.5 text-muted-foreground" aria-hidden />
+                    if (e.key === 'Enter') handleCustomSubmit();
+                    if (e.key === 'Escape') {
+                      setCustomMode(false);
+                      setCustomValue('');
+                      setOpen(false);
                     }
-                  </button>
-                )}
+                  }}
+                  onBlur={handleCustomSubmit}
+                  placeholder={t('modelSelector.name')}
+                  className="w-full h-8 px-2.5 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  aria-label={t('modelSelector.customName')}
+                />
               </div>
+            ) : (
+              <>
+                {/* Search + Refresh toolbar */}
+                <div className="flex items-center gap-1.5 p-2 border-b border-border/50 shrink-0">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Escape') {
+                        setSearchQuery('');
+                        setOpen(false);
+                      }
+                    }}
+                    placeholder={t('modelSelector.searchPlaceholder')}
+                    className="flex-1 h-7 px-2 rounded-md text-xs border border-border bg-[var(--input-background)] text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    aria-label={t('modelSelector.search')}
+                  />
+                  {onRefresh && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (!refreshing) onRefresh();
+                      }}
+                      disabled={refreshing}
+                      className="size-7 shrink-0 flex items-center justify-center rounded-md border border-border hover:bg-primary/10 hover:border-primary/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={t('modelSelector.refreshFromProvider')}
+                      aria-label={t('modelSelector.refresh')}
+                    >
+                      {refreshing ? (
+                        <Loader2
+                          className="size-3.5 animate-spin text-primary"
+                          aria-hidden
+                        />
+                      ) : (
+                        <RefreshCw
+                          className="size-3.5 text-muted-foreground"
+                          aria-hidden
+                        />
+                      )}
+                    </button>
+                  )}
+                </div>
 
-              {/* Options list */}
-              <div className="overflow-auto flex-1 min-h-0">
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={!trimmed}
-                  onClick={() => handleSelect(defaultLabel)}
-                  className={`${OPTION_CLASS_BASE} ${!trimmed ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-primary/10'}`}
-                >
-                  {defaultLabel}
-                </button>
-                {filteredOptions.length === 0 && query && (
-                  <p className="px-3 py-3 text-xs text-muted-foreground text-center">
-                    {t('modelSelector.noMatches', { query: searchQuery.trim() })}
-                  </p>
-                )}
-                {filteredOptions.map((opt) => (
+                {/* Options list */}
+                <div className="overflow-auto flex-1 min-h-0">
                   <button
-                    key={opt}
                     type="button"
                     role="option"
-                    aria-selected={trimmed === opt}
-                    onClick={() => handleSelect(opt)}
-                    className={`${OPTION_CLASS_BASE} ${trimmed === opt ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-primary/10 hover:text-primary'}`}
+                    aria-selected={!trimmed}
+                    onClick={() => handleSelect(defaultLabel)}
+                    className={`${OPTION_CLASS_BASE} ${!trimmed ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-primary/10'}`}
                   >
-                    {opt}
+                    {defaultLabel}
                   </button>
-                ))}
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={false}
-                  onClick={() => setCustomMode(true)}
-                  className={`${OPTION_CLASS_BASE} text-muted-foreground hover:bg-primary/10 hover:text-primary border-t border-border/50 mt-1 pt-2`}
-                >
-                  {t('modelSelector.custom')}
-                </button>
-              </div>
-            </>
-          )}
-        </div>,
-        document.body
-      )}
+                  {filteredOptions.length === 0 && query && (
+                    <p className="px-3 py-3 text-xs text-muted-foreground text-center">
+                      {t('modelSelector.noMatches', {
+                        query: searchQuery.trim(),
+                      })}
+                    </p>
+                  )}
+                  {filteredOptions.map((opt) => (
+                    <button
+                      key={opt}
+                      type="button"
+                      role="option"
+                      aria-selected={trimmed === opt}
+                      onClick={() => handleSelect(opt)}
+                      className={`${OPTION_CLASS_BASE} ${trimmed === opt ? MODEL_OPTION_SELECTED : 'text-foreground hover:bg-primary/10 hover:text-primary'}`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={false}
+                    onClick={() => setCustomMode(true)}
+                    className={`${OPTION_CLASS_BASE} text-muted-foreground hover:bg-primary/10 hover:text-primary border-t border-border/50 mt-1 pt-2`}
+                  >
+                    {t('modelSelector.custom')}
+                  </button>
+                </div>
+              </>
+            )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

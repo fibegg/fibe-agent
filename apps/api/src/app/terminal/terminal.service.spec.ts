@@ -4,11 +4,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { TerminalService } from './terminal.service';
 
-// ─── Mock node-pty ────────────────────────────────────────────────────────────
 const mockPty = {
-  write:  mock(() => undefined),
+  write: mock(() => undefined),
   resize: mock(() => undefined),
-  kill:   mock(() => undefined),
+  kill: mock(() => undefined),
   onData: mock(() => undefined),
   onExit: mock(() => undefined),
 };
@@ -18,8 +17,6 @@ mock.module('node-pty', () => ({
 }));
 
 import * as nodePty from 'node-pty';
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 describe('TerminalService', () => {
   let service: TerminalService;
@@ -35,8 +32,6 @@ describe('TerminalService', () => {
   afterEach(() => {
     service.onModuleDestroy();
   });
-
-  // ── create ──────────────────────────────────────────────────────────────────
 
   it('spawns a PTY shell with default dimensions', () => {
     service.create('s1');
@@ -68,7 +63,8 @@ describe('TerminalService', () => {
   it('clamps cols below minimum to MIN_COLS (10)', () => {
     service.create('s1', 2, 24);
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String), [],
+      expect.any(String),
+      [],
       expect.objectContaining({ cols: 10 }),
     );
   });
@@ -76,7 +72,8 @@ describe('TerminalService', () => {
   it('clamps rows below minimum to MIN_ROWS (5)', () => {
     service.create('s1', 80, 1);
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String), [],
+      expect.any(String),
+      [],
       expect.objectContaining({ rows: 5 }),
     );
   });
@@ -85,8 +82,13 @@ describe('TerminalService', () => {
     const saved = process.env.SHELL;
     process.env.SHELL = '/bin/zsh';
     service.create('s1');
-    expect(nodePty.spawn).toHaveBeenCalledWith('/bin/zsh', [], expect.any(Object));
-    if (saved !== undefined) process.env.SHELL = saved; else delete process.env.SHELL;
+    expect(nodePty.spawn).toHaveBeenCalledWith(
+      '/bin/zsh',
+      [],
+      expect.any(Object),
+    );
+    if (saved !== undefined) process.env.SHELL = saved;
+    else delete process.env.SHELL;
   });
 
   it('falls back to bash on non-Windows when SHELL is unset', () => {
@@ -98,25 +100,31 @@ describe('TerminalService', () => {
       [],
       expect.any(Object),
     );
-    if (saved !== undefined) process.env.SHELL = saved; else delete process.env.SHELL;
+    if (saved !== undefined) process.env.SHELL = saved;
+    else delete process.env.SHELL;
   });
 
   it('uses explicit cwd when provided', () => {
     const dir = mkdtempSync(join(tmpdir(), 'fibe-terminal-cwd-'));
     service.create('s1', 80, 24, dir);
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String), [],
+      expect.any(String),
+      [],
       expect.objectContaining({ cwd: dir }),
     );
     rmSync(dir, { recursive: true, force: true });
   });
 
   it('creates missing cwd before spawning the PTY', () => {
-    const dir = join(mkdtempSync(join(tmpdir(), 'fibe-terminal-parent-')), 'missing-playground');
+    const dir = join(
+      mkdtempSync(join(tmpdir(), 'fibe-terminal-parent-')),
+      'missing-playground',
+    );
     service.create('s1', 80, 24, dir);
     expect(existsSync(dir)).toBe(true);
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String), [],
+      expect.any(String),
+      [],
       expect.objectContaining({ cwd: dir }),
     );
     rmSync(dir, { recursive: true, force: true });
@@ -140,8 +148,10 @@ describe('TerminalService', () => {
       }),
     );
 
-    if (savedPath !== undefined) process.env.PATH = savedPath; else delete process.env.PATH;
-    if (savedDataDir !== undefined) process.env.DATA_DIR = savedDataDir; else delete process.env.DATA_DIR;
+    if (savedPath !== undefined) process.env.PATH = savedPath;
+    else delete process.env.PATH;
+    if (savedDataDir !== undefined) process.env.DATA_DIR = savedDataDir;
+    else delete process.env.DATA_DIR;
   });
 
   it('falls back to PLAYGROUNDS_DIR when no explicit cwd given', () => {
@@ -150,11 +160,13 @@ describe('TerminalService', () => {
     process.env.PLAYGROUNDS_DIR = dir;
     service.create('s1');
     expect(nodePty.spawn).toHaveBeenCalledWith(
-      expect.any(String), [],
+      expect.any(String),
+      [],
       expect.objectContaining({ cwd: dir }),
     );
     rmSync(dir, { recursive: true, force: true });
-    if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved; else delete process.env.PLAYGROUNDS_DIR;
+    if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved;
+    else delete process.env.PLAYGROUNDS_DIR;
   });
 
   it('falls back to a playground directory under process.cwd() when neither cwd nor PLAYGROUNDS_DIR is set', () => {
@@ -167,7 +179,8 @@ describe('TerminalService', () => {
       const expectedCwd = join(process.cwd(), 'playground');
       service.create('s1');
       expect(nodePty.spawn).toHaveBeenCalledWith(
-        expect.any(String), [],
+        expect.any(String),
+        [],
         expect.objectContaining({ cwd: expectedCwd }),
       );
     } finally {
@@ -176,8 +189,6 @@ describe('TerminalService', () => {
       if (saved !== undefined) process.env.PLAYGROUNDS_DIR = saved;
     }
   });
-
-  // ── write ───────────────────────────────────────────────────────────────────
 
   it('forwards data to the PTY process', () => {
     service.create('s1');
@@ -189,8 +200,6 @@ describe('TerminalService', () => {
     expect(() => service.write('ghost', 'data')).not.toThrow();
     expect(mockPty.write).not.toHaveBeenCalled();
   });
-
-  // ── resize ──────────────────────────────────────────────────────────────────
 
   it('resizes the PTY to new dimensions', () => {
     service.create('s1');
@@ -211,11 +220,11 @@ describe('TerminalService', () => {
 
   it('swallows errors thrown by PTY resize', () => {
     service.create('s1');
-    mockPty.resize.mockImplementationOnce(() => { throw new Error('PTY gone'); });
+    mockPty.resize.mockImplementationOnce(() => {
+      throw new Error('PTY gone');
+    });
     expect(() => service.resize('s1', 80, 24)).not.toThrow();
   });
-
-  // ── kill ─────────────────────────────────────────────────────────────────────
 
   it('kills the PTY and removes the session', () => {
     service.create('s1');
@@ -232,11 +241,11 @@ describe('TerminalService', () => {
 
   it('swallows errors thrown by PTY kill', () => {
     service.create('s1');
-    mockPty.kill.mockImplementationOnce(() => { throw new Error('already dead'); });
+    mockPty.kill.mockImplementationOnce(() => {
+      throw new Error('already dead');
+    });
     expect(() => service.kill('s1')).not.toThrow();
   });
-
-  // ── onModuleDestroy ──────────────────────────────────────────────────────────
 
   it('kills all sessions on module destroy', () => {
     service.create('s1');

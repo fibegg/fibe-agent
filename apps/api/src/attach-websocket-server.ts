@@ -9,7 +9,10 @@ import { OrchestratorService } from './app/orchestrator/orchestrator.service';
 import { SessionRegistryService } from './app/orchestrator/session-registry.service';
 import { PlaygroundWatcherService } from './app/playgrounds/playground-watcher.service';
 import { TerminalService } from './app/terminal/terminal.service';
-import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from './app/conversation/conversation-manager.service';
+import {
+  ConversationManagerService,
+  DEFAULT_CONVERSATION_ID,
+} from './app/conversation/conversation-manager.service';
 import { WS_CLOSE, WS_EVENT } from '@shared/ws-constants';
 import { logWs } from './container-logger';
 
@@ -31,15 +34,13 @@ interface ConnectionParams {
   conversationId: string;
 }
 
-/**
- * Parse the WS upgrade URL once per connection — avoids creating two URL
- * objects (previously done by extractToken + extractConversationId separately).
- */
 function parseConnectionParams(req: IncomingMessage): ConnectionParams {
-  const url = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
+  const url = new URL(
+    req.url ?? '',
+    `http://${req.headers.host ?? 'localhost'}`,
+  );
   const c = (
-    url.searchParams.get('conversation_id') ??
-    url.searchParams.get('c')
+    url.searchParams.get('conversation_id') ?? url.searchParams.get('c')
   )?.trim();
   return {
     token: url.searchParams.get('token'),
@@ -47,11 +48,18 @@ function parseConnectionParams(req: IncomingMessage): ConnectionParams {
   };
 }
 
-/** Return true and close with 4001 if the required password is set but doesn't match. */
-function rejectIfUnauthorized(ws: WebSocket, params: ConnectionParams, requiredPassword: string | undefined): boolean {
+function rejectIfUnauthorized(
+  ws: WebSocket,
+  params: ConnectionParams,
+  requiredPassword: string | undefined,
+): boolean {
   if (!requiredPassword) return false;
   if (params.token !== requiredPassword) {
-    logWs({ event: 'disconnect', closeCode: WS_CLOSE.UNAUTHORIZED, error: 'Unauthorized' });
+    logWs({
+      event: 'disconnect',
+      closeCode: WS_CLOSE.UNAUTHORIZED,
+      error: 'Unauthorized',
+    });
     ws.close(WS_CLOSE.UNAUTHORIZED, 'Unauthorized');
     return true;
   }
@@ -68,62 +76,70 @@ function attachChatWs(
   playgroundWatcher: PlaygroundWatcherService,
   conversationManager: ConversationManagerService,
 ): void {
-  // Broadcast playground changes to all active sessions
   playgroundWatcher.playgroundChanged$.subscribe(() =>
-    sessionRegistry.broadcast(WS_EVENT.PLAYGROUND_CHANGED, {})
+    sessionRegistry.broadcast(WS_EVENT.PLAYGROUND_CHANGED, {}),
   );
 
   const clientsBySession = new Map<string, WebSocket>();
 
   wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-    // Parse URL once for all downstream consumers
     const params = parseConnectionParams(req);
 
     if (rejectIfUnauthorized(ws, params, config.getAgentPassword())) return;
 
-    // Enforce max connections by evicting the oldest session
     const maxConnections = config.getWebsocketMaxConnections();
     const allSessions = sessionRegistry.connected();
     if (allSessions.length >= maxConnections) {
       const oldest = allSessions[0];
-      logWs({ event: 'disconnect', closeCode: WS_CLOSE.SESSION_TAKEN_OVER, error: 'Max connections reached — oldest session evicted' });
+      logWs({
+        event: 'disconnect',
+        closeCode: WS_CLOSE.SESSION_TAKEN_OVER,
+        error: 'Max connections reached: oldest session evicted',
+      });
       const oldestWs = clientsBySession.get(oldest.sessionId);
       if (oldestWs?.readyState === WebSocket.OPEN) {
-        oldestWs.close(WS_CLOSE.SESSION_TAKEN_OVER, 'Session taken over by another client');
+        oldestWs.close(
+          WS_CLOSE.SESSION_TAKEN_OVER,
+          'Session taken over by another client',
+        );
       }
       sessionRegistry.destroy(oldest.sessionId);
     }
 
-    // Validate conversation_id: reject connections to non-existent conversations
     const { conversationId } = params;
-    if (conversationId !== DEFAULT_CONVERSATION_ID && !conversationManager.get(conversationId)) {
-      logWs({ event: 'disconnect', closeCode: 4004, error: `Unknown conversation_id: ${conversationId}` });
+    if (
+      conversationId !== DEFAULT_CONVERSATION_ID &&
+      !conversationManager.get(conversationId)
+    ) {
+      logWs({
+        event: 'disconnect',
+        closeCode: 4004,
+        error: `Unknown conversation_id: ${conversationId}`,
+      });
       ws.close(4004, 'Unknown conversation');
       return;
     }
 
-    // Create an isolated session for this connection, bound to the requested conversation
     const ctx = sessionRegistry.create(conversationId);
     clientsBySession.set(ctx.sessionId, ws);
     logWs({ event: 'connect' });
 
-    // Tell the client which conversation it's in right away
     if (ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: 'conversation_id', conversationId }));
     }
 
-    // Wire per-session events → this specific WS client
     const sub = ctx.outbound$.subscribe((ev) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({ type: ev.type, ...ev.data }));
       }
     });
 
-    // Notify the new session of current state
     orchestrator.handleClientConnected(ctx);
 
     let messageCount = 0;
-    const resetInterval = setInterval(() => { messageCount = 0; }, 60_000);
+    const resetInterval = setInterval(() => {
+      messageCount = 0;
+    }, 60_000);
 
     ws.on('message', (raw: RawData) => {
       messageCount++;
@@ -136,7 +152,7 @@ function attachChatWs(
         logWs({ event: 'action', action: msg.action });
         void orchestrator.handleClientMessage(ctx, msg);
       } catch {
-        // ignore invalid JSON
+        // Ignore malformed client messages.
       }
     });
 
@@ -149,7 +165,10 @@ function attachChatWs(
     });
 
     ws.on('error', (err) => {
-      logWs({ event: 'disconnect', error: err instanceof Error ? err.message : String(err) });
+      logWs({
+        event: 'disconnect',
+        error: err instanceof Error ? err.message : String(err),
+      });
     });
   });
 }
@@ -170,7 +189,9 @@ function attachTerminalWs(
     try {
       ptyProcess = terminalService.create(sessionId, 80, 24, playgroundDir);
     } catch (err) {
-      ws.send(`\r\n\x1b[31mFailed to start terminal: ${err instanceof Error ? err.message : String(err)}\x1b[0m\r\n`);
+      ws.send(
+        `\r\n\x1b[31mFailed to start terminal: ${err instanceof Error ? err.message : String(err)}\x1b[0m\r\n`,
+      );
       ws.close();
       return;
     }
@@ -190,7 +211,10 @@ function attachTerminalWs(
     });
 
     ptyProcess.onExit(() => {
-      if (flushTimeout) { clearTimeout(flushTimeout); flushTimeout = null; }
+      if (flushTimeout) {
+        clearTimeout(flushTimeout);
+        flushTimeout = null;
+      }
       if (outputBuffer && ws.readyState === ws.OPEN) ws.send(outputBuffer);
       if (ws.readyState === ws.OPEN) ws.close();
       terminalService.kill(sessionId);
@@ -200,22 +224,38 @@ function attachTerminalWs(
       const text = raw.toString();
       if (text.startsWith('{')) {
         try {
-          const msg = JSON.parse(text) as { type?: string; cols?: number; rows?: number };
-          if (msg.type === 'resize' && typeof msg.cols === 'number' && typeof msg.rows === 'number') {
+          const msg = JSON.parse(text) as {
+            type?: string;
+            cols?: number;
+            rows?: number;
+          };
+          if (
+            msg.type === 'resize' &&
+            typeof msg.cols === 'number' &&
+            typeof msg.rows === 'number'
+          ) {
             terminalService.resize(sessionId, msg.cols, msg.rows);
             return;
           }
-        } catch { /* not JSON — fall through */ }
+        } catch {
+          /* not JSON: fall through */
+        }
       }
       terminalService.write(sessionId, text);
     });
 
     ws.on('close', () => {
-      if (flushTimeout) { clearTimeout(flushTimeout); flushTimeout = null; }
+      if (flushTimeout) {
+        clearTimeout(flushTimeout);
+        flushTimeout = null;
+      }
       terminalService.kill(sessionId);
     });
     ws.on('error', () => {
-      if (flushTimeout) { clearTimeout(flushTimeout); flushTimeout = null; }
+      if (flushTimeout) {
+        clearTimeout(flushTimeout);
+        flushTimeout = null;
+      }
       terminalService.kill(sessionId);
     });
   });
@@ -223,8 +263,8 @@ function attachTerminalWs(
 
 /**
  * Attaches two WebSocket servers to the Fastify HTTP server:
- *   /ws          — main chat + orchestrator channel (multi-session)
- *   /ws-terminal — PTY terminal sessions
+ *   /ws: main chat + orchestrator channel (multi-session)
+ *   /ws-terminal: PTY terminal sessions
  */
 export function attachWebSocketServer(
   fastify: FastifyInstance,
@@ -241,17 +281,31 @@ export function attachWebSocketServer(
   const terminalWss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', (req: IncomingMessage, socket: Socket, head: Buffer) => {
-    const { pathname } = new URL(req.url ?? '', `http://${req.headers.host ?? 'localhost'}`);
+    const { pathname } = new URL(
+      req.url ?? '',
+      `http://${req.headers.host ?? 'localhost'}`,
+    );
     if (pathname === '/ws-terminal') {
-      terminalWss.handleUpgrade(req, socket, head, (ws) => terminalWss.emit('connection', ws, req));
+      terminalWss.handleUpgrade(req, socket, head, (ws) =>
+        terminalWss.emit('connection', ws, req),
+      );
     } else if (pathname === '/ws') {
-      wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));
+      wss.handleUpgrade(req, socket, head, (ws) =>
+        wss.emit('connection', ws, req),
+      );
     } else {
       socket.destroy();
     }
   });
 
-  attachChatWs(wss, config, orchestrator, sessionRegistry, playgroundWatcher, conversationManager);
+  attachChatWs(
+    wss,
+    config,
+    orchestrator,
+    sessionRegistry,
+    playgroundWatcher,
+    conversationManager,
+  );
   attachTerminalWs(terminalWss, config, terminalService);
 
   return wss;

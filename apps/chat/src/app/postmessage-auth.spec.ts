@@ -15,14 +15,12 @@ describe('waitForAutoAuth', () => {
   });
 
   it('resolves false immediately when window === window.parent (default jsdom)', async () => {
-    // In jsdom, window.parent === window, so the function should return immediately
     const { waitForAutoAuth } = await import('./postmessage-auth');
     const result = await waitForAutoAuth();
     expect(result).toBe(false);
   });
 
   it('resolves false after timeout when in iframe and no message received', async () => {
-    // Simulate iframe: window !== window.parent
     const fakeParent = {} as Window;
     vi.stubGlobal('parent', fakeParent);
     localStorage.removeItem('agent_password');
@@ -30,7 +28,6 @@ describe('waitForAutoAuth', () => {
     const { waitForAutoAuth } = await import('./postmessage-auth');
     const promise = waitForAutoAuth();
 
-    // Advance past AUTO_AUTH_TIMEOUT_MS (3000ms)
     await vi.runAllTimersAsync();
 
     const result = await promise;
@@ -38,7 +35,6 @@ describe('waitForAutoAuth', () => {
   });
 
   it('resolves false immediately when already authenticated in iframe', async () => {
-    // Set a token so isAuthenticated() returns true
     localStorage.setItem('agent_password', 'mytoken');
     const fakeParent = {} as Window;
     vi.stubGlobal('parent', fakeParent);
@@ -48,7 +44,6 @@ describe('waitForAutoAuth', () => {
     // When already auth'd, the module short-circuits → still returns false
     const { waitForAutoAuth: wfa } = await import('./postmessage-auth');
     const result = await wfa();
-    // With fake parent but already authenticated: Promise.resolve(false)
     expect(result).toBe(false);
   });
 
@@ -65,20 +60,18 @@ describe('waitForAutoAuth', () => {
     });
     vi.stubGlobal('fetch', mockFetch);
 
-    // Import module — listener gets attached
     const mod = await import('./postmessage-auth');
 
     // Dispatch the auto_auth message BEFORE calling waitForAutoAuth
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
 
-    // Let microtasks run (loginWithPassword is async: fetch → json() → setToken)
     await new Promise(process.nextTick);
     await vi.runAllTimersAsync();
 
-    // Now the LoginPage "mounts" and calls waitForAutoAuth — it should
-    // resolve true immediately because earlyAuthSuccess was set
     const result = await mod.waitForAutoAuth();
     expect(result).toBe(true);
   });
@@ -103,7 +96,9 @@ describe('waitForAutoAuth', () => {
     await expect(promise).resolves.toBe(false);
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
 
     await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
@@ -134,7 +129,9 @@ describe('postmessage-auth onMessage handler', () => {
     const promise = waitForAutoAuth();
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'other', password: 'pass' } })
+      new MessageEvent('message', {
+        data: { action: 'other', password: 'pass' },
+      }),
     );
 
     await vi.runAllTimersAsync();
@@ -151,7 +148,9 @@ describe('postmessage-auth onMessage handler', () => {
     const promise = waitForAutoAuth();
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 42 } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 42 },
+      }),
     );
 
     await vi.runAllTimersAsync();
@@ -175,8 +174,6 @@ describe('postmessage-auth onMessage handler', () => {
   });
 
   it('calls loginWithPassword when valid auto_auth message dispatched', async () => {
-    // This test verifies the message handler calls the login API
-    // by checking that fetch is invoked (loginWithPassword uses apiRequest which uses fetch)
     const fakeParent = {} as Window;
     vi.stubGlobal('parent', fakeParent);
     localStorage.removeItem('agent_password');
@@ -192,15 +189,14 @@ describe('postmessage-auth onMessage handler', () => {
     void waitForAutoAuth(); // start listening
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
 
-    // Give microtasks a chance to run
     await Promise.resolve();
     await Promise.resolve();
 
-    // The fetch call should have been made (login attempted)
-    // Note: timing may vary due to fake timers; we verify the intent
     expect(mockFetch).toHaveBeenCalled();
   });
 
@@ -211,29 +207,37 @@ describe('postmessage-auth onMessage handler', () => {
 
     let resolveLogin!: (v: Response) => void;
     const mockFetch = vi.fn().mockImplementation(
-      () => new Promise<Response>((r) => { resolveLogin = r; })
+      () =>
+        new Promise<Response>((r) => {
+          resolveLogin = r;
+        }),
     );
     vi.stubGlobal('fetch', mockFetch);
 
     const { waitForAutoAuth } = await import('./postmessage-auth');
     void waitForAutoAuth();
 
-    // Send two messages in quick succession (simulates _sendAuth retry)
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
     await Promise.resolve();
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
     await Promise.resolve();
 
-    // Only one fetch should have been made — second message ignored via authInFlight guard
+    // Only one fetch should have been made: second message ignored via authInFlight guard
     expect(mockFetch).toHaveBeenCalledTimes(1);
 
-    // Resolve the login to clean up
-    resolveLogin({ ok: true, json: async () => ({ success: true, token: 'tok' }) } as Response);
+    resolveLogin({
+      ok: true,
+      json: async () => ({ success: true, token: 'tok' }),
+    } as Response);
     await Promise.resolve();
     await Promise.resolve();
   });
@@ -249,12 +253,13 @@ describe('postmessage-auth onMessage handler', () => {
     await import('./postmessage-auth');
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
     await Promise.resolve();
     await Promise.resolve();
 
-    // Should not attempt login — already authenticated
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
@@ -274,11 +279,15 @@ describe('postmessage-auth onMessage handler', () => {
     window.addEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
 
     window.dispatchEvent(
-      new MessageEvent('message', { data: { action: 'auto_auth', password: 'secret' } })
+      new MessageEvent('message', {
+        data: { action: 'auto_auth', password: 'secret' },
+      }),
     );
 
     await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(localStorage.getItem('agent_password')).toBe('secret'));
+    await vi.waitFor(() =>
+      expect(localStorage.getItem('agent_password')).toBe('secret'),
+    );
     await vi.waitFor(() => expect(onSuccess).toHaveBeenCalledTimes(1));
     window.removeEventListener(mod.AUTO_AUTH_SUCCESS_EVENT, onSuccess);
   });

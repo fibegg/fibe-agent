@@ -29,9 +29,7 @@ export interface UseChatWebSocketResult {
   errorMessage: string | null;
   authModal: AuthModalState;
   sessionActivity: StoredActivityEntry[];
-  /** Number of currently connected browser tabs/sessions. */
   sessionCount: number;
-  /** True if any connected session's agent is currently processing a request. */
   anyProcessing: boolean;
   send: (msg: Record<string, unknown>) => void;
   reconnect: () => void;
@@ -47,8 +45,6 @@ export interface UseChatWebSocketResult {
   setAuthModal: React.Dispatch<React.SetStateAction<AuthModalState>>;
 }
 
-
-
 export interface ThinkingCallbacks {
   onStreamStartData?: (data: { model?: string }) => void;
   onReasoningStart?: () => void;
@@ -62,22 +58,29 @@ export function useChatWebSocket(
   onMessage?: (data: ServerMessage) => void,
   onStreamChunk?: (text: string) => void,
   onStreamStart?: (data?: { model?: string; startedAt?: string }) => void,
-  onStreamEnd?: (usage?: { inputTokens: number; outputTokens: number }, model?: string) => void,
+  onStreamEnd?: (
+    usage?: { inputTokens: number; outputTokens: number },
+    model?: string,
+  ) => void,
   thinkingCallbacks?: ThinkingCallbacks,
   onPlaygroundChanged?: () => void,
   onLocalToolEvent?: (data: ServerMessage) => void,
   onConversationReset?: (resetAt: string) => void,
-  /** Which conversation to bind this WS session to. Defaults to 'default'. */
   conversationId = 'default',
   onStreamAbort?: () => void,
   onConversationDeleted?: (conversationId: string) => void,
-  onProcessingState?: (data: { isProcessing: boolean; startedAt: string | null }) => void,
+  onProcessingState?: (data: {
+    isProcessing: boolean;
+    startedAt: string | null;
+  }) => void,
 ): UseChatWebSocketResult {
   const navigate = useNavigate();
   const [state, setState] = useState<ChatState>(CHAT_STATES.INITIALIZING);
   const [agentMode, setAgentMode] = useState<string>('Exploring...');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>([]);
+  const [sessionActivity, setSessionActivity] = useState<StoredActivityEntry[]>(
+    [],
+  );
   const [sessionCount, setSessionCount] = useState<number>(1);
   const [anyProcessing, setAnyProcessing] = useState<boolean>(false);
 
@@ -86,7 +89,7 @@ export function useChatWebSocket(
   const responseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const offlineTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messageQueueRef = useRef<Record<string, unknown>[]>([]);
-  // Stable callback refs — always reflect the latest value without becoming
+  // Stable callback refs: always reflect the latest value without becoming
   // stale inside long-lived WebSocket handlers.
   const onMessageRef = useStableRef(onMessage);
   const onStreamChunkRef = useStableRef(onStreamChunk);
@@ -115,17 +118,14 @@ export function useChatWebSocket(
       setState(CHAT_STATES.ERROR);
     }, RESPONSE_TIMEOUT_MS);
   }, [clearResponseTimer]);
-  const send = useCallback(
-    (msg: Record<string, unknown>) => {
-      const ws = wsRef.current;
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify(msg));
-      } else {
-        messageQueueRef.current.push(msg);
-      }
-    },
-    []
-  );
+  const send = useCallback((msg: Record<string, unknown>) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify(msg));
+    } else {
+      messageQueueRef.current.push(msg);
+    }
+  }, []);
 
   const {
     authModal,
@@ -147,7 +147,8 @@ export function useChatWebSocket(
     const params = new URLSearchParams();
     const token = getAuthTokenForRequest();
     if (token) params.set('token', token);
-    if (conversationId !== 'default') params.set('conversation_id', conversationId);
+    if (conversationId !== 'default')
+      params.set('conversation_id', conversationId);
     const query = params.toString();
     const url = query ? `${wsBase}/ws?${query}` : `${wsBase}/ws`;
     const ws = new WebSocket(url);
@@ -167,7 +168,6 @@ export function useChatWebSocket(
       send({ action: 'get_model' });
       send({ action: 'get_effort' });
 
-      // Flush queued messages
       const queue = messageQueueRef.current;
       messageQueueRef.current = [];
       queue.forEach((msg) => {
@@ -200,17 +200,28 @@ export function useChatWebSocket(
             setState(CHAT_STATES.AUTHENTICATED);
           }
         } else {
-          setState((s) => (s !== CHAT_STATES.AUTH_PENDING ? CHAT_STATES.UNAUTHENTICATED : s));
+          setState((s) =>
+            s !== CHAT_STATES.AUTH_PENDING ? CHAT_STATES.UNAUTHENTICATED : s,
+          );
           if (wsRef.current?.readyState === WebSocket.OPEN) {
             wsRef.current.send(JSON.stringify({ action: 'initiate_auth' }));
           }
         }
       },
       auth_url_generated: (d) => {
-        setAuthModal((a) => ({ ...a, authUrl: d.url ?? null, isManualToken: false }));
+        setAuthModal((a) => ({
+          ...a,
+          authUrl: d.url ?? null,
+          isManualToken: false,
+        }));
         setState(CHAT_STATES.AUTH_PENDING);
       },
-      auth_device_code: (d) => setAuthModal((a) => ({ ...a, deviceCode: d.code ?? null, isManualToken: false })),
+      auth_device_code: (d) =>
+        setAuthModal((a) => ({
+          ...a,
+          deviceCode: d.code ?? null,
+          isManualToken: false,
+        })),
       auth_manual_token: () => {
         setAuthModal({ authUrl: null, deviceCode: null, isManualToken: true });
         setState(CHAT_STATES.AUTH_PENDING);
@@ -230,7 +241,9 @@ export function useChatWebSocket(
       control_result: (d) => {
         if (d.accepted === false) {
           clearResponseTimer();
-          setErrorMessage(d.reason ?? d.error ?? 'Agent control was not accepted');
+          setErrorMessage(
+            d.reason ?? d.error ?? 'Agent control was not accepted',
+          );
           setState(CHAT_STATES.ERROR);
           onStreamAbortRef.current?.();
         }
@@ -266,42 +279,65 @@ export function useChatWebSocket(
         clearResponseTimer();
         setErrorMessage(null);
         const usage =
-          d.usage && typeof d.usage.inputTokens === 'number' && typeof d.usage.outputTokens === 'number'
-            ? { inputTokens: d.usage.inputTokens, outputTokens: d.usage.outputTokens }
+          d.usage &&
+          typeof d.usage.inputTokens === 'number' &&
+          typeof d.usage.outputTokens === 'number'
+            ? {
+                inputTokens: d.usage.inputTokens,
+                outputTokens: d.usage.outputTokens,
+              }
             : undefined;
-        onStreamEndRef.current?.(usage, typeof d.model === 'string' ? d.model : undefined);
+        onStreamEndRef.current?.(
+          usage,
+          typeof d.model === 'string' ? d.model : undefined,
+        );
         setState(CHAT_STATES.AUTHENTICATED);
       },
       reasoning_start: () => thinkingRef.current?.onReasoningStart?.(),
-      reasoning_chunk: (d) => thinkingRef.current?.onReasoningChunk?.(d.text ?? ''),
+      reasoning_chunk: (d) =>
+        thinkingRef.current?.onReasoningChunk?.(d.text ?? ''),
       reasoning_end: () => thinkingRef.current?.onReasoningEnd?.(),
-      thinking_step: (d) => thinkingRef.current?.onThinkingStep?.({
-        id: d.id ?? '',
-        title: d.title ?? '',
-        status: (d.status as ThinkingStep['status']) ?? 'pending',
-        details: d.details,
-        timestamp: d.timestamp ? new Date(d.timestamp) : new Date(),
-      }),
-      tool_call: (d) => thinkingRef.current?.onToolOrFile?.({
-        kind: 'tool_call',
-        name: d.name ?? '',
-        path: d.path,
-        summary: d.summary,
-        command: d.command,
-        details: d.details,
-      }),
-      file_created: (d) => thinkingRef.current?.onToolOrFile?.({
-        kind: 'file_created',
-        name: d.name ?? '',
-        path: d.path,
-        summary: d.summary,
-      }),
-      activity_snapshot: (d) => setSessionActivity(Array.isArray(d.activity) ? d.activity : []),
-      activity_appended: (d) => { if (d.entry) setSessionActivity((prev) => [...prev, d.entry as StoredActivityEntry]) },
+      thinking_step: (d) =>
+        thinkingRef.current?.onThinkingStep?.({
+          id: d.id ?? '',
+          title: d.title ?? '',
+          status: (d.status as ThinkingStep['status']) ?? 'pending',
+          details: d.details,
+          timestamp: d.timestamp ? new Date(d.timestamp) : new Date(),
+        }),
+      tool_call: (d) =>
+        thinkingRef.current?.onToolOrFile?.({
+          kind: 'tool_call',
+          name: d.name ?? '',
+          path: d.path,
+          summary: d.summary,
+          command: d.command,
+          details: d.details,
+        }),
+      file_created: (d) =>
+        thinkingRef.current?.onToolOrFile?.({
+          kind: 'file_created',
+          name: d.name ?? '',
+          path: d.path,
+          summary: d.summary,
+        }),
+      activity_snapshot: (d) =>
+        setSessionActivity(Array.isArray(d.activity) ? d.activity : []),
+      activity_appended: (d) => {
+        if (d.entry)
+          setSessionActivity((prev) => [
+            ...prev,
+            d.entry as StoredActivityEntry,
+          ]);
+      },
       activity_updated: (d) => {
         if (d.entry) {
           const updated = d.entry as StoredActivityEntry;
-          setSessionActivity((prev) => prev.some((a) => a.id === updated.id) ? prev.map((a) => (a.id === updated.id ? updated : a)) : [...prev, updated]);
+          setSessionActivity((prev) =>
+            prev.some((a) => a.id === updated.id)
+              ? prev.map((a) => (a.id === updated.id ? updated : a))
+              : [...prev, updated],
+          );
         }
       },
       model_updated: (d) => onMessageRef.current?.(d),
@@ -316,12 +352,20 @@ export function useChatWebSocket(
       notify: (d) => onLocalToolEventRef.current?.(d),
       sessions_updated: (d) => {
         if (typeof d.count === 'number') setSessionCount(d.count);
-        if (typeof d.anyProcessing === 'boolean') setAnyProcessing(d.anyProcessing);
+        if (typeof d.anyProcessing === 'boolean')
+          setAnyProcessing(d.anyProcessing);
       },
-      // Server confirms which conversation this session is bound to
-      conversation_id: (_d) => { /* acknowledged */ },
-      conversation_reset: (d) => onConversationResetRef.current?.(typeof d.resetAt === 'string' ? d.resetAt : new Date().toISOString()),
-      conversation_deleted: (d) => onConversationDeletedRef.current?.(typeof d.id === 'string' ? d.id : conversationId),
+      conversation_id: (_d) => {
+        /* acknowledged */
+      },
+      conversation_reset: (d) =>
+        onConversationResetRef.current?.(
+          typeof d.resetAt === 'string' ? d.resetAt : new Date().toISOString(),
+        ),
+      conversation_deleted: (d) =>
+        onConversationDeletedRef.current?.(
+          typeof d.id === 'string' ? d.id : conversationId,
+        ),
     };
 
     ws.onmessage = (event: MessageEvent) => {
@@ -394,7 +438,11 @@ export function useChatWebSocket(
   const dismissError = useCallback(() => {
     const shouldRequireAuth = isProviderAuthFailureMessage(errorMessage);
     setErrorMessage(null);
-    setState(shouldRequireAuth ? CHAT_STATES.UNAUTHENTICATED : CHAT_STATES.AUTHENTICATED);
+    setState(
+      shouldRequireAuth
+        ? CHAT_STATES.UNAUTHENTICATED
+        : CHAT_STATES.AUTHENTICATED,
+    );
   }, [errorMessage]);
 
   const interruptAgent = useCallback(() => {
@@ -419,7 +467,8 @@ export function useChatWebSocket(
   }, [connect, clearResponseTimer]);
 
   useEffect(() => {
-    const conversationChanged = previousConversationIdRef.current !== conversationId;
+    const conversationChanged =
+      previousConversationIdRef.current !== conversationId;
     previousConversationIdRef.current = conversationId;
     messageQueueRef.current = [];
     setSessionActivity([]);
@@ -437,7 +486,10 @@ export function useChatWebSocket(
 
     connect();
     return () => {
-      window.removeEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
+      window.removeEventListener(
+        AUTO_AUTH_SUCCESS_EVENT,
+        handleAutoAuthSuccess,
+      );
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
       }

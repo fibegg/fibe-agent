@@ -1,11 +1,25 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { GeminiStrategy, buildGeminiArgs, parseGeminiStreamJsonLine } from './gemini.strategy';
+import {
+  GeminiStrategy,
+  buildGeminiArgs,
+  parseGeminiStreamJsonLine,
+} from './gemini.strategy';
 
 function writeFakeGemini(path: string): void {
-  writeFileSync(path, `#!/usr/bin/env node
+  writeFileSync(
+    path,
+    `#!/usr/bin/env node
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -87,7 +101,9 @@ const fakeMsg = process.env.GEMINI_FAKE_MESSAGE || 'fake response';
 if (process.env.GEMINI_FAKE_STDOUT_EMPTY !== '1') {
   console.log(JSON.stringify({ type: 'message', role: 'assistant', content: fakeMsg, delta: true }));
 }
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   chmodSync(path, 0o755);
 }
 
@@ -100,7 +116,8 @@ describe('GeminiStrategy API token mode', () => {
   });
 
   afterEach(() => {
-    if (savedEnv.GEMINI_API_KEY === undefined) delete process.env.GEMINI_API_KEY;
+    if (savedEnv.GEMINI_API_KEY === undefined)
+      delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = savedEnv.GEMINI_API_KEY;
   });
 
@@ -203,13 +220,17 @@ describe('GeminiStrategy API token mode', () => {
   test('submitAuthCode with empty string sends unauthenticated', () => {
     const strategy = new GeminiStrategy(true);
     let status = '';
-    const noop = () => { return; };
+    const noop = () => {
+      return;
+    };
     const connection = {
       sendAuthUrlGenerated: noop,
       sendDeviceCode: noop,
       sendAuthManualToken: noop,
       sendAuthSuccess: noop,
-      sendAuthStatus: (s: string) => { status = s; },
+      sendAuthStatus: (s: string) => {
+        status = s;
+      },
       sendError: noop,
     };
     strategy.executeAuth(connection);
@@ -220,18 +241,19 @@ describe('GeminiStrategy API token mode', () => {
   test('cancelAuth clears state safely', () => {
     const strategy = new GeminiStrategy(true);
     strategy.cancelAuth();
-    // Should not throw
   });
 
   test('clearCredentials is safe when no credentials exist', () => {
     const strategy = new GeminiStrategy(true);
     strategy.clearCredentials();
-    // Should not throw
   });
 
   test('getModelArgs returns flags for valid model', () => {
     const strategy = new GeminiStrategy(true);
-    expect(strategy.getModelArgs('gemini-2.5-pro')).toEqual(['-m', 'gemini-2.5-pro']);
+    expect(strategy.getModelArgs('gemini-2.5-pro')).toEqual([
+      '-m',
+      'gemini-2.5-pro',
+    ]);
   });
 
   test('getModelArgs returns empty array for empty model', () => {
@@ -260,10 +282,14 @@ describe('GeminiStrategy API token mode', () => {
   test('executeLogout in api-token mode clears credentials immediately', () => {
     const strategy = new GeminiStrategy(true);
     let logoutSuccessCalled = false;
-    const noop = () => { return; };
+    const noop = () => {
+      return;
+    };
     const connection = {
       sendLogoutOutput: noop,
-      sendLogoutSuccess: () => { logoutSuccessCalled = true; },
+      sendLogoutSuccess: () => {
+        logoutSuccessCalled = true;
+      },
       sendError: noop,
     };
     strategy.executeLogout(connection);
@@ -274,7 +300,14 @@ describe('GeminiStrategy API token mode', () => {
 describe('buildGeminiArgs', () => {
   test('passes the prompt via the -p=value equals form so yargs binds it to -p', () => {
     const args = buildGeminiArgs('hello world', 'gemini-2.5-pro', null);
-    expect(args).toEqual(['-m', 'gemini-2.5-pro', '-p=hello world', '--output-format', 'stream-json', '--yolo']);
+    expect(args).toEqual([
+      '-m',
+      'gemini-2.5-pro',
+      '-p=hello world',
+      '--output-format',
+      'stream-json',
+      '--yolo',
+    ]);
   });
 
   test('keeps -p bound to the value when the prompt starts with a dash (markdown bullet)', () => {
@@ -287,40 +320,75 @@ describe('buildGeminiArgs', () => {
   });
 
   test('includes --resume when hasSession is true', () => {
-    const args = buildGeminiArgs('continue', 'gemini-2.5-pro', '11111111-2222-4333-8444-555555555555');
+    const args = buildGeminiArgs(
+      'continue',
+      'gemini-2.5-pro',
+      '11111111-2222-4333-8444-555555555555',
+    );
     expect(args).toContain('--resume');
     expect(args).toContain('11111111-2222-4333-8444-555555555555');
     expect(args.find((a) => a.startsWith('-p='))).toBe('-p=continue');
   });
 
   test('omits -m when model is empty or the literal string "undefined"', () => {
-    expect(buildGeminiArgs('hi', '', null)).toEqual(['-p=hi', '--output-format', 'stream-json', '--yolo']);
-    expect(buildGeminiArgs('hi', 'undefined', null)).toEqual(['-p=hi', '--output-format', 'stream-json', '--yolo']);
+    expect(buildGeminiArgs('hi', '', null)).toEqual([
+      '-p=hi',
+      '--output-format',
+      'stream-json',
+      '--yolo',
+    ]);
+    expect(buildGeminiArgs('hi', 'undefined', null)).toEqual([
+      '-p=hi',
+      '--output-format',
+      'stream-json',
+      '--yolo',
+    ]);
   });
 });
 describe('parseGeminiStreamJsonLine', () => {
   test('returns content for an assistant delta message', () => {
-    const line = JSON.stringify({ type: 'message', role: 'assistant', content: 'Hello!', delta: true });
+    const line = JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content: 'Hello!',
+      delta: true,
+    });
     expect(parseGeminiStreamJsonLine(line)).toBe('Hello!');
   });
 
   test('returns content even when delta field is absent', () => {
-    const line = JSON.stringify({ type: 'message', role: 'assistant', content: 'Hi there' });
+    const line = JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content: 'Hi there',
+    });
     expect(parseGeminiStreamJsonLine(line)).toBe('Hi there');
   });
 
   test('returns null for user messages', () => {
-    const line = JSON.stringify({ type: 'message', role: 'user', content: 'who r u' });
+    const line = JSON.stringify({
+      type: 'message',
+      role: 'user',
+      content: 'who r u',
+    });
     expect(parseGeminiStreamJsonLine(line)).toBeNull();
   });
 
   test('returns null for init events', () => {
-    const line = JSON.stringify({ type: 'init', session_id: 'abc', model: 'gemini-2.5-flash' });
+    const line = JSON.stringify({
+      type: 'init',
+      session_id: 'abc',
+      model: 'gemini-2.5-flash',
+    });
     expect(parseGeminiStreamJsonLine(line)).toBeNull();
   });
 
   test('returns null for result events', () => {
-    const line = JSON.stringify({ type: 'result', status: 'success', stats: { total_tokens: 100 } });
+    const line = JSON.stringify({
+      type: 'result',
+      status: 'success',
+      stats: { total_tokens: 100 },
+    });
     expect(parseGeminiStreamJsonLine(line)).toBeNull();
   });
 
@@ -333,25 +401,46 @@ describe('parseGeminiStreamJsonLine', () => {
   });
 
   test('returns null for non-JSON lines (MCP warnings, ANSI output)', () => {
-    expect(parseGeminiStreamJsonLine('MCP issues detected. Run /mcp list for status.')).toBeNull();
-    expect(parseGeminiStreamJsonLine('Warning: Basic terminal detected (TERM=dumb).')).toBeNull();
+    expect(
+      parseGeminiStreamJsonLine(
+        'MCP issues detected. Run /mcp list for status.',
+      ),
+    ).toBeNull();
+    expect(
+      parseGeminiStreamJsonLine(
+        'Warning: Basic terminal detected (TERM=dumb).',
+      ),
+    ).toBeNull();
     expect(parseGeminiStreamJsonLine('\x1B[2J\x1B[H')).toBeNull();
   });
 
   test('returns null when content is not a string', () => {
-    const line = JSON.stringify({ type: 'message', role: 'assistant', content: 42 });
+    const line = JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content: 42,
+    });
     expect(parseGeminiStreamJsonLine(line)).toBeNull();
   });
 
   test('handles empty string content', () => {
-    const line = JSON.stringify({ type: 'message', role: 'assistant', content: '', delta: true });
-    // Empty string is a valid content (e.g. a partial chunk starting with nothing)
+    const line = JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content: '',
+      delta: true,
+    });
     expect(parseGeminiStreamJsonLine(line)).toBe('');
   });
 
   test('handles multi-word content with newlines', () => {
     const content = 'Line one\nLine two\nLine three';
-    const line = JSON.stringify({ type: 'message', role: 'assistant', content, delta: true });
+    const line = JSON.stringify({
+      type: 'message',
+      role: 'assistant',
+      content,
+      delta: true,
+    });
     expect(parseGeminiStreamJsonLine(line)).toBe(content);
   });
 });
@@ -368,8 +457,10 @@ describe('GeminiStrategy session recovery', () => {
     savedEnv.GEMINI_FAKE_MODE = process.env.GEMINI_FAKE_MODE;
     savedEnv.GEMINI_FAKE_MESSAGE = process.env.GEMINI_FAKE_MESSAGE;
     savedEnv.GEMINI_FAKE_SESSION_ID = process.env.GEMINI_FAKE_SESSION_ID;
-    savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE = process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
-    savedEnv.GEMINI_FAKE_SESSION_FORMAT = process.env.GEMINI_FAKE_SESSION_FORMAT;
+    savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE =
+      process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    savedEnv.GEMINI_FAKE_SESSION_FORMAT =
+      process.env.GEMINI_FAKE_SESSION_FORMAT;
     savedEnv.GEMINI_FAKE_STDOUT_EMPTY = process.env.GEMINI_FAKE_STDOUT_EMPTY;
     savedEnv.GEMINI_FAKE_STDERR = process.env.GEMINI_FAKE_STDERR;
     savedEnv.GEMINI_FAKE_OLD_PROMPT = process.env.GEMINI_FAKE_OLD_PROMPT;
@@ -403,31 +494,49 @@ describe('GeminiStrategy session recovery', () => {
   afterEach(() => {
     if (savedEnv.PATH === undefined) delete process.env.PATH;
     else process.env.PATH = savedEnv.PATH;
-    if (savedEnv.GEMINI_API_KEY === undefined) delete process.env.GEMINI_API_KEY;
+    if (savedEnv.GEMINI_API_KEY === undefined)
+      delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = savedEnv.GEMINI_API_KEY;
-    if (savedEnv.GEMINI_FAKE_ARGS_PATH === undefined) delete process.env.GEMINI_FAKE_ARGS_PATH;
+    if (savedEnv.GEMINI_FAKE_ARGS_PATH === undefined)
+      delete process.env.GEMINI_FAKE_ARGS_PATH;
     else process.env.GEMINI_FAKE_ARGS_PATH = savedEnv.GEMINI_FAKE_ARGS_PATH;
-    if (savedEnv.GEMINI_FAKE_ENV_PATH === undefined) delete process.env.GEMINI_FAKE_ENV_PATH;
+    if (savedEnv.GEMINI_FAKE_ENV_PATH === undefined)
+      delete process.env.GEMINI_FAKE_ENV_PATH;
     else process.env.GEMINI_FAKE_ENV_PATH = savedEnv.GEMINI_FAKE_ENV_PATH;
-    if (savedEnv.GEMINI_FAKE_MODE === undefined) delete process.env.GEMINI_FAKE_MODE;
+    if (savedEnv.GEMINI_FAKE_MODE === undefined)
+      delete process.env.GEMINI_FAKE_MODE;
     else process.env.GEMINI_FAKE_MODE = savedEnv.GEMINI_FAKE_MODE;
-    if (savedEnv.GEMINI_FAKE_MESSAGE === undefined) delete process.env.GEMINI_FAKE_MESSAGE;
+    if (savedEnv.GEMINI_FAKE_MESSAGE === undefined)
+      delete process.env.GEMINI_FAKE_MESSAGE;
     else process.env.GEMINI_FAKE_MESSAGE = savedEnv.GEMINI_FAKE_MESSAGE;
-    if (savedEnv.GEMINI_FAKE_SESSION_ID === undefined) delete process.env.GEMINI_FAKE_SESSION_ID;
+    if (savedEnv.GEMINI_FAKE_SESSION_ID === undefined)
+      delete process.env.GEMINI_FAKE_SESSION_ID;
     else process.env.GEMINI_FAKE_SESSION_ID = savedEnv.GEMINI_FAKE_SESSION_ID;
-    if (savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE === undefined) delete process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
-    else process.env.GEMINI_FAKE_SKIP_SESSION_WRITE = savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE;
-    if (savedEnv.GEMINI_FAKE_SESSION_FORMAT === undefined) delete process.env.GEMINI_FAKE_SESSION_FORMAT;
-    else process.env.GEMINI_FAKE_SESSION_FORMAT = savedEnv.GEMINI_FAKE_SESSION_FORMAT;
-    if (savedEnv.GEMINI_FAKE_STDOUT_EMPTY === undefined) delete process.env.GEMINI_FAKE_STDOUT_EMPTY;
-    else process.env.GEMINI_FAKE_STDOUT_EMPTY = savedEnv.GEMINI_FAKE_STDOUT_EMPTY;
-    if (savedEnv.GEMINI_FAKE_STDERR === undefined) delete process.env.GEMINI_FAKE_STDERR;
+    if (savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE === undefined)
+      delete process.env.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    else
+      process.env.GEMINI_FAKE_SKIP_SESSION_WRITE =
+        savedEnv.GEMINI_FAKE_SKIP_SESSION_WRITE;
+    if (savedEnv.GEMINI_FAKE_SESSION_FORMAT === undefined)
+      delete process.env.GEMINI_FAKE_SESSION_FORMAT;
+    else
+      process.env.GEMINI_FAKE_SESSION_FORMAT =
+        savedEnv.GEMINI_FAKE_SESSION_FORMAT;
+    if (savedEnv.GEMINI_FAKE_STDOUT_EMPTY === undefined)
+      delete process.env.GEMINI_FAKE_STDOUT_EMPTY;
+    else
+      process.env.GEMINI_FAKE_STDOUT_EMPTY = savedEnv.GEMINI_FAKE_STDOUT_EMPTY;
+    if (savedEnv.GEMINI_FAKE_STDERR === undefined)
+      delete process.env.GEMINI_FAKE_STDERR;
     else process.env.GEMINI_FAKE_STDERR = savedEnv.GEMINI_FAKE_STDERR;
-    if (savedEnv.GEMINI_FAKE_OLD_PROMPT === undefined) delete process.env.GEMINI_FAKE_OLD_PROMPT;
+    if (savedEnv.GEMINI_FAKE_OLD_PROMPT === undefined)
+      delete process.env.GEMINI_FAKE_OLD_PROMPT;
     else process.env.GEMINI_FAKE_OLD_PROMPT = savedEnv.GEMINI_FAKE_OLD_PROMPT;
-    if (savedEnv.GEMINI_FAKE_OLD_MESSAGE === undefined) delete process.env.GEMINI_FAKE_OLD_MESSAGE;
+    if (savedEnv.GEMINI_FAKE_OLD_MESSAGE === undefined)
+      delete process.env.GEMINI_FAKE_OLD_MESSAGE;
     else process.env.GEMINI_FAKE_OLD_MESSAGE = savedEnv.GEMINI_FAKE_OLD_MESSAGE;
-    if (savedEnv.GEMINI_CLI_HOME === undefined) delete process.env.GEMINI_CLI_HOME;
+    if (savedEnv.GEMINI_CLI_HOME === undefined)
+      delete process.env.GEMINI_CLI_HOME;
     else process.env.GEMINI_CLI_HOME = savedEnv.GEMINI_CLI_HOME;
     if (savedEnv.NO_BROWSER === undefined) delete process.env.NO_BROWSER;
     else process.env.NO_BROWSER = savedEnv.NO_BROWSER;
@@ -450,8 +559,14 @@ describe('GeminiStrategy session recovery', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('continue', 'gemini-2.5-pro', () => undefined)).rejects.toThrow(
-      'No conversation found with session ID: stale-gemini-session'
+    await expect(
+      strategy.executePromptStreaming(
+        'continue',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).rejects.toThrow(
+      'No conversation found with session ID: stale-gemini-session',
     );
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       '-m',
@@ -481,9 +596,17 @@ describe('GeminiStrategy session recovery', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    await expect(
+      strategy.executePromptStreaming(
+        'hello',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
     expect(strategy.getWorkingDir()).toBe(join(defaultDir, 'gemini_workspace'));
-    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe('aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee');
+    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe(
+      'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+    );
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       '-m',
       'gemini-2.5-pro',
@@ -493,7 +616,13 @@ describe('GeminiStrategy session recovery', () => {
       '--yolo',
     ]);
 
-    await expect(strategy.executePromptStreaming('again', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    await expect(
+      strategy.executePromptStreaming(
+        'again',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       '-m',
       'gemini-2.5-pro',
@@ -522,11 +651,17 @@ describe('GeminiStrategy session recovery', () => {
     const chunks: string[] = [];
 
     await expect(
-      strategy.executePromptStreaming('recover from session', 'gemini-2.5-flash-lite', (chunk) => chunks.push(chunk)),
+      strategy.executePromptStreaming(
+        'recover from session',
+        'gemini-2.5-flash-lite',
+        (chunk) => chunks.push(chunk),
+      ),
     ).resolves.toBeUndefined();
 
     expect(chunks).toEqual(['jsonl recovered response']);
-    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe('bbbbbbbb-cccc-4ddd-8eee-ffffffffffff');
+    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe(
+      'bbbbbbbb-cccc-4ddd-8eee-ffffffffffff',
+    );
   });
 
   test('executePromptStreaming recovers only the current Gemini JSONL turn output', async () => {
@@ -547,7 +682,11 @@ describe('GeminiStrategy session recovery', () => {
     const chunks: string[] = [];
 
     await expect(
-      strategy.executePromptStreaming('current turn', 'gemini-2.5-flash-lite', (chunk) => chunks.push(chunk)),
+      strategy.executePromptStreaming(
+        'current turn',
+        'gemini-2.5-flash-lite',
+        (chunk) => chunks.push(chunk),
+      ),
     ).resolves.toBeUndefined();
 
     expect(chunks).toEqual(['current recovered response']);
@@ -558,7 +697,8 @@ describe('GeminiStrategy session recovery', () => {
     process.env.GEMINI_FAKE_SESSION_ID = 'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa';
     process.env.GEMINI_FAKE_SESSION_FORMAT = 'jsonl';
     process.env.GEMINI_FAKE_STDOUT_EMPTY = '1';
-    process.env.GEMINI_FAKE_STDERR = 'warning: transient provider status 403 was recovered';
+    process.env.GEMINI_FAKE_STDERR =
+      'warning: transient provider status 403 was recovered';
     process.env.GEMINI_FAKE_MESSAGE = 'recovered despite warning';
 
     const convDir = join(testHome, 'jsonl-warning-conv');
@@ -570,11 +710,17 @@ describe('GeminiStrategy session recovery', () => {
     const chunks: string[] = [];
 
     await expect(
-      strategy.executePromptStreaming('recover despite warning', 'gemini-2.5-flash-lite', (chunk) => chunks.push(chunk)),
+      strategy.executePromptStreaming(
+        'recover despite warning',
+        'gemini-2.5-flash-lite',
+        (chunk) => chunks.push(chunk),
+      ),
     ).resolves.toBeUndefined();
 
     expect(chunks).toEqual(['recovered despite warning']);
-    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe('cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa');
+    expect(readFileSync(join(convDir, '.gemini_session'), 'utf8')).toBe(
+      'cccccccc-dddd-4eee-8fff-aaaaaaaaaaaa',
+    );
   });
 
   test('new UUID conversations do not inherit a legacy workspace latest marker', async () => {
@@ -595,7 +741,13 @@ describe('GeminiStrategy session recovery', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('fresh', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    await expect(
+      strategy.executePromptStreaming(
+        'fresh',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       '-m',
       'gemini-2.5-pro',
@@ -619,9 +771,17 @@ describe('GeminiStrategy session recovery', () => {
     });
 
     strategy.steerAgent('operator note');
-    await expect(strategy.executePromptStreaming('continue', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    await expect(
+      strategy.executePromptStreaming(
+        'continue',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
     const args = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
-    expect(args.find((arg) => arg.startsWith('-p='))).toBe('-p=[Operator Interruption]\noperator note\n\ncontinue');
+    expect(args.find((arg) => arg.startsWith('-p='))).toBe(
+      '-p=[Operator Interruption]\noperator note\n\ncontinue',
+    );
   });
 
   test('executePromptStreaming preserves Rails-provided Gemini env', async () => {
@@ -635,7 +795,13 @@ describe('GeminiStrategy session recovery', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    await expect(
+      strategy.executePromptStreaming(
+        'hello',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
       GEMINI_CLI_HOME: join(testHome, 'fibe-gemini-home'),
       GEMINI_CLI_TRUST_WORKSPACE: 'true',
@@ -649,7 +815,14 @@ describe('GeminiStrategy session recovery', () => {
     mkdirSync(settingsDir, { recursive: true });
     writeFileSync(
       join(settingsDir, 'settings.json'),
-      JSON.stringify({ security: { auth: { selectedType: 'oauth-personal' } }, theme: 'dark' }, null, 2),
+      JSON.stringify(
+        {
+          security: { auth: { selectedType: 'oauth-personal' } },
+          theme: 'dark',
+        },
+        null,
+        2,
+      ),
     );
     process.env.GEMINI_CLI_HOME = geminiHome;
 
@@ -658,8 +831,16 @@ describe('GeminiStrategy session recovery', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
-    const settings = JSON.parse(readFileSync(join(settingsDir, 'settings.json'), 'utf8'));
+    await expect(
+      strategy.executePromptStreaming(
+        'hello',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
+    const settings = JSON.parse(
+      readFileSync(join(settingsDir, 'settings.json'), 'utf8'),
+    );
     expect(settings.security.auth.selectedType).toBe('gemini-api-key');
     expect(settings.theme).toBe('dark');
   });
@@ -676,7 +857,13 @@ describe('GeminiStrategy session recovery', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('hello', 'gemini-2.5-pro', () => undefined)).resolves.toBeUndefined();
+    await expect(
+      strategy.executePromptStreaming(
+        'hello',
+        'gemini-2.5-pro',
+        () => undefined,
+      ),
+    ).resolves.toBeUndefined();
     expect(JSON.parse(readFileSync(envPath, 'utf8'))).toEqual({
       GEMINI_CLI_HOME: geminiHome,
       GEMINI_CLI_TRUST_WORKSPACE: 'true',

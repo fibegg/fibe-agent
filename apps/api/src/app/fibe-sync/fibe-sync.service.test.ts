@@ -25,7 +25,6 @@ describe('FibeSyncService', () => {
 
   test('syncMessages does nothing when sync is disabled', async () => {
     const service = new FibeSyncService(mockConfig as never);
-    // Should not throw
     service.syncMessages(() => '{"messages":[]}');
   });
 
@@ -37,7 +36,6 @@ describe('FibeSyncService', () => {
   test('sync does nothing when apiUrl/apiKey/agentId are missing', async () => {
     mockConfig.isFibeSyncEnabled = () => true;
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';
-    // Missing apiKey and agentId
     const service = new FibeSyncService(mockConfig as never);
     service.syncMessages(() => '{}');
   });
@@ -49,14 +47,13 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('', { status: 200 })
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 200 }),
     ) as unknown as typeof fetch;
 
     try {
       const service = new FibeSyncService(mockConfig as never);
       service.syncMessages(() => '{"data":"test"}');
-      // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -67,7 +64,10 @@ describe('FibeSyncService', () => {
             'Content-Type': 'application/json',
             Authorization: 'Bearer key123',
           },
-          body: JSON.stringify({ content: '{"data":"test"}', conversation_id: 'default' }),
+          body: JSON.stringify({
+            content: '{"data":"test"}',
+            conversation_id: 'default',
+          }),
         },
       );
     } finally {
@@ -82,14 +82,13 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('', { status: 200 })
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 200 }),
     ) as unknown as typeof fetch;
 
     try {
       const service = new FibeSyncService(mockConfig as never);
       service.syncActivity(() => '[]');
-      // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -108,21 +107,23 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('', { status: 200 })
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 200 }),
     ) as unknown as typeof fetch;
 
     try {
       const service = new FibeSyncService(mockConfig as never);
       service.syncRawProviders(() => '[{"id":"raw-1"}]');
-      // Wait for debounce timer to fire
       await new Promise((r) => setTimeout(r, 600));
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://fibe.test/api/agents/agent-1/provider_traffic',
         expect.objectContaining({
           method: 'PUT',
-          body: JSON.stringify({ content: '[{"id":"raw-1"}]', conversation_id: 'default' }),
+          body: JSON.stringify({
+            content: '[{"id":"raw-1"}]',
+            conversation_id: 'default',
+          }),
         }),
       );
     } finally {
@@ -137,8 +138,8 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('', { status: 200 })
+    globalThis.fetch = mock(
+      async () => new Response('', { status: 200 }),
     ) as unknown as typeof fetch;
 
     const service = new FibeSyncService(mockConfig as never);
@@ -151,13 +152,19 @@ describe('FibeSyncService', () => {
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://fibe.test/api/agents/agent-1/messages',
         expect.objectContaining({
-          body: JSON.stringify({ content: '{"conversation":"a"}', conversation_id: 'conv-a' }),
+          body: JSON.stringify({
+            content: '{"conversation":"a"}',
+            conversation_id: 'conv-a',
+          }),
         }),
       );
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://fibe.test/api/agents/agent-1/messages',
         expect.objectContaining({
-          body: JSON.stringify({ content: '{"conversation":"b"}', conversation_id: 'conv-b' }),
+          body: JSON.stringify({
+            content: '{"conversation":"b"}',
+            conversation_id: 'conv-b',
+          }),
         }),
       );
     } finally {
@@ -191,7 +198,10 @@ describe('FibeSyncService', () => {
       expect(globalThis.fetch).toHaveBeenLastCalledWith(
         'https://fibe.test/api/agents/agent-1/messages',
         expect.objectContaining({
-          body: JSON.stringify({ content: '{"attempt":"second"}', conversation_id: 'conv-retry' }),
+          body: JSON.stringify({
+            content: '{"attempt":"second"}',
+            conversation_id: 'conv-retry',
+          }),
         }),
       );
     } finally {
@@ -207,8 +217,8 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('Unauthorized', { status: 401 })
+    globalThis.fetch = mock(
+      async () => new Response('Unauthorized', { status: 401 }),
     ) as unknown as typeof fetch;
 
     const service = new FibeSyncService(mockConfig as never);
@@ -220,7 +230,10 @@ describe('FibeSyncService', () => {
       expect(globalThis.fetch).toHaveBeenLastCalledWith(
         'https://fibe.test/api/agents/agent-1/messages',
         expect.objectContaining({
-          body: JSON.stringify({ content: '{"kept":true}', conversation_id: 'conv-auth' }),
+          body: JSON.stringify({
+            content: '{"kept":true}',
+            conversation_id: 'conv-auth',
+          }),
         }),
       );
     } finally {
@@ -236,13 +249,12 @@ describe('FibeSyncService', () => {
     mockConfig.getFibeAgentId = () => 'agent-1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('Server Error', { status: 500 })
+    globalThis.fetch = mock(
+      async () => new Response('Server Error', { status: 500 }),
     ) as unknown as typeof fetch;
 
     const service = new FibeSyncService(mockConfig as never);
     try {
-      // Should not throw
       service.syncMessages(() => '{}');
       await new Promise((r) => setTimeout(r, 600));
     } finally {

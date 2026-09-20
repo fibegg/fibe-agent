@@ -1,17 +1,6 @@
-/**
- * Local MCP tool UI components
- *
- * QuestionCard   — inline input card for ask_user_prompt events
- * ConfirmCard    — yes/no confirmation card for confirm_action_prompt events
- * ShowImageCard  — inline image display for show_image events
- * NotifyToast    — transient toast notification for notify events
- */
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, MessageSquare, AlertTriangle, X } from 'lucide-react';
 import { useT } from '../../i18n';
-
-// ─── QuestionCard ─────────────────────────────────────────────────────────────
 
 export interface QuestionCardProps {
   questionId: string;
@@ -20,7 +9,12 @@ export interface QuestionCardProps {
   onAnswer: (questionId: string, answer: string) => void;
 }
 
-export function QuestionCard({ questionId, question, placeholder, onAnswer }: QuestionCardProps) {
+export function QuestionCard({
+  questionId,
+  question,
+  placeholder,
+  onAnswer,
+}: QuestionCardProps) {
   const t = useT();
   const [answer, setAnswer] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -60,7 +54,9 @@ export function QuestionCard({ questionId, question, placeholder, onAnswer }: Qu
       </div>
       <div className="flex-1 min-w-0">
         <div className="rounded-2xl rounded-tl-sm border border-amber-500/30 bg-amber-500/8 px-4 py-3 shadow-sm">
-          <p className="text-sm font-medium text-amber-200 mb-2 leading-snug whitespace-pre-wrap">{question}</p>
+          <p className="text-sm font-medium text-amber-200 mb-2 leading-snug whitespace-pre-wrap">
+            {question}
+          </p>
           {submitted ? (
             <p className="text-xs text-muted-foreground italic flex items-center gap-1">
               <Check className="size-3" aria-hidden />
@@ -95,8 +91,6 @@ export function QuestionCard({ questionId, question, placeholder, onAnswer }: Qu
     </div>
   );
 }
-
-// ─── ConfirmCard ──────────────────────────────────────────────────────────────
 
 export interface ConfirmCardProps {
   questionId: string;
@@ -141,7 +135,9 @@ export function ConfirmCard({
       </div>
       <div className="flex-1 min-w-0">
         <div className="rounded-2xl rounded-tl-sm border border-rose-500/30 bg-rose-500/8 px-4 py-3 shadow-sm">
-          <p className="text-sm font-medium text-rose-200 mb-3 leading-snug whitespace-pre-wrap">{message}</p>
+          <p className="text-sm font-medium text-rose-200 mb-3 leading-snug whitespace-pre-wrap">
+            {message}
+          </p>
           {decided !== null ? (
             <p className="text-xs text-muted-foreground italic flex items-center gap-1">
               <Check className="size-3" aria-hidden />
@@ -173,8 +169,6 @@ export function ConfirmCard({
   );
 }
 
-// ─── ShowImageCard ────────────────────────────────────────────────────────────
-
 export interface ShowImageCardProps {
   url?: string | null;
   base64?: string | null;
@@ -182,7 +176,12 @@ export interface ShowImageCardProps {
   caption?: string;
 }
 
-export function ShowImageCard({ url, base64, mimeType = 'image/png', caption }: ShowImageCardProps) {
+export function ShowImageCard({
+  url,
+  base64,
+  mimeType = 'image/png',
+  caption,
+}: ShowImageCardProps) {
   const t = useT();
   const src = url ?? (base64 ? `data:${mimeType};base64,${base64}` : null);
   if (!src) return null;
@@ -199,15 +198,15 @@ export function ShowImageCard({ url, base64, mimeType = 'image/png', caption }: 
             loading="lazy"
           />
           {caption && (
-            <p className="text-xs text-muted-foreground leading-snug">{caption}</p>
+            <p className="text-xs text-muted-foreground leading-snug">
+              {caption}
+            </p>
           )}
         </div>
       </div>
     </div>
   );
 }
-
-// ─── NotifyToast ──────────────────────────────────────────────────────────────
 
 const LEVEL_STYLES: Record<string, string> = {
   info: 'bg-sky-500/15 border-sky-500/40 text-sky-300',
@@ -223,7 +222,12 @@ export interface NotifyToastProps {
   onDismiss: (id: string) => void;
 }
 
-export function NotifyToast({ id, message, level = 'info', onDismiss }: NotifyToastProps) {
+export function NotifyToast({
+  id,
+  message,
+  level = 'info',
+  onDismiss,
+}: NotifyToastProps) {
   const t = useT();
   const style = LEVEL_STYLES[level] ?? LEVEL_STYLES['info'];
 
@@ -252,8 +256,6 @@ export function NotifyToast({ id, message, level = 'info', onDismiss }: NotifyTo
   );
 }
 
-// ─── Toast container ──────────────────────────────────────────────────────────
-
 export interface ToastItem {
   id: string;
   message: string;
@@ -265,7 +267,10 @@ export interface NotifyToastContainerProps {
   onDismiss: (id: string) => void;
 }
 
-export function NotifyToastContainer({ toasts, onDismiss }: NotifyToastContainerProps) {
+export function NotifyToastContainer({
+  toasts,
+  onDismiss,
+}: NotifyToastContainerProps) {
   const t = useT();
   if (!toasts.length) return null;
 

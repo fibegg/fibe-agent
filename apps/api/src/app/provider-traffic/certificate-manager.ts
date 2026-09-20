@@ -29,7 +29,9 @@ export class CertificateManager {
     cert.serialNumber = '01';
     cert.validity.notBefore = new Date();
     cert.validity.notAfter = new Date();
-    cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear() + 1);
+    cert.validity.notAfter.setFullYear(
+      cert.validity.notAfter.getFullYear() + 1,
+    );
 
     const attrs: forge.pki.CertificateField[] = [
       { name: 'commonName', value: 'Fibe MITM Proxy CA' },
@@ -78,7 +80,9 @@ export class CertificateManager {
     cert.serialNumber = Date.now().toString(16);
     cert.validity.notBefore = new Date();
     cert.validity.notAfter = new Date();
-    cert.validity.notAfter.setFullYear(cert.validity.notAfter.getFullYear() + 1);
+    cert.validity.notAfter.setFullYear(
+      cert.validity.notAfter.getFullYear() + 1,
+    );
 
     cert.setSubject([{ name: 'commonName', value: domain }]);
     cert.setIssuer(this.caCert.subject.attributes);
@@ -108,7 +112,6 @@ export class CertificateManager {
     return pair;
   }
 
-  /** Remove the temp CA cert file. */
   cleanup(): void {
     try {
       if (existsSync(this.caCertPath)) {
@@ -119,7 +122,6 @@ export class CertificateManager {
     }
   }
 
-  /** Remove stale CA files left by crashed previous processes. */
   static cleanupStale(): void {
     const dir = tmpdir();
     try {
@@ -132,13 +134,13 @@ export class CertificateManager {
             try {
               unlinkSync(join(dir, file));
             } catch {
-              // ignore
+              // Stale certificate cleanup is best effort.
             }
           }
         }
       }
     } catch {
-      // ignore
+      // A missing or unreadable temporary directory needs no cleanup.
     }
   }
 }

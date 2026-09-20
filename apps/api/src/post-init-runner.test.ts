@@ -55,21 +55,32 @@ describe('post-init-runner', () => {
   });
 
   test('runPostInitOnce skips run when state already done', async () => {
-    writePostInitState(tmpDir, { state: 'done', finishedAt: '2026-01-01T00:00:00.000Z' });
+    writePostInitState(tmpDir, {
+      state: 'done',
+      finishedAt: '2026-01-01T00:00:00.000Z',
+    });
     await runPostInitOnce(tmpDir, 'echo should-not-run', tmpDir);
     const state = readPostInitState(tmpDir);
     expect(state?.state).toBe('done');
     expect(state?.finishedAt).toBe('2026-01-01T00:00:00.000Z');
-    expect(state?.output == null || !String(state.output).includes('should-not-run')).toBe(true);
+    expect(
+      state?.output == null || !String(state.output).includes('should-not-run'),
+    ).toBe(true);
   });
 
   test('runPostInitOnce skips run when state already failed', async () => {
-    writePostInitState(tmpDir, { state: 'failed', error: 'previous', finishedAt: '2026-01-01T00:00:00.000Z' });
+    writePostInitState(tmpDir, {
+      state: 'failed',
+      error: 'previous',
+      finishedAt: '2026-01-01T00:00:00.000Z',
+    });
     await runPostInitOnce(tmpDir, 'echo should-not-run', tmpDir);
     const state = readPostInitState(tmpDir);
     expect(state?.state).toBe('failed');
     expect(state?.error).toBe('previous');
-    expect(state?.output == null || !String(state.output).includes('should-not-run')).toBe(true);
+    expect(
+      state?.output == null || !String(state.output).includes('should-not-run'),
+    ).toBe(true);
   });
 
   test('runPostInitOnce records failed state for non-zero exit code', async () => {
@@ -88,10 +99,8 @@ describe('post-init-runner', () => {
   });
 
   test('runPostInitOnce handles spawn error gracefully', async () => {
-    // Use a non-existent directory as cwd to trigger spawn error
     await runPostInitOnce(tmpDir, 'echo test', '/nonexistent-dir-12345');
     const state = readPostInitState(tmpDir);
-    // Should be either failed or done depending on sh behavior
     expect(state?.state).toBeDefined();
   });
 

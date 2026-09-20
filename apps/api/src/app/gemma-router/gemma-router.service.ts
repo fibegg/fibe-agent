@@ -3,45 +3,30 @@ import { ConfigService } from '../config/config.service';
 import type { GemmaRouterResult } from './gemma-router.types';
 
 const UNAVAILABLE_RESULT: GemmaRouterResult = { skipped: true };
-/**
- * GemmaRouterService
- *
- * Calls a local Ollama instance to classify a user message and suggest
- * which MCP tools might be relevant before the main agent strategy runs.
- *
- * Gracefully degrades: if Ollama is not running, not yet loaded, or times out,
- * it returns a "skipped" result so the caller can proceed unchanged.
- *
- * Optimizations:
- * - Lazy re-probe: if Ollama was down at startup, re-checks before each request.
- * - Model warm-up: after a successful probe, fires a tiny dummy inference so the
- *   model is loaded into VRAM before the first real user message arrives.
- */
+/** Suggests MCP tools through local Ollama and skips cleanly when unavailable. */
 @Injectable()
 export class GemmaRouterService implements OnModuleInit {
   private readonly logger = new Logger(GemmaRouterService.name);
   private isAvailable = false;
-  /** Prevents multiple concurrent warm-up calls */
+  /** Prevents duplicate warm-up calls. */
   private warmUpDone = false;
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
     if (!this.config.isGemmaRouterEnabled()) {
-      this.logger.log('GemmaRouter disabled (GEMMA_ROUTER_ENABLED is not set to true)');
+      this.logger.log(
+        'GemmaRouter disabled (GEMMA_ROUTER_ENABLED is not set to true)',
+      );
       return;
     }
     await this.probe();
     if (this.isAvailable) {
-      // Warm up the model in the background — don't block server startup
       void this.warmUpModel();
     }
   }
 
-  /**
-   * Probes Ollama availability.
-   * Called once at startup, and lazily before each request if isAvailable=false.
-   */
+  /** Probes Ollama at startup and again after failures. */
   private async probe(): Promise<void> {
     try {
       const url = this.config.getGemmaUrl();
@@ -51,20 +36,22 @@ export class GemmaRouterService implements OnModuleInit {
       clearTimeout(timer);
       if (res.ok) {
         this.isAvailable = true;
-        this.logger.log(`Ollama available at ${url} — GemmaRouter ready (model: ${this.config.getGemmaModel()})`);
+        this.logger.log(
+          `Ollama available at ${url}: GemmaRouter ready (model: ${this.config.getGemmaModel()})`,
+        );
       } else {
-        this.logger.warn(`Ollama responded with status ${res.status} — GemmaRouter will be skipped`);
+        this.logger.warn(
+          `Ollama responded with status ${res.status}: GemmaRouter will be skipped`,
+        );
       }
     } catch {
-      this.logger.warn('Ollama not reachable at startup — GemmaRouter will be skipped until next restart');
+      this.logger.warn(
+        'Ollama not reachable at startup: GemmaRouter will be skipped until next restart',
+      );
     }
   }
 
-  /**
-   * Fires a minimal dummy inference to force Ollama to load the model into VRAM.
-   * This eliminates the 10-30s cold-start latency on the first real user request.
-   * Runs non-blocking; failures are silently ignored.
-   */
+  /** Warms the model without blocking startup. */
   private async warmUpModel(): Promise<void> {
     if (this.warmUpDone) return;
     this.warmUpDone = true;
@@ -72,7 +59,6 @@ export class GemmaRouterService implements OnModuleInit {
       const url = this.config.getGemmaUrl();
       const model = this.config.getGemmaModel();
       const controller = new AbortController();
-      // Give warm-up up to 60s — model load can take a while on first pull
       const timer = setTimeout(() => controller.abort(), 60_000);
       const res = await fetch(`${url}/api/generate`, {
         method: 'POST',
@@ -88,21 +74,18 @@ export class GemmaRouterService implements OnModuleInit {
       });
       clearTimeout(timer);
       if (res.ok) {
-        this.logger.log(`[GemmaRouter] Model warm-up complete — ${model} is ready`);
+        this.logger.log(
+          `[GemmaRouter] Model warm-up complete: ${model} is ready`,
+        );
       }
     } catch {
-      // Warm-up failure is non-fatal; the first real request will pay the latency cost instead
-      this.logger.debug('[GemmaRouter] Model warm-up timed out or failed (non-fatal)');
+      this.logger.debug(
+        '[GemmaRouter] Model warm-up timed out or failed (non-fatal)',
+      );
     }
   }
 
-  /**
-   * Analyzes a user message and returns suggested MCP tool names with confidence.
-   *
-   * @param userText - The raw user message text.
-   * @param mcpTools - Available MCP tools. Can be simple names or name+description pairs.
-   * @returns A GemmaRouterResult. If skipped=true, the caller should not modify the prompt.
-   */
+  /** Suggests relevant tools and confidence, or returns skipped. */
   async analyze(
     userText: string,
     mcpTools: string[] | Array<{ name: string; description: string }>,
@@ -111,7 +94,6 @@ export class GemmaRouterService implements OnModuleInit {
       return UNAVAILABLE_RESULT;
     }
 
-    // Lazy re-probe: if Ollama was down at startup, retry before giving up
     if (!this.isAvailable) {
       await this.probe();
       if (this.isAvailable && !this.warmUpDone) {
@@ -133,7 +115,6 @@ export class GemmaRouterService implements OnModuleInit {
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       this.logger.debug(`GemmaRouter call failed (will skip): ${msg}`);
-      // Mark unavailable so next request re-probes rather than immediately failing
       this.isAvailable = false;
       return UNAVAILABLE_RESULT;
     }
@@ -143,33 +124,24 @@ export class GemmaRouterService implements OnModuleInit {
     userText: string,
     mcpTools: string[] | Array<{ name: string; description: string }>,
   ): string {
-    // Format tool list — include descriptions when available for better accuracy
     const toolList = mcpTools
-      .map((t) =>
-        typeof t === 'string' ? t : `${t.name} (${t.description})`
-      )
+      .map((t) => (typeof t === 'string' ? t : `${t.name} (${t.description})`))
       .join(', ');
 
     const toolNames = mcpTools
       .map((t) => (typeof t === 'string' ? t : t.name))
       .join(', ');
 
-    return `You are an intent router for a coding assistant. Given a user message and a list of available MCP tool names, you must decide how to handle the request.
+    return `Route this request for a coding assistant. Return one JSON object with no markdown or explanation.
 
-Output ONLY a single valid JSON object with no extra text, no markdown, no explanation.
-
-Decision 1: Direct CLI Command
-If the user's intent is simple and can be answered immediately by running a fibe CLI command (like checking playgrounds), output:
+For a simple request that a Fibe CLI command can answer immediately:
 {"type": "EXECUTE_CLI", "command": "fibe playgrounds list"}
 
-Decision 2: Delegate to Heavy Agent
-If the user wants to write code, build an app, or requires complex reasoning, delegate the task and suggest tools:
+For coding, app building, complex reasoning, or general chat:
 {"type": "DELEGATE_TO_AGENT", "tools": ["tool_name_1"], "confidence": 0.8}
 
-Rules for DELEGATE_TO_AGENT:
-- "tools" must be a subset of these exact tool names: ${toolNames}
-- "confidence" is a float between 0.0 and 1.0 reflecting how sure you are those tools are needed.
-- If the message is general chat or coding work that doesn't need any specific tool, return {"type": "DELEGATE_TO_AGENT", "tools": [], "confidence": 0.0}.
+Use only these exact tool names: ${toolNames}
+Set confidence from 0.0 to 1.0. Use an empty tools list and 0.0 when no tool is needed.
 
 Available MCP tools:
 ${toolList}
@@ -210,7 +182,7 @@ JSON:`;
       return UNAVAILABLE_RESULT;
     }
 
-    const body = await res.json() as { response?: string };
+    const body = (await res.json()) as { response?: string };
     const raw = body.response?.trim() ?? '';
 
     return this.parseResponse(raw);
@@ -219,7 +191,10 @@ JSON:`;
   private parseResponse(raw: string): GemmaRouterResult {
     try {
       // Ollama sometimes wraps in markdown code fences even with format:json
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+      const cleaned = raw
+        .replace(/^```(?:json)?\s*/i, '')
+        .replace(/\s*```$/, '')
+        .trim();
       const parsed = JSON.parse(cleaned) as Record<string, unknown>;
 
       if (parsed.type === 'EXECUTE_CLI') {
@@ -227,26 +202,32 @@ JSON:`;
           action: {
             type: 'EXECUTE_CLI',
             command: typeof parsed.command === 'string' ? parsed.command : '',
-            reason: typeof parsed.reason === 'string' ? parsed.reason : undefined,
+            reason:
+              typeof parsed.reason === 'string' ? parsed.reason : undefined,
           },
           skipped: false,
         };
       }
 
       const tools = Array.isArray(parsed.tools)
-        ? (parsed.tools as unknown[]).filter((t): t is string => typeof t === 'string')
+        ? (parsed.tools as unknown[]).filter(
+            (t): t is string => typeof t === 'string',
+          )
         : [];
 
-      const confidence = typeof parsed.confidence === 'number'
-        ? Math.max(0, Math.min(1, parsed.confidence))
-        : 0;
+      const confidence =
+        typeof parsed.confidence === 'number'
+          ? Math.max(0, Math.min(1, parsed.confidence))
+          : 0;
 
       return {
         action: { type: 'DELEGATE_TO_AGENT', tools, confidence },
         skipped: false,
       };
     } catch {
-      this.logger.debug(`Could not parse Gemma response as JSON: ${raw.slice(0, 120)}`);
+      this.logger.debug(
+        `Could not parse Gemma response as JSON: ${raw.slice(0, 120)}`,
+      );
       return UNAVAILABLE_RESULT;
     }
   }

@@ -20,7 +20,7 @@ describe('loadInjectedCredentials', () => {
     try {
       fs.rmSync(tempDir, { recursive: true });
     } catch {
-      // ignore
+      // Test cleanup is best effort.
     }
   });
 
@@ -87,17 +87,32 @@ describe('loadInjectedCredentials', () => {
     });
     process.env.SESSION_DIR = tempDir;
     expect(loadInjectedCredentials()).toBe(true);
-    expect(fs.readFileSync(path.join(tempDir, 'oauth_creds.json'), 'utf8')).toBe('{"token":"abc"}');
-    expect(fs.readFileSync(path.join(tempDir, 'credentials.json'), 'utf8')).toBe('{"refresh":"xyz"}');
+    expect(
+      fs.readFileSync(path.join(tempDir, 'oauth_creds.json'), 'utf8'),
+    ).toBe('{"token":"abc"}');
+    expect(
+      fs.readFileSync(path.join(tempDir, 'credentials.json'), 'utf8'),
+    ).toBe('{"refresh":"xyz"}');
   });
 
   test('writes nested credential files inside SESSION_DIR', () => {
     process.env.AGENT_CREDENTIALS_JSON = JSON.stringify({
-      'antigravity-cli/cache/last_conversations.json': '{"workspace":"session-1"}',
+      'antigravity-cli/cache/last_conversations.json':
+        '{"workspace":"session-1"}',
     });
     process.env.SESSION_DIR = tempDir;
     expect(loadInjectedCredentials()).toBe(true);
-    expect(fs.readFileSync(path.join(tempDir, 'antigravity-cli', 'cache', 'last_conversations.json'), 'utf8')).toBe('{"workspace":"session-1"}');
+    expect(
+      fs.readFileSync(
+        path.join(
+          tempDir,
+          'antigravity-cli',
+          'cache',
+          'last_conversations.json',
+        ),
+        'utf8',
+      ),
+    ).toBe('{"workspace":"session-1"}');
   });
 
   test('decodes base64-encoded binary credential files', () => {
@@ -106,7 +121,11 @@ describe('loadInjectedCredentials', () => {
     });
     process.env.SESSION_DIR = tempDir;
     expect(loadInjectedCredentials()).toBe(true);
-    expect([...fs.readFileSync(path.join(tempDir, '.local', 'share', 'keyrings', 'login.keyring'))]).toEqual([0, 1, 2, 3, 255]);
+    expect([
+      ...fs.readFileSync(
+        path.join(tempDir, '.local', 'share', 'keyrings', 'login.keyring'),
+      ),
+    ]).toEqual([0, 1, 2, 3, 255]);
   });
 
   test('rejects path traversal in filenames', () => {
@@ -120,10 +139,8 @@ describe('loadInjectedCredentials', () => {
     // Use a read-only directory to trigger write errors
     const readOnlyFile = path.join(tempDir, 'not-a-dir');
     fs.writeFileSync(readOnlyFile, 'block');
-    // Point SESSION_DIR to a file (not a directory) so writeFileSync into it fails
     process.env.AGENT_CREDENTIALS_JSON = '{"file.txt":"content"}';
     process.env.SESSION_DIR = readOnlyFile;
-    // mkdirSync will fail (path is a file), but injection should handle gracefully
     const result = loadInjectedCredentials();
     // Should fail because we can't write inside a file
     expect(typeof result).toBe('boolean');
@@ -138,6 +155,8 @@ describe('loadInjectedCredentials', () => {
     const result = loadInjectedCredentials();
     expect(result).toBe(true);
     expect(fs.existsSync(path.join(tempDir, 'good.txt'))).toBe(true);
-    expect(fs.existsSync(path.join(path.dirname(tempDir), 'bad.txt'))).toBe(false);
+    expect(fs.existsSync(path.join(path.dirname(tempDir), 'bad.txt'))).toBe(
+      false,
+    );
   });
 });

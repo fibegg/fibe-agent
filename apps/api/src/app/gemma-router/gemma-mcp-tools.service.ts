@@ -30,22 +30,32 @@ export class GemmaMcpToolsService {
         const res = await fetch(serverUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} }),
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            method: 'tools/list',
+            params: {},
+          }),
           signal: controller.signal,
         });
         clearTimeout(timer);
         if (!res.ok) continue;
 
-        const data = await res.json() as {
-          result?: { tools?: Array<{ name: string; description?: string }> }
+        const data = (await res.json()) as {
+          result?: { tools?: Array<{ name: string; description?: string }> };
         };
         const tools = data?.result?.tools ?? [];
         for (const tool of tools) {
           if (tool.name) {
-            allTools.push({ name: tool.name, description: tool.description ?? tool.name });
+            allTools.push({
+              name: tool.name,
+              description: tool.description ?? tool.name,
+            });
           }
         }
-        this.logger.log(`Fetched ${tools.length} MCP tool descriptions from ${serverUrl}`);
+        this.logger.log(
+          `Fetched ${tools.length} MCP tool descriptions from ${serverUrl}`,
+        );
       } catch {
         this.logger.debug(`Could not fetch MCP tool list from ${serverUrl}`);
       }
@@ -56,7 +66,9 @@ export class GemmaMcpToolsService {
     }
   }
 
-  private dedupeTools(tools: GemmaMcpToolDescription[]): GemmaMcpToolDescription[] {
+  private dedupeTools(
+    tools: GemmaMcpToolDescription[],
+  ): GemmaMcpToolDescription[] {
     const seen = new Set<string>();
     const unique: GemmaMcpToolDescription[] = [];
     for (const tool of tools) {
@@ -82,7 +94,7 @@ export class GemmaMcpToolsService {
         return [parsed];
       }
     } catch {
-      // Ignore parse errors. Gemma routing is experimental and should degrade silently.
+      // Invalid optional MCP configuration resolves to no servers.
     }
     return [];
   }
@@ -90,6 +102,8 @@ export class GemmaMcpToolsService {
   private getMcpServerUrls(): string[] {
     return this.getMcpServerEntriesFromEnv()
       .map((entry) => entry.serverUrl)
-      .filter((url): url is string => typeof url === 'string' && url.length > 0);
+      .filter(
+        (url): url is string => typeof url === 'string' && url.length > 0,
+      );
   }
 }

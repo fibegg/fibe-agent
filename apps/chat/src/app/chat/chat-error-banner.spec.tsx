@@ -11,7 +11,7 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.ERROR}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -23,7 +23,7 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.AUTHENTICATED}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -35,7 +35,7 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.ERROR}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText(/Cannot connect/)).toBeTruthy();
   });
@@ -47,7 +47,7 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.ERROR}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /dismiss/i })).toBeTruthy();
   });
@@ -60,24 +60,21 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.ERROR}
         onRetry={vi.fn()}
         onDismiss={onDismiss}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /dismiss/i }));
     expect(onDismiss).toHaveBeenCalled();
   });
 
   it('shows Retry button for retryable errors', () => {
-    // A retryable error is one where isRetryableError() returns true
-    // Looking at isRetryableError, it checks for connection-related errors
     render(
       <ChatErrorBanner
         errorMessage="Connection lost"
         state={CHAT_STATES.ERROR}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
-      />
+      />,
     );
-    // Either shows Retry or not — just check the banner is there
     expect(screen.getByRole('button', { name: /dismiss/i })).toBeTruthy();
   });
 
@@ -89,7 +86,7 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.ERROR}
         onRetry={onRetry}
         onDismiss={vi.fn()}
-      />
+      />,
     );
     const retryBtn = screen.queryByRole('button', { name: /retry/i });
     if (retryBtn) {
@@ -106,9 +103,8 @@ describe('ChatErrorBanner', () => {
         state={CHAT_STATES.ERROR}
         onRetry={vi.fn()}
         onDismiss={vi.fn()}
-      />
+      />,
     );
-    // The error text element exists
     const span = screen.getByTitle(longError);
     expect(span).toBeTruthy();
   });

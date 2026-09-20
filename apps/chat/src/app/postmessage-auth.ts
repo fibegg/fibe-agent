@@ -1,4 +1,8 @@
-import { loginWithPassword, isAuthenticated, getAuthTokenForRequest } from './api-url';
+import {
+  loginWithPassword,
+  isAuthenticated,
+  getAuthTokenForRequest,
+} from './api-url';
 
 const AUTO_AUTH_TIMEOUT_MS = 3000;
 export const AUTO_AUTH_SUCCESS_EVENT = 'fibe:auto-auth-success';
@@ -55,7 +59,8 @@ function notifyAutoAuthSuccess(): void {
 function onMessage(event: MessageEvent): void {
   const data = event.data as { action?: string; password?: string } | undefined;
   const password = data?.password;
-  if (!data || data.action !== 'auto_auth' || typeof password !== 'string') return;
+  if (!data || data.action !== 'auto_auth' || typeof password !== 'string')
+    return;
 
   // Already authenticated for this runtime (e.g. from a previous message in the retry loop).
   // If the parent sends a different password, refresh the stored iframe token; otherwise
@@ -71,11 +76,10 @@ function onMessage(event: MessageEvent): void {
       const success = await handleAutoAuth(password);
       if (success) {
         if (pendingResolve) {
-          // LoginPage is already waiting — resolve its promise
           pendingResolve();
           pendingResolve = null;
         } else {
-          // LoginPage hasn't mounted yet — store for when it calls waitForAutoAuth()
+          // LoginPage hasn't mounted yet: store for when it calls waitForAutoAuth()
           // If it already timed out, the page-level listener below will navigate.
           earlyAuthSuccess = true;
           notifyAutoAuthSuccess();

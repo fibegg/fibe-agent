@@ -257,9 +257,7 @@ describe('ChatInputArea', () => {
         }}
       />,
     );
-    // Raw error string should NOT appear — it's replaced by the i18n message
     expect(screen.queryByText('NotAllowedError: Permission denied')).toBeNull();
-    // The error alert container should be rendered
     const alert = container.querySelector('[class*="border-red"]');
     expect(alert).toBeTruthy();
   });
@@ -311,7 +309,6 @@ describe('ChatInputArea', () => {
         }}
       />,
     );
-    // 75 seconds = 1:15
     expect(screen.getByText(/1:15/)).toBeTruthy();
   });
 
@@ -341,10 +338,6 @@ describe('ChatInputArea', () => {
     const input = screen.getByTestId('mention-input');
     expect(input.getAttribute('disabled')).not.toBeNull();
   });
-
-  // ── Focus after Send (iframe postMessage fix) ────────────────────────────
-  // Clicking a button blurs the input, so the button asks the owner hook to run
-  // the same persistent focus recovery used by keyboard sends.
 
   it('Send button requests persistent chat input focus recovery', () => {
     const onRequestInputFocus = vi.fn();

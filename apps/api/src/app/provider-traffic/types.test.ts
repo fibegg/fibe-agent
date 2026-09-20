@@ -6,7 +6,9 @@ describe('types', () => {
     test('resolves known provider domains', () => {
       expect(resolveProvider('api.anthropic.com')).toBe('anthropic');
       expect(resolveProvider('api.openai.com')).toBe('openai');
-      expect(resolveProvider('generativelanguage.googleapis.com')).toBe('google');
+      expect(resolveProvider('generativelanguage.googleapis.com')).toBe(
+        'google',
+      );
       expect(resolveProvider('openrouter.ai')).toBe('openrouter');
     });
 
@@ -38,7 +40,6 @@ describe('types', () => {
 
     test('handles mixed-case header names', () => {
       const headers = { Authorization: 'Bearer token' };
-      // Keys are compared lowercase
       const sanitized = sanitizeHeaders(headers);
       // Capital A stays as-is, but value is redacted because lowercase match
       expect(sanitized['Authorization']).toBe('[REDACTED]');
@@ -53,7 +54,9 @@ describe('types', () => {
     test('contains all known provider domains', () => {
       expect(INTERCEPTED_DOMAINS.has('api.anthropic.com')).toBe(true);
       expect(INTERCEPTED_DOMAINS.has('api.openai.com')).toBe(true);
-      expect(INTERCEPTED_DOMAINS.has('generativelanguage.googleapis.com')).toBe(true);
+      expect(INTERCEPTED_DOMAINS.has('generativelanguage.googleapis.com')).toBe(
+        true,
+      );
       expect(INTERCEPTED_DOMAINS.has('openrouter.ai')).toBe(true);
     });
 

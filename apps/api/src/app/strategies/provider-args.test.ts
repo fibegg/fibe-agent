@@ -57,7 +57,10 @@ describe('buildProviderArgs', () => {
   });
 
   test('user can add new flags not in defaults or blocked', () => {
-    process.env.PROVIDER_ARGS = JSON.stringify({ bare: true, 'max-tokens': '4096' });
+    process.env.PROVIDER_ARGS = JSON.stringify({
+      bare: true,
+      'max-tokens': '4096',
+    });
     const tokens = buildProviderArgs(baseConfig);
     expect(tokens).toContain('--bare');
     expect(tokens).toContain('--max-tokens');
@@ -67,7 +70,6 @@ describe('buildProviderArgs', () => {
   test('invalid JSON in PROVIDER_ARGS is silently ignored', () => {
     process.env.PROVIDER_ARGS = 'not-json{';
     const tokens = buildProviderArgs(baseConfig);
-    // Should still produce defaults + blocked
     expect(tokens).toContain('--no-chrome');
     expect(tokens).toContain('--dangerously-skip-permissions');
   });
@@ -92,7 +94,9 @@ describe('buildProviderArgs', () => {
   });
 
   test('blocks short flags when user input came from normalized settings', () => {
-    process.env.PROVIDER_ARGS = JSON.stringify({ p: 'do not inject this prompt' });
+    process.env.PROVIDER_ARGS = JSON.stringify({
+      p: 'do not inject this prompt',
+    });
     const tokens = buildProviderArgs({
       defaultArgs: {},
       blockedArgs: { '-p': false },
@@ -160,7 +164,14 @@ describe('buildProviderArgs', () => {
       },
     });
 
-    expect(tokens).toEqual(['--color', 'never', '-c', 'never', '--maxTokens', '8192']);
+    expect(tokens).toEqual([
+      '--color',
+      'never',
+      '-c',
+      'never',
+      '--maxTokens',
+      '8192',
+    ]);
   });
 
   test('serializes the complete supported scalar matrix from PROVIDER_ARGS', () => {

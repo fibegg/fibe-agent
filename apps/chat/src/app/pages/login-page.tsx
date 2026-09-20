@@ -10,7 +10,9 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [autoAuthPending, setAutoAuthPending] = useState(window !== window.parent);
+  const [autoAuthPending, setAutoAuthPending] = useState(
+    window !== window.parent,
+  );
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -20,7 +22,11 @@ export function LoginPage() {
 
     if (isAuthenticated()) {
       navigate('/', { replace: true });
-      return () => window.removeEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
+      return () =>
+        window.removeEventListener(
+          AUTO_AUTH_SUCCESS_EVENT,
+          handleAutoAuthSuccess,
+        );
     }
 
     let cancelled = false;
@@ -32,7 +38,10 @@ export function LoginPage() {
     })();
     return () => {
       cancelled = true;
-      window.removeEventListener(AUTO_AUTH_SUCCESS_EVENT, handleAutoAuthSuccess);
+      window.removeEventListener(
+        AUTO_AUTH_SUCCESS_EVENT,
+        handleAutoAuthSuccess,
+      );
     };
   }, [navigate]);
 
@@ -59,7 +68,9 @@ export function LoginPage() {
         <div className="text-center space-y-4">
           <div className="flex items-center justify-center gap-2">
             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-            <span className="text-sm text-primary/60">{t('login.connecting')}</span>
+            <span className="text-sm text-primary/60">
+              {t('login.connecting')}
+            </span>
           </div>
         </div>
       </div>
@@ -99,7 +110,7 @@ export function LoginPage() {
         ))}
       </div>
 
-      {/* Form — floats directly on the background, no card box */}
+      {/* Form: floats directly on the background, no card box */}
       <div className="relative z-10 w-full max-w-sm px-6 flex flex-col items-center gap-6">
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
@@ -114,7 +125,10 @@ export function LoginPage() {
 
         <form onSubmit={handleSubmit} className="w-full space-y-3">
           <div>
-            <label htmlFor="password" className="block text-xs text-primary/60 mb-2 text-center tracking-wide uppercase">
+            <label
+              htmlFor="password"
+              className="block text-xs text-primary/60 mb-2 text-center tracking-wide uppercase"
+            >
               {t('login.passwordLabel')}
             </label>
             <input

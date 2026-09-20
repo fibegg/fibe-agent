@@ -4,7 +4,8 @@ import { dirname, join } from 'node:path';
 
 /** Real HOME and NVM_DIR captured at module load time, before any test overrides. */
 const ORIG_HOME = process.env.HOME?.trim() ?? '';
-const ORIG_NVM_DIR = process.env.NVM_DIR?.trim() || (ORIG_HOME ? join(ORIG_HOME, '.nvm') : '');
+const ORIG_NVM_DIR =
+  process.env.NVM_DIR?.trim() || (ORIG_HOME ? join(ORIG_HOME, '.nvm') : '');
 
 let _cachedPath: string | null | undefined = undefined;
 
@@ -17,10 +18,7 @@ function isExecutable(path: string): boolean {
   }
 }
 
-/**
- * Returns nvm bin directories sorted newest-version-first.
- * Each entry is e.g. `~/.nvm/versions/node/v24.14.1/bin`.
- */
+/** Returns nvm bin directories newest first. */
 function nvmBinDirs(): string[] {
   if (!ORIG_NVM_DIR) return [];
   const versionsDir = join(ORIG_NVM_DIR, 'versions', 'node');
@@ -29,7 +27,8 @@ function nvmBinDirs(): string[] {
     return readdirSync(versionsDir)
       .filter((v) => v.startsWith('v'))
       .sort((a, b) => {
-        const parse = (s: string) => (s.match(/^v(\d+)\.(\d+)\.(\d+)/) ?? []).slice(1).map(Number);
+        const parse = (s: string) =>
+          (s.match(/^v(\d+)\.(\d+)\.(\d+)/) ?? []).slice(1).map(Number);
         const [aMaj = 0, aMin = 0, aPat = 0] = parse(a);
         const [bMaj = 0, bMin = 0, bPat = 0] = parse(b);
         return bMaj - aMaj || bMin - aMin || bPat - aPat;
@@ -41,26 +40,12 @@ function nvmBinDirs(): string[] {
 }
 
 /**
- * Resolves the absolute path to the `claude` CLI binary.
- *
- * Resolution order:
- *  1. `CLAUDE_PATH` env var — explicit override, highest priority
- *  2. `command -v claude` — shell lookup on the current PATH
- *  3. nvm bin directories — newest Node version first
- *  4. Common system locations (`~/.npm/bin`, `/usr/local/bin`, Homebrew)
- *  5. Bare `'claude'` fallback — lets spawn produce a clear ENOENT
- *
- * When `CLAUDE_PATH` is set it is fail-closed: the exact executable must
- * exist, otherwise startup of a Claude turn fails instead of silently using a
- * different `claude` from PATH.
- *
- * Result is cached for the process lifetime.
- * Call `_resetResolveClaudeCache()` in tests that change `CLAUDE_PATH`.
+ * Resolves and caches Claude from a fail-closed override, PATH, newest nvm,
+ * common install paths, then the bare command for a clear spawn error.
  */
 export function resolveClaude(): string {
   if (_cachedPath !== undefined) return _cachedPath ?? 'claude';
 
-  // 1. Explicit override
   const override = process.env['CLAUDE_PATH']?.trim();
   if (override && isExecutable(override)) {
     return (_cachedPath = override);
@@ -73,7 +58,6 @@ export function resolveClaude(): string {
     );
   }
 
-  // 2. Shell lookup (respects the running process PATH)
   try {
     const found = execSync('command -v claude', {
       encoding: 'utf8',
@@ -81,10 +65,9 @@ export function resolveClaude(): string {
     }).trim();
     if (found && isExecutable(found)) return (_cachedPath = found);
   } catch {
-    /* not on PATH — fall through */
+    // Probe the fallback paths below.
   }
 
-  // 3 & 4. Probe nvm dirs then common system locations
   const staticCandidates = [
     ...(ORIG_HOME ? [join(ORIG_HOME, '.npm', 'bin', 'claude')] : []),
     '/usr/local/bin/claude',
@@ -98,20 +81,11 @@ export function resolveClaude(): string {
     if (isExecutable(candidate)) return (_cachedPath = candidate);
   }
 
-  // 5. Fallback
   _cachedPath = null;
   return 'claude';
 }
 
-/**
- * Returns an enriched PATH that prepends:
- *  - The parent directory of `CLAUDE_PATH` override (if set)
- *  - All nvm bin directories (newest first)
- *
- * This ensures `node` and `claude` are resolvable in restricted shells
- * (e.g. NestJS spawn without loading `.zshrc` / nvm init).
- * Already-present segments are not duplicated.
- */
+/** Prepends the override and nvm directories needed by restricted shells. */
 export function getEnrichedPath(currentPath: string): string {
   const existing = new Set(currentPath.split(':').filter(Boolean));
   const extra: string[] = [];

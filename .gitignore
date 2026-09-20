@@ -1,14 +1,9 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
-
-# compiled output
 dist
 tmp
 out-tsc
 
-# dependencies
 node_modules
 
-# IDEs and editors
 /.idea
 .project
 .classpath
@@ -17,14 +12,12 @@ node_modules
 .settings/
 *.sublime-workspace
 
-# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# misc
 /.sass-cache
 /connect.lock
 /coverage
@@ -34,7 +27,6 @@ yarn-error.log
 testem.log
 /typings
 
-# System Files
 .DS_Store
 Thumbs.db
 
@@ -57,7 +49,6 @@ playground
 
 .docker-test/
 
-# fibe binaries (downloaded from GitHub Releases at build time)
 bin/fibe-*
 
 # Local / Docker fibe.yml overrides (fibe.yml template in root is tracked)

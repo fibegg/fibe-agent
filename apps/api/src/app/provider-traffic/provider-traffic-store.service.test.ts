@@ -24,7 +24,9 @@ function makeFibeSync() {
   } as never;
 }
 
-function makeSampleRecord(overrides?: Partial<CapturedProviderRequest>): CapturedProviderRequest {
+function makeSampleRecord(
+  overrides?: Partial<CapturedProviderRequest>,
+): CapturedProviderRequest {
   return {
     id: 'test-id-1',
     timestamp: '2026-04-12T10:00:00.000Z',
@@ -59,7 +61,10 @@ describe('ProviderTrafficStoreService', () => {
   let services: ProviderTrafficStoreService[];
 
   function makeService(): ProviderTrafficStoreService {
-    const instance = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    const instance = new ProviderTrafficStoreService(
+      makeConfig(dataDir),
+      makeFibeSync(),
+    );
     services.push(instance);
     return instance;
   }
@@ -109,7 +114,6 @@ describe('ProviderTrafficStoreService', () => {
 
     await service.flush();
 
-    // Create new service instance pointing to same dir
     const service2 = makeService();
     expect(service2.all()).toHaveLength(1);
     expect(service2.all()[0].id).toBe('test-id-1');

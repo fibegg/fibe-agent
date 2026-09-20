@@ -1,15 +1,17 @@
-/**
- * Shared Tailwind class strings to avoid long inline class lists and keep styling consistent.
- * Use these constants instead of repeating the same class combinations across components.
- */
-
 export const INPUT =
   'rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30';
 export const INPUT_BG = 'bg-input-background dark:bg-input/30';
-export const INPUT_FOCUS_BORDER = 'focus:border-primary dark:focus:border-primary';
+export const INPUT_FOCUS_BORDER =
+  'focus:border-primary dark:focus:border-primary';
 
 export const INPUT_SEARCH =
-  'h-8 w-full pl-8 pr-8 text-xs rounded-xl ' + INPUT_BG + ' border border-border ' + INPUT_FOCUS_BORDER + ' ' + INPUT + ' transition-all duration-200';
+  'h-8 w-full pl-8 pr-8 text-xs rounded-xl ' +
+  INPUT_BG +
+  ' border border-border ' +
+  INPUT_FOCUS_BORDER +
+  ' ' +
+  INPUT +
+  ' transition-all duration-200';
 
 export const INPUT_SM =
   'w-28 sm:w-32 h-7 sm:h-8 px-2.5 rounded-md text-[10px] sm:text-xs ' +
@@ -28,15 +30,19 @@ export const BUTTON_ICON_ACCENT_SM =
 export const BUTTON_GHOST_ACCENT =
   'rounded-md px-2 py-1.5 h-7 text-xs text-muted-foreground hover:bg-primary/10 hover:text-primary disabled:opacity-50 flex items-center gap-1.5';
 
-export const SEARCH_ICON_POSITION = 'absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none';
-export const CLEAR_BUTTON_POSITION = 'absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground';
+export const SEARCH_ICON_POSITION =
+  'absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none';
+export const CLEAR_BUTTON_POSITION =
+  'absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground';
 export const SEARCH_ROW_WRAPPER = 'relative h-8 mt-2';
-export const HEADER_FIRST_ROW = 'h-[3.25rem] mb-2 overflow-hidden flex-shrink-0';
+export const HEADER_FIRST_ROW =
+  'h-[3.25rem] mb-2 overflow-hidden flex-shrink-0';
 export const HEADER_BORDER = 'border-border/50';
 export const HEADER_PADDING = 'px-4 py-3';
 
 export const FLEX_ROW_CENTER = 'flex items-center gap-2 min-w-0';
-export const FLEX_ROW_CENTER_WRAP = 'flex items-center justify-between gap-2 flex-wrap min-w-0';
+export const FLEX_ROW_CENTER_WRAP =
+  'flex items-center justify-between gap-2 flex-wrap min-w-0';
 
 export const ACTIVITY_BLOCK_BASE = 'px-3 py-1.5 flex flex-col gap-0.5';
 export const ACTIVITY_BLOCK_VARIANTS = {
@@ -56,12 +62,15 @@ export const ACTIVITY_ICON_COLOR: Record<string, string> = {
   default: 'text-primary',
 };
 
-export const ACTIVITY_LABEL = 'text-[10px] font-semibold uppercase tracking-wide text-foreground/90 truncate';
+export const ACTIVITY_LABEL =
+  'text-[10px] font-semibold uppercase tracking-wide text-foreground/90 truncate';
 export const ACTIVITY_TIMESTAMP = 'text-[9px] text-muted-foreground shrink-0';
 export const ACTIVITY_BODY = 'text-xs text-foreground/90 break-words';
-export const ACTIVITY_MONO = 'text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words';
+export const ACTIVITY_MONO =
+  'text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words';
 
-export const BADGE_CARD = 'shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
+export const BADGE_CARD =
+  'shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
 
 export const AVATAR_USER =
   'size-7 sm:size-8 rounded-full flex items-center justify-center text-white ring-2 ring-background';
@@ -70,7 +79,8 @@ export const AVATAR_ASSISTANT =
 
 export const BUBBLE_ASSISTANT =
   'rounded-2xl rounded-tl-md bg-card/60 backdrop-blur-md border border-border/50 shadow-sm text-card-foreground';
-export const BUBBLE_TYPING = 'rounded-2xl rounded-tl-md bg-card border border-border text-card-foreground';
+export const BUBBLE_TYPING =
+  'rounded-2xl rounded-tl-md bg-card border border-border text-card-foreground';
 export const BUBBLE_USER =
   'rounded-2xl rounded-tr-sm bg-gradient-to-br from-user-bubble-from to-user-bubble-to text-user-bubble-foreground shadow-md shadow-primary/15';
 
@@ -82,8 +92,10 @@ export const SIDEBAR_PANEL =
 export const SIDEBAR_HEADER = `border-b ${HEADER_BORDER} shrink-0 ${HEADER_PADDING}`;
 export const CARD_HEADER = `border-b ${HEADER_BORDER} bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`;
 
-export const MODAL_OVERLAY = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm';
-export const MODAL_OVERLAY_DARK = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm';
+export const MODAL_OVERLAY =
+  'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm';
+export const MODAL_OVERLAY_DARK =
+  'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm';
 export const MOBILE_SHEET_PANEL =
   'fixed top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col lg:hidden';
 export const MODAL_OVERLAY_CENTER =
@@ -97,7 +109,8 @@ export const SESSION_STATS_PANEL =
 export const SESSION_STATS_HEADING =
   'flex items-center gap-1.5 text-xs font-semibold px-3 py-2 text-primary dark:text-primary border-b border-primary/20';
 
-export const MODEL_OPTION_SELECTED = 'bg-gradient-to-r from-primary to-secondary text-white shadow shadow-primary/20';
+export const MODEL_OPTION_SELECTED =
+  'bg-gradient-to-r from-primary to-secondary text-white shadow shadow-primary/20';
 export const MODEL_OPTION_UNSELECTED =
   'bg-input-bg border border-border-subtle text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30';
 
@@ -120,10 +133,8 @@ export const INPUT_ROUNDED =
 export const BUTTON_PRIMARY_ROUNDED =
   'rounded-xl bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white text-sm font-medium shadow-lg shadow-primary/30 transition-opacity flex items-center gap-2 px-4 py-2.5';
 
-/** Full-screen translucent backdrop behind the right drawer. */
 export const RIGHT_DRAWER_OVERLAY =
   'fixed inset-0 z-[240] bg-black/60 backdrop-blur-sm';
 
-/** The sliding drawer panel itself — positioned at the right edge of the viewport. */
 export const RIGHT_DRAWER_PANEL =
   'fixed top-0 bottom-0 right-0 z-[250] flex flex-col bg-background border-l border-primary/20 shadow-2xl shadow-black/40 will-change-transform';

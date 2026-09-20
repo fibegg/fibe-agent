@@ -27,7 +27,7 @@ describe('useChatInput', () => {
   it('returns empty inputValue and cursorOffset initially', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     expect(result.current.inputValue).toBe('');
     expect(result.current.cursorOffset).toBe(0);
@@ -36,7 +36,7 @@ describe('useChatInput', () => {
   it('setInputState updates input value and cursor', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     act(() => {
       result.current.setInputState({ value: 'hello', cursor: 5 });
@@ -48,22 +48,22 @@ describe('useChatInput', () => {
   it('returns chatInputRef initialised to null', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     expect(result.current.chatInputRef).toEqual({ current: null });
   });
 
-  // ── handleKeyDown ────────────────────────────────────────────────────────
-
   it('handleKeyDown calls onSendRef on Enter without shift', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     act(() => result.current.setInputState({ value: 'hi', cursor: 2 }));
 
     const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
 
     expect(onSendRef.current).toHaveBeenCalledOnce();
     expect(e.preventDefault).toHaveBeenCalledOnce();
@@ -72,10 +72,12 @@ describe('useChatInput', () => {
   it('handleKeyDown does not call onSendRef when shiftKey is true', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     const e = { key: 'Enter', shiftKey: true, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
     expect(onSendRef.current).not.toHaveBeenCalled();
   });
 
@@ -83,10 +85,12 @@ describe('useChatInput', () => {
     setCoarsePointer(true);
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
     expect(onSendRef.current).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
   });
@@ -95,10 +99,12 @@ describe('useChatInput', () => {
     setCoarsePointer(false);
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
     expect(onSendRef.current).toHaveBeenCalledOnce();
     expect(e.preventDefault).toHaveBeenCalledOnce();
   });
@@ -106,7 +112,7 @@ describe('useChatInput', () => {
   it('handleKeyDown does not send while IME composition is active', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     const e = {
       key: 'Enter',
@@ -114,37 +120,56 @@ describe('useChatInput', () => {
       nativeEvent: { isComposing: true },
       preventDefault: vi.fn(),
     };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
     expect(onSendRef.current).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
   });
 
   it('handleKeyDown calls onSendRef on Enter in iframe mode', () => {
     const mockParent = {} as Window;
-    Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+    Object.defineProperty(window, 'parent', {
+      value: mockParent,
+      writable: true,
+      configurable: true,
+    });
     try {
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
-      act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+      act(() =>
+        result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+      );
 
       expect(onSendRef.current).toHaveBeenCalledOnce();
       expect(e.preventDefault).toHaveBeenCalledOnce();
     } finally {
-      Object.defineProperty(window, 'parent', { value: window, writable: true, configurable: true });
+      Object.defineProperty(window, 'parent', {
+        value: window,
+        writable: true,
+        configurable: true,
+      });
     }
   });
 
   it('handleKeyDown does not send when event was already handled', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
-    const e = { key: 'Enter', shiftKey: false, defaultPrevented: true, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    const e = {
+      key: 'Enter',
+      shiftKey: false,
+      defaultPrevented: true,
+      preventDefault: vi.fn(),
+    };
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
     expect(onSendRef.current).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
   });
@@ -152,10 +177,12 @@ describe('useChatInput', () => {
   it('handleKeyDown does not call onSendRef for non-Enter keys', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     const e = { key: 'a', shiftKey: false, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
     expect(onSendRef.current).not.toHaveBeenCalled();
     expect(e.preventDefault).not.toHaveBeenCalled();
   });
@@ -164,17 +191,18 @@ describe('useChatInput', () => {
     vi.useFakeTimers();
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
 
     const focusMock = vi.fn();
-    // Attach a fake DOM node so the focus call has something to call
     (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
       focus: focusMock,
     };
 
     const e = { key: 'Enter', shiftKey: false, preventDefault: vi.fn() };
-    act(() => result.current.handleKeyDown(e as unknown as React.KeyboardEvent));
+    act(() =>
+      result.current.handleKeyDown(e as unknown as React.KeyboardEvent),
+    );
 
     // focus must NOT have been called synchronously
     expect(focusMock).not.toHaveBeenCalled();
@@ -190,7 +218,7 @@ describe('useChatInput', () => {
     vi.useFakeTimers();
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
 
     const focusMock = vi.fn();
@@ -206,12 +234,10 @@ describe('useChatInput', () => {
     vi.useRealTimers();
   });
 
-  // ── handleMentionSelect ──────────────────────────────────────────────────
-
   it('handleMentionSelect inserts path and moves cursor to end', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
     act(() => result.current.setInputState({ value: '@', cursor: 1 }));
     act(() => result.current.handleMentionSelect('src/index.ts'));
@@ -223,10 +249,11 @@ describe('useChatInput', () => {
   it('handleMentionSelect inserts path correctly in the middle of text', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
-    // "prefix @ suffix" -> user typing @ at cursor 8
-    act(() => result.current.setInputState({ value: 'prefix @ suffix', cursor: 8 }));
+    act(() =>
+      result.current.setInputState({ value: 'prefix @ suffix', cursor: 8 }),
+    );
     act(() => result.current.handleMentionSelect('lib/util.ts'));
 
     expect(result.current.inputValue).toBe('prefix @lib/util.ts  suffix');
@@ -237,7 +264,7 @@ describe('useChatInput', () => {
     vi.useFakeTimers();
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
 
     const focusMock = vi.fn();
@@ -257,18 +284,14 @@ describe('useChatInput', () => {
     vi.useRealTimers();
   });
 
-  // ── handleMentionClose ───────────────────────────────────────────────────
-
   it('handleMentionClose removes the in-progress @-query from the value', () => {
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
-    // Simulate user having typed "@foo" at position 4
     act(() => result.current.setInputState({ value: '@foo', cursor: 4 }));
     act(() => result.current.handleMentionClose());
 
-    // The @-query should be stripped; value becomes ''
     expect(result.current.inputValue).toBe('');
   });
 
@@ -276,7 +299,7 @@ describe('useChatInput', () => {
     vi.useFakeTimers();
     const onSendRef = { current: vi.fn() };
     const { result } = renderHook(() =>
-      useChatInput({ playgroundEntries: [], onSendRef })
+      useChatInput({ playgroundEntries: [], onSendRef }),
     );
 
     const focusMock = vi.fn();
@@ -296,12 +319,13 @@ describe('useChatInput', () => {
     vi.useRealTimers();
   });
 
-  // ── iframe focus-recovery ────────────────────────────────────────────────
-
   describe('iframe focus-recovery blur listener', () => {
     afterEach(() => {
-      // Reset window.parent to itself (standalone mode)
-      Object.defineProperty(window, 'parent', { value: window, writable: true, configurable: true });
+      Object.defineProperty(window, 'parent', {
+        value: window,
+        writable: true,
+        configurable: true,
+      });
       vi.restoreAllMocks();
     });
 
@@ -310,24 +334,28 @@ describe('useChatInput', () => {
 
       // Must mock BEFORE rendering so the effect sees isEmbedded = true
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
       vi.spyOn(window, 'focus').mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const focusMock = vi.fn();
-      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
-        focus: focusMock,
-      };
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current =
+        {
+          focus: focusMock,
+        };
 
       document.body.focus();
 
       act(() => {
         window.dispatchEvent(new Event('blur'));
-        // Flush requestAnimationFrame
         vi.runAllTimers();
       });
 
@@ -340,18 +368,23 @@ describe('useChatInput', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
       vi.spyOn(window, 'focus').mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const focusMock = vi.fn();
-      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
-        focus: focusMock,
-      };
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current =
+        {
+          focus: focusMock,
+        };
 
       // Another element has intentional focus
       const btn = document.createElement('button');
@@ -373,12 +406,16 @@ describe('useChatInput', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
       vi.spyOn(window, 'focus').mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const input = document.createElement('div');
@@ -409,12 +446,18 @@ describe('useChatInput', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
-      const windowFocus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
+      const windowFocus = vi
+        .spyOn(window, 'focus')
+        .mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const input = document.createElement('div');
@@ -450,12 +493,18 @@ describe('useChatInput', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
-      const windowFocus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
+      const windowFocus = vi
+        .spyOn(window, 'focus')
+        .mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const input = document.createElement('div');
@@ -478,9 +527,11 @@ describe('useChatInput', () => {
       focusMock.mockClear();
 
       act(() => {
-        window.dispatchEvent(new MessageEvent('message', {
-          data: { type: 'fibe_parent_focus_requested' },
-        }));
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: { type: 'fibe_parent_focus_requested' },
+          }),
+        );
       });
 
       expect(blurMock).toHaveBeenCalledOnce();
@@ -499,12 +550,16 @@ describe('useChatInput', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
       vi.spyOn(window, 'focus').mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const input = document.createElement('div');
@@ -520,9 +575,11 @@ describe('useChatInput', () => {
 
       act(() => {
         window.dispatchEvent(new Event('blur'));
-        window.dispatchEvent(new MessageEvent('message', {
-          data: { type: 'fibe_parent_focus_requested' },
-        }));
+        window.dispatchEvent(
+          new MessageEvent('message', {
+            data: { type: 'fibe_parent_focus_requested' },
+          }),
+        );
         vi.runAllTimers();
       });
 
@@ -537,12 +594,18 @@ describe('useChatInput', () => {
       vi.useFakeTimers();
 
       const mockParent = {} as Window;
-      Object.defineProperty(window, 'parent', { value: mockParent, writable: true, configurable: true });
-      const windowFocus = vi.spyOn(window, 'focus').mockImplementation(() => undefined);
+      Object.defineProperty(window, 'parent', {
+        value: mockParent,
+        writable: true,
+        configurable: true,
+      });
+      const windowFocus = vi
+        .spyOn(window, 'focus')
+        .mockImplementation(() => undefined);
 
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const input = document.createElement('div');
@@ -556,7 +619,9 @@ describe('useChatInput', () => {
 
       const selection = window.getSelection();
       expect(windowFocus).toHaveBeenCalled();
-      expect(selection?.anchorNode ? input.contains(selection.anchorNode) : false).toBe(true);
+      expect(
+        selection?.anchorNode ? input.contains(selection.anchorNode) : false,
+      ).toBe(true);
 
       document.body.removeChild(input);
       vi.useRealTimers();
@@ -565,16 +630,16 @@ describe('useChatInput', () => {
     it('does NOT attach blur listener in standalone mode (window === window.parent)', () => {
       vi.useFakeTimers();
 
-      // jsdom default: window.parent === window — standalone mode
       const onSendRef = { current: vi.fn() };
       const { result } = renderHook(() =>
-        useChatInput({ playgroundEntries: [], onSendRef })
+        useChatInput({ playgroundEntries: [], onSendRef }),
       );
 
       const focusMock = vi.fn();
-      (result.current.chatInputRef as React.MutableRefObject<unknown>).current = {
-        focus: focusMock,
-      };
+      (result.current.chatInputRef as React.MutableRefObject<unknown>).current =
+        {
+          focus: focusMock,
+        };
 
       document.body.focus();
       act(() => {

@@ -1,16 +1,6 @@
 /**
- * Provider Args: Centralized CLI argument resolution from PROVIDER_ARGS env variable.
- *
- * Each strategy defines its own BLOCKED_ARGS — critical flags that must never be
- * overridden by the player. The value in BLOCKED_ARGS is the enforced value:
- *   - `true`  → boolean flag (always emitted, e.g. `--yolo`)
- *   - string  → value flag (always emitted with that value, e.g. `--color never`)
- *   - `false` → presence-only block (flag is stripped from user input)
- *
- * DEFAULT_ARGS are the strategy's baseline. They can be overridden by PROVIDER_ARGS
- * unless they appear in BLOCKED_ARGS.
- *
- * Resolution: DEFAULT_ARGS ← PROVIDER_ARGS (env) ← BLOCKED_ARGS (enforced)
+ * Merges strategy defaults, player PROVIDER_ARGS, then enforced flags. A blocked
+ * true emits the flag, a string pins its value, and false removes it.
  */
 
 export interface BlockedArgs {
@@ -18,9 +8,9 @@ export interface BlockedArgs {
 }
 
 export interface ProviderArgsConfig {
-  /** Strategy defaults — overrideable by PROVIDER_ARGS unless blocked */
+  /** Defaults that PROVIDER_ARGS may override unless blocked. */
   defaultArgs: Record<string, string | true>;
-  /** Non-overrideable flags: key = flag name, value = enforced value */
+  /** Non-overrideable flags and their enforced values. */
   blockedArgs: BlockedArgs;
 }
 
@@ -29,18 +19,23 @@ function normalizeFlagKey(key: string): string {
   return key.length === 1 ? `-${key}` : `--${key}`;
 }
 
-function normalizeDefaultArgs(defaultArgs: Record<string, string | true>): Record<string, string | true> {
+function normalizeDefaultArgs(
+  defaultArgs: Record<string, string | true>,
+): Record<string, string | true> {
   return Object.fromEntries(
     Object.entries(defaultArgs).map(([key, value]) => [
       normalizeFlagKey(key),
       value === true ? true : String(value),
-    ])
+    ]),
   );
 }
 
 function normalizeBlockedArgs(blockedArgs: BlockedArgs): BlockedArgs {
   return Object.fromEntries(
-    Object.entries(blockedArgs).map(([key, value]) => [normalizeFlagKey(key), value])
+    Object.entries(blockedArgs).map(([key, value]) => [
+      normalizeFlagKey(key),
+      value,
+    ]),
   );
 }
 
@@ -52,15 +47,11 @@ function normalizeUserValue(value: unknown): string | true | null {
   return null;
 }
 
-/**
- * Parse PROVIDER_ARGS env and merge with strategy defaults + blocked args.
- * Returns an array of CLI tokens ready to spread into spawn args.
- */
+/** Returns merged provider arguments as CLI tokens. */
 export function buildProviderArgs(config: ProviderArgsConfig): string[] {
   const defaultArgs = normalizeDefaultArgs(config.defaultArgs);
   const blockedArgs = normalizeBlockedArgs(config.blockedArgs);
 
-  // Parse env
   let userArgs: Record<string, unknown> = {};
   const raw = process.env.PROVIDER_ARGS;
   if (raw) {
@@ -70,40 +61,34 @@ export function buildProviderArgs(config: ProviderArgsConfig): string[] {
         userArgs = parsed;
       }
     } catch {
-      // Invalid JSON — ignore silently, use defaults only
+      // Invalid overrides fall back to defaults.
     }
   }
 
-  // Merge: defaults ← user ← blocked
   const merged: Record<string, string | true> = { ...defaultArgs };
 
-  // Apply user overrides (skip blocked keys)
   for (const [key, value] of Object.entries(userArgs)) {
     const flag = normalizeFlagKey(key);
-    if (flag in blockedArgs) continue; // silently skip blocked
+    if (flag in blockedArgs) continue;
     const normalizedValue = normalizeUserValue(value);
     if (normalizedValue === null) continue;
     merged[flag] = normalizedValue;
   }
 
-  // Enforce blocked args
   for (const [flag, value] of Object.entries(blockedArgs)) {
     if (value === false) {
-      // false means "strip this flag entirely"
       delete merged[flag];
       continue;
     }
     merged[flag] = value;
   }
 
-  // Convert to CLI tokens
   const tokens: string[] = [];
   for (const [flag, value] of Object.entries(merged)) {
     tokens.push(flag);
     if (typeof value === 'string') {
       tokens.push(value);
     }
-    // true = boolean flag, no value needed
   }
 
   return tokens;

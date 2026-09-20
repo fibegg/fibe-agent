@@ -7,7 +7,6 @@ if [ -z "$MODE" ]; then
   exit 1
 fi
 
-# Validate against known keys
 case "$MODE" in
   exploring|casting|overseeing|build|greenfielding|brownfielding) ;;
   *)

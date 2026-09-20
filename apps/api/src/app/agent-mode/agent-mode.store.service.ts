@@ -17,7 +17,7 @@ export class AgentModeStoreService implements OnModuleDestroy {
   private cached: AgentModeValue | null = null;
 
   constructor(private readonly config: ConfigService) {
-    // Mode is a global runtime signal — stored at DATA_DIR root, not per-conversation.
+    // Mode is a global runtime signal: stored at DATA_DIR root, not per-conversation.
     const dataDir = this.config.getDataDir();
     this.modePath = join(dataDir, 'mode.json');
     this.jsonWriter = new SequentialJsonWriter(
@@ -28,17 +28,12 @@ export class AgentModeStoreService implements OnModuleDestroy {
     this.ensureDataDir();
   }
 
-  /** Return the persisted mode, or the default when nothing is stored yet. */
   get(): AgentModeValue {
     const stored = this.getStored();
     return stored ?? DEFAULT_AGENT_MODE;
   }
 
-  /**
-   * Validate and persist a new mode.
-   * Accepts both canonical keys ("exploring") and display strings ("Exploring...").
-   * Returns the resolved display string, or `null` when the input is invalid.
-   */
+  /** Persists a canonical key or display value; returns null for invalid input. */
   set(raw: string): AgentModeValue | null {
     const resolved = resolveAgentMode(raw);
     if (!resolved) return null;

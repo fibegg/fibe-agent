@@ -27,18 +27,8 @@ export interface ConversationLiveState {
 const RECENT_STREAM_RETENTION_MS = 30_000;
 
 /**
- * Manages the lifecycle of per-connection SessionContexts.
- *
- * - `create()` is called when a new WS client connects.
- * - `destroy()` is called when the client disconnects.
- * - `broadcast()` pushes an event to ALL live sessions (used for shared-state changes
- *   like model/effort updates, auth status, conversation resets).
- * - `broadcastProcessingState()` pushes anyProcessing flag + session count to all.
- *
- * Performance notes:
- * - `byConversation` maintains a per-conversation Set for O(k) broadcasts, where k
- *   is the number of sessions in that conversation (vs O(n) total sessions).
- * - `_allCache` caches the full sessions array and is invalidated on create/destroy.
+ * Owns connection sessions. Per-conversation sets make scoped broadcasts O(k),
+ * while the all-session cache is invalidated on create and destroy.
  */
 @Injectable()
 export class SessionRegistryService {
@@ -46,7 +36,7 @@ export class SessionRegistryService {
   private readonly sessions = new Map<string, SessionContext>();
   /** Per-conversation session sets for O(k) broadcastToConversation. */
   private readonly byConversation = new Map<string, Set<SessionContext>>();
-  /** Cached result of `all()` — invalidated on create/destroy. */
+  /** Cached result of `all()`: invalidated on create/destroy. */
   private _allCache: SessionContext[] | null = null;
 
   constructor(
@@ -54,18 +44,17 @@ export class SessionRegistryService {
     private readonly conversationManager: ConversationManagerService,
   ) {}
 
-  /**
-   * Create a new isolated session context for an incoming WS connection.
-   * Each session gets its own AgentStrategy instance (= its own Claude process slot).
-   * Pass conversationId to bind this session to a specific conversation thread.
-   */
+  /** Creates an isolated strategy instance bound to one conversation. */
   create(conversationId = 'default', clientConnected = true): SessionContext {
-    const detached = this.sessionsForConversation(conversationId)
-      .find((s) => !s.isClientConnected && s.isProcessing);
+    const detached = this.sessionsForConversation(conversationId).find(
+      (s) => !s.isClientConnected && s.isProcessing,
+    );
     if (detached) {
       detached.isClientConnected = true;
       detached.destroyWhenIdle = false;
-      this.logger.log(`Session reattached: ${detached.sessionId} conversation:${conversationId}`);
+      this.logger.log(
+        `Session reattached: ${detached.sessionId} conversation:${conversationId}`,
+      );
       this.broadcastSessionCount();
       return detached;
     }
@@ -79,17 +68,18 @@ export class SessionRegistryService {
     this.sessions.set(sessionId, ctx);
     this.addToConversationIndex(ctx);
     this._allCache = null;
-    this.logger.log(`Session created: ${sessionId} conversation:${conversationId} (total: ${this.sessions.size})`);
+    this.logger.log(
+      `Session created: ${sessionId} conversation:${conversationId} (total: ${this.sessions.size})`,
+    );
     this.broadcastSessionCount();
     return ctx;
   }
 
-  /** Look up a session by ID. */
   get(sessionId: string): SessionContext | undefined {
     return this.sessions.get(sessionId);
   }
 
-  /** All active sessions (cached — O(1) on repeat calls between mutations). */
+  /** All active sessions (cached: O(1) on repeat calls between mutations). */
   all(): SessionContext[] {
     if (!this._allCache) {
       this._allCache = [...this.sessions.values()];
@@ -97,12 +87,13 @@ export class SessionRegistryService {
     return this._allCache;
   }
 
-  /** Sessions that still have a browser WebSocket attached. */
   connected(): SessionContext[] {
     return this.all().filter((s) => s.isClientConnected);
   }
 
-  processingForConversation(conversationId: string): SessionContext | undefined {
+  processingForConversation(
+    conversationId: string,
+  ): SessionContext | undefined {
     const inIndex = this.sessionsForConversation(conversationId);
     // If the index has entries, use it (fast path O(k))
     if (inIndex.length > 0) return inIndex.find((s) => s.isProcessing);
@@ -112,7 +103,10 @@ export class SessionRegistryService {
     );
   }
 
-  isConversationProcessing(conversationId: string, excludeSessionId?: string): boolean {
+  isConversationProcessing(
+    conversationId: string,
+    excludeSessionId?: string,
+  ): boolean {
     const inIndex = this.sessionsForConversation(conversationId);
     if (inIndex.length > 0) {
       return inIndex.some(
@@ -142,7 +136,9 @@ export class SessionRegistryService {
           text: turn.displayText ?? turn.text,
           policy: turn.policy,
           createdAt: turn.createdAt,
-          ...(turn.attachmentFilenames?.length ? { attachmentFilenames: turn.attachmentFilenames } : {}),
+          ...(turn.attachmentFilenames?.length
+            ? { attachmentFilenames: turn.attachmentFilenames }
+            : {}),
         })),
         startedAt: processing.streamStartedAt,
         finishedAt: null,
@@ -155,20 +151,25 @@ export class SessionRegistryService {
       streamText: completed?.lastStreamText ?? '',
       currentActivityId: null,
       queuedTurns: completed?.queuedTurns.length ?? 0,
-      queue: completed?.queuedTurns.map((turn) => ({
-        id: turn.id,
-        messageId: turn.messageId,
-        text: turn.displayText ?? turn.text,
-        policy: turn.policy,
-        createdAt: turn.createdAt,
-        ...(turn.attachmentFilenames?.length ? { attachmentFilenames: turn.attachmentFilenames } : {}),
-      })) ?? [],
+      queue:
+        completed?.queuedTurns.map((turn) => ({
+          id: turn.id,
+          messageId: turn.messageId,
+          text: turn.displayText ?? turn.text,
+          policy: turn.policy,
+          createdAt: turn.createdAt,
+          ...(turn.attachmentFilenames?.length
+            ? { attachmentFilenames: turn.attachmentFilenames }
+            : {}),
+        })) ?? [],
       startedAt: completed?.lastStreamStartedAt ?? null,
       finishedAt: completed?.lastStreamFinishedAt ?? null,
     };
   }
 
-  private recentCompletedStreamForConversation(conversationId: string): SessionContext | undefined {
+  private recentCompletedStreamForConversation(
+    conversationId: string,
+  ): SessionContext | undefined {
     const cutoff = Date.now() - RECENT_STREAM_RETENTION_MS;
     return this.sessionsForConversation(conversationId)
       .filter((s) => {
@@ -176,16 +177,17 @@ export class SessionRegistryService {
         const finishedAt = Date.parse(s.lastStreamFinishedAt);
         return !Number.isNaN(finishedAt) && finishedAt >= cutoff;
       })
-      .sort((a, b) => Date.parse(b.lastStreamFinishedAt ?? '') - Date.parse(a.lastStreamFinishedAt ?? ''))[0];
+      .sort(
+        (a, b) =>
+          Date.parse(b.lastStreamFinishedAt ?? '') -
+          Date.parse(a.lastStreamFinishedAt ?? ''),
+      )[0];
   }
 
   get size(): number {
     return this.connected().length;
   }
 
-  /**
-   * Tear down a session: interrupt its agent, complete its stream, remove from registry.
-   */
   destroy(sessionId: string): void {
     const ctx = this.sessions.get(sessionId);
     if (!ctx) return;
@@ -193,7 +195,9 @@ export class SessionRegistryService {
     this.sessions.delete(sessionId);
     this.removeFromConversationIndex(ctx);
     this._allCache = null;
-    this.logger.log(`Session destroyed: ${sessionId} (total: ${this.sessions.size})`);
+    this.logger.log(
+      `Session destroyed: ${sessionId} (total: ${this.sessions.size})`,
+    );
     this.broadcastSessionCount();
   }
 
@@ -223,14 +227,16 @@ export class SessionRegistryService {
 
   destroyIfDetachedAndIdle(sessionId: string): void {
     const ctx = this.sessions.get(sessionId);
-    if (!ctx || ctx.isClientConnected || ctx.isProcessing || !ctx.destroyWhenIdle) return;
+    if (
+      !ctx ||
+      ctx.isClientConnected ||
+      ctx.isProcessing ||
+      !ctx.destroyWhenIdle
+    )
+      return;
     this.destroy(sessionId);
   }
 
-  /**
-   * Push an event to every active session.
-   * Used for shared-state changes: auth, model/effort updates, conversation reset, etc.
-   */
   broadcast(type: string, data: Record<string, unknown> = {}): void {
     const event: OutboundEvent = { type, data };
     for (const ctx of this.sessions.values()) {
@@ -240,7 +246,7 @@ export class SessionRegistryService {
 
   /**
    * Push an event only to sessions bound to a given conversation.
-   * O(k) where k = sessions in that conversation — uses per-conversation index.
+   * O(k) where k = sessions in that conversation: uses per-conversation index.
    */
   broadcastToConversation(
     conversationId: string,
@@ -265,13 +271,14 @@ export class SessionRegistryService {
    */
   broadcastAuthStatus(
     status: string,
-    extraData: Record<string, unknown> = {}
+    extraData: Record<string, unknown> = {},
   ): void {
     const sessions = this.all();
     const anyProcessing = sessions.some((s) => s.isProcessing);
     for (const s of sessions) {
       const isProcessing =
-        s.isProcessing || this.isConversationProcessing(s.conversationId, s.sessionId);
+        s.isProcessing ||
+        this.isConversationProcessing(s.conversationId, s.sessionId);
       const liveState = isProcessing
         ? this.liveConversationState(s.conversationId)
         : null;
@@ -285,15 +292,10 @@ export class SessionRegistryService {
     }
   }
 
-  /**
-   * Send the current session count to all connected clients.
-   * Each client can display "N tabs open" or similar.
-   */
   private broadcastSessionCount(): void {
     this.broadcast(WS_EVENT.SESSIONS_UPDATED, { count: this.size });
   }
 
-  /** Returns sessions for a conversation as an array for iteration. */
   private sessionsForConversation(conversationId: string): SessionContext[] {
     const set = this.byConversation.get(conversationId);
     return set ? [...set] : [];

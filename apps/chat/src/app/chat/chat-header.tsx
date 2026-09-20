@@ -14,13 +14,30 @@ import type { BrowseEntry } from './use-playground-selector';
 import { CHAT_STATES, truncateError } from './chat-state';
 import { getChatStateLabel, type ChatState } from './chat-state';
 import { TypewriterText } from './typewriter-text';
-import { formatCompactInteger, formatSessionDurationMs } from '../agent-thinking-utils';
-import { HEADER_FIRST_ROW, INPUT_SEARCH, SEARCH_ICON_POSITION, CLEAR_BUTTON_POSITION } from '../ui-classes';
+import {
+  formatCompactInteger,
+  formatSessionDurationMs,
+} from '../agent-thinking-utils';
+import {
+  HEADER_FIRST_ROW,
+  INPUT_SEARCH,
+  SEARCH_ICON_POSITION,
+  CLEAR_BUTTON_POSITION,
+} from '../ui-classes';
 import { PANEL_HEADER_MIN_HEIGHT_PX } from '../layout-constants';
 import { LocaleSelector } from '../locale-selector';
 import { useT } from '../i18n';
-import { CliButton, DiffButton, TerminalButton, StarkGlassesIcon } from './chat-header-controls';
-import { MoreActionsMenu, ProviderModelMenu, CompactConversationPicker } from './chat-header-menus';
+import {
+  CliButton,
+  DiffButton,
+  TerminalButton,
+  StarkGlassesIcon,
+} from './chat-header-controls';
+import {
+  MoreActionsMenu,
+  ProviderModelMenu,
+  CompactConversationPicker,
+} from './chat-header-menus';
 
 export interface ChatHeaderProps {
   isMobile: boolean;
@@ -32,7 +49,11 @@ export interface ChatHeaderProps {
   agentMode?: string;
   errorMessage: string | null;
   sessionTimeMs: number;
-  mobileSessionStats: { totalActions: number; completed: number; processing: number };
+  mobileSessionStats: {
+    totalActions: number;
+    completed: number;
+    processing: number;
+  };
   sessionTokenUsage?: { inputTokens: number; outputTokens: number } | null;
   mobileBrainClasses: { brain: string; accent: string };
   statusClass: string;
@@ -66,7 +87,6 @@ export interface ChatHeaderProps {
   modelLocked?: boolean;
   onRefreshModels?: () => void;
   refreshingModels?: boolean;
-  // Playground selector
   playgroundEntries?: BrowseEntry[];
   playgroundLoading?: boolean;
   playgroundError?: string | null;
@@ -84,16 +104,11 @@ export interface ChatHeaderProps {
   onPlaygroundLinked?: () => void;
   onPlaygroundUnlinked?: () => void;
   onPlaygroundSmartMount?: () => void;
-  /** When provided, shows a Reset button in the MoreActionsMenu. */
   onResetConversation?: () => void;
-  /** Number of currently connected WS sessions (browser tabs). */
   sessionCount?: number;
-  /** True if any connected session's agent is processing a request right now. */
   anyProcessing?: boolean;
-  /** Toggle the conversations drawer in the main chat column. */
   onToggleConversations?: () => void;
   conversationsOpen?: boolean;
-  /** Conversations for the compact-mode inline picker. */
   conversations?: import('./use-conversations').ConversationMeta[];
   activeConversationId?: string;
   onConversationSelect?: (id: string) => void;
@@ -160,29 +175,43 @@ export function ChatHeader({
   const t = useT();
   const displayName = agentName || agentProviderLabel?.trim() || 'Agent';
   const modelLabel = currentModel?.trim() ?? '';
-  const statusContent = state === CHAT_STATES.AWAITING_RESPONSE && agentMode
-    ? <TypewriterText text={agentMode} speed={40} />
-    : state === CHAT_STATES.AGENT_OFFLINE && errorMessage
-    ? truncateError(errorMessage)
-    : isKnownChatState(state) ? getChatStateLabel(state, t) : state;
-  const statusTextClass = state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass;
+  const statusContent =
+    state === CHAT_STATES.AWAITING_RESPONSE && agentMode ? (
+      <TypewriterText text={agentMode} speed={40} />
+    ) : state === CHAT_STATES.AGENT_OFFLINE && errorMessage ? (
+      truncateError(errorMessage)
+    ) : isKnownChatState(state) ? (
+      getChatStateLabel(state, t)
+    ) : (
+      state
+    );
+  const statusTextClass =
+    state === CHAT_STATES.AWAITING_RESPONSE ? 'text-warning' : statusClass;
   const statsLabel = useMemo(() => {
     const parts = [
       `${mobileSessionStats.totalActions}/${mobileSessionStats.completed}/${mobileSessionStats.processing}`,
     ];
     if (sessionTokenUsage) {
-        parts.push(
-          `${formatCompactInteger(sessionTokenUsage.inputTokens)} ${t('header.inputShort')} / ${formatCompactInteger(sessionTokenUsage.outputTokens)} ${t('header.outputShort')}`,
-        );
+      parts.push(
+        `${formatCompactInteger(sessionTokenUsage.inputTokens)} ${t('header.inputShort')} / ${formatCompactInteger(sessionTokenUsage.outputTokens)} ${t('header.outputShort')}`,
+      );
     }
     if (sessionTimeMs > 0) {
       parts.push(formatSessionDurationMs(sessionTimeMs));
     }
     return parts.join(' · ');
-  }, [mobileSessionStats.completed, mobileSessionStats.processing, mobileSessionStats.totalActions, sessionTimeMs, sessionTokenUsage, t]);
+  }, [
+    mobileSessionStats.completed,
+    mobileSessionStats.processing,
+    mobileSessionStats.totalActions,
+    sessionTimeMs,
+    sessionTokenUsage,
+    t,
+  ]);
   const statsAriaLabel = `${mobileSessionStats.totalActions} ${t('header.totalActions')} / ${mobileSessionStats.completed} ${t('header.completed')} / ${mobileSessionStats.processing} ${t('header.processing')}${sessionTokenUsage ? ` / ${sessionTokenUsage.inputTokens} ${t('header.inputShort')} / ${sessionTokenUsage.outputTokens} ${t('header.outputShort')}` : ''}${sessionTimeMs > 0 ? ` / ${formatSessionDurationMs(sessionTimeMs)}` : ''}`;
   const compactMode = simplicateMode;
-  const canShowReconnect = state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
+  const canShowReconnect =
+    state === CHAT_STATES.AGENT_OFFLINE || state === CHAT_STATES.ERROR;
   const menuButtonLabel = t('header.openMenu');
   const compactShowsProviderModel = state === CHAT_STATES.AUTHENTICATED;
   const busyBadge =
@@ -223,15 +252,17 @@ export function ChatHeader({
 
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-1.5 text-sm">
-              {/* Compact conversation picker — only in simplicate mode when conversations exist */}
-              {conversations && conversations.length > 0 && onConversationSelect && (
-                <CompactConversationPicker
-                  conversations={conversations}
-                  activeId={activeConversationId ?? ''}
-                  onSelect={onConversationSelect}
-                  onCreate={onConversationCreate}
-                />
-              )}
+              {/* Compact conversation picker: only in simplicate mode when conversations exist */}
+              {conversations &&
+                conversations.length > 0 &&
+                onConversationSelect && (
+                  <CompactConversationPicker
+                    conversations={conversations}
+                    activeId={activeConversationId ?? ''}
+                    onSelect={onConversationSelect}
+                    onCreate={onConversationCreate}
+                  />
+                )}
               {sessionBadge}
               {compactShowsProviderModel ? (
                 <ProviderModelMenu
@@ -248,10 +279,17 @@ export function ChatHeader({
                   currentEffort={currentEffort}
                   onEffortSelect={onEffortSelect}
                 >
-                  <span className="truncate font-semibold text-foreground" title={displayName}>{displayName}</span>
+                  <span
+                    className="truncate font-semibold text-foreground"
+                    title={displayName}
+                  >
+                    {displayName}
+                  </span>
                   {modelLabel && (
                     <>
-                      <span className="shrink-0 text-muted-foreground/60">·</span>
+                      <span className="shrink-0 text-muted-foreground/60">
+                        ·
+                      </span>
                       <span
                         className="min-w-0 truncate text-xs font-medium text-muted-foreground"
                         title={t('header.modelTitle', { model: modelLabel })}
@@ -281,7 +319,56 @@ export function ChatHeader({
               </button>
             )}
             <MoreActionsMenu
-              playgroundProps={{ isMobile, agentName, agentProvider, agentProviderLabel, currentModel, state, agentMode, errorMessage, sessionTimeMs, mobileSessionStats, sessionTokenUsage, mobileBrainClasses, statusClass, searchQuery, filteredMessagesCount, onSearchChange, onReconnect, onStartAuth, onOpenMenu, onOpenActivity, onToggleTerminal, terminalOpen, onToggleDiff, diffOpen, onToggleCli, cliOpen, tonyStarkMode, onToggleTonyStarkMode, simplicateMode, onSimplicateModeChange, currentEffort, onEffortSelect, showModelSelector, modelOptions, onModelSelect, onModelInputChange, modelLocked, onRefreshModels, refreshingModels, onResetConversation, sessionCount, anyProcessing, onToggleConversations, conversationsOpen, conversations, activeConversationId, onConversationSelect, onConversationCreate }}
+              playgroundProps={{
+                isMobile,
+                agentName,
+                agentProvider,
+                agentProviderLabel,
+                currentModel,
+                state,
+                agentMode,
+                errorMessage,
+                sessionTimeMs,
+                mobileSessionStats,
+                sessionTokenUsage,
+                mobileBrainClasses,
+                statusClass,
+                searchQuery,
+                filteredMessagesCount,
+                onSearchChange,
+                onReconnect,
+                onStartAuth,
+                onOpenMenu,
+                onOpenActivity,
+                onToggleTerminal,
+                terminalOpen,
+                onToggleDiff,
+                diffOpen,
+                onToggleCli,
+                cliOpen,
+                tonyStarkMode,
+                onToggleTonyStarkMode,
+                simplicateMode,
+                onSimplicateModeChange,
+                currentEffort,
+                onEffortSelect,
+                showModelSelector,
+                modelOptions,
+                onModelSelect,
+                onModelInputChange,
+                modelLocked,
+                onRefreshModels,
+                refreshingModels,
+                onResetConversation,
+                sessionCount,
+                anyProcessing,
+                onToggleConversations,
+                conversationsOpen,
+                conversations,
+                activeConversationId,
+                onConversationSelect,
+                onConversationCreate,
+              }}
               searchQuery={searchQuery}
               filteredMessagesCount={filteredMessagesCount}
               onSearchChange={onSearchChange}
@@ -354,7 +441,12 @@ export function ChatHeader({
               currentEffort={currentEffort}
               onEffortSelect={onEffortSelect}
             >
-              <span className="truncate text-sm font-semibold text-foreground" title={displayName}>{displayName}</span>
+              <span
+                className="truncate text-sm font-semibold text-foreground"
+                title={displayName}
+              >
+                {displayName}
+              </span>
               {modelLabel && (
                 <span
                   className="max-w-28 truncate text-[11px] font-medium leading-none text-muted-foreground/70 sm:max-w-40"
@@ -387,22 +479,40 @@ export function ChatHeader({
               className="text-xs sm:text-sm font-medium tabular-nums leading-none flex items-center gap-0.5 flex-wrap shrink-0 mr-2"
               aria-label={statsAriaLabel}
             >
-              <span key={`m-total-${mobileSessionStats.totalActions}`} className="text-foreground mobile-stat-tick" title={t('header.totalActions')}>
+              <span
+                key={`m-total-${mobileSessionStats.totalActions}`}
+                className="text-foreground mobile-stat-tick"
+                title={t('header.totalActions')}
+              >
                 {mobileSessionStats.totalActions}
               </span>
               <span className="text-muted-foreground/70">/</span>
-              <span key={`m-done-${mobileSessionStats.completed}`} className="text-emerald-400 mobile-stat-tick" title={t('header.completed')}>
+              <span
+                key={`m-done-${mobileSessionStats.completed}`}
+                className="text-emerald-400 mobile-stat-tick"
+                title={t('header.completed')}
+              >
                 {mobileSessionStats.completed}
               </span>
               <span className="text-muted-foreground/70">/</span>
-              <span key={`m-proc-${mobileSessionStats.processing}`} className="text-cyan-400 mobile-stat-tick" title={t('header.processing')}>
+              <span
+                key={`m-proc-${mobileSessionStats.processing}`}
+                className="text-cyan-400 mobile-stat-tick"
+                title={t('header.processing')}
+              >
                 {mobileSessionStats.processing}
               </span>
               {sessionTokenUsage && (
                 <>
                   <span className="text-muted-foreground/70">·</span>
-                  <span className="text-primary/90" title={t('header.tokenUsage')}>
-                    {formatCompactInteger(sessionTokenUsage.inputTokens)} {t('header.inputShort')} / {formatCompactInteger(sessionTokenUsage.outputTokens)} {t('header.outputShort')}
+                  <span
+                    className="text-primary/90"
+                    title={t('header.tokenUsage')}
+                  >
+                    {formatCompactInteger(sessionTokenUsage.inputTokens)}{' '}
+                    {t('header.inputShort')} /{' '}
+                    {formatCompactInteger(sessionTokenUsage.outputTokens)}{' '}
+                    {t('header.outputShort')}
                   </span>
                 </>
               )}
@@ -417,11 +527,19 @@ export function ChatHeader({
               title={t('header.agentActivity')}
               aria-label={t('header.openAgentActivity')}
             >
-              <Brain className={`size-8 ${mobileBrainClasses.brain} transition-colors`} />
+              <Brain
+                className={`size-8 ${mobileBrainClasses.brain} transition-colors`}
+              />
               {state === CHAT_STATES.AWAITING_RESPONSE ? (
-                <Loader2 className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`} aria-hidden />
+                <Loader2
+                  className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-spin transition-colors`}
+                  aria-hidden
+                />
               ) : (
-                <Sparkles className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`} aria-hidden />
+                <Sparkles
+                  className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
+                  aria-hidden
+                />
               )}
             </button>
           )}
@@ -466,7 +584,11 @@ export function ChatHeader({
           )}
           {/* Desktop-only: diff button in top row */}
           {onToggleDiff && (
-            <DiffButton open={diffOpen} onToggle={onToggleDiff} className="hidden sm:flex size-9" />
+            <DiffButton
+              open={diffOpen}
+              onToggle={onToggleDiff}
+              className="hidden sm:flex size-9"
+            />
           )}
           {onTogglePreview && previewAvailable && (
             <button
@@ -486,11 +608,19 @@ export function ChatHeader({
           )}
           {/* Desktop-only: CLI button in top row */}
           {onToggleCli && (
-            <CliButton open={cliOpen} onToggle={onToggleCli} className="hidden sm:flex size-9" />
+            <CliButton
+              open={cliOpen}
+              onToggle={onToggleCli}
+              className="hidden sm:flex size-9"
+            />
           )}
           {/* Desktop-only: terminal button in top row */}
           {onToggleTerminal && (
-            <TerminalButton open={terminalOpen} onToggle={onToggleTerminal} className="hidden sm:flex size-9" />
+            <TerminalButton
+              open={terminalOpen}
+              onToggle={onToggleTerminal}
+              className="hidden sm:flex size-9"
+            />
           )}
           {state === CHAT_STATES.UNAUTHENTICATED && (
             <button
@@ -530,7 +660,11 @@ export function ChatHeader({
 
         {/* Mobile-only: diff button right of search, before terminal */}
         {onToggleDiff && (
-          <DiffButton open={diffOpen} onToggle={onToggleDiff} className="sm:hidden size-8" />
+          <DiffButton
+            open={diffOpen}
+            onToggle={onToggleDiff}
+            className="sm:hidden size-8"
+          />
         )}
         {onTogglePreview && previewAvailable && (
           <button
@@ -551,12 +685,20 @@ export function ChatHeader({
 
         {/* Mobile-only: CLI button right of search */}
         {onToggleCli && (
-          <CliButton open={cliOpen} onToggle={onToggleCli} className="sm:hidden size-8" />
+          <CliButton
+            open={cliOpen}
+            onToggle={onToggleCli}
+            className="sm:hidden size-8"
+          />
         )}
 
         {/* Mobile-only: terminal button right of search */}
         {onToggleTerminal && (
-          <TerminalButton open={terminalOpen} onToggle={onToggleTerminal} className="sm:hidden size-8" />
+          <TerminalButton
+            open={terminalOpen}
+            onToggle={onToggleTerminal}
+            className="sm:hidden size-8"
+          />
         )}
       </div>
 

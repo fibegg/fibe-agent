@@ -1,4 +1,13 @@
-import { Brain, ChevronDown, ChevronRight, Loader2, Search, Sparkles, Terminal, X } from 'lucide-react';
+import {
+  Brain,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  Search,
+  Sparkles,
+  Terminal,
+  X,
+} from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { CountUpNumber } from './count-up-number';
@@ -31,13 +40,24 @@ import {
   TREE_NODE_BASE,
   TREE_NODE_SELECTED,
 } from './ui-classes';
-import { MAIN_CONTENT_MIN_WIDTH_PX, PANEL_HEADER_MIN_HEIGHT_PX } from './layout-constants';
+import {
+  MAIN_CONTENT_MIN_WIDTH_PX,
+  PANEL_HEADER_MIN_HEIGHT_PX,
+} from './layout-constants';
 import { useT, type TranslationKey } from './i18n';
 import { safeScrollIntoView } from './browser-compat';
 
-function localizedActivityLabel(type: string, t: (key: TranslationKey, params?: Record<string, string | number>) => string): string {
+function localizedActivityLabel(
+  type: string,
+  t: (key: TranslationKey, params?: Record<string, string | number>) => string,
+): string {
   if (type === 'stream_start') return t('activity.started');
-  if (type === 'reasoning_start' || type === 'reasoning_end' || type === 'reasoning') return t('activity.reasoning');
+  if (
+    type === 'reasoning_start' ||
+    type === 'reasoning_end' ||
+    type === 'reasoning'
+  )
+    return t('activity.reasoning');
   if (type === 'step') return t('activity.step');
   if (type === 'file_created') return t('activity.file');
   if (type === 'tool_call') return t('activity.command');
@@ -58,15 +78,21 @@ export function StoryListRow({
   const t = useT();
   const Icon = getActivityIcon(story.type);
   const label = localizedActivityLabel(story.type, t);
-  const iconColor = ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
+  const iconColor =
+    ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
   const summary =
     story.type === 'file_created'
-      ? story.path ?? (story.details?.trim() !== '{}' ? story.details : undefined) ?? story.message ?? label
+      ? (story.path ??
+        (story.details?.trim() !== '{}' ? story.details : undefined) ??
+        story.message ??
+        label)
       : story.type === 'tool_call'
         ? commandLabel(story)
         : story.type === 'reasoning_start' || story.type === 'reasoning_end'
           ? (story.details ?? '').trim().slice(0, 60) || t('activity.reasoning')
-          : (story.message?.trim() !== '{}' ? story.message?.slice(0, 60) : undefined) ?? label;
+          : ((story.message?.trim() !== '{}'
+              ? story.message?.slice(0, 60)
+              : undefined) ?? label);
 
   return (
     <button
@@ -76,7 +102,9 @@ export function StoryListRow({
     >
       <Icon className={`size-4 shrink-0 ${iconColor}`} />
       <span className="truncate text-left flex-1 min-w-0">{summary}</span>
-      <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>{formatRelativeTime(story.timestamp)}</span>
+      <span className={`${ACTIVITY_TIMESTAMP} shrink-0`}>
+        {formatRelativeTime(story.timestamp)}
+      </span>
     </button>
   );
 }
@@ -92,7 +120,8 @@ export function StoryDetail({
   const Icon = getActivityIcon(story.type);
   const label = localizedActivityLabel(story.type, t);
   const variant = getBlockVariant(story);
-  const iconColor = ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
+  const iconColor =
+    ACTIVITY_ICON_COLOR[story.type] ?? ACTIVITY_ICON_COLOR.default;
   const isSingleRow = SINGLE_ROW_TYPES.has(story.type);
   const isThinkingBlock =
     story.type === 'reasoning_start' && (story.details ?? '').trim().length > 0;
@@ -101,7 +130,7 @@ export function StoryDetail({
   if (isSingleRow) {
     const singleRowText =
       story.type === 'file_created'
-        ? story.path ?? story.details ?? story.message
+        ? (story.path ?? story.details ?? story.message)
         : story.type === 'tool_call'
           ? commandLabel(story)
           : story.type === 'step'
@@ -113,23 +142,32 @@ export function StoryDetail({
       >
         <div className={`${FLEX_ROW_CENTER} min-w-0 flex-1`}>
           <Icon className={`size-4 shrink-0 ${iconColor}`} />
-          <p className={`${ACTIVITY_LABEL} truncate`} title={String(singleRowText)}>
+          <p
+            className={`${ACTIVITY_LABEL} truncate`}
+            title={String(singleRowText)}
+          >
             {highlightText(String(singleRowText), q)}
           </p>
         </div>
-        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(story.timestamp)}</span>
+        <span className={ACTIVITY_TIMESTAMP}>
+          {formatRelativeTime(story.timestamp)}
+        </span>
       </div>
     );
   }
 
   return (
-    <div className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}>
+    <div
+      className={`${ACTIVITY_BLOCK_VARIANTS[variant]} ${ACTIVITY_BLOCK_BASE}`}
+    >
       <div className={FLEX_ROW_CENTER_WRAP}>
         <div className={FLEX_ROW_CENTER}>
           <Icon className={`size-4 shrink-0 ${iconColor}`} />
           <p className={ACTIVITY_LABEL}>{label}</p>
         </div>
-        <span className={ACTIVITY_TIMESTAMP}>{formatRelativeTime(story.timestamp)}</span>
+        <span className={ACTIVITY_TIMESTAMP}>
+          {formatRelativeTime(story.timestamp)}
+        </span>
       </div>
       {isThinkingBlock ? (
         <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-[70vh] overflow-y-auto">
@@ -145,7 +183,10 @@ export function StoryDetail({
           {story.details &&
             story.type !== 'reasoning_start' &&
             String(story.details).trim() !== '{}' && (
-              <p className="text-[10px] text-muted-foreground mt-0.5 break-words" title={story.details}>
+              <p
+                className="text-[10px] text-muted-foreground mt-0.5 break-words"
+                title={story.details}
+              >
                 {highlightText(story.details, q)}
               </p>
             )}
@@ -155,17 +196,19 @@ export function StoryDetail({
   );
 }
 
-
-
-// ─── Command grouping (same as in AgentThinkingSidebar) ──────────────────────
-
 const COMMAND_GROUP_MIN = 3;
 
 type ActivityDisplayItem =
   | { kind: 'entry'; story: StoryEntry; originalIndex: number }
-  | { kind: 'command_group'; id: string; entries: Array<{ story: StoryEntry; originalIndex: number }> };
+  | {
+      kind: 'command_group';
+      id: string;
+      entries: Array<{ story: StoryEntry; originalIndex: number }>;
+    };
 
-function buildActivityDisplayList(stories: StoryEntry[]): ActivityDisplayItem[] {
+function buildActivityDisplayList(
+  stories: StoryEntry[],
+): ActivityDisplayItem[] {
   const result: ActivityDisplayItem[] = [];
   let i = 0;
   while (i < stories.length) {
@@ -182,7 +225,9 @@ function buildActivityDisplayList(stories: StoryEntry[]): ActivityDisplayItem[] 
       result.push({
         kind: 'command_group',
         id: `cg-${stories[i].id}`,
-        entries: stories.slice(i, j).map((s, k) => ({ story: s, originalIndex: startIndex + k })),
+        entries: stories
+          .slice(i, j)
+          .map((s, k) => ({ story: s, originalIndex: startIndex + k })),
       });
     } else {
       for (let k = i; k < j; k++) {
@@ -223,9 +268,11 @@ function CommandGroupListRow({
         }`}
         aria-expanded={expanded}
       >
-        {expanded
-          ? <ChevronDown className="size-3.5 shrink-0 text-primary" />
-          : <ChevronRight className="size-3.5 shrink-0 text-primary" />}
+        {expanded ? (
+          <ChevronDown className="size-3.5 shrink-0 text-primary" />
+        ) : (
+          <ChevronRight className="size-3.5 shrink-0 text-primary" />
+        )}
         <Terminal className="size-3.5 shrink-0 text-primary" />
         <span className="flex-1 truncate text-left text-xs">
           {t('activity.commandsCount', { count: n })}
@@ -243,7 +290,9 @@ function CommandGroupListRow({
               onClick={onSelectFirst}
               className="flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left min-w-0 hover:bg-primary/10 transition-colors"
             >
-              <span className="text-amber-400/60 shrink-0 text-[10px] font-mono select-none">$</span>
+              <span className="text-amber-400/60 shrink-0 text-[10px] font-mono select-none">
+                $
+              </span>
               <span className="text-[11px] font-mono text-green-300/80 truncate">
                 {commandLabel(story)}
               </span>
@@ -286,10 +335,15 @@ export function ActivityStoryList({
   }
   const displayList = buildActivityDisplayList(stories);
   return (
-    <div ref={scrollRef} className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 min-h-0">
+    <div
+      ref={scrollRef}
+      className="flex-1 overflow-y-auto p-2 flex flex-col gap-0.5 min-h-0"
+    >
       {displayList.map((item) => {
         if (item.kind === 'command_group') {
-          const isAnySelected = item.entries.some((e) => e.originalIndex === safeIndex);
+          const isAnySelected = item.entries.some(
+            (e) => e.originalIndex === safeIndex,
+          );
           return (
             <CommandGroupListRow
               key={item.id}
@@ -344,15 +398,30 @@ export function ActivityStoryDetailPanel({
   const t = useT();
   const isWorking = brainState === 'working';
   const isComplete = brainState === 'complete';
-  const brainColor = isWorking ? 'text-cyan-400' : isComplete ? 'text-emerald-400' : 'text-primary';
-  const accentColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-300' : 'text-primary';
-  const statColor = isWorking ? 'text-cyan-300' : isComplete ? 'text-emerald-400' : 'text-foreground';
+  const brainColor = isWorking
+    ? 'text-cyan-400'
+    : isComplete
+      ? 'text-emerald-400'
+      : 'text-primary';
+  const accentColor = isWorking
+    ? 'text-cyan-300'
+    : isComplete
+      ? 'text-emerald-300'
+      : 'text-primary';
+  const statColor = isWorking
+    ? 'text-cyan-300'
+    : isComplete
+      ? 'text-emerald-400'
+      : 'text-foreground';
   const liveResponseRef = useRef<HTMLDivElement>(null);
 
   // When following, scroll latest-response block into view whenever the text updates
   useEffect(() => {
     if (!isFollowing || !liveResponseText) return;
-    safeScrollIntoView(liveResponseRef.current, { behavior: 'smooth', block: 'nearest' });
+    safeScrollIntoView(liveResponseRef.current, {
+      behavior: 'smooth',
+      block: 'nearest',
+    });
   }, [isFollowing, liveResponseText]);
   return (
     <main
@@ -377,7 +446,11 @@ export function ActivityStoryDetailPanel({
           .brain-download-anim { animation: brainDownloadPulse 2.2s ease-in-out forwards; }
         `}</style>
         <div className="flex items-center justify-between min-w-0 mb-2">
-          <div ref={brainButtonRef} className="relative shrink-0 flex items-center justify-center" style={{ display: 'none' }}>
+          <div
+            ref={brainButtonRef}
+            className="relative shrink-0 flex items-center justify-center"
+            style={{ display: 'none' }}
+          >
             <button
               type="button"
               onClick={onCopyClick}
@@ -387,7 +460,10 @@ export function ActivityStoryDetailPanel({
               aria-label={t('activity.copyToClipboard')}
             >
               {copyAnimating ? (
-                <span className="inline-flex items-center justify-center text-primary" aria-hidden>
+                <span
+                  className="inline-flex items-center justify-center text-primary"
+                  aria-hidden
+                >
                   <Brain className="size-8 brain-download-anim" />
                 </span>
               ) : (
@@ -424,7 +500,7 @@ export function ActivityStoryDetailPanel({
               >
                 {t('activity.copiedToClipboard')}
               </span>,
-              document.body
+              document.body,
             )}
           <div className="flex flex-col min-w-0 flex-1 pl-3 gap-0.5">
             <h1 className="font-semibold text-sm text-foreground truncate min-w-0">
@@ -437,16 +513,24 @@ export function ActivityStoryDetailPanel({
                 <span className={`${statColor} transition-colors`}>
                   <CountUpNumber value={totalStories} format="raw" />
                 </span>
-                <span className="text-muted-foreground/60 text-[10px]"> {t('activity.total')}</span>
+                <span className="text-muted-foreground/60 text-[10px]">
+                  {' '}
+                  {t('activity.total')}
+                </span>
                 <span className="text-muted-foreground/40 mx-0.5">·</span>
                 <span className="text-emerald-400 transition-colors">
                   <CountUpNumber value={completedStories} format="raw" />
                 </span>
-                <span className="text-muted-foreground/60 text-[10px]"> {t('activity.done')}</span>
+                <span className="text-muted-foreground/60 text-[10px]">
+                  {' '}
+                  {t('activity.done')}
+                </span>
                 {isWorking && (
                   <>
                     <span className="text-muted-foreground/40 mx-0.5">·</span>
-                    <span className="text-cyan-400 text-[10px] animate-pulse">{t('header.processing').toLowerCase()}</span>
+                    <span className="text-cyan-400 text-[10px] animate-pulse">
+                      {t('header.processing').toLowerCase()}
+                    </span>
                   </>
                 )}
               </p>
@@ -477,7 +561,10 @@ export function ActivityStoryDetailPanel({
       </div>
       <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
         {liveResponseText && (
-          <div ref={liveResponseRef} className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm shadow-primary/10">
+          <div
+            ref={liveResponseRef}
+            className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm shadow-primary/10"
+          >
             <div className="flex items-center gap-2 shrink-0">
               <span className="relative flex size-2 shrink-0">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
@@ -489,17 +576,27 @@ export function ActivityStoryDetailPanel({
             </div>
             <div className="max-h-[40vh] overflow-y-auto">
               <p className={`text-[11px] ${ACTIVITY_MONO} whitespace-pre-wrap`}>
-                {reasoningBodyWithHighlights(liveResponseText, detailSearchQuery)}
+                {reasoningBodyWithHighlights(
+                  liveResponseText,
+                  detailSearchQuery,
+                )}
               </p>
             </div>
           </div>
         )}
         {selectedStory ? (
           <div className="w-full min-w-0">
-            <StoryDetail story={selectedStory} highlightQuery={detailSearchQuery} />
+            <StoryDetail
+              story={selectedStory}
+              highlightQuery={detailSearchQuery}
+            />
           </div>
         ) : (
-          !liveResponseText && <p className="text-sm text-muted-foreground">{t('activity.selectStory')}</p>
+          !liveResponseText && (
+            <p className="text-sm text-muted-foreground">
+              {t('activity.selectStory')}
+            </p>
+          )
         )}
       </div>
     </main>

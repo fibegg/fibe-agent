@@ -119,7 +119,6 @@ describe('AgentModeStoreService', () => {
     service1.set('casting');
     await service1.flush();
 
-    // Simulate restart with a fresh instance
     const service2 = makeService();
     expect(service2.get()).toBe(AGENT_MODES.casting);
   });

@@ -1,6 +1,10 @@
 import { lstat, readdir, readFile, realpath, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { runLocalPlaygroundsCli } from './local-playgrounds-cli';
 
@@ -38,7 +42,11 @@ export class PlayroomBrowserService {
     if (relPath) return []; // Flattened UI workflow doesn't browse subdirectories
 
     try {
-      const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'names']);
+      const stdout = await runLocalPlaygroundsCli(this.config, [
+        'info',
+        '--view',
+        'names',
+      ]);
       const items = JSON.parse(stdout) as LocalPlaygroundName[];
       const seen = new Set<string>();
       const entries: BrowseEntry[] = [];
@@ -56,28 +64,27 @@ export class PlayroomBrowserService {
 
       return entries;
     } catch {
-      throw new NotFoundException(`Cannot execute Fibe local playgrounds command.`);
+      throw new NotFoundException(
+        `Cannot execute Fibe local playgrounds command.`,
+      );
     }
   }
 
-  /**
-   * Link the target services to /app/playground through the Fibe CLI.
-   *
-   * Throws:
-   *  - BadRequestException  if relPath is empty / invalid
-   */
+  /** Links selected services to /app/playground through the Fibe CLI. */
   async linkPlayground(relPath: string): Promise<{ linkedPath: string }> {
     if (!relPath?.trim()) {
       throw new BadRequestException('Path is required');
     }
 
-
     try {
       const linkDir = resolve(this.config.getPlaygroundsDir());
 
-      // Trust the Fibe CLI to do all validation and linking
-      await runLocalPlaygroundsCli(this.config, ['link', relPath, '--link-dir', linkDir]);
-
+      await runLocalPlaygroundsCli(this.config, [
+        'link',
+        relPath,
+        '--link-dir',
+        linkDir,
+      ]);
     } catch (err: unknown) {
       const e = err as Error;
       throw new BadRequestException(
@@ -99,18 +106,28 @@ export class PlayroomBrowserService {
       info = await lstat(playgroundDir);
     } catch (err: unknown) {
       const e = err as Error;
-      throw new BadRequestException(`Failed to unlink playground: ${e.message}`);
+      throw new BadRequestException(
+        `Failed to unlink playground: ${e.message}`,
+      );
     }
 
     if (info.isSymbolicLink() || !info.isDirectory()) {
-      throw new BadRequestException(`Failed to unlink playground: ${playgroundDir} is not a directory`);
+      throw new BadRequestException(
+        `Failed to unlink playground: ${playgroundDir} is not a directory`,
+      );
     }
 
     const entries = await readdir(playgroundDir, { withFileTypes: true });
-    await Promise.all(entries.map((entry) => rm(resolve(playgroundDir, entry.name), { recursive: true, force: true })));
+    await Promise.all(
+      entries.map((entry) =>
+        rm(resolve(playgroundDir, entry.name), {
+          recursive: true,
+          force: true,
+        }),
+      ),
+    );
   }
 
-  /** Returns the name of the playground currently active in /app/playground, or null. */
   async getCurrentLink(): Promise<string | null> {
     const playgroundDir = resolve(this.config.getPlaygroundsDir());
     const stateFile = resolve(playgroundDir, '.current_playground.json');
@@ -123,13 +140,19 @@ export class PlayroomBrowserService {
     }
   }
 
-  private async inferCurrentLinkFromMountedTargets(playgroundDir: string): Promise<string | null> {
+  private async inferCurrentLinkFromMountedTargets(
+    playgroundDir: string,
+  ): Promise<string | null> {
     const mountedTargets = await this.realMountedTargets(playgroundDir);
     if (mountedTargets.size === 0) return null;
 
     let playgrounds: LocalPlaygroundName[];
     try {
-      const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'names']);
+      const stdout = await runLocalPlaygroundsCli(this.config, [
+        'info',
+        '--view',
+        'names',
+      ]);
       playgrounds = JSON.parse(stdout) as LocalPlaygroundName[];
     } catch {
       return null;
@@ -141,10 +164,18 @@ export class PlayroomBrowserService {
       if (!name) continue;
 
       try {
-        const stdout = await runLocalPlaygroundsCli(this.config, ['info', '--view', 'mounts', '--playground', name]);
+        const stdout = await runLocalPlaygroundsCli(this.config, [
+          'info',
+          '--view',
+          'mounts',
+          '--playground',
+          name,
+        ]);
         const mounts = JSON.parse(stdout) as LocalPlaygroundMount[];
         const mountTargets = await this.realMountTargets(mounts);
-        if (this.allMountedTargetsBelongToPlayground(mountedTargets, mountTargets)) {
+        if (
+          this.allMountedTargetsBelongToPlayground(mountedTargets, mountTargets)
+        ) {
           matches.push(name);
         }
       } catch {
@@ -155,7 +186,9 @@ export class PlayroomBrowserService {
     return matches.length === 1 ? matches[0] : null;
   }
 
-  private async realMountedTargets(playgroundDir: string): Promise<Set<string>> {
+  private async realMountedTargets(
+    playgroundDir: string,
+  ): Promise<Set<string>> {
     const targets = new Set<string>();
     let entries;
     try {
@@ -176,7 +209,9 @@ export class PlayroomBrowserService {
     return targets;
   }
 
-  private async realMountTargets(mounts: LocalPlaygroundMount[]): Promise<Set<string>> {
+  private async realMountTargets(
+    mounts: LocalPlaygroundMount[],
+  ): Promise<Set<string>> {
     const targets = new Set<string>();
     for (const mount of mounts) {
       const raw = mount.mount?.trim();
@@ -190,7 +225,10 @@ export class PlayroomBrowserService {
     return targets;
   }
 
-  private allMountedTargetsBelongToPlayground(mountedTargets: Set<string>, mountTargets: Set<string>): boolean {
+  private allMountedTargetsBelongToPlayground(
+    mountedTargets: Set<string>,
+    mountTargets: Set<string>,
+  ): boolean {
     if (mountedTargets.size === 0 || mountTargets.size === 0) return false;
     for (const target of mountedTargets) {
       if (!mountTargets.has(target)) return false;

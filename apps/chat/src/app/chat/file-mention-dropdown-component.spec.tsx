@@ -8,7 +8,6 @@ vi.mock('../file-icon', () => ({
   FileIcon: () => <span data-testid="file-icon" />,
 }));
 
-// jsdom does not implement scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();
 
 const entries: PlaygroundEntryItem[] = [
@@ -20,7 +19,7 @@ const entries: PlaygroundEntryItem[] = [
   { path: 'tsconfig.json', name: 'tsconfig.json', type: 'file' },
   { path: 'vite.config.ts', name: 'vite.config.ts', type: 'file' },
   { path: 'jest.config.ts', name: 'jest.config.ts', type: 'file' },
-  { path: 'extra.ts', name: 'extra.ts', type: 'file' }, // 9th entry — beyond MAX_VISIBLE=8
+  { path: 'extra.ts', name: 'extra.ts', type: 'file' }, // 9th entry: beyond MAX_VISIBLE=8
 ];
 
 const anchorRef = { current: null } as React.RefObject<HTMLDivElement | null>;
@@ -39,7 +38,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -53,7 +52,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     expect(screen.getByRole('listbox')).toBeTruthy();
   });
@@ -67,7 +66,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     expect(screen.getByText('No files or folders in playground')).toBeTruthy();
   });
@@ -81,7 +80,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     expect(screen.getByText('No matching files or folders')).toBeTruthy();
   });
@@ -95,7 +94,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     expect(screen.getByText('index.ts')).toBeTruthy();
     expect(screen.queryByText('app.tsx')).toBeNull();
@@ -111,7 +110,7 @@ describe('FileMentionDropdown', () => {
         onSelect={onSelect}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     const options = screen.getAllByRole('option');
     fireEvent.click(options[0]);
@@ -127,9 +126,9 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
-    expect(screen.getByText(/more — type to filter/)).toBeTruthy();
+    expect(screen.getByText(/more\. type to filter/i)).toBeTruthy();
   });
 
   it('does not show "+ more" when entries fit within MAX_VISIBLE', () => {
@@ -141,9 +140,9 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
-    expect(screen.queryByText(/more — type to filter/)).toBeNull();
+    expect(screen.queryByText(/more\. type to filter/i)).toBeNull();
   });
 
   it('highlights the first entry by default', () => {
@@ -155,7 +154,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     const options = screen.getAllByRole('option');
     expect(options[0].getAttribute('aria-selected')).toBe('true');
@@ -171,7 +170,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     const options = screen.getAllByRole('option');
     fireEvent.mouseEnter(options[2]);
@@ -189,7 +188,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={onClose}
         anchorRef={anchorRef}
-      />
+      />,
     );
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledTimes(1);
@@ -204,7 +203,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     const options = screen.getAllByRole('option');
@@ -220,9 +219,8 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
-    // Move down first
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: 'ArrowUp' });
     const options = screen.getAllByRole('option');
@@ -239,7 +237,7 @@ describe('FileMentionDropdown', () => {
         onSelect={onSelect}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     fireEvent.keyDown(window, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledWith(entries[0].path);
@@ -254,7 +252,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     fireEvent.keyDown(window, { key: 'ArrowDown' });
     fireEvent.keyDown(window, { key: 'ArrowDown' });
@@ -272,7 +270,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     fireEvent.keyDown(window, { key: 'ArrowUp' });
     const options = screen.getAllByRole('option');
@@ -289,7 +287,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={onClose}
         anchorRef={anchorRef}
-      />
+      />,
     );
     rerender(
       <FileMentionDropdown
@@ -299,7 +297,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={onClose}
         anchorRef={anchorRef}
-      />
+      />,
     );
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onClose).not.toHaveBeenCalled();
@@ -317,7 +315,7 @@ describe('FileMentionDropdown', () => {
         onSelect={vi.fn()}
         onClose={vi.fn()}
         anchorRef={anchorRef}
-      />
+      />,
     );
     const options = screen.getAllByRole('option');
     expect(options[0].textContent).toContain('app.tsx');

@@ -44,7 +44,9 @@ describe('usePersistedTypeFilter', () => {
       result.current[1](['tool_call']);
     });
     expect(result.current[0]).toEqual(['tool_call']);
-    expect(localStorage.getItem(STORAGE_KEY)).toBe(JSON.stringify(['tool_call']));
+    expect(localStorage.getItem(STORAGE_KEY)).toBe(
+      JSON.stringify(['tool_call']),
+    );
   });
 
   it('removes key from localStorage when filter is empty', () => {
@@ -74,7 +76,7 @@ describe('usePersistedTypeFilter', () => {
 
     act(() => {
       window.dispatchEvent(
-        new CustomEvent(SYNC_EVENT, { detail: ['file_created'] })
+        new CustomEvent(SYNC_EVENT, { detail: ['file_created'] }),
       );
     });
 
@@ -86,9 +88,7 @@ describe('usePersistedTypeFilter', () => {
 
     act(() => {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(['reasoning']));
-      window.dispatchEvent(
-        new StorageEvent('storage', { key: STORAGE_KEY })
-      );
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY }));
     });
 
     expect(result.current[0]).toEqual(['reasoning']);
@@ -102,16 +102,13 @@ describe('usePersistedTypeFilter', () => {
     });
 
     act(() => {
-      window.dispatchEvent(
-        new StorageEvent('storage', { key: 'other_key' })
-      );
+      window.dispatchEvent(new StorageEvent('storage', { key: 'other_key' }));
     });
 
     expect(result.current[0]).toEqual(['step']);
   });
 
   it('returns empty array when localStorage.getItem throws', () => {
-    // Cover the outer catch in readFilter
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
       throw new Error('SecurityError');
     });

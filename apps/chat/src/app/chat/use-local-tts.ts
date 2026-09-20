@@ -24,9 +24,12 @@ export function useLocalTts() {
   const currentSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
   useEffect(() => {
-    workerRef.current = new Worker(new URL('./workers/tts.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    workerRef.current = new Worker(
+      new URL('./workers/tts.worker.ts', import.meta.url),
+      {
+        type: 'module',
+      },
+    );
 
     const onMessageReceived = (e: MessageEvent) => {
       switch (e.data.type) {
@@ -35,9 +38,15 @@ export function useLocalTts() {
           if (status === 'ready') {
             setIsReady(true);
           }
-          if (status === 'progress' || status === 'init' || status === 'download') {
+          if (
+            status === 'progress' ||
+            status === 'init' ||
+            status === 'download'
+          ) {
             setProgress((prev) => {
-              const existingIndex = prev.findIndex((p) => p.file === e.data.progress.file && p.name === name);
+              const existingIndex = prev.findIndex(
+                (p) => p.file === e.data.progress.file && p.name === name,
+              );
               if (existingIndex !== -1) {
                 const next = [...prev];
                 next[existingIndex] = e.data.progress;
@@ -58,7 +67,10 @@ export function useLocalTts() {
         workerRef.current.terminate();
         workerRef.current = null;
       }
-      if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
+      if (
+        audioContextRef.current &&
+        audioContextRef.current.state !== 'closed'
+      ) {
         audioContextRef.current.close().catch(console.error);
       }
     };
@@ -90,25 +102,29 @@ export function useLocalTts() {
         if (e.data.id === id) {
           if (e.data.type === 'complete') {
             workerRef.current?.removeEventListener('message', onMessage);
-            
+
             try {
-              if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
+              if (
+                !audioContextRef.current ||
+                audioContextRef.current.state === 'closed'
+              ) {
                 const AC = window.AudioContext || window.webkitAudioContext;
-                audioContextRef.current = new AC({ sampleRate: e.data.sampling_rate });
+                audioContextRef.current = new AC({
+                  sampleRate: e.data.sampling_rate,
+                });
               }
 
               const audioContext = audioContextRef.current;
               if (audioContext.state === 'suspended') {
                 await audioContext.resume();
               }
-              
-              // Create an empty, mono audio buffer
+
               const audioBuffer = audioContext.createBuffer(
                 1,
                 e.data.audio.length,
-                e.data.sampling_rate
+                e.data.sampling_rate,
               );
-              
+
               audioBuffer.copyToChannel(e.data.audio, 0);
 
               if (currentSourceRef.current) {
@@ -118,7 +134,7 @@ export function useLocalTts() {
               const source = audioContext.createBufferSource();
               source.buffer = audioBuffer;
               source.connect(audioContext.destination);
-              
+
               source.onended = () => {
                 if (currentSourceRef.current === source) {
                   setIsSpeaking(false);
@@ -128,7 +144,6 @@ export function useLocalTts() {
 
               currentSourceRef.current = source;
               source.start();
-              
             } catch (err) {
               setIsSpeaking(false);
               reject(err);

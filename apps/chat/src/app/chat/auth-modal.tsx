@@ -16,7 +16,12 @@ interface AuthModalProps {
   onSubmitCode: (code: string) => void;
 }
 
-export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalProps) {
+export function AuthModal({
+  open,
+  authModal,
+  onClose,
+  onSubmitCode,
+}: AuthModalProps) {
   const t = useT();
   const [code, setCode] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -25,9 +30,11 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
   if (!open) return null;
 
   const showUrl = authModal.authUrl && !authModal.isManualToken;
-  const isDeviceCode = Boolean(authModal.deviceCode && !authModal.isManualToken);
-  // Waiting for OAuth URL: OAuth flow started (not manual token, no device code yet, no URL yet)
-  const isWaitingForUrl = !authModal.isManualToken && !authModal.authUrl && !authModal.deviceCode;
+  const isDeviceCode = Boolean(
+    authModal.deviceCode && !authModal.isManualToken,
+  );
+  const isWaitingForUrl =
+    !authModal.isManualToken && !authModal.authUrl && !authModal.deviceCode;
   const codeLabel = authModal.isManualToken
     ? t('auth.apiToken')
     : isDeviceCode
@@ -89,8 +96,12 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           {isWaitingForUrl && (
             <div className="flex flex-col items-center gap-3 py-4 text-center">
               <span className="size-7 border-2 border-primary/30 border-t-primary rounded-full animate-spin" />
-              <p className="text-sm font-medium text-foreground">{t('auth.waitingForUrl')}</p>
-              <p className="text-xs text-muted-foreground max-w-xs">{t('auth.generatingUrl')}</p>
+              <p className="text-sm font-medium text-foreground">
+                {t('auth.waitingForUrl')}
+              </p>
+              <p className="text-xs text-muted-foreground max-w-xs">
+                {t('auth.generatingUrl')}
+              </p>
             </div>
           )}
           {showUrl && (
@@ -114,7 +125,10 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
           )}
           {!isWaitingForUrl && (
             <div className="space-y-2">
-              <label htmlFor="auth-code" className="block text-xs sm:text-sm font-medium text-foreground">
+              <label
+                htmlFor="auth-code"
+                className="block text-xs sm:text-sm font-medium text-foreground"
+              >
                 {codeLabel}
               </label>
               {authModal.isManualToken && (
@@ -130,7 +144,11 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
                   readOnly={readOnly}
                   onChange={(e) => setCode(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder={authModal.isManualToken ? t('auth.tokenPlaceholder') : t('auth.codePlaceholder')}
+                  placeholder={
+                    authModal.isManualToken
+                      ? t('auth.tokenPlaceholder')
+                      : t('auth.codePlaceholder')
+                  }
                   className={INPUT_ROUNDED}
                   autoComplete="off"
                   autoFocus
@@ -173,16 +191,36 @@ export function AuthModal({ open, authModal, onClose, onSubmitCode }: AuthModalP
 
 function KeyIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+      />
     </svg>
   );
 }
 
 function ExternalIcon({ className }: { className?: string }) {
   return (
-    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+    <svg
+      className={className}
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={2}
+        d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+      />
     </svg>
   );
 }

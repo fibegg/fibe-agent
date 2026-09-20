@@ -4,7 +4,8 @@ import { useUiEffectsEnabled } from './use-ui-effects';
 const ANIMATION_DURATION_MS = 400;
 
 function formatCompact(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 1_000_000)
+    return `${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
   if (n >= 1_000) return `${(n / 1_000).toFixed(1).replace(/\.0$/, '')}k`;
   return String(n);
 }
@@ -43,7 +44,6 @@ export function CountUpNumber({
     const tick = (now: number) => {
       const elapsed = now - startTime;
       const progress = Math.min(elapsed / ANIMATION_DURATION_MS, 1);
-      // Ease-out cubic
       const eased = 1 - Math.pow(1 - progress, 3);
       const current = Math.round(from + diff * eased);
       setDisplay(current);

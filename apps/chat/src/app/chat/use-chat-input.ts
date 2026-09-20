@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAtMentionState, valueAfterAtMatchesEntry } from './file-mention-dropdown';
+import {
+  getAtMentionState,
+  valueAfterAtMatchesEntry,
+} from './file-mention-dropdown';
 import type { PlaygroundEntryItem } from './use-playground-files';
 
 export interface UseChatInputParams {
@@ -21,7 +24,10 @@ function isEmbeddedFrame(): boolean {
 }
 
 function isCoarsePointer(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches === true;
+  return (
+    typeof window !== 'undefined' &&
+    window.matchMedia?.('(pointer: coarse)').matches === true
+  );
 }
 
 function selectionIsInsideElement(el: HTMLElement): boolean {
@@ -41,14 +47,22 @@ function restoreCaretAtEnd(el: HTMLElement): void {
   sel.addRange(range);
 }
 
-export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParams) {
+export function useChatInput({
+  playgroundEntries,
+  onSendRef,
+}: UseChatInputParams) {
   const [inputState, setInputState] = useState({ value: '', cursor: 0 });
-  const [mentionDropdownClosedAfterSelect, setMentionDropdownClosedAfterSelect] = useState(false);
+  const [
+    mentionDropdownClosedAfterSelect,
+    setMentionDropdownClosedAfterSelect,
+  ] = useState(false);
   const chatInputRef = useRef<HTMLDivElement>(null);
   const focusTimeoutsRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const forceFocusUntilRef = useRef(0);
   const suppressBlurRefocusUntilRef = useRef(0);
-  const blurRefocusRafRef = useRef<ReturnType<typeof requestAnimationFrame> | null>(null);
+  const blurRefocusRafRef = useRef<ReturnType<
+    typeof requestAnimationFrame
+  > | null>(null);
 
   const inputValue = inputState.value;
   const cursorOffset = inputState.cursor;
@@ -80,8 +94,15 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
     const el = chatInputRef.current;
     if (!el) return;
     const active = document.activeElement;
-    const activeIsInsideInput = el instanceof HTMLElement && active instanceof Node && el.contains(active);
-    const canTakeFocus = !active || active === document.body || active === el || activeIsInsideInput;
+    const activeIsInsideInput =
+      el instanceof HTMLElement &&
+      active instanceof Node &&
+      el.contains(active);
+    const canTakeFocus =
+      !active ||
+      active === document.body ||
+      active === el ||
+      activeIsInsideInput;
     if (!canTakeFocus) {
       forceFocusUntilRef.current = 0;
       return;
@@ -90,7 +111,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
       try {
         window.focus();
       } catch {
-        // Some embedded hosts disallow programmatic frame focus.
+        // Some embedded browsers deny programmatic window focus.
       }
     }
     if (force || canTakeFocus) {
@@ -101,20 +122,23 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
     }
   }, []);
 
-  const focusInput = useCallback((options: FocusInputOptions = {}) => {
-    const persistent = options.persistent === true;
-    if (persistent) {
-      forceFocusUntilRef.current = Date.now() + POST_SEND_FOCUS_RECOVERY_MS;
-    }
-    clearFocusTimeouts();
-    const delays = persistent ? POST_SEND_FOCUS_RETRY_DELAYS_MS : [50];
-    focusTimeoutsRef.current = delays.map((delay) =>
-      setTimeout(() => {
-        const force = persistent && Date.now() <= forceFocusUntilRef.current;
-        focusChatInput(force);
-      }, delay)
-    );
-  }, [clearFocusTimeouts, focusChatInput]);
+  const focusInput = useCallback(
+    (options: FocusInputOptions = {}) => {
+      const persistent = options.persistent === true;
+      if (persistent) {
+        forceFocusUntilRef.current = Date.now() + POST_SEND_FOCUS_RECOVERY_MS;
+      }
+      clearFocusTimeouts();
+      const delays = persistent ? POST_SEND_FOCUS_RETRY_DELAYS_MS : [50];
+      focusTimeoutsRef.current = delays.map((delay) =>
+        setTimeout(() => {
+          const force = persistent && Date.now() <= forceFocusUntilRef.current;
+          focusChatInput(force);
+        }, delay),
+      );
+    },
+    [clearFocusTimeouts, focusChatInput],
+  );
 
   useEffect(() => {
     return () => {
@@ -127,7 +151,8 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
 
     const releaseChatFocus = () => {
       forceFocusUntilRef.current = 0;
-      suppressBlurRefocusUntilRef.current = Date.now() + PARENT_FOCUS_RELEASE_SUPPRESSION_MS;
+      suppressBlurRefocusUntilRef.current =
+        Date.now() + PARENT_FOCUS_RELEASE_SUPPRESSION_MS;
       clearFocusTimeouts();
       cancelBlurRefocus();
 
@@ -137,7 +162,10 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
       const active = document.activeElement;
       if (active instanceof HTMLElement && active !== document.body) {
         active.blur();
-      } else if (active instanceof Node && (active === el || el.contains(active))) {
+      } else if (
+        active instanceof Node &&
+        (active === el || el.contains(active))
+      ) {
         el.blur();
       }
 
@@ -198,7 +226,7 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
         focusInput({ persistent: true });
       }
     },
-    [onSendRef, mentionOpen, focusInput]
+    [onSendRef, mentionOpen, focusInput],
   );
 
   const handleMentionSelect = useCallback(
@@ -206,17 +234,25 @@ export function useChatInput({ playgroundEntries, onSendRef }: UseChatInputParam
       setMentionDropdownClosedAfterSelect(true);
       const inserted = `@${path} `;
       setInputState((prev) => {
-        const newVal = prev.value.slice(0, atMention.replaceStart) + inserted + prev.value.slice(prev.cursor);
-        return { value: newVal, cursor: atMention.replaceStart + inserted.length };
+        const newVal =
+          prev.value.slice(0, atMention.replaceStart) +
+          inserted +
+          prev.value.slice(prev.cursor);
+        return {
+          value: newVal,
+          cursor: atMention.replaceStart + inserted.length,
+        };
       });
       focusInput();
     },
-    [atMention.replaceStart, focusInput]
+    [atMention.replaceStart, focusInput],
   );
 
   const handleMentionClose = useCallback(() => {
     setInputState((prev) => {
-      const newVal = prev.value.slice(0, atMention.replaceStart) + prev.value.slice(prev.cursor);
+      const newVal =
+        prev.value.slice(0, atMention.replaceStart) +
+        prev.value.slice(prev.cursor);
       return { value: newVal, cursor: atMention.replaceStart };
     });
     focusInput();

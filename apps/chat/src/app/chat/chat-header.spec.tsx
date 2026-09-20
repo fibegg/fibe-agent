@@ -5,7 +5,13 @@ import { ChatHeader } from './chat-header';
 import { CHAT_STATES } from './chat-state';
 
 vi.mock('./model-selector', () => ({
-  ModelSelector: ({ currentModel, visible }: { currentModel: string; visible: boolean }) =>
+  ModelSelector: ({
+    currentModel,
+    visible,
+  }: {
+    currentModel: string;
+    visible: boolean;
+  }) =>
     visible ? <div data-testid="model-selector">{currentModel}</div> : null,
 }));
 
@@ -28,8 +34,6 @@ const DEFAULT_PROPS = {
   simplicateMode: false,
 };
 
-// ─── Core rendering ───────────────────────────────────────────────────────────
-
 describe('ChatHeader', () => {
   it('shows agent provider label as heading when agentName is not provided', () => {
     render(<ChatHeader {...DEFAULT_PROPS} agentProviderLabel="Claude" />);
@@ -37,14 +41,26 @@ describe('ChatHeader', () => {
   });
 
   it('shows current model as muted secondary text beside provider label', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} agentProviderLabel="Claude" currentModel="haiku" />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+      />,
+    );
     expect(screen.getByText('Claude')).toBeTruthy();
     expect(screen.getByText('haiku')).toBeTruthy();
     expect(screen.getByTitle('Model: haiku')).toBeTruthy();
   });
 
   it('shows agentName as heading when provided', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} agentName="My Agent" agentProviderLabel="Claude" />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        agentName="My Agent"
+        agentProviderLabel="Claude"
+      />,
+    );
     expect(screen.getByText('My Agent')).toBeTruthy();
     expect(screen.queryByText('Claude')).toBeNull();
   });
@@ -71,10 +87,14 @@ describe('ChatHeader', () => {
     expect(screen.getByText('Ready')).toBeTruthy();
   });
 
-  // ─── Reconnect / Auth buttons ──────────────────────────────────────────────
-
   it('shows Reconnect button when state is AGENT_OFFLINE', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} simplicateMode />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        state={CHAT_STATES.AGENT_OFFLINE}
+        simplicateMode
+      />,
+    );
     const reconnect = screen.getByRole('button', { name: /reconnect/i });
     const moreActions = screen.getByRole('button', { name: /more actions/i });
     expect(reconnect).toBeTruthy();
@@ -83,7 +103,13 @@ describe('ChatHeader', () => {
 
   it('calls onReconnect when Reconnect button clicked', () => {
     const onReconnect = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} onReconnect={onReconnect} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        state={CHAT_STATES.AGENT_OFFLINE}
+        onReconnect={onReconnect}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /reconnect/i }));
     expect(onReconnect).toHaveBeenCalled();
   });
@@ -93,21 +119,32 @@ describe('ChatHeader', () => {
     expect(screen.getByRole('button', { name: /reconnect/i })).toBeTruthy();
   });
 
-  it('shows Start Auth button when state is UNAUTHENTICATED', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} simplicateMode />);
+  it('shows Authenticate when state is UNAUTHENTICATED', () => {
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        state={CHAT_STATES.UNAUTHENTICATED}
+        simplicateMode
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
-    expect(screen.getByRole('menuitem', { name: /start auth/i })).toBeTruthy();
+    expect(screen.getByRole('menuitem', { name: 'Authenticate' })).toBeTruthy();
   });
 
-  it('calls onStartAuth when Start Auth clicked', () => {
+  it('calls onStartAuth when Authenticate is clicked', () => {
     const onStartAuth = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.UNAUTHENTICATED} onStartAuth={onStartAuth} simplicateMode />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        state={CHAT_STATES.UNAUTHENTICATED}
+        onStartAuth={onStartAuth}
+        simplicateMode
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /start auth/i }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Authenticate' }));
     expect(onStartAuth).toHaveBeenCalled();
   });
-
-  // ─── Search ────────────────────────────────────────────────────────────────
 
   it('renders search input', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
@@ -117,17 +154,31 @@ describe('ChatHeader', () => {
   it('calls onSearchChange when typing in search', () => {
     const onSearchChange = vi.fn();
     render(<ChatHeader {...DEFAULT_PROPS} onSearchChange={onSearchChange} />);
-    fireEvent.change(screen.getByPlaceholderText(/search in conversation/i), { target: { value: 'hello' } });
+    fireEvent.change(screen.getByPlaceholderText(/search in conversation/i), {
+      target: { value: 'hello' },
+    });
     expect(onSearchChange).toHaveBeenCalledWith('hello');
   });
 
   it('shows result count when searchQuery is set', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} searchQuery="hello" filteredMessagesCount={3} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        searchQuery="hello"
+        filteredMessagesCount={3}
+      />,
+    );
     expect(screen.getByText(/found 3 messages/i)).toBeTruthy();
   });
 
   it('shows singular "message" for 1 result', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} searchQuery="test" filteredMessagesCount={1} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        searchQuery="test"
+        filteredMessagesCount={1}
+      />,
+    );
     expect(screen.getByText(/found 1 message/i)).toBeTruthy();
   });
 
@@ -138,12 +189,16 @@ describe('ChatHeader', () => {
 
   it('calls onSearchChange with empty string when clear button clicked', () => {
     const onSearchChange = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} searchQuery="hello" onSearchChange={onSearchChange} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        searchQuery="hello"
+        onSearchChange={onSearchChange}
+      />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /clear search/i }));
     expect(onSearchChange).toHaveBeenCalledWith('');
   });
-
-  // ─── Mobile-specific ──────────────────────────────────────────────────────
 
   it('shows Mobile menu button when isMobile is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} />);
@@ -151,7 +206,9 @@ describe('ChatHeader', () => {
   });
 
   it('paints the mobile safe-area header with the PWA theme surface', () => {
-    const { container } = render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} />);
+    const { container } = render(
+      <ChatHeader {...DEFAULT_PROPS} isMobile={true} />,
+    );
     const header = container.querySelector('header');
     expect(header?.className).toContain('bg-[var(--pwa-safe-area-bg)]');
     expect(header?.className).not.toContain('bg-card/60');
@@ -159,7 +216,9 @@ describe('ChatHeader', () => {
 
   it('calls onOpenMenu when menu button clicked', () => {
     const onOpenMenu = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenMenu={onOpenMenu} />);
+    render(
+      <ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenMenu={onOpenMenu} />,
+    );
     fireEvent.click(screen.getByRole('button', { name: /open menu/i }));
     expect(onOpenMenu).toHaveBeenCalled();
   });
@@ -179,12 +238,20 @@ describe('ChatHeader', () => {
 
   it('shows mobile activity button when isMobile is true', () => {
     render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} />);
-    expect(document.querySelector('[aria-label="Open agent activity"]')).toBeTruthy();
+    expect(
+      document.querySelector('[aria-label="Open agent activity"]'),
+    ).toBeTruthy();
   });
 
   it('calls onOpenActivity when activity button clicked', () => {
     const onOpenActivity = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} isMobile={true} onOpenActivity={onOpenActivity} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        isMobile={true}
+        onOpenActivity={onOpenActivity}
+      />,
+    );
     fireEvent.click(screen.getByLabelText('Open agent activity'));
     expect(onOpenActivity).toHaveBeenCalled();
   });
@@ -202,19 +269,25 @@ describe('ChatHeader', () => {
 
   it('shows error message for AGENT_OFFLINE state', () => {
     render(
-      <ChatHeader {...DEFAULT_PROPS} state={CHAT_STATES.AGENT_OFFLINE} errorMessage="Agent down" />,
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        state={CHAT_STATES.AGENT_OFFLINE}
+        errorMessage="Agent down"
+      />,
     );
     expect(screen.getByText(/agent down/i)).toBeTruthy();
   });
 
   it('shows Loader2 during AWAITING_RESPONSE on mobile', () => {
     const { container } = render(
-      <ChatHeader {...DEFAULT_PROPS} isMobile={true} state={CHAT_STATES.AWAITING_RESPONSE} />,
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        isMobile={true}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+      />,
     );
     expect(container.querySelector('.animate-spin')).toBeTruthy();
   });
-
-  // ─── Terminal button ──────────────────────────────────────────────────────
 
   it('does not render terminal button when onToggleTerminal is not provided', () => {
     render(<ChatHeader {...DEFAULT_PROPS} />);
@@ -223,42 +296,69 @@ describe('ChatHeader', () => {
 
   it('renders terminal toggle buttons when onToggleTerminal is provided', () => {
     render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} />);
-    // Both desktop (hidden sm:flex) and mobile (sm:hidden) buttons are in DOM.
     const btns = screen.getAllByRole('button', { name: /open terminal/i });
     expect(btns.length).toBeGreaterThanOrEqual(1);
   });
 
   it('calls onToggleTerminal when terminal button is clicked', () => {
     const onToggleTerminal = vi.fn();
-    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={onToggleTerminal} />);
-    fireEvent.click(screen.getAllByRole('button', { name: /open terminal/i })[0]);
+    render(
+      <ChatHeader {...DEFAULT_PROPS} onToggleTerminal={onToggleTerminal} />,
+    );
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /open terminal/i })[0],
+    );
     expect(onToggleTerminal).toHaveBeenCalledTimes(1);
   });
 
   it('shows "Close terminal" label on both buttons when terminalOpen is true', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={true} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        onToggleTerminal={vi.fn()}
+        terminalOpen={true}
+      />,
+    );
     const btns = screen.getAllByRole('button', { name: /close terminal/i });
     expect(btns.length).toBeGreaterThanOrEqual(1);
   });
 
   it('sets aria-pressed=true on terminal buttons when terminalOpen is true', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={true} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        onToggleTerminal={vi.fn()}
+        terminalOpen={true}
+      />,
+    );
     const btns = screen.getAllByRole('button', { name: /close terminal/i });
-    btns.forEach((btn) => expect(btn.getAttribute('aria-pressed')).toBe('true'));
+    btns.forEach((btn) =>
+      expect(btn.getAttribute('aria-pressed')).toBe('true'),
+    );
   });
 
   it('sets aria-pressed=false on terminal buttons when terminalOpen is false', () => {
-    render(<ChatHeader {...DEFAULT_PROPS} onToggleTerminal={vi.fn()} terminalOpen={false} />);
+    render(
+      <ChatHeader
+        {...DEFAULT_PROPS}
+        onToggleTerminal={vi.fn()}
+        terminalOpen={false}
+      />,
+    );
     const btns = screen.getAllByRole('button', { name: /open terminal/i });
-    btns.forEach((btn) => expect(btn.getAttribute('aria-pressed')).toBe('false'));
+    btns.forEach((btn) =>
+      expect(btn.getAttribute('aria-pressed')).toBe('false'),
+    );
   });
-
-  // ─── Tony Stark ───────────────────────────────────────────────────────────
 
   it('renders Tony Stark link when onToggleTonyStarkMode is provided', () => {
     render(
       <MemoryRouter>
-        <ChatHeader {...DEFAULT_PROPS} onToggleTonyStarkMode={vi.fn()} tonyStarkMode={false} />
+        <ChatHeader
+          {...DEFAULT_PROPS}
+          onToggleTonyStarkMode={vi.fn()}
+          tonyStarkMode={false}
+        />
       </MemoryRouter>,
     );
     const link = screen.getByTitle('Tony Stark');
@@ -272,8 +372,6 @@ describe('ChatHeader', () => {
     expect(screen.queryByTitle('Tony Stark')).toBeNull();
   });
 
-  // ─── Simplicate mode ──────────────────────────────────────────────────────
-
   it('renders compact header when Simplicate is on with sidebar menu and no idle status/search', () => {
     const { container } = render(
       <ChatHeader
@@ -286,7 +384,9 @@ describe('ChatHeader', () => {
 
     expect(screen.getByRole('button', { name: /open menu/i })).toBeTruthy();
     expect(screen.getByRole('button', { name: /more actions/i })).toBeTruthy();
-    expect(container.querySelector('header')?.className).toContain('bg-[var(--pwa-safe-area-bg)]');
+    expect(container.querySelector('header')?.className).toContain(
+      'bg-[var(--pwa-safe-area-bg)]',
+    );
     expect(screen.getByText('Claude')).toBeTruthy();
     expect(screen.getByText('haiku')).toBeTruthy();
     expect(screen.queryByText('Ready')).toBeNull();
@@ -318,12 +418,18 @@ describe('ChatHeader', () => {
     expect(screen.getByRole('menuitem', { name: /terminal/i })).toBeTruthy();
     expect(screen.getByRole('menuitem', { name: /commands/i })).toBeTruthy();
     expect(screen.queryByRole('menuitem', { name: /files/i })).toBeNull();
-    const simplicateSwitch = screen.getByRole('switch', { name: /simplicate/i });
+    const simplicateSwitch = screen.getByRole('switch', {
+      name: /simplicate/i,
+    });
     expect(simplicateSwitch.getAttribute('aria-checked')).toBe('true');
     expect(simplicateSwitch.className).toContain('inline-flex');
     expect(simplicateSwitch.className).toContain('justify-end');
-    expect(simplicateSwitch.firstElementChild?.className).not.toContain('absolute');
-    expect(screen.getByText(/9\/9\/0 · 3k in \/ 1\.2k out · 22s/i)).toBeTruthy();
+    expect(simplicateSwitch.firstElementChild?.className).not.toContain(
+      'absolute',
+    );
+    expect(
+      screen.getByText(/9\/9\/0 · 3k in \/ 1\.2k out · 22s/i),
+    ).toBeTruthy();
     expect(screen.getByPlaceholderText(/search in conversation/i)).toBeTruthy();
   });
 
@@ -397,11 +503,17 @@ describe('ChatHeader', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /change model and effort/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /change model and effort/i }),
+    );
 
-    expect(screen.getByRole('dialog', { name: /change model and effort/i })).toBeTruthy();
+    expect(
+      screen.getByRole('dialog', { name: /change model and effort/i }),
+    ).toBeTruthy();
     expect(screen.getByTestId('model-selector').textContent).toBe('haiku');
-    const range = screen.getByRole('slider', { name: /effort/i }) as HTMLInputElement;
+    const range = screen.getByRole('slider', {
+      name: /effort/i,
+    }) as HTMLInputElement;
     expect(range.value).toBe('2');
     fireEvent.change(range, { target: { value: '0' } });
     expect(onEffortSelect).toHaveBeenCalledWith('low');
@@ -419,8 +531,12 @@ describe('ChatHeader', () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /change model and effort/i }));
-    expect(screen.getByRole('dialog', { name: /change model and effort/i })).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole('button', { name: /change model and effort/i }),
+    );
+    expect(
+      screen.getByRole('dialog', { name: /change model and effort/i }),
+    ).toBeTruthy();
     expect(screen.getByRole('slider', { name: /effort/i })).toBeTruthy();
   });
 
@@ -433,8 +549,18 @@ describe('ChatHeader', () => {
         currentModel="haiku"
         simplicateMode
         conversations={[
-          { id: 'default', title: 'Default', createdAt: '2026-01-01', lastMessageAt: '2026-01-01' },
-          { id: 'thread-1', title: 'Thread one', createdAt: '2026-01-01', lastMessageAt: '2026-01-01' },
+          {
+            id: 'default',
+            title: 'Default',
+            createdAt: '2026-01-01',
+            lastMessageAt: '2026-01-01',
+          },
+          {
+            id: 'thread-1',
+            title: 'Thread one',
+            createdAt: '2026-01-01',
+            lastMessageAt: '2026-01-01',
+          },
         ]}
         activeConversationId="default"
         onConversationSelect={onConversationSelect}
@@ -443,7 +569,9 @@ describe('ChatHeader', () => {
     );
 
     expect(screen.queryByText('Default')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: /switch conversation/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /switch conversation/i }),
+    );
     const threadItem = screen.getByRole('menuitem', { name: /thread one/i });
     fireEvent.mouseDown(threadItem);
     expect(screen.getByRole('menu', { name: /conversations/i })).toBeTruthy();
@@ -452,8 +580,6 @@ describe('ChatHeader', () => {
     expect(onConversationSelect).toHaveBeenCalledWith('thread-1');
     expect(screen.queryByRole('menu', { name: /conversations/i })).toBeNull();
   });
-
-  // ─── Reset conversation ───────────────────────────────────────────────────
 
   it('shows Reset conversation item in MoreActionsMenu when onResetConversation is provided', () => {
     const onResetConversation = vi.fn();
@@ -466,7 +592,9 @@ describe('ChatHeader', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
-    expect(screen.getByRole('menuitem', { name: /reset conversation/i })).toBeTruthy();
+    expect(
+      screen.getByRole('menuitem', { name: /reset conversation/i }),
+    ).toBeTruthy();
   });
 
   it('calls onResetConversation and closes the menu when Reset is clicked', () => {
@@ -480,22 +608,21 @@ describe('ChatHeader', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
-    fireEvent.click(screen.getByRole('menuitem', { name: /reset conversation/i }));
+    fireEvent.click(
+      screen.getByRole('menuitem', { name: /reset conversation/i }),
+    );
     expect(onResetConversation).toHaveBeenCalledTimes(1);
     // Menu should close after clicking
     expect(screen.queryByRole('menu', { name: /chat actions/i })).toBeNull();
   });
 
   it('does not show Reset conversation item when onResetConversation is not provided', () => {
-    render(
-      <ChatHeader
-        {...DEFAULT_PROPS}
-        simplicateMode={true}
-      />,
-    );
+    render(<ChatHeader {...DEFAULT_PROPS} simplicateMode={true} />);
 
     fireEvent.click(screen.getByRole('button', { name: /more actions/i }));
-    expect(screen.queryByRole('menuitem', { name: /reset conversation/i })).toBeNull();
+    expect(
+      screen.queryByRole('menuitem', { name: /reset conversation/i }),
+    ).toBeNull();
   });
 
   describe('mobile header viewport anchoring', () => {
@@ -516,17 +643,17 @@ describe('ChatHeader', () => {
     }
 
     afterEach(() => {
-      Object.defineProperty(window, 'visualViewport', { configurable: true, writable: true, value: undefined });
+      Object.defineProperty(window, 'visualViewport', {
+        configurable: true,
+        writable: true,
+        value: undefined,
+      });
     });
 
     it('does not translate the simplicate header because the app root follows the visual viewport', () => {
       setVisualViewport(120);
       const { container } = render(
-        <ChatHeader
-          {...DEFAULT_PROPS}
-          isMobile={true}
-          simplicateMode={true}
-        />,
+        <ChatHeader {...DEFAULT_PROPS} isMobile={true} simplicateMode={true} />,
       );
       const header = container.querySelector('header');
       expect(header).toBeTruthy();
@@ -536,11 +663,7 @@ describe('ChatHeader', () => {
     it('does not translate the simplicate header when visualViewport.offsetTop is 0', () => {
       setVisualViewport(0);
       const { container } = render(
-        <ChatHeader
-          {...DEFAULT_PROPS}
-          isMobile={true}
-          simplicateMode={true}
-        />,
+        <ChatHeader {...DEFAULT_PROPS} isMobile={true} simplicateMode={true} />,
       );
       const header = container.querySelector('header');
       expect(header?.style.transform).toBe('');

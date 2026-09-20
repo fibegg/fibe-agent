@@ -3,13 +3,11 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { LoginPage } from './login-page';
 
-// Mock the api-url module
 vi.mock('../api-url', () => ({
   loginWithPassword: vi.fn(),
   isAuthenticated: vi.fn().mockReturnValue(false),
 }));
 
-// Mock postmessage-auth module
 vi.mock('../postmessage-auth', () => ({
   AUTO_AUTH_SUCCESS_EVENT: 'fibe:auto-auth-success',
   waitForAutoAuth: vi.fn().mockResolvedValue(false),
@@ -28,14 +26,13 @@ function renderLoginPage() {
   return render(
     <MemoryRouter>
       <LoginPage />
-    </MemoryRouter>
+    </MemoryRouter>,
   );
 }
 
 describe('LoginPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Stub __APP_VERSION__
     vi.stubGlobal('__APP_VERSION__', '1.0.0');
   });
 
@@ -63,7 +60,10 @@ describe('LoginPage', () => {
 
   it('shows error message on failed login', async () => {
     const { loginWithPassword } = await import('../api-url');
-    vi.mocked(loginWithPassword).mockResolvedValue({ success: false, error: 'Wrong password' });
+    vi.mocked(loginWithPassword).mockResolvedValue({
+      success: false,
+      error: 'Wrong password',
+    });
 
     const { container } = renderLoginPage();
     const input = screen.getByPlaceholderText(/enter password/i);
@@ -106,7 +106,9 @@ describe('LoginPage', () => {
 
   it('navigates when iframe auto-auth succeeds after the waiting state timed out', async () => {
     vi.stubGlobal('parent', {} as Window);
-    const { AUTO_AUTH_SUCCESS_EVENT, waitForAutoAuth } = await import('../postmessage-auth');
+    const { AUTO_AUTH_SUCCESS_EVENT, waitForAutoAuth } = await import(
+      '../postmessage-auth'
+    );
     vi.mocked(waitForAutoAuth).mockResolvedValue(false);
 
     renderLoginPage();
@@ -126,11 +128,15 @@ describe('LoginPage', () => {
     const { loginWithPassword } = await import('../api-url');
     let resolveLogin!: (v: { success: boolean }) => void;
     vi.mocked(loginWithPassword).mockReturnValue(
-      new Promise(r => { resolveLogin = r; })
+      new Promise((r) => {
+        resolveLogin = r;
+      }),
     );
 
     const { container } = renderLoginPage();
-    fireEvent.change(screen.getByPlaceholderText(/enter password/i), { target: { value: 'pwd' } });
+    fireEvent.change(screen.getByPlaceholderText(/enter password/i), {
+      target: { value: 'pwd' },
+    });
     const form = container.querySelector('form');
     if (form) fireEvent.submit(form);
 

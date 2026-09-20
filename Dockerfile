@@ -102,7 +102,7 @@ ARG NPM_CONFIG_JOBS
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-# Unconditional packages — cached across all provider variants
+# Unconditional packages: cached across all provider variants
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
@@ -168,7 +168,6 @@ RUN curl -fsSL https://deno.land/install.sh | sh
 
 WORKDIR /app
 
-# ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
 COPY --link apps/api/package.json ./package.json
 
 # node-gyp must be globally available for native addon compilation.
@@ -210,12 +209,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 ENV CHROME_BIN=/opt/google/chrome/chrome \
     GOOGLE_CHROME_BIN=/opt/google/chrome/chrome
 
-# ---- FIX FILE DESCRIPTOR LIMITS ----
-# Ensures su/sudo sessions inherit high nofile — prevents EMFILE in dev mode
+# Ensures su/sudo sessions inherit high nofile: prevents EMFILE in dev mode
 RUN mkdir -p /etc/security/limits.d \
     && printf "*  soft  nofile  1048576\n*  hard  nofile  1048576\n" > /etc/security/limits.d/99-nofile.conf
 
-# ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && chown -R node:node /app/data /app/playground /home/node/.cache
 
@@ -226,22 +223,18 @@ RUN npx -y playwright install chromium && /opt/google/chrome/chrome --version
 
 USER root
 
-# ---- MCP REMOTE RECONNECTION WRAPPER ----
 COPY --link scripts/mcp-remote-wrapper.sh /usr/local/bin/mcp-remote-wrapper
 RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 
-# ---- SMART ENTRYPOINT ----
 # Detects prod (dist/ present) vs dev (source code mounted, no dist/) at runtime.
 # In dev mode it runs `npm install` then `nx serve` so the container works
 # when the entire project root is volume-mounted (e.g. local Rails orchestration).
 COPY --link docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# ---- MODE HELPER (agent mode switcher) ----
 COPY --link mode /app/mode
 RUN chmod +x /app/mode
 
-# ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
@@ -302,7 +295,6 @@ RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini/antigravity-cli && chown -R node:node /home/node/.gemini; \
     fi
 
-# ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
 COPY --link --from=builder /app/apps/api/dist ./dist/
 COPY --link --from=builder /app/apps/chat/dist ./chat/

@@ -26,7 +26,7 @@ prompts/
 
 ### `base/`
 
-Provider-agnostic prompts that work across all supported agents. Start here when creating a new prompt — it should describe the task, constraints, and expected behaviour without relying on any provider-specific syntax or behaviour.
+Provider-agnostic prompts that work across all supported agents. Start here when creating a new prompt: it should describe the task, constraints, and expected behaviour without relying on any provider-specific syntax or behaviour.
 
 `code-playground.md` is the recommended default for all code-generation playground sessions.
 
@@ -59,14 +59,14 @@ FIBE_SETTINGS_JSON='{"systemPrompt":"You are a TypeScript expert. Focus only on 
 ## Adding a new prompt
 
 1. Create a `.md` file in the appropriate subdirectory (`base/` for generic, `providers/` for provider-specific).
-2. Write the prompt in plain Markdown — the agent CLI reads it as raw text.
+2. Write the prompt in plain Markdown: the agent CLI reads it as raw text.
 3. Test it locally by copying the prompt content into `systemPrompt` in `fibe.yml` or `FIBE_SETTINGS_JSON`, then running `bun run dev`.
 4. Document any notable behaviour differences in a comment block at the top of the file.
 
 ### Naming conventions
 
-| Type | Pattern | Example |
-|------|---------|---------|
-| Base / use-case prompt | `base/<use-case>.md` | `base/code-review.md` |
-| Provider-specific prompt | `providers/<provider>.md` | `providers/gemini.md` |
-| Experiment / draft | `base/<use-case>.draft.md` | `base/code-playground.draft.md` |
+| Type                     | Pattern                    | Example                         |
+| ------------------------ | -------------------------- | ------------------------------- |
+| Base / use-case prompt   | `base/<use-case>.md`       | `base/code-review.md`           |
+| Provider-specific prompt | `providers/<provider>.md`  | `providers/gemini.md`           |
+| Experiment / draft       | `base/<use-case>.draft.md` | `base/code-playground.draft.md` |

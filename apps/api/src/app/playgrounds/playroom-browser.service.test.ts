@@ -1,5 +1,13 @@
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { existsSync, mkdtempSync, readdirSync, rmSync, mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  rmSync,
+  mkdirSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
@@ -19,15 +27,11 @@ mock.module('node:util', () => {
         return mockExecFileAsync;
       }
       return util.promisify(fn);
-    }
+    },
   };
 });
 
 const { PlayroomBrowserService } = require('./playroom-browser.service');
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function tmpDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -40,10 +44,6 @@ function makeService(rootDir: string, playgroundDir: string): any {
     getPlaygroundsDir: () => playgroundDir,
   } as never);
 }
-
-// ---------------------------------------------------------------------------
-// Test suite
-// ---------------------------------------------------------------------------
 
 describe('PlayroomBrowserService', () => {
   let rootDir: string;
@@ -60,12 +60,12 @@ describe('PlayroomBrowserService', () => {
 
   afterEach(() => {
     rmSync(rootDir, { recursive: true, force: true });
-    try { rmSync(playgroundDir, { recursive: true, force: true }); } catch { /* ok */ }
+    try {
+      rmSync(playgroundDir, { recursive: true, force: true });
+    } catch {
+      /* ok */
+    }
   });
-
-  // -------------------------------------------------------------------------
-  // browse()
-  // -------------------------------------------------------------------------
 
   describe('browse()', () => {
     test('returns empty array when relPath is provided', async () => {
@@ -75,21 +75,49 @@ describe('PlayroomBrowserService', () => {
     test('parses stdout into playground-name BrowseEntry array', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
         stdout: JSON.stringify([
-          { id: '1', name: 'proj1', playspec: 'fibe.gg/play1', path: `${rootDir}/playgrounds/proj1` },
-          { id: '2', name: 'proj2', playspec: 'fibe.gg/play2', path: `${rootDir}/playgrounds/proj2` },
+          {
+            id: '1',
+            name: 'proj1',
+            playspec: 'fibe.gg/play1',
+            path: `${rootDir}/playgrounds/proj1`,
+          },
+          {
+            id: '2',
+            name: 'proj2',
+            playspec: 'fibe.gg/play2',
+            path: `${rootDir}/playgrounds/proj2`,
+          },
         ]),
       });
 
       const entries = await service.browse('');
 
       expect(entries).toHaveLength(2);
-      expect(entries[0]).toEqual({ name: 'proj1', path: 'proj1', type: 'directory' });
-      expect(entries[1]).toEqual({ name: 'proj2', path: 'proj2', type: 'directory' });
+      expect(entries[0]).toEqual({
+        name: 'proj1',
+        path: 'proj1',
+        type: 'directory',
+      });
+      expect(entries[1]).toEqual({
+        name: 'proj2',
+        path: 'proj2',
+        type: 'directory',
+      });
 
       expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
       expect(mockExecFileAsync.mock.calls[0][0]).toBe('fibe');
-      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
-      expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(join(rootDir, 'playgrounds'));
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+        '--output',
+        'json',
+        'local',
+        'playgrounds',
+        'info',
+        '--view',
+        'names',
+      ]);
+      expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(
+        join(rootDir, 'playgrounds'),
+      );
     });
 
     test('trusts the CLI names view to return only mountable playgrounds', async () => {
@@ -129,21 +157,21 @@ describe('PlayroomBrowserService', () => {
 
       const promise = service.browse('');
       await expect(promise).rejects.toThrow(NotFoundException);
-      await expect(promise).rejects.toThrow('Cannot execute Fibe local playgrounds command.');
+      await expect(promise).rejects.toThrow(
+        'Cannot execute Fibe local playgrounds command.',
+      );
     });
   });
 
-  // -------------------------------------------------------------------------
-  // linkPlayground()
-  // -------------------------------------------------------------------------
-
   describe('linkPlayground()', () => {
     test('throws BadRequestException for empty path', async () => {
-      await expect(service.linkPlayground('')).rejects.toThrow(BadRequestException);
-      await expect(service.linkPlayground('   ')).rejects.toThrow('Path is required');
+      await expect(service.linkPlayground('')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.linkPlayground('   ')).rejects.toThrow(
+        'Path is required',
+      );
     });
-
-
 
     test('runs fibe local playgrounds link when target exists', async () => {
       mkdirSync(join(rootDir, 'playgrounds', 'project'), { recursive: true });
@@ -171,21 +199,25 @@ describe('PlayroomBrowserService', () => {
       mkdirSync(join(rootDir, 'playgrounds', 'project'), { recursive: true });
       mockExecFileAsync.mockRejectedValueOnce(new Error('Linking failed'));
 
-      await expect(service.linkPlayground('project')).rejects.toThrow(BadRequestException);
+      await expect(service.linkPlayground('project')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
-
-  // -------------------------------------------------------------------------
-  // unlinkPlayground()
-  // -------------------------------------------------------------------------
 
   describe('unlinkPlayground()', () => {
     test('requires explicit confirmation', async () => {
       writeFileSync(join(playgroundDir, '.current_playground.json'), '{}');
 
-      await expect(service.unlinkPlayground(false)).rejects.toThrow(BadRequestException);
-      await expect(service.unlinkPlayground(false)).rejects.toThrow('unlink requires confirm=true');
-      expect(existsSync(join(playgroundDir, '.current_playground.json'))).toBe(true);
+      await expect(service.unlinkPlayground(false)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.unlinkPlayground(false)).rejects.toThrow(
+        'unlink requires confirm=true',
+      );
+      expect(existsSync(join(playgroundDir, '.current_playground.json'))).toBe(
+        true,
+      );
     });
 
     test('clears link directory entries and preserves the directory itself', async () => {
@@ -211,8 +243,12 @@ describe('PlayroomBrowserService', () => {
       symlinkSync(realDir, linkDir);
       service = makeService(rootDir, linkDir);
 
-      await expect(service.unlinkPlayground(true)).rejects.toThrow(BadRequestException);
-      await expect(service.unlinkPlayground(true)).rejects.toThrow('is not a directory');
+      await expect(service.unlinkPlayground(true)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.unlinkPlayground(true)).rejects.toThrow(
+        'is not a directory',
+      );
     });
 
     test('rejects when configured link path is a regular file', async () => {
@@ -220,25 +256,31 @@ describe('PlayroomBrowserService', () => {
       writeFileSync(filePath, 'not a directory');
       service = makeService(rootDir, filePath);
 
-      await expect(service.unlinkPlayground(true)).rejects.toThrow(BadRequestException);
-      await expect(service.unlinkPlayground(true)).rejects.toThrow('is not a directory');
+      await expect(service.unlinkPlayground(true)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.unlinkPlayground(true)).rejects.toThrow(
+        'is not a directory',
+      );
     });
   });
 
-  // -------------------------------------------------------------------------
-  // getCurrentLink()
-  // -------------------------------------------------------------------------
-
   describe('getCurrentLink()', () => {
     test('returns current playground name from .current_playground.json before id', async () => {
-      writeFileSync(join(playgroundDir, '.current_playground.json'), JSON.stringify({ id: '42', name: 'my-project' }));
+      writeFileSync(
+        join(playgroundDir, '.current_playground.json'),
+        JSON.stringify({ id: '42', name: 'my-project' }),
+      );
 
       const link = await service.getCurrentLink();
       expect(link).toBe('my-project');
     });
 
     test('falls back to current playground name from .current_playground.json', async () => {
-      writeFileSync(join(playgroundDir, '.current_playground.json'), JSON.stringify({ name: 'my-project' }));
+      writeFileSync(
+        join(playgroundDir, '.current_playground.json'),
+        JSON.stringify({ name: 'my-project' }),
+      );
 
       const link = await service.getCurrentLink();
       expect(link).toBe('my-project');
@@ -251,7 +293,12 @@ describe('PlayroomBrowserService', () => {
 
     test('infers current playground from mounted targets when state file is missing', async () => {
       const aliceBackend = join(rootDir, 'playgrounds', 'alice--10', 'backend');
-      const aliceFrontend = join(rootDir, 'playgrounds', 'alice--10', 'frontend');
+      const aliceFrontend = join(
+        rootDir,
+        'playgrounds',
+        'alice--10',
+        'frontend',
+      );
       const bobBackend = join(rootDir, 'playgrounds', 'bob--11', 'backend');
       const bobFrontend = join(rootDir, 'playgrounds', 'bob--11', 'frontend');
       mkdirSync(aliceBackend, { recursive: true });
@@ -284,9 +331,37 @@ describe('PlayroomBrowserService', () => {
       const link = await service.getCurrentLink();
 
       expect(link).toBe('alice');
-      expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
-      expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'mounts', '--playground', 'alice']);
-      expect(mockExecFileAsync.mock.calls[2][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'mounts', '--playground', 'bob']);
+      expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+        '--output',
+        'json',
+        'local',
+        'playgrounds',
+        'info',
+        '--view',
+        'names',
+      ]);
+      expect(mockExecFileAsync.mock.calls[1][1]).toEqual([
+        '--output',
+        'json',
+        'local',
+        'playgrounds',
+        'info',
+        '--view',
+        'mounts',
+        '--playground',
+        'alice',
+      ]);
+      expect(mockExecFileAsync.mock.calls[2][1]).toEqual([
+        '--output',
+        'json',
+        'local',
+        'playgrounds',
+        'info',
+        '--view',
+        'mounts',
+        '--playground',
+        'bob',
+      ]);
     });
   });
 });

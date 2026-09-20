@@ -5,12 +5,7 @@ import { containerLog } from './container-logger';
 const CREDENTIALS_CONTEXT = 'Credentials';
 const BASE64_CREDENTIAL_PREFIX = '__fibe_base64__:';
 
-/**
- * Loads pre-authenticated credentials from AGENT_CREDENTIALS_JSON.
- * Used when Fibe attaches a stored Agent to a Playground.
- * Writes files into SESSION_DIR (e.g. agent_token.txt, oauth_creds.json).
- * No-op if env vars are unset or empty.
- */
+/** Writes stored-agent credentials from AGENT_CREDENTIALS_JSON into SESSION_DIR. */
 export function loadInjectedCredentials(): boolean {
   const raw = process.env.AGENT_CREDENTIALS_JSON;
   if (!raw?.trim()) {
@@ -21,7 +16,7 @@ export function loadInjectedCredentials(): boolean {
   if (!sessionDir) {
     containerLog.warn(
       'AGENT_CREDENTIALS_JSON is set but SESSION_DIR is not. Skipping injection.',
-      CREDENTIALS_CONTEXT
+      CREDENTIALS_CONTEXT,
     );
     return false;
   }
@@ -31,7 +26,10 @@ export function loadInjectedCredentials(): boolean {
     credentialFiles = JSON.parse(raw) as Record<string, unknown>;
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    containerLog.error(`Failed to parse AGENT_CREDENTIALS_JSON: ${message}`, CREDENTIALS_CONTEXT);
+    containerLog.error(
+      `Failed to parse AGENT_CREDENTIALS_JSON: ${message}`,
+      CREDENTIALS_CONTEXT,
+    );
     return false;
   }
 
@@ -42,38 +40,49 @@ export function loadInjectedCredentials(): boolean {
   ) {
     containerLog.error(
       'AGENT_CREDENTIALS_JSON must be a JSON object { filename: content }',
-      CREDENTIALS_CONTEXT
+      CREDENTIALS_CONTEXT,
     );
     return false;
   }
 
   const entries = Object.entries(credentialFiles);
   if (entries.length === 0) {
-    containerLog.warn('AGENT_CREDENTIALS_JSON is empty object. Skipping.', CREDENTIALS_CONTEXT);
+    containerLog.warn(
+      'AGENT_CREDENTIALS_JSON is empty object. Skipping.',
+      CREDENTIALS_CONTEXT,
+    );
     return false;
   }
 
   if (!fs.existsSync(sessionDir)) {
     fs.mkdirSync(sessionDir, { recursive: true });
-    containerLog.log(`Created session directory: ${sessionDir}`, CREDENTIALS_CONTEXT);
+    containerLog.log(
+      `Created session directory: ${sessionDir}`,
+      CREDENTIALS_CONTEXT,
+    );
   }
 
   let injectedCount = 0;
   for (const [filename, content] of entries) {
     const targetPath = resolveCredentialPath(sessionDir, filename);
     if (!targetPath) {
-      containerLog.warn(`Skipping suspicious filename: ${filename}`, CREDENTIALS_CONTEXT);
+      containerLog.warn(
+        `Skipping suspicious filename: ${filename}`,
+        CREDENTIALS_CONTEXT,
+      );
       continue;
     }
     try {
       fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-      fs.writeFileSync(targetPath, credentialContentBuffer(content), { mode: 0o600 });
+      fs.writeFileSync(targetPath, credentialContentBuffer(content), {
+        mode: 0o600,
+      });
       injectedCount++;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       containerLog.error(
         `Failed to write ${targetPath}: ${message}`,
-        CREDENTIALS_CONTEXT
+        CREDENTIALS_CONTEXT,
       );
     }
   }
@@ -81,7 +90,7 @@ export function loadInjectedCredentials(): boolean {
   if (injectedCount > 0) {
     containerLog.log(
       `Injected ${injectedCount} credential file(s) from stored Agent.`,
-      CREDENTIALS_CONTEXT
+      CREDENTIALS_CONTEXT,
     );
   }
   return injectedCount > 0;
@@ -94,7 +103,10 @@ function credentialContentBuffer(content: unknown): Buffer | string {
   return Buffer.from(value.slice(BASE64_CREDENTIAL_PREFIX.length), 'base64');
 }
 
-function resolveCredentialPath(sessionDir: string, filename: string): string | null {
+function resolveCredentialPath(
+  sessionDir: string,
+  filename: string,
+): string | null {
   const normalizedName = String(filename || '').replace(/\\/g, '/');
   if (!normalizedName || path.isAbsolute(normalizedName)) return null;
 

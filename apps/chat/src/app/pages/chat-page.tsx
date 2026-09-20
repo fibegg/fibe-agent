@@ -246,7 +246,9 @@ export function ChatPage() {
   const [lastSentMessage, setLastSentMessage] = useState<string | null>(null);
   const [viewingFile, setViewingFile] = useState<PlaygroundEntry | null>(null);
   const [servicePreviewOpen, setServicePreviewOpen] = useState(false);
-  const [selectedPreviewServiceId, setSelectedPreviewServiceId] = useState<string | null>(null);
+  const [selectedPreviewServiceId, setSelectedPreviewServiceId] = useState<
+    string | null
+  >(null);
   const [pageDirtyPaths, setPageDirtyPaths] = useState<Set<string>>(new Set());
   const { terminalOpen, toggleTerminal, closeTerminal } = useTerminalPanel();
   const { diffOpen, toggleDiff, closeDiff } = useDiffPanel();
@@ -298,13 +300,14 @@ export function ChatPage() {
   const compactMode = simplicateMode;
   const canShowDiff = playgroundStats.hasGitRepo;
   const drawerOpen = terminalOpen || cliOpen || (canShowDiff && diffOpen);
-  const openServicePreview = useCallback((service?: PlaygroundPreviewService) => {
-    setViewingFile(null);
-    if (service) setSelectedPreviewServiceId(service.id);
-    setServicePreviewOpen(true);
-  }, []);
-
-  // ─── Local MCP tool state ─────────────────────────────────────────────────
+  const openServicePreview = useCallback(
+    (service?: PlaygroundPreviewService) => {
+      setViewingFile(null);
+      if (service) setSelectedPreviewServiceId(service.id);
+      setServicePreviewOpen(true);
+    },
+    [],
+  );
 
   type LocalToolItem =
     | {
@@ -953,7 +956,6 @@ export function ChatPage() {
     return () => clearInterval(interval);
   }, [state]);
 
-  // Parent-provided greetings belong to the conversation active on mount.
   const initialGreetingConversationIdRef = useRef(activeConversationId);
   // Auto-send initial greeting when chat is authenticated with empty history.
   const greetingSentRef = useRef(false);
@@ -1045,7 +1047,7 @@ export function ChatPage() {
    * both handleSend and handleVoiceToggle.
    */
   const stopAndTranscribe = useCallback(async (): Promise<string> => {
-    // Capture liveText BEFORE stopping — final Web Speech onresult may arrive after onstop resolves
+    // Capture liveText BEFORE stopping: final Web Speech onresult may arrive after onstop resolves
     const liveTextSnapshot = voiceRecorderRef.current.liveText;
     const result = await voiceRecorderRef.current.stopRecording();
     if (!result) return '';
@@ -1138,7 +1140,6 @@ export function ChatPage() {
             ...(queueStatus ? { queued: true, queueStatus } : {}),
           },
         ]);
-        // Auto-title the conversation on the very first user message
         if (!isQueuing) {
           autoTitleConversation(activeConversationId, currentInput);
         }
@@ -1202,7 +1203,6 @@ export function ChatPage() {
     };
   }, [handleSend]);
 
-  // Clear queued badges when streaming stops (e.g. session interrupted and restarted)
   useEffect(() => {
     if (state !== CHAT_STATES.AWAITING_RESPONSE) {
       setMessages((prev) => {
@@ -1334,7 +1334,7 @@ export function ChatPage() {
                   }}
                 />
               </div>
-              {/* Conversations — always visible at bottom on mobile too */}
+              {/* Conversations: always visible at bottom on mobile too */}
               <div
                 className="shrink-0 border-t border-border overflow-hidden flex flex-col"
                 style={
@@ -1499,7 +1499,6 @@ export function ChatPage() {
               }}
               previewOpen={servicePreviewOpen}
               previewAvailable
-              // onToggleCli={toggleCli}  // Hidden: CLI commands not yet wired to execution
               cliOpen={cliOpen}
               currentEffort={currentEffort}
               onEffortSelect={handleEffortSelect}
@@ -1580,13 +1579,13 @@ export function ChatPage() {
                   messages={filteredMessages}
                   streamingText={streamingText}
                   isStreaming={agentIsStreaming}
-                  lastUserMessage={
-                    agentIsStreaming ? lastUserMessage : null
-                  }
+                  lastUserMessage={agentIsStreaming ? lastUserMessage : null}
                   scrollRef={scroll.scrollRef}
                   bothSidebarsCollapsed={
                     !isMobile &&
-                    (compactMode ? !compactFileBrowserOpen : sidebarCollapsed) &&
+                    (compactMode
+                      ? !compactFileBrowserOpen
+                      : sidebarCollapsed) &&
                     rightSidebarCollapsed
                   }
                   noOutputBody={t('chat.noOutput')}
@@ -1597,7 +1596,7 @@ export function ChatPage() {
               </div>
             </div>
           )}
-          {/* Local MCP tool cards — rendered below message list, above input */}
+          {/* Local MCP tool cards: rendered below message list, above input */}
           {!servicePreviewOpen && localToolItems.length > 0 && (
             <div className="px-3 sm:px-4 md:px-6 flex flex-col gap-1">
               {localToolItems.map((item) => {

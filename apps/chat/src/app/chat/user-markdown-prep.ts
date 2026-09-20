@@ -11,17 +11,26 @@ function normalizeFenceLang(lang: string): string {
   return l;
 }
 
-/**
- * Minified or flattened TS/JS often arrives as one physical line. Insert newlines before
- * obvious statement boundaries so markdown can form a proper fenced block after wrapping.
- */
-export function recoverDenseCodeNewlines(text: string, minLength = MIN_LENGTH_FOR_RECOVERY): string {
+/** Restores statement breaks in flattened TS/JS before Markdown wrapping. */
+export function recoverDenseCodeNewlines(
+  text: string,
+  minLength = MIN_LENGTH_FOR_RECOVERY,
+): string {
   if (text.includes('\n')) return text;
   if (text.length < minLength) return text;
   let out = text;
-  out = out.replace(/;(async\s+function|import|export|const|let|var|type|interface|function|class)\b/g, ';\n$1');
-  out = out.replace(/\)\s*;(const|let|var|type|interface|function)\b/g, ');\n$1');
-  out = out.replace(/\}\s*(export|async\s+function|function|const|let|type|interface|class)\b/g, '}\n$1');
+  out = out.replace(
+    /;(async\s+function|import|export|const|let|var|type|interface|function|class)\b/g,
+    ';\n$1',
+  );
+  out = out.replace(
+    /\)\s*;(const|let|var|type|interface|function)\b/g,
+    ');\n$1',
+  );
+  out = out.replace(
+    /\}\s*(export|async\s+function|function|const|let|type|interface|class)\b/g,
+    '}\n$1',
+  );
   return out;
 }
 
@@ -31,24 +40,32 @@ export function recoverDenseCodeNewlines(text: string, minLength = MIN_LENGTH_FO
  * Normalizes ```ts / ```js to ```typescript / ```javascript so Prism matches the file viewer.
  */
 export function recoverDenseCodeNewlinesInFences(text: string): string {
-  return text.replace(FENCED_CODE_BLOCK_RE, (full, lang: string, body: string) => {
-    const trimmed = body.trim();
-    const lg = normalizeFenceLang(lang);
-    const openLang = lang.toLowerCase();
+  return text.replace(
+    FENCED_CODE_BLOCK_RE,
+    (full, lang: string, body: string) => {
+      const trimmed = body.trim();
+      const lg = normalizeFenceLang(lang);
+      const openLang = lang.toLowerCase();
 
-    if (trimmed.length < MIN_LENGTH_FOR_RECOVERY_IN_FENCE) {
-      return openLang !== lg ? `\`\`\`${lg}\n${body}\n\`\`\`` : full;
-    }
+      if (trimmed.length < MIN_LENGTH_FOR_RECOVERY_IN_FENCE) {
+        return openLang !== lg ? `\`\`\`${lg}\n${body}\n\`\`\`` : full;
+      }
 
-    const nonEmptyLines = trimmed.split('\n').filter((l) => l.trim().length > 0).length;
-    if (nonEmptyLines > 1) {
-      return openLang !== lg ? `\`\`\`${lg}\n${trimmed}\n\`\`\`` : full;
-    }
+      const nonEmptyLines = trimmed
+        .split('\n')
+        .filter((l) => l.trim().length > 0).length;
+      if (nonEmptyLines > 1) {
+        return openLang !== lg ? `\`\`\`${lg}\n${trimmed}\n\`\`\`` : full;
+      }
 
-    const recovered = recoverDenseCodeNewlines(trimmed, MIN_LENGTH_FOR_RECOVERY_IN_FENCE);
-    const bodyOut = recovered === trimmed ? trimmed : recovered;
-    return `\`\`\`${lg}\n${bodyOut}\n\`\`\``;
-  });
+      const recovered = recoverDenseCodeNewlines(
+        trimmed,
+        MIN_LENGTH_FOR_RECOVERY_IN_FENCE,
+      );
+      const bodyOut = recovered === trimmed ? trimmed : recovered;
+      return `\`\`\`${lg}\n${bodyOut}\n\`\`\``;
+    },
+  );
 }
 
 function startsWithFencedMarkdown(s: string): boolean {
@@ -59,7 +76,9 @@ function looksLikeBareTypeScriptSnippet(s: string): boolean {
   const t = s.trim();
   if (t.length < MIN_LENGTH_FOR_RECOVERY) return false;
   if (
-    !/^(import\s|export\s|const\s|let\s|var\s|type\s|interface\s|function\s|async\s+function\s|\/\/\/)/m.test(t)
+    !/^(import\s|export\s|const\s|let\s|var\s|type\s|interface\s|function\s|async\s+function\s|\/\/\/)/m.test(
+      t,
+    )
   ) {
     return false;
   }
@@ -70,7 +89,7 @@ function looksLikeBareTypeScriptSnippet(s: string): boolean {
 
 /**
  * Renders user-authored text that is dense code (no markdown fence, newlines lost) as a
- * Telegram-style code block. Does not change stored/copy payload — use only before renderMarkdown.
+ * Telegram-style code block. Does not change stored/copy payload: use only before renderMarkdown.
  */
 export function prepareUserMessageMarkdownForRender(text: string): string {
   if (!text) return text;

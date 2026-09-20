@@ -1,19 +1,7 @@
 #!/bin/sh
-# ─────────────────────────────────────────────────────────────────────────────
-# mcp-remote-wrapper — auto-restart wrapper for mcp-remote.
-#
-# mcp-remote (v0.1.x) has zero reconnection logic. When the upstream MCP
-# server restarts (e.g. Rails Puma reload during development), the HTTP/SSE
-# connection drops and mcp-remote exits immediately. Claude Code / Gemini CLI
-# then marks those tools as "no longer available" for the rest of the session.
-#
-# This wrapper catches exits and restarts mcp-remote, keeping the parent
-# process alive so the AI agent CLI still sees a running MCP child process
-# and re-discovers tools on reconnection.
-#
+# mcp-remote 0.1.x exits after a dropped HTTP/SSE connection. Restart it so
+# the parent agent can rediscover tools when the upstream server returns.
 # Usage: mcp-remote-wrapper <url> [--allow-http] [--header ...] [...]
-#        (same arguments as mcp-remote)
-# ─────────────────────────────────────────────────────────────────────────────
 
 MAX_RETRIES=${MCP_REMOTE_MAX_RETRIES:-30}
 RETRY_DELAY=${MCP_REMOTE_RETRY_DELAY:-5}
@@ -46,7 +34,7 @@ while [ "$attempt" -lt "$MAX_RETRIES" ]; do
   mcp-remote "$@"
   exit_code=$?
 
-  # Clean exit (e.g. graceful shutdown) — don't restart
+  # Do not restart after a graceful shutdown.
   [ "$exit_code" -eq 0 ] && exit 0
 
   attempt=$((attempt + 1))

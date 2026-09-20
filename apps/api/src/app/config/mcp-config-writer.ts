@@ -7,14 +7,10 @@ const getSessionDir = () => process.env.SESSION_DIR;
 const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const logger = new Logger('McpConfigWriter');
-const CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY = 'skipDangerousModePermissionPrompt';
+const CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY =
+  'skipDangerousModePermissionPrompt';
 
-/**
- * A single MCP server entry — either streamable-HTTP or stdio.
- *
- * Streamable HTTP: has serverUrl + optional authHeader.
- * Stdio:           has command + args.
- */
+/** A streamable-HTTP entry has serverUrl; a stdio entry has command and args. */
 interface McpServerEntry {
   serverUrl?: string;
   authHeader?: string;
@@ -25,15 +21,8 @@ interface McpServerEntry {
   env?: Record<string, string>;
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────
-
-/**
- * Converts a McpServerEntry from the env var into the provider-native config
- * shape that Gemini/Claude expect inside their settings.json `mcpServers`.
- */
 function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   if (entry.command) {
-    // Stdio server (e.g. docker MCP) — pass through as-is
     return {
       command: entry.command,
       args: entry.args ?? [],
@@ -41,10 +30,7 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
     };
   }
 
-  // Streamable-HTTP server — use mcp-remote proxy via auto-restart wrapper.
-  // mcp-remote (v0.1.x) has no reconnection logic; if the upstream server
-  // restarts the process exits and tools become permanently unavailable.
-  // The wrapper script catches exits and relaunches mcp-remote automatically.
+  // mcp-remote 0.1.x exits after an upstream restart, so the wrapper relaunches it.
   const url = entry.serverUrl ?? '';
   const args = [url];
   if (entry.serverUrl && !entry.serverUrl.startsWith('https://')) {
@@ -56,7 +42,9 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   return { command: 'mcp-remote-wrapper', args };
 }
 
-function toClaudeProjectJsonEntry(entry: McpServerEntry): Record<string, unknown> {
+function toClaudeProjectJsonEntry(
+  entry: McpServerEntry,
+): Record<string, unknown> {
   const native = toNativeJsonEntry(entry);
   if (native.command) {
     return {
@@ -68,11 +56,15 @@ function toClaudeProjectJsonEntry(entry: McpServerEntry): Record<string, unknown
   return native;
 }
 
-function toAntigravityJsonEntry(entry: McpServerEntry): Record<string, unknown> {
+function toAntigravityJsonEntry(
+  entry: McpServerEntry,
+): Record<string, unknown> {
   return {
     ...(entry.serverUrl ? { serverUrl: entry.serverUrl } : {}),
     ...(entry.authHeader ? { authHeader: entry.authHeader } : {}),
-    ...(entry.bearerTokenEnvVar ? { bearerTokenEnvVar: entry.bearerTokenEnvVar } : {}),
+    ...(entry.bearerTokenEnvVar
+      ? { bearerTokenEnvVar: entry.bearerTokenEnvVar }
+      : {}),
     ...(entry.type ? { type: entry.type } : {}),
     ...(entry.command ? { command: entry.command } : {}),
     ...(entry.args ? { args: entry.args } : {}),
@@ -106,7 +98,10 @@ function getDataDir(): string {
 }
 
 function getConversationId(): string {
-  const raw = process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim() || '';
+  const raw =
+    process.env.FIBE_AGENT_ID?.trim() ||
+    process.env.CONVERSATION_ID?.trim() ||
+    '';
   return raw || 'default';
 }
 
@@ -120,8 +115,6 @@ function june1815Enabled(): boolean {
 
 function getClaudeProjectMcpConfigPath(): string {
   const conversationId = getConversationId();
-  // We now always have a conversationId (falls back to 'default')
-  // so this will always match the path Claude uses via ConfigService.
   return join(
     getDataDir(),
     sanitizeConversationId(conversationId),
@@ -131,7 +124,9 @@ function getClaudeProjectMcpConfigPath(): string {
 }
 
 function getCursorMcpConfigPath(): string {
-  const hasConversationId = !!(process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim());
+  const hasConversationId = !!(
+    process.env.FIBE_AGENT_ID?.trim() || process.env.CONVERSATION_ID?.trim()
+  );
   if (!hasConversationId) {
     return join(getSessionDir() || join(getHome(), '.cursor'), 'mcp.json');
   }
@@ -154,12 +149,16 @@ function codexBearerTokenEnvVar(entry: McpServerEntry): string | null {
     return null;
   }
 
-  const envPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  const envPlaceholder = entry.authHeader.match(
+    /^Bearer\s+\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/,
+  );
   if (envPlaceholder) {
     return envPlaceholder[1];
   }
 
-  const rawPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  const rawPlaceholder = entry.authHeader.match(
+    /^Bearer\s+\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/,
+  );
   if (rawPlaceholder) {
     return rawPlaceholder[1];
   }
@@ -175,12 +174,16 @@ function opencodeAuthorizationHeader(entry: McpServerEntry): string | null {
     return null;
   }
 
-  const envPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  const envPlaceholder = entry.authHeader.match(
+    /^Bearer\s+\$\{env:([A-Za-z_][A-Za-z0-9_]*)\}$/,
+  );
   if (envPlaceholder) {
     return `Bearer {env:${envPlaceholder[1]}}`;
   }
 
-  const rawPlaceholder = entry.authHeader.match(/^Bearer\s+\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/);
+  const rawPlaceholder = entry.authHeader.match(
+    /^Bearer\s+\$\{([A-Za-z_][A-Za-z0-9_]*)\}$/,
+  );
   if (rawPlaceholder) {
     return `Bearer {env:${rawPlaceholder[1]}}`;
   }
@@ -188,7 +191,10 @@ function opencodeAuthorizationHeader(entry: McpServerEntry): string | null {
   return entry.authHeader;
 }
 
-function stripManagedCodexBlocks(content: string, serverNames: string[]): string {
+function stripManagedCodexBlocks(
+  content: string,
+  serverNames: string[],
+): string {
   if (!content.trim()) {
     return '';
   }
@@ -217,13 +223,11 @@ function stripManagedCodexBlocks(content: string, serverNames: string[]): string
   return kept.join('\n').trim();
 }
 
-/**
- * Converts a McpServerEntry into a TOML block for OpenAI Codex config.
- */
 function toTomlBlock(name: string, entry: McpServerEntry): string {
   if (entry.command) {
-    // Stdio — Codex uses "type", "command" and "args" keys
-    const argsQuoted = (entry.args ?? []).map((a) => quotedTomlString(a)).join(', ');
+    const argsQuoted = (entry.args ?? [])
+      .map((a) => quotedTomlString(a))
+      .join(', ');
     const lines = [
       `[mcp_servers.${quotedTomlString(name)}]`,
       `type = "stdio"`,
@@ -250,13 +254,10 @@ function toTomlBlock(name: string, entry: McpServerEntry): string {
   return lines.join('\n');
 }
 
-// ─── Provider Writers ──────────────────────────────────────────────
-
-/**
- * Provider-specific MCP config writers.
- * Each provider stores MCP server configuration in a different format/location.
- */
-const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>) => void> = {
+const PROVIDER_WRITERS: Record<
+  string,
+  (servers: Record<string, McpServerEntry>) => void
+> = {
   /**
    * Gemini CLI: ~/.gemini/settings.json
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
@@ -271,7 +272,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
         existing = JSON.parse(readFileSync(configPath, 'utf8'));
       }
     } catch {
-      /* start fresh */
+      // Unreadable config falls back to defaults.
     }
 
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -324,13 +325,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     logger.log(`Wrote Antigravity MCP config to ${configPath}`);
   },
 
-  /**
-   * Claude Code: writes MCP servers to:
-   *   1. <workspace>/.mcp.json     — project-scoped MCP config used by Claude Code
-   *   2. ~/.claude/settings.json   — user-scoped settings file
-   *
-   * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
-   */
+  /** Writes Claude MCP servers to the project and user config files. */
   'claude-code': (servers) => {
     const nativeServers: Record<string, unknown> = {};
     const projectServers: Record<string, unknown> = {};
@@ -348,7 +343,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
           projectExisting = JSON.parse(readFileSync(projectPath, 'utf8'));
         }
       } catch {
-        /* start fresh */
+        // Unreadable config falls back to defaults.
       }
 
       if (!existsSync(projectDir)) mkdirSync(projectDir, { recursive: true });
@@ -363,11 +358,11 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
       writeFileSync(projectPath, JSON.stringify(projectConfig, null, 2));
       logger.log(`Wrote Claude project MCP config to ${projectPath}`);
     } else {
-      logger.warn('Skipped Claude project .mcp.json because no conversation id or SESSION_DIR is available');
+      logger.warn(
+        'Skipped Claude project .mcp.json because no conversation id or SESSION_DIR is available',
+      );
     }
 
-    // Write to ~/.claude/settings.json
-    // Respect SESSION_DIR if set — strategies read config from there
     const settingsDir = getSessionDir() || join(getHome(), '.claude');
     const settingsPath = join(settingsDir, 'settings.json');
     if (!existsSync(settingsDir)) mkdirSync(settingsDir, { recursive: true });
@@ -378,12 +373,14 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
         settingsExisting = JSON.parse(readFileSync(settingsPath, 'utf8'));
       }
     } catch {
-      /* start fresh */
+      // Unreadable settings fall back to defaults.
     }
 
     const settingsConfig = {
       ...settingsExisting,
-      ...(june1815Enabled() ? { [CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY]: true } : {}),
+      ...(june1815Enabled()
+        ? { [CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY]: true }
+        : {}),
       mcpServers: {
         ...((settingsExisting.mcpServers as Record<string, unknown>) ?? {}),
         ...nativeServers,
@@ -407,26 +404,35 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
         existingContent = readFileSync(configPath, 'utf8');
       }
     } catch {
-      /* start fresh */
+      // Unreadable config falls back to defaults.
     }
 
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
 
     for (const [name, entry] of Object.entries(servers)) {
-      if (entry.serverUrl && entry.authHeader && !codexBearerTokenEnvVar(entry)) {
+      if (
+        entry.serverUrl &&
+        entry.authHeader &&
+        !codexBearerTokenEnvVar(entry)
+      ) {
         logger.warn(
           `Codex MCP server "${name}" uses authHeader, but Codex only supports bearer_token_env_var for remote servers; skipping auth header`,
         );
       }
     }
 
-    const cleaned = stripManagedCodexBlocks(existingContent, Object.keys(servers));
+    const cleaned = stripManagedCodexBlocks(
+      existingContent,
+      Object.keys(servers),
+    );
 
     const tomlBlocks = Object.entries(servers)
       .map(([name, entry]) => toTomlBlock(name, entry))
       .join('\n\n');
 
-    const finalContent = cleaned ? `${cleaned}\n\n${tomlBlocks}\n` : `${tomlBlocks}\n`;
+    const finalContent = cleaned
+      ? `${cleaned}\n\n${tomlBlocks}\n`
+      : `${tomlBlocks}\n`;
     writeFileSync(configPath, finalContent);
     logger.log(`Wrote Codex MCP config (TOML) to ${configPath}`);
   },
@@ -442,7 +448,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
     try {
       if (existingRaw) existing = JSON.parse(existingRaw);
     } catch {
-      /* start fresh */
+      // Unreadable config falls back to defaults.
     }
 
     // Current OpenCode config schema:
@@ -464,7 +470,9 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
           type: 'remote',
           enabled: true,
           url: entry.serverUrl,
-          ...(authorization ? { headers: { Authorization: authorization } } : {}),
+          ...(authorization
+            ? { headers: { Authorization: authorization } }
+            : {}),
         };
       }
     }
@@ -495,7 +503,7 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
         existing = JSON.parse(readFileSync(configPath, 'utf8'));
       }
     } catch {
-      /* start fresh */
+      // Unreadable config falls back to defaults.
     }
 
     if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
@@ -517,13 +525,9 @@ const PROVIDER_WRITERS: Record<string, (servers: Record<string, McpServerEntry>)
   },
 };
 
-// ─── Main Entry Point ──────────────────────────────────────────────
-
-/**
- * Parses a JSON string containing `{ mcpServers: { ... } }`.
- * Returns the inner `mcpServers` map, or null on failure.
- */
-function parseServersFromJson(raw: string): Record<string, McpServerEntry> | null {
+function parseServersFromJson(
+  raw: string,
+): Record<string, McpServerEntry> | null {
   try {
     const parsed = JSON.parse(raw);
     if (parsed?.mcpServers && typeof parsed.mcpServers === 'object') {
@@ -539,28 +543,22 @@ function parseServersFromJson(raw: string): Record<string, McpServerEntry> | nul
   }
 }
 
-/**
- * Reads MCP_CONFIG_JSON env var and writes the appropriate provider-specific
- * MCP configuration files so the AI agent CLI can connect to all configured
- * MCP servers on startup.
- *
- * @param extraServers Optional additional server entries merged in last (highest priority).
- *   Use this to inject built-in servers (e.g. fibe-local) from callers that already
- *   hold a reference to the relevant service — avoids any module-level path resolution.
- */
-export function writeMcpConfig(extraServers?: Record<string, McpServerEntry>): void {
+/** Writes provider config from MCP_CONFIG_JSON, with extraServers taking priority. */
+export function writeMcpConfig(
+  extraServers?: Record<string, McpServerEntry>,
+): void {
   const rawProvider = process.env.AGENT_PROVIDER || 'claude-code';
 
-  // Normalize: Dockerfile uses underscores (claude_code), registry uses hyphens (claude-code)
   const provider = rawProvider.replace(/_/g, '-');
 
   const writer = PROVIDER_WRITERS[provider];
   if (!writer) {
-    logger.warn(`No MCP config writer for provider: ${provider} (raw: ${rawProvider})`);
+    logger.warn(
+      `No MCP config writer for provider: ${provider} (raw: ${rawProvider})`,
+    );
     return;
   }
 
-  // Collect servers from all sources
   const allServers: Record<string, McpServerEntry> = {};
 
   const mcpRaw = process.env.MCP_CONFIG_JSON;
@@ -570,12 +568,11 @@ export function writeMcpConfig(extraServers?: Record<string, McpServerEntry>): v
     else logger.warn('MCP_CONFIG_JSON could not be parsed');
   }
 
-  // Merge caller-supplied servers last so they always win
   if (extraServers) {
     Object.assign(allServers, extraServers);
   }
   if (Object.keys(allServers).length === 0) {
-    logger.log('No MCP servers configured — skipping config write');
+    logger.log('No MCP servers configured: skipping config write');
     return;
   }
 

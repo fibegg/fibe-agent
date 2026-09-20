@@ -7,9 +7,7 @@ import {
 
 describe('isScrollAtBottom', () => {
   it('returns true when scroll is at bottom (distance zero)', () => {
-    expect(
-      isScrollAtBottom(1000, 400, 600, 80)
-    ).toBe(true);
+    expect(isScrollAtBottom(1000, 400, 600, 80)).toBe(true);
   });
 
   it('returns true when within threshold', () => {
@@ -21,11 +19,9 @@ describe('isScrollAtBottom', () => {
   });
 
   it('uses default threshold when not provided', () => {
+    expect(isScrollAtBottom(1000, 0, 1000)).toBe(true);
     expect(
-      isScrollAtBottom(1000, 0, 1000)
-    ).toBe(true);
-    expect(
-      isScrollAtBottom(1000, 0, 1000 - SCROLL_AT_BOTTOM_THRESHOLD_PX - 1)
+      isScrollAtBottom(1000, 0, 1000 - SCROLL_AT_BOTTOM_THRESHOLD_PX - 1),
     ).toBe(false);
   });
 
@@ -57,5 +53,3 @@ describe('nextNewMessageCount', () => {
 // tests (e.g. message-list.spec.tsx) where the full jsdom environment is
 // already initialised within the shared worker. Running renderHook in a
 // dedicated forks worker crashes due to the heavy jsdom + React 19 setup cost.
-// The behaviour of isScrollAtBottom (the core scroll logic) is fully covered
-// by the pure-function tests above.

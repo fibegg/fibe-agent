@@ -20,7 +20,14 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest, getAuthTokenForRequest } from '../api-url';
 import {
@@ -39,9 +46,13 @@ import { copyTextToClipboard } from '../browser-compat';
 
 const FILE_PREVIEW_STORAGE_KEY = 'fibe.fileEditor.filePreview';
 
-// ─── Toast ────────────────────────────────────────────────────────────────────
-
-function Toast({ message, type }: { message: string; type: 'success' | 'error' }) {
+function Toast({
+  message,
+  type,
+}: {
+  message: string;
+  type: 'success' | 'error';
+}) {
   return (
     <div
       className={`fixed bottom-4 right-4 z-[200] flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-medium shadow-lg border animate-modal-enter ${
@@ -50,7 +61,11 @@ function Toast({ message, type }: { message: string; type: 'success' | 'error' }
           : 'bg-red-500/15 border-red-500/30 text-red-400'
       }`}
     >
-      {type === 'success' ? <Check className="size-4 shrink-0" /> : <X className="size-4 shrink-0" />}
+      {type === 'success' ? (
+        <Check className="size-4 shrink-0" />
+      ) : (
+        <X className="size-4 shrink-0" />
+      )}
       {message}
     </div>
   );
@@ -64,9 +79,17 @@ function withQueryParams(path: string, params: Record<string, string>): string {
   return `${url.pathname}${url.search}`;
 }
 
-// ─── Status Bar ───────────────────────────────────────────────────────────────
-
-function StatusBar({ language, lines, isDirty, isSaving }: { language: string; lines: number; isDirty: boolean; isSaving: boolean }) {
+function StatusBar({
+  language,
+  lines,
+  isDirty,
+  isSaving,
+}: {
+  language: string;
+  lines: number;
+  isDirty: boolean;
+  isSaving: boolean;
+}) {
   const t = useT();
   return (
     <div className="flex items-center justify-between gap-3 border-t border-border/50 bg-card/40 px-4 py-1.5 text-[10px] text-muted-foreground select-none">
@@ -96,27 +119,47 @@ function StatusBar({ language, lines, isDirty, isSaving }: { language: string; l
   );
 }
 
-function FilePreviewRail({ content, onJumpToLine }: { content: string; onJumpToLine: (lineNumber: number) => void }) {
+function FilePreviewRail({
+  content,
+  onJumpToLine,
+}: {
+  content: string;
+  onJumpToLine: (lineNumber: number) => void;
+}) {
   const t = useT();
   const lines = content.split('\n');
   const preview = lines.join('\n');
 
-  const jumpFromPointer = useCallback((event: ReactPointerEvent<HTMLElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top;
-    const visibleOffset = rect.height > 0 ? clientY - rect.top : 0;
-    const scrollableHeight = Math.max(event.currentTarget.scrollHeight, event.currentTarget.clientHeight, 1);
-    const absoluteOffset = event.currentTarget.scrollTop + Math.max(0, visibleOffset);
-    const ratio = absoluteOffset / scrollableHeight;
-    const lineNumber = Math.max(1, Math.min(lines.length, Math.floor(ratio * lines.length) + 1));
-    onJumpToLine(lineNumber);
-  }, [lines.length, onJumpToLine]);
+  const jumpFromPointer = useCallback(
+    (event: ReactPointerEvent<HTMLElement>) => {
+      const rect = event.currentTarget.getBoundingClientRect();
+      const clientY = Number.isFinite(event.clientY) ? event.clientY : rect.top;
+      const visibleOffset = rect.height > 0 ? clientY - rect.top : 0;
+      const scrollableHeight = Math.max(
+        event.currentTarget.scrollHeight,
+        event.currentTarget.clientHeight,
+        1,
+      );
+      const absoluteOffset =
+        event.currentTarget.scrollTop + Math.max(0, visibleOffset);
+      const ratio = absoluteOffset / scrollableHeight;
+      const lineNumber = Math.max(
+        1,
+        Math.min(lines.length, Math.floor(ratio * lines.length) + 1),
+      );
+      onJumpToLine(lineNumber);
+    },
+    [lines.length, onJumpToLine],
+  );
 
-  const jumpFromKeyboard = useCallback((event: ReactKeyboardEvent<HTMLElement>) => {
-    if (event.key !== 'Enter' && event.key !== ' ') return;
-    event.preventDefault();
-    onJumpToLine(1);
-  }, [onJumpToLine]);
+  const jumpFromKeyboard = useCallback(
+    (event: ReactKeyboardEvent<HTMLElement>) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      event.preventDefault();
+      onJumpToLine(1);
+    },
+    [onJumpToLine],
+  );
 
   return (
     <aside
@@ -133,8 +176,6 @@ function FilePreviewRail({ content, onJumpToLine }: { content: string; onJumpToL
     </aside>
   );
 }
-
-// ─── FileEditorPanel ──────────────────────────────────────────────────────────
 
 export function FileEditorPanel({
   entry,
@@ -157,9 +198,14 @@ export function FileEditorPanel({
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    type: 'success' | 'error';
+  } | null>(null);
   const [editorReady, setEditorReady] = useState(false);
-  const [previewMode, setPreviewMode] = useState<'code' | 'preview' | 'split'>('code');
+  const [previewMode, setPreviewMode] = useState<'code' | 'preview' | 'split'>(
+    'code',
+  );
   const [rawFileRevision, setRawFileRevision] = useState(0);
   const [imageFit, setImageFit] = useState<'fit' | 'actual'>('fit');
   const [imageZoom, setImageZoom] = useState(1);
@@ -169,20 +215,41 @@ export function FileEditorPanel({
   });
   const [fileSearchOpen, setFileSearchOpen] = useState(false);
   const [fileSearchQuery, setFileSearchQuery] = useState('');
-  const [fileSearchResult, setFileSearchResult] = useState<{ current: number; total: number } | null>(null);
+  const [fileSearchResult, setFileSearchResult] = useState<{
+    current: number;
+    total: number;
+  } | null>(null);
 
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const editorHandleRef = useRef<EditorHandle | null>(null);
   const fileSearchInputRef = useRef<HTMLInputElement>(null);
   const fileSearchQueryRef = useRef(fileSearchQuery);
-  const isDark = useCallback(() => document.documentElement.classList.contains('dark'), []);
+  const isDark = useCallback(
+    () => document.documentElement.classList.contains('dark'),
+    [],
+  );
 
-  const isDirty = liveContent !== null && originalContent !== null && liveContent !== originalContent;
-  const lineCount = liveContent !== null ? liveContent.split('\n').length : null;
+  const isDirty =
+    liveContent !== null &&
+    originalContent !== null &&
+    liveContent !== originalContent;
+  const lineCount =
+    liveContent !== null ? liveContent.split('\n').length : null;
   const language = getLanguageLabel(entry.name);
 
-  // ── Image files bypass the text editor entirely ────────────────────────────
-  const IMAGE_FILE_EXTS = new Set(['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.avif', '.bmp', '.ico', '.tiff', '.tif']);
+  const IMAGE_FILE_EXTS = new Set([
+    '.png',
+    '.jpg',
+    '.jpeg',
+    '.gif',
+    '.webp',
+    '.svg',
+    '.avif',
+    '.bmp',
+    '.ico',
+    '.tiff',
+    '.tif',
+  ]);
   function getFileExt(name: string): string {
     const i = name.lastIndexOf('.');
     return i >= 0 ? name.slice(i).toLowerCase() : '';
@@ -191,20 +258,23 @@ export function FileEditorPanel({
   const isImageFile = IMAGE_FILE_EXTS.has(ext);
   const isHtmlFile = ext === '.html' || ext === '.htm';
   const authToken = getAuthTokenForRequest();
-  const rawFileUrl = withQueryParams(rawApiBasePath ?? API_PATHS.PLAYGROUNDS_FILE_RAW, {
-    path: entry.path,
-    ...(authToken ? { token: authToken } : {}),
-    ...(rawFileRevision > 0 ? { v: String(rawFileRevision) } : {}),
-  });
-  
+  const rawFileUrl = withQueryParams(
+    rawApiBasePath ?? API_PATHS.PLAYGROUNDS_FILE_RAW,
+    {
+      path: entry.path,
+      ...(authToken ? { token: authToken } : {}),
+      ...(rawFileRevision > 0 ? { v: String(rawFileRevision) } : {}),
+    },
+  );
+
   const isGitModified = entry.gitStatus === 'modified';
-  const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
+  const isGitAddedOrUntracked =
+    entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
   const isGitDeleted = entry.gitStatus === 'deleted';
   const isGitRenamed = entry.gitStatus === 'renamed';
 
   fileSearchQueryRef.current = fileSearchQuery;
 
-  // Notify parent of dirty state changes
   const onDirtyChangeRef = useRef(onDirtyChange);
   onDirtyChangeRef.current = onDirtyChange;
   useEffect(() => {
@@ -222,12 +292,17 @@ export function FileEditorPanel({
   }, [entry.path, isHtmlFile]);
 
   useEffect(() => {
-    window.localStorage.setItem(FILE_PREVIEW_STORAGE_KEY, showFilePreview ? '1' : '0');
+    window.localStorage.setItem(
+      FILE_PREVIEW_STORAGE_KEY,
+      showFilePreview ? '1' : '0',
+    );
   }, [showFilePreview]);
 
-  // ── Fetch content (text files only) ──────────────────────────────────────
   useEffect(() => {
-    if (isImageFile) { setLoading(false); return; }  // Skip text fetch for images
+    if (isImageFile) {
+      setLoading(false);
+      return;
+    } // Skip text fetch for images
     const ac = new AbortController();
     setLoading(true);
     setFetchError(null);
@@ -235,13 +310,19 @@ export function FileEditorPanel({
     setLiveContent(null);
     setEditorReady(false);
 
-    const path = withQueryParams(apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE, { path: entry.path });
+    const path = withQueryParams(apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE, {
+      path: entry.path,
+    });
 
     apiRequest(path, { signal: ac.signal })
       .then(async (res) => {
         if (!res.ok) {
           if (res.status === 404) throw new Error(t('fileEditor.fileNotFound'));
-          throw new Error(res.status === 401 ? t('fileEditor.unauthorized') : t('fileEditor.failedLoadFile'));
+          throw new Error(
+            res.status === 401
+              ? t('fileEditor.unauthorized')
+              : t('fileEditor.failedLoadFile'),
+          );
         }
         const data = (await res.json()) as { content?: string };
         const text = typeof data.content === 'string' ? data.content : '';
@@ -250,7 +331,9 @@ export function FileEditorPanel({
       })
       .catch((e) => {
         if ((e as Error).name !== 'AbortError') {
-          setFetchError(e instanceof Error ? e.message : t('fileEditor.failedLoadFile'));
+          setFetchError(
+            e instanceof Error ? e.message : t('fileEditor.failedLoadFile'),
+          );
         }
       })
       .finally(() => {
@@ -260,10 +343,13 @@ export function FileEditorPanel({
     return () => ac.abort();
   }, [entry.path, apiBasePath, isImageFile, t]);
 
-  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f' && !isImageFile) {
+      if (
+        (e.metaKey || e.ctrlKey) &&
+        e.key.toLowerCase() === 'f' &&
+        !isImageFile
+      ) {
         e.preventDefault();
         if (isHtmlFile && previewMode === 'preview') setPreviewMode('code');
         setFileSearchOpen(true);
@@ -287,58 +373,68 @@ export function FileEditorPanel({
     if (!editorReady || !fileSearchOpen) return;
     const trimmed = fileSearchQueryRef.current.trim();
     if (!trimmed) return;
-    setFileSearchResult(editorHandleRef.current?.searchInFile(trimmed, 'next') ?? { current: 0, total: 0 });
+    setFileSearchResult(
+      editorHandleRef.current?.searchInFile(trimmed, 'next') ?? {
+        current: 0,
+        total: 0,
+      },
+    );
   }, [editorReady, fileSearchOpen]);
 
-  // ── Toast auto-dismiss ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!toast) return;
     const t = setTimeout(() => setToast(null), 3000);
     return () => clearTimeout(t);
   }, [toast]);
 
-  // ── Mount CodeMirror (text files only) ────────────────────────────────────
   useEffect(() => {
-    if (isImageFile) return;  // Images don't use the text editor
+    if (isImageFile) return; // Images don't use the text editor
     if (isHtmlFile && previewMode === 'preview') return;
-    if (loading || fetchError || originalContent === null || !editorContainerRef.current) return;
+    if (
+      loading ||
+      fetchError ||
+      originalContent === null ||
+      !editorContainerRef.current
+    )
+      return;
 
     let destroyed = false;
     let handle: EditorHandle | null = null;
 
-    import('./file-editor-cm').then(({ createEditor }) => {
-      if (destroyed || !editorContainerRef.current) return;
+    import('./file-editor-cm')
+      .then(({ createEditor }) => {
+        if (destroyed || !editorContainerRef.current) return;
 
-      handle = createEditor({
-        parent: editorContainerRef.current,
-        content: originalContent,
-        filename: entry.name,
-        isDark: isDark(),
-        readOnly: false,
-        onChange(content) {
-          setLiveContent(content);
-        },
-        onSave(content) {
-          void handleSave(content);
-        },
-      });
+        handle = createEditor({
+          parent: editorContainerRef.current,
+          content: originalContent,
+          filename: entry.name,
+          isDark: isDark(),
+          readOnly: false,
+          onChange(content) {
+            setLiveContent(content);
+          },
+          onSave(content) {
+            void handleSave(content);
+          },
+        });
 
-      editorHandleRef.current = handle;
-      setEditorReady(true);
+        editorHandleRef.current = handle;
+        setEditorReady(true);
 
-      // Watch dark/light class toggle
-      const observer = new MutationObserver(() => {
-        handle?.setTheme(document.documentElement.classList.contains('dark'));
-      });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+        const observer = new MutationObserver(() => {
+          handle?.setTheme(document.documentElement.classList.contains('dark'));
+        });
+        observer.observe(document.documentElement, {
+          attributes: true,
+          attributeFilter: ['class'],
+        });
 
-      // Focus editor
-      setTimeout(() => handle?.focus(), 50);
+        setTimeout(() => handle?.focus(), 50);
 
-      return () => observer.disconnect();
-    }).catch(() => {
-      // Editor failed to load — graceful degradation handled via !editorReady
-    });
+        return () => observer.disconnect();
+      })
+      .catch(() => undefined);
 
     return () => {
       destroyed = true;
@@ -349,41 +445,42 @@ export function FileEditorPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, fetchError, originalContent, entry.name, previewMode]);
 
-  // ── Save ───────────────────────────────────────────────────────────────────
-  const handleSave = useCallback(async (contentToSave?: string) => {
-    const content = contentToSave ?? editorHandleRef.current?.getContent() ?? liveContent;
-    if (content === null) return;
+  const handleSave = useCallback(
+    async (contentToSave?: string) => {
+      const content =
+        contentToSave ?? editorHandleRef.current?.getContent() ?? liveContent;
+      if (content === null) return;
 
-    setIsSaving(true);
-    try {
-      const savePath = apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE;
+      setIsSaving(true);
+      try {
+        const savePath = apiBasePath ?? API_PATHS.PLAYGROUNDS_FILE;
 
-      const res = await apiRequest(savePath, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: entry.path, content }),
-      });
+        const res = await apiRequest(savePath, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ path: entry.path, content }),
+        });
 
-      if (!res.ok) throw new Error(t('fileEditor.saveFailed'));
+        if (!res.ok) throw new Error(t('fileEditor.saveFailed'));
 
-      setOriginalContent(content);
-      setLiveContent(content);
-      if (isHtmlFile || isImageFile) setRawFileRevision((value) => value + 1);
-      setToast({ message: t('fileEditor.fileSaved'), type: 'success' });
-    } catch {
-      setToast({ message: t('fileEditor.saveFailed'), type: 'error' });
-    } finally {
-      setIsSaving(false);
-    }
-  }, [entry.path, liveContent, apiBasePath, t, isHtmlFile, isImageFile]);
+        setOriginalContent(content);
+        setLiveContent(content);
+        if (isHtmlFile || isImageFile) setRawFileRevision((value) => value + 1);
+        setToast({ message: t('fileEditor.fileSaved'), type: 'success' });
+      } catch {
+        setToast({ message: t('fileEditor.saveFailed'), type: 'error' });
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [entry.path, liveContent, apiBasePath, t, isHtmlFile, isImageFile],
+  );
 
-  // ── Copy ───────────────────────────────────────────────────────────────────
   const handleCopy = useCallback(() => {
     const content = editorHandleRef.current?.getContent() ?? liveContent;
     if (content !== null) void copyTextToClipboard(content);
   }, [liveContent]);
 
-  // ── Download ───────────────────────────────────────────────────────────────
   const handleDownload = useCallback(() => {
     if (isImageFile) {
       const a = document.createElement('a');
@@ -410,19 +507,30 @@ export function FileEditorPanel({
     editorHandleRef.current?.scrollToLine(lineNumber);
   }, []);
 
-  const handleFileSearch = useCallback((query: string, direction: 'next' | 'previous') => {
-    const trimmed = query.trim();
-    if (!trimmed) {
-      setFileSearchResult(null);
-      return;
-    }
-    setFileSearchResult(editorHandleRef.current?.searchInFile(trimmed, direction) ?? { current: 0, total: 0 });
-  }, []);
+  const handleFileSearch = useCallback(
+    (query: string, direction: 'next' | 'previous') => {
+      const trimmed = query.trim();
+      if (!trimmed) {
+        setFileSearchResult(null);
+        return;
+      }
+      setFileSearchResult(
+        editorHandleRef.current?.searchInFile(trimmed, direction) ?? {
+          current: 0,
+          total: 0,
+        },
+      );
+    },
+    [],
+  );
 
-  const handleFileSearchChange = useCallback((query: string) => {
-    setFileSearchQuery(query);
-    handleFileSearch(query, 'next');
-  }, [handleFileSearch]);
+  const handleFileSearchChange = useCallback(
+    (query: string) => {
+      setFileSearchQuery(query);
+      handleFileSearch(query, 'next');
+    },
+    [handleFileSearch],
+  );
 
   const closeFileSearch = useCallback(() => {
     setFileSearchOpen(false);
@@ -431,21 +539,21 @@ export function FileEditorPanel({
     editorHandleRef.current?.focus();
   }, []);
 
-  // ── Discard ────────────────────────────────────────────────────────────────
   const handleDiscard = useCallback(() => {
     if (originalContent === null) return;
     editorHandleRef.current?.setContent(originalContent);
     setLiveContent(originalContent);
   }, [originalContent]);
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   const panelClasses = inline
     ? 'flex flex-col overflow-hidden bg-card flex-1 min-h-0 rounded-none border-0'
     : 'flex flex-col overflow-hidden bg-card w-full max-w-[95vw] sm:max-w-[92vw] sm:w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card';
   const headerClasses = inline
     ? 'border-b border-border/50 bg-card/40 px-2 py-2 sm:px-4 backdrop-blur-xl shrink-0'
     : CARD_HEADER;
-  const headerStyle = inline ? undefined : { minHeight: PANEL_HEADER_MIN_HEIGHT_PX };
+  const headerStyle = inline
+    ? undefined
+    : { minHeight: PANEL_HEADER_MIN_HEIGHT_PX };
   const headerRowClasses = inline
     ? 'min-h-10 flex-shrink-0 flex-wrap sm:flex-nowrap'
     : HEADER_FIRST_ROW;
@@ -462,11 +570,17 @@ export function FileEditorPanel({
       >
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <div className={headerClasses} style={headerStyle}>
-          <div className={`flex items-center justify-between gap-2 min-w-0 ${headerRowClasses}`}>
+          <div
+            className={`flex items-center justify-between gap-2 min-w-0 ${headerRowClasses}`}
+          >
             {/* Title */}
-            <div className={`${inline ? 'hidden sm:flex' : 'flex'} items-center gap-3 min-w-0 flex-1`}>
+            <div
+              className={`${inline ? 'hidden sm:flex' : 'flex'} items-center gap-3 min-w-0 flex-1`}
+            >
               <div className={logoClasses}>
-                <Edit3 className={inline ? 'size-4 text-white' : 'size-5 text-white'} />
+                <Edit3
+                  className={inline ? 'size-4 text-white' : 'size-5 text-white'}
+                />
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
@@ -480,14 +594,22 @@ export function FileEditorPanel({
                     {entry.gitStatus && (
                       <span
                         className={`size-2 rounded-full shrink-0 ${
-                          isGitModified ? 'bg-amber-400' :
-                          isGitAddedOrUntracked ? 'bg-green-400' :
-                          isGitDeleted ? 'bg-red-400' :
-                          isGitRenamed ? 'bg-blue-400' :
-                          'bg-muted-foreground'
+                          isGitModified
+                            ? 'bg-amber-400'
+                            : isGitAddedOrUntracked
+                              ? 'bg-green-400'
+                              : isGitDeleted
+                                ? 'bg-red-400'
+                                : isGitRenamed
+                                  ? 'bg-blue-400'
+                                  : 'bg-muted-foreground'
                         }`}
-                        title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
-                        aria-label={t('fileEditor.gitStatus', { status: entry.gitStatus })}
+                        title={t('fileEditor.gitStatus', {
+                          status: entry.gitStatus,
+                        })}
+                        aria-label={t('fileEditor.gitStatus', {
+                          status: entry.gitStatus,
+                        })}
                       />
                     )}
                     {isDirty && (
@@ -498,7 +620,10 @@ export function FileEditorPanel({
                     )}
                   </div>
                 </div>
-                <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={entry.path}>
+                <p
+                  className="text-[10px] text-muted-foreground mt-0.5 truncate"
+                  title={entry.path}
+                >
                   {entry.path}
                 </p>
               </div>
@@ -551,7 +676,9 @@ export function FileEditorPanel({
                     ) : (
                       <Save className="size-3" />
                     )}
-                    <span className="hidden sm:inline">{t('fileEditor.save')}</span>
+                    <span className="hidden sm:inline">
+                      {t('fileEditor.save')}
+                    </span>
                   </button>
                 )}
                 {!isImageFile && isDirty && (
@@ -562,7 +689,9 @@ export function FileEditorPanel({
                     title={t('fileEditor.discardTitle')}
                   >
                     <RotateCcw className="size-3" />
-                    <span className="hidden sm:inline">{t('fileEditor.discard')}</span>
+                    <span className="hidden sm:inline">
+                      {t('fileEditor.discard')}
+                    </span>
                   </button>
                 )}
                 {!isImageFile && (
@@ -570,7 +699,12 @@ export function FileEditorPanel({
                     type="button"
                     onClick={() => {
                       const nextSearchOpen = !fileSearchOpen;
-                      if (nextSearchOpen && isHtmlFile && previewMode === 'preview') setPreviewMode('code');
+                      if (
+                        nextSearchOpen &&
+                        isHtmlFile &&
+                        previewMode === 'preview'
+                      )
+                        setPreviewMode('code');
                       setFileSearchOpen(nextSearchOpen);
                       setTimeout(() => fileSearchInputRef.current?.focus(), 0);
                     }}
@@ -614,7 +748,9 @@ export function FileEditorPanel({
                     title={t('fileEditor.openRaw')}
                   >
                     <ExternalLink className="size-3" />
-                    <span className="hidden sm:inline">{t('fileEditor.open')}</span>
+                    <span className="hidden sm:inline">
+                      {t('fileEditor.open')}
+                    </span>
                   </button>
                 )}
                 <button
@@ -625,7 +761,9 @@ export function FileEditorPanel({
                   title={t('fileEditor.downloadTitle')}
                 >
                   <Download className="size-3" />
-                  <span className="hidden sm:inline">{t('fileEditor.download')}</span>
+                  <span className="hidden sm:inline">
+                    {t('fileEditor.download')}
+                  </span>
                 </button>
               </div>
               <button
@@ -646,7 +784,9 @@ export function FileEditorPanel({
             <div className="flex items-center justify-between gap-2 border-b border-border/40 bg-card/35 px-4 py-2">
               <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
                 <ImageIcon className="size-3.5 shrink-0" />
-                <span className="truncate" title={entry.path}>{entry.path}</span>
+                <span className="truncate" title={entry.path}>
+                  {entry.path}
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 <button
@@ -669,7 +809,9 @@ export function FileEditorPanel({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setImageZoom((value) => Math.max(0.25, value - 0.25))}
+                  onClick={() =>
+                    setImageZoom((value) => Math.max(0.25, value - 0.25))
+                  }
                   className={`${BUTTON_ICON_MUTED} size-8`}
                   title={t('fileEditor.zoomOut')}
                   aria-label={t('fileEditor.zoomOut')}
@@ -691,16 +833,19 @@ export function FileEditorPanel({
               </div>
             </div>
             <div className="flex-1 min-h-0 overflow-auto p-6 flex items-center justify-center">
-              <div
-                className="rounded-xl border border-border/50 shadow-xl overflow-hidden bg-[repeating-conic-gradient(#80808020_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]"
-              >
+              <div className="rounded-xl border border-border/50 shadow-xl overflow-hidden bg-[repeating-conic-gradient(#80808020_0%_25%,transparent_0%_50%)] bg-[length:16px_16px]">
                 <img
                   src={rawFileUrl}
                   alt={entry.name}
                   className="object-contain block"
-                  style={imageFit === 'fit'
-                    ? { maxWidth: 'min(100%, 1200px)', maxHeight: 'calc(100vh - 12rem)' }
-                    : { width: `${imageZoom * 100}%`, maxWidth: 'none' }}
+                  style={
+                    imageFit === 'fit'
+                      ? {
+                          maxWidth: 'min(100%, 1200px)',
+                          maxHeight: 'calc(100vh - 12rem)',
+                        }
+                      : { width: `${imageZoom * 100}%`, maxWidth: 'none' }
+                  }
                 />
               </div>
             </div>
@@ -716,7 +861,11 @@ export function FileEditorPanel({
               value={fileSearchQuery}
               onChange={(event) => handleFileSearchChange(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Enter') handleFileSearch(fileSearchQuery, event.shiftKey ? 'previous' : 'next');
+                if (event.key === 'Enter')
+                  handleFileSearch(
+                    fileSearchQuery,
+                    event.shiftKey ? 'previous' : 'next',
+                  );
                 if (event.key === 'Escape') {
                   event.stopPropagation();
                   closeFileSearch();
@@ -726,7 +875,9 @@ export function FileEditorPanel({
               className="h-7 min-w-0 flex-1 rounded-md border border-border bg-background px-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
             />
             <span className="w-14 shrink-0 text-right text-[10px] text-muted-foreground">
-              {fileSearchResult ? `${fileSearchResult.current}/${fileSearchResult.total}` : ''}
+              {fileSearchResult
+                ? `${fileSearchResult.current}/${fileSearchResult.total}`
+                : ''}
             </span>
             <button
               type="button"
@@ -760,72 +911,98 @@ export function FileEditorPanel({
 
         {/* ── Editor Area ─────────────────────────────────────────────────── */}
         {!isImageFile && (
-        <div className={`flex-1 overflow-hidden min-h-0 relative ${isHtmlFile && previewMode === 'split' ? 'grid grid-rows-2 md:grid-cols-2 md:grid-rows-none' : 'flex flex-col'}`}>
-          {isHtmlFile && previewMode !== 'code' && (
-            <div className={`${previewMode === 'split' ? 'order-2 border-t border-border/50 md:border-l md:border-t-0' : ''} min-h-0 flex-1 overflow-hidden bg-white`}>
-              <iframe
-                key={rawFileUrl}
-                src={rawFileUrl}
-                title={t('fileEditor.preview')}
-                className="h-full w-full border-0 bg-white"
-                sandbox="allow-scripts allow-forms allow-modals allow-popups"
-              />
-            </div>
-          )}
-          {previewMode !== 'preview' && (
-          <div className={`${isHtmlFile && previewMode === 'split' ? 'order-1' : ''} relative flex min-h-0 flex-1 overflow-hidden`}>
-          <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-          {loading && (
-            <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-card z-10">
-              <Loader2 className="size-4 animate-spin mr-2" />
-              {t('common.loading')}
-            </div>
-          )}
-          {fetchError && (
-            <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="p-4 rounded-xl border border-border-subtle bg-muted/20 text-center max-w-sm">
-                <FileText className="size-8 text-muted-foreground mx-auto mb-2" />
-                <p className="text-sm text-muted-foreground">{fetchError}</p>
+          <div
+            className={`flex-1 overflow-hidden min-h-0 relative ${isHtmlFile && previewMode === 'split' ? 'grid grid-rows-2 md:grid-cols-2 md:grid-rows-none' : 'flex flex-col'}`}
+          >
+            {isHtmlFile && previewMode !== 'code' && (
+              <div
+                className={`${previewMode === 'split' ? 'order-2 border-t border-border/50 md:border-l md:border-t-0' : ''} min-h-0 flex-1 overflow-hidden bg-white`}
+              >
+                <iframe
+                  key={rawFileUrl}
+                  src={rawFileUrl}
+                  title={t('fileEditor.preview')}
+                  className="h-full w-full border-0 bg-white"
+                  sandbox="allow-scripts allow-forms allow-modals allow-popups"
+                />
               </div>
-            </div>
-          )}
+            )}
+            {previewMode !== 'preview' && (
+              <div
+                className={`${isHtmlFile && previewMode === 'split' ? 'order-1' : ''} relative flex min-h-0 flex-1 overflow-hidden`}
+              >
+                <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
+                  {loading && (
+                    <div className="absolute inset-0 flex items-center justify-center text-sm text-muted-foreground bg-card z-10">
+                      <Loader2 className="size-4 animate-spin mr-2" />
+                      {t('common.loading')}
+                    </div>
+                  )}
+                  {fetchError && (
+                    <div className="absolute inset-0 flex items-center justify-center z-10">
+                      <div className="p-4 rounded-xl border border-border-subtle bg-muted/20 text-center max-w-sm">
+                        <FileText className="size-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-sm text-muted-foreground">
+                          {fetchError}
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-          {/* CodeMirror mount point */}
-          {!fetchError && (
-            <div
-              ref={editorContainerRef}
-              className="flex-1 overflow-hidden min-h-0 bg-background dark:bg-[#1a1a2e] relative"
-              style={{ display: loading ? 'none' : 'flex', flexDirection: 'column' }}
-            >
-              {/* Empty file placeholder shown inside editor if content is empty */}
-              {!loading && liveContent === '' && (
-                <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[1]">
-                  <p className="text-sm text-muted-foreground">{t('fileEditor.empty')}</p>
+                  {/* CodeMirror mount point */}
+                  {!fetchError && (
+                    <div
+                      ref={editorContainerRef}
+                      className="flex-1 overflow-hidden min-h-0 bg-background dark:bg-[#1a1a2e] relative"
+                      style={{
+                        display: loading ? 'none' : 'flex',
+                        flexDirection: 'column',
+                      }}
+                    >
+                      {/* Empty file placeholder shown inside editor if content is empty */}
+                      {!loading && liveContent === '' && (
+                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-[1]">
+                          <p className="text-sm text-muted-foreground">
+                            {t('fileEditor.empty')}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Fallback plain text if CM didn't mount */}
+                  {!loading &&
+                    !fetchError &&
+                    !editorReady &&
+                    liveContent !== null &&
+                    liveContent.length > 0 && (
+                      <div className="absolute inset-0 overflow-auto bg-background dark:bg-[#1e1e1e]">
+                        <pre className="p-4 text-sm font-mono text-foreground whitespace-pre-wrap">
+                          {liveContent}
+                        </pre>
+                      </div>
+                    )}
+                  {!loading &&
+                    !fetchError &&
+                    !editorReady &&
+                    liveContent === '' && (
+                      <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
+                        {t('fileEditor.empty')}
+                      </div>
+                    )}
                 </div>
-              )}
-            </div>
-          )}
-
-          {/* Fallback plain text if CM didn't mount */}
-          {!loading && !fetchError && !editorReady && liveContent !== null && liveContent.length > 0 && (
-            <div className="absolute inset-0 overflow-auto bg-background dark:bg-[#1e1e1e]">
-              <pre className="p-4 text-sm font-mono text-foreground whitespace-pre-wrap">
-                {liveContent}
-              </pre>
-            </div>
-          )}
-          {!loading && !fetchError && !editorReady && liveContent === '' && (
-            <div className="flex items-center justify-center p-4 text-sm text-muted-foreground">
-              {t('fileEditor.empty')}
-            </div>
-          )}
+                {showFilePreview &&
+                  liveContent !== null &&
+                  !loading &&
+                  !fetchError && (
+                    <FilePreviewRail
+                      content={liveContent}
+                      onJumpToLine={handleJumpToPreviewLine}
+                    />
+                  )}
+              </div>
+            )}
           </div>
-          {showFilePreview && liveContent !== null && !loading && !fetchError && (
-            <FilePreviewRail content={liveContent} onJumpToLine={handleJumpToPreviewLine} />
-          )}
-          </div>
-          )}
-        </div>
         )}
 
         {/* ── Status Bar (text files only) ─────────────────────────────────── */}
@@ -845,8 +1022,6 @@ export function FileEditorPanel({
   );
 }
 
-// ─── Modal Wrapper ─────────────────────────────────────────────────────────────
-
 export function FileEditorDialog({
   entry,
   onClose,
@@ -865,7 +1040,10 @@ export function FileEditorDialog({
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)]">
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)]"
+      >
         <FileEditorPanel
           entry={entry}
           onClose={onClose}

@@ -22,9 +22,9 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
   protected currentStreamProcess: ChildProcess | null = null;
   protected streamInterrupted = false;
   protected readonly useApiTokenMode: boolean;
-  protected readonly conversationDataDir: ConversationDataDirProvider | undefined;
-
-  // ── Shared helpers promoted from concrete strategies ──────────────────────
+  protected readonly conversationDataDir:
+    | ConversationDataDirProvider
+    | undefined;
 
   /**
    * Patterns that indicate a stored session ID is no longer valid on the
@@ -38,7 +38,9 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
 
   /** Returns `true` when `message` looks like a missing/expired session error. */
   protected missingSessionError(message: string): boolean {
-    return AbstractCLIStrategy.MISSING_SESSION_PATTERNS.some((p) => p.test(message));
+    return AbstractCLIStrategy.MISSING_SESSION_PATTERNS.some((p) =>
+      p.test(message),
+    );
   }
 
   /** Strip ANSI escape sequences so sidebar output is clean. */
@@ -50,19 +52,22 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
    * Prepend pending steer messages to `prompt` as an `[Operator Interruption]`
    * block, and optionally prefix the system prompt.
    */
-  protected buildPromptWithPending(prompt: string, systemPrompt?: string): string {
+  protected buildPromptWithPending(
+    prompt: string,
+    systemPrompt?: string,
+  ): string {
     const pending = this.consumePendingMessages();
-    let final = pending ? `[Operator Interruption]\n${pending}\n\n${prompt}` : prompt;
+    let final = pending
+      ? `[Operator Interruption]\n${pending}\n\n${prompt}`
+      : prompt;
     if (systemPrompt) final = `${systemPrompt}\n${final}`;
     return final;
   }
 
-  // ─────────────────────────────────────────────────────────────────────────
-
   constructor(
     loggerName: string,
     useApiTokenMode = false,
-    conversationDataDir?: ConversationDataDirProvider
+    conversationDataDir?: ConversationDataDirProvider,
   ) {
     this.logger = new Logger(loggerName);
     this.useApiTokenMode = useApiTokenMode;
@@ -87,7 +92,7 @@ export abstract class AbstractCLIStrategy implements AgentStrategy {
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
     systemPrompt?: string,
-    runtimeOptions?: AgentRuntimeOptions
+    runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void>;
 
   cancelAuth(): void {

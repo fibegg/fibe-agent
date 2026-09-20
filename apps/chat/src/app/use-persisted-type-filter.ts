@@ -19,7 +19,9 @@ function readFilter(): string[] {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw && typeof raw === 'string' && !raw.startsWith('[')) return [raw];
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     return [];
   }
 }
@@ -36,13 +38,15 @@ function writeFilter(value: string[]): void {
   }
 }
 
-export function usePersistedTypeFilter(): [string[], (filter: string[]) => void] {
+export function usePersistedTypeFilter(): [
+  string[],
+  (filter: string[]) => void,
+] {
   const [filter, setFilterState] = useState<string[]>(() => readFilter());
 
   const setFilter = useCallback((value: string[]) => {
     setFilterState(value);
     writeFilter(value);
-    // Sync across hook instances within the same page
     window.dispatchEvent(new CustomEvent(SYNC_EVENT, { detail: value }));
   }, []);
 
@@ -51,7 +55,6 @@ export function usePersistedTypeFilter(): [string[], (filter: string[]) => void]
       const detail = (e as CustomEvent<string[]>).detail;
       setFilterState(detail);
     };
-    // Cross-tab sync
     const onStorage = (e: StorageEvent) => {
       if (e.key === STORAGE_KEY) setFilterState(readFilter());
     };

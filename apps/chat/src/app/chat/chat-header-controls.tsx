@@ -1,13 +1,12 @@
-/**
- * Shared control buttons used in both the desktop top-row and mobile search-row
- * of the ChatHeader, as well as in MoreActionsMenu.
- */
-import { Command, FolderOpen, GitCompareArrows, TerminalSquare } from 'lucide-react';
+import {
+  Command,
+  FolderOpen,
+  GitCompareArrows,
+  TerminalSquare,
+} from 'lucide-react';
 import { useT } from '../i18n';
 import { PlaygroundSelector } from './playground-selector';
 import type { ChatHeaderProps } from './chat-header';
-
-// ─── Icon ────────────────────────────────────────────────────────────────────
 
 export const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg
@@ -31,14 +30,23 @@ export const StarkGlassesIcon = (props: React.SVGProps<SVGSVGElement>) => (
     {/* Right arm */}
     <path d="M22 11V9c0-1-.5-2-1.5-2h-1" fill="none" strokeWidth="1.5" />
     {/* Glass reflection lines */}
-    <path d="M5 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
-    <path d="M16 11l-1.5 2" fill="none" stroke="black" strokeWidth="1" strokeOpacity="0.3" />
+    <path
+      d="M5 11l-1.5 2"
+      fill="none"
+      stroke="black"
+      strokeWidth="1"
+      strokeOpacity="0.3"
+    />
+    <path
+      d="M16 11l-1.5 2"
+      fill="none"
+      stroke="black"
+      strokeWidth="1"
+      strokeOpacity="0.3"
+    />
   </svg>
 );
 
-// ─── PlaygroundSelectorSlot ───────────────────────────────────────────────────
-
-/** Shared prop-forwarding helper — avoids repeating the 13-prop spread twice. */
 export function PlaygroundSelectorSlot({
   props,
   className,
@@ -73,9 +81,6 @@ export function PlaygroundSelectorSlot({
   );
 }
 
-// ─── Toggle buttons ───────────────────────────────────────────────────────────
-
-/** Commands toggle button, shared between the desktop top-row and the mobile search-row. */
 export function CliButton({
   open,
   onToggle,
@@ -105,7 +110,6 @@ export function CliButton({
   );
 }
 
-/** Diff toggle button, shared between the desktop top-row and the mobile search-row. */
 export function DiffButton({
   open,
   onToggle,
@@ -135,7 +139,6 @@ export function DiffButton({
   );
 }
 
-/** Terminal toggle button, shared between the desktop top-row and the mobile search-row. */
 export function TerminalButton({
   open,
   onToggle,
@@ -165,12 +168,7 @@ export function TerminalButton({
   );
 }
 
-/** Open-file-browser button. Used only inside MoreActionsMenu but extracted for symmetry. */
-export function FileBrowserButton({
-  onClick,
-}: {
-  onClick: () => void;
-}) {
+export function FileBrowserButton({ onClick }: { onClick: () => void }) {
   const t = useT();
   return (
     <button

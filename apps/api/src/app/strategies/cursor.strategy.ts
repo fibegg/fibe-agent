@@ -1,5 +1,11 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type {
@@ -18,14 +24,15 @@ const DEFAULT_CURSOR_HOME = join(process.env.HOME ?? '/home/node', '.cursor');
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const SESSION_MARKER_FILE = '.cursor_session';
 const CURSOR_API_KEY_ENV = 'CURSOR_API_KEY';
-const CURSOR_BIN_NAME = process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent';
+const CURSOR_BIN_NAME =
+  process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent';
 const RESPONSE_PREVIEW_MAX = 200;
 const CURSOR_AUTH_FILE = 'auth.json';
 
 const CURSOR_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   defaultArgs: {},
   blockedArgs: {
-    // Critical: non-interactive mode, always enforced
+    // Always enforce non-interactive mode.
     '--print': true,
     '--force': true,
     // Output format, always enforced for structured parsing
@@ -34,11 +41,16 @@ const CURSOR_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
 };
 
 function getCursorHome(): string {
-  return process.env.CURSOR_CONFIG_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CURSOR_HOME;
+  return (
+    process.env.CURSOR_CONFIG_HOME ??
+    process.env.SESSION_DIR ??
+    DEFAULT_CURSOR_HOME
+  );
 }
 
 function getCursorCommand(): string {
-  if (process.env.CURSOR_AGENT_BIN?.trim()) return process.env.CURSOR_AGENT_BIN.trim();
+  if (process.env.CURSOR_AGENT_BIN?.trim())
+    return process.env.CURSOR_AGENT_BIN.trim();
   return CURSOR_BIN_NAME;
 }
 
@@ -100,7 +112,9 @@ export interface CursorExecJsonHandlers {
 
 function preview(text: string | undefined): string | undefined {
   if (!text) return undefined;
-  return text.length > RESPONSE_PREVIEW_MAX ? `${text.slice(0, RESPONSE_PREVIEW_MAX)}…` : text;
+  return text.length > RESPONSE_PREVIEW_MAX
+    ? `${text.slice(0, RESPONSE_PREVIEW_MAX)}…`
+    : text;
 }
 
 function getToolName(toolCall: CursorToolCall | undefined): string | undefined {
@@ -108,7 +122,9 @@ function getToolName(toolCall: CursorToolCall | undefined): string | undefined {
   return Object.keys(toolCall)[0];
 }
 
-function getToolArgs(toolCall: CursorToolCall | undefined): CursorToolCallArgs | undefined {
+function getToolArgs(
+  toolCall: CursorToolCall | undefined,
+): CursorToolCallArgs | undefined {
   if (!toolCall) return undefined;
   const toolName = getToolName(toolCall);
   if (!toolName) return undefined;
@@ -125,7 +141,7 @@ function getUsage(event: CursorStreamEvent): TokenUsage {
 export function handleCursorExecJsonLine(
   line: string,
   state: CursorExecJsonState,
-  handlers: CursorExecJsonHandlers
+  handlers: CursorExecJsonHandlers,
 ): void {
   const trimmed = line.trim();
   if (!trimmed) return;
@@ -181,7 +197,9 @@ export function handleCursorExecJsonLine(
       const command = args?.command;
       const isFileTool = /read|write|edit|delete|file/i.test(toolName);
       state.hasEmittedOutput = true;
-      handlers.onReasoningChunk?.(`${toolName}${path ? `: ${path}` : command ? `: ${command}` : ''}\n`);
+      handlers.onReasoningChunk?.(
+        `${toolName}${path ? `: ${path}` : command ? `: ${command}` : ''}\n`,
+      );
       handlers.onTool?.(
         isFileTool && path
           ? {
@@ -197,7 +215,7 @@ export function handleCursorExecJsonLine(
               command,
               summary: preview(JSON.stringify(args)),
               details: JSON.stringify(args ?? {}),
-            }
+            },
       );
       return;
     }
@@ -232,7 +250,10 @@ export function handleCursorExecJsonLine(
 }
 
 export class CursorStrategy extends AbstractCLIStrategy {
-  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
+  constructor(
+    useApiTokenMode = false,
+    conversationDataDir?: ConversationDataDirProvider,
+  ) {
     super(CursorStrategy.name, useApiTokenMode, conversationDataDir);
   }
 
@@ -252,7 +273,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
     try {
       const authPath = this.getAuthFilePath();
       if (!existsSync(authPath)) return null;
-      const parsed = JSON.parse(readFileSync(authPath, 'utf8')) as Record<string, string>;
+      const parsed = JSON.parse(readFileSync(authPath, 'utf8')) as Record<
+        string,
+        string
+      >;
       return parsed.api_key?.trim() || parsed.token?.trim() || null;
     } catch {
       return null;
@@ -260,7 +284,9 @@ export class CursorStrategy extends AbstractCLIStrategy {
   }
 
   private isAuthenticated(): boolean {
-    return Boolean(process.env[CURSOR_API_KEY_ENV]?.trim() || this.getStoredApiKey());
+    return Boolean(
+      process.env[CURSOR_API_KEY_ENV]?.trim() || this.getStoredApiKey(),
+    );
   }
 
   private buildCursorEnv(): NodeJS.ProcessEnv {
@@ -303,7 +329,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
 
   getWorkingDir(): string {
     if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CURSOR_WORKSPACE_SUBDIR);
+      return join(
+        this.conversationDataDir.getConversationDataDir(),
+        CURSOR_WORKSPACE_SUBDIR,
+      );
     }
     return join(process.cwd(), CURSOR_WORKSPACE_SUBDIR);
   }
@@ -313,7 +342,11 @@ export class CursorStrategy extends AbstractCLIStrategy {
     return ['--model', model];
   }
 
-  private buildExecArgs(prompt: string, model: string, sessionId: string | null): string[] {
+  private buildExecArgs(
+    prompt: string,
+    model: string,
+    sessionId: string | null,
+  ): string[] {
     const modelArgs = this.getModelArgs(model);
     const providerTokens = buildProviderArgs(CURSOR_PROVIDER_ARGS_CONFIG);
     const baseArgs = [...modelArgs, ...providerTokens];
@@ -351,7 +384,11 @@ export class CursorStrategy extends AbstractCLIStrategy {
       return;
     }
     this.ensureSettings();
-    writeFileSync(this.getAuthFilePath(), JSON.stringify({ api_key: trimmed }), { mode: 0o600 });
+    writeFileSync(
+      this.getAuthFilePath(),
+      JSON.stringify({ api_key: trimmed }),
+      { mode: 0o600 },
+    );
     this.currentConnection?.sendAuthSuccess();
     this.currentConnection = null;
   }
@@ -376,23 +413,30 @@ export class CursorStrategy extends AbstractCLIStrategy {
     model: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
       this.ensureSettings();
 
       const playgroundDir = this.getWorkingDir();
-      if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
+      if (!existsSync(playgroundDir))
+        mkdirSync(playgroundDir, { recursive: true });
 
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
       if (pendingMessages) {
         finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
       }
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
+      const effectivePrompt = systemPrompt
+        ? `${systemPrompt}\n${finalPrompt}`
+        : finalPrompt;
       const existingSessionId = this.readSessionId();
-      const args = this.buildExecArgs(effectivePrompt, model, existingSessionId);
+      const args = this.buildExecArgs(
+        effectivePrompt,
+        model,
+        existingSessionId,
+      );
       const cursorProcess = spawn(getCursorCommand(), args, {
         env: this.buildCursorEnv(),
         cwd: playgroundDir,
@@ -450,7 +494,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
           return;
         }
 
-        const shouldInspectFailure = code !== 0 || !jsonState.hasEmittedOutput || Boolean(errorResult.trim());
+        const shouldInspectFailure =
+          code !== 0 ||
+          !jsonState.hasEmittedOutput ||
+          Boolean(errorResult.trim());
         if (shouldInspectFailure) {
           const authError = detectProviderAuthFailure('Cursor', errorResult);
           if (authError) {
@@ -462,7 +509,12 @@ export class CursorStrategy extends AbstractCLIStrategy {
         if (code === 0) {
           if (!jsonState.hasEmittedOutput) {
             if (!existingSessionId) this.clearSessionId();
-            reject(new Error(errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+            reject(
+              new Error(
+                errorResult.trim() ||
+                  'Agent process completed successfully but returned no output. Session not saved to prevent corruption.',
+              ),
+            );
             return;
           }
           if (capturedSessionId) {
@@ -472,7 +524,8 @@ export class CursorStrategy extends AbstractCLIStrategy {
           return;
         }
 
-        const message = errorResult.trim() || 'Cursor agent exited with a non-zero status';
+        const message =
+          errorResult.trim() || 'Cursor agent exited with a non-zero status';
         if (this.missingSessionError(message)) {
           this.clearSessionId();
         }

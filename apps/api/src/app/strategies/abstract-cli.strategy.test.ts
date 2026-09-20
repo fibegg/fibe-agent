@@ -12,15 +12,20 @@ class MockCLIStrategy extends AbstractCLIStrategy {
   getWorkingDir(): string {
     return '/tmp/mock-dir';
   }
-  executeAuth(_connection: AuthConnection): void { /* noop */ }
-  cancelAuth(): void { /* noop */ }
-  checkAuthStatus(): Promise<boolean> { return Promise.resolve(true); }
-  
+  executeAuth(_connection: AuthConnection): void {
+    /* noop */
+  }
+  cancelAuth(): void {
+    /* noop */
+  }
+  checkAuthStatus(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+
   override interruptAgent(): void {
     this.killed = true;
   }
-  
-  // Expose protected methods for testing
+
   public exposeConsumePendingMessages() {
     return this.consumePendingMessages();
   }
@@ -43,10 +48,10 @@ describe('AbstractCLIStrategy', () => {
   test('consumePendingMessages clears the queue', () => {
     strategy.steerAgent('Turn left!');
     strategy.steerAgent('Wait, go right!');
-    
+
     const msgs1 = strategy.exposeConsumePendingMessages();
     expect(msgs1).toBe('Turn left!\n\nWait, go right!');
-    
+
     const msgs2 = strategy.exposeConsumePendingMessages();
     expect(msgs2).toBeUndefined();
   });

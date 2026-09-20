@@ -37,11 +37,15 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response(JSON.stringify({ token: 'ghs_fresh_token', expires_in: 3000 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    globalThis.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({ token: 'ghs_fresh_token', expires_in: 3000 }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
     ) as typeof fetch;
 
     try {
@@ -53,13 +57,12 @@ describe('GithubTokenRefreshService', () => {
         {
           method: 'GET',
           headers: { Authorization: 'Bearer fibe_test123' },
-        }
+        },
       );
 
-      // Verify MCP_CONFIG_JSON was updated
       const config = JSON.parse(process.env.MCP_CONFIG_JSON as string);
       expect(config.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
-        'ghs_fresh_token'
+        'ghs_fresh_token',
       );
     } finally {
       globalThis.fetch = originalFetch;
@@ -72,8 +75,8 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('Not Found', { status: 404 })
+    globalThis.fetch = mock(
+      async () => new Response('Not Found', { status: 404 }),
     ) as typeof fetch;
 
     try {
@@ -90,8 +93,8 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response('Internal Server Error', { status: 500 })
+    globalThis.fetch = mock(
+      async () => new Response('Internal Server Error', { status: 500 }),
     ) as typeof fetch;
 
     try {
@@ -123,7 +126,7 @@ describe('GithubTokenRefreshService', () => {
   test('preserves existing MCP config when updating token', async () => {
     process.env.MCP_CONFIG_JSON = JSON.stringify({
       mcpServers: {
-        'fibe': { serverUrl: 'https://test/mcp' },
+        fibe: { serverUrl: 'https://test/mcp' },
         Sentry: { serverUrl: 'https://sentry/mcp' },
       },
     });
@@ -133,23 +136,25 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '42';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response(JSON.stringify({ token: 'ghs_new_token', expires_in: 3000 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    globalThis.fetch = mock(
+      async () =>
+        new Response(
+          JSON.stringify({ token: 'ghs_new_token', expires_in: 3000 }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ),
     ) as typeof fetch;
 
     try {
       await service.refreshToken();
 
       const config = JSON.parse(process.env.MCP_CONFIG_JSON as string);
-      expect(config.mcpServers['fibe'].serverUrl).toBe(
-        'https://test/mcp'
-      );
+      expect(config.mcpServers['fibe'].serverUrl).toBe('https://test/mcp');
       expect(config.mcpServers.Sentry.serverUrl).toBe('https://sentry/mcp');
       expect(config.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
-        'ghs_new_token'
+        'ghs_new_token',
       );
     } finally {
       globalThis.fetch = originalFetch;
@@ -162,7 +167,6 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => undefined;
 
     await service.onModuleInit();
-    // Timer should be set — calling onModuleDestroy clears it
     service.onModuleDestroy();
   });
 
@@ -177,11 +181,12 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response(JSON.stringify({ expires_in: 3600 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    globalThis.fetch = mock(
+      async () =>
+        new Response(JSON.stringify({ expires_in: 3600 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     ) as typeof fetch;
 
     try {
@@ -198,17 +203,16 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response(JSON.stringify({ token: 'ghs_123', expires_in: 3600 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    globalThis.fetch = mock(
+      async () =>
+        new Response(JSON.stringify({ token: 'ghs_123', expires_in: 3600 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     ) as typeof fetch;
 
     try {
-      // First call is the initial refresh
       await service.onModuleInit();
-      // Second call simulates periodic refresh (isInitialRefresh is now false)
       const result = await service.refreshToken();
       expect(result).toBe('ghs_123');
     } finally {
@@ -224,18 +228,21 @@ describe('GithubTokenRefreshService', () => {
     mockConfig.getFibeAgentId = () => '1';
 
     const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(async () =>
-      new Response(JSON.stringify({ token: 'ghs_abc', expires_in: 3600 }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      })
+    globalThis.fetch = mock(
+      async () =>
+        new Response(JSON.stringify({ token: 'ghs_abc', expires_in: 3600 }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
     ) as typeof fetch;
 
     try {
       const result = await service.refreshToken();
       expect(result).toBe('ghs_abc');
       const config = JSON.parse(process.env.MCP_CONFIG_JSON);
-      expect(config.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('ghs_abc');
+      expect(config.mcpServers.github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe(
+        'ghs_abc',
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }

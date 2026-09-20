@@ -2,7 +2,11 @@ import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { chmodSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { resolveClaude, getEnrichedPath, _resetResolveClaudeCache } from './resolve-claude';
+import {
+  resolveClaude,
+  getEnrichedPath,
+  _resetResolveClaudeCache,
+} from './resolve-claude';
 
 const TEST_TMP = join(tmpdir(), `resolve-claude-test-${process.pid}`);
 
@@ -42,7 +46,9 @@ describe('resolveClaude', () => {
 
   test('throws when CLAUDE_PATH override does not exist', () => {
     process.env.CLAUDE_PATH = join(TEST_TMP, 'non-existent-claude');
-    expect(() => resolveClaude()).toThrow('CLAUDE_PATH is set but does not exist');
+    expect(() => resolveClaude()).toThrow(
+      'CLAUDE_PATH is set but does not exist',
+    );
   });
 
   test('throws when CLAUDE_PATH override is not executable', () => {
@@ -53,7 +59,9 @@ describe('resolveClaude', () => {
     chmodSync(fakeClaude, 0o644);
 
     process.env.CLAUDE_PATH = fakeClaude;
-    expect(() => resolveClaude()).toThrow('CLAUDE_PATH is set but is not executable');
+    expect(() => resolveClaude()).toThrow(
+      'CLAUDE_PATH is set but is not executable',
+    );
   });
 
   test('caches result and returns same value on second call', () => {
@@ -64,7 +72,7 @@ describe('resolveClaude', () => {
 
     process.env.CLAUDE_PATH = fakeClaude;
     const first = resolveClaude();
-    // mutate env — cache should return old value
+    // mutate env: cache should return old value
     delete process.env.CLAUDE_PATH;
     const second = resolveClaude();
     expect(first).toBe(second);
@@ -90,7 +98,6 @@ describe('resolveClaude', () => {
   });
 
   test('falls back to "claude" string when binary cannot be found anywhere', () => {
-    // Strip PATH so command -v fails; nvm + system dirs won't have claude in tmp
     process.env.PATH = TEST_TMP;
 
     // Force cache miss by resetting (already done in beforeEach, but be explicit)
@@ -102,7 +109,6 @@ describe('resolveClaude', () => {
   });
 
   test('returns a non-empty string in production-like environment', () => {
-    // No CLAUDE_PATH set; should find the real claude binary via nvm or PATH
     const result = resolveClaude();
     expect(typeof result).toBe('string');
     expect(result.length).toBeGreaterThan(0);
@@ -131,19 +137,15 @@ describe('getEnrichedPath', () => {
     process.env.CLAUDE_PATH = fakeClaude;
     const baseWithDir = `${fakeBin}:/usr/bin`;
     const enriched = getEnrichedPath(baseWithDir);
-    // fakeBin should appear only once
     const count = enriched.split(':').filter((s) => s === fakeBin).length;
     expect(count).toBe(1);
   });
 
   test('returns currentPath unchanged when no enrichment is possible', () => {
     delete process.env.CLAUDE_PATH;
-    // Without CLAUDE_PATH and with no nvm candidates matching a fresh tmp HOME,
-    // the function should at minimum not throw and return a string
     const base = '/usr/bin:/bin';
     const enriched = getEnrichedPath(base);
     expect(typeof enriched).toBe('string');
-    // The original base must still be present
     expect(enriched).toContain('/usr/bin');
   });
 
@@ -153,8 +155,6 @@ describe('getEnrichedPath', () => {
   });
 
   test('nvm bin dirs appear before system dirs in enriched PATH', () => {
-    // We can verify this by checking that enriched PATH is either unchanged
-    // (no nvm on this machine) or starts with an nvm directory
     const base = '/usr/bin:/bin';
     const enriched = getEnrichedPath(base);
     // Enriched must always end with the original base content (order guarantee)

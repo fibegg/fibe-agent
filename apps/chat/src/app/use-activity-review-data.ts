@@ -2,17 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from './api-url';
 import { API_PATHS } from '@shared/api-paths';
-import { filterVisibleStoryItems, getActivityLabel, type StoryEntry } from './agent-thinking-utils';
+import {
+  filterVisibleStoryItems,
+  getActivityLabel,
+  type StoryEntry,
+} from './agent-thinking-utils';
 import { getCopyableActivityText } from './activity-review-utils';
 import { usePersistedTypeFilter } from './use-persisted-type-filter';
 import { copyTextToClipboard } from './browser-compat';
 
 const ACTIVITY_POLL_INTERVAL_MS = 4000;
-// How long to hold 'complete' (emerald) state before going back to idle — same as chat sidebar
+// How long to hold 'complete' (emerald) state before going back to idle: same as chat sidebar
 const BRAIN_COMPLETE_TO_IDLE_MS = 7_000;
 // If the most-recent story entry is older than this, treat the run as finished
 const WORKING_RECENCY_MS = 90_000; // 90 seconds
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 function isActivityId(id: string): boolean {
   return UUID_REGEX.test(id);
@@ -32,9 +37,14 @@ export interface ActivityReviewData {
   }>;
 }
 
-type StoryEntryWithActivity = StoryEntry & { _activityId: string; _activityCreatedAt: string };
+type StoryEntryWithActivity = StoryEntry & {
+  _activityId: string;
+  _activityCreatedAt: string;
+};
 
-function flattenAllStories(activities: ActivityReviewData[]): StoryEntryWithActivity[] {
+function flattenAllStories(
+  activities: ActivityReviewData[],
+): StoryEntryWithActivity[] {
   const seen = new Set<string>();
   const out: StoryEntryWithActivity[] = [];
   for (let ai = activities.length - 1; ai >= 0; ai--) {
@@ -62,7 +72,11 @@ export interface UseActivityReviewDataParams {
 }
 
 export function useActivityReviewData(params: UseActivityReviewDataParams) {
-  const { activityId: routeActivityId, storyId: routeStoryId, activityStoryId } = params;
+  const {
+    activityId: routeActivityId,
+    storyId: routeStoryId,
+    activityStoryId,
+  } = params;
   const navigate = useNavigate();
   const [activities, setActivities] = useState<ActivityReviewData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,15 +84,19 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
   const [selectedIndex, setSelectedIndex] = useState<number>(0);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
   const [copyAnimating, setCopyAnimating] = useState(false);
-  const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{ centerX: number; bottom: number } | null>(null);
+  const [copyTooltipAnchor, setCopyTooltipAnchor] = useState<{
+    centerX: number;
+    bottom: number;
+  } | null>(null);
   const brainButtonRef = useRef<HTMLDivElement>(null);
   const [activitySearchQuery, setActivitySearchQuery] = useState('');
   const [detailSearchQuery, setDetailSearchQuery] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const prevFilteredLengthRef = useRef(0);
-  // Brain state machine: idle | working | complete
-  const [brainState, setBrainState] = useState<'idle' | 'working' | 'complete'>('idle');
+  const [brainState, setBrainState] = useState<'idle' | 'working' | 'complete'>(
+    'idle',
+  );
   const brainStateRef = useRef<'idle' | 'working' | 'complete'>('idle');
   const completedAtRef = useRef<number>(0);
   const prevLatestStoryLenRef = useRef<number>(0);
@@ -88,9 +106,11 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     brainStateRef.current = brainState;
   }, [brainState]);
 
-  const activityStories = useMemo(() => flattenAllStories(activities), [activities]);
+  const activityStories = useMemo(
+    () => flattenAllStories(activities),
+    [activities],
+  );
 
-  // Extract the latest reasoning/response text from the most recent activity for the detail panel
   const liveResponseText = useMemo(() => {
     if (activities.length === 0) return '';
     const latest = activities[activities.length - 1];
@@ -98,14 +118,17 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     // Walk backwards to find the most recent reasoning_start with details
     for (let i = latest.story.length - 1; i >= 0; i--) {
       const s = latest.story[i];
-      if (s?.type === 'reasoning_start' && s.details?.trim() && s.details.trim() !== '{}') {
+      if (
+        s?.type === 'reasoning_start' &&
+        s.details?.trim() &&
+        s.details.trim() !== '{}'
+      ) {
         return s.details.trim();
       }
     }
     return '';
   }, [activities]);
 
-  // Derive brain state from polling data
   useEffect(() => {
     const latest = activities[activities.length - 1];
     const story = Array.isArray(latest?.story) ? latest.story : [];
@@ -121,7 +144,9 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     prevLatestStoryLenRef.current = currentLen;
 
     const lastEntry = story[story.length - 1];
-    const lastTs = lastEntry?.timestamp ? new Date(lastEntry.timestamp).getTime() : 0;
+    const lastTs = lastEntry?.timestamp
+      ? new Date(lastEntry.timestamp).getTime()
+      : 0;
     const isRecent = lastTs > 0 && Date.now() - lastTs < WORKING_RECENCY_MS;
 
     if (!isRecent) {
@@ -129,7 +154,6 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
       return;
     }
 
-    // New entries just arrived → still working
     if (currentLen > prevLen && prevLen > 0) {
       setBrainState('working');
       completedAtRef.current = 0;
@@ -143,7 +167,6 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
       completedAtRef.current = Date.now();
       setBrainState('complete');
     } else if (prev === 'idle' && prevLen === 0) {
-      // First load of a recent activity → briefly show complete
       completedAtRef.current = Date.now();
       setBrainState('complete');
     }
@@ -167,10 +190,13 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     let list = activityStories;
     if (typeFilter.length > 0) {
       const filterSet = new Set(typeFilter);
-      // Expand 'reasoning' shorthand to include both start/end entries
       const hasReasoning = filterSet.has('reasoning');
       list = list.filter((s) => {
-        if (hasReasoning && (s.type === 'reasoning_start' || s.type === 'reasoning_end')) return true;
+        if (
+          hasReasoning &&
+          (s.type === 'reasoning_start' || s.type === 'reasoning_end')
+        )
+          return true;
         return filterSet.has(s.type);
       });
     }
@@ -182,7 +208,13 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
       const cmd = (s.command ?? '').toLowerCase();
       const path = (s.path ?? '').toLowerCase();
       const label = (getActivityLabel(s.type) ?? '').toLowerCase();
-      return msg.includes(q) || details.includes(q) || cmd.includes(q) || path.includes(q) || label.includes(q);
+      return (
+        msg.includes(q) ||
+        details.includes(q) ||
+        cmd.includes(q) ||
+        path.includes(q) ||
+        label.includes(q)
+      );
     });
   }, [activityStories, typeFilter, activitySearchQuery]);
 
@@ -192,13 +224,18 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     return filteredStories[idx];
   }, [filteredStories, selectedIndex]);
 
-  const selectedIndexSafe = Math.min(selectedIndex, Math.max(0, filteredStories.length - 1));
+  const selectedIndexSafe = Math.min(
+    selectedIndex,
+    Math.max(0, filteredStories.length - 1),
+  );
 
   useEffect(() => {
     if (filteredStories.length === 0) return;
     if (routeActivityId && routeStoryId) {
       const idx = filteredStories.findIndex(
-        (s) => (s as StoryEntryWithActivity)._activityId === routeActivityId && s.id === routeStoryId
+        (s) =>
+          (s as StoryEntryWithActivity)._activityId === routeActivityId &&
+          s.id === routeStoryId,
       );
       if (idx !== -1) setSelectedIndex(idx);
       return;
@@ -207,7 +244,7 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
     if (!single) return;
     if (isActivityId(single)) {
       const idx = filteredStories.findIndex(
-        (s) => (s as StoryEntryWithActivity)._activityId === single
+        (s) => (s as StoryEntryWithActivity)._activityId === single,
       );
       if (idx !== -1) setSelectedIndex(idx);
       return;
@@ -232,18 +269,22 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
   const handleSelectStory = useCallback(
     (index: number) => {
       setSelectedIndex(index);
-      const story = filteredStories[index] as StoryEntryWithActivity | undefined;
+      const story = filteredStories[index] as
+        | StoryEntryWithActivity
+        | undefined;
       if (!story?.id) return;
       const aid = story._activityId;
       if (aid) navigate(`/activity/${aid}/${story.id}`);
       else navigate(`/activity/${story.id}`);
     },
-    [filteredStories, navigate]
+    [filteredStories, navigate],
   );
 
   const runCopyActivityWithAnimation = useCallback(async () => {
     if (!selectedStory || copyAnimating) return;
-    const activity = activities.find((a) => a.id === (selectedStory as StoryEntryWithActivity)._activityId);
+    const activity = activities.find(
+      (a) => a.id === (selectedStory as StoryEntryWithActivity)._activityId,
+    );
     const storyItems = activity?.story ?? [];
     setCopyAnimating(true);
     const text = getCopyableActivityText(storyItems);
@@ -251,7 +292,10 @@ export function useActivityReviewData(params: UseActivityReviewDataParams) {
       if (await copyTextToClipboard(text)) {
         const rect = brainButtonRef.current?.getBoundingClientRect();
         if (rect) {
-          setCopyTooltipAnchor({ centerX: rect.left + rect.width / 2, bottom: rect.bottom });
+          setCopyTooltipAnchor({
+            centerX: rect.left + rect.width / 2,
+            bottom: rect.bottom,
+          });
         }
         setTimeout(() => {
           setCopyTooltipAnchor(null);

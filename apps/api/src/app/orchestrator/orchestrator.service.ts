@@ -81,7 +81,7 @@ type ControlTargetResolution =
 @Injectable()
 export class OrchestratorService implements OnModuleInit {
   private readonly logger = new Logger(OrchestratorService.name);
-  /** Shared auth state — if provider is authed, all sessions benefit. */
+  /** Shared auth state: if provider is authed, all sessions benefit. */
   private sharedIsAuthenticated = false;
   /** Cached system prompt shared across all sessions. */
   private sharedSystemPromptFromFile: string | null = null;
@@ -132,7 +132,6 @@ export class OrchestratorService implements OnModuleInit {
       }
     }
 
-    // Forward local MCP tool WS events (ask_user_prompt, confirm_action_prompt, etc.) to the chat UI
     this.localMcp.outbound$.subscribe((event) => {
       const data = event.data as Record<string, unknown>;
       const conversationId =
@@ -148,14 +147,11 @@ export class OrchestratorService implements OnModuleInit {
       }
     });
 
-    // Register mode accessors so local tools can read/write the agent mode
     this.localMcp.registerModeAccessors(
       () => this.agentModeStore.get(),
       (mode) => this.setAgentMode(mode),
     );
 
-    // Pre-fetch optional HTTP MCP tool descriptions for Gemma classification (non-blocking).
-    // Claude and other agent clients discover stdio MCP tools themselves.
     if (this.config.isGemmaRouterEnabled()) {
       void this.gemmaMcpTools.refresh();
     }
@@ -235,7 +231,6 @@ export class OrchestratorService implements OnModuleInit {
 
   private finishStreamDeps(ctx: SessionContext): FinishAgentStreamDeps {
     const { messageStore: fMsg, activityStore: fAct } = this.stores(ctx);
-    // Fan-out stream-completion events to all tabs watching this conversation.
     const bcast = (type: string, data?: Record<string, unknown>) =>
       this.sessionRegistry.broadcastToConversation(
         ctx.conversationId,
@@ -271,10 +266,7 @@ export class OrchestratorService implements OnModuleInit {
     ]);
   }
 
-  /**
-   * Validate, persist, and broadcast a new agent mode.
-   * Returns the resolved display string, or `null` when the mode is invalid.
-   */
+  /** Returns the resolved mode label, or null when invalid. */
   setAgentMode(mode: string): AgentModeValue | null {
     const resolved = this.agentModeStore.set(mode);
     if (!resolved) return null;
@@ -407,7 +399,6 @@ export class OrchestratorService implements OnModuleInit {
   private async checkAndSendAuthStatus(ctx: SessionContext): Promise<void> {
     const authenticated = await ctx.strategy.checkAuthStatus();
     this.sharedIsAuthenticated = authenticated;
-    // Single pass: set auth flag, compute anyProcessing, and emit — no repeated all() calls
     const sessions = this.sessionRegistry.all();
     const anyProcessing = sessions.some((s) => s.isProcessing);
     for (const s of sessions) {
@@ -471,7 +462,6 @@ export class OrchestratorService implements OnModuleInit {
   private handleLogout(ctx: SessionContext): void {
     ctx.strategy.cancelAuth();
     this.setAllSessionsAuthenticated(false);
-    // Single pass: clear processing flag on all sessions
     for (const s of this.sessionRegistry.all()) s.isProcessing = false;
     this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, {
       status: AUTH_STATUS_VAL.UNAUTHENTICATED,
@@ -544,12 +534,14 @@ export class OrchestratorService implements OnModuleInit {
       return {
         accepted: false,
         error: ERROR_CODE.AGENT_BUSY,
-        reason: 'Agent run is active; provide conversationId or a queue/steer busyPolicy.',
+        reason:
+          'Agent run is active; provide conversationId or a queue/steer busyPolicy.',
         ...(onlyActive ? { conversationId: onlyActive.conversationId } : {}),
       };
     }
 
-    const targetConversationId = requestedConversationId || INBOX_CONVERSATION_ID;
+    const targetConversationId =
+      requestedConversationId || INBOX_CONVERSATION_ID;
     if (!this.conversationManager.get(targetConversationId)) {
       return { accepted: false, error: 'Conversation not found' };
     }
@@ -823,7 +815,8 @@ export class OrchestratorService implements OnModuleInit {
 
     const active = this.processingSessions();
     const onlyActive = active[0];
-    if (active.length === 1 && onlyActive) return { accepted: true, ctx: onlyActive };
+    if (active.length === 1 && onlyActive)
+      return { accepted: true, ctx: onlyActive };
     const reason =
       active.length === 0
         ? 'No active agent run.'
@@ -849,7 +842,9 @@ export class OrchestratorService implements OnModuleInit {
       accepted: false,
       error: result.error ?? ERROR_CODE.AGENT_BUSY,
       reason: result.reason ?? result.error ?? ERROR_CODE.AGENT_BUSY,
-      ...(result.conversationId ? { conversationId: result.conversationId } : {}),
+      ...(result.conversationId
+        ? { conversationId: result.conversationId }
+        : {}),
     };
   }
 
@@ -910,11 +905,10 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
 
-    const result = await this.acceptBusyMessage(
-      resolution.ctx,
-      requesterCtx,
-      { ...payload, busyPolicy: action },
-    );
+    const result = await this.acceptBusyMessage(resolution.ctx, requesterCtx, {
+      ...payload,
+      busyPolicy: action,
+    });
     this.emitControlResult(requesterCtx, {
       accepted: result.accepted,
       action,
@@ -1050,7 +1044,7 @@ export class OrchestratorService implements OnModuleInit {
 
       // Gemma pre-pass: classify user intent → inject MCP tool hints into the prompt.
       // Runs only when GEMMA_ROUTER_ENABLED=true and Ollama is reachable.
-      // Stored chat history is never modified — only the built prompt changes.
+      // Stored chat history is never modified: only the built prompt changes.
       let routedText = text;
       if (this.config.isGemmaRouterEnabled()) {
         const mcpTools = this.gemmaMcpTools.getTools();
@@ -1082,11 +1076,11 @@ export class OrchestratorService implements OnModuleInit {
                   action.confidence,
                 );
                 this.logger.log(
-                  `[GemmaRouter] injected hint — tools: [${action.tools.join(', ')}], confidence: ${Math.round(action.confidence * 100)}%`,
+                  `[GemmaRouter] injected hint: tools: [${action.tools.join(', ')}], confidence: ${Math.round(action.confidence * 100)}%`,
                 );
               } else {
                 this.logger.log(
-                  `[GemmaRouter] no hint injected — confidence: ${action.confidence}`,
+                  `[GemmaRouter] no hint injected: confidence: ${action.confidence}`,
                 );
               }
             }
@@ -1096,7 +1090,7 @@ export class OrchestratorService implements OnModuleInit {
         }
       }
 
-      // Mode hint injection — tells the agent CLI what mode the operator has set.
+      // Mode hint injection: tells the agent CLI what mode the operator has set.
       // Applied after Gemma routing so the mode frame is the outermost context.
       const currentMode = this.agentModeStore.get();
       routedText = this.chatPromptContext.injectModeHint(
@@ -1114,8 +1108,8 @@ export class OrchestratorService implements OnModuleInit {
       );
       const model = this.effectiveModel();
       const effort = this.effectiveEffort();
-      const previousAssistantMessages = this.stores(ctx).messageStore
-        .all()
+      const previousAssistantMessages = this.stores(ctx)
+        .messageStore.all()
         .filter((message) => message.role === 'assistant')
         .map((message) => message.body);
       const streamStartedAt = new Date().toISOString();
@@ -1124,7 +1118,6 @@ export class OrchestratorService implements OnModuleInit {
       ctx.lastStreamText = '';
       ctx.lastStreamStartedAt = null;
       ctx.lastStreamFinishedAt = null;
-      // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(
         ctx.conversationId,
         WS_EVENT.STREAM_START,
@@ -1158,7 +1151,6 @@ export class OrchestratorService implements OnModuleInit {
         },
       );
       ctx.lastStreamUsage = undefined;
-      // Helper to fan-out per-stream events to all tabs watching this conversation
       const bcastConv = (type: string, data?: Record<string, unknown>) =>
         this.sessionRegistry.broadcastToConversation(
           ctx.conversationId,
@@ -1188,7 +1180,6 @@ export class OrchestratorService implements OnModuleInit {
         if (!chunk) return;
         accumulated += chunk;
         ctx.streamTextAccumulated += chunk;
-        // Fan-out stream chunks to every tab watching this conversation
         this.sessionRegistry.broadcastToConversation(
           ctx.conversationId,
           WS_EVENT.STREAM_CHUNK,
@@ -1304,7 +1295,10 @@ export class OrchestratorService implements OnModuleInit {
     }
   }
 
-  private persistAgentErrorActivity(ctx: SessionContext, message: string): void {
+  private persistAgentErrorActivity(
+    ctx: SessionContext,
+    message: string,
+  ): void {
     const { activityStore } = this.stores(ctx);
     const activityId = ctx.currentActivityId;
     if (!activityId) return;
@@ -1344,7 +1338,6 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
     ctx.isProcessing = true;
-    // Notify all sessions that an agent is now running (anyProcessing = true)
     this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
       count: this.sessionRegistry.size,
       anyProcessing: true,
@@ -1551,7 +1544,7 @@ export class OrchestratorService implements OnModuleInit {
       ctx.currentActivityId = null;
     } else {
       // If currentActivityId is null, this might be a duplicate submission from a second tab.
-      // Instead of appending a new activity, we just update the last assistant message's story if it exists.
+      // A duplicate tab submission updates the existing assistant activity.
       this.logger.debug(
         'Received submit_story but currentActivityId is null (possible duplicate from another tab).',
       );
@@ -1578,8 +1571,6 @@ export class OrchestratorService implements OnModuleInit {
     );
     await Promise.all([sMsg.flush(), sAct.flush()]);
   }
-
-  // ── Global model / effort helpers ───────────────────────────────────
 
   private effectiveModel(): string {
     return this.modelStore.get();
@@ -1629,7 +1620,7 @@ export class OrchestratorService implements OnModuleInit {
   private handleSetAgentMode(mode: string): void {
     const resolved = this.setAgentMode(mode);
     if (!resolved) {
-      this.logger.warn(`SET_AGENT_MODE: invalid mode "${mode}" — ignoring`);
+      this.logger.warn(`SET_AGENT_MODE: invalid mode "${mode}": ignoring`);
     }
   }
 

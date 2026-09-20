@@ -27,7 +27,6 @@ describe('logConsoleBanner', () => {
     vi.stubGlobal('__APP_VERSION__', '1.0.0');
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
     logConsoleBanner();
-    // Should have banner + 6 style strings
     expect(logSpy.mock.calls[0].length).toBeGreaterThanOrEqual(3);
   });
 });

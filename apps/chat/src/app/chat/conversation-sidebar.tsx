@@ -1,5 +1,16 @@
 import { memo, useCallback, useRef, useState } from 'react';
-import { MessageSquare, Plus, Trash2, Edit3, Check, X, Search, Link2, ChevronDown, ChevronRight } from 'lucide-react';
+import {
+  MessageSquare,
+  Plus,
+  Trash2,
+  Edit3,
+  Check,
+  X,
+  Search,
+  Link2,
+  ChevronDown,
+  ChevronRight,
+} from 'lucide-react';
 import type { ConversationMeta } from './use-conversations';
 import { useT } from '../i18n';
 import {
@@ -52,12 +63,15 @@ const ConversationItem = memo(function ConversationItem({
   const inputRef = useRef<HTMLInputElement>(null);
   const isProtected = conv.id === 'default' || conv.id === 'inbox';
 
-  const startEdit = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    setDraft(conv.title);
-    setEditing(true);
-    setTimeout(() => inputRef.current?.select(), 50);
-  }, [conv.title]);
+  const startEdit = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      setDraft(conv.title);
+      setEditing(true);
+      setTimeout(() => inputRef.current?.select(), 50);
+    },
+    [conv.title],
+  );
 
   const commitEdit = useCallback(() => {
     const trimmed = draft.trim();
@@ -70,72 +84,100 @@ const ConversationItem = memo(function ConversationItem({
     setEditing(false);
   }, [conv.title]);
 
-  const handleShare = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
-    const url = new URL(window.location.href);
-    url.searchParams.set('c', conv.id);
-    const shareUrl = url.toString();
-    if (navigator.share) {
-      void navigator.share({ title: conv.title, url: shareUrl }).catch(() => { /* user cancelled */ });
-    } else {
-      void navigator.clipboard.writeText(shareUrl).then(() => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      });
-    }
-  }, [conv.id, conv.title]);
+  const handleShare = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const url = new URL(window.location.href);
+      url.searchParams.set('c', conv.id);
+      const shareUrl = url.toString();
+      if (navigator.share) {
+        void navigator.share({ title: conv.title, url: shareUrl }).catch(() => {
+          /* user cancelled */
+        });
+      } else {
+        void navigator.clipboard.writeText(shareUrl).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 1500);
+        });
+      }
+    },
+    [conv.id, conv.title],
+  );
 
   return (
     <div
       onClick={onSelect}
       className={`group relative flex items-start gap-2.5 rounded-lg px-3 py-2.5 cursor-pointer transition-all duration-150
-        ${isActive
-          ? 'bg-primary/15 border border-primary/30 text-foreground'
-          : 'hover:bg-muted/50 border border-transparent text-muted-foreground hover:text-foreground'
+        ${
+          isActive
+            ? 'bg-primary/15 border border-primary/30 text-foreground'
+            : 'hover:bg-muted/50 border border-transparent text-muted-foreground hover:text-foreground'
         }`}
     >
       <div className="relative mt-0.5 shrink-0">
-        <MessageSquare className={`h-3.5 w-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`} />
+        <MessageSquare
+          className={`h-3.5 w-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`}
+        />
         {conv.isProcessing && (
           <span className="absolute -right-1 -top-1 size-2 rounded-full bg-primary shadow-[0_0_8px_rgba(121,212,78,0.75)]" />
         )}
       </div>
       <div className="min-w-0 flex-1">
         {editing ? (
-          <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="flex items-center gap-1"
+            onClick={(e) => e.stopPropagation()}
+          >
             <input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') cancelEdit(); }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitEdit();
+                if (e.key === 'Escape') cancelEdit();
+              }}
               className="w-full rounded bg-background/80 px-1.5 py-0.5 text-xs text-foreground outline-none ring-1 ring-primary/40"
               autoFocus
             />
-            <button onClick={commitEdit} className="shrink-0 text-green-400 hover:text-green-300 transition-colors">
+            <button
+              onClick={commitEdit}
+              className="shrink-0 text-green-400 hover:text-green-300 transition-colors"
+            >
               <Check className="h-3 w-3" />
             </button>
-            <button onClick={cancelEdit} className="shrink-0 text-muted-foreground hover:text-foreground transition-colors">
+            <button
+              onClick={cancelEdit}
+              className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+            >
               <X className="h-3 w-3" />
             </button>
           </div>
         ) : (
-          <p className="truncate text-xs font-medium leading-tight">{conv.title}</p>
+          <p className="truncate text-xs font-medium leading-tight">
+            {conv.title}
+          </p>
         )}
-        <p className="mt-0.5 text-[10px] text-muted-foreground/50">{timeAgo(conv.lastMessageAt, t)}</p>
+        <p className="mt-0.5 text-[10px] text-muted-foreground/50">
+          {timeAgo(conv.lastMessageAt, t)}
+        </p>
       </div>
 
-      {/* Action buttons — visible on hover / active */}
+      {/* Action buttons: visible on hover / active */}
       {!editing && (
         <div className="absolute right-2 top-1/2 -translate-y-1/2 hidden items-center gap-1 group-hover:flex">
           <button
             onClick={handleShare}
             className="rounded p-0.5 text-muted-foreground/60 hover:text-primary transition-colors"
             title={copied ? t('common.copied') : t('conversation.shareLink')}
-            aria-label={copied ? t('common.copied') : t('conversation.shareLink')}
+            aria-label={
+              copied ? t('common.copied') : t('conversation.shareLink')
+            }
           >
-            {copied
-              ? <Check className="h-3 w-3 text-green-400" />
-              : <Link2 className="h-3 w-3" />}
+            {copied ? (
+              <Check className="h-3 w-3 text-green-400" />
+            ) : (
+              <Link2 className="h-3 w-3" />
+            )}
           </button>
           {!isProtected && (
             <>
@@ -148,7 +190,10 @@ const ConversationItem = memo(function ConversationItem({
                 <Edit3 className="h-3 w-3" />
               </button>
               <button
-                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
                 className="rounded p-0.5 text-muted-foreground/60 hover:text-red-400 transition-colors"
                 title={t('conversation.delete')}
                 aria-label={t('conversation.delete')}
@@ -177,11 +222,13 @@ export const ConversationSidebar = memo(function ConversationSidebar({
   const t = useT();
   const [searchQuery, setSearchQuery] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
-  const toggleLabel = collapsed ? t('conversation.expand') : t('conversation.collapse');
+  const toggleLabel = collapsed
+    ? t('conversation.expand')
+    : t('conversation.collapse');
 
   const filtered = searchQuery.trim()
     ? conversations.filter((c) =>
-        c.title.toLowerCase().includes(searchQuery.toLowerCase())
+        c.title.toLowerCase().includes(searchQuery.toLowerCase()),
       )
     : conversations;
 
@@ -198,9 +245,15 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           title={toggleLabel}
         >
           {collapsed ? (
-            <ChevronRight className="size-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
+            <ChevronRight
+              className="size-3.5 shrink-0 text-muted-foreground/60"
+              aria-hidden
+            />
           ) : (
-            <ChevronDown className="size-3.5 shrink-0 text-muted-foreground/60" aria-hidden />
+            <ChevronDown
+              className="size-3.5 shrink-0 text-muted-foreground/60"
+              aria-hidden
+            />
           )}
           <span className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/60">
             {t('conversation.title')}
@@ -251,7 +304,9 @@ export const ConversationSidebar = memo(function ConversationSidebar({
           <div className="flex-1 min-h-0 overflow-y-auto px-2 py-2 space-y-0.5">
             {loading ? (
               <div className="flex items-center justify-center py-8">
-                <span className="text-xs text-muted-foreground/50 animate-pulse">{t('common.loading')}</span>
+                <span className="text-xs text-muted-foreground/50 animate-pulse">
+                  {t('common.loading')}
+                </span>
               </div>
             ) : conversations.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-3 px-4 text-center">
@@ -259,8 +314,12 @@ export const ConversationSidebar = memo(function ConversationSidebar({
                   <MessageSquare className="h-5 w-5 text-primary/60" />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-foreground/70">{t('conversation.emptyTitle')}</p>
-                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">{t('conversation.emptyDescription')}</p>
+                  <p className="text-xs font-medium text-foreground/70">
+                    {t('conversation.emptyTitle')}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground/50 mt-0.5">
+                    {t('conversation.emptyDescription')}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -273,7 +332,9 @@ export const ConversationSidebar = memo(function ConversationSidebar({
               </div>
             ) : filtered.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 gap-2">
-                <span className="text-xs text-muted-foreground/50">{t('conversation.noMatches')}</span>
+                <span className="text-xs text-muted-foreground/50">
+                  {t('conversation.noMatches')}
+                </span>
               </div>
             ) : (
               filtered.map((conv) => (
