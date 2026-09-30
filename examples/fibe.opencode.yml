@@ -66,7 +66,7 @@ agentRuntimeFiles:
         - Fibe MCP server for platform operations
         - Docker MCP server for container management
 
-cliVersion: '1.18.33'
+cliVersion: '1.18.34'
 
 providerArgs:
   auto: true

@@ -62,7 +62,7 @@ agentRuntimeFiles:
         You are running inside a Fibe Playground. Follow the project's
         coding standards and always write tests.
 
-cliVersion: '0.159.2'
+cliVersion: '0.159.3'
 
 providerArgs:
   color: never

@@ -14,10 +14,10 @@ Reviewed on 2026-09-30:
 | --- | --- | --- |
 | Claude Code | 2.1.286 | [npm](https://www.npmjs.com/package/@anthropic-ai/claude-code) |
 | Claude Agent SDK | 0.3.286 | [npm](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) |
-| Anthropic SDK | 0.130.0 | [npm](https://www.npmjs.com/package/@anthropic-ai/sdk) |
-| Codex | 0.159.2 | [npm](https://www.npmjs.com/package/@openai/codex) |
+| Anthropic SDK | 0.131.0 | [npm](https://www.npmjs.com/package/@anthropic-ai/sdk) |
+| Codex | 0.159.3 | [npm](https://www.npmjs.com/package/@openai/codex) |
 | Gemini CLI | 0.62.0 | [npm](https://www.npmjs.com/package/@google/gemini-cli) |
-| OpenCode | 1.18.33 | [npm](https://www.npmjs.com/package/opencode-ai) |
+| OpenCode | 1.18.34 | [npm](https://www.npmjs.com/package/opencode-ai) |
 | Cursor Agent | 2026.09.28-64d2043 | [installer](https://cursor.com/install) |
 | Antigravity | 1.2.14 | [installer](https://antigravity.google/cli/install.sh) |
 | Fibe CLI | 0.2.45 | [release](https://github.com/fibegg/sdk/releases/tag/v0.2.45) |

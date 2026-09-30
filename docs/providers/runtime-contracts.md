@@ -18,7 +18,7 @@ account-dependent; the maintained Rails fallback lists `gpt-6.1-sol`,
 `gpt-6-astra` and `gpt-6-luna`, with Sol first. Explicit saved model choices and
 administrator configuration retain precedence.
 
-The example pins CLI 0.159.2 and uses root-level `model` in `config.toml`.
+The example pins CLI 0.159.3 and uses root-level `model` in `config.toml`.
 Effort is passed through the app-server contract, including `max` and `ultra`.
 The installed unauthenticated app-server catalog and generated schema were
 checked separately from the deterministic streaming, model pagination and
