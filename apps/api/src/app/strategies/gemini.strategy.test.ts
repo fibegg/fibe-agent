@@ -98,9 +98,15 @@ if (process.env.GEMINI_FAKE_STDERR) {
   console.error(process.env.GEMINI_FAKE_STDERR);
 }
 const fakeMsg = process.env.GEMINI_FAKE_MESSAGE || 'fake response';
+console.log(JSON.stringify({ type: 'init', session_id: sessionIdFromArgs(), model: 'pro' }));
 if (process.env.GEMINI_FAKE_STDOUT_EMPTY !== '1') {
   console.log(JSON.stringify({ type: 'message', role: 'assistant', content: fakeMsg, delta: true }));
 }
+if (process.env.GEMINI_FAKE_MODE === 'tool-events') {
+  console.log(JSON.stringify({ type: 'tool_use', tool_id: 'tool-1', tool_name: 'run_shell_command', parameters: { command: 'pwd' } }));
+  console.log(JSON.stringify({ type: 'tool_result', tool_id: 'tool-1', status: 'success', output: '/workspace' }));
+}
+if (process.env.GEMINI_FAKE_MODE !== 'missing-result') console.log(JSON.stringify({ type: 'result', status: process.env.GEMINI_FAKE_MODE === 'result-error' ? 'error' : 'success', stats: { input_tokens: 20, output_tokens: 4 } }));
 `,
     { mode: 0o755 },
   );
@@ -108,17 +114,31 @@ if (process.env.GEMINI_FAKE_STDOUT_EMPTY !== '1') {
 }
 
 describe('GeminiStrategy API token mode', () => {
+  let authDir: string;
   const savedEnv: Record<string, string | undefined> = {};
 
   beforeEach(() => {
+    savedEnv.SESSION_DIR = process.env.SESSION_DIR;
+    authDir = mkdtempSync(join(tmpdir(), 'gemini-auth-'));
+    process.env.SESSION_DIR = authDir;
     savedEnv.GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     delete process.env.GEMINI_API_KEY;
   });
 
   afterEach(() => {
+    rmSync(authDir, { recursive: true, force: true });
+    if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
+    else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
     if (savedEnv.GEMINI_API_KEY === undefined)
       delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = savedEnv.GEMINI_API_KEY;
+  });
+
+  test('manual API key survives restart and is cleared on logout', async () => {
+    new GeminiStrategy(true).submitAuthCode('fixture-key');
+    expect(await new GeminiStrategy(true).checkAuthStatus()).toBe(true);
+    new GeminiStrategy(true).clearCredentials();
+    expect(await new GeminiStrategy(true).checkAuthStatus()).toBe(false);
   });
 
   test('checkAuthStatus returns false when GEMINI_API_KEY is not set in api-token mode', async () => {
@@ -543,6 +563,38 @@ describe('GeminiStrategy session recovery', () => {
     if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
     else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
     rmSync(testHome, { recursive: true, force: true });
+  });
+
+  test('forwards current Gemini tool and token events', async () => {
+    process.env.GEMINI_FAKE_MODE = 'tool-events';
+    const events: unknown[] = [];
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'events'),
+    });
+    await strategy.executePromptStreaming('hello', 'pro', () => undefined, {
+      onTool: (event) => events.push(event),
+      onUsage: (usage) => events.push(usage),
+    });
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      name: 'run_shell_command',
+      command: 'pwd',
+    });
+    expect(events[1]).toEqual({ inputTokens: 20, outputTokens: 4 });
+  });
+
+  test('does not accept partial text without successful terminal result', async () => {
+    const strategy = new GeminiStrategy(true, {
+      getConversationDataDir: () => join(testHome, 'unfinished'),
+    });
+    process.env.GEMINI_FAKE_MODE = 'missing-result';
+    await expect(
+      strategy.executePromptStreaming('hello', 'pro', () => undefined),
+    ).rejects.toThrow('successful result');
+    process.env.GEMINI_FAKE_MODE = 'result-error';
+    await expect(
+      strategy.executePromptStreaming('hello', 'pro', () => undefined),
+    ).rejects.toThrow('successful result');
   });
 
   test('executePromptStreaming clears stale session marker when Gemini reports missing conversation', async () => {

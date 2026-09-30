@@ -254,15 +254,37 @@ function toTomlBlock(name: string, entry: McpServerEntry): string {
   return lines.join('\n');
 }
 
+// These names are reserved by the Rails MCP builder. A supplied full manifest
+// may retire their credentials while unrelated on-volume servers stay intact.
+const BUILTIN_CREDENTIAL_SERVERS = [
+  'fibe',
+  'fibe-gg',
+  'fibe-sdk',
+  'github',
+  'gitea',
+];
+
+function mergeMcpServers(
+  existing: unknown,
+  incoming: Record<string, unknown>,
+  fullManifest: boolean,
+): Record<string, unknown> {
+  const retained = { ...((existing as Record<string, unknown>) ?? {}) };
+  if (fullManifest) {
+    for (const name of BUILTIN_CREDENTIAL_SERVERS) delete retained[name];
+  }
+  return { ...retained, ...incoming };
+}
+
 const PROVIDER_WRITERS: Record<
   string,
-  (servers: Record<string, McpServerEntry>) => void
+  (servers: Record<string, McpServerEntry>, fullManifest: boolean) => void
 > = {
   /**
    * Gemini CLI: ~/.gemini/settings.json
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
-  gemini: (servers) => {
+  gemini: (servers, fullManifest) => {
     const dir = getSessionDir() || join(getHome(), '.gemini');
     const configPath = join(dir, 'settings.json');
     let existing: Record<string, unknown> = {};
@@ -284,16 +306,17 @@ const PROVIDER_WRITERS: Record<
 
     const config = {
       ...existing,
-      mcpServers: {
-        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
-        ...nativeServers,
-      },
+      mcpServers: mergeMcpServers(
+        existing.mcpServers,
+        nativeServers,
+        fullManifest,
+      ),
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     logger.log(`Wrote Gemini MCP config to ${configPath}`);
   },
 
-  antigravity: (servers) => {
+  antigravity: (servers, fullManifest) => {
     const dir = getSessionDir() || join(getHome(), '.gemini');
     const configDir = join(dir, 'config');
     const configPath = join(configDir, 'mcp_config.json');
@@ -316,17 +339,18 @@ const PROVIDER_WRITERS: Record<
 
     const config = {
       ...existing,
-      mcpServers: {
-        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
-        ...nativeServers,
-      },
+      mcpServers: mergeMcpServers(
+        existing.mcpServers,
+        nativeServers,
+        fullManifest,
+      ),
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     logger.log(`Wrote Antigravity MCP config to ${configPath}`);
   },
 
   /** Writes Claude MCP servers to the project and user config files. */
-  'claude-code': (servers) => {
+  'claude-code': (servers, fullManifest) => {
     const nativeServers: Record<string, unknown> = {};
     const projectServers: Record<string, unknown> = {};
     for (const [name, entry] of Object.entries(servers)) {
@@ -350,10 +374,11 @@ const PROVIDER_WRITERS: Record<
 
       const projectConfig = {
         ...projectExisting,
-        mcpServers: {
-          ...((projectExisting.mcpServers as Record<string, unknown>) ?? {}),
-          ...projectServers,
-        },
+        mcpServers: mergeMcpServers(
+          projectExisting.mcpServers,
+          projectServers,
+          fullManifest,
+        ),
       };
       writeFileSync(projectPath, JSON.stringify(projectConfig, null, 2));
       logger.log(`Wrote Claude project MCP config to ${projectPath}`);
@@ -381,10 +406,11 @@ const PROVIDER_WRITERS: Record<
       ...(june1815Enabled()
         ? { [CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY]: true }
         : {}),
-      mcpServers: {
-        ...((settingsExisting.mcpServers as Record<string, unknown>) ?? {}),
-        ...nativeServers,
-      },
+      mcpServers: mergeMcpServers(
+        settingsExisting.mcpServers,
+        nativeServers,
+        fullManifest,
+      ),
     };
     writeFileSync(settingsPath, JSON.stringify(settingsConfig, null, 2));
     logger.log(`Wrote Claude MCP config to ${settingsPath}`);
@@ -394,7 +420,7 @@ const PROVIDER_WRITERS: Record<
    * OpenAI Codex: ~/.codex/config.toml
    * Format: [mcp_servers."<name>"] with url/command and env keys (TOML)
    */
-  'openai-codex': (servers) => {
+  'openai-codex': (servers, fullManifest) => {
     const dir = getSessionDir() || join(getHome(), '.codex');
     const configPath = join(dir, 'config.toml');
     let existingContent = '';
@@ -421,10 +447,10 @@ const PROVIDER_WRITERS: Record<
       }
     }
 
-    const cleaned = stripManagedCodexBlocks(
-      existingContent,
-      Object.keys(servers),
-    );
+    const cleaned = stripManagedCodexBlocks(existingContent, [
+      ...Object.keys(servers),
+      ...(fullManifest ? BUILTIN_CREDENTIAL_SERVERS : []),
+    ]);
 
     const tomlBlocks = Object.entries(servers)
       .map(([name, entry]) => toTomlBlock(name, entry))
@@ -442,7 +468,7 @@ const PROVIDER_WRITERS: Record<
    * OpenCode reads config exclusively from this env var (highest precedence).
    * The strategy's YOLO_ENV already sets base config; we merge MCP servers into it.
    */
-  opencode: (servers) => {
+  opencode: (servers, fullManifest) => {
     const existingRaw = process.env.OPENCODE_CONFIG_CONTENT;
     let existing: Record<string, unknown> = {};
     try {
@@ -479,10 +505,7 @@ const PROVIDER_WRITERS: Record<
 
     const config = {
       ...existing,
-      mcp: {
-        ...((existing.mcp as Record<string, unknown>) ?? {}),
-        ...nativeServers,
-      },
+      mcp: mergeMcpServers(existing.mcp, nativeServers, fullManifest),
     };
     process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
     logger.log('Injected MCP servers into OPENCODE_CONFIG_CONTENT env var');
@@ -493,7 +516,7 @@ const PROVIDER_WRITERS: Record<
    * otherwise SESSION_DIR/ ~/.cursor/mcp.json.
    * Format: { "mcpServers": { "<name>": { "command": ..., "args": [...], "env": {...} } } }
    */
-  cursor: (servers) => {
+  cursor: (servers, fullManifest) => {
     const configPath = getCursorMcpConfigPath();
     const dir = dirname(configPath);
     let existing: Record<string, unknown> = {};
@@ -515,10 +538,11 @@ const PROVIDER_WRITERS: Record<
 
     const config = {
       ...existing,
-      mcpServers: {
-        ...((existing.mcpServers as Record<string, unknown>) ?? {}),
-        ...nativeServers,
-      },
+      mcpServers: mergeMcpServers(
+        existing.mcpServers,
+        nativeServers,
+        fullManifest,
+      ),
     };
     writeFileSync(configPath, JSON.stringify(config, null, 2));
     logger.log(`Wrote Cursor MCP config to ${configPath}`);
@@ -527,15 +551,22 @@ const PROVIDER_WRITERS: Record<
 
 function parseServersFromJson(
   raw: string,
-): Record<string, McpServerEntry> | null {
+): { servers: Record<string, McpServerEntry>; fullManifest: boolean } | null {
   try {
     const parsed = JSON.parse(raw);
-    if (parsed?.mcpServers && typeof parsed.mcpServers === 'object') {
-      return parsed.mcpServers;
+    if (
+      parsed?.mcpServers &&
+      typeof parsed.mcpServers === 'object' &&
+      !Array.isArray(parsed.mcpServers)
+    ) {
+      return { servers: parsed.mcpServers, fullManifest: true };
     }
     // Legacy single-server format: treat it as the built-in Fibe MCP.
     if (parsed?.serverUrl) {
-      return { fibe: parsed as McpServerEntry };
+      return {
+        servers: { fibe: parsed as McpServerEntry },
+        fullManifest: false,
+      };
     }
     return null;
   } catch {
@@ -561,23 +592,26 @@ export function writeMcpConfig(
 
   const allServers: Record<string, McpServerEntry> = {};
 
+  let fullManifest = false;
   const mcpRaw = process.env.MCP_CONFIG_JSON;
   if (mcpRaw) {
     const servers = parseServersFromJson(mcpRaw);
-    if (servers) Object.assign(allServers, servers);
-    else logger.warn('MCP_CONFIG_JSON could not be parsed');
+    if (servers) {
+      Object.assign(allServers, servers.servers);
+      fullManifest = servers.fullManifest;
+    } else logger.warn('MCP_CONFIG_JSON could not be parsed');
   }
 
   if (extraServers) {
     Object.assign(allServers, extraServers);
   }
-  if (Object.keys(allServers).length === 0) {
+  if (Object.keys(allServers).length === 0 && !fullManifest) {
     logger.log('No MCP servers configured: skipping config write');
     return;
   }
 
   try {
-    writer(allServers);
+    writer(allServers, fullManifest);
   } catch (err) {
     logger.error(`Failed to write MCP config: ${err}`);
   }

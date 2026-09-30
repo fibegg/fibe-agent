@@ -68,6 +68,20 @@ describe('SequentialJsonWriter', () => {
     expect(JSON.parse(content)).toEqual({ recovered: true });
   });
 
+  test('strict flush rejects failed persistence and recovers after a later successful write', async () => {
+    let fail = true;
+    const writer = new SequentialJsonWriter(testFile, () => {
+      if (fail) throw new Error('receipt disk unavailable');
+      return { receipt: 'persisted' };
+    });
+    writer.schedule();
+    await expect(writer.flush(true)).rejects.toThrow('receipt disk unavailable');
+    fail = false;
+    writer.schedule();
+    await writer.flush(true);
+    expect(JSON.parse(readFileSync(testFile, 'utf8'))).toEqual({ receipt: 'persisted' });
+  });
+
   test('writes encrypted data when encryption key is provided', async () => {
     const writer = new SequentialJsonWriter(
       testFile,

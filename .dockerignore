@@ -19,6 +19,8 @@
 !shared/
 !scripts/
 scripts/*
+!scripts/install-provider.mjs
+!scripts/provider-versions.json
 !scripts/install-fibe.sh
 !scripts/mcp-remote-wrapper.sh
 

@@ -871,4 +871,88 @@ describe('writeMcpConfig', () => {
     expect(existsSync(settingsPath)).toBe(true);
     expect(existsSync(projectPath)).toBe(true);
   });
+
+  describe('retiring built-in credentials from persisted runtime config', () => {
+    const builtinServers = {
+      github: {
+        command: 'mcp-github',
+        env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'old-github' },
+      },
+      gitea: { command: 'gitea-mcp', env: { GITEA_ACCESS_TOKEN: 'old-gitea' } },
+      fibe: { command: 'fibe', env: { FIBE_API_KEY: 'old-fibe' } },
+      fibe_sdk_custom: { command: 'custom-tool' },
+    };
+
+    for (const [provider, relativePath] of [
+      ['gemini', 'settings.json'],
+      ['antigravity', 'config/mcp_config.json'],
+      ['claude-code', 'settings.json'],
+      ['openai-codex', 'config.toml'],
+      ['cursor', 'mcp.json'],
+    ]) {
+      it(`removes retired reserved credentials for ${provider} while preserving custom entries`, () => {
+        process.env.AGENT_PROVIDER = provider;
+        process.env.SESSION_DIR = testHome;
+        process.env.DATA_DIR = testHome;
+        delete process.env.FIBE_AGENT_ID;
+        delete process.env.CONVERSATION_ID;
+        process.env.MCP_CONFIG_JSON = JSON.stringify({
+          mcpServers: builtinServers,
+        });
+        writeMcpConfig();
+        // Custom on-volume entries remain useful; only known reserved names are managed here.
+        process.env.MCP_CONFIG_JSON = JSON.stringify({ mcpServers: {} });
+        writeMcpConfig();
+        const output = readFileSync(join(testHome, relativePath), 'utf8');
+        expect(output).not.toContain('old-github');
+        expect(output).not.toContain('old-gitea');
+        expect(output).not.toContain('old-fibe');
+        expect(output).toContain('custom-tool');
+        if (provider === 'claude-code') {
+          const project = readFileSync(
+            join(testHome, 'default/claude_workspace/.mcp.json'),
+            'utf8',
+          );
+          expect(project).not.toContain('old-github');
+          expect(project).not.toContain('old-gitea');
+          expect(project).not.toContain('old-fibe');
+        }
+      });
+    }
+
+    it('removes retired credentials from OpenCode merged environment config', () => {
+      process.env.AGENT_PROVIDER = 'opencode';
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: builtinServers,
+      });
+      writeMcpConfig();
+      process.env.MCP_CONFIG_JSON = JSON.stringify({ mcpServers: {} });
+      writeMcpConfig();
+      expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain('old-github');
+      expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain('old-gitea');
+      expect(process.env.OPENCODE_CONFIG_CONTENT).not.toContain('old-fibe');
+      expect(process.env.OPENCODE_CONFIG_CONTENT).toContain('custom-tool');
+    });
+
+    it('preserves on-volume configuration when there is no full manifest', () => {
+      process.env.AGENT_PROVIDER = 'gemini';
+      process.env.SESSION_DIR = testHome;
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        mcpServers: builtinServers,
+      });
+      writeMcpConfig();
+      delete process.env.MCP_CONFIG_JSON;
+      writeMcpConfig({ sentry: { command: 'sentry' } });
+      expect(readFileSync(join(testHome, 'settings.json'), 'utf8')).toContain(
+        'old-github',
+      );
+      process.env.MCP_CONFIG_JSON = JSON.stringify({
+        serverUrl: 'https://legacy.example/mcp',
+      });
+      writeMcpConfig();
+      expect(readFileSync(join(testHome, 'settings.json'), 'utf8')).toContain(
+        'old-gitea',
+      );
+    });
+  });
 });

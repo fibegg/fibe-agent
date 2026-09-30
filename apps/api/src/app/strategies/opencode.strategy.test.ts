@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  realpathSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -396,6 +397,58 @@ describe('OpencodeStrategy', () => {
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
+  });
+
+  test('recognizes injected native provider OAuth and API credentials', async () => {
+    const authDir = join(TEST_HOME, '.local', 'share', 'opencode');
+    mkdirSync(authDir, { recursive: true });
+    for (const credential of [
+      {
+        type: 'oauth',
+        refresh: 'fixture-refresh',
+        access: 'fixture-access',
+        expires: Date.now() + 60_000,
+      },
+      { type: 'api', key: 'fixture-key' },
+    ]) {
+      writeFileSync(
+        join(authDir, 'auth.json'),
+        JSON.stringify({ anthropic: credential }),
+      );
+      const strategy = new OpencodeStrategy();
+      expect(await strategy.checkAuthStatus()).toBe(true);
+      const savedSessionDir = process.env.SESSION_DIR;
+      process.env.SESSION_DIR = authDir;
+      try {
+        const env = (
+          strategy as unknown as { buildOpencodeEnv(): NodeJS.ProcessEnv }
+        ).buildOpencodeEnv();
+        expect(env.XDG_DATA_HOME).toBe(join(TEST_HOME, '.local', 'share'));
+      } finally {
+        if (savedSessionDir === undefined) delete process.env.SESSION_DIR;
+        else process.env.SESSION_DIR = savedSessionDir;
+      }
+      const conn = makeConnection();
+      strategy.executeAuth(conn);
+      expect(conn.calls).toContain('auth_success');
+    }
+  });
+
+  test('routes arbitrary scoped native homes to the same writable XDG directory', () => {
+    const savedSessionDir = process.env.SESSION_DIR;
+    process.env.SESSION_DIR = join(TEST_HOME, 'custom-session');
+    try {
+      const strategy = new OpencodeStrategy();
+      const env = (
+        strategy as unknown as { buildOpencodeEnv(): NodeJS.ProcessEnv }
+      ).buildOpencodeEnv();
+      expect(realpathSync(join(env.XDG_DATA_HOME ?? '', 'opencode'))).toBe(
+        realpathSync(process.env.SESSION_DIR),
+      );
+    } finally {
+      if (savedSessionDir === undefined) delete process.env.SESSION_DIR;
+      else process.env.SESSION_DIR = savedSessionDir;
+    }
   });
 
   test('submitAuthCode writes auth file and signals success', () => {
@@ -1445,7 +1498,7 @@ describe('buildOpencodeRunArgs', () => {
     const args = buildOpencodeRunArgs(
       'hello',
       ['--model', 'openai/gpt-5.4'],
-      false,
+      null,
     );
     expect(args).toEqual([
       'run',
@@ -1464,7 +1517,7 @@ describe('buildOpencodeRunArgs', () => {
     const args = buildOpencodeRunArgs(
       dashPrompt,
       ['--model', 'openai/gpt-5.4'],
-      false,
+      null,
     );
     const separatorIndex = args.indexOf('--');
     expect(separatorIndex).toBeGreaterThan(-1);
@@ -1472,11 +1525,12 @@ describe('buildOpencodeRunArgs', () => {
     expect(args[args.length - 1]).toBe(dashPrompt);
   });
 
-  test('includes --continue when hasSession is true', () => {
-    const args = buildOpencodeRunArgs('hi', [], true);
+  test('resumes the exact saved session', () => {
+    const args = buildOpencodeRunArgs('hi', [], 'session-123');
     expect(args).toEqual([
       'run',
-      '--continue',
+      '--session',
+      'session-123',
       '--thinking',
       '--format',
       'json',
@@ -1491,7 +1545,7 @@ describe('buildOpencodeRunArgs', () => {
     const args = buildOpencodeRunArgs(
       'hello',
       ['--model', 'openai/gpt-5.4'],
-      false,
+      null,
     );
     expect(args).toEqual([
       'run',
@@ -1510,7 +1564,7 @@ describe('buildOpencodeRunArgs', () => {
     const args = buildOpencodeRunArgs(
       dashPrompt,
       ['--model', 'openai/gpt-5.4'],
-      false,
+      null,
     );
     const separatorIndex = args.indexOf('--');
     expect(separatorIndex).toBeGreaterThan(-1);
@@ -1518,11 +1572,12 @@ describe('buildOpencodeRunArgs', () => {
     expect(args[args.length - 1]).toBe(dashPrompt);
   });
 
-  test('includes --continue when hasSession is true', () => {
-    const args = buildOpencodeRunArgs('hi', [], true);
+  test('resumes the exact saved session', () => {
+    const args = buildOpencodeRunArgs('hi', [], 'session-123');
     expect(args).toEqual([
       'run',
-      '--continue',
+      '--session',
+      'session-123',
       '--thinking',
       '--format',
       'json',

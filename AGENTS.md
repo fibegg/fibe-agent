@@ -69,7 +69,7 @@ All strategies live under `apps/api/src/app/strategies/`:
 | File                           | Strategy                                                                                                   |
 | ------------------------------ | ---------------------------------------------------------------------------------------------------------- |
 | `gemini.strategy.ts`           | Gemini CLI: OAuth device flow or `GEMINI_API_KEY`                                                          |
-| `antigravity.strategy.ts`      | Antigravity CLI: Google OAuth code flow, `agy --prompt=<text>` headless runs                               |
+| `antigravity.strategy.ts`      | Antigravity CLI: terminal OAuth code flow or Gemini API key, `agy --print --output-format=stream-json` runs                               |
 | `claude-sdk.strategy.ts`       | Claude Code: `@anthropic-ai/claude-agent-sdk` in-process SDK; OAuth or `ANTHROPIC_API_KEY`                 |
 | `openai-codex.strategy.ts`     | OpenAI Codex: OAuth or `OPENAI_API_KEY`                                                                    |
 | `cursor.strategy.ts`           | Cursor Agent CLI: `CURSOR_API_KEY`, stream-json                                                            |
@@ -337,7 +337,7 @@ Each file in `prompts/providers/` extends the base code-playground behaviour wit
 | File                        | Provider       | Notable additions                                                               |
 | --------------------------- | -------------- | ------------------------------------------------------------------------------- |
 | `providers/gemini.md`       | `gemini`       | `--yolo` mode, `--resume` sessions, output-length advice                        |
-| `providers/antigravity.md`  | `antigravity`  | `agy --prompt=<text>` headless mode, `--conversation` sessions, OAuth code flow |
+| `providers/antigravity.md`  | `antigravity`  | `agy --print --output-format=stream-json`, `--model`/`--effort`, `--conversation` sessions, PTY OAuth or Gemini API key |
 | `providers/claude-code.md`  | `claude-code`  | Native file-edit tools, SDK resume sessions, extended thinking                  |
 | `providers/openai-codex.md` | `openai-codex` | Codex execution transport notes, full-file writes, o-series reasoning           |
 | `providers/cursor.md`       | `cursor`       | `cursor-agent --print --output-format stream-json --force`, API-key auth        |
@@ -602,7 +602,7 @@ docker run -p 3000:3000 \
 
 ### Prerequisites
 
-- [Bun](https://bun.sh): version pinned in `packageManager` in `package.json` (`bun@1.3.11`)
+- [Bun](https://bun.sh): version pinned in `packageManager` in `package.json` (`bun@1.4.2`)
 - Node 24 (see `.nvmrc`) for native addon compatibility (`node-pty`)
 
 ### Setup

@@ -93,6 +93,16 @@ const GEMINI_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   blockedArgs: {
     '--yolo': true, // non-interactive mode, always enforced
     '-p': false, // handled dynamically
+    '--prompt': false,
+    '--prompt-interactive': false,
+    '--output-format': false,
+    '-o': false,
+    '--resume': false,
+    '-r': false,
+    '--session-id': false,
+    '--session-file': false,
+    '--acp': false,
+    '--experimental-acp': false,
   },
 };
 
@@ -500,9 +510,6 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         ) {
           isCode42Expected = true;
         }
-        if (!output.includes('Waiting for authentication')) {
-          this.logger.log(`RAW OUTPUT: ${output.trim()}`);
-        }
 
         // Gemini CLI 0.40+ requires consent before printing the OAuth URL.
         if (
@@ -573,6 +580,12 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     if (this.useApiTokenMode) {
       if (trimmed) {
         this._apiToken = trimmed;
+        this.ensureRuntimeSettings();
+        writeFileSync(
+          join(getGeminiConfigDir(), 'auth.json'),
+          JSON.stringify({ api_key: trimmed }),
+          { mode: 0o600 },
+        );
         this.currentConnection?.sendAuthSuccess();
       } else {
         this.currentConnection?.sendAuthStatus('unauthenticated');
@@ -587,6 +600,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
   clearCredentials(): void {
     this._apiToken = null;
     const credentialFiles = [
+      'auth.json',
       'oauth_creds.json',
       'credentials.json',
       '.credentials.json',
@@ -608,39 +622,24 @@ export class GeminiStrategy extends AbstractCLIStrategy {
   }
 
   executeLogout(connection: LogoutConnection): void {
-    if (this.useApiTokenMode) {
-      this.clearCredentials();
-      connection.sendLogoutSuccess();
-      return;
-    }
-    const logoutProcess = spawn('gemini', ['auth', 'logout'], {
-      env: getGeminiProcessEnv(),
-      shell: false,
-    });
-
-    const handleOutput = (data: Buffer | string) => {
-      const text = data.toString();
-      connection.sendLogoutOutput(text);
-    };
-
-    logoutProcess.stdout?.on('data', handleOutput);
-    logoutProcess.stderr?.on('data', handleOutput);
-
-    logoutProcess.on('close', () => {
-      this.clearCredentials();
-      connection.sendLogoutSuccess();
-    });
-
-    logoutProcess.on('error', () => {
-      this.clearCredentials();
-      connection.sendLogoutSuccess();
-    });
+    // Gemini exposes /auth in its interactive UI, not an `auth logout` command.
+    this.cancelAuth();
+    this.clearCredentials();
+    connection.sendLogoutSuccess();
   }
 
   private getApiToken(): string | null {
     const envToken = process.env[GEMINI_API_KEY_ENV]?.trim();
     if (envToken) return envToken;
-    return this._apiToken;
+    if (this._apiToken) return this._apiToken;
+    try {
+      const auth = JSON.parse(
+        readFileSync(join(getGeminiConfigDir(), 'auth.json'), 'utf8'),
+      ) as { api_key?: string };
+      return auth.api_key?.trim() || null;
+    } catch {
+      return null;
+    }
   }
 
   checkAuthStatus(): Promise<boolean> {
@@ -655,11 +654,18 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       const geminiProcess = spawn('gemini', ['-p', ''], {
         env: getGeminiProcessEnv(),
         shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
 
       let outputStr = '';
       let resolved = false;
       let isCode42Expected = false;
+      const timer = setTimeout(() => {
+        if (resolved) return;
+        resolved = true;
+        geminiProcess.kill();
+        resolve(false);
+      }, 15_000);
 
       const handleData = (data: Buffer | string) => {
         if (resolved) return;
@@ -676,6 +682,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           text.includes('Waiting for authentication')
         ) {
           resolved = true;
+          clearTimeout(timer);
           geminiProcess.kill();
           resolve(false);
         }
@@ -685,6 +692,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       geminiProcess.stderr?.on('data', handleData);
 
       geminiProcess.on('close', (code) => {
+        clearTimeout(timer);
         if (!resolved) {
           resolved = true;
           resolve(code === 0 || (code === 42 && isCode42Expected));
@@ -692,6 +700,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       });
 
       geminiProcess.on('error', () => {
+        clearTimeout(timer);
         if (!resolved) {
           resolved = true;
           resolve(false);
@@ -754,6 +763,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         env,
         cwd: workspaceDir,
         shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
       this.currentStreamProcess = geminiProcess;
 
@@ -762,6 +772,57 @@ export class GeminiStrategy extends AbstractCLIStrategy {
       let authUrlEmitted = false;
       let hasEmittedOutput = false;
       let lineCarryOver = '';
+      let streamSessionId: string | null = null;
+      let terminalStatus: string | null = null;
+      const readStreamLine = (line: string) => {
+        const content = parseGeminiStreamJsonLine(line);
+        if (content !== null) {
+          hasEmittedOutput = true;
+          onChunk(content);
+        }
+        try {
+          const event = JSON.parse(line);
+          if (event.type === 'init' && typeof event.session_id === 'string')
+            streamSessionId = event.session_id;
+          if (event.type === 'tool_use') {
+            const parameters = event.parameters ?? {};
+            callbacks?.onTool?.({
+              kind: 'tool_call',
+              name: event.tool_name || 'tool',
+              command: parameters.command,
+              path: parameters.file_path || parameters.path,
+              details: JSON.stringify(parameters),
+            });
+            callbacks?.onStep?.({
+              id: event.tool_id,
+              title: event.tool_name || 'tool',
+              status: 'processing',
+              timestamp: new Date(),
+            });
+          }
+          if (event.type === 'tool_result')
+            callbacks?.onStep?.({
+              id: event.tool_id,
+              title: event.error?.message || event.output || 'Tool complete',
+              status: 'complete',
+              timestamp: new Date(),
+            });
+          if (event.type === 'error' && event.severity === 'error')
+            errorResult += `\n${event.message || 'Gemini stream failed'}`;
+          if (event.type === 'result') {
+            terminalStatus = event.status;
+            if (event.error?.message) errorResult += `\n${event.error.message}`;
+            const counts = event.stats;
+            if (counts)
+              callbacks?.onUsage?.({
+                inputTokens: counts.input_tokens ?? 0,
+                outputTokens: counts.output_tokens ?? 0,
+              });
+          }
+        } catch {
+          /* plain-text warnings are not response events */
+        }
+      };
 
       const detectAndEmitAuthUrl = (output: string): boolean => {
         if (authUrlEmitted) return true;
@@ -787,13 +848,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
         const lines = combined.split('\n');
         lineCarryOver = lines.pop() ?? '';
 
-        for (const line of lines) {
-          const content = parseGeminiStreamJsonLine(line);
-          if (content !== null) {
-            hasEmittedOutput = true;
-            onChunk(content);
-          }
-        }
+        lines.forEach(readStreamLine);
       });
 
       geminiProcess.stderr?.on('data', (data: Buffer | string) => {
@@ -811,14 +866,7 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
         }
-        if (lineCarryOver) {
-          const content = parseGeminiStreamJsonLine(lineCarryOver);
-          if (content !== null) {
-            hasEmittedOutput = true;
-            onChunk(content);
-          }
-          lineCarryOver = '';
-        }
+        if (lineCarryOver.trim()) readStreamLine(lineCarryOver);
         const capturedSession =
           code === 0 || code === null
             ? this.captureSessionAfterRun(
@@ -882,10 +930,20 @@ export class GeminiStrategy extends AbstractCLIStrategy {
           return;
         }
         if (code === 0 || code === null) {
+          if (terminalStatus !== 'success') {
+            reject(
+              new Error(
+                errorResult.trim() ||
+                  'Gemini stream ended without a successful result.',
+              ),
+            );
+            return;
+          }
           const capturedSessionId =
-            storedSessionId && storedSessionId !== GEMINI_RESUME_LATEST
+            streamSessionId ||
+            (storedSessionId && storedSessionId !== GEMINI_RESUME_LATEST
               ? storedSessionId
-              : capturedSession?.sessionId;
+              : capturedSession?.sessionId);
           if (capturedSessionId) {
             this.writeStoredSession(capturedSessionId);
           } else {

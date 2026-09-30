@@ -1,9 +1,10 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Subject } from 'rxjs';
 import { OrchestratorService } from './orchestrator.service';
+import { AgentController } from '../agent/agent.controller';
 import { SessionContext } from './session-context';
 import { SessionRegistryService } from './session-registry.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
@@ -26,24 +27,52 @@ import { INTERRUPTED_MESSAGE } from '../strategies/strategy.types';
 describe('OrchestratorService', () => {
   let dataDir: string;
   let lastActivityStore: ActivityStoreService | undefined;
+  let fixtures: Array<{ dispose: () => Promise<void> }>;
   const envBackup = process.env.AGENT_PROVIDER;
 
   beforeEach(() => {
     lastActivityStore = undefined;
+    fixtures = [];
     dataDir = mkdtempSync(join(tmpdir(), 'orch-'));
     process.env.AGENT_PROVIDER = 'mock';
   });
 
   afterEach(async () => {
-    if (envBackup === undefined) {
-      delete process.env.AGENT_PROVIDER;
-    } else {
-      process.env.AGENT_PROVIDER = envBackup;
+    // A timed-out hook may resume after the next fixture starts: keep ownership
+    // of this directory and never delete or reconfigure the following fixture.
+    const fixtureDir = dataDir;
+    const ownedFixtures = fixtures;
+    await Promise.all(ownedFixtures.map((fixture) => fixture.dispose()));
+    rmSync(fixtureDir, { recursive: true, force: true });
+    if (dataDir === fixtureDir) {
+      if (envBackup === undefined) delete process.env.AGENT_PROVIDER;
+      else process.env.AGENT_PROVIDER = envBackup;
     }
-    await lastActivityStore?.flush();
-    await new Promise((r) => setTimeout(r, 50));
-    rmSync(dataDir, { recursive: true, force: true });
   });
+
+  function trackBackgroundTasks(orch: OrchestratorService): () => Promise<void> {
+    const tasks = new Set<Promise<void>>();
+    const background = orch as unknown as Record<
+      'runAgentResponse' | 'drainQueuedTurns' | 'recoverPendingApiRequests',
+      (...args: unknown[]) => Promise<void>
+    >;
+    for (const method of ['runAgentResponse', 'drainQueuedTurns', 'recoverPendingApiRequests'] as const) {
+      const original = background[method].bind(orch);
+      spyOn(background, method).mockImplementation((...args) => {
+        const task = original(...args);
+        tasks.add(task);
+        void task.then(() => tasks.delete(task), () => tasks.delete(task));
+        return task;
+      });
+    }
+    return async () => {
+      // Response settlement can schedule another queue/recovery task.
+      do {
+        await Promise.allSettled([...tasks]);
+        await Promise.resolve();
+      } while (tasks.size);
+    };
+  }
 
   function makeLocalMcpStub(): {
     service: LocalMcpService;
@@ -71,6 +100,7 @@ describe('OrchestratorService', () => {
     cachedSystemPromptFromFile?: string | null;
     nativeSessionSupport?: boolean;
     injectPromptHistory?: boolean;
+    beforeStrategyResponse?: () => Promise<void>;
   };
 
   async function createOrchestrator(
@@ -94,10 +124,14 @@ describe('OrchestratorService', () => {
       effort?: string;
     }>;
     syncActivityContents: string[];
+    messageStore: MessageStoreService;
+    waitForBackgroundTasks: () => Promise<void>;
+    dispose: () => Promise<void>;
   }> {
+    const fixtureDir = dataDir;
     const config = {
-      getDataDir: () => dataDir,
-      getConversationDataDir: () => dataDir,
+      getDataDir: () => fixtureDir,
+      getConversationDataDir: () => fixtureDir,
       getEncryptionKey: () => undefined,
       getSystemPrompt: () => options.systemPrompt,
       getModelOptions: () => [],
@@ -115,7 +149,7 @@ describe('OrchestratorService', () => {
       get: (_id: string) => ({ messageStore, activityStore }),
       getOrCreate: (_id: string) => ({ messageStore, activityStore }),
       dataDirProvider: (_id: string) => ({
-        getConversationDataDir: () => dataDir,
+        getConversationDataDir: () => fixtureDir,
       }),
       touch: (_id: string) => undefined,
       list: () => [],
@@ -157,6 +191,7 @@ describe('OrchestratorService', () => {
           systemPrompt,
           effort: runtimeOptions?.effort,
         });
+        await options.beforeStrategyResponse?.();
         onChunk('test response');
       },
       ensureSettings: () => undefined,
@@ -241,6 +276,13 @@ describe('OrchestratorService', () => {
       stub,
       conversationManager,
     );
+    const waitForBackgroundTasks = trackBackgroundTasks(orch);
+    const dispose = async () => {
+      await waitForBackgroundTasks();
+      await Promise.all([messageStore, activityStore, modelStore, effortStore, agentModeStore]
+        .map((store) => store.onModuleDestroy()));
+    };
+    fixtures.push({ dispose });
     await orch.onModuleInit();
     const ctx = sessionRegistry.create();
     if (options.cachedSystemPromptFromFile !== undefined) {
@@ -255,7 +297,17 @@ describe('OrchestratorService', () => {
       strategyCalls,
       syncMessageContents,
       syncActivityContents,
+      messageStore,
+      waitForBackgroundTasks,
+      dispose,
     };
+  }
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (error: Error) => void;
+    const promise = new Promise<T>((res, rej) => { resolve = res; reject = rej; });
+    return { promise, resolve, reject };
   }
 
   async function waitForIdle(ctx: SessionContext): Promise<void> {
@@ -728,6 +780,359 @@ describe('OrchestratorService', () => {
     const result = await orch.sendMessageFromApi('hello', 'default');
     expect(result.accepted).toBe(false);
     expect(result.error).toBe(ERROR_CODE.AGENT_BUSY);
+  });
+
+  test('caller identity replays response loss without repeating a message or provider turn', async () => {
+    const { orch, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
+    const requestId = 'a514ad73-8519-42e4-b268-ce7e141cb9e9';
+    const first = await orch.sendMessageFromApi('one occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
+    const replay = await orch.sendMessageFromApi('one occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
+    expect(first.accepted).toBe(true);
+    expect(first.messageId).toBe(requestId);
+    expect(replay.messageId).toBe(first.messageId);
+    await waitForBackgroundTasks();
+    expect(messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
+    expect(strategyCalls).toHaveLength(1);
+    const mismatch = await orch.sendMessageFromApi('different occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
+    expect(mismatch).toMatchObject({ accepted: false, error: 'REQUEST_ID_CONFLICT' });
+    // A restored record can retain its old generation under a fresh scope. A
+    // changed target is still a content conflict, not an equal uncertain replay.
+    writeFileSync(join(dataDir, 'message-store-generation.json'), JSON.stringify({ generation: '7514ad73-8519-42e4-b268-ce7e141cb9e9' }));
+    const targetMismatch = await orch.sendMessageFromApi('one occurrence', 'project-b', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
+    expect(targetMismatch).toMatchObject({ accepted: false, error: 'REQUEST_ID_CONFLICT' });
+  });
+
+  test('response loss followed by history reset refuses the old generation without recreating the turn', async () => {
+    const { orch, ctx, messageStore, strategyCalls } = await createOrchestrator();
+    ctx.isProcessing = true;
+    ctx.isAuthenticated = true;
+    const id = '1514ad73-8519-42e4-b268-ce7e141cb9e9';
+    const generation = messageStore.deliveryGeneration();
+    expect((await orch.sendMessageFromApi('queued occurrence', 'default', undefined, undefined, 'queue', id, generation)).accepted).toBe(true);
+    messageStore.reset();
+    const replay = await orch.sendMessageFromApi('queued occurrence', 'default', undefined, undefined, 'queue', id, generation);
+    expect(replay).toMatchObject({ accepted: false, messageId: id, error: 'STORE_GENERATION_CHANGED' });
+    expect(messageStore.all()).toEqual([]);
+    expect(strategyCalls).toHaveLength(0);
+  });
+
+  test('reset during awaited preparation refuses admission and every provider effect', async () => {
+    const { orch, messageStore, strategyCalls } = await createOrchestrator();
+    const generation = messageStore.deliveryGeneration();
+    const flush = messageStore.flush.bind(messageStore);
+    const resetDuringFlush = spyOn(messageStore, 'flush').mockImplementationOnce(async (strict) => {
+      messageStore.reset();
+      return flush(strict);
+    });
+    try {
+      const result = await orch.sendMessageFromApi('prepared occurrence', 'default', undefined, undefined, 'queue', '2514ad73-8519-42e4-b268-ce7e141cb9e9', generation);
+      expect(result).toMatchObject({ accepted: false, error: 'STORE_GENERATION_CHANGED' });
+      expect(strategyCalls).toHaveLength(0);
+      expect(messageStore.all()).toEqual([]);
+    } finally { resetDuringFlush.mockRestore(); }
+  });
+
+  test('reset during the strict running checkpoint prevents an accepted pending turn from executing', async () => {
+    const { orch, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
+    const generation = messageStore.deliveryGeneration();
+    const flush = messageStore.flush.bind(messageStore);
+    let checkpoints = 0;
+    const resetDuringRunning = spyOn(messageStore, 'flush').mockImplementation(async (strict) => {
+      if (++checkpoints === 2) messageStore.reset();
+      return flush(strict);
+    });
+    try {
+      await orch.sendMessageFromApi('accepted pending', 'default', undefined, undefined, 'queue', '3514ad73-8519-42e4-b268-ce7e141cb9e9', generation);
+      await waitForBackgroundTasks();
+      expect(checkpoints).toBeGreaterThanOrEqual(2);
+      expect(strategyCalls).toHaveLength(0);
+      expect(messageStore.all()).toEqual([]);
+    } finally { resetDuringRunning.mockRestore(); }
+  });
+
+  test('reset during asynchronous prompt preparation after the running checkpoint prevents the provider effect', async () => {
+    const { orch, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
+    const generation = messageStore.deliveryGeneration();
+    const context = (orch as unknown as { chatPromptContext: { buildFullPrompt: (...args: unknown[]) => Promise<string> } }).chatPromptContext;
+    const resetDuringPrompt = spyOn(context, 'buildFullPrompt').mockImplementationOnce(async () => {
+      expect(messageStore.all().find((message) => message.apiRequest)?.apiRequest?.state).toBe('running');
+      messageStore.reset();
+      await messageStore.flush(true);
+      return 'prepared after reset';
+    });
+    try {
+      await orch.sendMessageFromApi('prompt preparation', 'default', undefined, undefined, 'queue', '6514ad73-8519-42e4-b268-ce7e141cb9e9', generation);
+      await waitForBackgroundTasks();
+      expect(resetDuringPrompt).toHaveBeenCalledTimes(1);
+      expect(strategyCalls).toHaveLength(0);
+      expect(messageStore.all().filter((message) => message.role === 'user')).toEqual([]);
+    } finally { resetDuringPrompt.mockRestore(); }
+  });
+
+  test('explicit delivery scope pins one target, accepts an idle explicit target, and rejects ambiguous active routing', async () => {
+    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    expect(orch.resolveDeliveryScope('default')).toMatchObject({ accepted: true, conversationId: 'default' });
+    ctx.isProcessing = true;
+    expect(orch.resolveDeliveryScope()).toMatchObject({ accepted: true, conversationId: 'default' });
+    sessionRegistry.create('project-b').isProcessing = true;
+    expect(orch.resolveDeliveryScope()).toMatchObject({ accepted: false });
+    expect(orch.resolveDeliveryScope('default')).toMatchObject({ accepted: true, conversationId: 'default' });
+  });
+
+  test('ordinary GET status leaves storage untouched; only explicit scope status persists a generation', async () => {
+    const { orch } = await createOrchestrator();
+    const controller = new AgentController(orch);
+    const ordinary = controller.getStatus();
+    expect(ordinary).not.toHaveProperty('deliveryScope');
+    expect(existsSync(join(dataDir, 'message-store-generation.json'))).toBe(false);
+    const explicit = controller.getStatus('true', 'default');
+    expect(explicit.deliveryScope).toMatchObject({ accepted: true, conversationId: 'default' });
+    expect(existsSync(join(dataDir, 'message-store-generation.json'))).toBe(true);
+    expect(controller.getStatus()).toEqual(ordinary);
+  });
+
+  test('restart recovers persisted pending queued identities in order without creating duplicate messages', async () => {
+    const first = await createOrchestrator();
+    first.ctx.isProcessing = true;
+    first.ctx.isAuthenticated = true;
+    const ids = ['b514ad73-8519-42e4-b268-ce7e141cb9e9', 'c514ad73-8519-42e4-b268-ce7e141cb9e9'];
+    for (const [index, id] of ids.entries()) {
+      await first.orch.sendMessageFromApi(`queued ${index}`, 'default', undefined, undefined, 'queue', id, first.messageStore.deliveryGeneration());
+    }
+    first.orch.reorderQueuedTurnsFromApi('default', first.ctx.queuedTurns.map((turn) => turn.id).reverse());
+    expect(first.strategyCalls).toHaveLength(0);
+    await first.dispose();
+    const responseStarted = deferred<void>();
+    const providerResponse = deferred<void>();
+    const restarted = await createOrchestrator(undefined, {
+      beforeStrategyResponse: () => {
+        responseStarted.resolve();
+        return providerResponse.promise;
+      },
+    });
+    try {
+      await responseStarted.promise;
+      expect(restarted.strategyCalls.map((call) => call.prompt)).toEqual(['queued 1']);
+      expect(restarted.messageStore.getById(ids[1])?.apiRequest?.state).toBe('running');
+      expect(restarted.messageStore.getById(ids[0])?.apiRequest?.state).toBe('pending');
+    } finally { providerResponse.resolve(); }
+    await restarted.waitForBackgroundTasks();
+    expect(restarted.strategyCalls.map((call) => call.prompt)).toEqual(['queued 1', 'queued 0']);
+    expect(restarted.messageStore.all().filter((message) => message.role === 'user').map((message) => message.id)).toEqual(ids);
+    expect(restarted.messageStore.getById(ids[0])?.apiRequest?.state).toBe('completed');
+    expect(restarted.messageStore.getById(ids[1])?.apiRequest?.state).toBe('completed');
+  });
+
+  test('restart exposes interrupted running identity as unknown and never repeats its provider effect', async () => {
+    const first = await createOrchestrator();
+    const id = 'd514ad73-8519-42e4-b268-ce7e141cb9e9';
+    first.ctx.isProcessing = true;
+    first.ctx.isAuthenticated = true;
+    await first.orch.sendMessageFromApi('interrupted', 'default', undefined, undefined, 'queue', id, first.messageStore.deliveryGeneration());
+    await first.messageStore.updateRequestState(id, 'running');
+    await first.dispose();
+    const restarted = await createOrchestrator();
+    const replay = await restarted.orch.sendMessageFromApi('interrupted', 'default', undefined, undefined, 'queue', id, restarted.messageStore.deliveryGeneration());
+    expect(replay).toMatchObject({ accepted: false, messageId: id, error: 'REQUEST_OUTCOME_UNKNOWN', executionState: 'outcome_unknown' });
+    expect(restarted.strategyCalls).toHaveLength(0);
+    expect(restarted.messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
+  });
+
+  test('fixture disposal joins delayed provider settlement and every store before directory cleanup', async () => {
+    const started = deferred<void>();
+    const response = deferred<void>();
+    const fixture = await createOrchestrator(undefined, {
+      beforeStrategyResponse: () => {
+        started.resolve();
+        return response.promise;
+      },
+    });
+    const id = '8514ad73-8519-42e4-b268-ce7e141cb9e9';
+    await fixture.orch.sendMessageFromApi('slow fixture response', 'default', undefined, undefined, 'queue', id, fixture.messageStore.deliveryGeneration());
+    await started.promise;
+    fixture.orch.setAgentMode('casting');
+    let disposed = false;
+    const disposal = fixture.dispose().then(() => { disposed = true; });
+    try {
+      await Promise.resolve();
+      expect(disposed).toBe(false);
+      expect(existsSync(dataDir)).toBe(true);
+      expect(fixture.messageStore.getById(id)?.apiRequest?.state).toBe('running');
+    } finally { response.resolve(); }
+    await disposal;
+    const persisted = JSON.parse(readFileSync(join(dataDir, 'messages.json'), 'utf8'));
+    expect(persisted.find((message: { id: string }) => message.id === id).apiRequest.state).toBe('completed');
+    expect(JSON.parse(readFileSync(join(dataDir, 'mode.json'), 'utf8'))).toEqual({ mode: AGENT_MODES.casting });
+  });
+
+  test('caller admission prevents provider effects when the real message directory is unavailable', async () => {
+    const { orch, ctx, messageStore, strategyCalls } = await createOrchestrator();
+    const moved = `${dataDir}-unavailable`;
+    const generation = messageStore.deliveryGeneration();
+    const flush = messageStore.flush.bind(messageStore);
+    const flushSpy = spyOn(messageStore, 'flush').mockImplementationOnce(async (strict) => {
+      renameSync(dataDir, moved);
+      return flush(strict);
+    });
+    try {
+      await expect(orch.sendMessageFromApi('must persist first', 'default', undefined, undefined, 'queue',
+        'e514ad73-8519-42e4-b268-ce7e141cb9e9', generation)).rejects.toThrow();
+      expect(strategyCalls).toHaveLength(0);
+      expect(ctx.isProcessing).toBe(false);
+      expect(messageStore.all().filter((message) => message.role === 'user')).toHaveLength(0);
+    } finally {
+      flushSpy.mockRestore();
+      renameSync(moved, dataDir);
+      await messageStore.flush();
+    }
+  });
+
+  test('simultaneous equal caller identities admit once, and queue edits remain recoverable after restart', async () => {
+    const first = await createOrchestrator();
+    first.ctx.isProcessing = true;
+    first.ctx.isAuthenticated = true;
+    const id = 'f514ad73-8519-42e4-b268-ce7e141cb9e9';
+    const results = await Promise.all([1, 2].map(() => first.orch.sendMessageFromApi('original', 'default', undefined, undefined, 'queue', id, first.messageStore.deliveryGeneration())));
+    expect(results.map((result) => result.messageId)).toEqual([id, id]);
+    expect(first.ctx.queuedTurns).toHaveLength(1);
+    await first.orch.updateQueuedTurnFromApi('default', first.ctx.queuedTurns[0].id, { text: 'operator edited' });
+    await first.dispose();
+    const restarted = await createOrchestrator();
+    await restarted.waitForBackgroundTasks();
+    expect(restarted.strategyCalls.map((call) => call.prompt)).toEqual(['operator edited']);
+    expect(restarted.messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
+    const replay = await restarted.orch.sendMessageFromApi('original', 'default', undefined, undefined, 'queue', id, restarted.messageStore.deliveryGeneration());
+    expect(replay).toMatchObject({ accepted: true, messageId: id });
+  });
+
+  for (const conversationId of [undefined, 'default']) {
+    test(`sendMessageFromApi rejects the second simultaneous request after auth (${conversationId ?? 'inbox'})`, async () => {
+      const { orch, ctx, sessionRegistry, messageStore } = await createOrchestrator();
+      const auth = deferred<boolean>();
+      const provider = deferred<void>();
+      const authCheck = spyOn(ctx.strategy, 'checkAuthStatus').mockImplementation(() => auth.promise);
+      const execute = spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(() => provider.promise);
+      try {
+        const first = orch.sendMessageFromApi('first', conversationId);
+        const second = orch.sendMessageFromApi('second', conversationId);
+        expect(authCheck).toHaveBeenCalledTimes(2);
+        auth.resolve(true);
+        const results = await Promise.all([first, second]);
+        expect(results[0]?.accepted).toBe(true);
+        expect(results[1]).toMatchObject({ accepted: false, error: ERROR_CODE.AGENT_BUSY });
+        expect(execute).toHaveBeenCalledTimes(1);
+        expect(messageStore.all().filter((message) => message.role === 'user').map((message) => message.body)).toEqual(['first']);
+      } finally {
+        auth.resolve(true);
+        provider.resolve();
+        for (const session of sessionRegistry.all()) await waitForIdle(session);
+        authCheck.mockRestore();
+        execute.mockRestore();
+      }
+    });
+  }
+
+  for (const busyPolicy of ['queue', 'steer'] as const) {
+    test(`sendMessageFromApi honors ${busyPolicy} when the target starts during auth`, async () => {
+      const { orch, ctx, messageStore } = await createOrchestrator();
+      const auth = deferred<boolean>();
+      const authCheck = spyOn(ctx.strategy, 'checkAuthStatus').mockImplementation(() => auth.promise);
+      const execute = spyOn(ctx.strategy, 'executePromptStreaming');
+      const steered: string[] = [];
+      if (busyPolicy === 'steer') {
+        ctx.strategy.steerAgent = async (text) => { steered.push(text); return 'handled'; };
+      }
+      try {
+        const request = orch.sendMessageFromApi('follow-up', 'default', undefined, undefined, busyPolicy);
+        expect(authCheck).toHaveBeenCalledTimes(1);
+        ctx.isProcessing = true; // Another request owns the turn while auth awaits.
+        auth.resolve(true);
+        const result = await request;
+        expect(result).toMatchObject({ accepted: true, resolvedPolicy: busyPolicy, conversationId: 'default' });
+        expect(execute).not.toHaveBeenCalled();
+        expect(messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
+        if (busyPolicy === 'queue') {
+          expect(ctx.queuedTurns.map((turn) => turn.text)).toEqual(['follow-up']);
+        } else {
+          expect(steered).toEqual(['follow-up']);
+          expect(ctx.queuedTurns).toHaveLength(0);
+        }
+      } finally {
+        ctx.isProcessing = false;
+        authCheck.mockRestore();
+        execute.mockRestore();
+      }
+    });
+  }
+
+  for (const authFailure of ['false', 'throw'] as const) {
+    test(`sendMessageFromApi leaves no busy reservation when authentication returns ${authFailure}`, async () => {
+      const { orch, ctx, messageStore } = await createOrchestrator();
+      const auth = deferred<boolean>();
+      const authCheck = spyOn(ctx.strategy, 'checkAuthStatus').mockImplementation(() => auth.promise);
+      const execute = spyOn(ctx.strategy, 'executePromptStreaming');
+      try {
+        const request = orch.sendMessageFromApi('unauthorized', 'default');
+        if (authFailure === 'false') {
+          auth.resolve(false);
+          expect(await request).toEqual({ accepted: false, error: ERROR_CODE.NEED_AUTH });
+        } else {
+          auth.reject(new Error('auth unavailable'));
+          await expect(request).rejects.toThrow('auth unavailable');
+        }
+        expect(ctx.isProcessing).toBe(false);
+        expect(messageStore.all()).toHaveLength(0);
+        expect(execute).not.toHaveBeenCalled();
+        authCheck.mockRestore();
+        expect((await orch.sendMessageFromApi('retry', 'default')).accepted).toBe(true);
+        await waitForIdle(ctx);
+      } finally {
+        authCheck.mockRestore();
+        execute.mockRestore();
+      }
+    });
+  }
+
+  test('sendMessageFromApi releases its reservation after message persistence fails and allows retry', async () => {
+    const { orch, ctx, messageStore } = await createOrchestrator();
+    const flush = spyOn(messageStore, 'flush').mockRejectedValueOnce(new Error('storage unavailable'));
+    const execute = spyOn(ctx.strategy, 'executePromptStreaming');
+    try {
+      await expect(orch.sendMessageFromApi('first', 'default')).rejects.toThrow('storage unavailable');
+      expect(ctx.isProcessing).toBe(false);
+      expect(execute).not.toHaveBeenCalled();
+      flush.mockRestore();
+      expect((await orch.sendMessageFromApi('retry', 'default')).accepted).toBe(true);
+      await waitForIdle(ctx);
+      expect(execute).toHaveBeenCalledTimes(1);
+    } finally {
+      flush.mockRestore();
+      execute.mockRestore();
+    }
+  });
+
+  test('sendMessageFromApi runs an accepted queued follow-up after the first persistence failure', async () => {
+    const { orch, ctx, messageStore, strategyCalls } = await createOrchestrator();
+    const persistence = deferred<void>();
+    const enteredPersistence = deferred<void>();
+    const flush = spyOn(messageStore, 'flush').mockImplementationOnce(() => {
+      enteredPersistence.resolve();
+      return persistence.promise;
+    });
+    try {
+      const failed = orch.sendMessageFromApi('failed first turn', 'default');
+      await enteredPersistence.promise;
+      const followUp = await orch.sendMessageFromApi('accepted follow-up', 'default', undefined, undefined, 'queue');
+      expect(followUp).toMatchObject({ accepted: true, resolvedPolicy: 'queue' });
+      expect(ctx.queuedTurns).toHaveLength(1);
+      persistence.reject(new Error('storage unavailable'));
+      await expect(failed).rejects.toThrow('storage unavailable');
+      await waitForIdle(ctx);
+      expect(ctx.queuedTurns).toHaveLength(0);
+      expect(strategyCalls.map((call) => call.prompt)).toEqual(['accepted follow-up']);
+    } finally {
+      flush.mockRestore();
+    }
   });
 
   test('sendMessageFromApi queue policy accepts same-conversation busy sends', async () => {

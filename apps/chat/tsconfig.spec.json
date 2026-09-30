@@ -3,9 +3,16 @@
   "compilerOptions": {
     "outDir": "./out-tsc/vitest",
     "rootDir": "../../",
-    "baseUrl": ".",
-    "paths": { "@shared/*": ["../../shared/*"] },
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "paths": {
+      "@shared/*": [
+        "../../shared/*"
+      ]
+    },
+    "lib": [
+      "es2022",
+      "dom",
+      "dom.iterable"
+    ],
     "types": [
       "vitest/globals",
       "vitest/importMeta",

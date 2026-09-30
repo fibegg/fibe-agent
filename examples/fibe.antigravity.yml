@@ -1,8 +1,11 @@
 # Generated Google Antigravity configuration, mounted at /app/fibe.yml.
 
 agentProvider: antigravity
+agentAuthMode: api-token
 agentPassword: pg-internal-abc123def456
 
+# Refresh models in Chat to query the CLI's available model slugs. Empty default
+# lets the CLI choose its current account/provider default.
 modelOptions: ''
 defaultModel: ''
 
@@ -18,15 +21,11 @@ fibeSyncEnabled: true
 postInitScript: |
   npm install 2>/dev/null || true
 
-# The runtime validates Rails' OAuth marker through the headless `agy` CLI.
-agentCredentials:
-  auth.json: |
-    {
-      "provider": "antigravity",
-      "runtime_auth": true
-    }
-
-credentialEnv: {}
+# For API-token mode, the runtime sets modelProvider=gemini in the CLI's
+# settings.json and passes the key as GEMINI_API_KEY. Supply a real key through
+# protected runtime settings. OAuth mode instead uses the Chat sign-in flow.
+credentialEnv:
+  GEMINI_API_KEY: AIzaSyxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 providerArgs:
   print-timeout: 30m

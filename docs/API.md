@@ -71,7 +71,7 @@ All paths below include the `/api` global prefix.
 | POST   | `/api/uploads?conversationId=...`              | Bearer | Multipart attachment upload. Returns `{ filename }`. Blocked: executables/scripts. Max size: 20 MB.                                                                                                                                              |
 | GET    | `/api/uploads/:filename?conversationId=...`    | Bearer | Serve an uploaded attachment. Filename must be a safe basename.                                                                                                                                                                                  |
 | GET    | `/api/agent/status`                            | Bearer | Default/session status: auth, processing, queue count, and last error.                                                                                                                                                                           |
-| POST   | `/api/agent/send-message`                      | Bearer | Async integration/webhook send. Body `{ text, images?, attachmentFilenames?, conversationId?, busyPolicy? }`. Returns `202 { accepted, messageId, resolvedPolicy? }`.                                                                            |
+| POST   | `/api/agent/send-message`                      | Bearer | Async integration/webhook send. Body `{ text, images?, attachmentFilenames?, conversationId?, busyPolicy?, requestId?, storeGeneration? }`. Returns `202 { accepted, messageId, resolvedPolicy?, executionState? }`.                                                                            |
 | POST   | `/api/agent/interrupt`                         | Bearer | Interrupt a running provider turn. Body may include `{ conversationId? }`.                                                                                                                                                                       |
 | DELETE | `/api/agent/queue/:turnId`                     | Bearer | Remove a queued turn, using body `conversationId` when needed.                                                                                                                                                                                   |
 | PATCH  | `/api/agent/queue/:turnId`                     | Bearer | Update queued turn text/policy.                                                                                                                                                                                                                  |
@@ -222,3 +222,49 @@ Each connection spawns a dedicated `node-pty` shell session in `PLAYGROUNDS_DIR`
 ```
 
 Server messages are raw terminal output, batched roughly every 16 ms. The PTY is killed when the WebSocket closes or the PTY process exits.
+
+### Scheduled delivery identities
+
+REST send-message endpoints accept an optional caller-generated UUID `requestId`.
+Caller-ID requests also require `storeGeneration` from the explicit authenticated
+`GET /api/agent/status?deliveryScope=true&conversationId=...` handshake. Its
+`deliveryScope` returns `{ accepted: true, conversationId, storeGeneration }`.
+Without an explicit target, the handshake selects the only active conversation,
+or Inbox when none is active; multiple active conversations are refused. Pin that
+resolved conversation and generation before the first POST. Ordinary status
+requests retain their previous response and do not initialize delivery metadata.
+The existing user-message ID equals that UUID. Identical normalized requests replay
+the original identity; different text, requested conversation, image inputs,
+attachments or busy policy with that UUID return `409 REQUEST_ID_CONFLICT`. Ordinary
+manual messages continue to allocate their own identities.
+
+Acceptance means the user message and pending request are durably stored. It does
+not mean the provider finished the turn. `executionState` is pending, running,
+completed, failed or outcome_unknown. Pending queued requests are recovered in
+message order through existing routing after restart, retaining their saved
+conversation and any operator edits. A strict running checkpoint precedes provider
+or native steering effects. Running requests found at startup become
+outcome_unknown: retry returns `409 REQUEST_OUTCOME_UNKNOWN` with the original
+messageId and never repeats that uncertain effect. Terminal receipts retain their
+identity. Storage failure before admission prevents provider/queue effects.
+
+These identities are retained with their conversation messages. A fixed-size
+`message-store-generation.json` sidecar holds the opaque scope UUID; `messages.json`,
+archives, exports and control-plane history retain their message-array format.
+History/privacy reset and intentional caller-message deletion invalidate the old
+scope. Removing ordinary messages does not rotate it. An old scoped retry returns
+`409 STORE_GENERATION_CHANGED` with its original messageId and cannot recreate a
+deleted identity. Generation and row presence are checked after asynchronous
+preparation and again before provider/steering effects.
+
+Back up history and its sidecar together from a quiesced runtime. Restoring only
+history creates a fresh scope and leaves old pending receipts unknown; restoring
+only the sidecar with missing history also creates a fresh scope. Corrupt history
+or metadata fails closed until explicit repair/reset. A consistent complete
+restore retains identity and pending recovery. Rewinding a snapshot taken before
+an effect cannot prove what happened afterward: use a fresh generation rather than
+reusing such an old scope. There is no independent permanent delivery archive.
+Interrupted provider operations remain uncertain and require review.
+
+Scheduled delivery requires an upgraded runtime supporting this handshake. Rails
+defers legacy runtimes with an explicit error instead of sending an unsafe retry.

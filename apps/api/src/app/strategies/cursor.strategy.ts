@@ -37,6 +37,10 @@ const CURSOR_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
     '--force': true,
     // Output format, always enforced for structured parsing
     '--output-format': 'stream-json',
+    '--stream-partial-output': true,
+    '--resume': false,
+    '--output-json': false,
+    '-p': false,
   },
 };
 
@@ -87,6 +91,9 @@ interface CursorStreamEvent {
   result?: string;
   error?: string;
   model?: string;
+  timestamp_ms?: number;
+  model_call_id?: string;
+  is_error?: boolean;
   usage?: {
     inputTokens?: number;
     outputTokens?: number;
@@ -98,6 +105,8 @@ export interface CursorExecJsonState {
   lastAssistantChunk: string;
   hasStartedReasoning: boolean;
   hasEmittedOutput: boolean;
+  hasPartialOutput?: boolean;
+  terminalSuccess?: boolean;
 }
 
 export interface CursorExecJsonHandlers {
@@ -181,7 +190,14 @@ export function handleCursorExecJsonLine(
         .map((part) => part.text ?? '')
         .join('');
       if (!text) return;
-      if (text === state.lastAssistantChunk) return;
+      // Partial streams also flush buffered and complete messages. Those repeat
+      // text already emitted as timestamped deltas.
+      if (event.model_call_id) return;
+      if (event.timestamp_ms !== undefined) {
+        state.hasPartialOutput = true;
+      } else if (state.hasPartialOutput || text === state.lastAssistantChunk) {
+        return;
+      }
       state.lastAssistantChunk = text;
       if (text.trim()) state.hasEmittedOutput = true;
       handlers.onReasoningChunk?.(preview(text) ?? text);
@@ -222,6 +238,14 @@ export function handleCursorExecJsonLine(
 
     if (type === 'result') {
       endReasoning();
+      state.terminalSuccess = event.subtype === 'success' && !event.is_error;
+      if (!state.terminalSuccess) {
+        state.errorResult +=
+          event.error ||
+          event.result ||
+          'Cursor returned an unsuccessful result.';
+        return;
+      }
       if (typeof event.result === 'string' && event.result.trim()) {
         state.hasEmittedOutput = true;
       }
@@ -285,14 +309,16 @@ export class CursorStrategy extends AbstractCLIStrategy {
 
   private isAuthenticated(): boolean {
     return Boolean(
-      process.env[CURSOR_API_KEY_ENV]?.trim() || this.getStoredApiKey(),
+      process.env[CURSOR_API_KEY_ENV]?.trim() ||
+        process.env.CURSOR_AUTH_TOKEN?.trim() ||
+        this.getStoredApiKey(),
     );
   }
 
   private buildCursorEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {
-      CURSOR_CONFIG_HOME: this.getCursorHomeForSession(),
       ...process.env,
+      CURSOR_CONFIG_HOME: this.getCursorHomeForSession(),
       ...this.getProxyEnv(),
     };
     const storedKey = this.getStoredApiKey();
@@ -348,7 +374,13 @@ export class CursorStrategy extends AbstractCLIStrategy {
     sessionId: string | null,
   ): string[] {
     const modelArgs = this.getModelArgs(model);
-    const providerTokens = buildProviderArgs(CURSOR_PROVIDER_ARGS_CONFIG);
+    const providerTokens = buildProviderArgs({
+      ...CURSOR_PROVIDER_ARGS_CONFIG,
+      blockedArgs: {
+        ...CURSOR_PROVIDER_ARGS_CONFIG.blockedArgs,
+        ...(modelArgs.length ? { '--model': false } : {}),
+      },
+    });
     const baseArgs = [...modelArgs, ...providerTokens];
     if (sessionId) {
       return [...baseArgs, '--resume', sessionId, '--', prompt];
@@ -370,11 +402,61 @@ export class CursorStrategy extends AbstractCLIStrategy {
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
     if (this.isAuthenticated()) {
-      this.currentConnection.sendAuthSuccess();
+      connection.sendAuthSuccess();
       this.currentConnection = null;
       return;
     }
-    this.currentConnection.sendAuthManualToken();
+    if (this.useApiTokenMode) {
+      connection.sendAuthManualToken();
+      return;
+    }
+    this.ensureSettings();
+    const child = spawn(getCursorCommand(), ['login'], {
+      env: { ...this.buildCursorEnv(), NO_OPEN_BROWSER: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    this.activeAuthProcess = child;
+    let output = '';
+    let sentUrl = false;
+    const timer = setTimeout(
+      () => {
+        child.kill();
+        connection.sendError('Cursor sign-in timed out. Please try again.');
+      },
+      6 * 60 * 1000,
+    );
+    const readOutput = (data: Buffer | string) => {
+      output += stripAnsi(data.toString());
+      const url = output.match(
+        /https:\/\/cursor\.com\/loginDeepControl[^\s]+/,
+      )?.[0];
+      if (url && !sentUrl) {
+        sentUrl = true;
+        connection.sendAuthUrlGenerated(url);
+      }
+    };
+    child.stdout?.on('data', readOutput);
+    child.stderr?.on('data', readOutput);
+    child.on('error', () => {
+      clearTimeout(timer);
+      if (this.currentConnection === connection) {
+        connection.sendError('Could not start Cursor sign-in.');
+        this.currentConnection = null;
+      }
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      this.activeAuthProcess = null;
+      this.authCancel = null;
+      if (this.currentConnection !== connection) return;
+      this.currentConnection = null;
+      if (code === 0) connection.sendAuthSuccess();
+      else connection.sendError('Cursor sign-in did not complete.');
+    });
+    this.authCancel = () => {
+      clearTimeout(timer);
+      child.kill();
+    };
   }
 
   submitAuthCode(code: string): void {
@@ -400,12 +482,98 @@ export class CursorStrategy extends AbstractCLIStrategy {
   }
 
   executeLogout(connection: LogoutConnection): void {
+    this.cancelAuth();
     this.clearCredentials();
-    connection.sendLogoutSuccess();
+    if (this.useApiTokenMode) {
+      connection.sendLogoutSuccess();
+      return;
+    }
+    const child = spawn(getCursorCommand(), ['logout'], {
+      env: this.buildCursorEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const timer = setTimeout(() => {
+      child.kill();
+      connection.sendError('Cursor logout timed out.');
+    }, 15_000);
+    child.on('error', () => {
+      clearTimeout(timer);
+      connection.sendError('Could not start Cursor logout.');
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) connection.sendLogoutSuccess();
+      else connection.sendError('Cursor logout did not complete.');
+    });
   }
 
   checkAuthStatus(): Promise<boolean> {
-    return Promise.resolve(this.isAuthenticated());
+    if (this.isAuthenticated()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const child = spawn(getCursorCommand(), ['status', '--format', 'json'], {
+        env: this.buildCursorEnv(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      const timer = setTimeout(() => {
+        child.kill();
+        resolve(false);
+      }, 15_000);
+      child.stdout?.on('data', (data: Buffer | string) => {
+        output += data.toString();
+      });
+      child.on('error', () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        try {
+          const status = JSON.parse(output) as { isAuthenticated?: boolean };
+          resolve(code === 0 && status.isAuthenticated === true);
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  listModels(): Promise<string[]> {
+    return new Promise((resolve) => {
+      const child = spawn(getCursorCommand(), ['models'], {
+        env: this.buildCursorEnv(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      const timer = setTimeout(() => {
+        child.kill();
+        resolve([]);
+      }, 15_000);
+      child.stdout?.on('data', (data: Buffer | string) => {
+        output += data.toString();
+      });
+      child.on('error', () => {
+        clearTimeout(timer);
+        resolve([]);
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) {
+          resolve([]);
+          return;
+        }
+        const models = stripAnsi(output)
+          .split('\n')
+          .flatMap((line) => {
+            // CLI prints model IDs followed by display labels. Never return headers.
+            const match = line
+              .trim()
+              .match(/^([a-z0-9][a-z0-9._-]*)(?:\s+-\s+\S.*)?$/);
+            return match ? [match[1]] : [];
+          });
+        resolve([...new Set(models)]);
+      });
+    });
   }
 
   executePromptStreaming(
@@ -441,6 +609,7 @@ export class CursorStrategy extends AbstractCLIStrategy {
         env: this.buildCursorEnv(),
         cwd: playgroundDir,
         shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
       this.currentStreamProcess = cursorProcess;
 
@@ -466,7 +635,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
             capturedSessionId = sessionId;
           },
         });
-        errorResult = jsonState.errorResult;
+        if (jsonState.errorResult) {
+          errorResult += jsonState.errorResult;
+          jsonState.errorResult = '';
+        }
       };
 
       cursorProcess.stdout?.on('data', (data: Buffer | string) => {
@@ -507,12 +679,12 @@ export class CursorStrategy extends AbstractCLIStrategy {
         }
 
         if (code === 0) {
-          if (!jsonState.hasEmittedOutput) {
+          if (!jsonState.terminalSuccess || !jsonState.hasEmittedOutput) {
             if (!existingSessionId) this.clearSessionId();
             reject(
               new Error(
                 errorResult.trim() ||
-                  'Agent process completed successfully but returned no output. Session not saved to prevent corruption.',
+                  'Cursor stream ended without a successful result or returned no output. Session not saved to prevent corruption.',
               ),
             );
             return;

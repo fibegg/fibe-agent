@@ -1,5 +1,5 @@
 #!/bin/sh
-# mcp-remote 0.1.x exits after a dropped HTTP/SSE connection. Restart it so
+# Restart mcp-remote after a dropped HTTP/SSE connection so
 # the parent agent can rediscover tools when the upstream server returns.
 # Usage: mcp-remote-wrapper <url> [--allow-http] [--header ...] [...]
 

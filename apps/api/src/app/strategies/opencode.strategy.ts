@@ -4,9 +4,10 @@ import {
   mkdirSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import {
   detectProviderAuthFailure,
   detectProviderFailure,
@@ -96,11 +97,15 @@ const OPENCODE_SESSION_PERMISSION_ALLOW_ALL = [
 export function buildOpencodeRunArgs(
   effectivePrompt: string,
   modelArgs: string[],
-  hasSession: boolean,
+  sessionId: string | null,
 ): string[] {
   return [
     'run',
-    ...(hasSession ? ['--continue'] : []),
+    ...(sessionId === 'legacy'
+      ? ['--continue']
+      : sessionId
+        ? ['--session', sessionId]
+        : []),
     ...modelArgs,
     ...buildProviderArgs(OPENCODE_PROVIDER_ARGS_CONFIG),
     '--',
@@ -429,6 +434,28 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     }
   }
 
+  /** Native CLI credentials can contain provider API keys or OAuth tokens. */
+  private hasNativeCredentials(): boolean {
+    try {
+      const auth = JSON.parse(
+        readFileSync(opencodeAuthFile(), 'utf8'),
+      ) as Record<
+        string,
+        { type?: string; key?: string; access?: string; refresh?: string }
+      >;
+      return Object.values(auth).some(
+        (entry) =>
+          entry &&
+          typeof entry === 'object' &&
+          ((entry.type === 'api' && Boolean(entry.key?.trim())) ||
+            (entry.type === 'oauth' &&
+              Boolean(entry.access?.trim() || entry.refresh?.trim()))),
+      );
+    } catch {
+      return false;
+    }
+  }
+
   private getStoredApiKey(): string | null {
     return this.getStoredAuth()?.apiKey ?? null;
   }
@@ -509,14 +536,22 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
   /** Whether an environment or stored API key is available. */
   checkAuthStatus(): Promise<boolean> {
-    return Promise.resolve(hasEnvApiKey() || this.getStoredApiKey() !== null);
+    return Promise.resolve(
+      hasEnvApiKey() ||
+        this.getStoredApiKey() !== null ||
+        this.hasNativeCredentials(),
+    );
   }
 
   /** Skips the modal when an environment API key is available. */
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
 
-    if (hasEnvApiKey()) {
+    if (
+      hasEnvApiKey() ||
+      this.getStoredApiKey() ||
+      this.hasNativeCredentials()
+    ) {
       this.logger.log('API key found in environment: skipping auth modal');
       connection.sendAuthSuccess();
       return;
@@ -668,6 +703,24 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       ...this.getProxyEnv(),
       ...OpencodeStrategy.YOLO_ENV,
     };
+    if (process.env.SESSION_DIR) {
+      const dataDir = resolve(opencodeDataDir());
+      if (basename(dataDir) === 'opencode') {
+        env.XDG_DATA_HOME = dirname(dataDir);
+      } else {
+        // XDG always appends /opencode. Preserve arbitrary FIBE session paths
+        // through a local alias so native OAuth refresh writes back to that home.
+        env.XDG_DATA_HOME = join(dataDir, '.fibe-xdg-data');
+        mkdirSync(env.XDG_DATA_HOME, { recursive: true });
+        const alias = join(env.XDG_DATA_HOME, 'opencode');
+        if (!existsSync(alias))
+          symlinkSync(
+            dataDir,
+            alias,
+            process.platform === 'win32' ? 'junction' : 'dir',
+          );
+      }
+    }
     OpencodeStrategy.applyYoloConfigContent(env);
     const storedAuth = this.getStoredAuth();
 
@@ -686,7 +739,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       const env = this.buildOpencodeEnv();
 
       let stdout = '';
-      const proc = spawn('opencode', ['models'], {
+      const proc = spawn('opencode', ['models', '--refresh'], {
         env,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
@@ -701,13 +754,18 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         stdout += data.toString();
       });
 
-      proc.on('close', () => {
+      proc.on('close', (code) => {
         clearTimeout(timer);
+        if (code !== 0) {
+          resolve([]);
+          return;
+        }
         const models = stdout
           .split('\n')
-          .map((l) => l.trim())
-          .filter(Boolean);
-        resolve(models);
+          // eslint-disable-next-line no-control-regex
+          .map((l) => l.replace(/\u001b\[[0-9;]*[a-zA-Z]/g, '').trim())
+          .filter((model) => /^[a-z0-9_.-]+\/[^\s]+$/.test(model));
+        resolve([...new Set(models)]);
       });
 
       proc.on('error', (err) => {
@@ -803,7 +861,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
 
       this.ensureYoloConfig(workspaceDir);
 
-      const hasSession = this.readStoredSession() !== null;
+      const sessionId = this.readStoredSession();
 
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
@@ -816,13 +874,13 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       const opencodeArgs = buildOpencodeRunArgs(
         effectivePrompt,
         this.getModelArgs(model),
-        hasSession,
+        sessionId,
       );
 
       const env = this.buildOpencodeEnv();
       const storedKey = this.getStoredApiKey();
 
-      if (!hasEnvApiKey() && !storedKey) {
+      if (!hasEnvApiKey() && !storedKey && !this.hasNativeCredentials()) {
         reject(
           new Error('Not authenticated. Please provide an API key first.'),
         );
@@ -1007,7 +1065,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     this.ensureYoloConfig(workspaceDir);
 
     const storedKey = this.getStoredApiKey();
-    if (!hasEnvApiKey() && !storedKey) {
+    if (!hasEnvApiKey() && !storedKey && !this.hasNativeCredentials()) {
       throw new Error('Not authenticated. Please provide an API key first.');
     }
 

@@ -145,6 +145,8 @@ export class ConversationsController {
       body.images,
       body.attachmentFilenames,
       body.busyPolicy,
+      body.requestId,
+      body.storeGeneration,
     );
     return handleSendMessage(result);
   }

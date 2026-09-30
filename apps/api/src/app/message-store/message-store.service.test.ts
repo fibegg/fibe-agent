@@ -1,8 +1,9 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { MessageStoreService } from './message-store.service';
+import { DataPrivacyService } from '../data-privacy/data-privacy.service';
 
 describe('MessageStoreService', () => {
   let dataDir: string;
@@ -30,6 +31,91 @@ describe('MessageStoreService', () => {
 
   test('all returns empty array initially', () => {
     expect(makeService().all()).toEqual([]);
+  });
+
+  test('ordinary legacy arrays and archives remain arrays; explicit generation persists with restrictive permissions', async () => {
+    writeFileSync(join(dataDir, 'messages.json'), JSON.stringify([{ id: 'legacy', role: 'user', body: 'history', created_at: 'old' }]));
+    const service = makeService();
+    expect(existsSync(join(dataDir, 'message-store-generation.json'))).toBe(false);
+    const generation = service.deliveryGeneration();
+    expect(makeService().deliveryGeneration()).toBe(generation);
+    expect(statSync(join(dataDir, 'message-store-generation.json')).mode & 0o777).toBe(0o600);
+    service.reset();
+    await service.flush(true);
+    expect(Array.isArray(JSON.parse(readFileSync(join(dataDir, 'messages.previous.json'), 'utf8')))).toBe(true);
+    expect(Array.isArray(JSON.parse(readFileSync(join(dataDir, 'messages.json'), 'utf8')))).toBe(true);
+    expect(service.matchesGeneration(generation)).toBe(false);
+  });
+
+  test('a separate legacy writer rotates shared generation on clear and privacy deletion rejects old scope', () => {
+    const service = makeService();
+    const legacyWriter = makeService();
+    const generation = service.deliveryGeneration();
+    legacyWriter.clear();
+    expect(service.matchesGeneration(generation)).toBe(false);
+    const next = service.deliveryGeneration();
+    rmSync(dataDir, { recursive: true, force: true });
+    expect(service.matchesGeneration(next)).toBe(false);
+    expect(makeService().deliveryGeneration()).not.toBe(next);
+  });
+
+  test('actual privacy export keeps the array contract and actual delete invalidates the shared delivery scope', () => {
+    const service = makeService();
+    const legacyWriter = makeService();
+    const generation = service.deliveryGeneration();
+    service.add('user', 'manual history');
+    const privacy = new DataPrivacyService(
+      { getConversationDataDir: () => dataDir, getConversationId: () => 'default' } as never,
+      legacyWriter,
+      { all: () => [], clear: () => undefined } as never,
+      { get: () => 'model' } as never,
+      { get: () => 'effort' } as never,
+    );
+    expect(Array.isArray(privacy.exportData().messages)).toBe(true);
+    privacy.deleteData();
+    expect(service.matchesGeneration(generation)).toBe(false);
+    expect(makeService().deliveryGeneration()).not.toBe(generation);
+  });
+
+  test('restoring array history without its sidecar cannot cross the running boundary; complete restore retains identity', async () => {
+    const service = makeService();
+    const generation = service.deliveryGeneration();
+    const id = '4514ad73-8519-42e4-b268-ce7e141cb9e9';
+    service.add('user', 'pending', undefined, undefined, undefined, { id, metadata: { storeGeneration: generation, fingerprint: 'binding', text: 'pending', busyPolicy: 'queue', state: 'pending' } });
+    await service.flush(true);
+    copyFileSync(join(dataDir, 'message-store-generation.json'), join(dataDir, 'generation-backup.json'));
+    rmSync(join(dataDir, 'message-store-generation.json'));
+    const restored = makeService();
+    await expect(restored.updateRequestState(id, 'running')).rejects.toThrow('STORE_GENERATION_CHANGED');
+    copyFileSync(join(dataDir, 'generation-backup.json'), join(dataDir, 'message-store-generation.json'));
+    await restored.updateRequestState(id, 'running');
+    expect(restored.getById(id)?.apiRequest?.state).toBe('running');
+  });
+
+  test('deleting an intentional caller receipt rotates generation, but ordinary message deletion retains it', () => {
+    const service = makeService();
+    const generation = service.deliveryGeneration();
+    const ordinary = service.add('user', 'manual');
+    service.removeById(ordinary.id);
+    expect(service.matchesGeneration(generation)).toBe(true);
+    const id = '5514ad73-8519-42e4-b268-ce7e141cb9e9';
+    service.add('user', 'caller', undefined, undefined, undefined, { id, metadata: { storeGeneration: generation, fingerprint: 'binding', text: 'caller', busyPolicy: 'queue', state: 'pending' } });
+    service.removeById(id);
+    expect(service.matchesGeneration(generation)).toBe(false);
+  });
+
+  test('a restored sidecar without history gets a fresh scope and corrupt history fails closed until explicit reset', async () => {
+    const service = makeService();
+    const original = service.deliveryGeneration();
+    rmSync(join(dataDir, 'messages.json'));
+    expect(service.matchesGeneration(original)).toBe(false);
+    expect(makeService().deliveryGeneration()).not.toBe(original);
+    writeFileSync(join(dataDir, 'messages.json'), '{broken');
+    const corrupt = makeService();
+    expect(() => corrupt.deliveryGeneration()).toThrow('corrupt message history');
+    corrupt.clear();
+    await corrupt.flush(true);
+    expect(corrupt.deliveryGeneration()).toBeDefined();
   });
 
   test('add appends message and returns it', () => {
@@ -180,5 +266,23 @@ describe('MessageStoreService', () => {
     await service.flush();
     const raw = readFileSync(join(dataDir, 'messages.json'), 'utf8');
     expect(JSON.parse(raw)[0].body).toBe('hydrated');
+  });
+
+  test('lagging hydrated history cannot erase or rewind local caller execution receipts', async () => {
+    const service = makeService();
+    const id = 'a514ad73-8519-42e4-b268-ce7e141cb9e9';
+    service.add('user', 'local occurrence', undefined, undefined, undefined, {
+      id, metadata: { storeGeneration: service.deliveryGeneration(), fingerprint: 'binding', text: 'local occurrence', busyPolicy: 'queue', state: 'pending' },
+    });
+    await service.updateRequestState(id, 'running');
+    service.hydrate([{ id, role: 'user', body: 'stale remote', created_at: 'old',
+      apiRequest: { fingerprint: 'binding', text: 'local occurrence', busyPolicy: 'queue', state: 'pending' } }]);
+    expect(service.getById(id)?.apiRequest?.state).toBe('running');
+    expect(service.getById(id)?.body).toBe('local occurrence');
+    service.hydrate([{ id: 'another', role: 'user', body: 'other history', created_at: 'old' }]);
+    await service.flush(true);
+    const persisted = makeService();
+    expect(persisted.getById(id)?.apiRequest?.state).toBe('running');
+    expect(persisted.getById('another')?.body).toBe('other history');
   });
 });

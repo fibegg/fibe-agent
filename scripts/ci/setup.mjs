@@ -1,4 +1,10 @@
-import { cpuCount, run } from './lib.mjs';
+import { readFileSync } from 'node:fs';
+import { captureText, cpuCount, run } from './lib.mjs';
+
+const packageManager = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url))).packageManager;
+if (!/^bun@\d+\.\d+\.\d+$/.test(packageManager)) throw new Error('Pin the Bun package manager to an exact version');
+const bunVersion = packageManager.slice(4);
+const nodeGypVersion = '13.0.2';
 
 process.env.DEBIAN_FRONTEND = 'noninteractive';
 process.env.PATH = `/opt/fibe-ci-tools/node_modules/.bin:${process.env.PATH}`;
@@ -23,15 +29,18 @@ if (hasNativeBuildDeps) {
   await run('sh', ['-lc', 'rm -rf /var/lib/apt/lists/*']);
 }
 
-const hasToolchain = await run('sh', ['-lc', 'command -v bun >/dev/null 2>&1 && command -v node-gyp >/dev/null 2>&1'])
-  .then(() => true)
+const hasToolchain = await Promise.all([
+  captureText('bun', ['--version']),
+  captureText('node-gyp', ['--version']),
+])
+  .then(([bun, nodeGyp]) => bun.trim() === bunVersion && nodeGyp.trim() === `v${nodeGypVersion}`)
   .catch(() => false);
 
 if (!hasToolchain) {
-  console.log('--> Installing cached Bun toolchain');
-  await run('npm', ['install', '--prefix', '/opt/fibe-ci-tools', 'bun@1.3.11', 'node-gyp']);
+  console.log('--> Installing the pinned Bun toolchain');
+  await run('npm', ['install', '--prefix', '/opt/fibe-ci-tools', packageManager, `node-gyp@${nodeGypVersion}`]);
 } else {
-  console.log('--> Bun toolchain already installed (cached)');
+  console.log('--> Pinned Bun toolchain already installed (cached)');
 }
 
 console.log('--> Installing project dependencies');

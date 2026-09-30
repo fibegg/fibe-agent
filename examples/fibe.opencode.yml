@@ -5,8 +5,9 @@ agentPassword: pg-internal-abc123def456
 agentAuthMode: api-token
 
 # OpenRouter and local models are supported.
-modelOptions: openai/gpt-5.4,anthropic/claude-sonnet,openai/gpt-oss-120b:free
-defaultModel: openai/gpt-oss-120b:free
+# Refresh account-visible provider/model IDs rather than assuming availability.
+modelOptions: ''
+defaultModel: ''
 
 systemPrompt: |
   You are a DevOps engineer specializing in Kubernetes, Terraform, and
@@ -26,7 +27,7 @@ postInitScript: |
 # OpenCode uses OpenRouter API keys by default.
 
 agentCredentials:
-  config.json: |
+  auth.json: |
     {
       "provider": "openrouter",
       "api_key": "sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
@@ -65,11 +66,10 @@ agentRuntimeFiles:
         - Fibe MCP server for platform operations
         - Docker MCP server for container management
 
-cliVersion: '1.0.42'
+cliVersion: '1.18.33'
 
 providerArgs:
-  auto-approve: true
-  quiet: true
+  auto: true
 
 skillToggles:
   token-saver: true

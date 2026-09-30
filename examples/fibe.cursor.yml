@@ -4,8 +4,9 @@ agentProvider: cursor
 agentPassword: pg-internal-abc123def456
 agentAuthMode: api-token
 
-# Cursor normally manages its own model selection.
-defaultModel: claude-sonnet
+# Discover account-visible model IDs through cursor-agent models.
+modelOptions: ''
+defaultModel: ''
 
 systemPrompt: |
   You are a frontend specialist working with React, TypeScript, and
@@ -22,36 +23,12 @@ postInitScript: |
   cd /app/data/42/cursor_workspace
   npm ci 2>/dev/null || true
 
-# Cursor uses its own auth token format.
-
-agentCredentials:
-  token.json: |
-    {
-      "accessToken": "cursor_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "refreshToken": "cursor_rt_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
-      "expiresAt": "2026-12-31T23:59:59Z"
-    }
-
 credentialEnv:
   CURSOR_API_KEY: cursor_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 agentRuntimeFiles:
   version: 1
   files:
-    - path: /app/data/42/.cursor/settings.json
-      format: json
-      operation: deep_merge
-      mode: '0600'
-      content:
-        telemetry:
-          enabled: false
-        editor:
-          formatOnSave: true
-          tabSize: 2
-        ai:
-          model: claude-sonnet
-          autoApply: true
-
     - path: /app/data/42/cursor_workspace/.cursor/rules/fibe-runtime.mdc
       format: text
       operation: overwrite
@@ -77,10 +54,11 @@ agentRuntimeFiles:
         - Prefer functional components with hooks
         - Use CSS modules or Tailwind for styling
 
-cliVersion: '1.0.42'
+cliVersion: '2026.09.28-64d2043'
 
 providerArgs:
-  auto-apply: true
+  trust: true
+  approve-mcps: true
 
 skillToggles:
   token-saver: true

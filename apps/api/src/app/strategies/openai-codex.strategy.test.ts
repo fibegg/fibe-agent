@@ -159,6 +159,19 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
 
   if (msg.method === 'initialized') return;
 
+  if (msg.method === 'model/list') {
+    if (process.env.CODEX_FAKE_MODE === 'model-error') {
+      process.stdout.write(JSON.stringify({ id: msg.id, error: { message: 'catalog unavailable' } }) + '\\n');
+    } else if (process.env.CODEX_FAKE_MODE === 'model-loop') {
+      respond(msg.id, { data: [], nextCursor: 'same' });
+    } else if (msg.params.cursor) {
+      respond(msg.id, { data: [{ model: 'gpt-6-luna' }, { model: 'gpt-6.1-sol' }], nextCursor: null });
+    } else {
+      respond(msg.id, { data: [{ model: 'gpt-6.1-sol', isDefault: true }, { model: 'hidden-model', hidden: true }], nextCursor: 'page-2' });
+    }
+    return;
+  }
+
   if (msg.method === 'thread/start') {
     respond(msg.id, {
       thread: {
@@ -1059,6 +1072,38 @@ describe('OpenaiCodexStrategy', () => {
     expect(strategy.getModelArgs('undefined')).toEqual([]);
   });
 
+  test('listModels initializes the installed app-server and follows visible model pages', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    const requestsPath = join(TEST_HOME, 'model-requests.jsonl');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+    const strategy = new OpenaiCodexStrategy();
+
+    expect(await strategy.listModels()).toEqual(['gpt-6.1-sol', 'gpt-6-luna']);
+    const requests = readJsonl(requestsPath);
+    expect(requests.map((r) => r.method)).toEqual(['initialize', 'initialized', 'model/list', 'model/list']);
+    expect(requests[2].params).toEqual({ cursor: null, limit: 100, includeHidden: false });
+    expect(requests[3].params).toEqual({ cursor: 'page-2', limit: 100, includeHidden: false });
+    expect(strategy.hasNativeSessionSupport()).toBe(false);
+  });
+
+  test('listModels exposes discovery failures rather than returning an invented catalog', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_MODE = 'model-error';
+    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow('catalog unavailable');
+  });
+
+  test('listModels rejects a repeated pagination cursor', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_MODE = 'model-loop';
+    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow('repeated a cursor');
+  });
+
   test('constructor with conversationDataDir', () => {
     const strategy = new OpenaiCodexStrategy(false, {
       getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
@@ -1292,7 +1337,7 @@ describe('OpenaiCodexStrategy', () => {
     expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
   });
 
-  test('executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker', async () => {
+  test.each(['high', 'max', 'ultra'])('executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker at %s effort', async (effort) => {
     process.env.CODEX_AGENT_TRANSPORT = 'app-server';
     const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
     const requestsPath = join(TEST_HOME, 'codex-app-requests.jsonl');
@@ -1319,7 +1364,7 @@ describe('OpenaiCodexStrategy', () => {
       (chunk) => chunks.push(chunk),
       { onUsage: (u) => usage.push(u) },
       undefined,
-      { effort: 'high' },
+      { effort },
     );
 
     const requests = readJsonl(requestsPath);
@@ -1332,7 +1377,7 @@ describe('OpenaiCodexStrategy', () => {
 
     expect(threadStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
     expect(turnStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
-    expect(turnStart.params.effort).toBe('high');
+    expect(turnStart.params.effort).toBe(effort);
     expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
       'thread-app-new',
     );

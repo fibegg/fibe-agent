@@ -29,20 +29,19 @@ postInitScript: |
 
 # Files written to SESSION_DIR at startup. Keys are filenames.
 agentCredentials:
-  agent_token.txt: sk-ant-sid01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  agent_token.txt: sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# Authentication variables for the native Claude CLI.
+# API-key authentication; OAuth uses agentAuthMode: oauth and CLAUDE_CODE_OAUTH_TOKEN.
 credentialEnv:
-  CLAUDE_CODE_OAUTH_TOKEN: sk-ant-sid01-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  ANTHROPIC_API_KEY: sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Settings cascade from Marquee to Playspec to Agent to fibe.yml.
-cliVersion: '1.0.42'
+cliVersion: '2.1.286'
 
 providerArgs:
   print: true
   verbose: true
   dangerously-skip-permissions: true
-  model: sonnet
 
 skillToggles:
   token-saver: true

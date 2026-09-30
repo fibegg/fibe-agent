@@ -11,7 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/github/package-json/v/fibegg/fibe-agent" alt="Version" />
   <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage 100%" />
-  <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.3.11-000?logo=bun&logoColor=white" alt="Bun" /></a>
+  <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.4.2-000?logo=bun&logoColor=white" alt="Bun" /></a>
   <a href="https://nx.dev"><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></a>
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
 </p>

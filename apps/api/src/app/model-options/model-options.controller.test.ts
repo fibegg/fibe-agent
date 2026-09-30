@@ -1,80 +1,33 @@
 import { describe, test, expect } from 'bun:test';
+import { ModelOptionsController } from './model-options.controller';
 
-/**
- * Test the refresh-options merge logic directly, without importing
- * the NestJS-decorated controller class (which triggers decorator
- * metadata errors in Bun's test runner).
- */
-
-interface MergeOpts {
-  envModels: string[];
-  providerModels: string[];
+function controller(envModels: string[], listModels?: () => Promise<string[]>) {
+  return new ModelOptionsController(
+    { getModelOptions: () => envModels } as never,
+    { resolveStrategy: () => ({ listModels }) } as never,
+  );
 }
 
-/** Extracted merge logic identical to ModelOptionsController.refreshOptions */
-function mergeModelOptions({ envModels, providerModels }: MergeOpts): string[] {
-  const seen = new Set(envModels);
-  const merged = [...envModels];
-  for (const m of providerModels) {
-    if (!seen.has(m)) {
-      seen.add(m);
-      merged.push(m);
-    }
-  }
-  return merged;
-}
-
-describe('ModelOptionsController: merge logic', () => {
-  test('returns env models when provider list is empty', () => {
-    expect(mergeModelOptions({ envModels: ['a'], providerModels: [] })).toEqual(
-      ['a'],
-    );
+describe('ModelOptionsController', () => {
+  test('keeps configured model ordering in the initial response', () => {
+    expect(controller(['custom-model', 'gpt-6.1-sol']).getOptions()).toEqual(['custom-model', 'gpt-6.1-sol']);
   });
 
-  test('merges env and provider models', () => {
-    expect(
-      mergeModelOptions({
-        envModels: ['a', 'b'],
-        providerModels: ['b', 'c', 'd'],
-      }),
-    ).toEqual(['a', 'b', 'c', 'd']);
+  test('refreshes from the provider, deduplicating while preserving admin ordering', async () => {
+    const instance = controller(['custom-model', 'gpt-6.1-sol'], async () => ['gpt-6.1-sol', 'gpt-6-luna', 'gpt-6-luna']);
+    expect(await instance.refreshOptions()).toEqual(['custom-model', 'gpt-6.1-sol', 'gpt-6-luna']);
   });
 
-  test('deduplicates: env models come first', () => {
-    expect(
-      mergeModelOptions({
-        envModels: ['z', 'a'],
-        providerModels: ['a', 'z', 'm'],
-      }),
-    ).toEqual(['z', 'a', 'm']);
+  test('retains configured options when provider discovery fails', async () => {
+    const instance = controller(['custom-model'], async () => { throw new Error('provider unavailable'); });
+    expect(await instance.refreshOptions()).toEqual(['custom-model']);
   });
 
-  test('returns empty when both sources are empty', () => {
-    expect(mergeModelOptions({ envModels: [], providerModels: [] })).toEqual(
-      [],
-    );
+  test('retains configured options for providers without discovery', async () => {
+    expect(await controller(['custom-model']).refreshOptions()).toEqual(['custom-model']);
   });
 
-  test('returns provider models only when no env models', () => {
-    expect(
-      mergeModelOptions({ envModels: [], providerModels: ['p1', 'p2'] }),
-    ).toEqual(['p1', 'p2']);
-  });
-
-  test('preserves order within each group', () => {
-    expect(
-      mergeModelOptions({
-        envModels: ['c', 'a'],
-        providerModels: ['b', 'a', 'd'],
-      }),
-    ).toEqual(['c', 'a', 'b', 'd']);
-  });
-
-  test('handles large provider list', () => {
-    const envModels = ['pinned-model'];
-    const providerModels = Array.from({ length: 200 }, (_, i) => `model-${i}`);
-    const result = mergeModelOptions({ envModels, providerModels });
-    expect(result[0]).toBe('pinned-model');
-    expect(result).toHaveLength(201);
+  test('returns discovered options when no admin list is configured', async () => {
+    expect(await controller([], async () => ['provider-default']).refreshOptions()).toEqual(['provider-default']);
   });
 });

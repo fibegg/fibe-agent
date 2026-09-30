@@ -60,6 +60,8 @@ const CODEX_REASONING_EFFORTS = new Set([
   'medium',
   'high',
   'xhigh',
+  'max',
+  'ultra',
 ]);
 
 function getCodexHome(): string {
@@ -237,6 +239,11 @@ interface CodexThread {
 
 interface CodexThreadResponse {
   thread: CodexThread;
+}
+
+interface CodexModelListResponse {
+  data: Array<{ model: string; hidden?: boolean }>;
+  nextCursor: string | null;
 }
 
 interface CodexTurnResponse {
@@ -483,6 +490,34 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
   getModelArgs(model: string): string[] {
     if (!model || model === 'undefined') return [];
     return ['-m', model];
+  }
+
+  async listModels(): Promise<string[]> {
+    this.prepareWorkingDir();
+    // Discovery has its own process so refreshing the picker cannot interrupt a turn.
+    const appServer = this.createAppServer();
+    try {
+      await this.initializeAppServer(appServer);
+      const models = new Set<string>();
+      const cursors = new Set<string>();
+      let cursor: string | null = null;
+      do {
+        const page: CodexModelListResponse = await appServer.request(
+          'model/list', { cursor, limit: 100, includeHidden: false },
+        );
+        for (const entry of page.data) {
+          if (!entry.hidden && entry.model.trim()) models.add(entry.model);
+        }
+        cursor = page.nextCursor;
+        if (cursor) {
+          if (cursors.has(cursor)) throw new Error('Codex model listing repeated a cursor');
+          cursors.add(cursor);
+        }
+      } while (cursor);
+      return [...models];
+    } finally {
+      appServer.close();
+    }
   }
 
   private buildExecArgs(

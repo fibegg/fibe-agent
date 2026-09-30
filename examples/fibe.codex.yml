@@ -3,8 +3,8 @@
 agentProvider: openai-codex
 agentPassword: pg-internal-abc123def456
 
-modelOptions: gpt-5.4,gpt-5.3-codex,gpt-5.4-mini
-defaultModel: gpt-5.4
+modelOptions: gpt-6.1-sol,gpt-6-astra,gpt-6-luna
+defaultModel: gpt-6.1-sol
 
 systemPrompt: |
   You are a systems programmer working on a Go microservices architecture.
@@ -33,11 +33,11 @@ agentCredentials:
 credentialEnv:
   OPENAI_API_KEY: sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# codex.toml is written to CODEX_HOME at startup.
+# config.toml is written to CODEX_HOME at startup.
 agentRuntimeFiles:
   version: 1
   files:
-    - path: /app/data/42/.codex/codex.toml
+    - path: /app/data/42/.codex/config.toml
       format: text
       operation: overwrite
       mode: '0644'
@@ -45,31 +45,12 @@ agentRuntimeFiles:
         # Codex CLI configuration
         # https://github.com/openai/codex
 
-        [model]
-        name = "gpt-5.4"
+        model = "gpt-6.1-sol"
+        approval_policy = "never"
+        sandbox_mode = "danger-full-access"
 
         [history]
         persistence = "none"
-        save_inputs = false
-
-        [approval]
-        auto_edit = true
-        auto_run = [
-          "bash",
-          "python3",
-          "go",
-          "make",
-          "cargo",
-          "npm",
-          "bun",
-        ]
-
-        [safety]
-        ignore_file_patterns = [
-          ".env",
-          "*.key",
-          "*.pem",
-        ]
 
     - path: /app/data/42/.codex/instructions.md
       format: text
@@ -81,11 +62,10 @@ agentRuntimeFiles:
         You are running inside a Fibe Playground. Follow the project's
         coding standards and always write tests.
 
-cliVersion: '1.0.42'
+cliVersion: '0.159.2'
 
 providerArgs:
-  full-auto: true
-  quiet: true
+  color: never
 
 skillToggles:
   token-saver: true

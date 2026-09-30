@@ -1,10 +1,21 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { accessSync, constants, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ActivityStoreService } from './activity-store.service';
 
 function tmpDir(): string {
+  // Keep small Linux filesystem fixtures off the host's overlay journal while
+  // the full matrix performs builds and database writes. Persistence still
+  // uses real files, atomic renames and the actual shutdown/flush lifecycle.
+  if (process.platform === 'linux') {
+    try {
+      accessSync('/dev/shm', constants.W_OK);
+      return mkdtempSync(join('/dev/shm', 'activity-store-'));
+    } catch {
+      // Platforms without writable shared memory use the ordinary temp root.
+    }
+  }
   return mkdtempSync(join(tmpdir(), 'activity-store-'));
 }
 

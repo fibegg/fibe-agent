@@ -105,8 +105,16 @@ function handleEvent(
 describe('ClaudeSdkStrategy › runtime packaging', () => {
   test('declares the Claude agent SDK as an API runtime dependency', () => {
     const pkg = readApiPackageJson();
-    expect(pkg.dependencies?.['@anthropic-ai/claude-agent-sdk']).toBe(
-      '0.2.126',
+    const rootPkg = JSON.parse(
+      readFileSync(
+        join(import.meta.dir, '../../../../..', 'package.json'),
+        'utf8',
+      ),
+    );
+    const version = pkg.dependencies?.['@anthropic-ai/claude-agent-sdk'];
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(version).toBe(
+      rootPkg.dependencies['@anthropic-ai/claude-agent-sdk'],
     );
   });
 });
@@ -592,6 +600,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   let receivedPrompts: string[];
   let failResumedSessionOnce: boolean;
   let hangBeforeFirstEvent: boolean;
+  let omitResult: boolean;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'claude-turns-'));
@@ -600,6 +609,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     receivedPrompts = [];
     failResumedSessionOnce = false;
     hangBeforeFirstEvent = false;
+    omitResult = false;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
     ).records.clear();
@@ -656,6 +666,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
               ],
             },
           };
+          if (omitResult) return;
           yield {
             type: 'result',
             session_id: `session-${callIndex}`,
@@ -671,6 +682,11 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
           close: () => {
             closedCalls.push(callIndex);
           },
+          supportedModels: async () => [
+            { value: 'sonnet' },
+            { value: 'opus' },
+            { value: 'sonnet' },
+          ],
           setModel: async () => undefined,
         };
       },
@@ -713,6 +729,27 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(queryCalls[0].options.resume).toBeUndefined();
     expect(queryCalls[1].options.resume).toBe('session-0');
     expect(closedCalls).toEqual([0, 1]);
+  });
+
+  test('rejects an incomplete SDK stream after visible text', async () => {
+    omitResult = true;
+    const strategy = new ClaudeSdkStrategy(false, {
+      getConversationDataDir: () => tmpDir,
+    });
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow('without a terminal result');
+    expect(existsSync(join(tmpDir, '.claude_session'))).toBe(false);
+  });
+
+  test('discovers models through SDK control channel without sending a prompt', async () => {
+    const strategy = new ClaudeSdkStrategy(false, {
+      getConversationDataDir: () => tmpDir,
+    });
+    expect(await strategy.listModels()).toEqual(['sonnet', 'opus']);
+    expect(receivedPrompts).toEqual([]);
+    expect(closedCalls).toEqual([0]);
+    expect(existsSync(join(tmpDir, '.claude_session'))).toBe(false);
   });
 
   test('applies model and effort changes to the next fresh provider turn', async () => {
@@ -1048,6 +1085,22 @@ describe('ClaudeSdkStrategy › checkAuthStatus (API token mode)', () => {
     expect(await strategy.checkAuthStatus()).toBe(true);
   });
 
+  test('missing API key opens the manual token dialog', () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.CLAUDE_API_KEY;
+    const events: string[] = [];
+    makeStrategy(true).executeAuth({
+      sendAuthManualToken: () => events.push('manual'),
+      sendAuthSuccess: () => events.push('success'),
+      sendAuthStatus: (status) => events.push(status),
+      sendAuthUrlGenerated: () => undefined,
+      sendDeviceCode: () => undefined,
+      sendError: () => undefined,
+    });
+    expect(events).toEqual(['manual']);
+  });
+
   test('returns false when no env token and useApiTokenMode=true', async () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
@@ -1059,12 +1112,17 @@ describe('ClaudeSdkStrategy › checkAuthStatus (API token mode)', () => {
 
 describe('ClaudeSdkStrategy › auth management', () => {
   let tmpDir: string;
+  let savedSessionDir: string | undefined;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'claude-auth-'));
+    savedSessionDir = process.env.SESSION_DIR;
+    process.env.SESSION_DIR = tmpDir;
   });
 
   afterEach(() => {
+    if (savedSessionDir === undefined) delete process.env.SESSION_DIR;
+    else process.env.SESSION_DIR = savedSessionDir;
     rmSync(tmpDir, { recursive: true, force: true });
   });
 

@@ -7,6 +7,7 @@ export class SequentialJsonWriter {
   private chain: Promise<void> = Promise.resolve();
   private writeCounter = 0;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private writeError: unknown;
 
   constructor(
     private readonly filePath: string,
@@ -31,13 +32,14 @@ export class SequentialJsonWriter {
   }
 
   /** Flushes and waits for pending writes. */
-  flush(): Promise<void> {
+  async flush(strict = false): Promise<void> {
     if (this.debounceMs > 0 && this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
       this.enqueueWrite();
     }
-    return this.chain;
+    await this.chain;
+    if (strict && this.writeError !== undefined) throw this.writeError;
   }
 
   /** Cancels a pending debounce after the final flush. */
@@ -50,8 +52,12 @@ export class SequentialJsonWriter {
 
   private enqueueWrite(): void {
     this.chain = this.chain
-      .then(() => this.writeSnapshot())
+      .then(async () => {
+        await this.writeSnapshot();
+        this.writeError = undefined;
+      })
       .catch((err) => {
+        this.writeError = err;
         console.error('SequentialJsonWriter failed:', err);
       });
   }

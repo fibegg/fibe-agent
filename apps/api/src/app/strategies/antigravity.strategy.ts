@@ -1,10 +1,10 @@
 import { spawn } from 'node:child_process';
+import * as pty from 'node-pty';
 import {
   existsSync,
   mkdirSync,
   readdirSync,
   readFileSync,
-  realpathSync,
   rmSync,
   statSync,
   writeFileSync,
@@ -24,12 +24,15 @@ import { AbstractCLIStrategy } from './abstract-cli.strategy';
 import { buildProviderArgs, type ProviderArgsConfig } from './provider-args';
 import { ProviderConversationPaths } from './provider-conversation-paths';
 
-const DEFAULT_ANTIGRAVITY_GEMINI_DIR = join(process.env.HOME ?? '/home/node', '.gemini');
+const DEFAULT_ANTIGRAVITY_GEMINI_DIR = join(
+  process.env.HOME ?? '/home/node',
+  '.gemini',
+);
 const ANTIGRAVITY_WORKSPACE_SUBDIR = 'antigravity_workspace';
 const SESSION_MARKER_FILE = '.antigravity_session';
-const STDOUT_CURSOR_FILE = '.antigravity_stdout';
 const ANTIGRAVITY_BIN_NAME = process.platform === 'win32' ? 'agy.exe' : 'agy';
-const AUTH_PROMPT = 'Authenticate Antigravity CLI and respond with "authenticated".';
+const AUTH_PROMPT =
+  'Authenticate Antigravity CLI and respond with "authenticated".';
 const AUTH_TIMEOUT = '5m';
 
 const ANTIGRAVITY_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
@@ -45,31 +48,38 @@ const ANTIGRAVITY_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
     '--continue': false,
     '-c': false,
     '--conversation': false,
+    '--input-format': false,
+    '--output-format': 'stream-json',
     '--dangerously-skip-permissions': true,
     '--sandbox': true,
   },
 };
 
-const GOOGLE_OAUTH_URL_REGEX = /https:\/\/accounts\.google\.com\/o\/oauth2\/[^\s"'<>]+/;
-const MISSING_CONVERSATION_REGEX = /Warning:\s*conversation\s+"([^"]+)"\s+not found\./i;
-const AUTH_FAILURE_REGEX = /(?:authentication timed out|authentication failed|failed to authenticate|Error:\s*authentication)/i;
+const GOOGLE_OAUTH_URL_REGEX =
+  /https:\/\/accounts\.google\.com\/o\/oauth2\/[^\s"'<>]+/;
+const MISSING_CONVERSATION_REGEX =
+  /Warning:\s*conversation\s+"([^"]+)"\s+not found\./i;
+const AUTH_FAILURE_REGEX =
+  /(?:authentication timed out|authentication failed|failed to authenticate|Error:\s*authentication)/i;
 
 function getAntigravityGeminiDir(): string {
   return (
-    process.env.ANTIGRAVITY_HOME?.trim()
-    || process.env.SESSION_DIR?.trim()
-    || DEFAULT_ANTIGRAVITY_GEMINI_DIR
+    process.env.ANTIGRAVITY_HOME?.trim() ||
+    process.env.SESSION_DIR?.trim() ||
+    DEFAULT_ANTIGRAVITY_GEMINI_DIR
   );
 }
 
 function getAntigravityCommand(): string {
-  if (process.env.ANTIGRAVITY_BIN?.trim()) return process.env.ANTIGRAVITY_BIN.trim();
+  if (process.env.ANTIGRAVITY_BIN?.trim())
+    return process.env.ANTIGRAVITY_BIN.trim();
   return ANTIGRAVITY_BIN_NAME;
 }
 
 function getHomeRootForGeminiDir(geminiDir: string): string {
   const normalized = resolve(geminiDir);
-  if (basename(normalized) === 'antigravity-cli') return dirname(dirname(normalized));
+  if (basename(normalized) === 'antigravity-cli')
+    return dirname(dirname(normalized));
   if (basename(normalized) === '.gemini') return dirname(normalized);
   return process.env.HOME ?? dirname(normalized);
 }
@@ -81,7 +91,11 @@ function getAntigravityDataDir(geminiDir: string): string {
 }
 
 function getLastConversationsPath(geminiDir: string): string {
-  return join(getAntigravityDataDir(geminiDir), 'cache', 'last_conversations.json');
+  return join(
+    getAntigravityDataDir(geminiDir),
+    'cache',
+    'last_conversations.json',
+  );
 }
 
 function hasAntigravityKeyringState(geminiDir: string): boolean {
@@ -89,110 +103,57 @@ function hasAntigravityKeyringState(geminiDir: string): boolean {
   if (!existsSync(keyringDir)) return false;
 
   try {
-    return readdirSync(keyringDir).some((name) => statSync(join(keyringDir, name)).size > 0);
+    return readdirSync(keyringDir).some(
+      (name) => statSync(join(keyringDir, name)).size > 0,
+    );
   } catch {
     return false;
   }
 }
 
-function stripKnownPrefix(output: string, prefix: string | null | undefined): string | null {
-  const normalizedPrefix = prefix?.trimEnd();
-  if (!normalizedPrefix || !output.startsWith(normalizedPrefix)) return null;
-  const suffix = output.slice(normalizedPrefix.length);
-  if (suffix && !/^\s/.test(suffix)) return null;
-  return suffix.replace(/^\s+/, '').trimEnd();
-}
-
-function stripInternalPromptBlocks(output: string): string {
-  return output
-    .replace(/\[MODE\][\s\S]*?\[\/MODE\]\s*/g, '')
-    .trimEnd();
-}
-
-export function extractAntigravityLatestOutput(
-  output: string,
-  previousStdout: string | null | undefined,
-  previousAssistantMessages: string[] = []
-): string {
-  const cleaned = output.trimEnd();
-  const cursorStripped = stripKnownPrefix(cleaned, previousStdout);
-  if (cursorStripped !== null) return stripInternalPromptBlocks(cursorStripped);
-
-  const singleMessageStripped = [...previousAssistantMessages]
-    .sort((a, b) => b.length - a.length)
-    .map((message) => stripKnownPrefix(cleaned, message))
-    .find((stripped): stripped is string => stripped !== null);
-  if (singleMessageStripped !== undefined) return stripInternalPromptBlocks(singleMessageStripped);
-
-  let sequential = cleaned;
-  let strippedAny = false;
-  for (const message of previousAssistantMessages) {
-    const stripped = stripKnownPrefix(sequential, message);
-    if (stripped === null) continue;
-    sequential = stripped;
-    strippedAny = true;
-  }
-  if (strippedAny) return stripInternalPromptBlocks(sequential);
-
-  const visibleCleaned = stripInternalPromptBlocks(cleaned);
-  const previousVisibleMessages = previousAssistantMessages.map(stripInternalPromptBlocks);
-  const visibleMessageStripped = [...previousVisibleMessages]
-    .sort((a, b) => b.length - a.length)
-    .map((message) => stripKnownPrefix(visibleCleaned, message))
-    .find((stripped): stripped is string => stripped !== null);
-  if (visibleMessageStripped !== undefined) return visibleMessageStripped;
-
-  let visibleSequential = visibleCleaned;
-  let strippedVisibleAny = false;
-  for (const message of previousVisibleMessages) {
-    const stripped = stripKnownPrefix(visibleSequential, message);
-    if (stripped === null) continue;
-    visibleSequential = stripped;
-    strippedVisibleAny = true;
-  }
-  return strippedVisibleAny ? visibleSequential : visibleCleaned;
-}
-
-function normalizeWorkspaceKeys(workspaceDir: string): string[] {
-  const keys = new Set<string>([workspaceDir, resolve(workspaceDir)]);
-  try {
-    keys.add(realpathSync.native(workspaceDir));
-  } catch {
-    /* workspace may not exist yet */
-  }
-  return [...keys];
-}
-
-export function buildAntigravityArgs(prompt: string, sessionId: string | null): string[] {
-  const providerTokens = buildProviderArgs(ANTIGRAVITY_PROVIDER_ARGS_CONFIG);
+export function buildAntigravityArgs(
+  prompt: string,
+  sessionId: string | null,
+  model = '',
+  effort?: string,
+): string[] {
+  const normalizedModel = model.trim();
+  const normalizedEffort = effort?.trim().toLowerCase();
+  const providerTokens = buildProviderArgs({
+    ...ANTIGRAVITY_PROVIDER_ARGS_CONFIG,
+    blockedArgs: {
+      ...ANTIGRAVITY_PROVIDER_ARGS_CONFIG.blockedArgs,
+      ...(normalizedModel && normalizedModel !== 'undefined'
+        ? { '--model': false, '-m': false }
+        : {}),
+      ...(normalizedEffort ? { '--effort': false } : {}),
+    },
+  });
   const args = [...providerTokens];
+  if (normalizedModel && normalizedModel !== 'undefined')
+    args.push('--model', normalizedModel);
+  if (
+    normalizedEffort &&
+    ['low', 'medium', 'high', 'xhigh', 'max'].includes(normalizedEffort)
+  ) {
+    args.push(
+      '--effort',
+      ['xhigh', 'max'].includes(normalizedEffort) ? 'high' : normalizedEffort,
+    );
+  }
   if (sessionId) args.push('--conversation', sessionId);
   args.push(`--prompt=${prompt}`);
   return args;
 }
 
-export function readAntigravityLastConversation(
-  geminiDir: string,
-  workspaceDir: string
-): string | null {
-  try {
-    const path = getLastConversationsPath(geminiDir);
-    if (!existsSync(path)) return null;
-    const parsed = JSON.parse(readFileSync(path, 'utf8')) as Record<string, unknown>;
-    for (const key of normalizeWorkspaceKeys(workspaceDir)) {
-      const value = parsed[key];
-      if (typeof value === 'string' && value.trim()) return value.trim();
-    }
-  } catch {
-    return null;
-  }
-  return null;
-}
-
 export class AntigravityStrategy extends AbstractCLIStrategy {
   private readonly paths: ProviderConversationPaths;
+  private authTerminal: pty.IPty | null = null;
 
-  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
+  constructor(
+    useApiTokenMode = false,
+    conversationDataDir?: ConversationDataDirProvider,
+  ) {
     super(AntigravityStrategy.name, useApiTokenMode, conversationDataDir);
     this.paths = new ProviderConversationPaths({
       conversationDataDir,
@@ -210,13 +171,81 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
     this.paths.prepareWorkspace();
   }
 
+  private getApiKey(): string | null {
+    const fromEnv =
+      process.env.GEMINI_API_KEY?.trim() ||
+      process.env.GOOGLE_GENERATIVE_AI_API_KEY?.trim() ||
+      process.env.GOOGLE_API_KEY?.trim();
+    if (fromEnv) return fromEnv;
+    try {
+      const saved = JSON.parse(
+        readFileSync(join(this.getGeminiDirForSession(), 'auth.json'), 'utf8'),
+      );
+      return typeof saved.api_key === 'string'
+        ? saved.api_key.trim() || null
+        : null;
+    } catch {
+      return null;
+    }
+  }
+
   ensureSettings(): void {
     const dataDir = getAntigravityDataDir(this.getGeminiDirForSession());
     mkdirSync(join(dataDir, 'cache'), { recursive: true });
+    const settingsPath = join(dataDir, 'settings.json');
+    let settings: Record<string, unknown> = {};
+    if (existsSync(settingsPath))
+      settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
+    if (this.useApiTokenMode && this.getApiKey()) {
+      settings.modelProvider = 'gemini';
+    } else if (settings.modelProvider === 'gemini') {
+      delete settings.modelProvider;
+    }
+    writeFileSync(settingsPath, JSON.stringify(settings, null, 2), {
+      mode: 0o600,
+    });
   }
 
-  getModelArgs(_model: string): string[] {
-    return [];
+  getModelArgs(model: string): string[] {
+    return model.trim() && model !== 'undefined'
+      ? ['--model', model.trim()]
+      : [];
+  }
+
+  listModels(): Promise<string[]> {
+    this.ensureSettings();
+    return new Promise((resolveModels) => {
+      const proc = spawn(getAntigravityCommand(), ['models'], {
+        env: this.getAntigravityProcessEnv(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      const timer = setTimeout(() => {
+        proc.kill();
+        resolveModels([]);
+      }, 15_000);
+      proc.stdout?.on('data', (data) => {
+        output += data.toString();
+      });
+      proc.on('close', (code) => {
+        clearTimeout(timer);
+        const models =
+          code === 0
+            ? this.stripAnsi(output)
+                .split(/\r?\n/)
+                .map((line) => line.trim().split(/\s+/)[0])
+                .filter(
+                  (slug) =>
+                    /^[a-z0-9][a-z0-9._/-]*$/.test(slug) && slug !== 'model',
+                )
+            : [];
+        resolveModels([...new Set(models)]);
+      });
+      proc.on('error', () => {
+        clearTimeout(timer);
+        resolveModels([]);
+      });
+    });
   }
 
   hasNativeSessionSupport(): boolean {
@@ -224,68 +253,73 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
   }
 
   executeAuth(connection: AuthConnection): void {
+    this.cancelAuth();
     this.currentConnection = connection;
-    if (this.hasAntigravityConversationState()) {
-      connection.sendAuthSuccess();
-      this.currentConnection = null;
+    if (this.useApiTokenMode) {
+      if (this.getApiKey()) connection.sendAuthSuccess();
+      else connection.sendAuthManualToken();
       return;
     }
-
     this.ensureSettings();
     this.prepareWorkingDir();
-    let output = '';
-    let authUrlExtracted = false;
-    const proc = spawn(getAntigravityCommand(), [`--prompt=${AUTH_PROMPT}`, '--print-timeout', AUTH_TIMEOUT], {
-      env: this.getAntigravityProcessEnv(),
-      cwd: this.getWorkingDir(),
-      shell: false,
-    });
-
-    const handleData = (data: Buffer | string) => {
-      const text = data.toString();
-      output += text;
-      const match = output.match(GOOGLE_OAUTH_URL_REGEX);
-      if (match && !authUrlExtracted) {
-        authUrlExtracted = true;
-        this.currentConnection?.sendAuthUrlGenerated(match[0]);
-      }
-    };
-
-    proc.stdout?.on('data', handleData);
-    proc.stderr?.on('data', handleData);
-
-    proc.on('close', (code) => {
-      if (this.currentConnection) {
-        const failed = code !== 0 || AUTH_FAILURE_REGEX.test(output);
-        if (failed) {
-          this.currentConnection.sendAuthStatus('unauthenticated');
-        } else {
-          this.captureSessionAfterRun();
-          this.currentConnection.sendAuthSuccess();
+    // agy reads OAuth codes from /dev/tty; ordinary child-process pipes cannot
+    // complete its remote sign-in flow. Keep the terminal scoped to this run.
+    try {
+      const terminal = pty.spawn(
+        getAntigravityCommand(),
+        [`--prompt=${AUTH_PROMPT}`, '--print-timeout', AUTH_TIMEOUT],
+        {
+          name: 'xterm-256color',
+          cols: 120,
+          rows: 30,
+          cwd: this.getWorkingDir(),
+          env: Object.fromEntries(
+            Object.entries(this.getAntigravityProcessEnv()).filter(
+              (entry): entry is [string, string] =>
+                typeof entry[1] === 'string',
+            ),
+          ),
+        },
+      );
+      this.authTerminal = terminal;
+      let output = '';
+      let authUrlExtracted = false;
+      const timer = setTimeout(() => terminal.kill(), 360_000);
+      this.authCancel = () => {
+        clearTimeout(timer);
+        terminal.kill();
+        this.authTerminal = null;
+      };
+      terminal.onData((text) => {
+        output += text;
+        const match = this.stripAnsi(output).match(GOOGLE_OAUTH_URL_REGEX);
+        if (match && !authUrlExtracted) {
+          authUrlExtracted = true;
+          this.currentConnection?.sendAuthUrlGenerated(match[0]);
         }
-      }
-      this.activeAuthProcess = null;
-      this.authCancel = null;
+      });
+      terminal.onExit(({ exitCode }) => {
+        clearTimeout(timer);
+        if (this.authTerminal !== terminal) return;
+        this.authTerminal = null;
+        this.authCancel = null;
+        const activeConnection = this.currentConnection;
+        this.currentConnection = null;
+        if (
+          exitCode !== 0 ||
+          AUTH_FAILURE_REGEX.test(output) ||
+          detectProviderAuthFailure('Antigravity', output)
+        ) {
+          activeConnection?.sendAuthStatus('unauthenticated');
+        } else {
+          activeConnection?.sendAuthSuccess();
+        }
+      });
+    } catch (err) {
       this.currentConnection = null;
-    });
-
-    proc.on('error', (err) => {
-      if (this.currentConnection) {
-        const isNotFound = (err as NodeJS.ErrnoException).code === 'ENOENT';
-        this.currentConnection.sendError(
-          isNotFound
-            ? 'Antigravity CLI not found. Install it with: curl -fsSL https://antigravity.google/cli/install.sh | bash'
-            : err.message
-        );
-        this.currentConnection.sendAuthStatus('unauthenticated');
-      }
-      this.activeAuthProcess = null;
-      this.authCancel = null;
-      this.currentConnection = null;
-    });
-
-    this.activeAuthProcess = proc;
-    this.authCancel = () => proc.kill();
+      connection.sendError((err as Error).message);
+      connection.sendAuthStatus('unauthenticated');
+    }
   }
 
   submitAuthCode(code: string): void {
@@ -294,15 +328,33 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
       this.currentConnection?.sendAuthStatus('unauthenticated');
       return;
     }
-    this.activeAuthProcess?.stdin?.write(`${trimmed}\n`);
+    if (this.useApiTokenMode) {
+      const geminiDir = this.getGeminiDirForSession();
+      mkdirSync(geminiDir, { recursive: true });
+      writeFileSync(
+        join(geminiDir, 'auth.json'),
+        JSON.stringify({ api_key: trimmed }),
+        { mode: 0o600 },
+      );
+      this.ensureSettings();
+      this.currentConnection?.sendAuthSuccess();
+      this.currentConnection = null;
+    } else {
+      this.authTerminal?.write(`${trimmed}\r`);
+    }
   }
 
   clearCredentials(): void {
-    rmSync(getAntigravityDataDir(this.getGeminiDirForSession()), { recursive: true, force: true });
-    rmSync(join(this.getGeminiDirForSession(), '.local', 'share', 'keyrings'), { recursive: true, force: true });
+    rmSync(getAntigravityDataDir(this.getGeminiDirForSession()), {
+      recursive: true,
+      force: true,
+    });
+    rmSync(join(this.getGeminiDirForSession(), '.local', 'share', 'keyrings'), {
+      recursive: true,
+      force: true,
+    });
     this.clearCredentialMarker();
     this.paths.clearSessionMarker();
-    this.clearStdoutCursor();
   }
 
   executeLogout(connection: LogoutConnection): void {
@@ -311,7 +363,11 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
   }
 
   checkAuthStatus(): Promise<boolean> {
-    return Promise.resolve(this.hasAntigravityConversationState());
+    return Promise.resolve(
+      this.useApiTokenMode
+        ? Boolean(this.getApiKey())
+        : this.hasAntigravityConversationState(),
+    );
   }
 
   executePromptStreaming(
@@ -320,138 +376,176 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
     systemPrompt?: string,
-    runtimeOptions?: AgentRuntimeOptions
+    runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
-    return new Promise((resolvePromise, reject) => {
-      this.streamInterrupted = false;
-      this.ensureSettings();
-      this.prepareWorkingDir();
-
-      const workspaceDir = this.getWorkingDir();
-      const effectivePrompt = this.buildPromptWithPending(prompt, systemPrompt);
-      const sessionId = this.readSessionId();
-      const args = [
-        ...this.getModelArgs(model),
-        ...buildAntigravityArgs(effectivePrompt, sessionId),
-      ];
-      const previousStdout = this.readStdoutCursor();
-
-      const antigravityProcess = spawn(getAntigravityCommand(), args, {
+    this.streamInterrupted = false;
+    this.ensureSettings();
+    this.prepareWorkingDir();
+    const sessionId = this.readSessionId();
+    const args = buildAntigravityArgs(
+      this.buildPromptWithPending(prompt, systemPrompt),
+      sessionId,
+      model,
+      runtimeOptions?.effort,
+    );
+    return new Promise((resolvePrompt, reject) => {
+      const proc = spawn(getAntigravityCommand(), args, {
         env: this.getAntigravityProcessEnv(),
-        cwd: workspaceDir,
+        cwd: this.getWorkingDir(),
         shell: false,
         stdio: ['ignore', 'pipe', 'pipe'],
       });
-      this.currentStreamProcess = antigravityProcess;
-
-      let stdout = '';
+      this.currentStreamProcess = proc;
+      let lineBuffer = '';
       let stderr = '';
+      let result: {
+        status?: string;
+        response?: string;
+        error?: string;
+        conversation_id?: string;
+      } | null = null;
+      let emittedText = '';
+      let parseError = false;
       let authUrlEmitted = false;
-      let stderrReasoningStarted = false;
-
-      callbacks?.onStep?.({
-        id: 'antigravity-cli',
-        title: 'Antigravity CLI',
-        status: 'processing',
-        details: sessionId ? 'Resuming provider conversation.' : 'Starting provider conversation.',
-        timestamp: new Date(),
-      });
-
-      const detectAndEmitAuthUrl = (output: string) => {
-        if (authUrlEmitted) return;
-        const match = output.match(GOOGLE_OAUTH_URL_REGEX);
-        if (!match) return;
-        authUrlEmitted = true;
-        callbacks?.onAuthRequired?.(match[0]);
+      let diagnosticsStarted = false;
+      const usage = (value: unknown) => {
+        if (!value || typeof value !== 'object') return;
+        const counts = value as Record<string, number>;
+        callbacks?.onUsage?.({
+          inputTokens: counts.input_tokens ?? 0,
+          outputTokens: counts.output_tokens ?? 0,
+        });
       };
-
-      antigravityProcess.stdout?.on('data', (data: Buffer | string) => {
-        const text = data.toString();
-        stdout += text;
-        detectAndEmitAuthUrl(stdout);
+      const readLine = (line: string) => {
+        if (!line.trim()) return;
+        try {
+          const event = JSON.parse(line);
+          if (event.event === 'step_update') {
+            const step = event.step_update ?? {};
+            if (
+              step.step_type === 'agent_response' &&
+              typeof step.text_delta === 'string'
+            ) {
+              emittedText += step.text_delta;
+              onChunk(step.text_delta);
+            }
+            if (step.step_type === 'tool') {
+              const info = step.tool_info ?? {};
+              const parameters = info.parameters ?? {};
+              callbacks?.onTool?.({
+                kind: 'tool_call',
+                name: info.name || step.tool_name || 'tool',
+                command: parameters.CommandLine,
+                path: parameters.TargetFile || parameters.AbsolutePath,
+                details: JSON.stringify(parameters),
+                summary: info.output || info.error?.message,
+              });
+            }
+            callbacks?.onStep?.({
+              id: `antigravity-${step.step_index}`,
+              title: step.tool_name || step.step_type || 'Antigravity',
+              status: step.state === 'DONE' ? 'complete' : 'processing',
+              timestamp: new Date(),
+            });
+          } else if (event.event === 'result') {
+            result = event.result;
+            usage(event.result?.usage);
+          }
+        } catch {
+          parseError = true;
+        }
+      };
+      proc.stdout?.on('data', (data) => {
+        lineBuffer += data.toString();
+        const lines = lineBuffer.split('\n');
+        lineBuffer = lines.pop() ?? '';
+        lines.forEach(readLine);
       });
-
-      antigravityProcess.stderr?.on('data', (data: Buffer | string) => {
-        const text = data.toString();
-        stderr += text;
-        detectAndEmitAuthUrl(stderr);
-        const cleanText = this.stripAnsi(text);
-        if (cleanText.trim() && callbacks?.onReasoningChunk) {
-          if (!stderrReasoningStarted) {
-            stderrReasoningStarted = true;
+      proc.stderr?.on('data', (data) => {
+        const diagnostic = this.stripAnsi(data.toString());
+        stderr += diagnostic;
+        if (diagnostic.trim() && callbacks?.onReasoningChunk) {
+          if (!diagnosticsStarted) {
+            diagnosticsStarted = true;
             callbacks.onReasoningStart?.();
           }
-          callbacks.onReasoningChunk(cleanText);
+          callbacks.onReasoningChunk(diagnostic);
+        }
+        const match = stderr.match(GOOGLE_OAUTH_URL_REGEX);
+        if (match && !authUrlEmitted) {
+          authUrlEmitted = true;
+          callbacks?.onAuthRequired?.(match[0]);
         }
       });
-
-      antigravityProcess.on('error', (err) => {
+      proc.on('error', (err) => {
+        if (diagnosticsStarted) callbacks?.onReasoningEnd?.();
         this.currentStreamProcess = null;
-        if (stderrReasoningStarted) callbacks?.onReasoningEnd?.();
         reject(err);
       });
-
-      antigravityProcess.on('close', (code) => {
+      proc.on('close', (code) => {
+        if (diagnosticsStarted) callbacks?.onReasoningEnd?.();
         this.currentStreamProcess = null;
-        if (stderrReasoningStarted) callbacks?.onReasoningEnd?.();
-
+        if (lineBuffer.trim()) readLine(lineBuffer);
         if (this.streamInterrupted) {
           reject(new Error(INTERRUPTED_MESSAGE));
           return;
         }
-
-        const fullCleanedStdout = this.cleanProviderOutput(stdout);
-        const cleanedStdout = extractAntigravityLatestOutput(
-          fullCleanedStdout,
-          previousStdout,
-          runtimeOptions?.previousAssistantMessages,
-        );
-        const combinedOutput = [stdout, stderr].filter((text) => text.trim()).join('\n');
-
-        const authError = detectProviderAuthFailure('Antigravity', combinedOutput);
-        if (authError) {
+        const outcome = result as typeof result;
+        const failure = [outcome?.error, stderr].filter(Boolean).join('\n');
+        const authError = detectProviderAuthFailure('Antigravity', failure);
+        if (authError || AUTH_FAILURE_REGEX.test(failure)) {
           this.clearAuthStatusMarkers();
-          reject(authError);
+          reject(
+            authError ||
+              new Error(
+                'Authentication required. Please sign in with Google Antigravity.',
+              ),
+          );
           return;
         }
-
-        if (AUTH_FAILURE_REGEX.test(combinedOutput)) {
-          this.clearAuthStatusMarkers();
-          reject(new Error('Authentication required. Please sign in with Google Antigravity.'));
-          return;
-        }
-
-        const missingConversation = combinedOutput.match(MISSING_CONVERSATION_REGEX);
-        if (missingConversation) {
+        if (
+          this.missingSessionError(failure) ||
+          MISSING_CONVERSATION_REGEX.test(failure)
+        ) {
           this.paths.clearSessionMarker();
-          this.clearStdoutCursor();
-          reject(new Error(`Stored Antigravity conversation was not found: ${missingConversation[1]}. Retry to start a fresh provider conversation.`));
+          reject(
+            new Error(
+              `Stored Antigravity conversation was not found. Retry to start a fresh provider conversation.`,
+            ),
+          );
           return;
         }
-
-        if (code !== 0 && code !== null) {
-          reject(new Error(stderr.trim() || stdout.trim() || `Antigravity exited with code ${code}`));
+        if (
+          code !== 0 ||
+          !outcome ||
+          outcome.status !== 'SUCCESS' ||
+          parseError
+        ) {
+          reject(
+            new Error(
+              failure ||
+                `Antigravity did not complete successfully (${outcome?.status || code || 'missing result'}).`,
+            ),
+          );
           return;
         }
-
-        if (!cleanedStdout.trim()) {
-          this.paths.clearSessionMarker();
-          this.clearStdoutCursor();
-          reject(new Error('Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+        const response =
+          typeof outcome.response === 'string' ? outcome.response : '';
+        if (!response.trim()) {
+          reject(new Error('Antigravity completed without a response.'));
           return;
         }
-
-        this.captureSessionAfterRun();
-        this.writeStdoutCursor(fullCleanedStdout);
-        callbacks?.onStep?.({
-          id: 'antigravity-cli',
-          title: 'Antigravity CLI',
-          status: 'complete',
-          details: 'Provider response received.',
-          timestamp: new Date(),
-        });
-        onChunk(cleanedStdout);
-        resolvePromise();
+        // Result.response describes only the current turn. Deltas may have been
+        // emitted already; never concatenate the terminal copy a second time.
+        if (!emittedText) onChunk(response);
+        else if (
+          response.startsWith(emittedText) &&
+          response.length > emittedText.length
+        )
+          onChunk(response.slice(emittedText.length));
+        if (outcome.conversation_id)
+          this.paths.writeSessionMarker(outcome.conversation_id);
+        resolvePrompt();
       });
     });
   }
@@ -460,20 +554,29 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
     return getAntigravityGeminiDir();
   }
 
-  private getAntigravityProcessEnv(extraEnv: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
+  private getAntigravityProcessEnv(
+    extraEnv: NodeJS.ProcessEnv = {},
+  ): NodeJS.ProcessEnv {
     const geminiDir = this.getGeminiDirForSession();
+    const apiKey = this.useApiTokenMode ? this.getApiKey() : null;
     return {
       ...process.env,
       ...this.getProxyEnv(),
       ...extraEnv,
       HOME: getHomeRootForGeminiDir(geminiDir),
-      XDG_CONFIG_HOME: process.env.XDG_CONFIG_HOME?.trim() || join(geminiDir, '.config'),
-      XDG_DATA_HOME: process.env.XDG_DATA_HOME?.trim() || join(geminiDir, '.local', 'share'),
-      XDG_STATE_HOME: process.env.XDG_STATE_HOME?.trim() || join(geminiDir, '.local', 'state'),
-      XDG_CACHE_HOME: process.env.XDG_CACHE_HOME?.trim() || join(geminiDir, '.cache'),
+      XDG_CONFIG_HOME:
+        process.env.XDG_CONFIG_HOME?.trim() || join(geminiDir, '.config'),
+      XDG_DATA_HOME:
+        process.env.XDG_DATA_HOME?.trim() || join(geminiDir, '.local', 'share'),
+      XDG_STATE_HOME:
+        process.env.XDG_STATE_HOME?.trim() ||
+        join(geminiDir, '.local', 'state'),
+      XDG_CACHE_HOME:
+        process.env.XDG_CACHE_HOME?.trim() || join(geminiDir, '.cache'),
       BROWSER: '/bin/true',
       DISPLAY: '',
       NO_BROWSER: 'true',
+      ...(apiKey ? { GEMINI_API_KEY: apiKey } : {}),
     };
   }
 
@@ -488,17 +591,13 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
     return 'queued';
   }
 
-  private captureSessionAfterRun(): void {
-    const sessionId = readAntigravityLastConversation(this.getGeminiDirForSession(), this.getWorkingDir());
-    if (sessionId) {
-      this.paths.writeSessionMarker(sessionId);
-    }
-  }
-
   private hasAntigravityConversationState(): boolean {
-    const lastConversations = getLastConversationsPath(this.getGeminiDirForSession());
+    const lastConversations = getLastConversationsPath(
+      this.getGeminiDirForSession(),
+    );
     if (existsSync(lastConversations)) return true;
-    if (existsSync(join(this.getGeminiDirForSession(), 'auth.json'))) return true;
+    if (existsSync(join(this.getGeminiDirForSession(), 'auth.json')))
+      return true;
     if (hasAntigravityKeyringState(this.getGeminiDirForSession())) return true;
     return false;
   }
@@ -509,44 +608,13 @@ export class AntigravityStrategy extends AbstractCLIStrategy {
 
   private clearAuthStatusMarkers(): void {
     this.clearCredentialMarker();
-    rmSync(getLastConversationsPath(this.getGeminiDirForSession()), { force: true });
-    rmSync(join(this.getGeminiDirForSession(), '.local', 'share', 'keyrings'), { recursive: true, force: true });
+    rmSync(getLastConversationsPath(this.getGeminiDirForSession()), {
+      force: true,
+    });
+    rmSync(join(this.getGeminiDirForSession(), '.local', 'share', 'keyrings'), {
+      recursive: true,
+      force: true,
+    });
     this.paths.clearSessionMarker();
-    this.clearStdoutCursor();
-  }
-
-  private getStdoutCursorPath(): string | null {
-    const stateDir = this.paths.getConversationStateDir();
-    return stateDir ? join(stateDir, STDOUT_CURSOR_FILE) : null;
-  }
-
-  private readStdoutCursor(): string | null {
-    try {
-      const path = this.getStdoutCursorPath();
-      if (!path || !existsSync(path)) return null;
-      return readFileSync(path, 'utf8');
-    } catch {
-      return null;
-    }
-  }
-
-  private writeStdoutCursor(output: string): void {
-    const path = this.getStdoutCursorPath();
-    if (!path) return;
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, output, { mode: 0o600 });
-  }
-
-  private clearStdoutCursor(): void {
-    const path = this.getStdoutCursorPath();
-    if (path) rmSync(path, { force: true });
-  }
-
-  private cleanProviderOutput(output: string): string {
-    return this.stripAnsi(output)
-      .split(/\r?\n/)
-      .filter((line) => !MISSING_CONVERSATION_REGEX.test(line))
-      .join('\n')
-      .trimEnd();
   }
 }
