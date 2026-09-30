@@ -218,12 +218,17 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       itemId: 'assistant-1',
       delta: message,
     });
-    setTimeout(() => completeTurn(msg.params.threadId), delay);
+    if (process.env.CODEX_FAKE_MODE !== 'complete-on-steer') {
+      setTimeout(() => completeTurn(msg.params.threadId), delay);
+    }
     return;
   }
 
   if (msg.method === 'turn/steer') {
     respond(msg.id, { turnId });
+    if (process.env.CODEX_FAKE_MODE === 'complete-on-steer') {
+      completeTurn(msg.params.threadId);
+    }
     return;
   }
 
@@ -1477,7 +1482,7 @@ describe('OpenaiCodexStrategy', () => {
     writeFakeCodexAppServer(fakeCodexPath);
     process.env.CODEX_BIN = fakeCodexPath;
     process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
-    process.env.CODEX_FAKE_TURN_DELAY_MS = '120';
+    process.env.CODEX_FAKE_MODE = 'complete-on-steer';
 
     const convDir = join(TEST_HOME, 'conversations', 'app-steer');
     const strategy = new OpenaiCodexStrategy(false, {
@@ -1487,20 +1492,20 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
+    let receivedAssistantDelta = false;
     const promise = strategy.executePromptStreaming(
       'hello',
       'gpt-5.4',
-      () => undefined,
+      () => { receivedAssistantDelta = true; },
     );
-    await waitFor(
-      () =>
-        existsSync(requestsPath) &&
-        readJsonl(requestsPath).some(
-          (request) => request.method === 'turn/start',
-        ),
-    );
-    await strategy.steerAgent('adjust course');
-    await promise;
+    try {
+      await waitFor(() => receivedAssistantDelta);
+      expect(await strategy.steerAgent('adjust course')).toBe('handled');
+      await promise;
+    } finally {
+      strategy.interruptAgent();
+      await promise.catch(() => undefined);
+    }
 
     const steer = readJsonl(requestsPath).find(
       (request) => request.method === 'turn/steer',

@@ -1,11 +1,11 @@
 import { open, rename, unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { encryptData } from '../crypto/crypto.util';
 
 /** Serializes atomic JSON writes, optionally coalescing them behind a debounce. */
 export class SequentialJsonWriter {
   private chain: Promise<void> = Promise.resolve();
-  private writeCounter = 0;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
   private writeError: unknown;
 
@@ -73,10 +73,9 @@ export class SequentialJsonWriter {
   private nextTempPath(): string {
     const dir = dirname(this.filePath);
     const file = basename(this.filePath);
-    this.writeCounter += 1;
     return join(
       dir,
-      `.${file}.${process.pid}.${Date.now()}.${this.writeCounter}.tmp`,
+      `.${file}.${process.pid}.${randomUUID()}.tmp`,
     );
   }
 

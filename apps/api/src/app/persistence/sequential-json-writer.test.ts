@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach, spyOn } from 'bun:test';
 import { SequentialJsonWriter } from './sequential-json-writer';
 import { readdirSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -25,10 +25,11 @@ describe('SequentialJsonWriter', () => {
     expect(JSON.parse(content)).toEqual({ count: 0 });
   });
 
-  test('schedule() returns void (not a promise)', () => {
+  test('schedule() returns void (not a promise)', async () => {
     const writer = new SequentialJsonWriter(testFile, () => ({}));
     const result = writer.schedule();
     expect(result).toBeUndefined();
+    await writer.flush(true);
   });
 
   test('serializes rapid concurrent writes in order', async () => {
@@ -48,6 +49,24 @@ describe('SequentialJsonWriter', () => {
 
     const content = readFileSync(testFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ value: 3 });
+  });
+
+  test('independent writers to the same file never collide at the same clock instant', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1790805774869);
+    try {
+      const first = new SequentialJsonWriter(testFile, () => ({ writer: 'first' }));
+      const second = new SequentialJsonWriter(testFile, () => ({ writer: 'second' }));
+      first.schedule();
+      second.schedule();
+
+      const results = await Promise.allSettled([first.flush(true), second.flush(true)]);
+
+      expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
+      expect(['first', 'second']).toContain(JSON.parse(readFileSync(testFile, 'utf8')).writer);
+      expect(readdirSync(tmpdir()).filter((name) => name.startsWith(`.${basename(testFile)}.`) && name.endsWith('.tmp'))).toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   test('catches write errors without breaking the chain', async () => {

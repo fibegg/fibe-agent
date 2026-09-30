@@ -590,7 +590,9 @@ describe('FileEditorPanel', () => {
       target: { value: 'const' },
     });
 
-    expect(searchInFileMock).toHaveBeenCalledWith('const', 'next');
+    await waitFor(() =>
+      expect(searchInFileMock).toHaveBeenCalledWith('const', 'next'),
+    );
     expect(screen.getByText('1/2')).toBeTruthy();
   });
 
