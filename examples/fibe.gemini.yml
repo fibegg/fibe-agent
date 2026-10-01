@@ -36,7 +36,9 @@ agentRuntimeFiles:
         security:
           auth:
             selectedType: gemini-api-key
-cliVersion: '0.62.0'
+# Provider CLI snapshot: 0.62.0 (pinned by the agent image).
+# cliVersion selects the FIBE CLI used by MCP tools.
+cliVersion: '0.2.46'
 
 providerArgs:
   sandbox: false

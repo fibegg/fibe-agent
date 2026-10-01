@@ -2,7 +2,8 @@
 
 These contracts were checked against official documentation and the installed
 Linux CLI distributions on 2026-09-30. Installation versions belong in the
-provider manifest; example `cliVersion` values describe this checked snapshot.
+provider manifest and package manifests. Example `cliVersion` values select the
+FIBE CLI used by MCP tools; provider snapshots are documented separately.
 
 Use an explicit `SESSION_DIR` for native authentication state. Credential
 availability checks do not prove that a key works, that OAuth remains valid, or

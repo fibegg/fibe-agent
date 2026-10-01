@@ -323,6 +323,10 @@ ensure_runtime_fibe() {
 
   if [ -z "$installer" ]; then
     if [ -x /usr/local/bin/fibe ]; then
+      if [ -n "$normalized_desired" ] && [ "$baked_version" != "$normalized_desired" ]; then
+        echo "[entrypoint] ERROR: no fibe installer for requested version ${normalized_desired}" >&2
+        return 1
+      fi
       echo "[entrypoint] install-fibe.sh not found; copying baked fibe from /usr/local/bin/fibe"
       cp /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"
       chmod +x "$RUNTIME_FIBE_BIN"
@@ -332,7 +336,7 @@ ensure_runtime_fibe() {
     fi
   else
     echo "[entrypoint] Using fibe installer at ${installer}"
-    FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" sh "$installer"
+    FIBE_VERSION="$normalized_desired" FIBE_CLI_VERSION= FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" sh "$installer"
   fi
 
   if [ "$(id -u)" = "0" ]; then
@@ -340,6 +344,10 @@ ensure_runtime_fibe() {
   fi
 
   installed_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
+  if [ -n "$normalized_desired" ] && [ "$installed_version" != "$normalized_desired" ]; then
+    echo "[entrypoint] ERROR: requested fibe ${normalized_desired}, installed ${installed_version:-unknown}" >&2
+    return 1
+  fi
   echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
 }
 
