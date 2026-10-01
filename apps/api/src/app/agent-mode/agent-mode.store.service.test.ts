@@ -29,8 +29,9 @@ describe('AgentModeStoreService', () => {
   });
 
   afterEach(async () => {
+    const cleanupDir = dataDir;
     await Promise.all(services.map((service) => service.onModuleDestroy()));
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(cleanupDir, { recursive: true, force: true });
   });
 
   test('get returns default mode when no file exists', () => {
