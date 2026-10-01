@@ -4,6 +4,9 @@ import { run } from './lib.mjs';
 
 const geminiBin = 'tests/bin/gemini';
 
+console.log('--> Running unit tests');
+await run('bun', ['run', 'test']);
+
 console.log('--> Running Integration tests');
 if (existsSync(geminiBin)) {
   const content = await readFile(geminiBin, 'utf8');
