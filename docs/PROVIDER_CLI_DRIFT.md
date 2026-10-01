@@ -4,13 +4,16 @@ How `fibe-agent` manages provider CLI versions.
 
 ## Version policy
 
-Pin npm-distributed CLIs in `package.json` when possible. Codex and Gemini are the current exceptions.
+Provider CLIs are pinned by the shared image installer for both production and
+development images. `package.json` declares exact versions for Claude Code,
+OpenAI Codex, Gemini and OpenCode. `scripts/provider-versions.json` declares
+Cursor's versioned download and Antigravity's architecture-specific archives
+and checksums. Missing pins fail installation rather than selecting latest.
 
-- Docker builds extract Claude Code, OpenAI Codex, and OpenCode versions from `package.json`.
-- OpenAI Codex is currently declared as the caret range `^0.125.0`. Docker extracts `0.125.0` from that string, but local installs can float within the `0.125.x` range unless the lockfile is used.
-- Gemini is absent from `package.json` and both Dockerfiles install its latest release. Treat it as higher risk until pinned.
-- Cursor and Antigravity (`agy`) use official installers and are checked with `--help` during builds. Re-audit them when their installers change or support version pins.
-- Local and standalone setups should use `bun install` and the lockfile. Use npm only for compatibility tests.
+The installed CLI must pass `--version` and `--help`. Refresh pins against
+official registries/installers, then verify provider contracts before publishing.
+Local and standalone setups should use `bun install` and the lockfile. Use npm
+only for compatibility tests.
 
 ## Configuration
 
@@ -24,4 +27,4 @@ Planned, not implemented. Supporting several CLI versions requires CI coverage f
 
 ## Deprecation warnings
 
-Planned, not implemented. Provider strategies may parse transport-specific stderr, but `AbstractCliStrategy` does not classify deprecation warnings. Pins protect supported providers; CI and provider tests must catch drift in unpinned CLIs, especially Gemini.
+Planned, not implemented. Provider strategies may parse transport-specific stderr, but `AbstractCliStrategy` does not classify deprecation warnings. Pins protect supported providers; CI and provider tests must catch protocol drift when pinned releases change.

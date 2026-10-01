@@ -54,7 +54,9 @@ agentRuntimeFiles:
         - Prefer functional components with hooks
         - Use CSS modules or Tailwind for styling
 
-cliVersion: '2026.09.28-64d2043'
+# Provider CLI snapshot: 2026.09.28-64d2043 (pinned by the agent image).
+# cliVersion selects the FIBE CLI used by MCP tools.
+cliVersion: '0.2.46'
 
 providerArgs:
   trust: true
