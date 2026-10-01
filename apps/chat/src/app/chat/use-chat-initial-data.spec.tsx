@@ -30,7 +30,11 @@ describe('useChatInitialData', () => {
   it('when authenticated fetches messages and model options', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ['gpt-4', 'claude'] });
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ['gpt-4', 'claude'],
+      });
     const { result } = renderHook(() => useChatInitialData(true), { wrapper });
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalled();
@@ -46,14 +50,22 @@ describe('useChatInitialData', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => [{ role: 'user', body: 'thread body', created_at: '2026-01-01' }],
+        json: async () => [
+          { role: 'user', body: 'thread body', created_at: '2026-01-01' },
+        ],
       })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
 
-    const { result } = renderHook(() => useChatInitialData(true, 'thread-123'), { wrapper });
+    const { result } = renderHook(
+      () => useChatInitialData(true, 'thread-123'),
+      { wrapper },
+    );
 
     await waitFor(() => {
-      expect(mockApiRequest).toHaveBeenCalledWith('/api/conversations/thread-123/messages', undefined);
+      expect(mockApiRequest).toHaveBeenCalledWith(
+        '/api/conversations/thread-123/messages',
+        undefined,
+      );
     });
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
@@ -67,12 +79,18 @@ describe('useChatInitialData', () => {
   });
 
   it('setMessages updates messages', async () => {
-    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
     const { result } = renderHook(() => useChatInitialData(true), { wrapper });
     await waitFor(() => {
       expect(mockApiRequest).toHaveBeenCalled();
     });
-    result.current.setMessages([{ role: 'user', body: 'hi', created_at: '2020-01-01' }] as ChatListItem[]);
+    result.current.setMessages([
+      { role: 'user', body: 'hi', created_at: '2020-01-01' },
+    ] as ChatListItem[]);
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
       const first = result.current.messages[0];
@@ -85,20 +103,31 @@ describe('useChatInitialData', () => {
       .mockResolvedValueOnce({
         ok: true,
         status: 200,
-        json: async () => [{ role: 'user', body: 'persisted', created_at: '2026-01-01' }],
+        json: async () => [
+          { role: 'user', body: 'persisted', created_at: '2026-01-01' },
+        ],
       })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
 
-    const { result } = renderHook(() => useChatInitialData(true, 'thread-1'), { wrapper });
+    const { result } = renderHook(() => useChatInitialData(true, 'thread-1'), {
+      wrapper,
+    });
     await waitFor(() => {
       expect(result.current.messages).toHaveLength(1);
     });
 
     act(() => {
-      result.current.setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', body: 'local response', created_at: '2026-01-01' },
-      ] as ChatListItem[]);
+      result.current.setMessages(
+        (prev) =>
+          [
+            ...prev,
+            {
+              role: 'assistant',
+              body: 'local response',
+              created_at: '2026-01-01',
+            },
+          ] as ChatListItem[],
+      );
     });
     expect(result.current.messages).toHaveLength(2);
 
@@ -119,7 +148,9 @@ describe('useChatInitialData', () => {
       .mockRejectedValueOnce(new Error('network'))
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
 
-    const { result } = renderHook(() => useChatInitialData(true, 'thread-1'), { wrapper });
+    const { result } = renderHook(() => useChatInitialData(true, 'thread-1'), {
+      wrapper,
+    });
 
     await waitFor(() => {
       expect(result.current.messagesLoaded).toBe(true);
@@ -128,7 +159,6 @@ describe('useChatInitialData', () => {
   });
 
   it('refreshModelOptions calls POST and updates modelOptions', async () => {
-    // Setup: initial load returns empty
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] });
@@ -138,7 +168,6 @@ describe('useChatInitialData', () => {
     });
     expect(result.current.modelOptions).toEqual([]);
 
-    // Refresh returns new models
     mockApiRequest.mockResolvedValueOnce({
       ok: true,
       status: 200,
@@ -149,7 +178,9 @@ describe('useChatInitialData', () => {
       await result.current.refreshModelOptions();
     });
 
-    expect(mockApiRequest).toHaveBeenCalledWith('/api/model-options/refresh', { method: 'POST' });
+    expect(mockApiRequest).toHaveBeenCalledWith('/api/model-options/refresh', {
+      method: 'POST',
+    });
     expect(result.current.modelOptions).toEqual(['model-a', 'model-b']);
     expect(result.current.refreshingModels).toBe(false);
   });
@@ -157,13 +188,16 @@ describe('useChatInitialData', () => {
   it('refreshModelOptions keeps existing options on error', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => ['existing'] });
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ['existing'],
+      });
     const { result } = renderHook(() => useChatInitialData(true), { wrapper });
     await waitFor(() => {
       expect(result.current.modelOptions).toEqual(['existing']);
     });
 
-    // Refresh fails
     mockApiRequest.mockRejectedValueOnce(new Error('network'));
 
     await act(async () => {

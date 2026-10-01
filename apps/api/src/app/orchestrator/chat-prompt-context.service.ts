@@ -30,9 +30,15 @@ export class ChatPromptContextService {
     conversationId?: string,
   ): Promise<string> {
     const historyContext = this.buildHistoryContext(historyMessages);
-    const imageContext = await this.buildImageContext(imageUrls, conversationId);
+    const imageContext = await this.buildImageContext(
+      imageUrls,
+      conversationId,
+    );
     const voiceContext = this.buildVoiceContext(audioFilename, conversationId);
-    const attachmentContext = await this.buildAttachmentContext(attachmentFilenames ?? [], conversationId);
+    const attachmentContext = await this.buildAttachmentContext(
+      attachmentFilenames ?? [],
+      conversationId,
+    );
     const fileContext = await this.buildFileContext(text);
     return `${historyContext}${fileContext}${imageContext}${voiceContext}${attachmentContext}\n${text}`.trim();
   }
@@ -44,20 +50,21 @@ export class ChatPromptContextService {
     let totalChars = 0;
     for (const msg of recent) {
       const role = msg.role === 'user' ? 'User' : 'Assistant';
-      const body = msg.body.length > 2000 ? msg.body.slice(0, 2000) + '…' : msg.body;
+      const body =
+        msg.body.length > 2000 ? msg.body.slice(0, 2000) + '…' : msg.body;
       const line = `${role}: ${body}`;
       if (totalChars + line.length > MAX_HISTORY_CHARS) break;
       lines.push(line);
       totalChars += line.length;
     }
     if (!lines.length) return '';
-    return `\n\n[Conversation History — ${lines.length} prior messages]\n${lines.join('\n')}\n[End of Conversation History]\n\n`;
+    return `\n\n[Conversation History: ${lines.length} prior messages]\n${lines.join('\n')}\n[End of Conversation History]\n\n`;
   }
 
   /**
    * Prepends a system-level MCP tool hint block to the user message text.
    * This is injected only when GemmaRouter returns a high-confidence suggestion.
-   * The stored chat history is never affected — only the built prompt changes.
+   * The stored chat history is never affected: only the built prompt changes.
    */
   injectToolHint(text: string, tools: string[], confidence: number): string {
     if (!tools.length) return text;
@@ -76,23 +83,33 @@ export class ChatPromptContextService {
     return `[MODE]${mode}[/MODE]\n${text}`;
   }
 
-  private async buildImageContext(imageUrls: string[], conversationId?: string): Promise<string> {
+  private async buildImageContext(
+    imageUrls: string[],
+    conversationId?: string,
+  ): Promise<string> {
     if (!imageUrls.length) return '';
     const strings: string[] = [];
     for (const f of imageUrls) {
       const p = this.uploadsService.getPath(f, conversationId);
       if (!p) continue;
-      
+
       let infoStr = `- ${p}\n`;
       if (!this.uploadsService.supportsImageOcr(f)) {
-        infoStr += '  OCR: unavailable for this image format; visual reference only.\n';
+        infoStr +=
+          '  OCR: unavailable for this image format; visual reference only.\n';
         strings.push(infoStr);
         continue;
       }
 
-      const info = await this.uploadsService.extractImageInfo(f, conversationId);
+      const info = await this.uploadsService.extractImageInfo(
+        f,
+        conversationId,
+      );
       if (info) {
-        const dimensions = (info.width && info.height) ? `${info.width}x${info.height} pixels` : '';
+        const dimensions =
+          info.width && info.height
+            ? `${info.width}x${info.height} pixels`
+            : '';
         const format = info.format || '';
         const meta = [dimensions, format].filter(Boolean).join(' ');
         if (meta) {
@@ -111,13 +128,21 @@ export class ChatPromptContextService {
       : '';
   }
 
-  private buildVoiceContext(audioFilename: string | null, conversationId?: string): string {
+  private buildVoiceContext(
+    audioFilename: string | null,
+    conversationId?: string,
+  ): string {
     if (!audioFilename) return '';
     const path = this.uploadsService.getPath(audioFilename, conversationId);
-    return path ? `\n\nThe user attached a voice recording. File path: ${path}\n\n` : '';
+    return path
+      ? `\n\nThe user attached a voice recording. File path: ${path}\n\n`
+      : '';
   }
 
-  private async buildAttachmentContext(attachmentFilenames: string[], conversationId?: string): Promise<string> {
+  private async buildAttachmentContext(
+    attachmentFilenames: string[],
+    conversationId?: string,
+  ): Promise<string> {
     if (!attachmentFilenames.length) return '';
     const entries: string[] = [];
     for (const filename of attachmentFilenames) {
@@ -129,14 +154,21 @@ export class ChatPromptContextService {
       }
       let entry = `- ${path}\n  Type: image visual reference. Inspect this file when visual details matter.`;
       if (!this.uploadsService.supportsImageOcr(filename)) {
-        entry += '\n  OCR: unavailable for this image format; visual reference only.';
+        entry +=
+          '\n  OCR: unavailable for this image format; visual reference only.';
         entries.push(entry);
         continue;
       }
 
-      const info = await this.uploadsService.extractImageInfo(filename, conversationId);
+      const info = await this.uploadsService.extractImageInfo(
+        filename,
+        conversationId,
+      );
       if (info) {
-        const dimensions = (info.width && info.height) ? `${info.width}x${info.height} pixels` : '';
+        const dimensions =
+          info.width && info.height
+            ? `${info.width}x${info.height} pixels`
+            : '';
         const format = info.format || '';
         const meta = [dimensions, format].filter(Boolean).join(' ');
         if (meta) {
@@ -161,7 +193,9 @@ export class ChatPromptContextService {
 
   private async buildFileContext(text: string): Promise<string> {
     const atPathRegex = /@([^\s@]+)/g;
-    const atPaths = [...new Set((text.match(atPathRegex) ?? []).map((m) => m.slice(1)))];
+    const atPaths = [
+      ...new Set((text.match(atPathRegex) ?? []).map((m) => m.slice(1))),
+    ];
     if (!atPaths.length) return '';
     const blocks: string[] = [];
     for (const relPath of atPaths) {
@@ -170,7 +204,8 @@ export class ChatPromptContextService {
         blocks.push(`--- ${relPath} ---\n${content}\n---`);
       } catch {
         try {
-          const files = await this.playgroundsService.getFolderFileContents(relPath);
+          const files =
+            await this.playgroundsService.getFolderFileContents(relPath);
           for (const { path: p, content } of files) {
             blocks.push(`--- ${p} ---\n${content}\n---`);
           }

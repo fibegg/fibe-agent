@@ -17,7 +17,7 @@ const banner = `
 %c  ▶ fibegg  ·  fibe
 %c  ${VERSION}
 %c
-  Your future development
+  Agent workspace
 
   %cREPO:%c ${REPO_URL}
 `;
@@ -25,16 +25,28 @@ const banner = `
 export function logConsoleBanner(): void {
   const borderStyle = `color: ${THINKING_BLUE}; font-family: monospace; font-size: 10px; line-height: 1.2; letter-spacing: 1px; text-shadow: 0 0 8px ${THINKING_BLUE}, 0 0 12px ${THINKING_BLUE};`;
   const logoStyle = `color: ${FIBE_GREEN}; font-family: monospace; font-size: 10px; line-height: 1.2; letter-spacing: 1px; text-shadow: 0 0 12px ${FIBE_GREEN};`;
-  
+
   console.log(
     banner,
     borderStyle,
-    borderStyle, logoStyle, borderStyle,
-    borderStyle, logoStyle, borderStyle,
-    borderStyle, logoStyle, borderStyle,
-    borderStyle, logoStyle, borderStyle,
-    borderStyle, logoStyle, borderStyle,
-    borderStyle, logoStyle, borderStyle,
+    borderStyle,
+    logoStyle,
+    borderStyle,
+    borderStyle,
+    logoStyle,
+    borderStyle,
+    borderStyle,
+    logoStyle,
+    borderStyle,
+    borderStyle,
+    logoStyle,
+    borderStyle,
+    borderStyle,
+    logoStyle,
+    borderStyle,
+    borderStyle,
+    logoStyle,
+    borderStyle,
     borderStyle,
     `color: ${FIBE_GREEN}; font-family: monospace; font-size: 12px; font-weight: bold; text-shadow: 0 0 6px ${FIBE_GREEN};`,
     `color: ${DIM}; font-family: monospace; font-size: 11px;`,

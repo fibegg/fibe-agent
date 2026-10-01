@@ -4,8 +4,18 @@ import { render, screen, fireEvent, act } from '@testing-library/react';
 import { SidebarStatsBar } from './sidebar-stats-bar';
 import type { StoryEntry } from './agent-thinking-utils';
 
-const emptyStats = { totalActions: 0, completed: 0, processing: 0, sessionTimeMs: 0 };
-const filledStats = { totalActions: 10, completed: 8, processing: 1, sessionTimeMs: 5000 };
+const emptyStats = {
+  totalActions: 0,
+  completed: 0,
+  processing: 0,
+  sessionTimeMs: 0,
+};
+const filledStats = {
+  totalActions: 10,
+  completed: 8,
+  processing: 1,
+  sessionTimeMs: 5000,
+};
 const brainClasses = { brain: 'text-primary', accent: 'text-primary' };
 
 describe('SidebarStatsBar', () => {
@@ -18,7 +28,9 @@ describe('SidebarStatsBar', () => {
     vi.clearAllMocks();
   });
 
-  function renderBar(overrides: Partial<React.ComponentProps<typeof SidebarStatsBar>> = {}) {
+  function renderBar(
+    overrides: Partial<React.ComponentProps<typeof SidebarStatsBar>> = {},
+  ) {
     return render(
       <SidebarStatsBar
         sessionStats={filledStats}
@@ -29,28 +41,29 @@ describe('SidebarStatsBar', () => {
         sessionTokenUsage={null}
         fullStoryItems={[] as StoryEntry[]}
         {...overrides}
-      />
+      />,
     );
   }
 
   it('renders the activity button', () => {
     renderBar();
-    expect(screen.getByRole('button', { name: /activity/i, hidden: true })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /activity/i, hidden: true }),
+    ).toBeTruthy();
   });
 
   it('shows empty state message when all stats are zero', () => {
     renderBar({ sessionStats: emptyStats });
-    expect(screen.getByText(/not the droids/i)).toBeTruthy();
+    expect(screen.getByText('No activity yet.')).toBeTruthy();
   });
 
   it('does not show empty message when stats are non-zero', () => {
     renderBar({ sessionStats: filledStats });
-    expect(screen.queryByText(/not the droids/i)).toBeNull();
+    expect(screen.queryByText('No activity yet.')).toBeNull();
   });
 
   it('shows stat counts when non-zero stats provided', () => {
     renderBar({ sessionStats: filledStats });
-    // CountUpNumber renders the value; check for the stat wrapper
     expect(screen.getAllByRole('tooltip').length).toBeGreaterThanOrEqual(3);
   });
 
@@ -66,7 +79,6 @@ describe('SidebarStatsBar', () => {
 
   it('shows Brain icon when not animating', () => {
     const { container } = renderBar({ downloadAnimating: false });
-    // The Brain svg icon is present but no brain-download-anim class
     expect(container.querySelector('.brain-download-anim')).toBeNull();
   });
 
@@ -97,9 +109,16 @@ describe('SidebarStatsBar', () => {
     const onRunCopy = vi.fn();
     renderBar({ onRunCopy });
 
-    // Mock getBoundingClientRect
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
-      left: 100, right: 200, top: 50, bottom: 80, width: 100, height: 30, x: 100, y: 50, toJSON: () => ({}),
+      left: 100,
+      right: 200,
+      top: 50,
+      bottom: 80,
+      width: 100,
+      height: 30,
+      x: 100,
+      y: 50,
+      toJSON: () => ({}),
     });
 
     const btn = screen.getByRole('button', { name: /activity/i, hidden: true });
@@ -114,7 +133,15 @@ describe('SidebarStatsBar', () => {
     renderBar({ onRunCopy });
 
     vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
-      left: 0, right: 100, top: 0, bottom: 30, width: 100, height: 30, x: 0, y: 0, toJSON: () => ({}),
+      left: 0,
+      right: 100,
+      top: 0,
+      bottom: 30,
+      width: 100,
+      height: 30,
+      x: 0,
+      y: 0,
+      toJSON: () => ({}),
     });
 
     const btn = screen.getByRole('button', { name: /activity/i, hidden: true });

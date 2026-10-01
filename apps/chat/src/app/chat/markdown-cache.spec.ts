@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderMarkdown, clearMarkdownCache, getMarkdownCacheSize } from './markdown-cache';
+import {
+  renderMarkdown,
+  clearMarkdownCache,
+  getMarkdownCacheSize,
+} from './markdown-cache';
 
 describe('markdown-cache', () => {
   beforeEach(() => clearMarkdownCache());
@@ -43,7 +47,7 @@ describe('markdown-cache', () => {
   });
 
   it('passes block-level HTML pre through marked unchanged', () => {
-    const raw = "<pre>function test() { return 1; }</pre>";
+    const raw = '<pre>function test() { return 1; }</pre>';
     expect(renderMarkdown(raw)).toBe(raw);
   });
 
@@ -64,7 +68,6 @@ describe('markdown-cache', () => {
   });
 
   it('handles raw HTML tags in markdown input', () => {
-    // marked passes block-level HTML through unchanged; verify it renders
     const input = '<script>alert("xss")</script>';
     const result = renderMarkdown(input);
     expect(typeof result).toBe('string');

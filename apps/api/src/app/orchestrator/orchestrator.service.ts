@@ -1,6 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { exec } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -10,7 +10,10 @@ import { ConfigService } from '../config/config.service';
 import { ActivityStoreService } from '../activity-store/activity-store.service';
 import {
   MessageStoreService,
+  StoreGenerationChangedError,
   type StoredStoryEntry,
+  type StoredMessage,
+  type StoredApiRequest,
 } from '../message-store/message-store.service';
 import { FibeSyncService } from '../fibe-sync/fibe-sync.service';
 import { ModelStoreService } from '../model-store/model-store.service';
@@ -78,11 +81,27 @@ type ControlTargetResolution =
   | { accepted: true; ctx: SessionContext }
   | { accepted: false; result: AgentControlResult };
 
+type ApiSendResult = {
+  accepted: boolean;
+  messageId?: string;
+  error?: string;
+  reason?: string;
+  conversationId?: string;
+  resolvedPolicy?: string;
+  queueCount?: number;
+  executionState?: StoredApiRequest['state'];
+};
+
+type ApiAdmission = { id: string; metadata: StoredApiRequest; existing?: StoredMessage };
+
 @Injectable()
 export class OrchestratorService implements OnModuleInit {
   private readonly logger = new Logger(OrchestratorService.name);
-  /** Shared auth state — if provider is authed, all sessions benefit. */
+  /** Shared auth state: if provider is authed, all sessions benefit. */
   private sharedIsAuthenticated = false;
+  private readonly acceptedRequestIds = new Set<string>();
+  private readonly steeredRequestIds = new Map<string, Set<string>>();
+  private readonly requestAdmissions = new Map<string, { fingerprint: string; result: Promise<ApiSendResult> }>();
   /** Cached system prompt shared across all sessions. */
   private sharedSystemPromptFromFile: string | null = null;
 
@@ -132,7 +151,6 @@ export class OrchestratorService implements OnModuleInit {
       }
     }
 
-    // Forward local MCP tool WS events (ask_user_prompt, confirm_action_prompt, etc.) to the chat UI
     this.localMcp.outbound$.subscribe((event) => {
       const data = event.data as Record<string, unknown>;
       const conversationId =
@@ -148,14 +166,11 @@ export class OrchestratorService implements OnModuleInit {
       }
     });
 
-    // Register mode accessors so local tools can read/write the agent mode
     this.localMcp.registerModeAccessors(
       () => this.agentModeStore.get(),
       (mode) => this.setAgentMode(mode),
     );
 
-    // Pre-fetch optional HTTP MCP tool descriptions for Gemma classification (non-blocking).
-    // Claude and other agent clients discover stdio MCP tools themselves.
     if (this.config.isGemmaRouterEnabled()) {
       void this.gemmaMcpTools.refresh();
     }
@@ -185,6 +200,37 @@ export class OrchestratorService implements OnModuleInit {
         this.logger.error(`Error during hydration: ${err}`);
       }
     }
+    await this.recoverPendingApiRequests(true);
+  }
+
+  /** Re-admit only persisted turns that never crossed the provider-effect boundary. */
+  async recoverPendingApiRequests(interrupted = false): Promise<void> {
+    const records = this.apiRequestMessages();
+    for (const { store, message } of records) {
+      if ((interrupted && message.apiRequest?.state === 'running') || (message.apiRequest?.state === 'pending' && !store.matchesGeneration(message.apiRequest.storeGeneration))) {
+        await store.updateRequestState(message.id, 'outcome_unknown');
+      }
+    }
+    for (const { message } of records.sort((a, b) => {
+      const conversation = a.conversationId.localeCompare(b.conversationId);
+      if (conversation) return conversation;
+      const order = (a.message.apiRequest?.queueOrder ?? -1) - (b.message.apiRequest?.queueOrder ?? -1);
+      if (order) return order;
+      return a.message.created_at.localeCompare(b.message.created_at);
+    })) {
+      const request = message.apiRequest;
+      if (request?.state !== 'pending') continue;
+      await this.sendMessageFromApi(request.text, request.conversationId, request.images,
+        message.attachmentFilenames, request.busyPolicy, message.id, request.storeGeneration);
+    }
+  }
+
+  private apiRequestMessages(): Array<{ store: MessageStoreService; message: StoredMessage; conversationId: string }> {
+    const ids = new Set(['default', ...this.conversationManager.list().map((meta) => meta.id)]);
+    return [...ids].flatMap((conversationId) => {
+      const store = this.conversationManager.get(conversationId)?.messageStore;
+      return store ? store.all().filter((message) => message.apiRequest).map((message) => ({ store, message, conversationId })) : [];
+    });
   }
 
   /** Backward-compat: shared authentication flag for REST endpoint */
@@ -235,7 +281,6 @@ export class OrchestratorService implements OnModuleInit {
 
   private finishStreamDeps(ctx: SessionContext): FinishAgentStreamDeps {
     const { messageStore: fMsg, activityStore: fAct } = this.stores(ctx);
-    // Fan-out stream-completion events to all tabs watching this conversation.
     const bcast = (type: string, data?: Record<string, unknown>) =>
       this.sessionRegistry.broadcastToConversation(
         ctx.conversationId,
@@ -271,10 +316,7 @@ export class OrchestratorService implements OnModuleInit {
     ]);
   }
 
-  /**
-   * Validate, persist, and broadcast a new agent mode.
-   * Returns the resolved display string, or `null` when the mode is invalid.
-   */
+  /** Returns the resolved mode label, or null when invalid. */
   setAgentMode(mode: string): AgentModeValue | null {
     const resolved = this.agentModeStore.set(mode);
     if (!resolved) return null;
@@ -407,7 +449,6 @@ export class OrchestratorService implements OnModuleInit {
   private async checkAndSendAuthStatus(ctx: SessionContext): Promise<void> {
     const authenticated = await ctx.strategy.checkAuthStatus();
     this.sharedIsAuthenticated = authenticated;
-    // Single pass: set auth flag, compute anyProcessing, and emit — no repeated all() calls
     const sessions = this.sessionRegistry.all();
     const anyProcessing = sessions.some((s) => s.isProcessing);
     for (const s of sessions) {
@@ -471,7 +512,6 @@ export class OrchestratorService implements OnModuleInit {
   private handleLogout(ctx: SessionContext): void {
     ctx.strategy.cancelAuth();
     this.setAllSessionsAuthenticated(false);
-    // Single pass: clear processing flag on all sessions
     for (const s of this.sessionRegistry.all()) s.isProcessing = false;
     this.sessionRegistry.broadcast(WS_EVENT.AUTH_STATUS, {
       status: AUTH_STATUS_VAL.UNAUTHENTICATED,
@@ -485,6 +525,9 @@ export class OrchestratorService implements OnModuleInit {
     this.sharedIsAuthenticated = authenticated;
     for (const s of this.sessionRegistry.all())
       s.isAuthenticated = authenticated;
+    if (authenticated) {
+      void this.recoverPendingApiRequests().catch(() => this.logger.warn('Pending caller request recovery failed'));
+    }
   }
 
   async sendMessageFromApi(
@@ -493,76 +536,91 @@ export class OrchestratorService implements OnModuleInit {
     images?: string[],
     attachmentFilenames?: string[],
     busyPolicy: BusyPolicy = 'reject',
-  ): Promise<{
-    accepted: boolean;
-    messageId?: string;
-    error?: string;
-    reason?: string;
-    conversationId?: string;
-    resolvedPolicy?: string;
-    queueCount?: number;
-  }> {
-    const requestedConversationId = conversationId?.trim();
-    const activeProcessing = this.processingSessions();
-    if (
-      (busyPolicy === 'queue' || busyPolicy === 'steer') &&
-      activeProcessing.length > 0
-    ) {
-      const resolution = this.resolveControlTarget(
-        requestedConversationId,
-        busyPolicy,
-      );
-      if (!resolution.accepted) {
-        return this.controlFailureForSendMessage(resolution.result);
-      }
-      const result = await this.acceptBusyMessage(
-        resolution.ctx,
-        resolution.ctx,
-        {
-          text,
-          images,
-          attachmentFilenames,
-          busyPolicy,
-        },
-      );
-      return {
-        ...result,
-        conversationId: resolution.ctx.conversationId,
-        queueCount: resolution.ctx.queuedTurns.length,
-      };
+    requestId?: string,
+    storeGeneration?: string,
+  ): Promise<ApiSendResult> {
+    if (!requestId) return this.sendApiMessage(text, conversationId, images, attachmentFilenames, busyPolicy);
+    requestId = requestId.toLowerCase();
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
+      return { accepted: false, error: 'Invalid requestId' };
     }
+    const scope = this.resolveDeliveryScope(conversationId, false);
+    if (!scope.accepted) return scope;
+    const scopedStore = this.conversationManager.get(scope.conversationId)?.messageStore;
+    if (!scopedStore?.matchesGeneration(storeGeneration)) {
+      return { accepted: false, messageId: requestId, error: 'STORE_GENERATION_CHANGED' };
+    }
+    conversationId = scope.conversationId;
+    const fingerprint = createHash('sha256').update(JSON.stringify([
+      text.trim(), conversationId?.trim() || null, images ?? [], attachmentFilenames ?? [], busyPolicy,
+    ])).digest('hex');
+    const inFlight = this.requestAdmissions.get(requestId);
+    if (inFlight) return inFlight.fingerprint === fingerprint ? inFlight.result : { accepted: false, error: 'REQUEST_ID_CONFLICT' };
+    const existing = this.apiRequestMessages().find(({ message }) => message.id === requestId);
+    if (existing) {
+      const request = existing.message.apiRequest;
+      if (!request) return { accepted: false, error: 'REQUEST_ID_CONFLICT' };
+      if (request.fingerprint !== fingerprint) return { accepted: false, error: 'REQUEST_ID_CONFLICT' };
+      if (request.storeGeneration !== storeGeneration) return { accepted: false, messageId: requestId, error: 'REQUEST_OUTCOME_UNKNOWN' };
+      if (request.state === 'outcome_unknown') return {
+        accepted: false, messageId: requestId, error: 'REQUEST_OUTCOME_UNKNOWN',
+        conversationId: existing.conversationId, executionState: request.state,
+      };
+      if (request.state !== 'pending' || this.acceptedRequestIds.has(requestId)) {
+        return { accepted: true, messageId: requestId, conversationId: existing.conversationId, executionState: request.state };
+      }
+    }
+    const metadata = existing?.message.apiRequest ?? {
+      storeGeneration,
+      fingerprint, text: text.trim(), conversationId: conversationId?.trim() || undefined, busyPolicy,
+      images, queueOrder: -1, state: 'pending' as const,
+    };
+    const result = this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
+      { id: requestId, metadata, existing: existing?.message });
+    this.requestAdmissions.set(requestId, { fingerprint, result });
+    try {
+      const outcome = await result;
+      if (outcome.accepted) this.acceptedRequestIds.add(requestId);
+      return outcome.accepted ? { ...outcome, executionState: metadata.state } : outcome;
+    } catch (error) {
+      if (error instanceof StoreGenerationChangedError) return { accepted: false, messageId: requestId, error: 'STORE_GENERATION_CHANGED' };
+      throw error;
+    } finally {
+      this.requestAdmissions.delete(requestId);
+    }
+  }
 
-    if (!requestedConversationId && activeProcessing.length > 0) {
-      if (activeProcessing.length > 1) {
-        return {
-          accepted: false,
-          error: ERROR_CODE.AGENT_BUSY,
-          reason: 'Multiple active agent runs; provide conversationId.',
-        };
-      }
-      const onlyActive = activeProcessing[0];
-      return {
-        accepted: false,
-        error: ERROR_CODE.AGENT_BUSY,
-        reason: 'Agent run is active; provide conversationId or a queue/steer busyPolicy.',
-        ...(onlyActive ? { conversationId: onlyActive.conversationId } : {}),
-      };
+  /** Resolve once before the caller pins its receipt; ordinary status never calls this. */
+  resolveDeliveryScope(conversationId?: string, createGeneration = true):
+    { accepted: true; conversationId: string; storeGeneration?: string } | { accepted: false; error: string } {
+    let target = conversationId?.trim();
+    if (!target) {
+      const active = this.processingSessions();
+      if (active.length > 1) return { accepted: false, error: 'Multiple active agent runs; provide conversationId.' };
+      target = active[0]?.conversationId ?? INBOX_CONVERSATION_ID;
     }
+    const stores = this.conversationManager.get(target);
+    if (!stores) return { accepted: false, error: 'Conversation not found' };
+    return { accepted: true, conversationId: target, ...(createGeneration ? { storeGeneration: stores.messageStore.deliveryGeneration() } : {}) };
+  }
+
+  private async sendApiMessage(
+    text: string,
+    conversationId?: string,
+    images?: string[],
+    attachmentFilenames?: string[],
+    busyPolicy: BusyPolicy = 'reject',
+    admission?: ApiAdmission,
+  ): Promise<ApiSendResult> {
+    const requestedConversationId = conversationId?.trim();
+    const busyResult = this.routeBusyApiMessage(
+      text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission,
+    );
+    if (busyResult) return busyResult;
 
     const targetConversationId = requestedConversationId || INBOX_CONVERSATION_ID;
     if (!this.conversationManager.get(targetConversationId)) {
       return { accepted: false, error: 'Conversation not found' };
-    }
-
-    const processing =
-      this.sessionRegistry.processingForConversation(targetConversationId);
-    if (processing) {
-      return this.acceptBusyMessage(processing, processing, {
-        text,
-        images,
-        attachmentFilenames,
-        busyPolicy,
-      });
     }
 
     let ctx = this.findIdleSession(targetConversationId);
@@ -572,27 +630,79 @@ export class OrchestratorService implements OnModuleInit {
     await this.checkAndSendAuthStatus(ctx);
     if (!ctx.isAuthenticated)
       return { accepted: false, error: ERROR_CODE.NEED_AUTH };
-    ctx.isProcessing = true;
-    const {
-      messageId,
-      text: _text,
-      imageUrls: urls,
-      audioFilename: af,
-      attachmentFilenames: att,
-    } = await this.addUserMessageAndEmit(
-      ctx,
-      text,
-      images,
-      undefined,
-      undefined,
-      attachmentFilenames,
+    // Authentication yields: another REST or WebSocket request may have claimed
+    // this conversation in the meantime. Recheck before reserving the session.
+    const busyAfterAuth = this.routeBusyApiMessage(
+      text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission,
     );
-    void this.runAgentResponse(ctx, _text, urls, af, att)
+    if (busyAfterAuth) return busyAfterAuth;
+    ctx.isProcessing = true;
+    let prepared: Awaited<ReturnType<OrchestratorService['addUserMessageAndEmit']>>;
+    try {
+      prepared = await this.addUserMessageAndEmit(
+        ctx, text, images, undefined, undefined, attachmentFilenames, admission,
+      );
+    } catch (error) {
+      ctx.isProcessing = false;
+      // A queue request may have arrived during preparation. Preserve that turn
+      // and let it run after releasing this failed request's reservation.
+      void this.drainQueuedTurns(ctx).catch((err) =>
+        this.logger.warn('REST queued-message recovery failed', err),
+      );
+      throw error;
+    }
+    const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } = prepared;
+    void this.runAgentResponse(ctx, _text, urls, af, att, admission?.id)
       .then(() => this.drainQueuedTurns(ctx))
       .catch((err) =>
         this.logger.warn('REST send-message agent run failed', err),
       );
     return { accepted: true, messageId, conversationId: ctx.conversationId };
+  }
+
+  /** Synchronous idle inspection; only an already-busy route returns a promise. */
+  private routeBusyApiMessage(
+    text: string,
+    requestedConversationId: string | undefined,
+    images: string[] | undefined,
+    attachmentFilenames: string[] | undefined,
+    busyPolicy: BusyPolicy,
+    admission?: ApiAdmission,
+  ): ReturnType<OrchestratorService['sendMessageFromApi']> | null {
+    const activeProcessing = this.processingSessions();
+    let processing: SessionContext | undefined;
+    if ((busyPolicy === 'queue' || busyPolicy === 'steer') && activeProcessing.length > 0) {
+      const resolution = this.resolveControlTarget(requestedConversationId, busyPolicy);
+      if (!resolution.accepted) {
+        return Promise.resolve(this.controlFailureForSendMessage(resolution.result));
+      }
+      processing = resolution.ctx;
+    } else if (!requestedConversationId && activeProcessing.length > 0) {
+      const onlyActive = activeProcessing.length === 1 ? activeProcessing[0] : undefined;
+      return Promise.resolve({
+        accepted: false,
+        error: ERROR_CODE.AGENT_BUSY,
+        reason: onlyActive
+          ? 'Agent run is active; provide conversationId or a queue/steer busyPolicy.'
+          : 'Multiple active agent runs; provide conversationId.',
+        ...(onlyActive ? { conversationId: onlyActive.conversationId } : {}),
+      });
+    } else {
+      const targetConversationId = requestedConversationId || INBOX_CONVERSATION_ID;
+      if (!this.conversationManager.get(targetConversationId)) {
+        return Promise.resolve({ accepted: false, error: 'Conversation not found' });
+      }
+      processing = this.sessionRegistry.processingForConversation(targetConversationId);
+    }
+    if (!processing) return null;
+    const target = processing;
+    return this.acceptBusyMessage(target, target, {
+      text, images, attachmentFilenames, busyPolicy, admission,
+    }).then((result) => ({
+      ...result,
+      conversationId: target.conversationId,
+      queueCount: target.queuedTurns.length,
+    }));
   }
 
   interruptFromApi(conversationId?: string): AgentControlResult {
@@ -710,8 +820,13 @@ export class OrchestratorService implements OnModuleInit {
         turn.displayText &&
         ctx.strategy.steerAgent
       ) {
+        if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) {
+          await this.stores(ctx).messageStore.updateRequestState(turn.messageId, 'running');
+          this.stores(ctx).messageStore.assertRequestGeneration(turn.messageId);
+        }
         const steerResult = await ctx.strategy.steerAgent(turn.displayText);
         if (steerResult === 'handled') {
+          if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) this.trackSteeredRequest(ctx, turn.messageId);
           ctx.queuedTurns = ctx.queuedTurns.filter((queued) => queued !== turn);
           return {
             updated: true,
@@ -761,6 +876,7 @@ export class OrchestratorService implements OnModuleInit {
       (turn, index) => !used.has(turn.id || String(index)),
     );
     ctx.queuedTurns = [...ordered, ...rest];
+    ctx.queuedTurns.forEach((turn, index) => this.stores(ctx).messageStore.updateRequestQueueOrder(turn.messageId, index));
     return {
       reordered: true,
       conversationId: ctx.conversationId,
@@ -823,7 +939,8 @@ export class OrchestratorService implements OnModuleInit {
 
     const active = this.processingSessions();
     const onlyActive = active[0];
-    if (active.length === 1 && onlyActive) return { accepted: true, ctx: onlyActive };
+    if (active.length === 1 && onlyActive)
+      return { accepted: true, ctx: onlyActive };
     const reason =
       active.length === 0
         ? 'No active agent run.'
@@ -849,7 +966,9 @@ export class OrchestratorService implements OnModuleInit {
       accepted: false,
       error: result.error ?? ERROR_CODE.AGENT_BUSY,
       reason: result.reason ?? result.error ?? ERROR_CODE.AGENT_BUSY,
-      ...(result.conversationId ? { conversationId: result.conversationId } : {}),
+      ...(result.conversationId
+        ? { conversationId: result.conversationId }
+        : {}),
     };
   }
 
@@ -910,11 +1029,10 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
 
-    const result = await this.acceptBusyMessage(
-      resolution.ctx,
-      requesterCtx,
-      { ...payload, busyPolicy: action },
-    );
+    const result = await this.acceptBusyMessage(resolution.ctx, requesterCtx, {
+      ...payload,
+      busyPolicy: action,
+    });
     this.emitControlResult(requesterCtx, {
       accepted: result.accepted,
       action,
@@ -947,6 +1065,7 @@ export class OrchestratorService implements OnModuleInit {
     audio?: string,
     audioFilenameFromClient?: string,
     attachmentFilenames?: string[],
+    admission?: ApiAdmission,
   ): Promise<{
     messageId: string;
     text: string;
@@ -954,8 +1073,8 @@ export class OrchestratorService implements OnModuleInit {
     audioFilename: string | null;
     attachmentFilenames: string[] | undefined;
   }> {
-    const imageUrls: string[] = [];
-    if (images?.length) {
+    const imageUrls: string[] = admission?.existing?.imageUrls ?? [];
+    if (!admission?.existing && images?.length) {
       for (const dataUrl of images) {
         try {
           imageUrls.push(
@@ -978,14 +1097,25 @@ export class OrchestratorService implements OnModuleInit {
       }
     }
     const { messageStore: ctxMsgStore } = this.stores(ctx);
-    const userMessage = ctxMsgStore.add(
+    if (admission) ctxMsgStore.assertGeneration(admission.metadata.storeGeneration);
+    const userMessage = admission?.existing ?? ctxMsgStore.add(
       'user',
       text,
       imageUrls.length ? imageUrls : undefined,
       undefined,
       attachmentFilenames?.length ? attachmentFilenames : undefined,
+      admission,
     );
-    await ctxMsgStore.flush();
+    try {
+      await ctxMsgStore.flush(!!admission);
+      if (admission) {
+        ctxMsgStore.assertGeneration(admission.metadata.storeGeneration);
+        if (ctxMsgStore.getById(userMessage.id) !== userMessage) throw new StoreGenerationChangedError();
+      }
+    } catch (error) {
+      if (admission && !admission.existing) ctxMsgStore.removeById(userMessage.id, false);
+      throw error;
+    }
     void this.fibeSync.syncMessages(
       () => JSON.stringify(ctxMsgStore.all()),
       ctx.conversationId,
@@ -998,7 +1128,7 @@ export class OrchestratorService implements OnModuleInit {
     this.conversationManager.touch(ctx.conversationId);
     return {
       messageId: userMessage.id,
-      text,
+      text: userMessage.body,
       imageUrls,
       audioFilename,
       attachmentFilenames,
@@ -1011,7 +1141,20 @@ export class OrchestratorService implements OnModuleInit {
     imageUrls: string[],
     audioFilename: string | null,
     attachmentFilenames?: string[],
+    requestMessageId?: string,
   ): Promise<void> {
+    const requestStore = requestMessageId ? this.stores(ctx).messageStore : undefined;
+    // Failure here leaves a recoverable pending turn and prevents every provider effect.
+    if (requestMessageId && requestStore) {
+      try {
+        await requestStore.updateRequestState(requestMessageId, 'running');
+      } catch (error) {
+        ctx.isProcessing = false;
+        this.acceptedRequestIds.delete(requestMessageId);
+        throw error;
+      }
+    }
+    let requestState: 'completed' | 'failed' = 'completed';
     let accumulated = '';
     const syntheticStepId = 'generating-response';
     const syntheticStep: ThinkingStep = {
@@ -1050,7 +1193,7 @@ export class OrchestratorService implements OnModuleInit {
 
       // Gemma pre-pass: classify user intent → inject MCP tool hints into the prompt.
       // Runs only when GEMMA_ROUTER_ENABLED=true and Ollama is reachable.
-      // Stored chat history is never modified — only the built prompt changes.
+      // Stored chat history is never modified: only the built prompt changes.
       let routedText = text;
       if (this.config.isGemmaRouterEnabled()) {
         const mcpTools = this.gemmaMcpTools.getTools();
@@ -1058,6 +1201,7 @@ export class OrchestratorService implements OnModuleInit {
           `[GemmaRouter] input: "${text.slice(0, 80)}", tools: ${mcpTools.length}`,
         );
         if (mcpTools.length) {
+          if (requestMessageId) requestStore?.assertRequestGeneration(requestMessageId);
           const gemmaResult = await this.gemmaRouter.analyze(text, mcpTools);
           this.logger.log(
             `[GemmaRouter] result: ${JSON.stringify(gemmaResult)}`,
@@ -1065,6 +1209,7 @@ export class OrchestratorService implements OnModuleInit {
           if (!gemmaResult.skipped && gemmaResult.action) {
             const action = gemmaResult.action;
             if (action.type === 'EXECUTE_CLI') {
+              if (requestMessageId) requestStore?.assertRequestGeneration(requestMessageId);
               await this.executeCliDirectly(
                 ctx,
                 action.command,
@@ -1082,11 +1227,11 @@ export class OrchestratorService implements OnModuleInit {
                   action.confidence,
                 );
                 this.logger.log(
-                  `[GemmaRouter] injected hint — tools: [${action.tools.join(', ')}], confidence: ${Math.round(action.confidence * 100)}%`,
+                  `[GemmaRouter] injected hint: tools: [${action.tools.join(', ')}], confidence: ${Math.round(action.confidence * 100)}%`,
                 );
               } else {
                 this.logger.log(
-                  `[GemmaRouter] no hint injected — confidence: ${action.confidence}`,
+                  `[GemmaRouter] no hint injected: confidence: ${action.confidence}`,
                 );
               }
             }
@@ -1096,7 +1241,7 @@ export class OrchestratorService implements OnModuleInit {
         }
       }
 
-      // Mode hint injection — tells the agent CLI what mode the operator has set.
+      // Mode hint injection: tells the agent CLI what mode the operator has set.
       // Applied after Gemma routing so the mode frame is the outermost context.
       const currentMode = this.agentModeStore.get();
       routedText = this.chatPromptContext.injectModeHint(
@@ -1114,8 +1259,8 @@ export class OrchestratorService implements OnModuleInit {
       );
       const model = this.effectiveModel();
       const effort = this.effectiveEffort();
-      const previousAssistantMessages = this.stores(ctx).messageStore
-        .all()
+      const previousAssistantMessages = this.stores(ctx)
+        .messageStore.all()
         .filter((message) => message.role === 'assistant')
         .map((message) => message.body);
       const streamStartedAt = new Date().toISOString();
@@ -1124,7 +1269,6 @@ export class OrchestratorService implements OnModuleInit {
       ctx.lastStreamText = '';
       ctx.lastStreamStartedAt = null;
       ctx.lastStreamFinishedAt = null;
-      // Broadcast stream-start to all tabs in this conversation
       this.sessionRegistry.broadcastToConversation(
         ctx.conversationId,
         WS_EVENT.STREAM_START,
@@ -1158,7 +1302,6 @@ export class OrchestratorService implements OnModuleInit {
         },
       );
       ctx.lastStreamUsage = undefined;
-      // Helper to fan-out per-stream events to all tabs watching this conversation
       const bcastConv = (type: string, data?: Record<string, unknown>) =>
         this.sessionRegistry.broadcastToConversation(
           ctx.conversationId,
@@ -1188,13 +1331,13 @@ export class OrchestratorService implements OnModuleInit {
         if (!chunk) return;
         accumulated += chunk;
         ctx.streamTextAccumulated += chunk;
-        // Fan-out stream chunks to every tab watching this conversation
         this.sessionRegistry.broadcastToConversation(
           ctx.conversationId,
           WS_EVENT.STREAM_CHUNK,
           { text: chunk },
         );
       };
+      if (requestMessageId) requestStore?.assertRequestGeneration(requestMessageId);
       await ctx.strategy.executePromptStreaming(
         fullPrompt,
         model,
@@ -1215,6 +1358,7 @@ export class OrchestratorService implements OnModuleInit {
         ctx.lastStreamUsage,
       );
     } catch (err) {
+      requestState = 'failed';
       const raw = err instanceof Error ? err.message : String(err);
       if (raw === INTERRUPTED_MESSAGE) {
         if (accumulated.trim()) {
@@ -1282,6 +1426,17 @@ export class OrchestratorService implements OnModuleInit {
         ctx.send(WS_EVENT.ERROR, { message });
       }
     } finally {
+      const settledRequests = new Set(this.steeredRequestIds.get(ctx.sessionId));
+      this.steeredRequestIds.delete(ctx.sessionId);
+      if (requestMessageId) settledRequests.add(requestMessageId);
+      for (const id of settledRequests) {
+        try {
+          await this.stores(ctx).messageStore.updateRequestState(id, requestState);
+        } catch {
+          ctx.lastError = 'Caller request execution receipt could not be persisted';
+          this.logger.warn(ctx.lastError);
+        }
+      }
       await this.flushStores(ctx);
       ctx.isProcessing = false;
       if (ctx.streamTextAccumulated.trim()) {
@@ -1304,7 +1459,10 @@ export class OrchestratorService implements OnModuleInit {
     }
   }
 
-  private persistAgentErrorActivity(ctx: SessionContext, message: string): void {
+  private persistAgentErrorActivity(
+    ctx: SessionContext,
+    message: string,
+  ): void {
     const { activityStore } = this.stores(ctx);
     const activityId = ctx.currentActivityId;
     if (!activityId) return;
@@ -1344,7 +1502,6 @@ export class OrchestratorService implements OnModuleInit {
       return;
     }
     ctx.isProcessing = true;
-    // Notify all sessions that an agent is now running (anyProcessing = true)
     this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
       count: this.sessionRegistry.size,
       anyProcessing: true,
@@ -1376,6 +1533,7 @@ export class OrchestratorService implements OnModuleInit {
       audioFilename?: string;
       attachmentFilenames?: string[];
       busyPolicy?: BusyPolicy;
+      admission?: ApiAdmission;
     },
   ): Promise<void> {
     const result = await this.acceptBusyMessage(
@@ -1400,6 +1558,7 @@ export class OrchestratorService implements OnModuleInit {
       audioFilename?: string;
       attachmentFilenames?: string[];
       busyPolicy?: BusyPolicy;
+      admission?: ApiAdmission;
     },
   ): Promise<{
     accepted: boolean;
@@ -1433,6 +1592,10 @@ export class OrchestratorService implements OnModuleInit {
       return { accepted: false, error: ERROR_CODE.AGENT_BUSY };
     }
 
+    if (payload.admission) {
+      payload.admission.metadata.queueOrder = processingCtx.queuedTurns.length;
+      this.stores(processingCtx).messageStore.updateRequestQueueOrder(payload.admission.id, processingCtx.queuedTurns.length);
+    }
     const saved = await this.addUserMessageAndEmit(
       processingCtx,
       text,
@@ -1440,14 +1603,18 @@ export class OrchestratorService implements OnModuleInit {
       payload.audio,
       payload.audioFilename,
       payload.attachmentFilenames,
+      payload.admission,
     );
 
     let resolvedPolicy: Exclude<BusyPolicy, 'reject'> = 'queue';
     let queuedText = saved.text;
     if (policy === 'steer' && processingCtx.strategy.steerAgent) {
+      if (payload.admission) await this.stores(processingCtx).messageStore.updateRequestState(saved.messageId, 'running');
+      if (payload.admission) this.stores(processingCtx).messageStore.assertRequestGeneration(saved.messageId);
       processingCtx.pendingSteerRestart = true;
       const steerResult = await processingCtx.strategy.steerAgent(saved.text);
       if (steerResult === 'handled') {
+        if (payload.admission) this.trackSteeredRequest(processingCtx, saved.messageId);
         processingCtx.pendingSteerRestart = false;
         return {
           accepted: true,
@@ -1487,8 +1654,15 @@ export class OrchestratorService implements OnModuleInit {
         next.imageUrls,
         next.audioFilename,
         next.attachmentFilenames,
+        this.stores(ctx).messageStore.getById(next.messageId)?.apiRequest ? next.messageId : undefined,
       );
     }
+  }
+
+  private trackSteeredRequest(ctx: SessionContext, messageId: string): void {
+    const ids = this.steeredRequestIds.get(ctx.sessionId) ?? new Set<string>();
+    ids.add(messageId);
+    this.steeredRequestIds.set(ctx.sessionId, ids);
   }
 
   private normalizeBusyPolicy(policy: BusyPolicy | undefined): BusyPolicy {
@@ -1551,7 +1725,7 @@ export class OrchestratorService implements OnModuleInit {
       ctx.currentActivityId = null;
     } else {
       // If currentActivityId is null, this might be a duplicate submission from a second tab.
-      // Instead of appending a new activity, we just update the last assistant message's story if it exists.
+      // A duplicate tab submission updates the existing assistant activity.
       this.logger.debug(
         'Received submit_story but currentActivityId is null (possible duplicate from another tab).',
       );
@@ -1578,8 +1752,6 @@ export class OrchestratorService implements OnModuleInit {
     );
     await Promise.all([sMsg.flush(), sAct.flush()]);
   }
-
-  // ── Global model / effort helpers ───────────────────────────────────
 
   private effectiveModel(): string {
     return this.modelStore.get();
@@ -1629,7 +1801,7 @@ export class OrchestratorService implements OnModuleInit {
   private handleSetAgentMode(mode: string): void {
     const resolved = this.setAgentMode(mode);
     if (!resolved) {
-      this.logger.warn(`SET_AGENT_MODE: invalid mode "${mode}" — ignoring`);
+      this.logger.warn(`SET_AGENT_MODE: invalid mode "${mode}": ignoring`);
     }
   }
 

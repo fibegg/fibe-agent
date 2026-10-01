@@ -1,11 +1,16 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "outDir": "dist",
-    "paths": { "@shared/*": ["../../shared/*"] },
+    "paths": {
+      "@shared/*": [
+        "../../shared/*"
+      ]
+    },
     "module": "nodenext",
-    "types": ["node"],
+    "types": [
+      "node"
+    ],
     "rootDir": "../../",
     "moduleResolution": "nodenext",
     "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo",
@@ -13,7 +18,10 @@
     "emitDecoratorMetadata": true,
     "target": "es2021"
   },
-  "include": ["src/**/*.ts", "../../shared/*.ts"],
+  "include": [
+    "src/**/*.ts",
+    "../../shared/*.ts"
+  ],
   "exclude": [
     "out-tsc",
     "dist",

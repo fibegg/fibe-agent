@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import {
   cacheFromArgsForExistingRefs,
   configureBuildResources,
@@ -9,6 +10,11 @@ import {
   run,
   setupGhcrImageContext,
 } from './lib.mjs';
+
+const fibeCliVersion = process.env.FIBE_CLI_VERSION
+  || JSON.parse(readFileSync(new URL('../provider-versions.json', import.meta.url))).fibeCli.version;
+if (!/^\d+\.\d+\.\d+$/.test(fibeCliVersion)) throw new Error('FIBE_CLI_VERSION must be an exact stable version');
+console.log(`--> Pinned Fibe CLI release: ${fibeCliVersion}`);
 
 console.log('--> Preparing shared Docker build cache');
 
@@ -74,6 +80,10 @@ async function warmRuntimeBaseCache() {
     'linux/amd64,linux/arm64',
     '--target',
     'runtime-base',
+    '--build-arg',
+    `FIBE_CLI_VERSION=${fibeCliVersion}`,
+    '--label',
+    `gg.fibe.cli.version=${fibeCliVersion}`,
     '--build-arg',
     `NPM_CONFIG_JOBS=${buildConfig.npmJobs}`,
     ...(await cacheFromArgsForExistingRefs(commonCacheRefs)),

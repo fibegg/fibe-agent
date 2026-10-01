@@ -17,8 +17,6 @@ import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
 import { useT, type TranslationKey } from '../i18n';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface ChangedFile {
   path: string;
   index: string;
@@ -47,22 +45,39 @@ interface LocalRepo {
   repo_root: string;
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Returns a human-readable label + colour token for a status letter pair. */
 function fileStatusInfo(index: string, worktree: string) {
   const combined = `${index}${worktree}`.replace(/ /g, '');
-  if (combined.includes('?')) return { labelKey: 'diff.status.untracked' as const, color: 'text-amber-400', Icon: FileQuestion };
-  if (combined.includes('A')) return { labelKey: 'diff.status.added' as const,     color: 'text-emerald-400', Icon: FilePlus };
-  if (combined.includes('D')) return { labelKey: 'diff.status.deleted' as const,   color: 'text-red-400',     Icon: FileMinus };
-  if (combined.includes('R')) return { labelKey: 'diff.status.renamed' as const,   color: 'text-blue-400',    Icon: FileText };
-  return                                { labelKey: 'diff.status.modified' as const, color: 'text-primary',  Icon: FileText };
+  if (combined.includes('?'))
+    return {
+      labelKey: 'diff.status.untracked' as const,
+      color: 'text-amber-400',
+      Icon: FileQuestion,
+    };
+  if (combined.includes('A'))
+    return {
+      labelKey: 'diff.status.added' as const,
+      color: 'text-emerald-400',
+      Icon: FilePlus,
+    };
+  if (combined.includes('D'))
+    return {
+      labelKey: 'diff.status.deleted' as const,
+      color: 'text-red-400',
+      Icon: FileMinus,
+    };
+  if (combined.includes('R'))
+    return {
+      labelKey: 'diff.status.renamed' as const,
+      color: 'text-blue-400',
+      Icon: FileText,
+    };
+  return {
+    labelKey: 'diff.status.modified' as const,
+    color: 'text-primary',
+    Icon: FileText,
+  };
 }
 
-/**
- * Render one line of unified diff as a React element with colour coding.
- * We split by lines in the parent to keep this cheap.
- */
 function DiffLine({ line, idx }: { line: string; idx: number }) {
   if (line.startsWith('+++') || line.startsWith('---')) {
     return (
@@ -111,7 +126,12 @@ function repoKey(repo: LocalRepo): string {
 }
 
 function repoLabel(repo: LocalRepo): string {
-  const base = repo.prop || repo.service || repo.id || repo.repo_root.split('/').pop() || repo.repo_root;
+  const base =
+    repo.prop ||
+    repo.service ||
+    repo.id ||
+    repo.repo_root.split('/').pop() ||
+    repo.repo_root;
   return repo.branch ? `${base}:${repo.branch}` : base;
 }
 
@@ -121,28 +141,33 @@ async function responseErrorMessage(res: Response): Promise<string> {
   try {
     const payload = JSON.parse(text) as { message?: unknown; error?: unknown };
     if (Array.isArray(payload.message)) return payload.message.join('\n');
-    if (typeof payload.message === 'string' && payload.message.trim()) return payload.message;
-    if (typeof payload.error === 'string' && payload.error.trim()) return payload.error;
+    if (typeof payload.message === 'string' && payload.message.trim())
+      return payload.message;
+    if (typeof payload.error === 'string' && payload.error.trim())
+      return payload.error;
   } catch {
-    // Fall through to raw text.
+    // Non-JSON error bodies are returned as plain text below.
   }
   return text;
 }
 
-// ─── Auto-refresh interval while drawer is open ───────────────────────────────
-
 const POLL_MS = 5000;
-
-// ─── Component ────────────────────────────────────────────────────────────────
 
 export function DiffPanel() {
   const t = useT();
   const [result, setResult] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [busyAction, setBusyAction] = useState<'commit' | 'push' | 'pr' | null>(null);
-  const [operationResult, setOperationResult] = useState<{ ok: boolean; message: string } | null>(null);
-  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(() => new Set());
+  const [busyAction, setBusyAction] = useState<'commit' | 'push' | 'pr' | null>(
+    null,
+  );
+  const [operationResult, setOperationResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [commitMessage, setCommitMessage] = useState('');
   const [repos, setRepos] = useState<LocalRepo[]>([]);
   const [reposLoaded, setReposLoaded] = useState(false);
@@ -161,7 +186,8 @@ export function DiffPanel() {
       const nextRepos = data.repos ?? [];
       setRepos(nextRepos);
       setSelectedRepo((current) => {
-        if (current && nextRepos.some((repo) => repoKey(repo) === current)) return current;
+        if (current && nextRepos.some((repo) => repoKey(repo) === current))
+          return current;
         const nextOnlyRepo = nextRepos.length === 1 ? nextRepos[0] : undefined;
         return nextOnlyRepo ? repoKey(nextOnlyRepo) : '';
       });
@@ -213,10 +239,11 @@ export function DiffPanel() {
     }
   }, [repoSelector, repos.length, reposLoaded, t]);
 
-  // Initial fetch
   useEffect(() => {
     void fetchRepos();
-    return () => { abortRef.current?.abort(); };
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [fetchRepos]);
 
   useEffect(() => {
@@ -225,7 +252,9 @@ export function DiffPanel() {
 
   // Auto-refresh every 5 s while mounted (panel is open)
   useEffect(() => {
-    const id = setInterval(() => { void fetchDiff(); }, POLL_MS);
+    const id = setInterval(() => {
+      void fetchDiff();
+    }, POLL_MS);
     return () => clearInterval(id);
   }, [fetchDiff]);
 
@@ -237,7 +266,8 @@ export function DiffPanel() {
   }, [operationResult]);
 
   const selected = useMemo(() => [...selectedFiles], [selectedFiles]);
-  const canCommit = selected.length > 0 && commitMessage.trim().length > 0 && !busyAction;
+  const canCommit =
+    selected.length > 0 && commitMessage.trim().length > 0 && !busyAction;
 
   const toggleFile = useCallback((path: string) => {
     setSelectedFiles((current) => {
@@ -248,52 +278,90 @@ export function DiffPanel() {
     });
   }, []);
 
-  const runGitAction = useCallback(async (
-    action: 'commit' | 'push' | 'pr',
-    request: () => Promise<Response>,
-  ) => {
-    setBusyAction(action);
-    setOperationResult(null);
-    try {
-      const res = await request();
-      if (!res.ok) {
-        throw new Error(await responseErrorMessage(res));
+  const runGitAction = useCallback(
+    async (
+      action: 'commit' | 'push' | 'pr',
+      request: () => Promise<Response>,
+    ) => {
+      setBusyAction(action);
+      setOperationResult(null);
+      try {
+        const res = await request();
+        if (!res.ok) {
+          throw new Error(await responseErrorMessage(res));
+        }
+        const data = (await res.json()) as { message?: string };
+        setOperationResult({
+          ok: true,
+          message: data.message ?? t('diff.gitOperationSuccess'),
+        });
+        void fetchDiff();
+      } catch (err) {
+        setOperationResult({
+          ok: false,
+          message:
+            err instanceof Error ? err.message : t('diff.gitOperationFailed'),
+        });
+      } finally {
+        setBusyAction(null);
       }
-      const data = (await res.json()) as { message?: string };
-      setOperationResult({ ok: true, message: data.message ?? t('diff.gitOperationSuccess') });
-      void fetchDiff();
-    } catch (err) {
-      setOperationResult({ ok: false, message: err instanceof Error ? err.message : t('diff.gitOperationFailed') });
-    } finally {
-      setBusyAction(null);
-    }
-  }, [fetchDiff, t]);
+    },
+    [fetchDiff, t],
+  );
 
-  const handleCommit = useCallback(() => runGitAction('commit', async () => {
-      const stageRes = await apiRequest('/api/playgrounds/git-stage', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ files: selected, confirm: true, repo: repoSelector }),
-    });
-    if (!stageRes.ok) return stageRes;
-    return apiRequest('/api/playgrounds/git-commit', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: commitMessage, confirm: true, repo: repoSelector }),
-    });
-  }), [commitMessage, repoSelector, runGitAction, selected]);
+  const handleCommit = useCallback(
+    () =>
+      runGitAction('commit', async () => {
+        const stageRes = await apiRequest('/api/playgrounds/git-stage', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            files: selected,
+            confirm: true,
+            repo: repoSelector,
+          }),
+        });
+        if (!stageRes.ok) return stageRes;
+        return apiRequest('/api/playgrounds/git-commit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: commitMessage,
+            confirm: true,
+            repo: repoSelector,
+          }),
+        });
+      }),
+    [commitMessage, repoSelector, runGitAction, selected],
+  );
 
-  const handlePush = useCallback(() => runGitAction('push', () => apiRequest('/api/playgrounds/git-push', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ confirm: true, branch: result?.branch, repo: repoSelector }),
-  })), [repoSelector, result?.branch, runGitAction]);
+  const handlePush = useCallback(
+    () =>
+      runGitAction('push', () =>
+        apiRequest('/api/playgrounds/git-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            confirm: true,
+            branch: result?.branch,
+            repo: repoSelector,
+          }),
+        }),
+      ),
+    [repoSelector, result?.branch, runGitAction],
+  );
 
-  const handleDraftPr = useCallback(() => runGitAction('pr', () => apiRequest('/api/playgrounds/git-pr', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ confirm: true, repo: repoSelector }),
-  })), [repoSelector, runGitAction]);
+  const handleDraftPr = useCallback(
+    () =>
+      runGitAction('pr', () =>
+        apiRequest('/api/playgrounds/git-pr', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ confirm: true, repo: repoSelector }),
+        }),
+      ),
+    [repoSelector, runGitAction],
+  );
 
   const lines = result?.diff.split('\n') ?? [];
 
@@ -302,14 +370,23 @@ export function DiffPanel() {
       {/* ── Sub-header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-2 px-3 py-1.5 bg-[#0d0d14]/90 border-b border-primary/10 shrink-0">
         <div className="flex items-center gap-2">
-          <GitCompareArrows className="size-3.5 text-primary shrink-0" aria-hidden />
+          <GitCompareArrows
+            className="size-3.5 text-primary shrink-0"
+            aria-hidden
+          />
           <span className="text-[10px] font-medium text-primary/70 tracking-wide">
-            {result?.branch ? `git · ${result.branch}` : repos.length > 1 && !repoSelector ? t('diff.selectRepo') : 'git diff HEAD'}
+            {result?.branch
+              ? `git · ${result.branch}`
+              : repos.length > 1 && !repoSelector
+                ? t('diff.selectRepo')
+                : 'git diff HEAD'}
           </span>
           {result && (
             <span className="text-[10px] text-muted-foreground/40">
               · {t('diff.filesChanged', { count: result.files.length })}
-              {result.counts ? ` · ${result.counts.staged}/${result.counts.unstaged}/${result.counts.untracked}` : ''}
+              {result.counts
+                ? ` · ${result.counts.staged}/${result.counts.unstaged}/${result.counts.untracked}`
+                : ''}
             </span>
           )}
         </div>
@@ -333,60 +410,74 @@ export function DiffPanel() {
           {result?.hasDiff && (
             <button
               type="button"
-              onClick={() => { void handleCommit(); }}
+              onClick={() => {
+                void handleCommit();
+              }}
               disabled={!canCommit || loading}
               className="flex items-center gap-1 text-[10px] text-primary/80 hover:text-primary transition-colors disabled:opacity-40 shrink-0 rounded px-1.5 py-0.5 hover:bg-primary/10"
               aria-label={t('diff.commitSelected')}
               title={t('diff.commitSelected')}
             >
-              {busyAction === 'commit'
-                ? <SpinnerIcon className="size-3 animate-spin" aria-hidden />
-                : <GitCommitHorizontal className="size-3" aria-hidden />
-              }
+              {busyAction === 'commit' ? (
+                <SpinnerIcon className="size-3 animate-spin" aria-hidden />
+              ) : (
+                <GitCommitHorizontal className="size-3" aria-hidden />
+              )}
               <span>{t('diff.commit')}</span>
             </button>
           )}
           {result?.branch && (
             <button
               type="button"
-              onClick={() => { void handlePush(); }}
+              onClick={() => {
+                void handlePush();
+              }}
               disabled={Boolean(busyAction) || loading}
               className="flex items-center gap-1 text-[10px] text-emerald-400/80 hover:text-emerald-300 transition-colors disabled:opacity-40 shrink-0 rounded px-1.5 py-0.5 hover:bg-emerald-500/10"
               aria-label={t('drawer.gitPush')}
               title={t('drawer.gitPush')}
             >
-              {busyAction === 'push'
-                ? <SpinnerIcon className="size-3 animate-spin" aria-hidden />
-                : <Upload className="size-3" aria-hidden />
-              }
+              {busyAction === 'push' ? (
+                <SpinnerIcon className="size-3 animate-spin" aria-hidden />
+              ) : (
+                <Upload className="size-3" aria-hidden />
+              )}
               <span>{t('diff.push')}</span>
             </button>
           )}
           {result?.upstream && (
             <button
               type="button"
-              onClick={() => { void handleDraftPr(); }}
+              onClick={() => {
+                void handleDraftPr();
+              }}
               disabled={Boolean(busyAction) || loading}
               className="flex items-center gap-1 text-[10px] text-blue-300/80 hover:text-blue-200 transition-colors disabled:opacity-40 shrink-0 rounded px-1.5 py-0.5 hover:bg-blue-500/10"
               aria-label={t('diff.createDraftPr')}
               title={t('diff.createDraftPr')}
             >
-              {busyAction === 'pr'
-                ? <SpinnerIcon className="size-3 animate-spin" aria-hidden />
-                : <GitPullRequest className="size-3" aria-hidden />
-              }
+              {busyAction === 'pr' ? (
+                <SpinnerIcon className="size-3 animate-spin" aria-hidden />
+              ) : (
+                <GitPullRequest className="size-3" aria-hidden />
+              )}
               <span>{t('diff.pr')}</span>
             </button>
           )}
           <button
             type="button"
-            onClick={() => { void fetchDiff(); }}
+            onClick={() => {
+              void fetchDiff();
+            }}
             disabled={loading}
             className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-primary transition-colors disabled:opacity-40 shrink-0"
             aria-label={t('diff.refreshDiff')}
             title={t('diff.refresh')}
           >
-            <RefreshCw className={`size-3 ${loading ? 'animate-spin' : ''}`} aria-hidden />
+            <RefreshCw
+              className={`size-3 ${loading ? 'animate-spin' : ''}`}
+              aria-hidden
+            />
             <span>{t('diff.refresh')}</span>
           </button>
         </div>
@@ -394,9 +485,13 @@ export function DiffPanel() {
 
       {/* ── Operation result toast ─────────────────────────────────────── */}
       {operationResult && (
-        <div className={`px-3 py-1.5 text-[11px] font-medium shrink-0 border-b border-primary/10 ${
-          operationResult.ok ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
-        }`}>
+        <div
+          className={`px-3 py-1.5 text-[11px] font-medium shrink-0 border-b border-primary/10 ${
+            operationResult.ok
+              ? 'bg-emerald-500/10 text-emerald-400'
+              : 'bg-red-500/10 text-red-400'
+          }`}
+        >
           {operationResult.message}
         </div>
       )}
@@ -411,9 +506,7 @@ export function DiffPanel() {
 
       {/* ── Error ──────────────────────────────────────────────────────── */}
       {error && (
-        <div className="px-4 py-2 text-xs text-red-400 shrink-0">
-          {error}
-        </div>
+        <div className="px-4 py-2 text-xs text-red-400 shrink-0">{error}</div>
       )}
 
       {!loading && !error && repos.length > 1 && !repoSelector && (
@@ -424,12 +517,16 @@ export function DiffPanel() {
       )}
 
       {/* ── No changes ─────────────────────────────────────────────────── */}
-      {!loading && !error && !(repos.length > 1 && !repoSelector) && result?.isGitRepo && !result.hasDiff && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground/40 px-6 text-center">
-          <GitCompareArrows className="size-8 opacity-20" />
-          <p className="text-xs">{t('diff.noChanges')}</p>
-        </div>
-      )}
+      {!loading &&
+        !error &&
+        !(repos.length > 1 && !repoSelector) &&
+        result?.isGitRepo &&
+        !result.hasDiff && (
+          <div className="flex-1 flex flex-col items-center justify-center gap-2 text-muted-foreground/40 px-6 text-center">
+            <GitCompareArrows className="size-8 opacity-20" />
+            <p className="text-xs">{t('diff.noChanges')}</p>
+          </div>
+        )}
 
       {/* ── Changed files strip ─────────────────────────────────────────── */}
       {result?.files && result.files.length > 0 && (
@@ -446,7 +543,10 @@ export function DiffPanel() {
             </span>
           </div>
           {result.files.map((f) => {
-            const { labelKey, color, Icon } = fileStatusInfo(f.index, f.worktree);
+            const { labelKey, color, Icon } = fileStatusInfo(
+              f.index,
+              f.worktree,
+            );
             const label = t(labelKey satisfies TranslationKey);
             const selected = selectedFiles.has(f.path);
             return (
@@ -457,12 +557,22 @@ export function DiffPanel() {
                 className="flex items-center gap-2 min-w-0 rounded px-1 py-0.5 text-left hover:bg-primary/10"
                 aria-pressed={selected}
               >
-                {selected
-                  ? <CheckSquare className="size-3 shrink-0 text-primary" aria-hidden />
-                  : <Square className="size-3 shrink-0 text-muted-foreground/50" aria-hidden />
-                }
+                {selected ? (
+                  <CheckSquare
+                    className="size-3 shrink-0 text-primary"
+                    aria-hidden
+                  />
+                ) : (
+                  <Square
+                    className="size-3 shrink-0 text-muted-foreground/50"
+                    aria-hidden
+                  />
+                )}
                 <Icon className={`size-3 shrink-0 ${color}`} aria-hidden />
-                <span className="text-[11px] text-foreground/80 truncate min-w-0 flex-1" title={f.path}>
+                <span
+                  className="text-[11px] text-foreground/80 truncate min-w-0 flex-1"
+                  title={f.path}
+                >
                   {f.path}
                 </span>
                 {f.index && f.index !== ' ' && f.index !== '?' && (
@@ -475,7 +585,9 @@ export function DiffPanel() {
                     {t('diff.unstaged')}
                   </span>
                 )}
-                <span className={`text-[9px] font-medium uppercase tracking-wider shrink-0 ${color}`}>
+                <span
+                  className={`text-[9px] font-medium uppercase tracking-wider shrink-0 ${color}`}
+                >
                   {label}
                 </span>
               </button>

@@ -4,11 +4,8 @@ import { apiRequest } from '../api-url';
 export interface UseWorkspaceDropOptions {
   /** API endpoint to POST files to, e.g. '/api/playgrounds/upload' */
   uploadUrl: string;
-  /** Optional subdirectory (relative to workspace root) to drop files into */
   targetDir?: string;
-  /** Called after all files in a drop have been uploaded successfully */
   onUploaded?: () => void;
-  /** When true the drop zone is inactive */
   disabled?: boolean;
 }
 
@@ -46,11 +43,16 @@ export function useWorkspaceDrop({
         files.map(async (file) => {
           const formData = new FormData();
           formData.append('file', file, file.name);
-          const res = await apiRequest(requestUrl, { method: 'POST', body: formData });
+          const res = await apiRequest(requestUrl, {
+            method: 'POST',
+            body: formData,
+          });
           if (!res.ok) {
-            console.error(`Workspace upload failed for ${file.name}: ${res.status}`);
+            console.error(
+              `Workspace upload failed for ${file.name}: ${res.status}`,
+            );
           }
-        })
+        }),
       );
 
       const anySuccess = results.some((r) => r.status === 'fulfilled');
@@ -58,7 +60,7 @@ export function useWorkspaceDrop({
         onUploaded?.();
       }
     },
-    [uploadUrl, targetDir, onUploaded]
+    [uploadUrl, targetDir, onUploaded],
   );
 
   const onDragEnter = useCallback(
@@ -71,7 +73,7 @@ export function useWorkspaceDrop({
         setIsDragOver(true);
       }
     },
-    [disabled]
+    [disabled],
   );
 
   const onDragLeave = useCallback((e: React.DragEvent) => {
@@ -101,7 +103,7 @@ export function useWorkspaceDrop({
       if (!files.length) return;
       void uploadFiles(files);
     },
-    [disabled, uploadFiles]
+    [disabled, uploadFiles],
   );
 
   return {

@@ -1,37 +1,15 @@
 #!/usr/bin/env node
-/**
- * local-mcp.server.ts — Stdio MCP server for fibe-agent local tools.
- *
- * Spawned as a child process by LocalMcpService. Implements the MCP
- * JSON-RPC protocol over stdin/stdout (stdio transport) so any agent CLI
- * that supports MCP can call fibe-agent's interactive tools.
- *
- * Communication back to the parent NestJS process is done via HTTP:
- *   POST http://localhost:<PORT>/api/local-tool-call
- *
- * Tool definitions exposed via tools/list:
- *   ask_user            — ask the operator a question; blocks until answered
- *   confirm_action      — ask yes/no; blocks until answered
- *   show_image          — render an image inline in the chat thread (fire-and-forget)
- *   set_mode            — set the agent mode (exploring, casting, overseeing, build)
- *   get_mode            — return current agent mode
- *   notify              — show a toast notification (fire-and-forget)
- *   set_title           — update the run title in the sidebar (fire-and-forget)
- */
+/** Stdio MCP server that forwards local tool calls to the parent API over HTTP. */
 
 import { createInterface } from 'node:readline';
 import { randomUUID } from 'node:crypto';
 import type { LocalToolCallResponse } from './local-mcp-types';
 import { LOCAL_TOOL } from './local-mcp-types';
 
-// ─── Config ──────────────────────────────────────────────────────────────────
-
 const API_PORT = process.env['PORT'] ?? '3000';
 const TOOL_CALL_URL = `http://localhost:${API_PORT}/api/local-tool-call`;
 const AGENT_PASSWORD = process.env['AGENT_PASSWORD'] ?? '';
 const CONVERSATION_ID = process.env['CONVERSATION_ID'] ?? '';
-
-// ─── JSON-RPC helpers ────────────────────────────────────────────────────────
 
 interface JsonRpcRequest {
   jsonrpc: '2.0';
@@ -65,8 +43,6 @@ function replyError(
   process.stdout.write(JSON.stringify(response) + '\n');
 }
 
-// ─── Tool definitions ────────────────────────────────────────────────────────
-
 const TOOL_DEFINITIONS = [
   {
     name: LOCAL_TOOL.ASK_USER,
@@ -76,8 +52,14 @@ const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        question: { type: 'string', description: 'The question to display to the user.' },
-        placeholder: { type: 'string', description: 'Optional hint text inside the input field.' },
+        question: {
+          type: 'string',
+          description: 'The question to display to the user.',
+        },
+        placeholder: {
+          type: 'string',
+          description: 'Optional hint text inside the input field.',
+        },
       },
       required: ['question'],
     },
@@ -90,9 +72,18 @@ const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        message: { type: 'string', description: 'Description of the action to confirm.' },
-        confirmLabel: { type: 'string', description: 'Label for the confirm button (default: "Yes").' },
-        cancelLabel: { type: 'string', description: 'Label for the cancel button (default: "No").' },
+        message: {
+          type: 'string',
+          description: 'Description of the action to confirm.',
+        },
+        confirmLabel: {
+          type: 'string',
+          description: 'Label for the confirm button (default: "Yes").',
+        },
+        cancelLabel: {
+          type: 'string',
+          description: 'Label for the cancel button (default: "No").',
+        },
       },
       required: ['message'],
     },
@@ -105,10 +96,22 @@ const TOOL_DEFINITIONS = [
     inputSchema: {
       type: 'object',
       properties: {
-        url: { type: 'string', description: 'Public URL of the image to display.' },
-        base64: { type: 'string', description: 'Base64-encoded image data (alternative to url).' },
-        mimeType: { type: 'string', description: 'MIME type when using base64, e.g. image/png.' },
-        caption: { type: 'string', description: 'Optional caption shown below the image.' },
+        url: {
+          type: 'string',
+          description: 'Public URL of the image to display.',
+        },
+        base64: {
+          type: 'string',
+          description: 'Base64-encoded image data (alternative to url).',
+        },
+        mimeType: {
+          type: 'string',
+          description: 'MIME type when using base64, e.g. image/png.',
+        },
+        caption: {
+          type: 'string',
+          description: 'Optional caption shown below the image.',
+        },
       },
     },
   },
@@ -131,7 +134,8 @@ const TOOL_DEFINITIONS = [
   },
   {
     name: LOCAL_TOOL.GET_MODE,
-    description: 'Return the current agent mode display string. Returns { mode: string }.',
+    description:
+      'Return the current agent mode display string. Returns { mode: string }.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
@@ -167,14 +171,14 @@ const TOOL_DEFINITIONS = [
   },
 ];
 
-// ─── Tool call dispatcher ────────────────────────────────────────────────────
-
 async function callLocalApi(
   tool: string,
   args: Record<string, unknown>,
 ): Promise<unknown> {
   const requestId = randomUUID();
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
   if (AGENT_PASSWORD) {
     headers['Authorization'] = `Bearer ${AGENT_PASSWORD}`;
   }
@@ -201,8 +205,6 @@ async function callLocalApi(
   }
   return json.result;
 }
-
-// ─── MCP message handler ─────────────────────────────────────────────────────
 
 async function handleMessage(msg: JsonRpcRequest): Promise<void> {
   const { id, method, params } = msg;
@@ -261,8 +263,6 @@ async function handleMessage(msg: JsonRpcRequest): Promise<void> {
   replyError(id, -32601, `Method not found: ${method}`);
 }
 
-// ─── Stdin reader ─────────────────────────────────────────────────────────────
-
 const rl = createInterface({ input: process.stdin, crlfDelay: Infinity });
 
 rl.on('line', (line: string) => {
@@ -273,7 +273,6 @@ rl.on('line', (line: string) => {
   try {
     msg = JSON.parse(trimmed) as JsonRpcRequest;
   } catch {
-    // Malformed JSON — return parse error
     replyError(null, -32700, 'Parse error');
     return;
   }
@@ -288,5 +287,4 @@ rl.on('close', () => {
   process.exit(0);
 });
 
-// Keep alive — do not exit until stdin closes
 process.stdin.resume();

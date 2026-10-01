@@ -11,21 +11,26 @@ export class AuditService {
     this.logPath = join(this.config.getConversationDataDir(), 'audit.log');
   }
 
-  async logEvent(action: string, resource: string, actor: string, details?: Record<string, unknown>): Promise<void> {
+  async logEvent(
+    action: string,
+    resource: string,
+    actor: string,
+    details?: Record<string, unknown>,
+  ): Promise<void> {
     const entry = {
       timestamp: new Date().toISOString(),
       action,
       resource,
       actor,
-      ...(details ? { details } : {})
+      ...(details ? { details } : {}),
     };
-    
+
     try {
       const dir = this.config.getConversationDataDir();
       try {
         await mkdir(dir, { recursive: true });
       } catch {
-        // ignore
+        // The append below reports directory failures through the outer catch.
       }
       await appendFile(this.logPath, JSON.stringify(entry) + '\n', 'utf8');
     } catch (err) {

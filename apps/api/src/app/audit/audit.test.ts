@@ -4,8 +4,6 @@ import { AuditInterceptor } from './audit.interceptor';
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of } from 'rxjs';
 
-// ─── AuditService ─────────────────────────────────────────────────────────────
-
 vi.mock('node:fs/promises', () => ({
   appendFile: vi.fn().mockResolvedValue(undefined),
   mkdir: vi.fn().mockResolvedValue(undefined),
@@ -14,7 +12,7 @@ vi.mock('node:fs/promises', () => ({
 import { appendFile, mkdir } from 'node:fs/promises';
 
 const mockedAppend = appendFile as unknown as Mock<typeof appendFile>;
-const mockedMkdir  = mkdir as unknown as Mock<typeof mkdir>;
+const mockedMkdir = mkdir as unknown as Mock<typeof mkdir>;
 
 function makeConfig(dataDir = '/tmp/test-audit') {
   return { getConversationDataDir: vi.fn().mockReturnValue(dataDir) };
@@ -28,7 +26,11 @@ describe('AuditService', () => {
     await svc.logEvent('DELETE', '/conversations/1', 'AuthenticatedUser');
 
     expect(mockedAppend).toHaveBeenCalledOnce();
-    const [path, content] = mockedAppend.mock.calls[0] as [string, string, string];
+    const [path, content] = mockedAppend.mock.calls[0] as [
+      string,
+      string,
+      string,
+    ];
     expect(path).toContain('audit.log');
     const entry = JSON.parse(content.trim());
     expect(entry.action).toBe('DELETE');
@@ -39,7 +41,9 @@ describe('AuditService', () => {
 
   test('logEvent() includes details when provided', async () => {
     const svc = new AuditService(makeConfig() as never);
-    await svc.logEvent('POST', '/uploads', 'Anonymous', { filename: 'test.png' });
+    await svc.logEvent('POST', '/uploads', 'Anonymous', {
+      filename: 'test.png',
+    });
 
     const [, content] = mockedAppend.mock.calls[0] as [string, string, string];
     const entry = JSON.parse(content.trim());
@@ -58,15 +62,18 @@ describe('AuditService', () => {
   test('logEvent() creates the data directory before writing', async () => {
     const svc = new AuditService(makeConfig('/tmp/new-dir') as never);
     await svc.logEvent('PATCH', '/conversations/1', 'AuthenticatedUser');
-    expect(mockedMkdir).toHaveBeenCalledWith('/tmp/new-dir', { recursive: true });
+    expect(mockedMkdir).toHaveBeenCalledWith('/tmp/new-dir', {
+      recursive: true,
+    });
   });
 
   test('logEvent() does not throw when appendFile fails', async () => {
     // appendFile is the 2nd fs call (after mkdir), set it to reject
     mockedAppend.mockRejectedValue(new Error('ENOENT'));
     const svc = new AuditService(makeConfig() as never);
-    // Should resolve (catch inside logEvent swallows the error)
-    await expect(svc.logEvent('DELETE', '/data', 'User')).resolves.toBeUndefined();
+    await expect(
+      svc.logEvent('DELETE', '/data', 'User'),
+    ).resolves.toBeUndefined();
     mockedAppend.mockResolvedValue(undefined); // restore
   });
 
@@ -85,8 +92,6 @@ describe('AuditService', () => {
     expect(content).toMatch(/\n$/);
   });
 });
-
-// ─── AuditInterceptor ─────────────────────────────────────────────────────────
 
 function makeContext(method: string, url: string, authorization?: string) {
   const req = {
@@ -118,35 +123,55 @@ describe('AuditInterceptor', () => {
     const ctx = makeContext('POST', '/conversations', 'Bearer token123');
     interceptor.intercept(ctx, makeHandler()).subscribe();
 
-    expect(auditService.logEvent).toHaveBeenCalledWith('POST', '/conversations', 'AuthenticatedUser');
+    expect(auditService.logEvent).toHaveBeenCalledWith(
+      'POST',
+      '/conversations',
+      'AuthenticatedUser',
+    );
   });
 
   test('logs POST requests with actor=Anonymous when no Authorization header', () => {
     const ctx = makeContext('POST', '/conversations');
     interceptor.intercept(ctx, makeHandler()).subscribe();
 
-    expect(auditService.logEvent).toHaveBeenCalledWith('POST', '/conversations', 'Anonymous');
+    expect(auditService.logEvent).toHaveBeenCalledWith(
+      'POST',
+      '/conversations',
+      'Anonymous',
+    );
   });
 
   test('logs DELETE requests', () => {
     const ctx = makeContext('DELETE', '/conversations/1', 'Bearer x');
     interceptor.intercept(ctx, makeHandler()).subscribe();
 
-    expect(auditService.logEvent).toHaveBeenCalledWith('DELETE', '/conversations/1', 'AuthenticatedUser');
+    expect(auditService.logEvent).toHaveBeenCalledWith(
+      'DELETE',
+      '/conversations/1',
+      'AuthenticatedUser',
+    );
   });
 
   test('logs PUT requests', () => {
     const ctx = makeContext('PUT', '/playgrounds/file', 'Bearer x');
     interceptor.intercept(ctx, makeHandler()).subscribe();
 
-    expect(auditService.logEvent).toHaveBeenCalledWith('PUT', '/playgrounds/file', 'AuthenticatedUser');
+    expect(auditService.logEvent).toHaveBeenCalledWith(
+      'PUT',
+      '/playgrounds/file',
+      'AuthenticatedUser',
+    );
   });
 
   test('logs PATCH requests', () => {
     const ctx = makeContext('PATCH', '/fibe-sync-settings');
     interceptor.intercept(ctx, makeHandler()).subscribe();
 
-    expect(auditService.logEvent).toHaveBeenCalledWith('PATCH', '/fibe-sync-settings', 'Anonymous');
+    expect(auditService.logEvent).toHaveBeenCalledWith(
+      'PATCH',
+      '/fibe-sync-settings',
+      'Anonymous',
+    );
   });
 
   test('does NOT log GET requests', () => {
@@ -168,7 +193,9 @@ describe('AuditInterceptor', () => {
     const handler = makeHandler();
     const result: unknown[] = [];
 
-    interceptor.intercept(ctx, handler).subscribe({ next: (v) => result.push(v) });
+    interceptor
+      .intercept(ctx, handler)
+      .subscribe({ next: (v) => result.push(v) });
 
     expect(handler.handle).toHaveBeenCalledOnce();
     expect(result).toEqual(['response']);

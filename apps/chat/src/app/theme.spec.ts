@@ -16,12 +16,24 @@ const STORAGE_KEY = 'chat-theme';
    Create a proper in-memory implementation and install it globally. */
 let store: Record<string, string> = {};
 const storageMock: Storage = {
-  get length() { return Object.keys(store).length; },
-  key(index: number) { return Object.keys(store)[index] ?? null; },
-  getItem(key: string) { return key in store ? store[key] : null; },
-  setItem(key: string, value: string) { store[key] = String(value); },
-  removeItem(key: string) { delete store[key]; },
-  clear() { store = {}; },
+  get length() {
+    return Object.keys(store).length;
+  },
+  key(index: number) {
+    return Object.keys(store)[index] ?? null;
+  },
+  getItem(key: string) {
+    return key in store ? store[key] : null;
+  },
+  setItem(key: string, value: string) {
+    store[key] = String(value);
+  },
+  removeItem(key: string) {
+    delete store[key];
+  },
+  clear() {
+    store = {};
+  },
 };
 vi.stubGlobal('localStorage', storageMock);
 
@@ -35,12 +47,18 @@ function resetDocumentTheme() {
   document.documentElement.style.backgroundColor = '';
   document.body.style.backgroundColor = '';
   document
-    .querySelectorAll('meta[name="theme-color"], meta[name="apple-mobile-web-app-status-bar-style"]')
+    .querySelectorAll(
+      'meta[name="theme-color"], meta[name="apple-mobile-web-app-status-bar-style"]',
+    )
     .forEach((node) => node.remove());
 }
 
 function metaContent(name: string): string | null {
-  return document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`)?.getAttribute('content') ?? null;
+  return (
+    document.head
+      .querySelector<HTMLMetaElement>(`meta[name="${name}"]`)
+      ?.getAttribute('content') ?? null
+  );
 }
 
 function stubMatchMedia(matches: boolean) {
@@ -121,8 +139,12 @@ describe('setStoredTheme', () => {
   it('updates browser theme metadata for light PWAs', () => {
     setStoredTheme('light');
     expect(metaContent('theme-color')).toBe('#f5f0e6');
-    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('default');
-    expect(document.documentElement.style.backgroundColor).toBe('rgb(245, 240, 230)');
+    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe(
+      'default',
+    );
+    expect(document.documentElement.style.backgroundColor).toBe(
+      'rgb(245, 240, 230)',
+    );
     expect(document.body.style.backgroundColor).toBe('rgb(245, 240, 230)');
   });
 
@@ -137,7 +159,9 @@ describe('setStoredTheme', () => {
     setStoredTheme('dark');
     expect(metaContent('theme-color')).toBe('#191c14');
     expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black');
-    expect(document.documentElement.style.backgroundColor).toBe('rgb(25, 28, 20)');
+    expect(document.documentElement.style.backgroundColor).toBe(
+      'rgb(25, 28, 20)',
+    );
     expect(document.body.style.backgroundColor).toBe('rgb(25, 28, 20)');
   });
 
@@ -240,20 +264,30 @@ describe('toggleTheme', () => {
 
 describe('isSetThemeMessage', () => {
   it('returns true for valid light message', () => {
-    expect(isSetThemeMessage({ action: 'set_theme', theme: 'light' })).toBe(true);
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'light' })).toBe(
+      true,
+    );
   });
 
   it('returns true for valid dark message', () => {
-    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dark' })).toBe(true);
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dark' })).toBe(
+      true,
+    );
   });
 
   it('returns true for valid named theme message', () => {
-    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dracula' })).toBe(true);
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'dracula' })).toBe(
+      true,
+    );
   });
 
   it('returns true for legacy theme messages', () => {
-    expect(isSetThemeMessage({ action: 'set_theme', theme: 'winter' })).toBe(true);
-    expect(isSetThemeMessage({ action: 'set_theme', theme: 'halloween' })).toBe(true);
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'winter' })).toBe(
+      true,
+    );
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'halloween' })).toBe(
+      true,
+    );
   });
 
   it('returns false for null', () => {
@@ -265,7 +299,9 @@ describe('isSetThemeMessage', () => {
   });
 
   it('returns false for invalid theme', () => {
-    expect(isSetThemeMessage({ action: 'set_theme', theme: 'system' })).toBe(false);
+    expect(isSetThemeMessage({ action: 'set_theme', theme: 'system' })).toBe(
+      false,
+    );
   });
 
   it('returns false for non-object', () => {
@@ -304,11 +340,12 @@ describe('initTheme', () => {
     });
 
     initTheme();
-    expect(mockMediaQueryList.addEventListener).toHaveBeenCalledWith('change', expect.any(Function));
+    expect(mockMediaQueryList.addEventListener).toHaveBeenCalledWith(
+      'change',
+      expect.any(Function),
+    );
 
-    // Simulate system theme change — no stored theme, so applyTheme runs
     (changeHandler as (() => void) | null)?.();
-    // Should not throw — applyTheme was called
   });
 
   it('matchMedia change handler skips applyTheme when a theme is explicitly stored', () => {
@@ -327,9 +364,7 @@ describe('initTheme', () => {
     localStorage.setItem(STORAGE_KEY, 'light');
 
     initTheme();
-    // Stored theme exists → calling changeHandler should suppress applyTheme (but won't throw)
     (changeHandler as (() => void) | null)?.();
-    // light theme stored — dark class should still NOT be on
     expect(document.documentElement.classList.contains('dark')).toBe(false);
   });
 });

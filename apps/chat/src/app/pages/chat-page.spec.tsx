@@ -1,6 +1,12 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ChatPage } from './chat-page';
 import { isAuthenticated } from '../api-url';
@@ -13,15 +19,12 @@ import { useAgentFiles } from '../chat/use-agent-files';
 import { consumeGreeting } from '../postmessage-greeting';
 import { CHAT_STATES } from '../chat/chat-state';
 
-
 vi.mock('../chat/use-local-stt', () => ({
   useLocalStt: vi.fn().mockReturnValue({
     isTranscribing: false,
     transcribe: vi.fn().mockResolvedValue('test'),
   }),
 }));
-
-// ─── Mock ALL hooks and heavy dependencies ───────────────────────────────────
 
 vi.mock('../api-url', () => ({
   isAuthenticated: vi.fn().mockReturnValue(true),
@@ -220,7 +223,11 @@ vi.mock('../chat/use-chat-auth-ui', () => ({
     statusClass: 'text-green-500',
     showModelSelector: false,
     showAuthModal: false,
-    authModalForModal: { authUrl: null, deviceCode: null, isManualToken: false },
+    authModalForModal: {
+      authUrl: null,
+      deviceCode: null,
+      isManualToken: false,
+    },
   }),
 }));
 
@@ -236,7 +243,6 @@ vi.mock('../chat/use-scroll-to-bottom', () => ({
   }),
 }));
 
-// Mock heavy UI components
 vi.mock('../chat/message-list', () => ({
   MessageList: React.forwardRef((_, ref) => {
     React.useImperativeHandle(ref, () => ({
@@ -250,9 +256,7 @@ vi.mock('../chat/message-list', () => ({
 
 vi.mock('../file-explorer/file-explorer', () => ({
   FileExplorer: (props: { playgroundSelector?: React.ReactNode }) => (
-    <div data-testid="file-explorer">
-      {props.playgroundSelector}
-    </div>
+    <div data-testid="file-explorer">{props.playgroundSelector}</div>
   ),
 }));
 
@@ -344,13 +348,15 @@ describe('ChatPage', () => {
       removeEventListener: vi.fn(),
     };
     vi.stubGlobal('matchMedia', vi.fn().mockReturnValue(mq));
-    vi.stubGlobal('WebSocket', class MockWebSocket {
-      close = vi.fn();
-      addEventListener = vi.fn();
-      removeEventListener = vi.fn();
-    });
+    vi.stubGlobal(
+      'WebSocket',
+      class MockWebSocket {
+        close = vi.fn();
+        addEventListener = vi.fn();
+        removeEventListener = vi.fn();
+      },
+    );
 
-    // Re-assert mocks cleared by vi.clearAllMocks()
     vi.mocked(isAuthenticated).mockReturnValue(true);
     vi.mocked(consumeGreeting).mockReturnValue(null);
     vi.mocked(useConversations).mockReturnValue({
@@ -394,7 +400,7 @@ describe('ChatPage', () => {
       scrollToBottom: mockScrollToBottom,
       markJustSent: vi.fn(),
     });
-  vi.mocked(useChatLayout).mockReturnValue({
+    vi.mocked(useChatLayout).mockReturnValue({
       isMobile: false,
       sidebarOpen: false,
       setSidebarOpen: vi.fn(),
@@ -471,7 +477,9 @@ describe('ChatPage', () => {
     });
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /link playground/i }),
+    ).toBeTruthy();
   });
 
   it('focuses a posted message id in the active conversation', async () => {
@@ -519,7 +527,9 @@ describe('ChatPage', () => {
     localStorage.setItem('simplicate-mode', 'true');
     render(<ChatPage />, { wrapper });
 
-    const expand = screen.getByRole('button', { name: /expand file explorer/i });
+    const expand = screen.getByRole('button', {
+      name: /expand file explorer/i,
+    });
     expect(expand).toBeTruthy();
     fireEvent.click(expand);
 
@@ -547,8 +557,6 @@ describe('ChatPage', () => {
   });
 
   it('renders successfully (DragDropOverlay shows when isDragOver=true)', () => {
-    // The mock returns isDragOver: false by default, so overlay is not shown
-    // Just verify the page renders correctly
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('chat-header')).toBeTruthy();
   });
@@ -557,7 +565,9 @@ describe('ChatPage', () => {
     const send = vi.fn();
     const setMessages = vi.fn();
     let activeId = 'default';
-    let messages = [{ role: 'user', body: 'existing', created_at: '2026-01-01' }];
+    let messages = [
+      { role: 'user', body: 'existing', created_at: '2026-01-01' },
+    ];
 
     vi.mocked(consumeGreeting).mockReturnValue('OK');
     vi.mocked(useConversations).mockImplementation(() => ({
@@ -684,7 +694,9 @@ describe('ChatPage', () => {
       markJustSent: vi.fn(),
     });
     render(<ChatPage />, { wrapper });
-    const btn = screen.getByRole('button', { name: /jump to latest messages/i });
+    const btn = screen.getByRole('button', {
+      name: /jump to latest messages/i,
+    });
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(mockScrollToBottom).toHaveBeenCalledWith('smooth');
@@ -701,7 +713,9 @@ describe('ChatPage', () => {
       markJustSent: vi.fn(),
     });
     render(<ChatPage />, { wrapper });
-    const btn = screen.getByRole('button', { name: /jump to latest messages/i });
+    const btn = screen.getByRole('button', {
+      name: /jump to latest messages/i,
+    });
 
     expect(btn.className).toContain('bg-card');
     expect(btn.className).not.toContain('bg-card/');
@@ -828,9 +842,10 @@ describe('ChatPage', () => {
       closeSettings: vi.fn(),
     });
     render(<ChatPage />, { wrapper });
-    // File explorer is rendered inside the mobile sidebar overlay
     expect(screen.getAllByTestId('file-explorer').length).toBeGreaterThan(0);
-    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /link playground/i }),
+    ).toBeTruthy();
   });
 
   it('renders mobile activity sidebar when isMobile=true and rightSidebarOpen=true', () => {
@@ -854,7 +869,9 @@ describe('ChatPage', () => {
       closeSettings: vi.fn(),
     });
     render(<ChatPage />, { wrapper });
-    expect(screen.getAllByTestId('agent-thinking-sidebar').length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByTestId('agent-thinking-sidebar').length,
+    ).toBeGreaterThan(0);
   });
 
   it('does not render left/right panels for mobile', () => {
@@ -878,11 +895,11 @@ describe('ChatPage', () => {
       closeSettings: vi.fn(),
     });
     render(<ChatPage />, { wrapper });
-    // Desktop left/right panels not present in mobile mode
     expect(screen.queryByTestId('file-explorer')).toBeNull();
     // The RightDrawer keeps AgentThinkingSidebar in DOM (visibility:hidden) when closed.
-    // Assert the drawer panel element is not visible (translateX(100%)).
-    const drawerPanel = document.querySelector('[role="dialog"][aria-label="Activity"]');
+    const drawerPanel = document.querySelector(
+      '[role="dialog"][aria-label="Activity"]',
+    );
     expect(drawerPanel).not.toBeNull();
     expect((drawerPanel as HTMLElement).style.visibility).toBe('hidden');
   });

@@ -56,7 +56,7 @@ x-required-ci-env: &required-ci-env
   GH_TOKEN:
 
 x-common-build: &common-build
-  image: docker:29.3.1-cli
+  image: docker:29.8.1-cli
   working_dir: /app
   volumes:
     - ./:/app

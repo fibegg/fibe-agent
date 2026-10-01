@@ -1,110 +1,144 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { execSync } from 'node:child_process';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
+import { execFileSync } from 'node:child_process';
 import { ConfigService } from '../config/config.service';
 import { writeMcpConfig } from '../config/mcp-config-writer';
 
 const REFRESH_INTERVAL_MS = 50 * 60 * 1000; // 50 minutes
 
-/**
- * Periodically fetches a fresh GitHub token from the Fibe API
- * and updates the MCP config so the GitHub MCP server always has
- * a valid token. Runs every ~50 minutes (installation tokens last 1 hour).
- *
- * After updating the config files, kills the running server-github process
- * so the AI CLI respawns it with the fresh token.
- */
+/** Refreshes the selected installation credential before its actual expiry. */
 @Injectable()
-export class GithubTokenRefreshService implements OnModuleInit, OnModuleDestroy {
+export class GithubTokenRefreshService
+  implements OnModuleInit, OnModuleDestroy
+{
   private readonly logger = new Logger(GithubTokenRefreshService.name);
-  private timer: ReturnType<typeof setInterval> | null = null;
+  private timer: ReturnType<typeof setTimeout> | null = null;
+  private stopped = false;
+  private inFlight: Promise<string | null> | null = null;
+  private readonly abort = new AbortController();
+  private nextRefreshMs = REFRESH_INTERVAL_MS;
+  private expiresAt = Date.now() + 60 * 60 * 1000;
   private isInitialRefresh = true;
 
   constructor(private readonly config: ConfigService) {}
 
   async onModuleInit(): Promise<void> {
-    // Initial refresh at startup
     await this.refreshToken();
     this.isInitialRefresh = false;
 
-    // Schedule periodic refresh
-    this.timer = setInterval(() => {
-      void this.refreshToken();
-    }, REFRESH_INTERVAL_MS);
+    this.scheduleRefresh();
+  }
 
-    this.logger.log(
-      `GitHub token refresh scheduled every ${REFRESH_INTERVAL_MS / 60000} minutes`
-    );
+  private scheduleRefresh(): void {
+    if (this.stopped) return;
+    this.timer = setTimeout(async () => {
+      await this.refreshToken();
+      this.scheduleRefresh();
+    }, this.nextRefreshMs);
   }
 
   onModuleDestroy(): void {
-    if (this.timer) {
-      clearInterval(this.timer);
-      this.timer = null;
-    }
+    this.stopped = true;
+    this.abort.abort();
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = null;
   }
 
-  /**
-   * Fetches a fresh GitHub installation token from Fibe API
-   * and rewrites the MCP config with the new token.
-   */
-  async refreshToken(): Promise<string | null> {
+  /** Fetches a GitHub installation token and rewrites MCP config. */
+  refreshToken(): Promise<string | null> {
+    if (this.stopped) return Promise.resolve(null);
+    this.inFlight ??= this.fetchToken().finally(() => {
+      this.inFlight = null;
+    });
+    return this.inFlight;
+  }
+
+  private async fetchToken(): Promise<string | null> {
     const apiUrl = this.config.getFibeApiUrl();
     const apiKey = this.config.getFibeApiKey();
-    const agentId = this.config.getFibeAgentId();
+    const connectionId = process.env.FIBE_GITHUB_CONNECTION_ID;
 
-    if (!apiUrl || !apiKey || !agentId) {
+    if (!apiUrl || !apiKey || !connectionId?.match(/^[1-9]\d*$/)) {
       this.logger.debug(
-        'Fibe API config missing — skipping GitHub token refresh'
+        'Fibe API config missing: skipping GitHub token refresh',
       );
       return null;
     }
 
-    const url = `${apiUrl}/api/agents/${agentId}/github_token`;
+    const url = `${apiUrl}/api/installations/${connectionId}/token`;
+    this.nextRefreshMs = 60_000;
 
     try {
       const res = await fetch(url, {
         method: 'GET',
+        signal: AbortSignal.any([
+          this.abort.signal,
+          AbortSignal.timeout(30_000),
+        ]),
         headers: {
           Authorization: `Bearer ${apiKey}`,
         },
       });
 
+      if (this.stopped) return null;
       if (!res.ok) {
-        // 404 = no GitHub App installed, not an error
-        if (res.status === 404) {
-          this.logger.debug('No GitHub App installation for this agent owner');
-          return null;
+        if (
+          [401, 403, 404].includes(res.status) ||
+          Date.now() >= this.expiresAt
+        ) {
+          this.clearToken();
         }
-        this.logger.warn(
-          `GitHub token refresh failed: ${res.status} ${res.statusText}`
-        );
+        this.logger.warn(`GitHub token refresh failed: ${res.status}`);
         return null;
       }
 
-      const data = (await res.json()) as { token?: string; expires_in?: number };
+      const data = (await res.json()) as {
+        token?: string;
+        expires_in?: number;
+      };
       const token = data.token;
 
-      if (!token) {
-        this.logger.warn('GitHub token response missing token field');
+      const lifetime = data.expires_in;
+      if (
+        typeof token !== 'string' ||
+        !token ||
+        typeof lifetime !== 'number' ||
+        !Number.isFinite(lifetime) ||
+        lifetime <= 0
+      ) {
+        if (!this.stopped && Date.now() >= this.expiresAt) this.clearToken();
+        this.logger.warn('GitHub token response missing valid token or expiry');
         return null;
       }
 
-      // Update the MCP config JSON env var with the fresh token, then rewrite config
+      if (this.stopped) return null;
+      this.expiresAt = Date.now() + lifetime * 1000;
+      this.nextRefreshMs = Math.max(
+        30_000,
+        Math.min(REFRESH_INTERVAL_MS, lifetime * 1000 - 300_000),
+      );
       this.updateGithubTokenInMcpConfig(token);
       writeMcpConfig();
 
-      // On periodic refreshes (not initial), kill the running GitHub MCP server
-      // so the AI CLI respawns it with the fresh token from the updated config
       if (!this.isInitialRefresh) {
         this.killGithubMcpServer();
       }
 
       this.logger.log(
-        `GitHub token refreshed (expires in ${data.expires_in ?? '?'}s)`
+        `GitHub token refreshed (expires in ${data.expires_in ?? '?'}s)`,
       );
       return token;
     } catch (err) {
-      this.logger.warn(`GitHub token refresh error: ${err}`);
+      if (!this.stopped) {
+        if (Date.now() >= this.expiresAt) this.clearToken();
+        this.logger.warn(
+          `GitHub token refresh error: ${err instanceof Error ? err.name : 'unknown'}`,
+        );
+      }
       return null;
     }
   }
@@ -126,30 +160,36 @@ export class GithubTokenRefreshService implements OnModuleInit, OnModuleDestroy 
 
     const servers = (config.mcpServers as Record<string, unknown>) ?? {};
 
+    const existing = servers['github'] as Record<string, unknown> | undefined;
     servers['github'] = {
-      command: 'npx',
-      args: ['-y', '@modelcontextprotocol/server-github'],
-      env: { GITHUB_PERSONAL_ACCESS_TOKEN: token },
+      ...(existing ?? { command: 'mcp-github' }),
+      env: {
+        ...((existing?.env as Record<string, string> | undefined) ?? {}),
+        GITHUB_PERSONAL_ACCESS_TOKEN: token,
+      },
     };
 
     config.mcpServers = servers;
     process.env.MCP_CONFIG_JSON = JSON.stringify(config);
   }
 
-  /**
-   * Kills any running server-github MCP process so the AI CLI will
-   * respawn it with the fresh token from the updated config files.
-   * Uses pkill to find processes matching the GitHub MCP server package name.
-   * Failures are silently ignored (process may not be running).
-   */
+  private clearToken(): void {
+    // Overwrite the managed entry: provider writers merge existing files, so
+    // deleting only the in-memory entry would leave the old credential on disk.
+    this.updateGithubTokenInMcpConfig('');
+    writeMcpConfig();
+    this.killGithubMcpServer();
+  }
+
+  /** mcp-github execs this installed official binary. */
   private killGithubMcpServer(): void {
     try {
-      execSync('pkill -f "server-github" 2>/dev/null || true', {
+      execFileSync('pkill', ['-f', '^/usr/local/bin/github-mcp-server stdio'], {
         timeout: 5000,
+        stdio: 'ignore',
       });
-      this.logger.log('Killed running GitHub MCP server — will respawn with fresh token');
     } catch {
-      // Process not running or pkill not available — both are fine
+      // No matching process is a valid state.
     }
   }
 }

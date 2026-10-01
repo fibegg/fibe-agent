@@ -1,9 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { ActivityReviewPage, type ActivityReviewData } from './activity-review-page';
+import {
+  ActivityReviewPage,
+  type ActivityReviewData,
+} from './activity-review-page';
 
-// jsdom does not implement scrollTo or scrollIntoView — stub them
 window.HTMLElement.prototype.scrollTo = vi.fn();
 window.HTMLElement.prototype.scrollIntoView = vi.fn();
 
@@ -38,20 +46,24 @@ vi.mock('../embed-config', () => ({
 }));
 
 vi.mock('../chat/chat-settings-modal', () => ({
-  ChatSettingsModal: ({ open, onClose }: any) => (
+  ChatSettingsModal: ({ open, onClose }: any) =>
     open ? (
       <div role="dialog" aria-label="Settings">
-        <button type="button" onClick={onClose}>Close</button>
+        <button type="button" onClick={onClose}>
+          Close
+        </button>
       </div>
-    ) : null
-  ),
+    ) : null,
 }));
 
 function renderWithRoute(id: string) {
   return render(
     <MemoryRouter initialEntries={[`/activity/${id}`]}>
       <Routes>
-        <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+        <Route
+          path="/activity/:activityStoryId"
+          element={<ActivityReviewPage />}
+        />
       </Routes>
     </MemoryRouter>,
   );
@@ -140,7 +152,9 @@ describe('ActivityReviewPage', () => {
       expect(screen.queryByText('Loading activities…')).toBeNull();
     });
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Switch to (dark|light) mode/ })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /Switch to (dark|light) mode/ }),
+    ).toBeNull();
   });
 
   it('shows No stories yet when activities array is empty', async () => {
@@ -154,7 +168,10 @@ describe('ActivityReviewPage', () => {
       <MemoryRouter initialEntries={['/activity']}>
         <Routes>
           <Route path="/activity" element={<ActivityReviewPage />} />
-          <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+          <Route
+            path="/activity/:activityStoryId"
+            element={<ActivityReviewPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -175,7 +192,9 @@ describe('ActivityReviewPage', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading activities…')).toBeNull();
     });
-    expect(screen.getAllByText(/Some reasoning/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/Some reasoning/).length).toBeGreaterThanOrEqual(
+      1,
+    );
     expect(screen.getAllByText('Step one').length).toBeGreaterThanOrEqual(1);
   });
 
@@ -193,7 +212,6 @@ describe('ActivityReviewPage', () => {
     const followBtn = screen.getByRole('button', { name: /Follow activity/i });
     expect(followBtn).toBeTruthy();
     expect(followBtn.getAttribute('aria-pressed')).toBe('false');
-    // Toggle on
     await act(async () => {
       fireEvent.click(followBtn);
     });
@@ -201,21 +219,30 @@ describe('ActivityReviewPage', () => {
     expect(screen.getByText('Live')).toBeTruthy();
   });
 
-
   it('shows most recent story at the top of the list', async () => {
     const twoActivityData = [
       {
         id: 'older-activity',
         created_at: '2025-01-14T10:00:00Z',
         story: [
-          { id: 'old-1', type: 'step', message: 'Older step', timestamp: '2025-01-14T10:00:00Z' },
+          {
+            id: 'old-1',
+            type: 'step',
+            message: 'Older step',
+            timestamp: '2025-01-14T10:00:00Z',
+          },
         ],
       },
       {
         id: 'newer-activity',
         created_at: '2025-01-15T12:00:00Z',
         story: [
-          { id: 'new-1', type: 'step', message: 'Newer step', timestamp: '2025-01-15T12:00:00Z' },
+          {
+            id: 'new-1',
+            type: 'step',
+            message: 'Newer step',
+            timestamp: '2025-01-15T12:00:00Z',
+          },
         ],
       },
     ];
@@ -229,7 +256,10 @@ describe('ActivityReviewPage', () => {
       <MemoryRouter initialEntries={['/activity']}>
         <Routes>
           <Route path="/activity" element={<ActivityReviewPage />} />
-          <Route path="/activity/:activityStoryId" element={<ActivityReviewPage />} />
+          <Route
+            path="/activity/:activityStoryId"
+            element={<ActivityReviewPage />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -237,8 +267,12 @@ describe('ActivityReviewPage', () => {
       expect(screen.queryByText('Loading activities…')).toBeNull();
     });
     const allButtons = screen.getAllByRole('button');
-    const newerIdx = allButtons.findIndex((b) => b.textContent?.includes('Newer step'));
-    const olderIdx = allButtons.findIndex((b) => b.textContent?.includes('Older step'));
+    const newerIdx = allButtons.findIndex((b) =>
+      b.textContent?.includes('Newer step'),
+    );
+    const olderIdx = allButtons.findIndex((b) =>
+      b.textContent?.includes('Older step'),
+    );
     expect(newerIdx).toBeLessThan(olderIdx);
   });
 });

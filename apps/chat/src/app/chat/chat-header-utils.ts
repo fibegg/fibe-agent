@@ -9,7 +9,10 @@ export type FloatingPanelRect = {
   maxHeight: number;
 };
 
-export function computeFloatingPanelRect(anchor: HTMLElement, widthPx: number): FloatingPanelRect {
+export function computeFloatingPanelRect(
+  anchor: HTMLElement,
+  widthPx: number,
+): FloatingPanelRect {
   const rect = anchor.getBoundingClientRect();
   const viewportWidth = window.visualViewport?.width ?? window.innerWidth;
   const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
@@ -19,7 +22,10 @@ export function computeFloatingPanelRect(anchor: HTMLElement, widthPx: number): 
     Math.max(gutter, rect.left),
     Math.max(gutter, viewportWidth - width - gutter),
   );
-  const top = Math.min(rect.bottom + 8, Math.max(gutter, viewportHeight - gutter - 180));
+  const top = Math.min(
+    rect.bottom + 8,
+    Math.max(gutter, viewportHeight - gutter - 180),
+  );
   return {
     top,
     left,
@@ -28,15 +34,11 @@ export function computeFloatingPanelRect(anchor: HTMLElement, widthPx: number): 
   };
 }
 
-/** CSS attribute used to identify the "more actions" floating panel. */
 export const MORE_MENU_PANEL_ATTR = 'data-chat-header-more-menu';
 
-/** CSS attribute used to identify the "provider/model" floating panel. */
 export const PROVIDER_MODEL_PANEL_ATTR = 'data-provider-model-menu';
 
-/** Base Tailwind class for menu items inside the MoreActionsMenu. */
 export const MORE_MENU_ITEM_CLASS =
   'flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm text-foreground transition-colors hover:bg-primary/10 hover:text-primary focus:outline-none focus:ring-2 focus:ring-primary/30';
 
-/** Active-state modifier for MORE_MENU_ITEM_CLASS. */
 export const MORE_MENU_ITEM_ACTIVE_CLASS = 'bg-primary/15 text-primary';

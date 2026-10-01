@@ -1,7 +1,5 @@
-# 1. Deny Everything Default
 *
 
-# 2. Whitelist ONLY files explicitly requested by `Dockerfile`
 !package.json
 !bun.lock
 !package-lock.json*
@@ -14,7 +12,6 @@
 !ci
 !mode
 
-# 3. Whitelist ONLY directories explicitly manipulated by `Dockerfile`
 !apps/api/
 !apps/chat/
 !apps/e2e-api/
@@ -22,10 +19,11 @@
 !shared/
 !scripts/
 scripts/*
+!scripts/install-provider.mjs
+!scripts/provider-versions.json
 !scripts/install-fibe.sh
 !scripts/mcp-remote-wrapper.sh
 
-# 4. Re-Blacklist recursive compiler & test caches explicitly nested inside the allowed dirs above
 node_modules
 **/node_modules
 **/dist
@@ -35,7 +33,6 @@ node_modules
 **/playwright-report
 **/.nx
 
-# 5. Re-Blacklist specific heavy runtime artifacts (just in case)
 data/
 playground/
 apps/api/data/

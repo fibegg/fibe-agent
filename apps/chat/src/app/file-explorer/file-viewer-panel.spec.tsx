@@ -13,7 +13,13 @@ vi.mock('./prism-loader', () => ({
 }));
 
 describe('FileViewerPanel', () => {
-  const mockEntry = { path: '/test/file.ts', name: 'file.ts', type: 'file' as const, size: 100, lastModified: Date.now() };
+  const mockEntry = {
+    path: '/test/file.ts',
+    name: 'file.ts',
+    type: 'file' as const,
+    size: 100,
+    lastModified: Date.now(),
+  };
   const mockOnClose = vi.fn();
 
   beforeEach(() => {
@@ -25,7 +31,6 @@ describe('FileViewerPanel', () => {
     });
     global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
     global.URL.revokeObjectURL = vi.fn();
-    // mock console.error to avoid noise in tests
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 

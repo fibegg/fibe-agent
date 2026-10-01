@@ -51,6 +51,11 @@ const CLAUDE_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
     '--dangerously-skip-permissions': true,
     '--no-chrome': true,
     '--effort': false,
+    '--model': false,
+    '--resume': false,
+    '--session-id': false,
+    '--output-format': false,
+    '--input-format': false,
     '-p': false,
   },
 };
@@ -305,7 +310,11 @@ interface StreamTurnState {
 
 type ClaudeAuthCredential =
   | { kind: 'oauth'; value: string }
-  | { kind: 'api'; value: string; envKey?: (typeof CLAUDE_API_TOKEN_ENVS)[number] };
+  | {
+      kind: 'api';
+      value: string;
+      envKey?: (typeof CLAUDE_API_TOKEN_ENVS)[number];
+    };
 
 export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   private static readonly records = new Map<
@@ -347,7 +356,9 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     if (!existsSync(workspaceDir)) mkdirSync(workspaceDir, { recursive: true });
   }
 
-  private getEnvValue(keys: readonly string[]): { key: string; value: string } | null {
+  private getEnvValue(
+    keys: readonly string[],
+  ): { key: string; value: string } | null {
     for (const key of keys) {
       const value = process.env[key];
       if (value && value.trim()) return { key, value: value.trim() };
@@ -359,7 +370,10 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     return this.getEnvValue([CLAUDE_OAUTH_TOKEN_ENV])?.value ?? null;
   }
 
-  private getEnvApiToken(): { key: (typeof CLAUDE_API_TOKEN_ENVS)[number]; value: string } | null {
+  private getEnvApiToken(): {
+    key: (typeof CLAUDE_API_TOKEN_ENVS)[number];
+    value: string;
+  } | null {
     const token = this.getEnvValue(CLAUDE_API_TOKEN_ENVS);
     if (!token) return null;
     return {
@@ -410,6 +424,48 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     return env;
   }
 
+  async listModels(): Promise<string[]> {
+    const query = await loadClaudeAgentSdkQuery();
+    const input = new AsyncMessageQueue<SDKUserMessage>();
+    const credential = this.getAuthCredential();
+    const envOverrides: Record<string, string | undefined> =
+      claudeProcessDefaults();
+    if (credential?.kind === 'oauth')
+      envOverrides.CLAUDE_CODE_OAUTH_TOKEN = credential.value;
+    else if (credential?.kind === 'api') {
+      envOverrides.CLAUDE_CODE_OAUTH_TOKEN = undefined;
+      envOverrides[credential.envKey ?? 'ANTHROPIC_API_KEY'] = credential.value;
+    }
+    const cwd = this.getWorkingDir();
+    mkdirSync(cwd, { recursive: true });
+    // Initialize the control channel without sending a billable user prompt.
+    const sdkQuery = query({
+      prompt: input,
+      options: {
+        cwd,
+        env: this.getClaudeProcessEnv(envOverrides),
+        pathToClaudeCodeExecutable: resolveClaude(),
+      },
+    });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const models = await Promise.race([
+        sdkQuery.supportedModels(),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(
+            () => reject(new Error('Claude model discovery timed out.')),
+            15_000,
+          );
+        }),
+      ]);
+      return [...new Set(models.map((model) => model.value).filter(Boolean))];
+    } finally {
+      clearTimeout(timer);
+      input.close();
+      sdkQuery.close();
+    }
+  }
+
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
     const token = this.getAuthCredential();
@@ -417,7 +473,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       if (token) {
         connection.sendAuthSuccess();
       } else {
-        connection.sendAuthStatus('unauthenticated');
+        connection.sendAuthManualToken();
       }
       return;
     }
@@ -459,8 +515,15 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       connection.sendLogoutOutput(data.toString());
     logoutProcess.stdout?.on('data', handleOutput);
     logoutProcess.stderr?.on('data', handleOutput);
-    logoutProcess.on('close', () => connection.sendLogoutSuccess());
-    logoutProcess.on('error', () => connection.sendLogoutSuccess());
+    let finished = false;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      this.clearCredentials();
+      connection.sendLogoutSuccess();
+    };
+    logoutProcess.on('close', finish);
+    logoutProcess.on('error', finish);
   }
 
   checkAuthStatus(): Promise<boolean> {
@@ -669,7 +732,8 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     const query = await loadClaudeAgentSdkQuery();
     const input = new AsyncMessageQueue<SDKUserMessage>();
     const credential = this.getAuthCredential();
-    const envOverrides: Record<string, string | undefined> = claudeProcessDefaults();
+    const envOverrides: Record<string, string | undefined> =
+      claudeProcessDefaults();
     if (credential?.kind === 'oauth') {
       envOverrides.CLAUDE_CODE_OAUTH_TOKEN = credential.value;
     } else if (credential?.kind === 'api') {
@@ -688,6 +752,11 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     const mcpServers = inlineMcpServers();
     const claudeExecutable = resolveClaude();
     this.logger.log(`Using Claude executable: ${claudeExecutable}`);
+    const providerArgsConfig: ProviderArgsConfig = {
+      ...CLAUDE_PROVIDER_ARGS_CONFIG,
+      blockedArgs: { ...CLAUDE_PROVIDER_ARGS_CONFIG.blockedArgs },
+    };
+    if (!model.trim()) delete providerArgsConfig.blockedArgs?.['--model'];
     const options: ClaudeSdkOptions = {
       cwd: workspaceDir,
       env: this.getClaudeProcessEnv(envOverrides),
@@ -701,7 +770,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       includePartialMessages: true,
       additionalDirectories: this.getPlaygroundDirs(),
       extraArgs: providerTokensToExtraArgs(
-        buildProviderArgs(CLAUDE_PROVIDER_ARGS_CONFIG),
+        buildProviderArgs(providerArgsConfig),
       ),
       ...(mcpServers ? { mcpServers } : {}),
       ...(markerSessionId ? { resume: markerSessionId } : {}),
@@ -740,7 +809,8 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
   ): Promise<void> {
     while (true) {
       const { value, done } = await this.nextSdkMessage(record);
-      if (done) break;
+      if (done)
+        throw new Error('Claude SDK stream ended without a terminal result.');
       this.handleSdkMessage(value, state, onChunk, callbacks);
       if (value.type === 'result') break;
     }

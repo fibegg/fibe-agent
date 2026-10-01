@@ -28,8 +28,11 @@ describe('ProxyService', () => {
 
   beforeEach(() => {
     dataDir = tmpDir();
-    // Save and clean relevant env vars
-    for (const key of ['PROVIDER_TRAFFIC_CAPTURE', '__FIBE_PROXY_PORT', '__FIBE_PROXY_CA_PATH']) {
+    for (const key of [
+      'PROVIDER_TRAFFIC_CAPTURE',
+      '__FIBE_PROXY_PORT',
+      '__FIBE_PROXY_CA_PATH',
+    ]) {
       originalEnv[key] = process.env[key];
       delete process.env[key];
     }
@@ -46,7 +49,10 @@ describe('ProxyService', () => {
   });
 
   test('does not start proxy when PROVIDER_TRAFFIC_CAPTURE is not set', async () => {
-    const store = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    const store = new ProviderTrafficStoreService(
+      makeConfig(dataDir),
+      makeFibeSync(),
+    );
     const service = new ProxyService(store);
 
     await service.onModuleInit();
@@ -61,14 +67,19 @@ describe('ProxyService', () => {
   test('starts proxy when PROVIDER_TRAFFIC_CAPTURE=true', async () => {
     process.env['PROVIDER_TRAFFIC_CAPTURE'] = 'true';
 
-    const store = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    const store = new ProviderTrafficStoreService(
+      makeConfig(dataDir),
+      makeFibeSync(),
+    );
     const service = new ProxyService(store);
 
     await service.onModuleInit();
 
     expect(service.isEnabled()).toBe(true);
     expect(process.env['__FIBE_PROXY_PORT']).toBeDefined();
-    expect(parseInt(process.env['__FIBE_PROXY_PORT'] ?? '0', 10)).toBeGreaterThan(0);
+    expect(
+      parseInt(process.env['__FIBE_PROXY_PORT'] ?? '0', 10),
+    ).toBeGreaterThan(0);
     expect(process.env['__FIBE_PROXY_CA_PATH']).toBeDefined();
     expect(process.env['__FIBE_PROXY_CA_PATH']).toContain('fibe-proxy-ca-');
 
@@ -81,7 +92,10 @@ describe('ProxyService', () => {
   test('does not start proxy when PROVIDER_TRAFFIC_CAPTURE=false', async () => {
     process.env['PROVIDER_TRAFFIC_CAPTURE'] = 'false';
 
-    const store = new ProviderTrafficStoreService(makeConfig(dataDir), makeFibeSync());
+    const store = new ProviderTrafficStoreService(
+      makeConfig(dataDir),
+      makeFibeSync(),
+    );
     const service = new ProxyService(store);
 
     await service.onModuleInit();

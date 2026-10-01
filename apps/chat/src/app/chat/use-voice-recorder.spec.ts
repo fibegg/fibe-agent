@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useVoiceRecorder } from './use-voice-recorder';
 
-// MockMediaRecorder that properly triggers onstop
 class MockMediaRecorder {
   state = 'recording';
   ondataavailable: ((e: { data: Blob }) => void) | null = null;
   onstop: (() => void) | null = null;
-  start = vi.fn(() => { this.state = 'recording'; });
+  start = vi.fn(() => {
+    this.state = 'recording';
+  });
   stop = vi.fn(() => {
     this.state = 'inactive';
-    // Synchronously trigger onstop like the real API does
     Promise.resolve().then(() => this.onstop?.());
   });
   static isTypeSupported = vi.fn().mockReturnValue(false);
@@ -64,22 +64,30 @@ describe('useVoiceRecorder', () => {
     vi.unstubAllGlobals();
     vi.stubGlobal('MediaRecorder', MockMediaRecorder);
     vi.stubGlobal('navigator', {
-      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()) },
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()),
+      },
       language: 'en-US',
     });
   });
 
   it('startRecording sets isRecording to true', async () => {
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.isRecording).toBe(true);
   });
 
   it('startRecording increments recordingTimeSec every second', async () => {
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
 
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
     expect(result.current.recordingTimeSec).toBe(3);
   });
 
@@ -92,7 +100,9 @@ describe('useVoiceRecorder', () => {
     });
 
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.error).toBe('Permission denied');
     expect(result.current.isRecording).toBe(false);
   });
@@ -106,7 +116,9 @@ describe('useVoiceRecorder', () => {
     });
 
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.error).toBe('some string error');
   });
 
@@ -118,7 +130,9 @@ describe('useVoiceRecorder', () => {
 
   it('stopRecording resets state after recording', async () => {
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.isRecording).toBe(true);
 
     await act(async () => {
@@ -133,8 +147,12 @@ describe('useVoiceRecorder', () => {
 
   it('stopRecording stops the timer', async () => {
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
-    act(() => { vi.advanceTimersByTime(2000); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
     expect(result.current.recordingTimeSec).toBe(2);
 
     await act(async () => {
@@ -143,54 +161,66 @@ describe('useVoiceRecorder', () => {
       await stopPromise;
     });
 
-    act(() => { vi.advanceTimersByTime(3000); });
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
     expect(result.current.recordingTimeSec).toBe(0);
   });
 
   it('getSupportedMimeType returns empty string when no types are supported', async () => {
     MockMediaRecorder.isTypeSupported.mockReturnValue(false);
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
-    // Should start successfully even with no supported mime type
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.isRecording).toBe(true);
   });
 
   it('getSupportedMimeType returns first supported type', async () => {
-    MockMediaRecorder.isTypeSupported.mockImplementation((type: string) => type === 'audio/webm');
+    MockMediaRecorder.isTypeSupported.mockImplementation(
+      (type: string) => type === 'audio/webm',
+    );
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.isRecording).toBe(true);
     MockMediaRecorder.isTypeSupported.mockReturnValue(false);
   });
 
   it('uses SpeechRecognition when available and fires onresult for final results', async () => {
-    // Create a fake SpeechRecognition that captures its onresult handler
     let capturedOnResult: ((e: unknown) => void) | null = null;
     class FakeSpeechRecognition {
       continuous = false;
       interimResults = false;
       lang = '';
       onresult: ((e: unknown) => void) | null = null;
-      start = vi.fn(() => { capturedOnResult = this.onresult; });
+      start = vi.fn(() => {
+        capturedOnResult = this.onresult;
+      });
       stop = vi.fn();
     }
     vi.stubGlobal('SpeechRecognition', FakeSpeechRecognition);
 
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.isRecording).toBe(true);
 
-    // Fire onresult with a final result to cover the transcript accumulation branch
     act(() => {
       capturedOnResult?.({
         results: {
           length: 1,
-          0: { isFinal: true, length: 1, 0: { transcript: 'Hello world', confidence: 0.99 } },
+          0: {
+            isFinal: true,
+            length: 1,
+            0: { transcript: 'Hello world', confidence: 0.99 },
+          },
         },
       });
     });
 
-    // Stop recording — transcript should be included
     await act(async () => {
       const stopPromise = result.current.stopRecording();
       await Promise.resolve();
@@ -198,10 +228,11 @@ describe('useVoiceRecorder', () => {
     });
 
     vi.unstubAllGlobals();
-    // Re-stub what beforeEach expects
     vi.stubGlobal('MediaRecorder', MockMediaRecorder);
     vi.stubGlobal('navigator', {
-      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()) },
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()),
+      },
       language: 'en-US',
     });
   });
@@ -213,13 +244,17 @@ describe('useVoiceRecorder', () => {
       interimResults = false;
       lang = '';
       onresult: ((e: unknown) => void) | null = null;
-      start = vi.fn(() => { capturedOnResult = this.onresult; });
+      start = vi.fn(() => {
+        capturedOnResult = this.onresult;
+      });
       stop = vi.fn();
     }
     vi.stubGlobal('SpeechRecognition', FakeSpeechRecognition);
 
     const { result } = renderHook(() => useVoiceRecorder());
-    await act(async () => { await result.current.startRecording(); });
+    await act(async () => {
+      await result.current.startRecording();
+    });
     expect(result.current.isRecording).toBe(true);
 
     act(() => {
@@ -227,7 +262,11 @@ describe('useVoiceRecorder', () => {
         resultIndex: 0,
         results: {
           length: 1,
-          0: { isFinal: false, length: 1, 0: { transcript: 'live test', confidence: 0.8 } },
+          0: {
+            isFinal: false,
+            length: 1,
+            0: { transcript: 'live test', confidence: 0.8 },
+          },
         },
       });
     });
@@ -245,7 +284,9 @@ describe('useVoiceRecorder', () => {
     vi.unstubAllGlobals();
     vi.stubGlobal('MediaRecorder', MockMediaRecorder);
     vi.stubGlobal('navigator', {
-      mediaDevices: { getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()) },
+      mediaDevices: {
+        getUserMedia: vi.fn().mockResolvedValue(new MockMediaStream()),
+      },
       language: 'en-US',
     });
   });

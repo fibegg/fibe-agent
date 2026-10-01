@@ -27,27 +27,22 @@ export interface OutboundEvent {
   data: Record<string, unknown>;
 }
 
-/**
- * Spawns the stdio MCP child process and handles all local tool calls forwarded
- * from it via POST /api/local-tool-call.
- *
- * Interactive tools (ask_user, confirm_action) block until the operator replies
- * via WebSocket, or until the configured timeout expires.
- */
+/** Runs the stdio MCP child; interactive calls wait for a WebSocket reply or timeout. */
 @Injectable()
 export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(LocalMcpService.name);
 
-  /** WS events forwarded to the chat UI by OrchestratorService. */
   readonly outbound$ = new Subject<OutboundEvent>();
 
-  /** Pending interactive tool promises keyed by questionId. */
   private readonly pending = new Map<
     string,
-    { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
+    {
+      resolve: (v: unknown) => void;
+      reject: (e: Error) => void;
+      timer: ReturnType<typeof setTimeout>;
+    }
   >();
 
-  /** Injected by OrchestratorService after init. */
   private modeGetter: (() => string) | null = null;
   private modeSetter: ((mode: string) => string | null) | null = null;
 
@@ -60,8 +55,6 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       DEFAULT_ASK_TIMEOUT_MS;
   }
 
-  // ─── Lifecycle ──────────────────────────────────────────────────────────────
-
   onModuleInit(): void {
     this.spawnServer();
   }
@@ -70,8 +63,6 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     this.cleanup();
   }
 
-  // ─── Mode injection ─────────────────────────────────────────────────────────
-
   registerModeAccessors(
     getter: () => string,
     setter: (mode: string) => string | null,
@@ -79,8 +70,6 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     this.modeGetter = getter;
     this.modeSetter = setter;
   }
-
-  // ─── Child process ──────────────────────────────────────────────────────────
 
   private spawnServer(): void {
     const launch = this.getServerLaunch();
@@ -93,15 +82,21 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
         this.logger.error(`Local MCP server error: ${err.message}`),
       );
       this.child.on('exit', (code, signal) => {
-        this.logger.warn(`Local MCP server exited (code=${code}, signal=${signal})`);
+        this.logger.warn(
+          `Local MCP server exited (code=${code}, signal=${signal})`,
+        );
         this.child = null;
       });
-      this.child.stdout?.on('data', () => { /* consumed by MCP client */ });
+      this.child.stdout?.on('data', () => {
+        /* consumed by MCP client */
+      });
       this.child.stderr?.on('data', (d: Buffer) => {
         const msg = d.toString().trim();
         if (msg) this.logger.debug(`[local-mcp] ${msg}`);
       });
-      this.logger.log(`Local MCP server spawned (PID ${this.child.pid ?? '?'})`);
+      this.logger.log(
+        `Local MCP server spawned (PID ${this.child.pid ?? '?'})`,
+      );
     } catch (err) {
       this.logger.error(
         `Failed to spawn local MCP server: ${err instanceof Error ? err.message : String(err)}`,
@@ -119,12 +114,16 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     this.child = null;
   }
 
-  // ─── Tool call entry point ──────────────────────────────────────────────────
-
-  async handleToolCall(req: LocalToolCallRequest): Promise<LocalToolCallResponse> {
+  async handleToolCall(
+    req: LocalToolCallRequest,
+  ): Promise<LocalToolCallResponse> {
     const { requestId, tool, args, conversationId } = req;
     try {
-      const result = await this.dispatch(tool as LocalToolName, args, conversationId);
+      const result = await this.dispatch(
+        tool as LocalToolName,
+        args,
+        conversationId,
+      );
       return { requestId, ok: true, result };
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
@@ -143,7 +142,11 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
 
     switch (tool) {
       case LOCAL_TOOL.ASK_USER:
-        return this.askUser(str('question') ?? '', str('placeholder'), conversationId);
+        return this.askUser(
+          str('question') ?? '',
+          str('placeholder'),
+          conversationId,
+        );
 
       case LOCAL_TOOL.CONFIRM_ACTION:
         return this.confirmAction(
@@ -154,13 +157,27 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
         );
 
       case LOCAL_TOOL.SHOW_IMAGE:
-        return this.showImage(str('url'), str('base64'), str('mimeType'), str('caption'), conversationId);
+        return this.showImage(
+          str('url'),
+          str('base64'),
+          str('mimeType'),
+          str('caption'),
+          conversationId,
+        );
 
       case LOCAL_TOOL.NOTIFY:
-        return this.emit(WS_EVENT.NOTIFY, { message: str('message') ?? '', level: str('level') ?? 'info' }, conversationId);
+        return this.emit(
+          WS_EVENT.NOTIFY,
+          { message: str('message') ?? '', level: str('level') ?? 'info' },
+          conversationId,
+        );
 
       case LOCAL_TOOL.SET_TITLE:
-        return this.emit(WS_EVENT.SET_TITLE, { title: str('title') ?? '' }, conversationId);
+        return this.emit(
+          WS_EVENT.SET_TITLE,
+          { title: str('title') ?? '' },
+          conversationId,
+        );
 
       case LOCAL_TOOL.GET_MODE:
         return { mode: this.modeGetter ? this.modeGetter() : 'Exploring...' };
@@ -168,9 +185,13 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       case LOCAL_TOOL.SET_MODE: {
         const raw = str('mode') ?? '';
         if (!resolveAgentMode(raw)) {
-          throw new Error(`Invalid mode "${raw}". Valid values: ${AGENT_MODE_KEYS.join(', ')}`);
+          throw new Error(
+            `Invalid mode "${raw}". Valid values: ${AGENT_MODE_KEYS.join(', ')}`,
+          );
         }
-        const resolved = this.modeSetter ? this.modeSetter(raw) : resolveAgentMode(raw);
+        const resolved = this.modeSetter
+          ? this.modeSetter(raw)
+          : resolveAgentMode(raw);
         if (!resolved) throw new Error(`Failed to resolve mode "${raw}"`);
         return { ok: true, mode: resolved };
       }
@@ -180,16 +201,23 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  // ─── Tool handlers ──────────────────────────────────────────────────────────
-
-  private askUser(question: string, placeholder?: string, conversationId?: string): Promise<{ answer: string }> {
+  private askUser(
+    question: string,
+    placeholder?: string,
+    conversationId?: string,
+  ): Promise<{ answer: string }> {
     if (!question.trim()) {
       return Promise.reject(new Error('ask_user: question must not be empty'));
     }
     const questionId = randomUUID();
     this.outbound$.next({
       type: WS_EVENT.ASK_USER_PROMPT,
-      data: { questionId, question, placeholder: placeholder ?? '', ...(conversationId ? { conversationId } : {}) },
+      data: {
+        questionId,
+        question,
+        placeholder: placeholder ?? '',
+        ...(conversationId ? { conversationId } : {}),
+      },
     });
     return this.waitForReply<{ answer: string }>(questionId);
   }
@@ -201,7 +229,9 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     conversationId?: string,
   ): Promise<{ confirmed: boolean }> {
     if (!message.trim()) {
-      return Promise.reject(new Error('confirm_action: message must not be empty'));
+      return Promise.reject(
+        new Error('confirm_action: message must not be empty'),
+      );
     }
     const questionId = randomUUID();
     this.outbound$.next({
@@ -225,31 +255,50 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     conversationId?: string,
   ): Promise<{ ok: true }> {
     if (!url && !base64) {
-      return Promise.reject(new Error('show_image: either url or base64 must be provided'));
+      return Promise.reject(
+        new Error('show_image: either url or base64 must be provided'),
+      );
     }
-    return this.emit(WS_EVENT.SHOW_IMAGE, {
-      url: url ?? null,
-      base64: base64 ?? null,
-      mimeType: mimeType ?? 'image/png',
-      caption: caption ?? '',
-    }, conversationId);
+    return this.emit(
+      WS_EVENT.SHOW_IMAGE,
+      {
+        url: url ?? null,
+        base64: base64 ?? null,
+        mimeType: mimeType ?? 'image/png',
+        caption: caption ?? '',
+      },
+      conversationId,
+    );
   }
 
   /** Fire-and-forget: emit an event and immediately resolve { ok: true }. */
-  private emit(type: string, data: Record<string, unknown>, conversationId?: string): Promise<{ ok: true }> {
-    this.outbound$.next({ type, data: { ...data, ...(conversationId ? { conversationId } : {}) } });
+  private emit(
+    type: string,
+    data: Record<string, unknown>,
+    conversationId?: string,
+  ): Promise<{ ok: true }> {
+    this.outbound$.next({
+      type,
+      data: { ...data, ...(conversationId ? { conversationId } : {}) },
+    });
     return Promise.resolve({ ok: true });
   }
-
-  // ─── Blocking reply helpers ─────────────────────────────────────────────────
 
   private waitForReply<T>(questionId: string): Promise<T> {
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(questionId);
-        reject(new Error(`Timed out waiting for operator reply (questionId=${questionId})`));
+        reject(
+          new Error(
+            `Timed out waiting for operator reply (questionId=${questionId})`,
+          ),
+        );
       }, this.askTimeoutMs);
-      this.pending.set(questionId, { resolve: resolve as (v: unknown) => void, reject, timer });
+      this.pending.set(questionId, {
+        resolve: resolve as (v: unknown) => void,
+        reject,
+        timer,
+      });
     });
   }
 

@@ -1,27 +1,27 @@
-# Provider CLI Drift
+# Provider CLI drift
 
-This document answers common architectural questions regarding how `fibe-agent` handles the underlying provider CLIs (such as `claude-code`, `codex`, `gemini-cli`, `agy`, etc.).
+How `fibe-agent` manages provider CLI versions.
 
-## 1. Do we pin claude/codex/etc version or let agent always download latest?
-**Decision: We pin versions when the provider publishes an npm package we consume directly; Codex and Gemini are the current exceptions.**
-To prevent unexpected API changes or output format drift from breaking the agent integration, npm-distributed CLI versions should be pinned in `package.json` when possible.
-- For Docker builds (`Dockerfile` and `Dockerfile.dev`), Claude Code, OpenAI Codex, and OpenCode installation steps extract the version from `package.json`. This keeps those containerized providers on tested CLI behavior.
+## Version policy
+
+Pin npm-distributed CLIs in `package.json` when possible. Codex and Gemini are the current exceptions.
+
+- Docker builds extract Claude Code, OpenAI Codex, and OpenCode versions from `package.json`.
 - OpenAI Codex is currently declared as the caret range `^0.125.0`. Docker extracts `0.125.0` from that string, but local installs can float within the `0.125.x` range unless the lockfile is used.
-- Gemini currently installs with `npm install -g @google/gemini-cli` in both Dockerfiles and `@google/gemini-cli` is not listed in `package.json`; Gemini images therefore pull the latest upstream CLI at build time. Treat Gemini CLI drift as a known higher-risk exception until it is pinned.
-- Binary-installer providers such as Cursor and Antigravity (`agy`) are installed from their official install scripts and verified with `--help` during image build. They must be re-audited when those upstream installers change behavior or add a stable version pinning interface.
-- For local/standalone setups, run `bun install` inside the agent repository to use the project package manager (`packageManager: bun@1.3.11`) and lockfile. Use npm only when intentionally testing npm compatibility.
+- Gemini is absent from `package.json` and both Dockerfiles install its latest release. Treat it as higher risk until pinned.
+- Cursor and Antigravity (`agy`) use official installers and are checked with `--help` during builds. Re-audit them when their installers change or support version pins.
+- Local and standalone setups should use `bun install` and the lockfile. Use npm only for compatibility tests.
 
-## 2. Should this be configured by user in fibe-agent-standalone / rails-managed?
-**Decision: Provider versions are tied to agent releases.**
-By default, the agent expects the pinned version to guarantee stability. However, advanced users running `fibe-agent-standalone` can manually install a different version globally. If version behavior deviates, they might encounter parsing or connectivity issues.
-`cliVersion` controls the runtime `fibe` CLI, not the provider CLI. The Docker entrypoint reads `FIBE_VERSION`, `FIBE_CLI_VERSION`, or `cliVersion` from `fibe.yml` and installs or reuses that `fibe` version before the API starts. No strategy currently switches provider binaries or invokes `npx @provider/cli@<version>` dynamically.
+## Configuration
 
-## 3. E2E tests for versions compatibility (matrix)
-**Decision: Add compatibility matrix to CI (Planned).**
-To formally support multiple CLI versions concurrently, our E2E framework must execute tests across a compatibility matrix. This would involve configuring GitHub Actions (or the CI pipeline) to test the agent with N-1 and N-2 versions of the CLIs. Currently, the test suite targets the single pinned version specified in `package.json`.
+Provider versions belong to agent releases. Standalone users can install a different global version, but parsing or connectivity may break.
 
-## 4. Improved deprecation warnings etc — to have time to adjust
-**Decision: Planned, not implemented.**
-There is no generic deprecation-warning interception layer today. Provider strategies may parse stderr for transport-specific output, but `AbstractCliStrategy` does not classify deprecation warnings during initialization/runtime.
+`cliVersion` controls the runtime `fibe` CLI, not provider CLIs. The Docker entrypoint reads `FIBE_VERSION`, `FIBE_CLI_VERSION`, or `cliVersion` from `fibe.yml`. No strategy switches provider binaries or invokes `npx @provider/cli@<version>` dynamically.
 
-For pinned providers, version pinning is the actual buffer against sudden upstream breakage. For unpinned providers, especially Gemini, compatibility must be monitored through CI/build verification and provider-specific tests until warning classification exists.
+## Compatibility matrix
+
+Planned, not implemented. Supporting several CLI versions requires CI coverage for N-1 and N-2 releases. Tests currently use the version in `package.json`.
+
+## Deprecation warnings
+
+Planned, not implemented. Provider strategies may parse transport-specific stderr, but `AbstractCliStrategy` does not classify deprecation warnings. Pins protect supported providers; CI and provider tests must catch drift in unpinned CLIs, especially Gemini.

@@ -1,5 +1,12 @@
 import { describe, expect, test, beforeEach, afterEach } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -47,7 +54,9 @@ describe('ConversationManagerService', () => {
   test('creates protected inbox conversation hidden while empty', () => {
     const manager = createManager();
 
-    expect(manager.list().find((m) => m.id === INBOX_CONVERSATION_ID)).toBeUndefined();
+    expect(
+      manager.list().find((m) => m.id === INBOX_CONVERSATION_ID),
+    ).toBeUndefined();
     expect(manager.get(INBOX_CONVERSATION_ID)?.meta).toEqual(
       expect.objectContaining({
         id: INBOX_CONVERSATION_ID,
@@ -73,8 +82,12 @@ describe('ConversationManagerService', () => {
 
     expect(manager.setTitle(DEFAULT_CONVERSATION_ID, 'Renamed')).toBe(false);
     expect(manager.setTitle(INBOX_CONVERSATION_ID, 'Renamed')).toBe(false);
-    expect(manager.get(DEFAULT_CONVERSATION_ID)?.meta.title).toBe(DEFAULT_CONVERSATION_TITLE);
-    expect(manager.get(INBOX_CONVERSATION_ID)?.meta.title).toBe(INBOX_CONVERSATION_TITLE);
+    expect(manager.get(DEFAULT_CONVERSATION_ID)?.meta.title).toBe(
+      DEFAULT_CONVERSATION_TITLE,
+    );
+    expect(manager.get(INBOX_CONVERSATION_ID)?.meta.title).toBe(
+      INBOX_CONVERSATION_TITLE,
+    );
   });
 
   test('createWithId is idempotent for safe external conversation ids', () => {
@@ -92,7 +105,9 @@ describe('ConversationManagerService', () => {
   test('createWithId rejects unsafe external conversation ids', () => {
     const manager = createManager();
 
-    expect(() => manager.createWithId('../escape', 'bad')).toThrow(/conversation id/);
+    expect(() => manager.createWithId('../escape', 'bad')).toThrow(
+      /conversation id/,
+    );
   });
 
   test('delete() removes the conversation directory from disk', () => {
@@ -113,17 +128,23 @@ describe('ConversationManagerService', () => {
     const tombstonesPath = join(conversationsDir, 'tombstones.json');
     mkdirSync(staleDir, { recursive: true });
     writeFileSync(join(staleDir, 'leftover.txt'), 'stale', 'utf8');
-    writeFileSync(tombstonesPath, JSON.stringify([
-      { id: 'stale-conversation', dir: staleDir, tombstonedAt: new Date().toISOString() },
-    ]), 'utf8');
+    writeFileSync(
+      tombstonesPath,
+      JSON.stringify([
+        {
+          id: 'stale-conversation',
+          dir: staleDir,
+          tombstonedAt: new Date().toISOString(),
+        },
+      ]),
+      'utf8',
+    );
 
     createManager();
 
     expect(existsSync(staleDir)).toBe(false);
     expect(existsSync(tombstonesPath)).toBe(false);
   });
-
-  // ── Claude session marker ─────────────────────────────────────────────────
 
   test('getClaudeSessionMarker returns null when no marker exists', () => {
     const manager = createManager();
@@ -139,7 +160,6 @@ describe('ConversationManagerService', () => {
     expect(manager.setClaudeSessionMarker(id, sessionId)).toBe(true);
     expect(manager.getClaudeSessionMarker(id)).toBe(sessionId);
 
-    // Verify the file is on disk in the expected location
     const markerPath = join(dataDir, 'conversations', id, '.claude_session');
     expect(existsSync(markerPath)).toBe(true);
     expect(readFileSync(markerPath, 'utf8').trim()).toBe(sessionId);
@@ -157,9 +177,15 @@ describe('ConversationManagerService', () => {
     const manager = createManager();
     const legacyWorkspaceDir = join(dataDir, 'claude_workspace');
     mkdirSync(legacyWorkspaceDir, { recursive: true });
-    writeFileSync(join(legacyWorkspaceDir, '.claude_session'), 'legacy-default-session', 'utf8');
+    writeFileSync(
+      join(legacyWorkspaceDir, '.claude_session'),
+      'legacy-default-session',
+      'utf8',
+    );
 
-    expect(manager.getClaudeSessionMarker(DEFAULT_CONVERSATION_ID)).toBe('legacy-default-session');
+    expect(manager.getClaudeSessionMarker(DEFAULT_CONVERSATION_ID)).toBe(
+      'legacy-default-session',
+    );
 
     manager.setClaudeSessionMarker(DEFAULT_CONVERSATION_ID, null);
     expect(manager.getClaudeSessionMarker(DEFAULT_CONVERSATION_ID)).toBeNull();

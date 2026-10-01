@@ -36,6 +36,18 @@ describe('handleSendMessage', () => {
     ).toThrow(ConflictException);
   });
 
+  test('interrupted delivery exposes its original identity in the conflict response', () => {
+    try {
+      handleSendMessage({ accepted: false, error: 'REQUEST_OUTCOME_UNKNOWN', messageId: 'original-id' });
+      throw new Error('expected conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getResponse()).toEqual({ error: 'REQUEST_OUTCOME_UNKNOWN', messageId: 'original-id' });
+    }
+    expect(handleSendMessage({ accepted: true, messageId: 'original-id', executionState: 'failed' }))
+      .toEqual({ accepted: true, messageId: 'original-id', executionState: 'failed' });
+  });
+
   test('throws BadRequestException when result has other error', () => {
     expect(() =>
       handleSendMessage({ accepted: false, error: 'Unknown error' })

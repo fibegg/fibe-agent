@@ -2,23 +2,11 @@ import { describe, test, expect } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-/**
- * These tests guard the integrity of the built-in system prompt asset and the
- * prompts/ library that ships alongside the source code.
- *
- * They are intentionally lightweight — they verify structure and essential
- * content rules so that accidental truncation or corruption of prompt files
- * is caught in CI before reaching production.
- */
+/** Guards prompt assets against truncation and structural corruption. */
 
 const REPO_ROOT = join(import.meta.dir, '..', '..', '..', '..');
 
-/** Resolve a path relative to the monorepo root. */
 const repo = (...parts: string[]) => join(REPO_ROOT, ...parts);
-
-// ---------------------------------------------------------------------------
-// Built-in fallback asset (bundled into Docker image)
-// ---------------------------------------------------------------------------
 
 describe('built-in SYSTEM_PROMPT.md asset', () => {
   const assetPath = join(import.meta.dir, 'SYSTEM_PROMPT.md');
@@ -43,11 +31,7 @@ describe('built-in SYSTEM_PROMPT.md asset', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// prompts/ library
-// ---------------------------------------------------------------------------
-
-describe('prompts/ library — README', () => {
+describe('prompts/ library: README', () => {
   const readmePath = repo('prompts', 'README.md');
 
   test('README.md exists', () => {
@@ -60,11 +44,16 @@ describe('prompts/ library — README', () => {
   });
 });
 
-describe('prompts/ library — base prompts', () => {
+describe('prompts/ library: base prompts', () => {
   const basePrompts: { name: string; requiredPhrases: string[] }[] = [
     {
       name: 'code-playground.md',
-      requiredPhrases: ['current working directory', 'Scope rules', 'Workflow', 'Code quality'],
+      requiredPhrases: [
+        'current working directory',
+        'Scope rules',
+        'Workflow',
+        'Code quality',
+      ],
     },
   ];
 
@@ -91,8 +80,15 @@ describe('prompts/ library — base prompts', () => {
   }
 });
 
-describe('prompts/ library — provider prompts', () => {
-  const providers = ['gemini', 'antigravity', 'claude-code', 'openai-codex', 'opencode', 'cursor'];
+describe('prompts/ library: provider prompts', () => {
+  const providers = [
+    'gemini',
+    'antigravity',
+    'claude-code',
+    'openai-codex',
+    'opencode',
+    'cursor',
+  ];
 
   for (const provider of providers) {
     const filePath = repo('prompts', 'providers', `${provider}.md`);
@@ -114,8 +110,12 @@ describe('prompts/ library — provider prompts', () => {
 
       test('contains provider name in content', () => {
         const content = readFileSync(filePath, 'utf8').toLowerCase();
-        // Each file should reference its own provider name (e.g. "gemini", "claude", "codex", "opencode")
-        const keyword = provider === 'claude-code' ? 'claude' : provider === 'openai-codex' ? 'codex' : provider;
+        const keyword =
+          provider === 'claude-code'
+            ? 'claude'
+            : provider === 'openai-codex'
+              ? 'codex'
+              : provider;
         expect(content).toContain(keyword);
       });
 

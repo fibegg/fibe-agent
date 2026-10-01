@@ -1,25 +1,16 @@
-/**
- * Comprehensive unit tests for ClaudeSdkStrategy.
- *
- * Covers:
- *  - handleSdkMessage: text deltas, thinking deltas, tool blocks, result, errors, session ID tracking
- *  - handleStreamEvent: message_start/stop/delta, text_delta, thinking_delta, tool_use lifecycle
- *  - Session marker: read (missing, empty, valid), write (no conversationDataDir, with dir)
- *  - AsyncMessageQueue: enqueue, close, next, done after close, async iteration
- *  - Utility functions: messageSessionId, usageFromObject, assistantText, userTextMessage
- *  - checkAuthStatus: apiTokenMode with/without env token
- *  - clearCredentials, submitAuthCode, interruptAgent flag
- *  - executePromptStreaming: busy record throws, interrupt rethrows INTERRUPTED_MESSAGE
- */
-
 import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
 import type { SDKMessage } from '@anthropic-ai/claude-agent-sdk';
-
-// ─── Helpers ────────────────────────────────────────────────────────────────
 
 function makeStrategy(
   useApiTokenMode = false,
@@ -111,13 +102,19 @@ function handleEvent(
   ).handleStreamEvent(rawEvent, state, onChunk, callbacks);
 }
 
-// ─── describe blocks ─────────────────────────────────────────────────────────
-
 describe('ClaudeSdkStrategy › runtime packaging', () => {
   test('declares the Claude agent SDK as an API runtime dependency', () => {
     const pkg = readApiPackageJson();
-    expect(pkg.dependencies?.['@anthropic-ai/claude-agent-sdk']).toBe(
-      '0.2.126',
+    const rootPkg = JSON.parse(
+      readFileSync(
+        join(import.meta.dir, '../../../../..', 'package.json'),
+        'utf8',
+      ),
+    );
+    const version = pkg.dependencies?.['@anthropic-ai/claude-agent-sdk'];
+    expect(version).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(version).toBe(
+      rootPkg.dependencies['@anthropic-ai/claude-agent-sdk'],
     );
   });
 });
@@ -302,7 +299,6 @@ describe('ClaudeSdkStrategy › handleSdkMessage', () => {
   });
 
   test('only-hidden-thinking followed by result emits result text', () => {
-    // Simulate thinking delta only → no visible output → result should provide text
     handleEvent(
       strategy,
       {
@@ -604,6 +600,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
   let receivedPrompts: string[];
   let failResumedSessionOnce: boolean;
   let hangBeforeFirstEvent: boolean;
+  let omitResult: boolean;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'claude-turns-'));
@@ -612,6 +609,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     receivedPrompts = [];
     failResumedSessionOnce = false;
     hangBeforeFirstEvent = false;
+    omitResult = false;
     (
       ClaudeSdkStrategy as unknown as { records: Map<string, unknown> }
     ).records.clear();
@@ -668,6 +666,7 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
               ],
             },
           };
+          if (omitResult) return;
           yield {
             type: 'result',
             session_id: `session-${callIndex}`,
@@ -683,6 +682,11 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
           close: () => {
             closedCalls.push(callIndex);
           },
+          supportedModels: async () => [
+            { value: 'sonnet' },
+            { value: 'opus' },
+            { value: 'sonnet' },
+          ],
           setModel: async () => undefined,
         };
       },
@@ -725,6 +729,27 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     expect(queryCalls[0].options.resume).toBeUndefined();
     expect(queryCalls[1].options.resume).toBe('session-0');
     expect(closedCalls).toEqual([0, 1]);
+  });
+
+  test('rejects an incomplete SDK stream after visible text', async () => {
+    omitResult = true;
+    const strategy = new ClaudeSdkStrategy(false, {
+      getConversationDataDir: () => tmpDir,
+    });
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow('without a terminal result');
+    expect(existsSync(join(tmpDir, '.claude_session'))).toBe(false);
+  });
+
+  test('discovers models through SDK control channel without sending a prompt', async () => {
+    const strategy = new ClaudeSdkStrategy(false, {
+      getConversationDataDir: () => tmpDir,
+    });
+    expect(await strategy.listModels()).toEqual(['sonnet', 'opus']);
+    expect(receivedPrompts).toEqual([]);
+    expect(closedCalls).toEqual([0]);
+    expect(existsSync(join(tmpDir, '.claude_session'))).toBe(false);
   });
 
   test('applies model and effort changes to the next fresh provider turn', async () => {
@@ -813,10 +838,16 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
       }),
     );
 
-    await strategy.executePromptStreaming('first turn', 'opus', () => undefined);
+    await strategy.executePromptStreaming(
+      'first turn',
+      'opus',
+      () => undefined,
+    );
 
     expect(queryCalls).toHaveLength(1);
-    expect(queryCalls[0].options.env?.CONVERSATION_ID).toBe('likeable-project-1');
+    expect(queryCalls[0].options.env?.CONVERSATION_ID).toBe(
+      'likeable-project-1',
+    );
     expect(queryCalls[0].options.mcpServers).toEqual({
       'fibe-local': {
         type: 'stdio',
@@ -828,8 +859,12 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
         },
       },
     });
-    expect(JSON.stringify(queryCalls[0].options.mcpServers)).not.toContain('secret-token');
-    expect(JSON.stringify(queryCalls[0].options.mcpServers)).not.toContain('agent-secret');
+    expect(JSON.stringify(queryCalls[0].options.mcpServers)).not.toContain(
+      'secret-token',
+    );
+    expect(JSON.stringify(queryCalls[0].options.mcpServers)).not.toContain(
+      'agent-secret',
+    );
   });
 
   test('folds pending steer text into the next fresh provider turn', async () => {
@@ -900,7 +935,11 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
       'likeable-project-1',
     );
 
-    await strategy.executePromptStreaming('first turn', 'opus', () => undefined);
+    await strategy.executePromptStreaming(
+      'first turn',
+      'opus',
+      () => undefined,
+    );
 
     expect(queryCalls[0].options.env?.ANTHROPIC_API_KEY).toBe(
       'sk-ant-api-token',
@@ -920,7 +959,11 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
       'likeable-project-1',
     );
 
-    await strategy.executePromptStreaming('first turn', 'opus', () => undefined);
+    await strategy.executePromptStreaming(
+      'first turn',
+      'opus',
+      () => undefined,
+    );
 
     expect(queryCalls[0].options.env?.ANTHROPIC_API_KEY).toBe(
       'sk-ant-manual-token',
@@ -935,7 +978,7 @@ describe('ClaudeSdkStrategy › AsyncMessageQueue', () => {
   // Access via module internals is not possible since it's private; test through strategy internals
   test('enqueue before next returns immediately', async () => {
     // We verify the queue works by watching that executePromptStreaming can receive messages
-    // indirectly — tested through the broader flow. Here we access the class directly via eval.
+    // indirectly: tested through the broader flow. Here we access the class directly via eval.
     // Instead, we test through the strategy: if steerAgent works, queue works.
     const strategy = makeStrategy();
     expect(() => strategy.steerAgent?.('msg')).not.toThrow();
@@ -977,7 +1020,6 @@ describe('ClaudeSdkStrategy › utility functions', () => {
   const strategy = makeStrategy();
 
   test('usageFromObject handles snake_case keys', () => {
-    // We test indirectly via handleStreamEvent which calls usageFromObject
     const state = freshState();
     const chunks: string[] = [];
     handleEvent(
@@ -1017,7 +1059,6 @@ describe('ClaudeSdkStrategy › utility functions', () => {
       state,
       () => undefined,
     );
-    // usage stays null since we passed null
     expect(state.usage).toBeNull();
   });
 });
@@ -1044,6 +1085,22 @@ describe('ClaudeSdkStrategy › checkAuthStatus (API token mode)', () => {
     expect(await strategy.checkAuthStatus()).toBe(true);
   });
 
+  test('missing API key opens the manual token dialog', () => {
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    delete process.env.CLAUDE_API_KEY;
+    const events: string[] = [];
+    makeStrategy(true).executeAuth({
+      sendAuthManualToken: () => events.push('manual'),
+      sendAuthSuccess: () => events.push('success'),
+      sendAuthStatus: (status) => events.push(status),
+      sendAuthUrlGenerated: () => undefined,
+      sendDeviceCode: () => undefined,
+      sendError: () => undefined,
+    });
+    expect(events).toEqual(['manual']);
+  });
+
   test('returns false when no env token and useApiTokenMode=true', async () => {
     delete process.env.ANTHROPIC_API_KEY;
     delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
@@ -1055,12 +1112,17 @@ describe('ClaudeSdkStrategy › checkAuthStatus (API token mode)', () => {
 
 describe('ClaudeSdkStrategy › auth management', () => {
   let tmpDir: string;
+  let savedSessionDir: string | undefined;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'claude-auth-'));
+    savedSessionDir = process.env.SESSION_DIR;
+    process.env.SESSION_DIR = tmpDir;
   });
 
   afterEach(() => {
+    if (savedSessionDir === undefined) delete process.env.SESSION_DIR;
+    else process.env.SESSION_DIR = savedSessionDir;
     rmSync(tmpDir, { recursive: true, force: true });
   });
 

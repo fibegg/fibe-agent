@@ -1,4 +1,10 @@
-import { useCallback, useEffect, useRef, useState, type SetStateAction } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type SetStateAction,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { apiRequest } from '../api-url';
 import { API_PATHS, API_PATH_CONVERSATION_MESSAGES } from '@shared/api-paths';
@@ -10,7 +16,10 @@ function messagesPathForConversation(conversationId: string): string {
     : API_PATH_CONVERSATION_MESSAGES(conversationId);
 }
 
-export function useChatInitialData(authenticated: boolean, conversationId = 'default') {
+export function useChatInitialData(
+  authenticated: boolean,
+  conversationId = 'default',
+) {
   const navigate = useNavigate();
   const [messages, setMessagesState] = useState<ChatListItem[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
@@ -21,15 +30,19 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
   const loadSeqRef = useRef(0);
   const messageCacheRef = useRef(new Map<string, ChatListItem[]>());
 
-  const setMessages = useCallback((value: SetStateAction<ChatListItem[]>) => {
-    setMessagesState((prev) => {
-      const next = typeof value === 'function'
-        ? (value as (prevState: ChatListItem[]) => ChatListItem[])(prev)
-        : value;
-      messageCacheRef.current.set(conversationId, next);
-      return next;
-    });
-  }, [conversationId]);
+  const setMessages = useCallback(
+    (value: SetStateAction<ChatListItem[]>) => {
+      setMessagesState((prev) => {
+        const next =
+          typeof value === 'function'
+            ? (value as (prevState: ChatListItem[]) => ChatListItem[])(prev)
+            : value;
+        messageCacheRef.current.set(conversationId, next);
+        return next;
+      });
+    },
+    [conversationId],
+  );
 
   const loadMessages = useCallback(async () => {
     const loadSeq = loadSeqRef.current + 1;
@@ -55,6 +68,7 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
       setMessagesLoadError(false);
       setMessagesLoaded(true);
     } catch {
+      // Fall back to cached messages when loading fails.
       if (loadSeq !== loadSeqRef.current) return;
       setMessagesState(messageCacheRef.current.get(conversationId) ?? []);
       setMessagesLoadError(true);
@@ -76,13 +90,15 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
   const refreshModelOptions = useCallback(async () => {
     setRefreshingModels(true);
     try {
-      const res = await apiRequest(API_PATHS.REFRESH_MODEL_OPTIONS, { method: 'POST' });
+      const res = await apiRequest(API_PATHS.REFRESH_MODEL_OPTIONS, {
+        method: 'POST',
+      });
       if (res.ok) {
         const data = (await res.json()) as string[];
         setModelOptions(Array.isArray(data) ? data : []);
       }
     } catch {
-      // Silently fail — keep existing options
+      // Keep the current model list when refresh fails.
     } finally {
       setRefreshingModels(false);
     }
@@ -92,11 +108,11 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
     try {
       const res = await fetch('/api/runtime-config');
       if (res.ok) {
-        const data = await res.json() as { agentProvider: string | null };
+        const data = (await res.json()) as { agentProvider: string | null };
         setAgentProvider(data.agentProvider);
       }
     } catch {
-      // Ignore
+      // Runtime configuration is optional in standalone builds.
     }
   }, []);
 
@@ -111,5 +127,15 @@ export function useChatInitialData(authenticated: boolean, conversationId = 'def
     }
   }, [authenticated, loadMessages, loadModelOptions]);
 
-  return { messages, setMessages, messagesLoaded, messagesLoadError, modelOptions, refreshingModels, loadMessages, refreshModelOptions, agentProvider };
+  return {
+    messages,
+    setMessages,
+    messagesLoaded,
+    messagesLoadError,
+    modelOptions,
+    refreshingModels,
+    loadMessages,
+    refreshModelOptions,
+    agentProvider,
+  };
 }

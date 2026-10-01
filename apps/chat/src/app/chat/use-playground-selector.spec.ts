@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePlaygroundSelector } from './use-playground-selector';
 
-// Mock apiRequest
 const mockApiRequest = vi.fn();
 vi.mock('../api-url', () => ({
   apiRequest: (...args: unknown[]) => mockApiRequest(...args),
@@ -28,8 +27,14 @@ describe('usePlaygroundSelector', () => {
       { name: 'project', path: 'project', type: 'directory' },
     ];
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockEntries) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: 'some/link' }) });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockEntries),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: 'some/link' }),
+      });
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -63,8 +68,14 @@ describe('usePlaygroundSelector', () => {
     const subEntries = [{ name: 'file.ts', path: 'sub/file.ts', type: 'file' }];
 
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: null }),
+      });
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -90,8 +101,14 @@ describe('usePlaygroundSelector', () => {
     const rootEntries = [{ name: 'sub', path: 'sub', type: 'directory' }];
 
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: null }),
+      });
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -124,7 +141,8 @@ describe('usePlaygroundSelector', () => {
   it('linkPlayground sends POST and updates currentLink', async () => {
     mockApiRequest.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ ok: true, linkedPath: '/opt/fibe/project' }),
+      json: () =>
+        Promise.resolve({ ok: true, linkedPath: '/opt/fibe/project' }),
     });
 
     const { result } = renderHook(() => usePlaygroundSelector());
@@ -215,7 +233,10 @@ describe('usePlaygroundSelector', () => {
   it('sets error when browse request fails', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: false, status: 404 }) // fetchEntries -> browse
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: 'existing' }) }); // fetchCurrentLink
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: 'existing' }),
+      }); // fetchCurrentLink
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -233,9 +254,18 @@ describe('usePlaygroundSelector', () => {
     ];
 
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }) // browse
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // link
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }); // fetchEntries
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      }) // browse
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      }) // link
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      }); // fetchEntries
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -256,12 +286,12 @@ describe('usePlaygroundSelector', () => {
   });
 
   it('smartMount returns false if no directories found', async () => {
-    const rootEntries = [
-      { name: 'file.ts', path: 'file.ts', type: 'file' },
-    ];
+    const rootEntries = [{ name: 'file.ts', path: 'file.ts', type: 'file' }];
 
-    mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) });
+    mockApiRequest.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(rootEntries),
+    });
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -279,10 +309,22 @@ describe('usePlaygroundSelector', () => {
 
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) }) // open -> fetchEntries
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) }) // fetchCurrentLink
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }) // smartMount -> browse
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ ok: true }) }) // smartMount -> link
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) }); // smartMount -> fetchEntries
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: null }),
+      }) // fetchCurrentLink
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      }) // smartMount -> browse
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ ok: true }),
+      }) // smartMount -> link
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      }); // smartMount -> fetchEntries
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -319,7 +361,8 @@ describe('usePlaygroundSelector', () => {
     mockApiRequest
       .mockResolvedValueOnce({
         ok: true,
-        json: () => Promise.resolve([{ name: 'dir', path: 'dir', type: 'directory' }]),
+        json: () =>
+          Promise.resolve([{ name: 'dir', path: 'dir', type: 'directory' }]),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -341,8 +384,14 @@ describe('usePlaygroundSelector', () => {
     const rootEntries = [{ name: 'a', path: 'a', type: 'directory' }];
 
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: null }),
+      });
 
     const { result } = renderHook(() => usePlaygroundSelector());
 
@@ -350,13 +399,19 @@ describe('usePlaygroundSelector', () => {
       result.current.open();
     });
 
-    mockApiRequest.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve([]) });
+    mockApiRequest.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve([]),
+    });
 
     await act(async () => {
       result.current.browseTo('a');
     });
 
-    mockApiRequest.mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) });
+    mockApiRequest.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve(rootEntries),
+    });
 
     await act(async () => {
       result.current.goToRoot();
@@ -371,12 +426,22 @@ describe('usePlaygroundSelector', () => {
       { name: 'playzones', path: 'playzones', type: 'directory' },
     ];
     const symlinkEntries = [
-      { name: 'example-backend', path: 'playzones/example-backend', type: 'symlink' },
+      {
+        name: 'example-backend',
+        path: 'playzones/example-backend',
+        type: 'symlink',
+      },
     ];
 
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(rootEntries) })
-      .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve({ current: null }) });
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(rootEntries),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ current: null }),
+      });
 
     const { result } = renderHook(() => usePlaygroundSelector());
 

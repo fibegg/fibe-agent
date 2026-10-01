@@ -71,22 +71,30 @@ describe('getTypeFilterLabel', () => {
 
 describe('commandLabel', () => {
   it('returns command when present', () => {
-    const entry = { type: 'tool_call', command: 'ls -la' } as Parameters<typeof commandLabel>[0];
+    const entry = { type: 'tool_call', command: 'ls -la' } as Parameters<
+      typeof commandLabel
+    >[0];
     expect(commandLabel(entry)).toBe('ls -la');
   });
 
   it('uses message when no command', () => {
-    const entry = { type: 'step', message: 'Ran something' } as Parameters<typeof commandLabel>[0];
+    const entry = { type: 'step', message: 'Ran something' } as Parameters<
+      typeof commandLabel
+    >[0];
     expect(commandLabel(entry)).toBe('something');
   });
 
   it('strips "Ran " prefix from message', () => {
-    const entry = { type: 'step', message: 'Ran the tests' } as Parameters<typeof commandLabel>[0];
+    const entry = { type: 'step', message: 'Ran the tests' } as Parameters<
+      typeof commandLabel
+    >[0];
     expect(commandLabel(entry)).toBe('the tests');
   });
 
   it('returns activity label for empty message', () => {
-    const entry = { type: 'stream_start', message: '{}' } as Parameters<typeof commandLabel>[0];
+    const entry = { type: 'stream_start', message: '{}' } as Parameters<
+      typeof commandLabel
+    >[0];
     const result = commandLabel(entry);
     expect(typeof result).toBe('string');
   });
@@ -225,7 +233,6 @@ describe('highlightText', () => {
 
 describe('reasoningBodyWithHighlights', () => {
   it('returns raw details when no segments', () => {
-    // Plain text with no patterns returns the string
     const result = reasoningBodyWithHighlights('', 'query');
     expect(result).toBe('');
   });

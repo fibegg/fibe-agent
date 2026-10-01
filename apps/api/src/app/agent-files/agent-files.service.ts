@@ -2,7 +2,10 @@ import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
 import { join, resolve, relative, basename, dirname } from 'node:path';
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
-import { ConversationManagerService, DEFAULT_CONVERSATION_ID } from '../conversation/conversation-manager.service';
+import {
+  ConversationManagerService,
+  DEFAULT_CONVERSATION_ID,
+} from '../conversation/conversation-manager.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 
@@ -22,20 +25,25 @@ export interface AgentWorkspaceStats {
 
 const HIDDEN_PREFIX = '.';
 
-
 @Injectable()
 export class AgentFilesService {
   constructor(
     private readonly strategyRegistry: StrategyRegistryService,
-    @Optional() private readonly conversationManager?: ConversationManagerService,
+    @Optional()
+    private readonly conversationManager?: ConversationManagerService,
   ) {}
 
   getAgentWorkingDir(conversationId = DEFAULT_CONVERSATION_ID): string | null {
-    if (this.conversationManager && !this.conversationManager.get(conversationId)) {
+    if (
+      this.conversationManager &&
+      !this.conversationManager.get(conversationId)
+    ) {
       return null;
     }
     const strategy = this.conversationManager
-      ? this.strategyRegistry.resolveStrategy(this.conversationManager.dataDirProvider(conversationId))
+      ? this.strategyRegistry.resolveStrategy(
+          this.conversationManager.dataDirProvider(conversationId),
+        )
       : this.strategyRegistry.resolveStrategy();
     try {
       strategy.prepareWorkingDir?.();
@@ -45,7 +53,9 @@ export class AgentFilesService {
     return strategy.getWorkingDir?.() ?? null;
   }
 
-  async getTree(conversationId = DEFAULT_CONVERSATION_ID): Promise<AgentFileEntry[]> {
+  async getTree(
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<AgentFileEntry[]> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return [];
     const settings = await loadFibeSettings(dir);
@@ -53,7 +63,9 @@ export class AgentFilesService {
     return this.readDir(dir, '', ig, settings);
   }
 
-  async getStats(conversationId = DEFAULT_CONVERSATION_ID): Promise<AgentWorkspaceStats> {
+  async getStats(
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<AgentWorkspaceStats> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return { fileCount: 0, totalLines: 0, workspaceAvailable: false };
     const settings = await loadFibeSettings(dir);
@@ -62,7 +74,11 @@ export class AgentFilesService {
     return { ...stats, workspaceAvailable: true };
   }
 
-  private async countStats(absPath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings): Promise<{ fileCount: number; totalLines: number }> {
+  private async countStats(
+    absPath: string,
+    parentIg: GitignoreFilter,
+    settings: ResolvedFibeSettings,
+  ): Promise<{ fileCount: number; totalLines: number }> {
     let fileCount = 0;
     let totalLines = 0;
     try {
@@ -71,7 +87,9 @@ export class AgentFilesService {
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
-          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          (name.startsWith(HIDDEN_PREFIX) &&
+            !settings.showHidden &&
+            !settings.visibleHidden.has(name)) ||
           settings.ignoredNames.has(name)
         ) {
           continue;
@@ -83,22 +101,36 @@ export class AgentFilesService {
           try {
             const content = await readFile(childAbs, 'utf-8');
             totalLines += content.split('\n').length;
-          } catch { /* skip binary/unreadable */ }
+          } catch {
+            /* skip binary/unreadable */
+          }
         } else if (e.isDirectory()) {
           const sub = await this.countStats(childAbs, ig, settings);
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
         }
       }
-    } catch { /* dir not accessible */ }
+    } catch {
+      /* dir not accessible */
+    }
     return { fileCount, totalLines };
   }
 
-  async getFileContent(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
-    return readFile(await this.getFilePath(relativePath, conversationId), 'utf-8');
+  async getFileContent(
+    relativePath: string,
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<string> {
+    return readFile(
+      await this.getFilePath(relativePath, conversationId),
+      'utf-8',
+    );
   }
 
-  async saveFileContent(relativePath: string, content: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<void> {
+  async saveFileContent(
+    relativePath: string,
+    content: string,
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<void> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) throw new NotFoundException('No agent working directory');
     const settings = await loadFibeSettings(dir);
@@ -106,14 +138,21 @@ export class AgentFilesService {
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
     const segments = rel.replace(/\\/g, '/').split('/');
-    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
+    if (
+      rel.startsWith('..') ||
+      absPath === base ||
+      segments.some((seg) => settings.ignoredNames.has(seg))
+    ) {
       throw new NotFoundException('File not found');
     }
     await mkdir(dirname(absPath), { recursive: true });
     await writeFile(absPath, content, 'utf-8');
   }
 
-  async getFilePath(relativePath: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+  async getFilePath(
+    relativePath: string,
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<string> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) throw new NotFoundException('No agent working directory');
     const settings = await loadFibeSettings(dir);
@@ -121,7 +160,11 @@ export class AgentFilesService {
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
     const segments = rel.replace(/\\/g, '/').split('/');
-    if (rel.startsWith('..') || absPath === base || segments.some((seg) => settings.ignoredNames.has(seg))) {
+    if (
+      rel.startsWith('..') ||
+      absPath === base ||
+      segments.some((seg) => settings.ignoredNames.has(seg))
+    ) {
       throw new NotFoundException('File not found');
     }
     let st: Awaited<ReturnType<typeof stat>>;
@@ -136,17 +179,26 @@ export class AgentFilesService {
     return absPath;
   }
 
-  async uploadFile(relativeDir: string, filename: string, buffer: Buffer, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+  async uploadFile(
+    relativeDir: string,
+    filename: string,
+    buffer: Buffer,
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<string> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) throw new NotFoundException('No agent working directory');
     const base = resolve(dir);
     const settings = await loadFibeSettings(base);
-    // Sanitise filename — strip any path separators so callers can't traverse
-    const safeName = basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
+    // Sanitise filename: strip any path separators so callers can't traverse
+    const safeName =
+      basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
     const targetDir = relativeDir ? resolve(base, relativeDir) : base;
     const relDir = relative(base, targetDir);
     const segments = relDir.replace(/\\/g, '/').split('/');
-    if (relDir.startsWith('..') || segments.some((seg) => settings.ignoredNames.has(seg))) {
+    if (
+      relDir.startsWith('..') ||
+      segments.some((seg) => settings.ignoredNames.has(seg))
+    ) {
       throw new NotFoundException('Invalid upload path');
     }
     await mkdir(targetDir, { recursive: true });
@@ -155,7 +207,12 @@ export class AgentFilesService {
     return relativeDir ? `${relDir}/${safeName}` : safeName;
   }
 
-  private async readDir(absPath: string, relativePath: string, parentIg: GitignoreFilter, settings: ResolvedFibeSettings): Promise<AgentFileEntry[]> {
+  private async readDir(
+    absPath: string,
+    relativePath: string,
+    parentIg: GitignoreFilter,
+    settings: ResolvedFibeSettings,
+  ): Promise<AgentFileEntry[]> {
     if (settings.ignoredNames.has(basename(absPath))) return [];
     try {
       const ig = await loadGitignore(absPath, parentIg);
@@ -166,7 +223,9 @@ export class AgentFilesService {
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
-          (name.startsWith(HIDDEN_PREFIX) && !settings.showHidden && !settings.visibleHidden.has(name)) ||
+          (name.startsWith(HIDDEN_PREFIX) &&
+            !settings.showHidden &&
+            !settings.visibleHidden.has(name)) ||
           settings.ignoredNames.has(name)
         ) {
           continue;
@@ -194,7 +253,9 @@ export class AgentFilesService {
         try {
           const st = await stat(join(absPath, f.name));
           mtime = st.mtimeMs;
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
         result.push({ name: f.name, path: f.rel, type: 'file', mtime });
       }
       return result;

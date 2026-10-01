@@ -35,7 +35,9 @@ export function useAgentFiles(conversationId = 'default'): {
   const [tree, setTree] = useState<AgentFileEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<{ fileCount: number; totalLines: number }>({ fileCount: 0, totalLines: 0 });
+  const [stats, setStats] = useState<{ fileCount: number; totalLines: number }>(
+    { fileCount: 0, totalLines: 0 },
+  );
   const [workspaceAvailable, setWorkspaceAvailable] = useState(false);
 
   const hasFiles = useMemo(() => flattenEntries(tree).length > 0, [tree]);
@@ -51,7 +53,9 @@ export function useAgentFiles(conversationId = 'default'): {
     setLoading(true);
     setError(null);
     try {
-      const res = await apiRequest(`${API_PATHS.AGENT_FILES}?conversationId=${encodeURIComponent(conversationId)}`);
+      const res = await apiRequest(
+        `${API_PATHS.AGENT_FILES}?conversationId=${encodeURIComponent(conversationId)}`,
+      );
       if (res.status === 401) {
         setTree([]);
         return;
@@ -77,23 +81,29 @@ export function useAgentFiles(conversationId = 'default'): {
     return () => clearInterval(id);
   }, [tree.length, loading, refetch]);
 
-  // Regular polling for live updates
   useEffect(() => {
     if (tree.length === 0) return;
     const id = setInterval(() => void refetch(), POLL_INTERVAL_MS);
     return () => clearInterval(id);
   }, [tree.length, refetch]);
 
-  // Stats fetching
   const fetchStats = useCallback(async () => {
     try {
-      const res = await apiRequest(`${API_PATHS.AGENT_FILES_STATS}?conversationId=${encodeURIComponent(conversationId)}`);
+      const res = await apiRequest(
+        `${API_PATHS.AGENT_FILES_STATS}?conversationId=${encodeURIComponent(conversationId)}`,
+      );
       if (res.ok) {
-        const data = await res.json() as { fileCount: number; totalLines: number; workspaceAvailable?: boolean };
+        const data = (await res.json()) as {
+          fileCount: number;
+          totalLines: number;
+          workspaceAvailable?: boolean;
+        };
         setStats({ fileCount: data.fileCount, totalLines: data.totalLines });
         setWorkspaceAvailable(data.workspaceAvailable === true);
       }
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, [conversationId]);
 
   useEffect(() => {

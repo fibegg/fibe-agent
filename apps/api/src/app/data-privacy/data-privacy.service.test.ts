@@ -42,7 +42,7 @@ describe('DataPrivacyService', () => {
       mockMessageStore as MessageStoreService,
       mockActivityStore as ActivityStoreService,
       mockModelStore as ModelStoreService,
-      mockEffortStore as EffortStoreService
+      mockEffortStore as EffortStoreService,
     );
   });
 
@@ -57,15 +57,20 @@ describe('DataPrivacyService', () => {
   });
 
   test('deleteData clears stores and removes directory', () => {
-    const rmSyncSpy = vi.spyOn(fs, 'rmSync').mockImplementation(() => undefined);
-    
+    const rmSyncSpy = vi
+      .spyOn(fs, 'rmSync')
+      .mockImplementation(() => undefined);
+
     service.deleteData();
     // @ts-expect-error mock
     expect(mockMessageStore.clear).toHaveBeenCalled();
     // @ts-expect-error mock
     expect(mockActivityStore.clear).toHaveBeenCalled();
-    expect(rmSyncSpy).toHaveBeenCalledWith('/mock/data/dir', { recursive: true, force: true });
-    
+    expect(rmSyncSpy).toHaveBeenCalledWith('/mock/data/dir', {
+      recursive: true,
+      force: true,
+    });
+
     rmSyncSpy.mockRestore();
   });
 
@@ -73,11 +78,10 @@ describe('DataPrivacyService', () => {
     const rmSyncSpy = vi.spyOn(fs, 'rmSync').mockImplementationOnce(() => {
       throw new Error('Test error');
     });
-    // Should not throw
     expect(() => service.deleteData()).not.toThrow();
     // @ts-expect-error mock
     expect(mockMessageStore.clear).toHaveBeenCalled();
-    
+
     rmSyncSpy.mockRestore();
   });
 });

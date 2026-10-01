@@ -27,7 +27,12 @@ export class TerminalService implements OnModuleDestroy {
 
     if (process.platform === 'win32') return 'powershell.exe';
 
-    for (const shell of ['/bin/bash', '/usr/bin/bash', '/bin/sh', '/usr/bin/sh']) {
+    for (const shell of [
+      '/bin/bash',
+      '/usr/bin/bash',
+      '/bin/sh',
+      '/usr/bin/sh',
+    ]) {
       if (existsSync(shell)) return shell;
     }
 
@@ -44,14 +49,17 @@ export class TerminalService implements OnModuleDestroy {
     const dataDir = env.DATA_DIR || DEFAULT_DATA_DIR;
     const runtimeFibeBinDir = `${dataDir}/${RUNTIME_FIBE_BIN_RELATIVE_DIR}`;
     const path = env.PATH || '';
-    env.PATH = [runtimeFibeBinDir, '/usr/local/bin', path].filter(Boolean).join(':');
+    env.PATH = [runtimeFibeBinDir, '/usr/local/bin', path]
+      .filter(Boolean)
+      .join(':');
     env.TERM = 'xterm-256color';
     env.COLORTERM = 'truecolor';
     return env;
   }
 
   private resolveCwd(cwd?: string): string {
-    const preferred = cwd || process.env.PLAYGROUNDS_DIR || `${process.cwd()}/playground`;
+    const preferred =
+      cwd || process.env.PLAYGROUNDS_DIR || `${process.cwd()}/playground`;
     try {
       mkdirSync(preferred, { recursive: true });
       if (existsSync(preferred)) return preferred;
@@ -66,21 +74,25 @@ export class TerminalService implements OnModuleDestroy {
 
     try {
       const packagePath = require.resolve('node-pty/package.json');
-      const helperPath = join(dirname(packagePath), 'prebuilds', `darwin-${process.arch}`, 'spawn-helper');
+      const helperPath = join(
+        dirname(packagePath),
+        'prebuilds',
+        `darwin-${process.arch}`,
+        'spawn-helper',
+      );
       if (existsSync(helperPath)) chmodSync(helperPath, 0o755);
     } catch {
       // node-pty will surface the actual spawn error if the helper is still unusable.
     }
   }
 
-  /**
-   * Spawn a new PTY shell session.
-   * @param id      Session identifier (defaults to a fresh UUID).
-   * @param cols    Terminal width  (clamped to ≥ MIN_COLS).
-   * @param rows    Terminal height (clamped to ≥ MIN_ROWS).
-   * @param cwd     Working directory. Falls back to PLAYGROUNDS_DIR then process.cwd().
-   */
-  create(id: string = randomUUID(), cols = 80, rows = 24, cwd?: string): pty.IPty {
+  /** Spawns a bounded PTY in the requested or default playground directory. */
+  create(
+    id: string = randomUUID(),
+    cols = 80,
+    rows = 24,
+    cwd?: string,
+  ): pty.IPty {
     const { cols: c, rows: r } = this.clamp(cols, rows);
     const sessionCwd = this.resolveCwd(cwd);
     this.ensurePtyRuntime();
@@ -105,17 +117,24 @@ export class TerminalService implements OnModuleDestroy {
     const p = this.sessions.get(id);
     if (!p) return;
     const { cols: c, rows: r } = this.clamp(cols, rows);
-    try { p.resize(c, r); } catch { /* ignore — PTY may have already exited */ }
+    try {
+      p.resize(c, r);
+    } catch {
+      /* ignore: PTY may have already exited */
+    }
   }
 
   kill(id: string): void {
     const p = this.sessions.get(id);
     if (!p) return;
-    try { p.kill(); } catch { /* ignore */ }
+    try {
+      p.kill();
+    } catch {
+      /* ignore */
+    }
     this.sessions.delete(id);
   }
 
-  /** Number of active sessions. */
   get sessionCount(): number {
     return this.sessions.size;
   }

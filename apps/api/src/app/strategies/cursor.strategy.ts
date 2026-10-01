@@ -1,5 +1,11 @@
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { detectProviderAuthFailure } from '@shared/provider-auth-errors';
 import type {
@@ -18,27 +24,37 @@ const DEFAULT_CURSOR_HOME = join(process.env.HOME ?? '/home/node', '.cursor');
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const SESSION_MARKER_FILE = '.cursor_session';
 const CURSOR_API_KEY_ENV = 'CURSOR_API_KEY';
-const CURSOR_BIN_NAME = process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent';
+const CURSOR_BIN_NAME =
+  process.platform === 'win32' ? 'cursor-agent.cmd' : 'cursor-agent';
 const RESPONSE_PREVIEW_MAX = 200;
 const CURSOR_AUTH_FILE = 'auth.json';
 
 const CURSOR_PROVIDER_ARGS_CONFIG: ProviderArgsConfig = {
   defaultArgs: {},
   blockedArgs: {
-    // Critical: non-interactive mode, always enforced
+    // Always enforce non-interactive mode.
     '--print': true,
     '--force': true,
     // Output format, always enforced for structured parsing
     '--output-format': 'stream-json',
+    '--stream-partial-output': true,
+    '--resume': false,
+    '--output-json': false,
+    '-p': false,
   },
 };
 
 function getCursorHome(): string {
-  return process.env.CURSOR_CONFIG_HOME ?? process.env.SESSION_DIR ?? DEFAULT_CURSOR_HOME;
+  return (
+    process.env.CURSOR_CONFIG_HOME ??
+    process.env.SESSION_DIR ??
+    DEFAULT_CURSOR_HOME
+  );
 }
 
 function getCursorCommand(): string {
-  if (process.env.CURSOR_AGENT_BIN?.trim()) return process.env.CURSOR_AGENT_BIN.trim();
+  if (process.env.CURSOR_AGENT_BIN?.trim())
+    return process.env.CURSOR_AGENT_BIN.trim();
   return CURSOR_BIN_NAME;
 }
 
@@ -75,6 +91,9 @@ interface CursorStreamEvent {
   result?: string;
   error?: string;
   model?: string;
+  timestamp_ms?: number;
+  model_call_id?: string;
+  is_error?: boolean;
   usage?: {
     inputTokens?: number;
     outputTokens?: number;
@@ -86,6 +105,8 @@ export interface CursorExecJsonState {
   lastAssistantChunk: string;
   hasStartedReasoning: boolean;
   hasEmittedOutput: boolean;
+  hasPartialOutput?: boolean;
+  terminalSuccess?: boolean;
 }
 
 export interface CursorExecJsonHandlers {
@@ -100,7 +121,9 @@ export interface CursorExecJsonHandlers {
 
 function preview(text: string | undefined): string | undefined {
   if (!text) return undefined;
-  return text.length > RESPONSE_PREVIEW_MAX ? `${text.slice(0, RESPONSE_PREVIEW_MAX)}…` : text;
+  return text.length > RESPONSE_PREVIEW_MAX
+    ? `${text.slice(0, RESPONSE_PREVIEW_MAX)}…`
+    : text;
 }
 
 function getToolName(toolCall: CursorToolCall | undefined): string | undefined {
@@ -108,7 +131,9 @@ function getToolName(toolCall: CursorToolCall | undefined): string | undefined {
   return Object.keys(toolCall)[0];
 }
 
-function getToolArgs(toolCall: CursorToolCall | undefined): CursorToolCallArgs | undefined {
+function getToolArgs(
+  toolCall: CursorToolCall | undefined,
+): CursorToolCallArgs | undefined {
   if (!toolCall) return undefined;
   const toolName = getToolName(toolCall);
   if (!toolName) return undefined;
@@ -125,7 +150,7 @@ function getUsage(event: CursorStreamEvent): TokenUsage {
 export function handleCursorExecJsonLine(
   line: string,
   state: CursorExecJsonState,
-  handlers: CursorExecJsonHandlers
+  handlers: CursorExecJsonHandlers,
 ): void {
   const trimmed = line.trim();
   if (!trimmed) return;
@@ -165,7 +190,14 @@ export function handleCursorExecJsonLine(
         .map((part) => part.text ?? '')
         .join('');
       if (!text) return;
-      if (text === state.lastAssistantChunk) return;
+      // Partial streams also flush buffered and complete messages. Those repeat
+      // text already emitted as timestamped deltas.
+      if (event.model_call_id) return;
+      if (event.timestamp_ms !== undefined) {
+        state.hasPartialOutput = true;
+      } else if (state.hasPartialOutput || text === state.lastAssistantChunk) {
+        return;
+      }
       state.lastAssistantChunk = text;
       if (text.trim()) state.hasEmittedOutput = true;
       handlers.onReasoningChunk?.(preview(text) ?? text);
@@ -181,7 +213,9 @@ export function handleCursorExecJsonLine(
       const command = args?.command;
       const isFileTool = /read|write|edit|delete|file/i.test(toolName);
       state.hasEmittedOutput = true;
-      handlers.onReasoningChunk?.(`${toolName}${path ? `: ${path}` : command ? `: ${command}` : ''}\n`);
+      handlers.onReasoningChunk?.(
+        `${toolName}${path ? `: ${path}` : command ? `: ${command}` : ''}\n`,
+      );
       handlers.onTool?.(
         isFileTool && path
           ? {
@@ -197,13 +231,21 @@ export function handleCursorExecJsonLine(
               command,
               summary: preview(JSON.stringify(args)),
               details: JSON.stringify(args ?? {}),
-            }
+            },
       );
       return;
     }
 
     if (type === 'result') {
       endReasoning();
+      state.terminalSuccess = event.subtype === 'success' && !event.is_error;
+      if (!state.terminalSuccess) {
+        state.errorResult +=
+          event.error ||
+          event.result ||
+          'Cursor returned an unsuccessful result.';
+        return;
+      }
       if (typeof event.result === 'string' && event.result.trim()) {
         state.hasEmittedOutput = true;
       }
@@ -232,7 +274,10 @@ export function handleCursorExecJsonLine(
 }
 
 export class CursorStrategy extends AbstractCLIStrategy {
-  constructor(useApiTokenMode = false, conversationDataDir?: ConversationDataDirProvider) {
+  constructor(
+    useApiTokenMode = false,
+    conversationDataDir?: ConversationDataDirProvider,
+  ) {
     super(CursorStrategy.name, useApiTokenMode, conversationDataDir);
   }
 
@@ -252,7 +297,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
     try {
       const authPath = this.getAuthFilePath();
       if (!existsSync(authPath)) return null;
-      const parsed = JSON.parse(readFileSync(authPath, 'utf8')) as Record<string, string>;
+      const parsed = JSON.parse(readFileSync(authPath, 'utf8')) as Record<
+        string,
+        string
+      >;
       return parsed.api_key?.trim() || parsed.token?.trim() || null;
     } catch {
       return null;
@@ -260,13 +308,17 @@ export class CursorStrategy extends AbstractCLIStrategy {
   }
 
   private isAuthenticated(): boolean {
-    return Boolean(process.env[CURSOR_API_KEY_ENV]?.trim() || this.getStoredApiKey());
+    return Boolean(
+      process.env[CURSOR_API_KEY_ENV]?.trim() ||
+        process.env.CURSOR_AUTH_TOKEN?.trim() ||
+        this.getStoredApiKey(),
+    );
   }
 
   private buildCursorEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {
-      CURSOR_CONFIG_HOME: this.getCursorHomeForSession(),
       ...process.env,
+      CURSOR_CONFIG_HOME: this.getCursorHomeForSession(),
       ...this.getProxyEnv(),
     };
     const storedKey = this.getStoredApiKey();
@@ -303,7 +355,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
 
   getWorkingDir(): string {
     if (this.conversationDataDir) {
-      return join(this.conversationDataDir.getConversationDataDir(), CURSOR_WORKSPACE_SUBDIR);
+      return join(
+        this.conversationDataDir.getConversationDataDir(),
+        CURSOR_WORKSPACE_SUBDIR,
+      );
     }
     return join(process.cwd(), CURSOR_WORKSPACE_SUBDIR);
   }
@@ -313,9 +368,19 @@ export class CursorStrategy extends AbstractCLIStrategy {
     return ['--model', model];
   }
 
-  private buildExecArgs(prompt: string, model: string, sessionId: string | null): string[] {
+  private buildExecArgs(
+    prompt: string,
+    model: string,
+    sessionId: string | null,
+  ): string[] {
     const modelArgs = this.getModelArgs(model);
-    const providerTokens = buildProviderArgs(CURSOR_PROVIDER_ARGS_CONFIG);
+    const providerTokens = buildProviderArgs({
+      ...CURSOR_PROVIDER_ARGS_CONFIG,
+      blockedArgs: {
+        ...CURSOR_PROVIDER_ARGS_CONFIG.blockedArgs,
+        ...(modelArgs.length ? { '--model': false } : {}),
+      },
+    });
     const baseArgs = [...modelArgs, ...providerTokens];
     if (sessionId) {
       return [...baseArgs, '--resume', sessionId, '--', prompt];
@@ -337,11 +402,61 @@ export class CursorStrategy extends AbstractCLIStrategy {
   executeAuth(connection: AuthConnection): void {
     this.currentConnection = connection;
     if (this.isAuthenticated()) {
-      this.currentConnection.sendAuthSuccess();
+      connection.sendAuthSuccess();
       this.currentConnection = null;
       return;
     }
-    this.currentConnection.sendAuthManualToken();
+    if (this.useApiTokenMode) {
+      connection.sendAuthManualToken();
+      return;
+    }
+    this.ensureSettings();
+    const child = spawn(getCursorCommand(), ['login'], {
+      env: { ...this.buildCursorEnv(), NO_OPEN_BROWSER: '1' },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    this.activeAuthProcess = child;
+    let output = '';
+    let sentUrl = false;
+    const timer = setTimeout(
+      () => {
+        child.kill();
+        connection.sendError('Cursor sign-in timed out. Please try again.');
+      },
+      6 * 60 * 1000,
+    );
+    const readOutput = (data: Buffer | string) => {
+      output += stripAnsi(data.toString());
+      const url = output.match(
+        /https:\/\/cursor\.com\/loginDeepControl[^\s]+/,
+      )?.[0];
+      if (url && !sentUrl) {
+        sentUrl = true;
+        connection.sendAuthUrlGenerated(url);
+      }
+    };
+    child.stdout?.on('data', readOutput);
+    child.stderr?.on('data', readOutput);
+    child.on('error', () => {
+      clearTimeout(timer);
+      if (this.currentConnection === connection) {
+        connection.sendError('Could not start Cursor sign-in.');
+        this.currentConnection = null;
+      }
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      this.activeAuthProcess = null;
+      this.authCancel = null;
+      if (this.currentConnection !== connection) return;
+      this.currentConnection = null;
+      if (code === 0) connection.sendAuthSuccess();
+      else connection.sendError('Cursor sign-in did not complete.');
+    });
+    this.authCancel = () => {
+      clearTimeout(timer);
+      child.kill();
+    };
   }
 
   submitAuthCode(code: string): void {
@@ -351,7 +466,11 @@ export class CursorStrategy extends AbstractCLIStrategy {
       return;
     }
     this.ensureSettings();
-    writeFileSync(this.getAuthFilePath(), JSON.stringify({ api_key: trimmed }), { mode: 0o600 });
+    writeFileSync(
+      this.getAuthFilePath(),
+      JSON.stringify({ api_key: trimmed }),
+      { mode: 0o600 },
+    );
     this.currentConnection?.sendAuthSuccess();
     this.currentConnection = null;
   }
@@ -363,12 +482,98 @@ export class CursorStrategy extends AbstractCLIStrategy {
   }
 
   executeLogout(connection: LogoutConnection): void {
+    this.cancelAuth();
     this.clearCredentials();
-    connection.sendLogoutSuccess();
+    if (this.useApiTokenMode) {
+      connection.sendLogoutSuccess();
+      return;
+    }
+    const child = spawn(getCursorCommand(), ['logout'], {
+      env: this.buildCursorEnv(),
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    const timer = setTimeout(() => {
+      child.kill();
+      connection.sendError('Cursor logout timed out.');
+    }, 15_000);
+    child.on('error', () => {
+      clearTimeout(timer);
+      connection.sendError('Could not start Cursor logout.');
+    });
+    child.on('close', (code) => {
+      clearTimeout(timer);
+      if (code === 0) connection.sendLogoutSuccess();
+      else connection.sendError('Cursor logout did not complete.');
+    });
   }
 
   checkAuthStatus(): Promise<boolean> {
-    return Promise.resolve(this.isAuthenticated());
+    if (this.isAuthenticated()) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      const child = spawn(getCursorCommand(), ['status', '--format', 'json'], {
+        env: this.buildCursorEnv(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      const timer = setTimeout(() => {
+        child.kill();
+        resolve(false);
+      }, 15_000);
+      child.stdout?.on('data', (data: Buffer | string) => {
+        output += data.toString();
+      });
+      child.on('error', () => {
+        clearTimeout(timer);
+        resolve(false);
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        try {
+          const status = JSON.parse(output) as { isAuthenticated?: boolean };
+          resolve(code === 0 && status.isAuthenticated === true);
+        } catch {
+          resolve(false);
+        }
+      });
+    });
+  }
+
+  listModels(): Promise<string[]> {
+    return new Promise((resolve) => {
+      const child = spawn(getCursorCommand(), ['models'], {
+        env: this.buildCursorEnv(),
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      const timer = setTimeout(() => {
+        child.kill();
+        resolve([]);
+      }, 15_000);
+      child.stdout?.on('data', (data: Buffer | string) => {
+        output += data.toString();
+      });
+      child.on('error', () => {
+        clearTimeout(timer);
+        resolve([]);
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        if (code !== 0) {
+          resolve([]);
+          return;
+        }
+        const models = stripAnsi(output)
+          .split('\n')
+          .flatMap((line) => {
+            // CLI prints model IDs followed by display labels. Never return headers.
+            const match = line
+              .trim()
+              .match(/^([a-z0-9][a-z0-9._-]*)(?:\s+-\s+\S.*)?$/);
+            return match ? [match[1]] : [];
+          });
+        resolve([...new Set(models)]);
+      });
+    });
   }
 
   executePromptStreaming(
@@ -376,27 +581,35 @@ export class CursorStrategy extends AbstractCLIStrategy {
     model: string,
     onChunk: (chunk: string) => void,
     callbacks?: StreamingCallbacks,
-    systemPrompt?: string
+    systemPrompt?: string,
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       this.streamInterrupted = false;
       this.ensureSettings();
 
       const playgroundDir = this.getWorkingDir();
-      if (!existsSync(playgroundDir)) mkdirSync(playgroundDir, { recursive: true });
+      if (!existsSync(playgroundDir))
+        mkdirSync(playgroundDir, { recursive: true });
 
       const pendingMessages = this.consumePendingMessages();
       let finalPrompt = prompt;
       if (pendingMessages) {
         finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
       }
-      const effectivePrompt = systemPrompt ? `${systemPrompt}\n${finalPrompt}` : finalPrompt;
+      const effectivePrompt = systemPrompt
+        ? `${systemPrompt}\n${finalPrompt}`
+        : finalPrompt;
       const existingSessionId = this.readSessionId();
-      const args = this.buildExecArgs(effectivePrompt, model, existingSessionId);
+      const args = this.buildExecArgs(
+        effectivePrompt,
+        model,
+        existingSessionId,
+      );
       const cursorProcess = spawn(getCursorCommand(), args, {
         env: this.buildCursorEnv(),
         cwd: playgroundDir,
         shell: false,
+        stdio: ['ignore', 'pipe', 'pipe'],
       });
       this.currentStreamProcess = cursorProcess;
 
@@ -422,7 +635,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
             capturedSessionId = sessionId;
           },
         });
-        errorResult = jsonState.errorResult;
+        if (jsonState.errorResult) {
+          errorResult += jsonState.errorResult;
+          jsonState.errorResult = '';
+        }
       };
 
       cursorProcess.stdout?.on('data', (data: Buffer | string) => {
@@ -450,7 +666,10 @@ export class CursorStrategy extends AbstractCLIStrategy {
           return;
         }
 
-        const shouldInspectFailure = code !== 0 || !jsonState.hasEmittedOutput || Boolean(errorResult.trim());
+        const shouldInspectFailure =
+          code !== 0 ||
+          !jsonState.hasEmittedOutput ||
+          Boolean(errorResult.trim());
         if (shouldInspectFailure) {
           const authError = detectProviderAuthFailure('Cursor', errorResult);
           if (authError) {
@@ -460,9 +679,14 @@ export class CursorStrategy extends AbstractCLIStrategy {
         }
 
         if (code === 0) {
-          if (!jsonState.hasEmittedOutput) {
+          if (!jsonState.terminalSuccess || !jsonState.hasEmittedOutput) {
             if (!existingSessionId) this.clearSessionId();
-            reject(new Error(errorResult.trim() || 'Agent process completed successfully but returned no output. Session not saved to prevent corruption.'));
+            reject(
+              new Error(
+                errorResult.trim() ||
+                  'Cursor stream ended without a successful result or returned no output. Session not saved to prevent corruption.',
+              ),
+            );
             return;
           }
           if (capturedSessionId) {
@@ -472,7 +696,8 @@ export class CursorStrategy extends AbstractCLIStrategy {
           return;
         }
 
-        const message = errorResult.trim() || 'Cursor agent exited with a non-zero status';
+        const message =
+          errorResult.trim() || 'Cursor agent exited with a non-zero status';
         if (this.missingSessionError(message)) {
           this.clearSessionId();
         }

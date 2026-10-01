@@ -3,15 +3,12 @@ import { LocalMcpService } from './local-mcp.service';
 import { WS_EVENT } from '@shared/ws-constants';
 import { LOCAL_TOOL } from './local-mcp-types';
 
-// ─── Factory ──────────────────────────────────────────────────────────────────
-
 function makeService(askTimeoutMs = 500): {
   svc: LocalMcpService;
   events: Array<{ type: string; data: Record<string, unknown> }>;
 } {
   process.env['ASK_USER_TIMEOUT_MS'] = String(askTimeoutMs);
   const svc = new LocalMcpService();
-  // Stub out child-process spawning — only in-process logic is tested here.
   (svc as unknown as { spawnServer(): void }).spawnServer = () => undefined;
   svc.onModuleInit();
   const events: Array<{ type: string; data: Record<string, unknown> }> = [];
@@ -23,8 +20,6 @@ describe('LocalMcpService', () => {
   afterEach(() => {
     delete process.env['ASK_USER_TIMEOUT_MS'];
   });
-
-  // ─── Fire-and-forget tools ─────────────────────────────────────────────────
 
   test('show_image (url) emits SHOW_IMAGE and resolves { ok: true }', async () => {
     const { svc, events } = makeService();
@@ -100,62 +95,100 @@ describe('LocalMcpService', () => {
     expect(ev?.data['title']).toBe('My run');
   });
 
-  // ─── Mode tools ────────────────────────────────────────────────────────────
-
   test('get_mode returns mode from injected getter', async () => {
     const { svc } = makeService();
-    svc.registerModeAccessors(() => 'Casting...', () => null);
-    const res = await svc.handleToolCall({ requestId: 'r7', tool: LOCAL_TOOL.GET_MODE, args: {} });
+    svc.registerModeAccessors(
+      () => 'Casting...',
+      () => null,
+    );
+    const res = await svc.handleToolCall({
+      requestId: 'r7',
+      tool: LOCAL_TOOL.GET_MODE,
+      args: {},
+    });
     expect(res.ok).toBe(true);
     expect((res.result as Record<string, unknown>)['mode']).toBe('Casting...');
   });
 
   test('get_mode falls back to default when no getter registered', async () => {
     const { svc } = makeService();
-    const res = await svc.handleToolCall({ requestId: 'r8', tool: LOCAL_TOOL.GET_MODE, args: {} });
+    const res = await svc.handleToolCall({
+      requestId: 'r8',
+      tool: LOCAL_TOOL.GET_MODE,
+      args: {},
+    });
     expect(res.ok).toBe(true);
-    expect((res.result as Record<string, unknown>)['mode']).toBe('Exploring...');
+    expect((res.result as Record<string, unknown>)['mode']).toBe(
+      'Exploring...',
+    );
   });
 
   test('set_mode calls the setter and returns resolved mode', async () => {
     const { svc } = makeService();
-    svc.registerModeAccessors(() => 'Exploring...', () => 'Casting...');
-    const res = await svc.handleToolCall({ requestId: 'r9', tool: LOCAL_TOOL.SET_MODE, args: { mode: 'casting' } });
+    svc.registerModeAccessors(
+      () => 'Exploring...',
+      () => 'Casting...',
+    );
+    const res = await svc.handleToolCall({
+      requestId: 'r9',
+      tool: LOCAL_TOOL.SET_MODE,
+      args: { mode: 'casting' },
+    });
     expect(res.ok).toBe(true);
     expect((res.result as Record<string, unknown>)['mode']).toBe('Casting...');
   });
 
   test('set_mode accepts MODE:BUILD trigger values', async () => {
     const { svc } = makeService();
-    svc.registerModeAccessors(() => 'Exploring...', () => 'Building...');
-    const res = await svc.handleToolCall({ requestId: 'r9b', tool: LOCAL_TOOL.SET_MODE, args: { mode: 'MODE:BUILD' } });
+    svc.registerModeAccessors(
+      () => 'Exploring...',
+      () => 'Building...',
+    );
+    const res = await svc.handleToolCall({
+      requestId: 'r9b',
+      tool: LOCAL_TOOL.SET_MODE,
+      args: { mode: 'MODE:BUILD' },
+    });
     expect(res.ok).toBe(true);
     expect((res.result as Record<string, unknown>)['mode']).toBe('Building...');
   });
 
   test('set_mode with invalid value returns error', async () => {
     const { svc } = makeService();
-    const res = await svc.handleToolCall({ requestId: 'r10', tool: LOCAL_TOOL.SET_MODE, args: { mode: 'hacking' } });
+    const res = await svc.handleToolCall({
+      requestId: 'r10',
+      tool: LOCAL_TOOL.SET_MODE,
+      args: { mode: 'hacking' },
+    });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/Invalid mode/);
   });
 
   test('set_mode returns error when setter returns null', async () => {
     const { svc } = makeService();
-    svc.registerModeAccessors(() => 'Exploring...', () => null);
-    const res = await svc.handleToolCall({ requestId: 'r11', tool: LOCAL_TOOL.SET_MODE, args: { mode: 'casting' } });
+    svc.registerModeAccessors(
+      () => 'Exploring...',
+      () => null,
+    );
+    const res = await svc.handleToolCall({
+      requestId: 'r11',
+      tool: LOCAL_TOOL.SET_MODE,
+      args: { mode: 'casting' },
+    });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/Failed to resolve mode/);
   });
 
   test('unknown tool returns error', async () => {
     const { svc } = makeService();
-    const res = await svc.handleToolCall({ requestId: 'r12', tool: 'no_such_tool' as never, args: {} });
+    const res = await svc.handleToolCall({
+      requestId: 'r12',
+      tool: 'no_such_tool' as never,
+      args: {},
+    });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/Unknown local tool/);
   });
-
-  // ─── Interactive tools (blocking) ──────────────────────────────────────────
 
   test('ask_user emits prompt and resolves when resolveQuestion is called', async () => {
     const { svc, events } = makeService(5000);
@@ -178,14 +211,22 @@ describe('LocalMcpService', () => {
 
   test('ask_user with empty question returns error immediately', async () => {
     const { svc } = makeService();
-    const res = await svc.handleToolCall({ requestId: 'rq2', tool: LOCAL_TOOL.ASK_USER, args: { question: '   ' } });
+    const res = await svc.handleToolCall({
+      requestId: 'rq2',
+      tool: LOCAL_TOOL.ASK_USER,
+      args: { question: '   ' },
+    });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/must not be empty/);
   });
 
   test('ask_user times out after askTimeoutMs', async () => {
     const { svc } = makeService(50);
-    const res = await svc.handleToolCall({ requestId: 'rt1', tool: LOCAL_TOOL.ASK_USER, args: { question: 'Still there?' } });
+    const res = await svc.handleToolCall({
+      requestId: 'rt1',
+      tool: LOCAL_TOOL.ASK_USER,
+      args: { question: 'Still there?' },
+    });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/Timed out/);
   });
@@ -195,7 +236,11 @@ describe('LocalMcpService', () => {
     const promise = svc.handleToolCall({
       requestId: 'rc1',
       tool: LOCAL_TOOL.CONFIRM_ACTION,
-      args: { message: 'Delete all data?', confirmLabel: 'Delete', cancelLabel: 'Cancel' },
+      args: {
+        message: 'Delete all data?',
+        confirmLabel: 'Delete',
+        cancelLabel: 'Cancel',
+      },
     });
     await new Promise((r) => setTimeout(r, 10));
     const ev = events.find((e) => e.type === WS_EVENT.CONFIRM_ACTION_PROMPT);
@@ -211,7 +256,11 @@ describe('LocalMcpService', () => {
 
   test('confirm_action with empty message returns error immediately', async () => {
     const { svc } = makeService();
-    const res = await svc.handleToolCall({ requestId: 'rc2', tool: LOCAL_TOOL.CONFIRM_ACTION, args: { message: '' } });
+    const res = await svc.handleToolCall({
+      requestId: 'rc2',
+      tool: LOCAL_TOOL.CONFIRM_ACTION,
+      args: { message: '' },
+    });
     expect(res.ok).toBe(false);
     expect(res.error).toMatch(/must not be empty/);
   });

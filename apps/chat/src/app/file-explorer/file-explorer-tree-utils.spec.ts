@@ -11,21 +11,23 @@ import {
   withInheritedGitStatus,
 } from './file-explorer-tree-utils';
 
-// Helper factories
 function file(name: string, path: string, mtime?: number): PlaygroundEntry {
   return { name, path, type: 'file' as const, mtime };
 }
 
-function dir(name: string, path: string, children: PlaygroundEntry[] = [], mtime?: number): PlaygroundEntry {
+function dir(
+  name: string,
+  path: string,
+  children: PlaygroundEntry[] = [],
+  mtime?: number,
+): PlaygroundEntry {
   return { name, path, type: 'directory' as const, children, mtime };
 }
 
 describe('getDirPathsAtDepth', () => {
   const tree = [
     dir('src', 'src', [
-      dir('app', 'src/app', [
-        dir('chat', 'src/app/chat'),
-      ]),
+      dir('app', 'src/app', [dir('chat', 'src/app/chat')]),
       file('main.ts', 'src/main.ts'),
     ]),
     dir('tests', 'tests'),
@@ -66,9 +68,7 @@ describe('findEntryByPath', () => {
   const tree = [
     dir('src', 'src', [
       file('main.ts', 'src/main.ts'),
-      dir('app', 'src/app', [
-        file('app.ts', 'src/app/app.ts'),
-      ]),
+      dir('app', 'src/app', [file('app.ts', 'src/app/app.ts')]),
     ]),
   ];
 
@@ -123,13 +123,13 @@ describe('filterTreeByQuery', () => {
     expect(result.length).toBe(1);
     expect(result[0].type).toBe('directory');
     const srcDir = result[0];
-    expect(srcDir.children?.some(c => c.name === 'main.ts')).toBe(true);
+    expect(srcDir.children?.some((c) => c.name === 'main.ts')).toBe(true);
   });
 
   it('includes directory whose name matches (with all children)', () => {
     const result = filterTreeByQuery(tree, 'components');
-    const srcDir = result.find(e => e.path === 'src');
-    const comps = srcDir?.children?.find(e => e.name === 'components');
+    const srcDir = result.find((e) => e.path === 'src');
+    const comps = srcDir?.children?.find((e) => e.name === 'components');
     expect(comps).toBeTruthy();
   });
 
@@ -149,7 +149,10 @@ describe('withInheritedGitStatus', () => {
     const tree = [
       dir('src', 'src', [
         dir('app', 'src/app', [
-          { ...file('index.ts', 'src/app/index.ts'), gitStatus: 'modified' as const },
+          {
+            ...file('index.ts', 'src/app/index.ts'),
+            gitStatus: 'modified' as const,
+          },
         ]),
       ]),
     ];
@@ -185,13 +188,16 @@ describe('withEntrySource', () => {
 
 describe('flattenFiles', () => {
   it('returns files with inherited source for quick open', () => {
-    const tree = withEntrySource([
-      dir('src', 'src', [
-        file('index.ts', 'src/index.ts'),
-        dir('app', 'src/app', [file('page.tsx', 'src/app/page.tsx')]),
-      ]),
-      file('README.md', 'README.md'),
-    ], 'playground');
+    const tree = withEntrySource(
+      [
+        dir('src', 'src', [
+          file('index.ts', 'src/index.ts'),
+          dir('app', 'src/app', [file('page.tsx', 'src/app/page.tsx')]),
+        ]),
+        file('README.md', 'README.md'),
+      ],
+      'playground',
+    );
 
     const result = flattenFiles(tree);
 
@@ -261,7 +267,9 @@ describe('mergeAnimatingRemoved', () => {
     const next = [file('a.ts', 'a.ts')];
     const animating = new Map([['gone.ts', 'removed' as const]]);
     const result = mergeAnimatingRemoved(prev, next, animating);
-    expect(result.some((e: PlaygroundEntry) => e.path === 'gone.ts')).toBe(true);
+    expect(result.some((e: PlaygroundEntry) => e.path === 'gone.ts')).toBe(
+      true,
+    );
   });
 
   it('sorts directories before files in merged result', () => {
@@ -280,6 +288,8 @@ describe('mergeAnimatingRemoved', () => {
     const animating = new Map([['src/old.ts', 'removed' as const]]);
     const result = mergeAnimatingRemoved(prev, next, animating);
     const srcDir = result.find((e: PlaygroundEntry) => e.path === 'src');
-    expect(srcDir?.children?.some((c: PlaygroundEntry) => c.path === 'src/old.ts')).toBe(true);
+    expect(
+      srcDir?.children?.some((c: PlaygroundEntry) => c.path === 'src/old.ts'),
+    ).toBe(true);
   });
 });

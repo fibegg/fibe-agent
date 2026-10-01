@@ -1,5 +1,8 @@
 import { describe, test, expect, afterEach } from 'bun:test';
-import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https';
+import {
+  createServer as createHttpsServer,
+  type Server as HttpsServer,
+} from 'node:https';
 import { request as httpRequest } from 'node:http';
 import forge from 'node-forge';
 import { CertificateManager } from './certificate-manager';
@@ -7,7 +10,6 @@ import { ConnectProxy } from './connect-proxy';
 import type { CapturedProviderRequest } from './types';
 import { INTERCEPTED_DOMAINS } from './types';
 
-/** Create a self-signed HTTPS server to act as a fake provider endpoint. */
 function _createFakeProvider(hostname: string): {
   server: HttpsServer;
   start: () => Promise<number>;
@@ -34,12 +36,16 @@ function _createFakeProvider(hostname: string): {
     },
     (req, res) => {
       let body = '';
-      req.on('data', (chunk: Buffer) => { body += chunk.toString(); });
+      req.on('data', (chunk: Buffer) => {
+        body += chunk.toString();
+      });
       req.on('end', () => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ echo: body, method: req.method, url: req.url }));
+        res.end(
+          JSON.stringify({ echo: body, method: req.method, url: req.url }),
+        );
       });
-    }
+    },
   );
 
   return {
@@ -94,9 +100,6 @@ describe('ConnectProxy', () => {
 
     const proxyPort = await proxy.start();
 
-    // Send a CONNECT request through the proxy to api.anthropic.com
-    // This will fail to connect to the real server (no DNS), but we can
-    // verify the proxy handles the CONNECT and attempts interception
     await new Promise<void>((resolve) => {
       const req = httpRequest({
         host: '127.0.0.1',
@@ -106,7 +109,7 @@ describe('ConnectProxy', () => {
       });
 
       req.on('connect', (_res, socket) => {
-        // The proxy accepted our CONNECT — TLS handshake will happen next.
+        // The proxy accepted our CONNECT: TLS handshake will happen next.
         // Since there's no real server, the TLS to the upstream will fail,
         // which is expected. We're testing that CONNECT is handled.
         socket.destroy();

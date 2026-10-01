@@ -76,6 +76,7 @@ export default defineConfig(() => ({
   },
   resolve: {
     alias: { '@shared': join(import.meta.dirname, '../../shared') },
+    dedupe: ['react', 'react-dom'],
   },
   plugins: [react()],
   // Uncomment this if you are using workers.

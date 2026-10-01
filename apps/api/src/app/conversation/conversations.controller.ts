@@ -1,4 +1,16 @@
-import { BadRequestException, Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, Patch, Post } from '@nestjs/common';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import {
   ConversationManagerService,
   DEFAULT_CONVERSATION_ID,
@@ -24,9 +36,6 @@ export class ConversationsController {
     private readonly providerTrafficStore: ProviderTrafficStoreService,
   ) {}
 
-  // ── Core CRUD ─────────────────────────────────────────────────────────────
-
-  /** List all conversations sorted by lastMessageAt desc. */
   @Get()
   list(): ConversationMeta[] {
     return this.convManager.list().map((meta) => ({
@@ -35,21 +44,30 @@ export class ConversationsController {
     }));
   }
 
-  /** Create a new conversation. */
   @Post()
-  create(@Body() body: { id?: string; conversationId?: string; conversation_id?: string; title?: string }): ConversationMeta {
-    const requestedId = body?.id ?? body?.conversationId ?? body?.conversation_id;
+  create(
+    @Body()
+    body: {
+      id?: string;
+      conversationId?: string;
+      conversation_id?: string;
+      title?: string;
+    },
+  ): ConversationMeta {
+    const requestedId =
+      body?.id ?? body?.conversationId ?? body?.conversation_id;
     if (typeof requestedId === 'string' && requestedId.trim()) {
       try {
         return this.convManager.createWithId(requestedId, body?.title);
       } catch (err) {
-        throw new BadRequestException(err instanceof Error ? err.message : 'invalid conversation id');
+        throw new BadRequestException(
+          err instanceof Error ? err.message : 'invalid conversation id',
+        );
       }
     }
     return this.convManager.create(body?.title);
   }
 
-  /** Rename a conversation. */
   @Patch(':id/title')
   setTitle(
     @Param('id') id: string,
@@ -72,7 +90,6 @@ export class ConversationsController {
     return { ok: true };
   }
 
-  /** Delete a conversation and its workspace from disk. */
   @Delete(':id')
   delete(@Param('id') id: string): { ok: boolean } {
     if (id === DEFAULT_CONVERSATION_ID || id === INBOX_CONVERSATION_ID) {
@@ -86,9 +103,6 @@ export class ConversationsController {
     return { ok: this.convManager.delete(id) };
   }
 
-  // ── Messages & activities ─────────────────────────────────────────────────
-
-  /** Load messages for one conversation (enriched with activity usage). */
   @Get(':id/messages')
   messages(@Param('id') id: string) {
     const bundle = this.requireBundle(id);
@@ -98,13 +112,11 @@ export class ConversationsController {
     );
   }
 
-  /** Load activity log for one conversation. */
   @Get(':id/activities')
   activities(@Param('id') id: string) {
     return this.requireBundle(id).activityStore.all();
   }
 
-  /** Current non-durable runtime stream state for one conversation. */
   @Get(':id/live')
   live(@Param('id') id: string) {
     this.requireBundle(id);
@@ -133,6 +145,8 @@ export class ConversationsController {
       body.images,
       body.attachmentFilenames,
       body.busyPolicy,
+      body.requestId,
+      body.storeGeneration,
     );
     return handleSendMessage(result);
   }
@@ -151,7 +165,13 @@ export class ConversationsController {
   removeQueuedTurn(
     @Param('id') id: string,
     @Param('turnId') turnId: string,
-  ): { accepted: true; removed: boolean; conversationId?: string; queueCount?: number; messageId?: string } {
+  ): {
+    accepted: true;
+    removed: boolean;
+    conversationId?: string;
+    queueCount?: number;
+    messageId?: string;
+  } {
     this.requireBundle(id);
     return {
       accepted: true,
@@ -164,7 +184,13 @@ export class ConversationsController {
     @Param('id') id: string,
     @Param('turnId') turnId: string,
     @Body() body: { text?: string; policy?: 'queue' | 'steer' },
-  ): Promise<{ accepted: true; updated: boolean; conversationId?: string; queueCount?: number; messageId?: string }> {
+  ): Promise<{
+    accepted: true;
+    updated: boolean;
+    conversationId?: string;
+    queueCount?: number;
+    messageId?: string;
+  }> {
     this.requireBundle(id);
     return {
       accepted: true,
@@ -176,22 +202,27 @@ export class ConversationsController {
   reorderQueuedTurns(
     @Param('id') id: string,
     @Body() body: { turnIds?: string[]; turn_ids?: string[] },
-  ): { accepted: true; reordered: boolean; conversationId?: string; queueCount?: number } {
+  ): {
+    accepted: true;
+    reordered: boolean;
+    conversationId?: string;
+    queueCount?: number;
+  } {
     this.requireBundle(id);
     return {
       accepted: true,
-      ...this.orchestrator.reorderQueuedTurnsFromApi(id, body.turnIds ?? body.turn_ids ?? []),
+      ...this.orchestrator.reorderQueuedTurnsFromApi(
+        id,
+        body.turnIds ?? body.turn_ids ?? [],
+      ),
     };
   }
 
-  // ── Private helpers ───────────────────────────────────────────────────────
-
-  /** Resolve a ConversationBundle by id, throwing 404 when unknown. */
   private requireBundle(id: string): ConversationBundle {
-    const bundle = id === DEFAULT_CONVERSATION_ID
-      || id === INBOX_CONVERSATION_ID
-      ? this.convManager.getOrCreate(id)
-      : this.convManager.get(id);
+    const bundle =
+      id === DEFAULT_CONVERSATION_ID || id === INBOX_CONVERSATION_ID
+        ? this.convManager.getOrCreate(id)
+        : this.convManager.get(id);
     if (!bundle) throw new NotFoundException('Conversation not found');
     return bundle;
   }

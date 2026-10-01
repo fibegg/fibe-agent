@@ -57,9 +57,7 @@ describe('SidebarActivityTooltip', () => {
     render(<SidebarActivityTooltip tooltip={tooltip} />);
     const el = screen.getByRole('tooltip');
     const style = (el as HTMLElement).style;
-    // left should be rect.left - 8 = 42
     expect(style.left).toBe('42px');
-    // top should be rect.top + rect.height / 2 = 115
     expect(style.top).toBe('115px');
   });
 });

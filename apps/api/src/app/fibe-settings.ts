@@ -21,7 +21,9 @@ export interface ResolvedFibeSettings {
 const DEFAULT_IGNORED_NAMES = ['node_modules', '.git'];
 const DEFAULT_VISIBLE_HIDDEN = ['.claude', '.opencode'];
 
-export async function loadFibeSettings(dir: string): Promise<ResolvedFibeSettings> {
+export async function loadFibeSettings(
+  dir: string,
+): Promise<ResolvedFibeSettings> {
   let settings: FibeSettings = {};
 
   try {
@@ -29,16 +31,16 @@ export async function loadFibeSettings(dir: string): Promise<ResolvedFibeSetting
     const content = await readFile(settingsPath, 'utf-8');
     settings = JSON.parse(content) as FibeSettings;
   } catch (err: unknown) {
-    // It's normal for the file to not exist
     const code = (err as NodeJS.ErrnoException).code;
     if (code !== 'ENOENT' && code !== 'ENOTDIR') {
-      logger.warn(`Failed to parse .fibe/settings.json in ${dir}: ${err instanceof Error ? err.message : String(err)}`);
+      logger.warn(
+        `Failed to parse .fibe/settings.json in ${dir}: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
 
   const browserSettings = settings.fileBrowser || {};
 
-  // Combine defaults with user settings
   const ignoredNamesArray = [
     ...DEFAULT_IGNORED_NAMES,
     ...(browserSettings.exclude || []),

@@ -18,29 +18,19 @@ export interface QueuedAgentTurn {
 }
 
 /**
- * Holds all mutable state that is scoped to a single WebSocket connection / chat session.
- *
- * The OrchestratorService (singleton) owns shared infra (stores, strategy factory, etc.).
- * Each connected client gets its own SessionContext so sessions are completely isolated:
- * every tab / device can run its own Claude process without interfering with others.
- *
- * Shared across sessions (intentionally): messages.json, activity.json, model, effort.
- * This gives a "shared chat-room" UX — all participants see the same conversation thread.
+ * Mutable state for one WebSocket session. Messages, activity, model, and effort
+ * remain conversation-scoped; provider processes and outbound events stay session-scoped.
  */
 export class SessionContext {
-  /** Unique ID generated when the WS client connects. */
   readonly sessionId: string;
 
-  /** Whether this session's Claude credentials have been verified. */
   isAuthenticated = false;
 
-  /** Whether this session's agent is currently running a prompt. */
   isProcessing = false;
 
   /** Last provider/runtime error observed for this session. Exposed via status for diagnostics. */
   lastError: string | null = null;
 
-  /** Whether a browser WebSocket is still attached to this runtime session. */
   isClientConnected = true;
 
   /** Set when the browser disconnects while the agent is still running. */
@@ -55,10 +45,8 @@ export class SessionContext {
    */
   readonly outbound$ = new Subject<OutboundEvent>();
 
-  /** Claude process / strategy instance owned by this session. */
   readonly strategy: AgentStrategy;
 
-  // ── Streaming scratch-pad ──────────────────────────────────────────────────
   currentActivityId: string | null = null;
   reasoningTextAccumulated = '';
   streamTextAccumulated = '';

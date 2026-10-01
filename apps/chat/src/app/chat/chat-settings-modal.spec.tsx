@@ -4,7 +4,12 @@ import { ChatSettingsModal } from './chat-settings-modal';
 import { CHAT_STATES } from './chat-state';
 
 vi.mock('../api-url', () => ({
-  apiRequest: vi.fn().mockResolvedValue({ ok: true, json: async () => ({ state: 'done', output: 'ok' }) }),
+  apiRequest: vi
+    .fn()
+    .mockResolvedValue({
+      ok: true,
+      json: async () => ({ state: 'done', output: 'ok' }),
+    }),
   getToken: vi.fn().mockReturnValue('tok'),
   buildApiUrl: vi.fn().mockReturnValue('/api/init-status'),
 }));
@@ -51,7 +56,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -65,7 +70,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText('Settings')).toBeTruthy();
   });
@@ -79,7 +84,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByText('v1.0.0')).toBeTruthy();
   });
@@ -96,7 +101,7 @@ describe('ChatSettingsModal', () => {
         onLogout={vi.fn()}
         simplicateMode={false}
         onSimplicateModeChange={onSimplicateModeChange}
-      />
+      />,
     );
 
     const toggle = screen.getByRole('switch', { name: /simplicate/i });
@@ -116,7 +121,7 @@ describe('ChatSettingsModal', () => {
         onLogout={vi.fn()}
         simplicateMode
         onSimplicateModeChange={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.queryByRole('switch', { name: /simplicate/i })).toBeNull();
@@ -131,10 +136,12 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
-    const toggle = screen.getByRole('switch', { name: /animations and visual effects/i });
+    const toggle = screen.getByRole('switch', {
+      name: /animations and visual effects/i,
+    });
     expect(toggle.getAttribute('aria-checked')).toBe('true');
     fireEvent.click(toggle);
     expect(localStorage.getItem('chat-ui-effects-enabled')).toBe('false');
@@ -152,11 +159,15 @@ describe('ChatSettingsModal', () => {
         onLogout={vi.fn()}
         simplicateMode={false}
         onSimplicateModeChange={vi.fn()}
-      />
+      />,
     );
 
-    const enabledSwitch = screen.getByRole('switch', { name: /animations and visual effects/i }) as HTMLElement;
-    const disabledSwitch = screen.getByRole('switch', { name: /simplicate/i }) as HTMLElement;
+    const enabledSwitch = screen.getByRole('switch', {
+      name: /animations and visual effects/i,
+    }) as HTMLElement;
+    const disabledSwitch = screen.getByRole('switch', {
+      name: /simplicate/i,
+    }) as HTMLElement;
     const enabledSwitchKnob = enabledSwitch.firstElementChild as HTMLElement;
     const disabledSwitchKnob = disabledSwitch.firstElementChild as HTMLElement;
 
@@ -179,7 +190,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.queryByText('Model')).toBeNull();
@@ -195,7 +206,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     const label = screen.getByText('Send raw provider activity to Fibe');
@@ -218,10 +229,12 @@ describe('ChatSettingsModal', () => {
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
         onResetConversation={onResetConversation}
-      />
+      />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /reset conversation/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /reset conversation/i }),
+    );
     expect(onResetConversation).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /confirm reset/i }));
     expect(onResetConversation).toHaveBeenCalledTimes(1);
@@ -237,7 +250,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(onClose).toHaveBeenCalled();
@@ -253,9 +266,8 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
-    // Click the overlay (first element)
     fireEvent.click(container.firstChild as Element);
     expect(onClose).toHaveBeenCalled();
   });
@@ -269,9 +281,11 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
-    expect(screen.getByRole('button', { name: /re-authenticate/i })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /re-authenticate/i }),
+    ).toBeTruthy();
   });
 
   it('hides standalone-only controls when rendered from Rails', () => {
@@ -284,17 +298,19 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     expect(screen.queryByText(/data privacy/i)).toBeNull();
-    expect(screen.queryByRole('button', { name: /re-authenticate/i })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /re-authenticate/i }),
+    ).toBeNull();
     expect(screen.queryByRole('button', { name: /logout/i })).toBeNull();
     expect(screen.queryByText(/post-init script/i)).toBeNull();
     expect(screen.queryByText(/system_prompt/i)).toBeNull();
   });
 
-  it('shows "Start Auth" button when state is UNAUTHENTICATED', () => {
+  it('shows Authenticate when state is UNAUTHENTICATED', () => {
     render(
       <ChatSettingsModal
         open={true}
@@ -303,12 +319,12 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
-    expect(screen.getByRole('button', { name: /start auth/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Authenticate' })).toBeTruthy();
   });
 
-  it('calls onStartAuth and onClose when Start Auth clicked from UNAUTHENTICATED', () => {
+  it('calls onStartAuth and onClose when Authenticate is clicked', () => {
     const onClose = vi.fn();
     const onStartAuth = vi.fn();
     render(
@@ -319,9 +335,9 @@ describe('ChatSettingsModal', () => {
         onStartAuth={onStartAuth}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
-    fireEvent.click(screen.getByRole('button', { name: /start auth/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Authenticate' }));
     expect(onClose).toHaveBeenCalled();
     expect(onStartAuth).toHaveBeenCalled();
   });
@@ -337,7 +353,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={onReauthenticate}
         onLogout={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /re-authenticate/i }));
     expect(onClose).toHaveBeenCalled();
@@ -353,7 +369,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /logout/i })).toBeTruthy();
   });
@@ -369,7 +385,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={onLogout}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: /logout/i }));
     expect(onClose).toHaveBeenCalled();
@@ -380,7 +396,11 @@ describe('ChatSettingsModal', () => {
     const { apiRequest } = await import('../api-url');
     vi.mocked(apiRequest).mockResolvedValue({
       ok: true,
-      json: async () => ({ state: 'done', output: 'Script ran successfully', systemPrompt: 'You are helpful' }),
+      json: async () => ({
+        state: 'done',
+        output: 'Script ran successfully',
+        systemPrompt: 'You are helpful',
+      }),
     } as Response);
 
     render(
@@ -391,7 +411,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -414,7 +434,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -437,7 +457,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     await waitFor(() => {
@@ -454,9 +474,13 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
-    expect(screen.queryByRole('button', { name: /start auth|re-authenticate|logout/i })).toBeNull();
+    expect(
+      screen.queryByRole('button', {
+        name: /start auth|re-authenticate|logout/i,
+      }),
+    ).toBeNull();
   });
 
   it('shows Logout button when state is AWAITING_RESPONSE', () => {
@@ -468,7 +492,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: /logout/i })).toBeTruthy();
   });
@@ -509,7 +533,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /export my data/i }));
@@ -518,7 +542,10 @@ describe('ChatSettingsModal', () => {
     expect(revokeObjectURL).toHaveBeenCalled();
 
     vi.restoreAllMocks();
-    Object.defineProperty(globalThis, 'URL', { writable: true, value: window.URL ?? URL });
+    Object.defineProperty(globalThis, 'URL', {
+      writable: true,
+      value: window.URL ?? URL,
+    });
   });
 
   it('handleDeleteData does nothing when user cancels confirm', async () => {
@@ -537,12 +564,14 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /delete my data/i }));
     const calls = vi.mocked(apiRequest).mock.calls;
-    const deleteCalls = calls.filter((c) => (c[1] as RequestInit | undefined)?.method === 'DELETE');
+    const deleteCalls = calls.filter(
+      (c) => (c[1] as RequestInit | undefined)?.method === 'DELETE',
+    );
     expect(deleteCalls.length).toBe(0);
     vi.unstubAllGlobals();
     vi.stubGlobal('__APP_VERSION__', '1.0.0');
@@ -553,13 +582,15 @@ describe('ChatSettingsModal', () => {
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
 
     let deleteCallMade = false;
-    vi.mocked(apiRequest).mockImplementation(async (path: string, opts?: RequestInit) => {
-      if ((opts as RequestInit | undefined)?.method === 'DELETE') {
-        deleteCallMade = true;
-        return { ok: true } as Response;
-      }
-      return { ok: true, json: async () => ({ state: 'done' }) } as Response;
-    });
+    vi.mocked(apiRequest).mockImplementation(
+      async (path: string, opts?: RequestInit) => {
+        if ((opts as RequestInit | undefined)?.method === 'DELETE') {
+          deleteCallMade = true;
+          return { ok: true } as Response;
+        }
+        return { ok: true, json: async () => ({ state: 'done' }) } as Response;
+      },
+    );
 
     // Suppress jsdom "not implemented navigation" error for location.reload
     const reloadSpy = vi.fn();
@@ -577,7 +608,7 @@ describe('ChatSettingsModal', () => {
         onStartAuth={vi.fn()}
         onReauthenticate={vi.fn()}
         onLogout={vi.fn()}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: /delete my data/i }));

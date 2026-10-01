@@ -5,26 +5,18 @@ import type { FileTab } from './file-explorer-tabs';
 
 describe('FileExplorerTabs', () => {
   it('renders both tabs', () => {
-    render(
-      <FileExplorerTabs
-        activeTab="playground"
-        onTabChange={vi.fn()}
-      />
-    );
+    render(<FileExplorerTabs activeTab="playground" onTabChange={vi.fn()} />);
     expect(screen.getByText('Playground')).toBeTruthy();
     expect(screen.getByText('AI')).toBeTruthy();
   });
 
   it('marks active tab with aria-selected=true', () => {
-    render(
-      <FileExplorerTabs
-        activeTab="playground"
-        onTabChange={vi.fn()}
-      />
-    );
+    render(<FileExplorerTabs activeTab="playground" onTabChange={vi.fn()} />);
     const tabs = screen.getAllByRole('tab');
-    const playgroundTab = tabs.find(t => t.textContent?.includes('Playground'));
-    const aiTab = tabs.find(t => t.textContent?.includes('AI'));
+    const playgroundTab = tabs.find((t) =>
+      t.textContent?.includes('Playground'),
+    );
+    const aiTab = tabs.find((t) => t.textContent?.includes('AI'));
     expect(playgroundTab?.getAttribute('aria-selected')).toBe('true');
     expect(aiTab?.getAttribute('aria-selected')).toBe('false');
   });
@@ -32,13 +24,10 @@ describe('FileExplorerTabs', () => {
   it('calls onTabChange with correct tab id when tab is clicked', () => {
     const onTabChange = vi.fn();
     render(
-      <FileExplorerTabs
-        activeTab="playground"
-        onTabChange={onTabChange}
-      />
+      <FileExplorerTabs activeTab="playground" onTabChange={onTabChange} />,
     );
     const tabs = screen.getAllByRole('tab');
-    const aiTab = tabs.find(t => t.textContent?.includes('AI'));
+    const aiTab = tabs.find((t) => t.textContent?.includes('AI'));
     if (aiTab) fireEvent.click(aiTab);
     expect(onTabChange).toHaveBeenCalledWith('agent' as FileTab);
   });
@@ -49,7 +38,7 @@ describe('FileExplorerTabs', () => {
         activeTab="playground"
         onTabChange={vi.fn()}
         playgroundStats={{ fileCount: 10, totalLines: 500 }}
-      />
+      />,
     );
     expect(screen.getByText('10')).toBeTruthy();
   });
@@ -60,12 +49,13 @@ describe('FileExplorerTabs', () => {
         activeTab="playground"
         onTabChange={vi.fn()}
         playgroundStats={{ fileCount: 0, totalLines: 0 }}
-      />
+      />,
     );
     // Count spans (only icon + label, no stats)
     const spans = container.querySelectorAll('span');
-    // No tabular-nums span should be present
-    const hasStats = Array.from(spans).some(s => s.className.includes('tabular-nums'));
+    const hasStats = Array.from(spans).some((s) =>
+      s.className.includes('tabular-nums'),
+    );
     expect(hasStats).toBe(false);
   });
 
@@ -75,7 +65,7 @@ describe('FileExplorerTabs', () => {
         activeTab="agent"
         onTabChange={vi.fn()}
         agentStats={{ fileCount: 5, totalLines: 200 }}
-      />
+      />,
     );
     expect(screen.getByText('5')).toBeTruthy();
   });

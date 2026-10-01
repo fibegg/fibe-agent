@@ -1,4 +1,10 @@
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { dirname, join } from 'node:path';
 import type { ConversationDataDirProvider } from './strategy.types';
 
@@ -10,18 +16,16 @@ export interface ProviderConversationPathsOptions {
 }
 
 /**
- * Shared provider path policy:
- * - workspace is shared from the default conversation data dir when available;
- * - native provider session markers live in the active conversation data dir;
- * - the default/no-provider cases can read legacy markers from the workspace.
+ * Shares the provider workspace while keeping session markers per conversation;
+ * default conversations may still read legacy workspace markers.
  */
 export class ProviderConversationPaths {
   constructor(private readonly options: ProviderConversationPathsOptions) {}
 
   getWorkspaceDir(): string {
     const sharedDataDir =
-      this.options.conversationDataDir?.getDefaultConversationDataDir?.()
-      ?? this.options.conversationDataDir?.getConversationDataDir();
+      this.options.conversationDataDir?.getDefaultConversationDataDir?.() ??
+      this.options.conversationDataDir?.getConversationDataDir();
     if (sharedDataDir) return join(sharedDataDir, this.options.workspaceSubdir);
     return this.options.fallbackWorkspaceDir;
   }
@@ -46,10 +50,12 @@ export class ProviderConversationPaths {
   }
 
   readSessionMarker(): string | null {
-    return this.readMarker(this.getSessionMarkerPath())
-      ?? (this.shouldReadLegacyWorkspaceMarker()
+    return (
+      this.readMarker(this.getSessionMarkerPath()) ??
+      (this.shouldReadLegacyWorkspaceMarker()
         ? this.readMarker(this.getLegacyWorkspaceMarkerPath())
-        : null);
+        : null)
+    );
   }
 
   writeSessionMarker(sessionId: string): void {
@@ -70,7 +76,9 @@ export class ProviderConversationPaths {
     if (!provider) return true;
     if (provider.getConversationId?.() === 'default') return true;
     const defaultDir = provider.getDefaultConversationDataDir?.();
-    return Boolean(defaultDir && defaultDir === provider.getConversationDataDir());
+    return Boolean(
+      defaultDir && defaultDir === provider.getConversationDataDir(),
+    );
   }
 
   private readMarker(path: string): string | null {

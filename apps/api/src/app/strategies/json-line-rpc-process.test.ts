@@ -1,18 +1,14 @@
-/**
- * Unit tests for JsonLineRpcProcess.
- *
- * We test the public protocol parsing and state-machine logic by driving the
- * private handleStdout / handleLine methods indirectly through the real
- * ChildProcess stdout EventEmitter that gets wired up when `start()` is called.
- *
- * Because spawning a real process is expensive and platform-dependent, we
- * replace `spawn` at the module level using bun:test's vi.mock() and wire a
- * hand-crafted EventEmitter instead.
- */
-import { describe, test, expect, beforeEach, afterEach, vi, type Mock } from 'bun:test';
+/** Drives protocol parsing through a mocked child-process EventEmitter. */
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  vi,
+  type Mock,
+} from 'bun:test';
 import { EventEmitter } from 'node:events';
-
-// ─── Fake ChildProcess ────────────────────────────────────────────────────────
 
 function makeProc() {
   const stdin = { writable: true, write: vi.fn() };
@@ -30,12 +26,12 @@ function makeProc() {
   proc.stdout = stdout;
   proc.stderr = stderr;
   proc.killed = false;
-  proc.kill = vi.fn(() => { proc.killed = true; });
+  proc.kill = vi.fn(() => {
+    proc.killed = true;
+  });
   proc.pid = 99999;
   return proc;
 }
-
-// ─── Mock spawn ───────────────────────────────────────────────────────────────
 
 let fakeProc: ReturnType<typeof makeProc>;
 
@@ -55,8 +51,6 @@ describe('JsonLineRpcProcess', () => {
     vi.clearAllMocks();
   });
 
-  // ─── request() / response correlation ────────────────────────────────────
-
   test('request() resolves when a matching result arrives', async () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     const p = rpc.request('ping');
@@ -70,8 +64,14 @@ describe('JsonLineRpcProcess', () => {
     pushLine(fakeProc, JSON.stringify({ id: 1, result: 'hi' }));
     await p;
 
-    const written = JSON.parse((fakeProc.stdin.write as Mock<typeof fakeProc.stdin.write>).mock.calls[0][0] as string);
-    expect(written).toMatchObject({ method: 'greet', params: { name: 'World' } });
+    const written = JSON.parse(
+      (fakeProc.stdin.write as Mock<typeof fakeProc.stdin.write>).mock
+        .calls[0][0] as string,
+    );
+    expect(written).toMatchObject({
+      method: 'greet',
+      params: { name: 'World' },
+    });
   });
 
   test('request() id increments on each call', async () => {
@@ -95,7 +95,10 @@ describe('JsonLineRpcProcess', () => {
   test('request() rejects when error is an object with message', async () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     const p = rpc.request('fail');
-    pushLine(fakeProc, JSON.stringify({ id: 1, error: { message: 'object error' } }));
+    pushLine(
+      fakeProc,
+      JSON.stringify({ id: 1, error: { message: 'object error' } }),
+    );
     await expect(p).rejects.toThrow('object error');
   });
 
@@ -114,17 +117,20 @@ describe('JsonLineRpcProcess', () => {
   test('request() ignores responses with unknown ids', async () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     const p = rpc.request('test');
-    pushLine(fakeProc, JSON.stringify({ id: 999, result: 'should be ignored' }));
+    pushLine(
+      fakeProc,
+      JSON.stringify({ id: 999, result: 'should be ignored' }),
+    );
     pushLine(fakeProc, JSON.stringify({ id: 1, result: 'real' }));
     await expect(p).resolves.toBe('real');
   });
 
-  // ─── notify() ───────────────────────────────────────────────────────────
-
   test('notify() writes a message without an id', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     rpc.notify('ping');
-    const written = JSON.parse((fakeProc.stdin.write as Mock<() => void>).mock.calls[0][0] as string);
+    const written = JSON.parse(
+      (fakeProc.stdin.write as Mock<() => void>).mock.calls[0][0] as string,
+    );
     expect(written.method).toBe('ping');
     expect(written.id).toBeUndefined();
   });
@@ -132,11 +138,11 @@ describe('JsonLineRpcProcess', () => {
   test('notify() includes params', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     rpc.notify('event', { val: 1 });
-    const written = JSON.parse((fakeProc.stdin.write as Mock<() => void>).mock.calls[0][0] as string);
+    const written = JSON.parse(
+      (fakeProc.stdin.write as Mock<() => void>).mock.calls[0][0] as string,
+    );
     expect(written.params).toEqual({ val: 1 });
   });
-
-  // ─── onNotification() ────────────────────────────────────────────────────
 
   test('onNotification() fires for server-push notifications', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
@@ -158,13 +164,13 @@ describe('JsonLineRpcProcess', () => {
     expect(received).toHaveLength(0);
   });
 
-  // ─── onClose() ──────────────────────────────────────────────────────────
-
   test('onClose() fires when process exits', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     rpc.notify('start');
     let err: Error | null = null;
-    rpc.onClose((e) => { err = e; });
+    rpc.onClose((e) => {
+      err = e;
+    });
     fakeProc.emit('close', 1, null);
     expect(err).toBeInstanceOf(Error);
   });
@@ -173,13 +179,13 @@ describe('JsonLineRpcProcess', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     rpc.notify('start');
     let called = false;
-    const unsub = rpc.onClose(() => { called = true; });
+    const unsub = rpc.onClose(() => {
+      called = true;
+    });
     unsub();
     fakeProc.emit('close', 0, null);
     expect(called).toBe(false);
   });
-
-  // ─── close() ────────────────────────────────────────────────────────────
 
   test('close() kills the process', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
@@ -204,17 +210,12 @@ describe('JsonLineRpcProcess', () => {
     expect(fakeProc.kill).toHaveBeenCalledWith('SIGKILL');
   });
 
-  // ─── Closed-state guard ──────────────────────────────────────────────────
-
   test('request() throws after close()', () => {
     const rpc = new JsonLineRpcProcess('echo', []);
     rpc.notify('start');
     rpc.close();
-    // start() throws synchronously when closed=true
     expect(() => rpc.request('any')).toThrow('app-server process is closed');
   });
-
-  // ─── Non-JSON / partial lines ────────────────────────────────────────────
 
   test('ignores non-JSON lines on stdout', async () => {
     const rpc = new JsonLineRpcProcess('echo', []);
@@ -232,8 +233,6 @@ describe('JsonLineRpcProcess', () => {
     fakeProc.stdout.emit('data', Buffer.from(full.slice(8) + '\n'));
     await expect(p).resolves.toBe('chunked');
   });
-
-  // ─── process error event ─────────────────────────────────────────────────
 
   test('rejectAll fires when process emits error', async () => {
     const rpc = new JsonLineRpcProcess('echo', []);

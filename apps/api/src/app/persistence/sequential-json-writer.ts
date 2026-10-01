@@ -1,19 +1,13 @@
 import { open, rename, unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { basename, dirname, join } from 'node:path';
 import { encryptData } from '../crypto/crypto.util';
 
-/**
- * Chains writes per file so rapid mutations serialize to disk in order
- * without overlapping writeFile calls corrupting JSON.
- *
- * When `debounceMs > 0`, rapid `schedule()` calls are coalesced into one
- * write after the debounce window (like AsyncJsonWriter), while still using
- * safe atomic temp-rename under the hood.
- */
+/** Serializes atomic JSON writes, optionally coalescing them behind a debounce. */
 export class SequentialJsonWriter {
   private chain: Promise<void> = Promise.resolve();
-  private writeCounter = 0;
   private debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  private writeError: unknown;
 
   constructor(
     private readonly filePath: string,
@@ -22,11 +16,7 @@ export class SequentialJsonWriter {
     private readonly debounceMs = 0,
   ) {}
 
-  /**
-   * Schedule a write.
-   * - When `debounceMs > 0`: debounces — multiple rapid calls coalesce into one.
-   * - When `debounceMs === 0`: chains immediately (original behaviour).
-   */
+  /** Schedules an immediate chained write or a debounced one. */
   schedule(): void {
     if (this.debounceMs > 0) {
       if (this.debounceTimer !== null) {
@@ -41,23 +31,18 @@ export class SequentialJsonWriter {
     }
   }
 
-  /**
-   * Flush any pending write immediately and wait for it to complete.
-   * Cancels the debounce timer when in debounce mode, then writes in-line.
-   */
-  flush(): Promise<void> {
+  /** Flushes and waits for pending writes. */
+  async flush(strict = false): Promise<void> {
     if (this.debounceMs > 0 && this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
       this.debounceTimer = null;
       this.enqueueWrite();
     }
-    return this.chain;
+    await this.chain;
+    if (strict && this.writeError !== undefined) throw this.writeError;
   }
 
-  /**
-   * Cancel any pending debounced write.
-   * Call from `onModuleDestroy` after `flush()` to avoid stale timer fires.
-   */
+  /** Cancels a pending debounce after the final flush. */
   destroy(): void {
     if (this.debounceTimer !== null) {
       clearTimeout(this.debounceTimer);
@@ -67,23 +52,31 @@ export class SequentialJsonWriter {
 
   private enqueueWrite(): void {
     this.chain = this.chain
-      .then(() => this.writeSnapshot())
+      .then(async () => {
+        await this.writeSnapshot();
+        this.writeError = undefined;
+      })
       .catch((err) => {
+        this.writeError = err;
         console.error('SequentialJsonWriter failed:', err);
       });
   }
 
   private async writeSnapshot(): Promise<void> {
     const json = JSON.stringify(this.getSnapshot(), null, 2);
-    const dataToWrite = this.encryptionKey ? encryptData(json, this.encryptionKey) : json;
+    const dataToWrite = this.encryptionKey
+      ? encryptData(json, this.encryptionKey)
+      : json;
     await this.writeAtomically(dataToWrite);
   }
 
   private nextTempPath(): string {
     const dir = dirname(this.filePath);
     const file = basename(this.filePath);
-    this.writeCounter += 1;
-    return join(dir, `.${file}.${process.pid}.${Date.now()}.${this.writeCounter}.tmp`);
+    return join(
+      dir,
+      `.${file}.${process.pid}.${randomUUID()}.tmp`,
+    );
   }
 
   private async writeAtomically(data: string): Promise<void> {
@@ -101,9 +94,17 @@ export class SequentialJsonWriter {
       await this.syncDirectory(dirname(this.filePath));
     } catch (err) {
       if (handle) {
-        try { await handle.close(); } catch { /* ignore close errors */ }
+        try {
+          await handle.close();
+        } catch {
+          /* ignore close errors */
+        }
       }
-      try { await unlink(tempPath); } catch { /* ignore cleanup errors */ }
+      try {
+        await unlink(tempPath);
+      } catch {
+        /* ignore cleanup errors */
+      }
       throw err;
     }
   }
@@ -117,7 +118,11 @@ export class SequentialJsonWriter {
       /* Best-effort: some filesystems do not allow fsync on directories. */
     } finally {
       if (handle) {
-        try { await handle.close(); } catch { /* ignore close errors */ }
+        try {
+          await handle.close();
+        } catch {
+          /* ignore close errors */
+        }
       }
     }
   }

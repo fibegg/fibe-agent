@@ -16,12 +16,14 @@ let cachedMinOrder: number | null = null;
 function getMinOrder(): number {
   if (cachedMinOrder !== null) return cachedMinOrder;
   const raw = (process.env.LOG_LEVEL ?? 'info').toLowerCase();
-  const level = raw === 'info' ? 'log' : (LOG_LEVELS.includes(raw as LogLevel) ? raw : 'log') as LogLevel;
+  const level =
+    raw === 'info'
+      ? 'log'
+      : ((LOG_LEVELS.includes(raw as LogLevel) ? raw : 'log') as LogLevel);
   cachedMinOrder = LEVEL_ORDER[level];
   return cachedMinOrder;
 }
 
-/** Reset the cached log level (for testing only). */
 export function resetLogLevelCache(): void {
   cachedMinOrder = null;
 }
@@ -30,16 +32,29 @@ function shouldLog(level: LogLevel): boolean {
   return LEVEL_ORDER[level] <= getMinOrder();
 }
 
-function writeLine(stream: 'stdout' | 'stderr', payload: Record<string, unknown>): void {
-  const line = JSON.stringify({ timestamp: new Date().toISOString(), ...payload }) + '\n';
+function writeLine(
+  stream: 'stdout' | 'stderr',
+  payload: Record<string, unknown>,
+): void {
+  const line =
+    JSON.stringify({ timestamp: new Date().toISOString(), ...payload }) + '\n';
   if (stream === 'stderr') process.stderr.write(line);
   else process.stdout.write(line);
 }
 
 function write(level: LogLevel, stream: 'stdout' | 'stderr') {
-  return (message: string, context?: string, extra?: Record<string, unknown>) => {
+  return (
+    message: string,
+    context?: string,
+    extra?: Record<string, unknown>,
+  ) => {
     if (!shouldLog(level)) return;
-    writeLine(stream, { level, ...(context && { context }), message, ...extra });
+    writeLine(stream, {
+      level,
+      ...(context && { context }),
+      message,
+      ...extra,
+    });
   };
 }
 
@@ -67,7 +82,11 @@ export class ContainerLoggerService implements LoggerService {
   }
 
   error(message: string, trace?: string, context?: string): void {
-    containerLog.error(message, context ?? this.context, trace ? { trace } : undefined);
+    containerLog.error(
+      message,
+      context ?? this.context,
+      trace ? { trace } : undefined,
+    );
   }
 
   warn(message: string, context?: string): void {
@@ -92,7 +111,12 @@ export function logRequest(payload: {
   error?: string;
 }): void {
   if (!shouldLog('log')) return;
-  writeLine('stdout', { level: 'log', context: 'http', message: 'request', ...payload });
+  writeLine('stdout', {
+    level: 'log',
+    context: 'http',
+    message: 'request',
+    ...payload,
+  });
 }
 
 export function logWs(payload: {
@@ -103,5 +127,10 @@ export function logWs(payload: {
   error?: string;
 }): void {
   if (!shouldLog('log')) return;
-  writeLine('stdout', { level: 'log', context: 'ws', message: payload.event, ...payload });
+  writeLine('stdout', {
+    level: 'log',
+    context: 'ws',
+    message: payload.event,
+    ...payload,
+  });
 }

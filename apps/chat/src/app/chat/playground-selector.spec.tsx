@@ -5,7 +5,9 @@ import type { BrowseEntry } from './use-playground-selector';
 
 const asyncNoop = async () => true;
 
-function renderSelector(overrides: Partial<Parameters<typeof PlaygroundSelector>[0]> = {}) {
+function renderSelector(
+  overrides: Partial<Parameters<typeof PlaygroundSelector>[0]> = {},
+) {
   const defaults = {
     entries: [] as BrowseEntry[],
     loading: false,
@@ -18,8 +20,6 @@ function renderSelector(overrides: Partial<Parameters<typeof PlaygroundSelector>
   };
   return render(<PlaygroundSelector {...defaults} {...overrides} />);
 }
-
-// ─── smartCutLabel unit tests ────────────────────────────────────────────────
 
 describe('smartCutLabel', () => {
   it('strips a trailing playground numeric suffix', () => {
@@ -40,12 +40,9 @@ describe('smartCutLabel', () => {
   });
 
   it('handles trailing slash gracefully', () => {
-    // last non-empty segment picked via filter(Boolean)
     expect(smartCutLabel('playgrounds/alice--10/')).toBe('alice');
   });
 });
-
-// ─── PlaygroundSelector component tests ─────────────────────────────────────
 
 describe('PlaygroundSelector', () => {
   it('returns null when visible is false', () => {
@@ -55,7 +52,9 @@ describe('PlaygroundSelector', () => {
 
   it('renders trigger button with accessible label', () => {
     renderSelector();
-    expect(screen.getByRole('button', { name: 'Link Playground' })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: 'Link Playground' }),
+    ).toBeTruthy();
   });
 
   it('opens dropdown and calls onOpen when trigger is clicked', () => {
@@ -63,14 +62,18 @@ describe('PlaygroundSelector', () => {
     renderSelector({ onOpen });
     fireEvent.click(screen.getByRole('button', { name: 'Link Playground' }));
     expect(onOpen).toHaveBeenCalledOnce();
-    expect(screen.getByRole('listbox', { name: 'Playground linker' })).toBeTruthy();
+    expect(
+      screen.getByRole('listbox', { name: 'Playground linker' }),
+    ).toBeTruthy();
   });
 
   it('closes dropdown when trigger is clicked a second time', () => {
     renderSelector();
     const btn = screen.getByRole('button', { name: 'Link Playground' });
     fireEvent.click(btn);
-    expect(screen.getByRole('listbox', { name: 'Playground linker' })).toBeTruthy();
+    expect(
+      screen.getByRole('listbox', { name: 'Playground linker' }),
+    ).toBeTruthy();
     fireEvent.click(btn);
     expect(screen.queryByRole('listbox')).toBeNull();
   });
@@ -83,14 +86,14 @@ describe('PlaygroundSelector', () => {
     ];
     renderSelector({ entries, onLink });
     fireEvent.click(screen.getByRole('button', { name: 'Link Playground' }));
-    
+
     const entryButton = screen.getByRole('option', { name: /project-a/ });
     expect(entryButton).toBeTruthy();
     expect(screen.queryByText('project-a--42')).toBeNull();
     fireEvent.click(entryButton);
-    
+
     expect(onLink).toHaveBeenCalledWith('project-a--42');
-    
+
     await waitFor(() => {
       expect(screen.queryByRole('listbox')).toBeNull();
     });
@@ -115,7 +118,9 @@ describe('PlaygroundSelector', () => {
   });
 
   it('shows linked indicator for currently linked entry', () => {
-    const entries: BrowseEntry[] = [{ name: 'my-project', path: 'my-project', type: 'directory' }];
+    const entries: BrowseEntry[] = [
+      { name: 'my-project', path: 'my-project', type: 'directory' },
+    ];
     renderSelector({ entries, currentLink: 'my-project' });
     fireEvent.click(screen.getByRole('button', { name: 'Link Playground' }));
     const option = screen.getByRole('option', { name: /my-project/ });

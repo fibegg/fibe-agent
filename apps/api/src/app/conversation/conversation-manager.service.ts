@@ -9,8 +9,14 @@ import {
 } from 'node:fs';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
-import { MessageStoreService, type StoredMessage } from '../message-store/message-store.service';
-import { ActivityStoreService, type StoredActivityEntry } from '../activity-store/activity-store.service';
+import {
+  MessageStoreService,
+  type StoredMessage,
+} from '../message-store/message-store.service';
+import {
+  ActivityStoreService,
+  type StoredActivityEntry,
+} from '../activity-store/activity-store.service';
 import { SequentialJsonWriter } from '../persistence/sequential-json-writer';
 import type { ConversationDataDirProvider } from '../strategies/strategy.types';
 
@@ -30,7 +36,8 @@ export const DEFAULT_CONVERSATION_ID = 'default';
 export const DEFAULT_CONVERSATION_TITLE = 'Default';
 export const INBOX_CONVERSATION_ID = 'inbox';
 export const INBOX_CONVERSATION_TITLE = 'INBOX';
-export const EXTERNAL_CONVERSATION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+export const EXTERNAL_CONVERSATION_ID_PATTERN =
+  /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 export interface ConversationBundle {
   meta: ConversationMeta;
@@ -44,29 +51,23 @@ interface ConversationTombstone {
   tombstonedAt: string;
 }
 
-/**
- * Minimal config shim for per-conversation store instances.
- * Delegates everything to the real ConfigService but overrides
- * getConversationDataDir() to return the conversation-specific dir.
- */
+/** Delegates shared config while overriding the conversation data directory. */
 class ConversationScopedConfig {
   constructor(
     private readonly dir: string,
     private readonly real: ConfigService,
   ) {}
-  getConversationDataDir(): string { return this.dir; }
-  getEncryptionKey() { return this.real.getEncryptionKey(); }
+  getConversationDataDir(): string {
+    return this.dir;
+  }
+  getEncryptionKey() {
+    return this.real.getEncryptionKey();
+  }
 }
 
 /**
- * Manages named, persistent conversation contexts.
- *
- * Each conversation gets its own MessageStore + ActivityStore backed
- * by `<dataDir>/conversations/<id>/`.  Metadata (title, timestamps) is
- * persisted to `<dataDir>/conversations/index.json`.
- *
- * The singleton `MessageStoreService` / `ActivityStoreService` injected
- * into other services still works for the "default" legacy conversation.
+ * Persists named conversation stores under `<dataDir>/conversations`; the
+ * singleton stores remain the legacy default conversation.
  */
 @Injectable()
 export class ConversationManagerService implements OnModuleDestroy {
@@ -85,12 +86,13 @@ export class ConversationManagerService implements OnModuleDestroy {
     mkdirSync(this.conversationsDir, { recursive: true });
     this.indexWriter = new SequentialJsonWriter(
       this.indexPath,
-      () => [...this.bundles.values()].map((b) => {
-        const { messageCount: _mc, isProcessing: _ip, ...meta } = b.meta;
-        return meta;
-      }),
+      () =>
+        [...this.bundles.values()].map((b) => {
+          const { messageCount: _mc, isProcessing: _ip, ...meta } = b.meta;
+          return meta;
+        }),
       undefined,
-      300, // debounce — rapid touch() calls (one per message) coalesce
+      300, // debounce: rapid touch() calls (one per message) coalesce
     );
     this.loadIndex();
     this.ensureDefaultConversation();
@@ -102,7 +104,6 @@ export class ConversationManagerService implements OnModuleDestroy {
     return this.indexWriter.flush();
   }
 
-  /** List visible conversations sorted by lastMessageAt desc. */
   list(): ConversationMeta[] {
     return [...this.bundles.values()]
       .map((b) => this.enrichedMeta(b))
@@ -110,15 +111,11 @@ export class ConversationManagerService implements OnModuleDestroy {
       .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
   }
 
-  /** Get existing bundle or throw. */
   get(id: string): ConversationBundle | undefined {
     return this.bundles.get(id);
   }
 
-  /**
-   * Get or create a conversation bundle by ID.
-   * If id is 'default', uses the legacy single-conversation dir.
-   */
+  /** The default ID retains the legacy single-conversation directory. */
   getOrCreate(id: string): ConversationBundle {
     const existing = this.bundles.get(id);
     if (existing) return existing;
@@ -145,7 +142,6 @@ export class ConversationManagerService implements OnModuleDestroy {
     return this.convDir(id);
   }
 
-  /** Create a brand-new conversation, persist, and return its meta. */
   create(title?: string): ConversationMeta {
     return this.createWithId(randomUUID(), title);
   }
@@ -158,7 +154,11 @@ export class ConversationManagerService implements OnModuleDestroy {
     }
     const existing = this.bundles.get(normalizedId);
     if (existing) {
-      if (!this.isProtected(normalizedId) && typeof title === 'string' && title.trim()) {
+      if (
+        !this.isProtected(normalizedId) &&
+        typeof title === 'string' &&
+        title.trim()
+      ) {
         existing.meta.title = title.trim();
         this.flushIndex();
       }
@@ -179,7 +179,6 @@ export class ConversationManagerService implements OnModuleDestroy {
     return this.enrichedMeta(bundle);
   }
 
-  /** Update the title of an existing conversation. */
   setTitle(id: string, title: string): boolean {
     if (this.isProtected(id)) return false;
     const bundle = this.bundles.get(id);
@@ -189,7 +188,6 @@ export class ConversationManagerService implements OnModuleDestroy {
     return true;
   }
 
-  /** Touch the lastMessageAt timestamp. */
   touch(id: string): void {
     const bundle = this.bundles.get(id);
     if (!bundle) return;
@@ -197,19 +195,19 @@ export class ConversationManagerService implements OnModuleDestroy {
     this.flushIndex();
   }
 
-  /**
-   * Read the Claude native session ID stored in the conversation state dir.
-   * The default conversation also falls back to the legacy workspace marker.
-   */
+  /** The default conversation falls back to its legacy Claude marker. */
   getClaudeSessionMarker(id: string): string | null {
-    return this.readSessionMarker(join(this.convDir(id), '.claude_session'))
-      ?? (id === DEFAULT_CONVERSATION_ID ? this.readSessionMarker(join(this.claudeWorkspaceDir(id), '.claude_session')) : null);
+    return (
+      this.readSessionMarker(join(this.convDir(id), '.claude_session')) ??
+      (id === DEFAULT_CONVERSATION_ID
+        ? this.readSessionMarker(
+            join(this.claudeWorkspaceDir(id), '.claude_session'),
+          )
+        : null)
+    );
   }
 
-  /**
-   * Write (or clear when sessionId is null/empty) the Claude session marker.
-   * This allows importing existing native Claude sessions into a conversation.
-   */
+  /** Writes or clears the Claude marker used to import native sessions. */
   setClaudeSessionMarker(id: string, sessionId: string | null): boolean {
     const dir = this.convDir(id);
     const markerPath = join(dir, '.claude_session');
@@ -220,18 +218,22 @@ export class ConversationManagerService implements OnModuleDestroy {
       } else {
         if (existsSync(markerPath)) rmSync(markerPath, { force: true });
         if (id === DEFAULT_CONVERSATION_ID) {
-          const legacyPath = join(this.claudeWorkspaceDir(id), '.claude_session');
+          const legacyPath = join(
+            this.claudeWorkspaceDir(id),
+            '.claude_session',
+          );
           if (existsSync(legacyPath)) rmSync(legacyPath, { force: true });
         }
       }
       return true;
     } catch (err) {
-      this.logger.warn(`Failed to update Claude session marker for ${id}: ${err}`);
+      this.logger.warn(
+        `Failed to update Claude session marker for ${id}: ${err}`,
+      );
       return false;
     }
   }
 
-  /** Delete a conversation (metadata + in-memory; files removed from disk). */
   delete(id: string): boolean {
     if (this.isProtected(id)) return false;
     if (!this.bundles.has(id)) return false;
@@ -243,16 +245,14 @@ export class ConversationManagerService implements OnModuleDestroy {
     return true;
   }
 
-  // ── private ────────────────────────────────────────────────────────────
-
   private convDir(id: string): string {
     // 'default' uses the legacy getConversationDataDir() path so existing
     // single-conversation installs are unaffected.
-    if (id === DEFAULT_CONVERSATION_ID) return this.config.getConversationDataDir();
+    if (id === DEFAULT_CONVERSATION_ID)
+      return this.config.getConversationDataDir();
     return join(this.conversationsDir, id);
   }
 
-  /** Path to the claude_workspace sub-directory for a conversation. */
   private claudeWorkspaceDir(id: string): string {
     return join(this.convDir(id), 'claude_workspace');
   }
@@ -267,11 +267,17 @@ export class ConversationManagerService implements OnModuleDestroy {
     }
   }
 
-  private createBundle(id: string, meta?: ConversationMeta): ConversationBundle {
+  private createBundle(
+    id: string,
+    meta?: ConversationMeta,
+  ): ConversationBundle {
     const dir = this.convDir(id);
     mkdirSync(dir, { recursive: true });
 
-    const scopedConfig = new ConversationScopedConfig(dir, this.config) as unknown as ConfigService;
+    const scopedConfig = new ConversationScopedConfig(
+      dir,
+      this.config,
+    ) as unknown as ConfigService;
     const messageStore = new MessageStoreService(scopedConfig);
     const activityStore = new ActivityStoreService(scopedConfig);
 
@@ -284,7 +290,11 @@ export class ConversationManagerService implements OnModuleDestroy {
     };
     this.applySystemFlags(resolvedMeta);
 
-    const bundle: ConversationBundle = { meta: resolvedMeta, messageStore, activityStore };
+    const bundle: ConversationBundle = {
+      meta: resolvedMeta,
+      messageStore,
+      activityStore,
+    };
     this.bundles.set(id, bundle);
     this.flushIndex();
     return bundle;
@@ -307,8 +317,14 @@ export class ConversationManagerService implements OnModuleDestroy {
   }
 
   private ensureDefaultConversation(): void {
-    this.ensureSystemConversation(DEFAULT_CONVERSATION_ID, DEFAULT_CONVERSATION_TITLE);
-    this.ensureSystemConversation(INBOX_CONVERSATION_ID, INBOX_CONVERSATION_TITLE);
+    this.ensureSystemConversation(
+      DEFAULT_CONVERSATION_ID,
+      DEFAULT_CONVERSATION_TITLE,
+    );
+    this.ensureSystemConversation(
+      INBOX_CONVERSATION_ID,
+      INBOX_CONVERSATION_TITLE,
+    );
   }
 
   private ensureSystemConversation(id: string, title: string): void {
@@ -386,7 +402,9 @@ export class ConversationManagerService implements OnModuleDestroy {
       if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
       return !existsSync(dir);
     } catch (err) {
-      this.logger.warn(`Failed to remove conversation dir ${dir} for ${id}: ${err}`);
+      this.logger.warn(
+        `Failed to remove conversation dir ${dir} for ${id}: ${err}`,
+      );
       return false;
     }
   }
@@ -405,7 +423,9 @@ export class ConversationManagerService implements OnModuleDestroy {
   }
 
   private retryTombstonedCleanup(): number {
-    const remaining = this.readTombstones().filter((entry) => !this.removeConversationDir(entry.id, entry.dir));
+    const remaining = this.readTombstones().filter(
+      (entry) => !this.removeConversationDir(entry.id, entry.dir),
+    );
     this.writeTombstones(remaining);
     return remaining.length;
   }
@@ -424,11 +444,12 @@ export class ConversationManagerService implements OnModuleDestroy {
     try {
       const parsed = JSON.parse(readFileSync(this.tombstonesPath, 'utf8'));
       if (!Array.isArray(parsed)) return [];
-      return parsed.filter((entry): entry is ConversationTombstone => (
-        typeof entry?.id === 'string'
-        && typeof entry.dir === 'string'
-        && typeof entry.tombstonedAt === 'string'
-      ));
+      return parsed.filter(
+        (entry): entry is ConversationTombstone =>
+          typeof entry?.id === 'string' &&
+          typeof entry.dir === 'string' &&
+          typeof entry.tombstonedAt === 'string',
+      );
     } catch (err) {
       this.logger.warn(`Failed to read conversation tombstones: ${err}`);
       return [];
@@ -438,10 +459,15 @@ export class ConversationManagerService implements OnModuleDestroy {
   private writeTombstones(tombstones: ConversationTombstone[]): void {
     try {
       if (tombstones.length === 0) {
-        if (existsSync(this.tombstonesPath)) rmSync(this.tombstonesPath, { force: true });
+        if (existsSync(this.tombstonesPath))
+          rmSync(this.tombstonesPath, { force: true });
         return;
       }
-      writeFileSync(this.tombstonesPath, JSON.stringify(tombstones, null, 2), 'utf8');
+      writeFileSync(
+        this.tombstonesPath,
+        JSON.stringify(tombstones, null, 2),
+        'utf8',
+      );
     } catch (err) {
       this.logger.warn(`Failed to write conversation tombstones: ${err}`);
     }

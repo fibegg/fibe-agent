@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { act, render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  act,
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react';
 import { FileExplorer, type PlaygroundEntry } from './file-explorer';
 import { FileViewerPanel } from './file-viewer-panel';
 
@@ -7,19 +13,24 @@ vi.mock('../api-url', () => ({
   getAuthTokenForRequest: vi.fn(() => ''),
   apiRequest: (path: string, options?: RequestInit) => {
     if (path.includes('/urls')) {
-      return Promise.resolve({ ok: true, status: 200, json: async () => ({ urls: [] }) });
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: async () => ({ urls: [] }),
+      });
     }
     return fetch(path, options);
-  }
+  },
 }));
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: (options: { count: number }) => ({
-    getVirtualItems: () => Array.from({ length: options.count }).map((_, i) => ({
-      index: i,
-      size: 28,
-      start: i * 28
-    })),
+    getVirtualItems: () =>
+      Array.from({ length: options.count }).map((_, i) => ({
+        index: i,
+        size: 28,
+        start: i * 28,
+      })),
     getTotalSize: () => options.count * 28,
   }),
 }));
@@ -28,8 +39,19 @@ describe('FileExplorer', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
     if (typeof Range !== 'undefined') {
-      Range.prototype.getClientRects = () => ([] as unknown as DOMRectList);
-      Range.prototype.getBoundingClientRect = () => ({ width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => undefined } as DOMRect);
+      Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+      Range.prototype.getBoundingClientRect = () =>
+        ({
+          width: 0,
+          height: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => undefined,
+        }) as DOMRect;
     }
   });
 
@@ -47,19 +69,26 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.getByText("You don't have any files in the playground.")).toBeTruthy();
+    expect(screen.getByText('Playground has no files.')).toBeTruthy();
   });
 
   it('shows loading state initially', () => {
     (fetch as ReturnType<typeof vi.fn>).mockImplementation(
-      () => new Promise<Response>(() => undefined)
+      () => new Promise<Response>(() => undefined),
     );
     render(<FileExplorer />);
     expect(screen.getByText('Loading…')).toBeTruthy();
   });
 
   it('shows provider and model in the explorer header', () => {
-    render(<FileExplorer tree={[]} agentTree={[]} agentProviderLabel="Claude" currentModel="haiku" />);
+    render(
+      <FileExplorer
+        tree={[]}
+        agentTree={[]}
+        agentProviderLabel="Claude"
+        currentModel="haiku"
+      />,
+    );
     expect(screen.getByText('Claude')).toBeTruthy();
     expect(screen.getByText('haiku')).toBeTruthy();
     expect(screen.getByTitle('Model: haiku')).toBeTruthy();
@@ -71,9 +100,11 @@ describe('FileExplorer', () => {
         tree={[]}
         agentTree={[]}
         playgroundSelector={<button type="button">Link Playground</button>}
-      />
+      />,
     );
-    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /link playground/i }),
+    ).toBeTruthy();
   });
 
   it('shows empty playground message when API returns empty array', async () => {
@@ -86,7 +117,7 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.getByText("You don't have any files in the playground.")).toBeTruthy();
+    expect(screen.getByText('Playground has no files.')).toBeTruthy();
   });
 
   it('does not render expand/collapse button when tree is empty', async () => {
@@ -99,11 +130,15 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(screen.queryByRole('button', { name: 'Expand file explorer' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Expand file explorer' }),
+    ).toBeNull();
   });
 
   it('shows error when fetch fails', async () => {
-    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('Network error'));
+    (fetch as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('Network error'),
+    );
     render(<FileExplorer />);
     await waitFor(() => {
       expect(screen.getByText('Network error')).toBeTruthy();
@@ -152,9 +187,7 @@ describe('FileExplorer', () => {
         status: 200,
         json: async () => tree,
       })
-      .mockImplementation(
-        () => new Promise(() => undefined)
-      );
+      .mockImplementation(() => new Promise(() => undefined));
     const { rerender } = render(<FileExplorer refreshTrigger={0} />);
     await waitFor(() => {
       expect(screen.getByText('src')).toBeTruthy();
@@ -210,7 +243,7 @@ describe('FileExplorer', () => {
         tree={[]}
         agentTree={agentTree}
         onFileSelect={onFileSelect}
-      />
+      />,
     );
 
     fireEvent.click(screen.getByText('CLAUDE.md'));
@@ -219,7 +252,7 @@ describe('FileExplorer', () => {
       expect.objectContaining({
         path: 'CLAUDE.md',
         source: 'agent',
-      })
+      }),
     );
   });
 
@@ -238,21 +271,25 @@ describe('FileExplorer', () => {
         agentTree={agentTree}
         agentWorkspaceAvailable
         onFileSelect={onFileSelect}
-      />
+      />,
     );
 
     fireEvent.change(screen.getByPlaceholderText('Search all files...'), {
       target: { value: 'claude' },
     });
 
-    await waitFor(() => expect(screen.getByText('Searching playground and AI workspace')).toBeTruthy());
+    await waitFor(() =>
+      expect(
+        screen.getByText('Searching playground and AI workspace'),
+      ).toBeTruthy(),
+    );
     fireEvent.click(screen.getByText('CLAUDE.md'));
 
     expect(onFileSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'CLAUDE.md',
         source: 'agent',
-      })
+      }),
     );
   });
 
@@ -271,7 +308,7 @@ describe('FileExplorer', () => {
         agentWorkspaceAvailable
         activeTab="playground"
         onTabChange={vi.fn()}
-      />
+      />,
     );
 
     const list = screen.getByTestId('file-explorer-tree-list');
@@ -294,22 +331,27 @@ describe('FileExplorer', () => {
         agentTree={agentTree}
         agentWorkspaceAvailable
         onFileSelect={onFileSelect}
-      />
+      />,
     );
 
     fireEvent.keyDown(window, { key: 'p', metaKey: true });
-    expect(screen.getByRole('dialog', { name: 'Quick open file' })).toBeTruthy();
+    expect(
+      screen.getByRole('dialog', { name: 'Quick open file' }),
+    ).toBeTruthy();
 
-    fireEvent.change(screen.getByPlaceholderText('Search files by name or path...'), {
-      target: { value: 'claude' },
-    });
+    fireEvent.change(
+      screen.getByPlaceholderText('Search files by name or path...'),
+      {
+        target: { value: 'claude' },
+      },
+    );
     fireEvent.click(screen.getByRole('button', { name: /CLAUDE\.md/i }));
 
     expect(onFileSelect).toHaveBeenCalledWith(
       expect.objectContaining({
         path: 'CLAUDE.md',
         source: 'agent',
-      })
+      }),
     );
   });
 
@@ -317,13 +359,22 @@ describe('FileExplorer', () => {
     const onFileSelect = vi.fn();
     const tree: PlaygroundEntry[] = [
       { name: 'app.ts', path: 'src/app.ts', type: 'file' },
-      { name: 'settings.ts', path: 'src/settings.ts', type: 'file', gitStatus: 'modified' },
+      {
+        name: 'settings.ts',
+        path: 'src/settings.ts',
+        type: 'file',
+        gitStatus: 'modified',
+      },
     ];
 
-    render(<FileExplorer tree={tree} agentTree={[]} onFileSelect={onFileSelect} />);
+    render(
+      <FileExplorer tree={tree} agentTree={[]} onFileSelect={onFileSelect} />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Quick open file' }));
-    const input = screen.getByPlaceholderText('Search files by name or path...');
+    const input = screen.getByPlaceholderText(
+      'Search files by name or path...',
+    );
     fireEvent.change(input, { target: { value: 'settings' } });
     fireEvent.keyDown(input, { key: 'Enter' });
 
@@ -331,7 +382,7 @@ describe('FileExplorer', () => {
       expect.objectContaining({
         path: 'src/settings.ts',
         source: 'playground',
-      })
+      }),
     );
   });
 
@@ -341,24 +392,22 @@ describe('FileExplorer', () => {
       { name: 'index.html', path: 'index.html', type: 'file' },
     ];
 
-    render(<FileExplorer tree={tree} agentTree={[]} onFileSelect={onFileSelect} />);
+    render(
+      <FileExplorer tree={tree} agentTree={[]} onFileSelect={onFileSelect} />,
+    );
 
     fireEvent.click(screen.getByRole('button', { name: 'Quick open file' }));
     const dialog = screen.getByRole('dialog', { name: 'Quick open file' });
     fireEvent.click(dialog);
 
-    expect(screen.queryByRole('dialog', { name: 'Quick open file' })).toBeNull();
+    expect(
+      screen.queryByRole('dialog', { name: 'Quick open file' }),
+    ).toBeNull();
     expect(onFileSelect).not.toHaveBeenCalled();
   });
 
   it('shows the agent workspace empty state when the workspace exists without visible files', () => {
-    render(
-      <FileExplorer
-        tree={[]}
-        agentTree={[]}
-        agentWorkspaceAvailable
-      />
-    );
+    render(<FileExplorer tree={[]} agentTree={[]} agentWorkspaceAvailable />);
 
     expect(screen.getByText('AI workspace is empty.')).toBeTruthy();
   });
@@ -446,7 +495,9 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.queryByText('Loading…')).toBeNull();
     });
-    expect(() => fireEvent.click(screen.getByRole('button', { name: 'Settings' }))).not.toThrow();
+    expect(() =>
+      fireEvent.click(screen.getByRole('button', { name: 'Settings' })),
+    ).not.toThrow();
   });
 
   it('renders Close button when onClose is provided and calls it when clicked', async () => {
@@ -480,7 +531,7 @@ describe('FileExplorer', () => {
 
   it('renders collapsed rail when collapsed is true', () => {
     (fetch as ReturnType<typeof vi.fn>).mockImplementation(
-      () => new Promise<Response>(() => undefined)
+      () => new Promise<Response>(() => undefined),
     );
     render(<FileExplorer collapsed />);
     expect(screen.queryByPlaceholderText('Search all files...')).toBeNull();
@@ -503,7 +554,7 @@ describe('FileExplorer', () => {
 
   it('can defer its right divider to a parent panel', () => {
     const { container } = render(
-      <FileExplorer tree={[]} agentTree={[]} showRightBorder={false} />
+      <FileExplorer tree={[]} agentTree={[]} showRightBorder={false} />,
     );
     expect(container.firstElementChild?.className).not.toContain('border-r');
   });
@@ -764,8 +815,16 @@ describe('FileExplorer', () => {
     const tree: PlaygroundEntry[] = [
       { name: 'slow.js', path: 'slow.js', type: 'file' },
     ];
-    let resolveFile: (value: { ok: boolean; status: number; json: () => Promise<{ content: string }> }) => void;
-    const filePromise = new Promise<{ ok: boolean; status: number; json: () => Promise<{ content: string }> }>((resolve) => {
+    let resolveFile: (value: {
+      ok: boolean;
+      status: number;
+      json: () => Promise<{ content: string }>;
+    }) => void;
+    const filePromise = new Promise<{
+      ok: boolean;
+      status: number;
+      json: () => Promise<{ content: string }>;
+    }>((resolve) => {
       resolveFile = resolve;
     });
     (fetch as ReturnType<typeof vi.fn>)
@@ -783,10 +842,18 @@ describe('FileExplorer', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: 'slow.js' })).toBeTruthy();
     });
-    expect(screen.getByRole('button', { name: 'Copy' }).hasAttribute('disabled')).toBe(true);
-    expect(screen.getByRole('button', { name: 'Download' }).hasAttribute('disabled')).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'Copy' }).hasAttribute('disabled'),
+    ).toBe(true);
+    expect(
+      screen.getByRole('button', { name: 'Download' }).hasAttribute('disabled'),
+    ).toBe(true);
     await act(async () => {
-      const resolve = resolveFile as (v: { ok: boolean; status: number; json: () => Promise<{ content: string }> }) => void;
+      const resolve = resolveFile as (v: {
+        ok: boolean;
+        status: number;
+        json: () => Promise<{ content: string }>;
+      }) => void;
       resolve({
         ok: true,
         status: 200,
@@ -800,8 +867,19 @@ describe('FileViewerPanel', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
     if (typeof Range !== 'undefined') {
-      Range.prototype.getClientRects = () => ([] as unknown as DOMRectList);
-      Range.prototype.getBoundingClientRect = () => ({ width: 0, height: 0, top: 0, left: 0, right: 0, bottom: 0, x: 0, y: 0, toJSON: () => undefined } as DOMRect);
+      Range.prototype.getClientRects = () => [] as unknown as DOMRectList;
+      Range.prototype.getBoundingClientRect = () =>
+        ({
+          width: 0,
+          height: 0,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          x: 0,
+          y: 0,
+          toJSON: () => undefined,
+        }) as DOMRect;
     }
   });
 
@@ -821,7 +899,7 @@ describe('FileViewerPanel', () => {
         entry={{ name: 'style.css', path: 'style.css', type: 'file' }}
         onClose={onClose}
         inline
-      />
+      />,
     );
     await waitFor(() => {
       expect(screen.getByText(/color: red/)).toBeTruthy();

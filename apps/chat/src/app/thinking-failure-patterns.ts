@@ -1,8 +1,3 @@
-/**
- * Detects phrases in agent thinking: failure, agreement, uncertainty, questions.
- * Used to highlight segments in the Activity tab.
- */
-
 export type ThinkingSegment = { text: string; suspicious: boolean };
 
 export type ThinkingSegmentKind =
@@ -12,7 +7,10 @@ export type ThinkingSegmentKind =
   | 'uncertainty'
   | 'question';
 
-export type ThinkingSegmentWithKind = { text: string; kind: ThinkingSegmentKind };
+export type ThinkingSegmentWithKind = {
+  text: string;
+  kind: ThinkingSegmentKind;
+};
 
 const KIND_PRIORITY: Record<ThinkingSegmentKind, number> = {
   normal: 0,
@@ -87,15 +85,17 @@ function mergeRanges(
   suspicious: { start: number; end: number }[],
   agreement: { start: number; end: number }[],
   uncertainty: { start: number; end: number }[],
-  question: { start: number; end: number }[]
+  question: { start: number; end: number }[],
 ): { start: number; end: number; kind: ThinkingSegmentKind }[] {
-  const withKind: { start: number; end: number; kind: ThinkingSegmentKind }[] = [
-    ...suspicious.map((r) => ({ ...r, kind: 'suspicious' as const })),
-    ...agreement.map((r) => ({ ...r, kind: 'agreement' as const })),
-    ...uncertainty.map((r) => ({ ...r, kind: 'uncertainty' as const })),
-    ...question.map((r) => ({ ...r, kind: 'question' as const })),
-  ].sort((a, b) => a.start - b.start);
-  const merged: { start: number; end: number; kind: ThinkingSegmentKind }[] = [];
+  const withKind: { start: number; end: number; kind: ThinkingSegmentKind }[] =
+    [
+      ...suspicious.map((r) => ({ ...r, kind: 'suspicious' as const })),
+      ...agreement.map((r) => ({ ...r, kind: 'agreement' as const })),
+      ...uncertainty.map((r) => ({ ...r, kind: 'uncertainty' as const })),
+      ...question.map((r) => ({ ...r, kind: 'question' as const })),
+    ].sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number; kind: ThinkingSegmentKind }[] =
+    [];
   for (const r of withKind) {
     const last = merged[merged.length - 1];
     if (last && r.start <= last.end) {
@@ -106,7 +106,10 @@ function mergeRanges(
   return merged;
 }
 
-function collectRangesSimple(text: string, patterns: RegExp[]): { start: number; end: number }[] {
+function collectRangesSimple(
+  text: string,
+  patterns: RegExp[],
+): { start: number; end: number }[] {
   const ranges: { start: number; end: number }[] = [];
   for (const re of patterns) {
     const copy = new RegExp(re.source, re.flags);
@@ -114,7 +117,8 @@ function collectRangesSimple(text: string, patterns: RegExp[]): { start: number;
     while ((m = copy.exec(text)) !== null) {
       const start = m.index;
       const end = start + m[0].length;
-      if (!ranges.some((r) => start < r.end && end > r.start)) ranges.push({ start, end });
+      if (!ranges.some((r) => start < r.end && end > r.start))
+        ranges.push({ start, end });
     }
   }
   ranges.sort((a, b) => a.start - b.start);
@@ -138,15 +142,19 @@ export function parseThinkingSegments(text: string): ThinkingSegment[] {
   const segments: ThinkingSegment[] = [];
   let pos = 0;
   for (const { start, end } of ranges) {
-    if (start > pos) segments.push({ text: trimmed.slice(pos, start), suspicious: false });
+    if (start > pos)
+      segments.push({ text: trimmed.slice(pos, start), suspicious: false });
     segments.push({ text: trimmed.slice(start, end), suspicious: true });
     pos = end;
   }
-  if (pos < trimmed.length) segments.push({ text: trimmed.slice(pos), suspicious: false });
+  if (pos < trimmed.length)
+    segments.push({ text: trimmed.slice(pos), suspicious: false });
   return segments;
 }
 
-export function parseThinkingSegmentsWithAgreement(text: string): ThinkingSegmentWithKind[] {
+export function parseThinkingSegmentsWithAgreement(
+  text: string,
+): ThinkingSegmentWithKind[] {
   if (typeof text !== 'string') return [];
   const trimmed = text.trim();
   if (!trimmed) return [];
@@ -159,25 +167,27 @@ export function parseThinkingSegmentsWithAgreement(text: string): ThinkingSegmen
     suspiciousRanges,
     agreementRanges,
     uncertaintyRanges,
-    questionRanges
+    questionRanges,
   );
   if (merged.length === 0) return [{ text: trimmed, kind: 'normal' }];
 
   const segments: ThinkingSegmentWithKind[] = [];
   let pos = 0;
   for (const { start, end, kind } of merged) {
-    if (start > pos) segments.push({ text: trimmed.slice(pos, start), kind: 'normal' });
+    if (start > pos)
+      segments.push({ text: trimmed.slice(pos, start), kind: 'normal' });
     segments.push({ text: trimmed.slice(start, end), kind });
     pos = end;
   }
-  if (pos < trimmed.length) segments.push({ text: trimmed.slice(pos), kind: 'normal' });
+  if (pos < trimmed.length)
+    segments.push({ text: trimmed.slice(pos), kind: 'normal' });
   return segments;
 }
 
-export const SUSPICIOUS_TOOLTIP = 'Possible failure — check token or access';
+export const SUSPICIOUS_TOOLTIP = 'Possible failure: check token or access';
 
 export const AGREEMENT_TOOLTIP = 'Agent agrees with you';
 
-export const UNCERTAINTY_TOOLTIP = 'Agent is uncertain — consider clarifying';
+export const UNCERTAINTY_TOOLTIP = 'Agent is uncertain: consider clarifying';
 
 export const QUESTION_TOOLTIP = 'Agent is asking for your input';

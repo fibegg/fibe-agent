@@ -4,47 +4,20 @@ import { X, Maximize2, Minimize2 } from 'lucide-react';
 import { RIGHT_DRAWER_OVERLAY, RIGHT_DRAWER_PANEL } from './ui-classes';
 import { useT } from './i18n';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 export interface RightDrawerProps {
-  /** Controls whether the drawer is visible. */
   open: boolean;
-  /** Called when the user requests the drawer to close (Escape, backdrop, close button). */
   onClose: () => void;
-  /** Drawer heading text displayed in the header. */
   title: string;
-  /** Optional icon rendered to the left of the title. */
   icon?: ReactNode;
-  /** Content rendered inside the scrollable drawer body. */
   children: ReactNode;
-  /**
-   * Width of the drawer panel.
-   * Accepts any valid CSS width value.
-   * Defaults to `min(85vw, 520px)`.
-   */
+  /** CSS width; defaults to `min(85vw, 520px)`. */
   width?: string;
-  /** Extra class names applied to the inner panel element. */
   className?: string;
-  /**
-   * When true, a maximize/restore button is shown in the drawer header so
-   * the user can expand the panel to full viewport size.
-   * Defaults to false.
-   */
+  /** Shows a maximize/restore control. */
   expandable?: boolean;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
-/**
- * `RightDrawer` — a slide-in panel from the right edge of the screen.
- *
- * Animations are driven entirely by CSS transitions so xterm.js and other
- * heavy children only mount once; the panel stays mounted while `open`
- * remains true and slides out when `open` becomes false.
- *
- * The component fires a `transitionend` callback when it finishes opening so
- * consumers can trigger layout-dependent side effects (e.g. xterm FitAddon).
- */
+/** Keeps heavy drawer children mounted while CSS handles opening and closing. */
 export function RightDrawer({
   open,
   onClose,
@@ -59,12 +32,10 @@ export function RightDrawer({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const [isExpanded, setIsExpanded] = useState(false);
 
-  // Reset expanded state when drawer closes
   useEffect(() => {
     if (!open) setIsExpanded(false);
   }, [open]);
 
-  // ── Escape key ──────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     const handleKey = (e: KeyboardEvent) => {
@@ -80,7 +51,6 @@ export function RightDrawer({
     return () => document.removeEventListener('keydown', handleKey);
   }, [open, onClose, isExpanded]);
 
-  // ── Focus trap — move focus into panel when it opens ────────────────────────
   useEffect(() => {
     if (!open) return;
     // Small delay to let the CSS transition start before stealing focus
@@ -88,22 +58,22 @@ export function RightDrawer({
       const el = panelRef.current;
       if (!el) return;
       const firstFocusable = el.querySelector<HTMLElement>(
-        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
       );
       firstFocusable?.focus();
     }, 60);
     return () => clearTimeout(id);
   }, [open]);
 
-  // ── Scroll-lock on body ─────────────────────────────────────────────────────
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
-  // ── Expanded panel style — covers the full viewport ─────────────────────────
   const panelStyle: React.CSSProperties = isExpanded
     ? {
         width: '100vw',
@@ -147,13 +117,18 @@ export function RightDrawer({
         style={panelStyle}
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div 
+        <div
           className="flex items-center justify-between px-4 pb-3 border-b border-primary/15 shrink-0 bg-background/95 backdrop-blur-sm"
-          style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
+          style={{
+            paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
+          }}
         >
           <div className="flex items-center gap-2 min-w-0">
             {icon && (
-              <span className="size-4 text-primary shrink-0 flex items-center justify-center" aria-hidden>
+              <span
+                className="size-4 text-primary shrink-0 flex items-center justify-center"
+                aria-hidden
+              >
                 {icon}
               </span>
             )}
@@ -167,13 +142,22 @@ export function RightDrawer({
                 type="button"
                 onClick={() => setIsExpanded((v) => !v)}
                 className="size-7 flex items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors shrink-0"
-                aria-label={isExpanded ? t('drawer.restoreTerminal') : t('drawer.expandTerminal')}
-                title={isExpanded ? t('drawer.restoreTerminal') : t('drawer.expandTerminal')}
-              >
-                {isExpanded
-                  ? <Minimize2 className="size-3.5" />
-                  : <Maximize2 className="size-3.5" />
+                aria-label={
+                  isExpanded
+                    ? t('drawer.restoreTerminal')
+                    : t('drawer.expandTerminal')
                 }
+                title={
+                  isExpanded
+                    ? t('drawer.restoreTerminal')
+                    : t('drawer.expandTerminal')
+                }
+              >
+                {isExpanded ? (
+                  <Minimize2 className="size-3.5" />
+                ) : (
+                  <Maximize2 className="size-3.5" />
+                )}
               </button>
             )}
             <button

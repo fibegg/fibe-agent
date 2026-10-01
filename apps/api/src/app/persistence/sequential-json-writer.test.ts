@@ -1,4 +1,4 @@
-import { describe, test, expect, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach, spyOn } from 'bun:test';
 import { SequentialJsonWriter } from './sequential-json-writer';
 import { readdirSync, readFileSync, unlinkSync, existsSync } from 'node:fs';
 import { basename, join } from 'node:path';
@@ -8,7 +8,11 @@ describe('SequentialJsonWriter', () => {
   const testFile = join(tmpdir(), `sjw-test-${process.pid}-${Date.now()}.json`);
 
   afterEach(() => {
-    try { if (existsSync(testFile)) unlinkSync(testFile); } catch { /* ignore */ }
+    try {
+      if (existsSync(testFile)) unlinkSync(testFile);
+    } catch {
+      /* ignore */
+    }
   });
 
   test('writes snapshot to file as JSON', async () => {
@@ -21,24 +25,48 @@ describe('SequentialJsonWriter', () => {
     expect(JSON.parse(content)).toEqual({ count: 0 });
   });
 
-  test('schedule() returns void (not a promise)', () => {
+  test('schedule() returns void (not a promise)', async () => {
     const writer = new SequentialJsonWriter(testFile, () => ({}));
     const result = writer.schedule();
     expect(result).toBeUndefined();
+    await writer.flush(true);
   });
 
   test('serializes rapid concurrent writes in order', async () => {
     let counter = 0;
-    const writer = new SequentialJsonWriter(testFile, () => ({ value: counter }));
+    const writer = new SequentialJsonWriter(testFile, () => ({
+      value: counter,
+    }));
 
-    counter = 1; writer.schedule();
-    counter = 2; writer.schedule();
-    counter = 3; writer.schedule();
+    counter = 1;
+    writer.schedule();
+    counter = 2;
+    writer.schedule();
+    counter = 3;
+    writer.schedule();
 
     await writer.flush();
 
     const content = readFileSync(testFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ value: 3 });
+  });
+
+  test('independent writers to the same file never collide at the same clock instant', async () => {
+    const clock = spyOn(Date, 'now').mockReturnValue(1790805774869);
+    try {
+      const first = new SequentialJsonWriter(testFile, () => ({ writer: 'first' }));
+      const second = new SequentialJsonWriter(testFile, () => ({ writer: 'second' }));
+      first.schedule();
+      second.schedule();
+
+      const results = await Promise.allSettled([first.flush(true), second.flush(true)]);
+
+      expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled']);
+      expect(['first', 'second']).toContain(JSON.parse(readFileSync(testFile, 'utf8')).writer);
+      expect(readdirSync(tmpdir()).filter((name) => name.startsWith(`.${basename(testFile)}.`) && name.endsWith('.tmp'))).toEqual([]);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   test('catches write errors without breaking the chain', async () => {
@@ -48,9 +76,10 @@ describe('SequentialJsonWriter', () => {
     writer.schedule();
     await writer.flush();
 
-    // Should not throw; a separate writer should work fine
     const goodFile = testFile;
-    const writer2 = new SequentialJsonWriter(goodFile, () => ({ recovered: true }));
+    const writer2 = new SequentialJsonWriter(goodFile, () => ({
+      recovered: true,
+    }));
     writer2.schedule();
     await writer2.flush();
 
@@ -58,8 +87,26 @@ describe('SequentialJsonWriter', () => {
     expect(JSON.parse(content)).toEqual({ recovered: true });
   });
 
+  test('strict flush rejects failed persistence and recovers after a later successful write', async () => {
+    let fail = true;
+    const writer = new SequentialJsonWriter(testFile, () => {
+      if (fail) throw new Error('receipt disk unavailable');
+      return { receipt: 'persisted' };
+    });
+    writer.schedule();
+    await expect(writer.flush(true)).rejects.toThrow('receipt disk unavailable');
+    fail = false;
+    writer.schedule();
+    await writer.flush(true);
+    expect(JSON.parse(readFileSync(testFile, 'utf8'))).toEqual({ receipt: 'persisted' });
+  });
+
   test('writes encrypted data when encryption key is provided', async () => {
-    const writer = new SequentialJsonWriter(testFile, () => ({ secret: 'value' }), 'my-key');
+    const writer = new SequentialJsonWriter(
+      testFile,
+      () => ({ secret: 'value' }),
+      'my-key',
+    );
     writer.schedule();
     await writer.flush();
 
@@ -122,14 +169,16 @@ describe('SequentialJsonWriter', () => {
     await writer.flush();
 
     const tempPrefix = `.${basename(testFile)}.`;
-    const leftovers = readdirSync(tmpdir()).filter((name) =>
-      name.startsWith(tempPrefix) && name.endsWith('.tmp')
+    const leftovers = readdirSync(tmpdir()).filter(
+      (name) => name.startsWith(tempPrefix) && name.endsWith('.tmp'),
     );
     expect(leftovers).toEqual([]);
   });
 
   test('failed write leaves previous file content intact', async () => {
-    const goodWriter = new SequentialJsonWriter(testFile, () => ({ version: 'old' }));
+    const goodWriter = new SequentialJsonWriter(testFile, () => ({
+      version: 'old',
+    }));
     goodWriter.schedule();
     await goodWriter.flush();
 
@@ -144,11 +193,18 @@ describe('SequentialJsonWriter', () => {
   });
 });
 
-describe('SequentialJsonWriter — debounce mode', () => {
-  const testFile = join(tmpdir(), `sjw-debounce-${process.pid}-${Date.now()}.json`);
+describe('SequentialJsonWriter: debounce mode', () => {
+  const testFile = join(
+    tmpdir(),
+    `sjw-debounce-${process.pid}-${Date.now()}.json`,
+  );
 
   afterEach(() => {
-    try { if (existsSync(testFile)) unlinkSync(testFile); } catch { /* ignore */ }
+    try {
+      if (existsSync(testFile)) unlinkSync(testFile);
+    } catch {
+      /* ignore */
+    }
   });
 
   test('rapid schedule() calls coalesce into a single write', async () => {
@@ -156,25 +212,35 @@ describe('SequentialJsonWriter — debounce mode', () => {
     let value = 0;
     const writer = new SequentialJsonWriter(
       testFile,
-      () => { writeCount++; return { value }; },
+      () => {
+        writeCount++;
+        return { value };
+      },
       undefined,
       50,
     );
 
-    value = 1; writer.schedule();
-    value = 2; writer.schedule();
-    value = 3; writer.schedule();
+    value = 1;
+    writer.schedule();
+    value = 2;
+    writer.schedule();
+    value = 3;
+    writer.schedule();
 
     await writer.flush();
 
     const content = readFileSync(testFile, 'utf8');
     expect(JSON.parse(content)).toEqual({ value: 3 });
-    // Snapshot called once (coalesced)
     expect(writeCount).toBe(1);
   });
 
   test('flush() cancels pending debounce and writes immediately', async () => {
-    const writer = new SequentialJsonWriter(testFile, () => ({ flushed: true }), undefined, 5000);
+    const writer = new SequentialJsonWriter(
+      testFile,
+      () => ({ flushed: true }),
+      undefined,
+      5000,
+    );
 
     writer.schedule(); // would fire in 5 s
     await writer.flush(); // must complete immediately
@@ -183,25 +249,36 @@ describe('SequentialJsonWriter — debounce mode', () => {
     expect(JSON.parse(content)).toEqual({ flushed: true });
   });
 
-  test('destroy() cancels pending debounce — no file created', async () => {
-    const writer = new SequentialJsonWriter(testFile, () => ({ written: true }), undefined, 5000);
+  test('destroy() cancels pending debounce: no file created', async () => {
+    const writer = new SequentialJsonWriter(
+      testFile,
+      () => ({ written: true }),
+      undefined,
+      5000,
+    );
 
     writer.schedule(); // would fire in 5 s
     writer.destroy();
 
-    // Give the timer time to fire (it should not)
     await new Promise((r) => setTimeout(r, 100));
     expect(existsSync(testFile)).toBe(false);
   });
 
   test('two separate debounce windows produce two writes', async () => {
     let counter = 0;
-    const writer = new SequentialJsonWriter(testFile, () => ({ v: counter }), undefined, 30);
+    const writer = new SequentialJsonWriter(
+      testFile,
+      () => ({ v: counter }),
+      undefined,
+      30,
+    );
 
-    counter = 1; writer.schedule();
+    counter = 1;
+    writer.schedule();
     await writer.flush();
 
-    counter = 2; writer.schedule();
+    counter = 2;
+    writer.schedule();
     await writer.flush();
 
     const content = readFileSync(testFile, 'utf8');

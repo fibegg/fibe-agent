@@ -1,8 +1,16 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsUUID } from 'class-validator';
 
 export class SendMessageDto {
   @IsString()
   text!: string;
+
+  @IsOptional()
+  @IsUUID()
+  requestId?: string;
+
+  @IsOptional()
+  @IsUUID()
+  storeGeneration?: string;
 
   @IsOptional()
   @IsString()

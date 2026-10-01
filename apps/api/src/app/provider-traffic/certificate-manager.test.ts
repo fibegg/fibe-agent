@@ -46,11 +46,9 @@ describe('CertificateManager', () => {
     const leafCert = forge.pki.certificateFromPem(leaf.cert);
     expect(leafCert.subject.getField('CN')?.value).toBe('api.anthropic.com');
 
-    // Verify signed by CA
     const caCert = forge.pki.certificateFromPem(manager.getCaCertPem());
     expect(caCert.verify(leafCert)).toBe(true);
 
-    // Verify SAN
     const sanExt = leafCert.getExtension('subjectAltName') as {
       altNames?: { type: number; value: string }[];
     } | null;

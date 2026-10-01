@@ -1,6 +1,9 @@
 import { memo } from 'react';
 import type { ReactNode } from 'react';
-import { FileExplorer, type PlaygroundEntry } from '../file-explorer/file-explorer';
+import {
+  FileExplorer,
+  type PlaygroundEntry,
+} from '../file-explorer/file-explorer';
 import type { FileTab, TabStats } from '../file-explorer/file-explorer-tabs';
 import { SIDEBAR_COLLAPSED_WIDTH_PX } from '../layout-constants';
 import { PanelResizeHandle } from '../panel-resize-handle';
@@ -40,7 +43,7 @@ interface ChatLeftPanelProps {
   playgroundSelector?: ReactNode;
   playgroundServices?: PlaygroundPreviewService[];
   onServicePreview?: (service: PlaygroundPreviewService) => void;
-  // Conversation sidebar — always shown when panel is open
+  // Conversation sidebar: always shown when panel is open
   conversations?: ConversationMeta[];
   conversationsLoading?: boolean;
   activeConversationId?: string;
@@ -99,7 +102,8 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
   // Conversations are shown as long as the panel isn't in collapsed icon-rail mode
   // and the necessary props are wired up. When there are no files, conversations
   // take the full height so progress is always trackable.
-  const showConversations = !isCollapsed && conversations !== undefined && !!onConversationSelect;
+  const showConversations =
+    !isCollapsed && conversations !== undefined && !!onConversationSelect;
   const hasFileSection = hasAnyFiles || Boolean(playgroundSelector);
 
   const panelWidth = isCollapsed ? SIDEBAR_COLLAPSED_WIDTH_PX : width;
@@ -112,7 +116,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
     >
       {/* overflow-visible is required so the PanelResizeHandle and SidebarToggle render correctly */}
       <aside className="flex min-h-0 flex-1 flex-col overflow-visible relative border-r border-border/20">
-        {/* File explorer — takes available space above conversations.
+        {/* File explorer: takes available space above conversations.
             hideSidebarToggle suppresses the toggle inside FileExplorer so we
             can render it here on the aside and center it over the full height. */}
         {(hasFileSection || isCollapsed) && (
@@ -144,11 +148,15 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
           </div>
         )}
 
-        {/* Conversations — pinned to the bottom half of the panel */}
+        {/* Conversations: pinned to the bottom half of the panel */}
         {showConversations && (
           <div
             className="shrink-0 border-t border-border overflow-hidden flex flex-col"
-            style={conversationsCollapsed ? undefined : { height: hasFileSection ? '45%' : '100%', minHeight: 180 }}
+            style={
+              conversationsCollapsed
+                ? undefined
+                : { height: hasFileSection ? '45%' : '100%', minHeight: 180 }
+            }
           >
             <ConversationSidebar
               conversations={conversations}
@@ -164,7 +172,7 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
           </div>
         )}
 
-        {/* Collapse/expand toggle — absolute on the aside so it centers over
+        {/* Collapse/expand toggle: absolute on the aside so it centers over
             the FULL panel height (file explorer + conversations combined) */}
         {hasAnyFiles && onToggleCollapse && !hideToggle && (
           <SidebarToggle
@@ -172,12 +180,14 @@ export const ChatLeftPanel = memo(function ChatLeftPanel({
             onClick={onToggleCollapse}
             side="left"
             ariaLabel={
-              isCollapsed ? t('fileExplorer.expand') : t('fileExplorer.collapse')
+              isCollapsed
+                ? t('fileExplorer.expand')
+                : t('fileExplorer.collapse')
             }
           />
         )}
 
-        {/* Resize handle — must be inside overflow-visible aside */}
+        {/* Resize handle: must be inside overflow-visible aside */}
         {!isCollapsed && (
           <PanelResizeHandle
             side="left"

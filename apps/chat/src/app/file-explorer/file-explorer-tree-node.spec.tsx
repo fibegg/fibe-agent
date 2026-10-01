@@ -1,4 +1,3 @@
-// TreeNode – file-explorer-tree-node.spec.tsx
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { TreeNode } from './file-explorer-tree-node';
@@ -8,7 +7,6 @@ vi.mock('../file-icon', () => ({
   FileIcon: () => <span data-testid="file-icon" />,
 }));
 
-// Mock scrollIntoView as it's not available in JSDOM
 HTMLElement.prototype.scrollIntoView = vi.fn();
 
 const fileEntry: PlaygroundEntry = {
@@ -46,9 +44,8 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
-    // Use getAllByText since the file name also appears in the button text
     const matches = screen.getAllByText('index.ts');
     expect(matches.length).toBeGreaterThan(0);
   });
@@ -63,7 +60,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTestId('file-icon')).toBeTruthy();
   });
@@ -78,7 +75,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     // ChevronRight is shown when collapsed and has children
     const svgs = container.querySelectorAll('svg');
@@ -95,7 +92,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     const svgs = container.querySelectorAll('svg');
     expect(svgs.length).toBeGreaterThan(0);
@@ -112,7 +109,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={onToggle}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button'));
     expect(onToggle).toHaveBeenCalledWith('/root/src');
@@ -130,7 +127,7 @@ describe('TreeNode', () => {
         animType={undefined}
         onToggle={vi.fn()}
         onFileClick={onFileClick}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button'));
     expect(onFileClick).toHaveBeenCalledWith(fileEntry);
@@ -147,9 +144,8 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={onToggle}
-      />
+      />,
     );
-    // Should not throw
     expect(() => fireEvent.click(screen.getByRole('button'))).not.toThrow();
     expect(onToggle).not.toHaveBeenCalled();
   });
@@ -164,7 +160,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     const btn = container.querySelector('button');
     expect(btn?.className).toContain('bg-primary/10');
@@ -180,7 +176,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
 
     const button = screen.getByRole('button');
@@ -198,7 +194,7 @@ describe('TreeNode', () => {
         isDirty={true}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     const dot = screen.getByTitle('Unsaved changes');
     expect(dot).toBeTruthy();
@@ -214,13 +210,16 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(screen.queryByTitle('Unsaved changes')).toBeNull();
   });
 
   it('shows status dot for modified git status', () => {
-    const modifiedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'modified' };
+    const modifiedEntry: PlaygroundEntry = {
+      ...fileEntry,
+      gitStatus: 'modified',
+    };
     render(
       <TreeNode
         entry={modifiedEntry}
@@ -230,14 +229,17 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTitle('Git: modified')).toBeTruthy();
     expect(screen.queryByText('M')).toBeNull();
   });
 
   it('shows status dot for untracked git status', () => {
-    const untrackedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'untracked' };
+    const untrackedEntry: PlaygroundEntry = {
+      ...fileEntry,
+      gitStatus: 'untracked',
+    };
     render(
       <TreeNode
         entry={untrackedEntry}
@@ -247,7 +249,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTitle('Git: untracked')).toBeTruthy();
     expect(screen.queryByText('U')).toBeNull();
@@ -264,14 +266,17 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTitle('Git: added')).toBeTruthy();
     expect(screen.queryByText('U')).toBeNull();
   });
 
   it('shows status dot for deleted git status', () => {
-    const deletedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'deleted' };
+    const deletedEntry: PlaygroundEntry = {
+      ...fileEntry,
+      gitStatus: 'deleted',
+    };
     render(
       <TreeNode
         entry={deletedEntry}
@@ -281,14 +286,17 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByTitle('Git: deleted')).toBeTruthy();
     expect(screen.queryByText('D')).toBeNull();
   });
 
   it('applies name color class for git modified', () => {
-    const modifiedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'modified' };
+    const modifiedEntry: PlaygroundEntry = {
+      ...fileEntry,
+      gitStatus: 'modified',
+    };
     render(
       <TreeNode
         entry={modifiedEntry}
@@ -298,16 +306,18 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
-    // The name span has the amber color class
     const nameSpans = screen.getAllByText('index.ts');
     const nameSpan = nameSpans.find((el) => el.className.includes('truncate'));
     expect(nameSpan?.className).toContain('text-amber-500/90');
   });
 
   it('selected overrides git color for name', () => {
-    const modifiedEntry: PlaygroundEntry = { ...fileEntry, gitStatus: 'modified' };
+    const modifiedEntry: PlaygroundEntry = {
+      ...fileEntry,
+      gitStatus: 'modified',
+    };
     render(
       <TreeNode
         entry={modifiedEntry}
@@ -317,7 +327,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     const nameSpans = screen.getAllByText('index.ts');
     const nameSpan = nameSpans.find((el) => el.className.includes('truncate'));
@@ -335,7 +345,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType="added"
         onToggle={vi.fn()}
-      />
+      />,
     );
     expect(container.firstChild?.toString()).toBeDefined();
     const outerDiv = container.firstChild as HTMLElement;
@@ -352,7 +362,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType="removed"
         onToggle={vi.fn()}
-      />
+      />,
     );
     const outerDiv = container.firstChild as HTMLElement;
     expect(outerDiv.className).toContain('animate-file-removed');
@@ -368,7 +378,7 @@ describe('TreeNode', () => {
         isDirty={false}
         animType="modified"
         onToggle={vi.fn()}
-      />
+      />,
     );
     const outerDiv = container.firstChild as HTMLElement;
     expect(outerDiv?.className).toContain('animate-file-modified');
@@ -384,10 +394,9 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
     const btn = container.querySelector('button');
-    // paddingLeft = 0.5 + 2 * 0.75 = 2rem
     expect(btn?.style.paddingLeft).toBe('2rem');
   });
 
@@ -401,9 +410,8 @@ describe('TreeNode', () => {
         isDirty={false}
         animType={undefined}
         onToggle={vi.fn()}
-      />
+      />,
     );
-    // Should show a placeholder span, not a chevron SVG in the chevron slot
     const chevronSlot = container.querySelector('[aria-hidden="true"] + *');
     expect(chevronSlot).toBeDefined();
   });

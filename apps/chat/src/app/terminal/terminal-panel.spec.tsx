@@ -2,49 +2,52 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TerminalPanel, buildTerminalWsUrl } from './terminal-panel';
 
-// ─── Mock Terminal & addons ────────────────────────────────────────────────────
-
-const mockWrite    = vi.fn();
-const mockDispose  = vi.fn();
-const mockOpen     = vi.fn();
+const mockWrite = vi.fn();
+const mockDispose = vi.fn();
+const mockOpen = vi.fn();
 const mockLoadAddon = vi.fn();
-const mockOnData   = vi.fn().mockReturnValue({ dispose: vi.fn() }) as ReturnType<typeof vi.fn> & ((cb: (data: string) => void) => { dispose: () => void });
+const mockOnData = vi.fn().mockReturnValue({ dispose: vi.fn() }) as ReturnType<
+  typeof vi.fn
+> &
+  ((cb: (data: string) => void) => { dispose: () => void });
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
     cols = 80;
     rows = 24;
-    write     = mockWrite;
-    dispose   = mockDispose;
-    open      = mockOpen;
+    write = mockWrite;
+    dispose = mockDispose;
+    open = mockOpen;
     loadAddon = mockLoadAddon;
-    onData    = mockOnData;
+    onData = mockOnData;
   },
 }));
 
-vi.mock('@xterm/addon-fit',       () => ({ FitAddon:      class { fit = vi.fn(); } }));
-vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {}                 }));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    fit = vi.fn();
+  },
+}));
+vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
 vi.mock('@xterm/xterm/css/xterm.css', () => ({}));
 
 vi.mock('../api-url', () => ({
-  getWsUrl:               vi.fn().mockReturnValue('ws://localhost:3000'),
+  getWsUrl: vi.fn().mockReturnValue('ws://localhost:3000'),
   getAuthTokenForRequest: vi.fn().mockReturnValue(''),
 }));
-
-// ─── Fake WebSocket ────────────────────────────────────────────────────────────
 
 const wsInstances: FakeWebSocket[] = [];
 
 class FakeWebSocket {
   static OPEN = 1;
-  readyState  = FakeWebSocket.OPEN;
-  binaryType  = '';
+  readyState = FakeWebSocket.OPEN;
+  binaryType = '';
   url: string;
-  onopen:    (() => void)                | null = null;
+  onopen: (() => void) | null = null;
   onmessage: ((e: MessageEvent) => void) | null = null;
-  onclose:   (() => void)                | null = null;
-  onerror:   (() => void)                | null = null;
-  send  = vi.fn();
+  onclose: (() => void) | null = null;
+  onerror: (() => void) | null = null;
+  send = vi.fn();
   close = vi.fn();
   constructor(url: string) {
     this.url = url;
@@ -53,16 +56,12 @@ class FakeWebSocket {
 }
 
 class FakeResizeObserver {
-  observe    = vi.fn();
+  observe = vi.fn();
   disconnect = vi.fn();
-  unobserve  = vi.fn();
+  unobserve = vi.fn();
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 const latest = () => wsInstances[wsInstances.length - 1];
-
-// ─── Setup ────────────────────────────────────────────────────────────────────
 
 beforeEach(async () => {
   vi.clearAllMocks();
@@ -70,16 +69,17 @@ beforeEach(async () => {
   // Reset token mock to empty string so tests don't bleed into each other
   const { getAuthTokenForRequest } = await import('../api-url');
   (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('');
-  vi.stubGlobal('WebSocket',             FakeWebSocket);
-  vi.stubGlobal('ResizeObserver',        FakeResizeObserver);
-  vi.stubGlobal('requestAnimationFrame', (cb: () => void) => { cb(); return 0; });
+  vi.stubGlobal('WebSocket', FakeWebSocket);
+  vi.stubGlobal('ResizeObserver', FakeResizeObserver);
+  vi.stubGlobal('requestAnimationFrame', (cb: () => void) => {
+    cb();
+    return 0;
+  });
 });
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
-
-// ─── buildTerminalWsUrl ───────────────────────────────────────────────────────
 
 describe('buildTerminalWsUrl', () => {
   it('returns /ws-terminal URL without token when token is empty', async () => {
@@ -90,12 +90,12 @@ describe('buildTerminalWsUrl', () => {
 
   it('appends token param when token is present', async () => {
     const { getAuthTokenForRequest } = await import('../api-url');
-    (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('abc123');
+    (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue(
+      'abc123',
+    );
     expect(buildTerminalWsUrl()).toContain('token=abc123');
   });
 });
-
-// ─── TerminalPanel rendering ──────────────────────────────────────────────────
 
 describe('TerminalPanel', () => {
   it('renders the bash shell sub-header', () => {
@@ -111,8 +111,6 @@ describe('TerminalPanel', () => {
 
   // Note: close button is now handled by the parent RightDrawer component
 
-  // ── WebSocket lifecycle ─────────────────────────────────────────────────────
-
   it('opens a WebSocket to /ws-terminal on mount', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
     expect(latest().url).toContain('/ws-terminal');
@@ -125,7 +123,9 @@ describe('TerminalPanel', () => {
 
   it('includes token in WebSocket URL when a token is present', async () => {
     const { getAuthTokenForRequest } = await import('../api-url');
-    (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue('secret');
+    (getAuthTokenForRequest as ReturnType<typeof vi.fn>).mockReturnValue(
+      'secret',
+    );
     render(<TerminalPanel onClose={vi.fn()} />);
     expect(latest().url).toContain('token=secret');
   });
@@ -150,8 +150,6 @@ describe('TerminalPanel', () => {
     expect(latest().close).toHaveBeenCalled();
   });
 
-  // ── Incoming messages ───────────────────────────────────────────────────────
-
   it('writes incoming text messages to the terminal', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
     latest().onmessage?.({ data: 'hello world' } as MessageEvent);
@@ -167,21 +165,24 @@ describe('TerminalPanel', () => {
   it('writes session-closed message when WebSocket closes', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
     latest().onclose?.();
-    expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining('Terminal session closed'));
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining('Terminal session closed'),
+    );
   });
 
   it('writes connection-error message when WebSocket errors', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
     latest().onerror?.();
-    expect(mockWrite).toHaveBeenCalledWith(expect.stringContaining('could not connect'));
+    expect(mockWrite).toHaveBeenCalledWith(
+      expect.stringContaining('could not connect'),
+    );
   });
-
-  // ── Keyboard input ──────────────────────────────────────────────────────────
 
   it('sends keyboard input to WebSocket when connection is OPEN', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    // Capture the onData callback registered with the terminal
-    const onDataCb = mockOnData.mock.calls[0]?.[0] as ((d: string) => void) | undefined;
+    const onDataCb = mockOnData.mock.calls[0]?.[0] as
+      | ((d: string) => void)
+      | undefined;
     expect(onDataCb).toBeDefined();
     latest().readyState = FakeWebSocket.OPEN;
     onDataCb?.('ls\r');
@@ -190,7 +191,9 @@ describe('TerminalPanel', () => {
 
   it('does NOT send keyboard input when WebSocket is not OPEN', () => {
     render(<TerminalPanel onClose={vi.fn()} />);
-    const onDataCb = mockOnData.mock.calls[0]?.[0] as ((d: string) => void) | undefined;
+    const onDataCb = mockOnData.mock.calls[0]?.[0] as
+      | ((d: string) => void)
+      | undefined;
     latest().readyState = 3; // CLOSED
     onDataCb?.('ls\r');
     expect(latest().send).not.toHaveBeenCalled();
@@ -203,8 +206,14 @@ describe('TerminalPanel', () => {
 
     const { unmount } = render(<TerminalPanel onClose={vi.fn()} />);
 
-    expect(addEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(addEventListener).toHaveBeenCalledWith(
+      'resize',
+      expect.any(Function),
+    );
     unmount();
-    expect(removeEventListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(removeEventListener).toHaveBeenCalledWith(
+      'resize',
+      expect.any(Function),
+    );
   });
 });

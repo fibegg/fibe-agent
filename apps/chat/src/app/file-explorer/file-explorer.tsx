@@ -1,8 +1,18 @@
 import { Command, Search, Settings, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { API_PATHS } from '@shared/api-paths';
 import { apiRequest } from '../api-url';
-import { PANEL_HEADER_MIN_HEIGHT_PX, REFETCH_WHEN_EMPTY_MS } from '../layout-constants';
+import {
+  PANEL_HEADER_MIN_HEIGHT_PX,
+  REFETCH_WHEN_EMPTY_MS,
+} from '../layout-constants';
 import { shouldHideThemeSwitch } from '../embed-config';
 import { SidebarToggle } from '../sidebar-toggle';
 import { ThemeToggle } from '../theme-toggle';
@@ -32,7 +42,11 @@ import {
 } from './file-explorer-tree-utils';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { FileDetailsDialog } from './file-viewer-panel';
-import { FileExplorerTabs, type FileTab, type TabStats } from './file-explorer-tabs';
+import {
+  FileExplorerTabs,
+  type FileTab,
+  type TabStats,
+} from './file-explorer-tabs';
 import { useWorkspaceDrop } from './use-workspace-drop';
 import { DragDropOverlay } from '../chat/drag-drop-overlay';
 import { useT } from '../i18n';
@@ -47,8 +61,9 @@ export type { PlaygroundEntry } from './file-explorer-types';
 const SIDEBAR_TITLE = 'Agent';
 const SIDEBAR_SUBTITLE = `v${__APP_VERSION__}`;
 
-const isControlledTree = (t: PlaygroundEntry[] | null | undefined): t is PlaygroundEntry[] =>
-  Array.isArray(t);
+const isControlledTree = (
+  t: PlaygroundEntry[] | null | undefined,
+): t is PlaygroundEntry[] => Array.isArray(t);
 
 export function FileExplorer({
   collapsed,
@@ -94,24 +109,15 @@ export function FileExplorer({
   agentWorkspaceAvailable?: boolean;
   playgroundStats?: TabStats;
   agentStats?: TabStats;
-  /** Externally-controlled dirty paths (from parent managing the editor inline) */
   dirtyPaths?: Set<string>;
-  /** Callback for dirty state changes from the internal FileDetailsDialog */
   onDirtyChange?: (path: string, isDirty: boolean) => void;
-  /** Called after files are uploaded to the playground via drag & drop */
   onPlaygroundUploaded?: () => void;
-  /** Called after files are uploaded to the AI workspace via drag & drop */
   onAgentUploaded?: () => void;
-  /** Agent provider label shown in the explorer header. */
   agentProviderLabel?: string;
-  /** Active model shown as muted secondary text in the explorer header. */
   currentModel?: string;
-  /** Optional playground selector rendered inside the file browser chrome. */
   playgroundSelector?: ReactNode;
-  /** Optional service list for opening playground previews in the main pane. */
   playgroundServices?: PlaygroundPreviewService[];
   onServicePreview?: (service: PlaygroundPreviewService) => void;
-  /** Draws the explorer's own right divider when it is not framed by a parent panel. */
   showRightBorder?: boolean;
 } = {}) {
   const t = useT();
@@ -123,9 +129,14 @@ export function FileExplorer({
   const [quickOpen, setQuickOpen] = useState(false);
   const [quickQuery, setQuickQuery] = useState('');
   const [quickSelectedIndex, setQuickSelectedIndex] = useState(0);
-  const [selectedFileLocal, setSelectedFileLocal] = useState<PlaygroundEntry | null>(null);
-  const [animatingPaths, setAnimatingPaths] = useState<Map<string, FileAnimationType>>(new Map());
-  const [animatingPrev, setAnimatingPrev] = useState<PlaygroundEntry[] | null>(null);
+  const [selectedFileLocal, setSelectedFileLocal] =
+    useState<PlaygroundEntry | null>(null);
+  const [animatingPaths, setAnimatingPaths] = useState<
+    Map<string, FileAnimationType>
+  >(new Map());
+  const [animatingPrev, setAnimatingPrev] = useState<PlaygroundEntry[] | null>(
+    null,
+  );
   const [dirtyPaths, setDirtyPaths] = useState<Set<string>>(new Set());
   const prevTreeRef = useRef<PlaygroundEntry[]>([]);
 
@@ -136,22 +147,26 @@ export function FileExplorer({
   const playgroundTree = controlled ? treeProp : internalTree;
   const agentTree = controlledAgent ? agentTreeProp : [];
   const loadingState = controlled ? false : loading;
-  const hasAgentWorkspace = agentWorkspaceAvailable === true || agentTree.length > 0;
+  const hasAgentWorkspace =
+    agentWorkspaceAvailable === true || agentTree.length > 0;
   const playgroundTreeWithMeta = useMemo(
     () => withInheritedGitStatus(withEntrySource(playgroundTree, 'playground')),
-    [playgroundTree]
+    [playgroundTree],
   );
   const agentTreeWithMeta = useMemo(
     () => withInheritedGitStatus(withEntrySource(agentTree, 'agent')),
-    [agentTree]
+    [agentTree],
   );
 
   const showTabs = playgroundTree.length > 0 && hasAgentWorkspace;
   const effectiveTab: FileTab =
-    showTabs && activeTab ? activeTab
-    : hasAgentWorkspace && playgroundTree.length === 0 ? 'agent'
-    : 'playground';
-  const activeTree = effectiveTab === 'agent' ? agentTreeWithMeta : playgroundTreeWithMeta;
+    showTabs && activeTab
+      ? activeTab
+      : hasAgentWorkspace && playgroundTree.length === 0
+        ? 'agent'
+        : 'playground';
+  const activeTree =
+    effectiveTab === 'agent' ? agentTreeWithMeta : playgroundTreeWithMeta;
   const globalTree = useMemo(() => {
     const roots: PlaygroundEntry[] = [];
     if (playgroundTreeWithMeta.length > 0) {
@@ -181,32 +196,45 @@ export function FileExplorer({
     if (raw.startsWith('/api/')) return raw;
 
     const normalized = raw.replace(/^\/+/, '');
-    return normalized.startsWith('api/') ? `/${normalized}` : `/api/${normalized}`;
+    return normalized.startsWith('api/')
+      ? `/${normalized}`
+      : `/api/${normalized}`;
   }, [agentFileApiPath]);
   const agentFileRawApiPath = useMemo(() => {
-    const raw = agentFileContentApiPath.replace(API_PATHS.AGENT_FILES_FILE, API_PATHS.AGENT_FILES_FILE_RAW);
-    return raw === agentFileContentApiPath ? API_PATHS.AGENT_FILES_FILE_RAW : raw;
+    const raw = agentFileContentApiPath.replace(
+      API_PATHS.AGENT_FILES_FILE,
+      API_PATHS.AGENT_FILES_FILE_RAW,
+    );
+    return raw === agentFileContentApiPath
+      ? API_PATHS.AGENT_FILES_FILE_RAW
+      : raw;
   }, [agentFileContentApiPath]);
 
-  const selectedFile = selectedPathProp !== undefined
-    ? (tree.length > 0 ? findEntryByPath(tree, selectedPathProp ?? '') : null)
-    : selectedFileLocal;
+  const selectedFile =
+    selectedPathProp !== undefined
+      ? tree.length > 0
+        ? findEntryByPath(tree, selectedPathProp ?? '')
+        : null
+      : selectedFileLocal;
 
   const [playgroundUrls, setPlaygroundUrls] = useState<string[]>([]);
   const displayServices = useMemo(
-    () => playgroundServices ?? normalizePlaygroundServices(playgroundUrls, 'cli'),
+    () =>
+      playgroundServices ?? normalizePlaygroundServices(playgroundUrls, 'cli'),
     [playgroundServices, playgroundUrls],
   );
 
   const fetchUrls = useCallback(async (signal?: AbortSignal) => {
     try {
-      const urlsRes = await apiRequest('/api/playgrounds/urls', { signal }).catch(() => null);
+      const urlsRes = await apiRequest('/api/playgrounds/urls', {
+        signal,
+      }).catch(() => null);
       if (urlsRes?.ok) {
         const urlData = await urlsRes.json();
         setPlaygroundUrls(Array.isArray(urlData.urls) ? urlData.urls : []);
       }
     } catch {
-      // ignore
+      // Playground URLs are optional; the file tree still works without them.
     }
   }, []);
 
@@ -354,23 +382,26 @@ export function FileExplorer({
         setSelectedFileLocal({ ...entry, source });
       }
     },
-    [effectiveTab, onFileSelect]
+    [effectiveTab, onFileSelect],
   );
 
-  const handleDirtyChange = useCallback((path: string, isDirty: boolean) => {
-    setDirtyPaths((prev) => {
-      const next = new Set(prev);
-      if (isDirty) next.add(path);
-      else next.delete(path);
-      return next;
-    });
-    onDirtyChangeProp?.(path, isDirty);
-  }, [onDirtyChangeProp]);
+  const handleDirtyChange = useCallback(
+    (path: string, isDirty: boolean) => {
+      setDirtyPaths((prev) => {
+        const next = new Set(prev);
+        if (isDirty) next.add(path);
+        else next.delete(path);
+        return next;
+      });
+      onDirtyChangeProp?.(path, isDirty);
+    },
+    [onDirtyChangeProp],
+  );
 
-  // Merge internal and externally-provided dirty paths
-  const effectiveDirtyPaths = dirtyPathsProp && dirtyPathsProp.size > 0
-    ? new Set([...dirtyPaths, ...dirtyPathsProp])
-    : dirtyPaths;
+  const effectiveDirtyPaths =
+    dirtyPathsProp && dirtyPathsProp.size > 0
+      ? new Set([...dirtyPaths, ...dirtyPathsProp])
+      : dirtyPaths;
 
   const displayTree = useMemo(() => {
     if (animatingPaths.size > 0 && animatingPrev) {
@@ -379,8 +410,14 @@ export function FileExplorer({
     return tree;
   }, [tree, animatingPaths, animatingPrev]);
 
-  const filteredTree = useMemo(() => filterTreeByQuery(displayTree, searchQuery), [displayTree, searchQuery]);
-  const flatTree = useMemo(() => flattenTree(filteredTree, expanded), [filteredTree, expanded]);
+  const filteredTree = useMemo(
+    () => filterTreeByQuery(displayTree, searchQuery),
+    [displayTree, searchQuery],
+  );
+  const flatTree = useMemo(
+    () => flattenTree(filteredTree, expanded),
+    [filteredTree, expanded],
+  );
   const quickFiles = useMemo(
     () => flattenFiles([...playgroundTreeWithMeta, ...agentTreeWithMeta]),
     [agentTreeWithMeta, playgroundTreeWithMeta],
@@ -394,19 +431,32 @@ export function FileExplorer({
         if (!query) return { item, index, score: 3 };
         if (name === query) return { item, index, score: 0 };
         if (name.startsWith(query)) return { item, index, score: 1 };
-        if (path.includes(query) || name.includes(query)) return { item, index, score: 2 };
+        if (path.includes(query) || name.includes(query))
+          return { item, index, score: 2 };
         return null;
       })
-      .filter((item): item is { item: typeof quickFiles[number]; index: number; score: number } => item != null);
+      .filter(
+        (
+          item,
+        ): item is {
+          item: (typeof quickFiles)[number];
+          index: number;
+          score: number;
+        } => item != null,
+      );
 
     return scored
-      .sort((a, b) => a.score - b.score || a.item.entry.path.length - b.item.entry.path.length || a.index - b.index)
+      .sort(
+        (a, b) =>
+          a.score - b.score ||
+          a.item.entry.path.length - b.item.entry.path.length ||
+          a.index - b.index,
+      )
       .slice(0, 80)
       .map(({ item }) => item);
   }, [quickFiles, quickQuery]);
   const quickInputRef = useRef<HTMLInputElement>(null);
 
-  // ── Workspace drop zones ──────────────────────────────────────────────────
   const playgroundDrop = useWorkspaceDrop({
     uploadUrl: API_PATHS.PLAYGROUNDS_UPLOAD,
     onUploaded: onPlaygroundUploaded,
@@ -419,7 +469,9 @@ export function FileExplorer({
   });
   const activeDrop = effectiveTab === 'agent' ? agentDrop : playgroundDrop;
   const dropLabel =
-    effectiveTab === 'agent' ? t('fileExplorer.dropAgent') : t('fileExplorer.dropPlayground');
+    effectiveTab === 'agent'
+      ? t('fileExplorer.dropAgent')
+      : t('fileExplorer.dropPlayground');
 
   const parentRef = useRef<HTMLDivElement>(null);
   const virtualizer = useVirtualizer({
@@ -430,7 +482,9 @@ export function FileExplorer({
   });
 
   const openFileEntry =
-    !onFileSelect && selectedFile !== null && selectedFile.type === 'file' ? selectedFile : null;
+    !onFileSelect && selectedFile !== null && selectedFile.type === 'file'
+      ? selectedFile
+      : null;
 
   const openQuickOpen = useCallback(() => {
     if (quickFiles.length === 0) return;
@@ -445,10 +499,13 @@ export function FileExplorer({
     setQuickSelectedIndex(0);
   }, []);
 
-  const selectQuickFile = useCallback((entry: PlaygroundEntry) => {
-    handleFileClick(entry);
-    closeQuickOpen();
-  }, [closeQuickOpen, handleFileClick]);
+  const selectQuickFile = useCallback(
+    (entry: PlaygroundEntry) => {
+      handleFileClick(entry);
+      closeQuickOpen();
+    },
+    [closeQuickOpen, handleFileClick],
+  );
 
   useEffect(() => {
     if (!quickOpen) return;
@@ -474,7 +531,9 @@ export function FileExplorer({
   const rightDividerClass = showRightBorder ? 'border-r border-border/50' : '';
 
   const collapsedContent = (
-    <div className={`flex min-h-0 w-full flex-1 flex-col items-center bg-card/30 pt-3 pb-4 backdrop-blur-xl ${rightDividerClass}`}>
+    <div
+      className={`flex min-h-0 w-full flex-1 flex-col items-center bg-card/30 pt-3 pb-4 backdrop-blur-xl ${rightDividerClass}`}
+    >
       <div className="flex flex-col items-center gap-3">
         {playgroundSelector}
         <button
@@ -492,16 +551,26 @@ export function FileExplorer({
   );
 
   const expandedContent = (
-    <div className={`min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl ${rightDividerClass}`}>
+    <div
+      className={`min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl ${rightDividerClass}`}
+    >
       <div
         className={`border-b border-border/50 bg-gradient-to-br from-primary/10 via-transparent to-secondary/5 backdrop-blur-sm shrink-0 px-4 pb-3`}
-        style={{ minHeight: PANEL_HEADER_MIN_HEIGHT_PX, paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))' }}
+        style={{
+          minHeight: PANEL_HEADER_MIN_HEIGHT_PX,
+          paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
+        }}
       >
-        <div className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}>
+        <div
+          className={`flex items-center justify-between ${HEADER_FIRST_ROW}`}
+        >
           <div className="flex items-center gap-2 min-w-0">
             <div className="min-w-0">
               <div className="flex min-w-0 items-baseline gap-2">
-                <h2 className="font-semibold text-xs sm:text-sm text-foreground truncate" title={titleLabel}>
+                <h2
+                  className="font-semibold text-xs sm:text-sm text-foreground truncate"
+                  title={titleLabel}
+                >
                   {titleLabel}
                 </h2>
                 {modelLabel && (
@@ -513,11 +582,15 @@ export function FileExplorer({
                   </span>
                 )}
               </div>
-              <p className="text-[9px] sm:text-[10px] text-muted-foreground">{SIDEBAR_SUBTITLE}</p>
+              <p className="text-[9px] sm:text-[10px] text-muted-foreground">
+                {SIDEBAR_SUBTITLE}
+              </p>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {playgroundSelector && <div className="shrink-0">{playgroundSelector}</div>}
+            {playgroundSelector && (
+              <div className="shrink-0">{playgroundSelector}</div>
+            )}
             <button
               type="button"
               className={BUTTON_ICON_ACCENT_SM}
@@ -585,7 +658,8 @@ export function FileExplorer({
         {effectiveTab === 'playground' && displayServices.length > 0 && (
           <div className="px-3 pb-2 flex flex-wrap gap-1.5 shrink-0">
             {displayServices.map((service) => {
-              const pillClasses = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20 shadow-sm';
+              const pillClasses =
+                'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] text-[10px] font-medium bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors border border-blue-500/20 shadow-sm';
               const content = (
                 <>
                   <div className="relative flex size-1.5">
@@ -635,7 +709,9 @@ export function FileExplorer({
           )}
           {!loadingState && !error && tree.length === 0 && (
             <div className="px-3 py-4 text-sm text-muted-foreground">
-              {effectiveTab === 'agent' ? t('fileExplorer.emptyAgent') : t('fileExplorer.emptyPlayground')}
+              {effectiveTab === 'agent'
+                ? t('fileExplorer.emptyAgent')
+                : t('fileExplorer.emptyPlayground')}
             </div>
           )}
           {!error && tree.length > 0 && filteredTree.length === 0 && (
@@ -644,7 +720,10 @@ export function FileExplorer({
             </div>
           )}
           {!error && filteredTree.length > 0 && (
-            <div className="px-2 pb-2 pt-0 animate-file-explorer-in" data-testid="file-explorer-tree-list">
+            <div
+              className="px-2 pb-2 pt-0 animate-file-explorer-in"
+              data-testid="file-explorer-tree-list"
+            >
               {isGlobalSearch && (
                 <div className="px-1 pb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground/70">
                   {t('fileExplorer.globalSearch')}
@@ -675,9 +754,12 @@ export function FileExplorer({
                         entry={entry}
                         depth={depth}
                         isExpanded={expanded.has(entry.path)}
-                        isSelected={selectedPathProp !== undefined
-                          ? selectedPathProp === entry.path
-                          : openFileEntry?.path === entry.path && openFileEntry.source === entry.source}
+                        isSelected={
+                          selectedPathProp !== undefined
+                            ? selectedPathProp === entry.path
+                            : openFileEntry?.path === entry.path &&
+                              openFileEntry.source === entry.source
+                        }
                         isDirty={effectiveDirtyPaths?.has(entry.path) ?? false}
                         animType={animatingPaths.get(entry.path)}
                         onToggle={handleToggle}
@@ -710,7 +792,10 @@ export function FileExplorer({
         >
           <div className="w-full max-w-2xl overflow-hidden rounded-lg border border-border bg-background shadow-2xl">
             <div className="relative border-b border-border/60">
-              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+              <Search
+                className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                aria-hidden
+              />
               <input
                 ref={quickInputRef}
                 value={quickQuery}
@@ -723,7 +808,9 @@ export function FileExplorer({
                   }
                   if (event.key === 'ArrowDown') {
                     event.preventDefault();
-                    setQuickSelectedIndex((index) => Math.min(index + 1, quickResults.length - 1));
+                    setQuickSelectedIndex((index) =>
+                      Math.min(index + 1, quickResults.length - 1),
+                    );
                     return;
                   }
                   if (event.key === 'ArrowUp') {
@@ -731,7 +818,10 @@ export function FileExplorer({
                     setQuickSelectedIndex((index) => Math.max(index - 1, 0));
                     return;
                   }
-                  if (event.key === 'Enter' && quickResults[quickSelectedIndex]) {
+                  if (
+                    event.key === 'Enter' &&
+                    quickResults[quickSelectedIndex]
+                  ) {
                     event.preventDefault();
                     selectQuickFile(quickResults[quickSelectedIndex].entry);
                   }
@@ -749,14 +839,19 @@ export function FileExplorer({
                 quickResults.map(({ entry, source }, index) => {
                   const isActive = index === quickSelectedIndex;
                   const isGitModified = entry.gitStatus === 'modified';
-                  const isGitAddedOrUntracked = entry.gitStatus === 'untracked' || entry.gitStatus === 'added';
+                  const isGitAddedOrUntracked =
+                    entry.gitStatus === 'untracked' ||
+                    entry.gitStatus === 'added';
                   const isGitDeleted = entry.gitStatus === 'deleted';
-                  const statusClass =
-                    isGitModified ? 'bg-amber-400'
-                    : isGitAddedOrUntracked ? 'bg-green-400'
-                    : isGitDeleted ? 'bg-red-400'
-                    : entry.gitStatus === 'renamed' ? 'bg-blue-400'
-                    : 'bg-muted-foreground';
+                  const statusClass = isGitModified
+                    ? 'bg-amber-400'
+                    : isGitAddedOrUntracked
+                      ? 'bg-green-400'
+                      : isGitDeleted
+                        ? 'bg-red-400'
+                        : entry.gitStatus === 'renamed'
+                          ? 'bg-blue-400'
+                          : 'bg-muted-foreground';
 
                   return (
                     <button
@@ -765,23 +860,35 @@ export function FileExplorer({
                       onMouseEnter={() => setQuickSelectedIndex(index)}
                       onClick={() => selectQuickFile(entry)}
                       className={`flex h-11 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors ${
-                        isActive ? 'bg-primary/12 text-foreground' : 'text-foreground hover:bg-muted/60'
+                        isActive
+                          ? 'bg-primary/12 text-foreground'
+                          : 'text-foreground hover:bg-muted/60'
                       }`}
                     >
                       <FileIcon pathOrName={entry.name} />
                       <span className="min-w-0 flex-1">
-                        <span className="block truncate font-medium">{entry.name}</span>
-                        <span className="block truncate text-[11px] text-muted-foreground">{entry.path}</span>
+                        <span className="block truncate font-medium">
+                          {entry.name}
+                        </span>
+                        <span className="block truncate text-[11px] text-muted-foreground">
+                          {entry.path}
+                        </span>
                       </span>
                       {entry.gitStatus && (
                         <span
                           className={`size-1.5 shrink-0 rounded-full ${statusClass}`}
-                          title={t('fileEditor.gitStatus', { status: entry.gitStatus })}
-                          aria-label={t('fileEditor.gitStatus', { status: entry.gitStatus })}
+                          title={t('fileEditor.gitStatus', {
+                            status: entry.gitStatus,
+                          })}
+                          aria-label={t('fileEditor.gitStatus', {
+                            status: entry.gitStatus,
+                          })}
                         />
                       )}
                       <span className="shrink-0 rounded-[4px] border border-border/70 px-1.5 py-0.5 text-[10px] uppercase text-muted-foreground">
-                        {source === 'agent' ? t('fileExplorer.aiTab') : t('fileExplorer.playgroundTab')}
+                        {source === 'agent'
+                          ? t('fileExplorer.aiTab')
+                          : t('fileExplorer.playgroundTab')}
                       </span>
                     </button>
                   );
@@ -791,7 +898,9 @@ export function FileExplorer({
           </div>
         </div>
       )}
-      {onToggleCollapse && collapsed !== undefined && (playgroundTree.length > 0 || hasAgentWorkspace) ? (
+      {onToggleCollapse &&
+      collapsed !== undefined &&
+      (playgroundTree.length > 0 || hasAgentWorkspace) ? (
         <div className="relative h-full flex flex-col min-h-0 flex-1">
           {content}
           <SidebarToggle
@@ -810,8 +919,14 @@ export function FileExplorer({
         <FileDetailsDialog
           entry={openFileEntry}
           onClose={() => setSelectedFileLocal(null)}
-          apiBasePath={openFileEntry.source === 'agent' ? agentFileContentApiPath : undefined}
-          rawApiBasePath={openFileEntry.source === 'agent' ? agentFileRawApiPath : undefined}
+          apiBasePath={
+            openFileEntry.source === 'agent'
+              ? agentFileContentApiPath
+              : undefined
+          }
+          rawApiBasePath={
+            openFileEntry.source === 'agent' ? agentFileRawApiPath : undefined
+          }
           onDirtyChange={handleDirtyChange}
         />
       )}

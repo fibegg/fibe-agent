@@ -7,7 +7,7 @@ export function isScrollAtBottom(
   scrollHeight: number,
   scrollTop: number,
   clientHeight: number,
-  thresholdPx: number = SCROLL_AT_BOTTOM_THRESHOLD_PX
+  thresholdPx: number = SCROLL_AT_BOTTOM_THRESHOLD_PX,
 ): boolean {
   return scrollHeight - scrollTop - clientHeight <= thresholdPx;
 }
@@ -45,7 +45,7 @@ export function useScrollToBottom(
     const atBottom = isScrollAtBottom(
       el.scrollHeight,
       el.scrollTop,
-      el.clientHeight
+      el.clientHeight,
     );
     userWasAtBottomRef.current = atBottom;
     const changed = prevAtBottomRef.current !== atBottom;
@@ -77,7 +77,6 @@ export function useScrollToBottom(
       return;
     }
 
-    // Skip the initial mount — there's nothing to scroll to yet
     if (!mountedRef.current) {
       mountedRef.current = true;
       visibleItemCountRef.current = visibleItemCount;
@@ -88,7 +87,6 @@ export function useScrollToBottom(
     visibleItemCountRef.current = visibleItemCount;
 
     if (!userWasAtBottomRef.current && !userJustSentRef.current) {
-      // Scrolled up — count new arrivals
       setNewMessageCount((n) =>
         nextNewMessageCount(
           n,
@@ -100,7 +98,6 @@ export function useScrollToBottom(
       return;
     }
 
-    // Defer past current render so the DOM has finished updating
     const id = setTimeout(() => {
       safeScrollIntoView(endRef.current, { behavior: 'smooth' });
       userJustSentRef.current = false;

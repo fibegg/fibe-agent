@@ -1,18 +1,8 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-/**
- * All settings fibe-agent recognises.
- * Keys are camelCase to keep fibe.yml human-friendly.
- * Every field is optional — unset keys are skipped.
- *
- * MCP config is an object so users can write it inline in YAML
- * instead of escaping a JSON string.
- */
+/** Optional camelCase settings accepted from fibe.yml. */
 export interface FibeSettings {
-  // Agent / auth
   agentPassword?: string;
   agentProvider?: string;
   agentAuthMode?: string;
@@ -35,43 +25,34 @@ export interface FibeSettings {
   corsOrigins?: string;
   frameAncestors?: string;
 
-  // Cascade settings
   cliVersion?: string;
   providerArgs?: Record<string, unknown>;
   skillToggles?: Record<string, unknown>;
   syscheckEnabled?: boolean;
 
-  // Credentials & runtime files (string OR object form — YAML emits objects, legacy uses strings)
   agentCredentialsJson?: string;
   /** Native object form from YAML (preferred). Serialized to JSON for AGENT_CREDENTIALS_JSON. */
   agentCredentials?: Record<string, unknown>;
   agentRuntimeFilesJson?: string;
   /** Native object form from YAML (preferred). Serialized to JSON for AGENT_RUNTIME_FILES_JSON. */
   agentRuntimeFiles?: Record<string, unknown>;
-  /**
-   * Pre-computed credential env vars (CLAUDE_CODE_OAUTH_TOKEN, GEMINI_API_KEY, etc.).
-   * Rails computes these from the credential data and provider mode.
-   * fibe-agent injects them into process.env for native CLI tools.
-   */
+  /** Credential variables precomputed by Rails for native provider CLIs. */
   credentialEnv?: Record<string, string>;
   opencodeConfig?: Record<string, unknown>;
   opencodeConfigJson?: string;
 
-  // MCP
   /** Equivalent to MCP_CONFIG_JSON (object form from YAML). */
   mcpConfig?: { mcpServers: Record<string, unknown> };
   /** Equivalent to MCP_CONFIG_JSON (string form from Rails). */
   mcpConfigJson?: string;
   askUserTimeoutMs?: number;
 
-  // Gemma Router
   gemmaRouterEnabled?: boolean;
   ollamaUrl?: string;
   gemmaModel?: string;
   gemmaConfidenceThreshold?: number;
   gemmaTimeoutMs?: number;
 
-  // UI / Chat
   /** Maximum simultaneous chat websocket connections before the oldest is evicted. */
   websocketMaxConnections?: number | string;
   /** Maximum source image size, in bytes, converted to PNG before OCR. */
@@ -88,8 +69,6 @@ export interface FibeSettings {
   simplicate?: boolean;
 }
 
-// ─── YAML parser ─────────────────────────────────────────────────────────────
-
 import jsYaml from 'js-yaml';
 
 export function parseYaml(content: string): Record<string, unknown> {
@@ -104,11 +83,11 @@ export function parseYaml(content: string): Record<string, unknown> {
   }
 }
 
-// ─── Readers ─────────────────────────────────────────────────────────────────
-
 function yamlCandidates(): string[] {
   const localPath = join(process.cwd(), 'fibe.yml');
-  return localPath === '/app/fibe.yml' ? [localPath] : [localPath, '/app/fibe.yml'];
+  return localPath === '/app/fibe.yml'
+    ? [localPath]
+    : [localPath, '/app/fibe.yml'];
 }
 
 function readYaml(): Record<string, unknown> {
@@ -128,23 +107,20 @@ function readJson(): Record<string, unknown> {
   if (!raw) return {};
   try {
     const v = JSON.parse(raw);
-    if (v && typeof v === 'object' && !Array.isArray(v)) return v as Record<string, unknown>;
-    console.warn('[fibe-settings] FIBE_SETTINGS_JSON must be a JSON object — ignored');
+    if (v && typeof v === 'object' && !Array.isArray(v))
+      return v as Record<string, unknown>;
+    console.warn(
+      '[fibe-settings] FIBE_SETTINGS_JSON must be a JSON object: ignored',
+    );
   } catch (err) {
     console.warn(`[fibe-settings] Cannot parse FIBE_SETTINGS_JSON: ${err}`);
   }
   return {};
 }
 
-// ─── Env promotion ────────────────────────────────────────────────────────────
-
-/**
- * Promotes merged settings into process.env.
- * Existing env vars are NEVER overwritten (individual vars always win).
- */
+/** Promotes settings into unset environment variables. */
 function promoteToEnv(s: FibeSettings): string[] {
   const promotedCredentialEnvKeys: string[] = [];
-  // Only set if the env var is not already present
   const set = (key: string, value: string | null | undefined): boolean => {
     if (value !== undefined && value !== null && !process.env[key]) {
       process.env[key] = value;
@@ -154,12 +130,14 @@ function promoteToEnv(s: FibeSettings): string[] {
   };
   const bool = (v: boolean) => (v ? 'true' : 'false');
 
-  // Agent
   set('AGENT_PASSWORD', s.agentPassword);
   set('AGENT_PROVIDER', s.agentProvider);
   set('AGENT_AUTH_MODE', s.agentAuthMode);
   if (s.modelOptions !== undefined)
-    set('MODEL_OPTIONS', Array.isArray(s.modelOptions) ? s.modelOptions.join(',') : s.modelOptions);
+    set(
+      'MODEL_OPTIONS',
+      Array.isArray(s.modelOptions) ? s.modelOptions.join(',') : s.modelOptions,
+    );
   set('DEFAULT_MODEL', s.defaultModel);
   set('CLAUDE_EFFORT', s.claudeEffort);
   set('DATA_DIR', s.dataDir);
@@ -171,112 +149,137 @@ function promoteToEnv(s: FibeSettings): string[] {
   set('MARQUEE_ROOT', s.marqueeRoot);
   set('MARQUEE_ROOT_DOMAIN', s.marqueeRootDomain);
   set('FIBE_API_KEY', s.fibeApiKey);
-  if (s.fibeSyncEnabled !== undefined) set('FIBE_SYNC_ENABLED', bool(s.fibeSyncEnabled));
+  if (s.fibeSyncEnabled !== undefined)
+    set('FIBE_SYNC_ENABLED', bool(s.fibeSyncEnabled));
   set('POST_INIT_SCRIPT', s.postInitScript);
   set('CORS_ORIGINS', s.corsOrigins);
   set('FRAME_ANCESTORS', s.frameAncestors);
 
-  // Cascade settings
   set('FIBE_CLI_VERSION', s.cliVersion);
-  if (s.providerArgs !== undefined) set('PROVIDER_ARGS', JSON.stringify(s.providerArgs));
-  if (s.skillToggles !== undefined) set('SKILL_TOGGLES', JSON.stringify(s.skillToggles));
-  if (s.syscheckEnabled !== undefined) set('SYSCHECK_ENABLED', bool(s.syscheckEnabled));
+  if (s.providerArgs !== undefined)
+    set('PROVIDER_ARGS', JSON.stringify(s.providerArgs));
+  if (s.skillToggles !== undefined)
+    set('SKILL_TOGGLES', JSON.stringify(s.skillToggles));
+  if (s.syscheckEnabled !== undefined)
+    set('SYSCHECK_ENABLED', bool(s.syscheckEnabled));
 
-  // Credentials & runtime files — accept both string (legacy) and object (YAML-native) forms
-  if (s.agentCredentialsJson !== undefined) set('AGENT_CREDENTIALS_JSON', s.agentCredentialsJson);
-  else if (s.agentCredentials !== undefined) set('AGENT_CREDENTIALS_JSON', JSON.stringify(s.agentCredentials));
-  if (s.agentRuntimeFilesJson !== undefined) set('AGENT_RUNTIME_FILES_JSON', s.agentRuntimeFilesJson);
-  else if (s.agentRuntimeFiles !== undefined) set('AGENT_RUNTIME_FILES_JSON', JSON.stringify(s.agentRuntimeFiles));
+  if (s.agentCredentialsJson !== undefined)
+    set('AGENT_CREDENTIALS_JSON', s.agentCredentialsJson);
+  else if (s.agentCredentials !== undefined)
+    set('AGENT_CREDENTIALS_JSON', JSON.stringify(s.agentCredentials));
+  if (s.agentRuntimeFilesJson !== undefined)
+    set('AGENT_RUNTIME_FILES_JSON', s.agentRuntimeFilesJson);
+  else if (s.agentRuntimeFiles !== undefined)
+    set('AGENT_RUNTIME_FILES_JSON', JSON.stringify(s.agentRuntimeFiles));
 
-  // Credential env — pre-computed by Rails, injected for native CLI tools
   if (s.credentialEnv) {
     for (const [k, v] of Object.entries(s.credentialEnv)) {
       if (set(k, v)) promotedCredentialEnvKeys.push(k);
     }
   }
 
-  if (s.opencodeConfigJson !== undefined) mergeJsonEnv('OPENCODE_CONFIG_CONTENT', s.opencodeConfigJson);
-  else if (s.opencodeConfig !== undefined) mergeJsonEnv('OPENCODE_CONFIG_CONTENT', s.opencodeConfig);
+  if (s.opencodeConfigJson !== undefined)
+    mergeJsonEnv('OPENCODE_CONFIG_CONTENT', s.opencodeConfigJson);
+  else if (s.opencodeConfig !== undefined)
+    mergeJsonEnv('OPENCODE_CONFIG_CONTENT', s.opencodeConfig);
 
-  // MCP — accept both object (mcpConfig) and string (mcpConfigJson) forms
   if (s.mcpConfigJson !== undefined) set('MCP_CONFIG_JSON', s.mcpConfigJson);
-  else if (s.mcpConfig !== undefined) set('MCP_CONFIG_JSON', JSON.stringify(s.mcpConfig));
-  if (s.askUserTimeoutMs !== undefined) set('ASK_USER_TIMEOUT_MS', String(s.askUserTimeoutMs));
+  else if (s.mcpConfig !== undefined)
+    set('MCP_CONFIG_JSON', JSON.stringify(s.mcpConfig));
+  if (s.askUserTimeoutMs !== undefined)
+    set('ASK_USER_TIMEOUT_MS', String(s.askUserTimeoutMs));
 
-  // Gemma Router
-  if (s.gemmaRouterEnabled !== undefined) set('GEMMA_ROUTER_ENABLED', bool(s.gemmaRouterEnabled));
+  if (s.gemmaRouterEnabled !== undefined)
+    set('GEMMA_ROUTER_ENABLED', bool(s.gemmaRouterEnabled));
   set('OLLAMA_URL', s.ollamaUrl);
   set('GEMMA_MODEL', s.gemmaModel);
-  if (s.gemmaConfidenceThreshold !== undefined) set('GEMMA_CONFIDENCE_THRESHOLD', String(s.gemmaConfidenceThreshold));
-  if (s.gemmaTimeoutMs !== undefined) set('GEMMA_TIMEOUT_MS', String(s.gemmaTimeoutMs));
+  if (s.gemmaConfidenceThreshold !== undefined)
+    set('GEMMA_CONFIDENCE_THRESHOLD', String(s.gemmaConfidenceThreshold));
+  if (s.gemmaTimeoutMs !== undefined)
+    set('GEMMA_TIMEOUT_MS', String(s.gemmaTimeoutMs));
 
-  // UI / Chat
-  if (s.websocketMaxConnections !== undefined) set('WEBSOCKET_MAX_CONNECTIONS', String(s.websocketMaxConnections));
-  if (s.ocrConversionMaxBytes !== undefined) set('FIBE_OCR_CONVERSION_MAX_BYTES', String(s.ocrConversionMaxBytes));
-  if (s.ocrConversionMaxOutputBytes !== undefined) set('FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES', String(s.ocrConversionMaxOutputBytes));
+  if (s.websocketMaxConnections !== undefined)
+    set('WEBSOCKET_MAX_CONNECTIONS', String(s.websocketMaxConnections));
+  if (s.ocrConversionMaxBytes !== undefined)
+    set('FIBE_OCR_CONVERSION_MAX_BYTES', String(s.ocrConversionMaxBytes));
+  if (s.ocrConversionMaxOutputBytes !== undefined)
+    set(
+      'FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES',
+      String(s.ocrConversionMaxOutputBytes),
+    );
   set('USER_AVATAR_URL', s.userAvatarUrl);
   set('USER_AVATAR_BASE64', s.userAvatarBase64);
   set('ASSISTANT_AVATAR_URL', s.assistantAvatarUrl);
   set('ASSISTANT_AVATAR_BASE64', s.assistantAvatarBase64);
-  if (s.lockChatModel !== undefined) set('LOCK_CHAT_MODEL', bool(s.lockChatModel));
+  if (s.lockChatModel !== undefined)
+    set('LOCK_CHAT_MODEL', bool(s.lockChatModel));
   if (s.simplicate !== undefined) set('SIMPLICATE', bool(s.simplicate));
 
   return promotedCredentialEnvKeys.sort();
 }
 
-function jsonRecord(value: string | Record<string, unknown> | undefined): Record<string, unknown> {
+function jsonRecord(
+  value: string | Record<string, unknown> | undefined,
+): Record<string, unknown> {
   if (value === undefined) return {};
   if (typeof value !== 'string') return value;
 
   try {
     const parsed = JSON.parse(value);
-    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : {};
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : {};
   } catch {
     return {};
   }
 }
 
-function mergeRecords(base: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+function mergeRecords(
+  base: Record<string, unknown>,
+  patch: Record<string, unknown>,
+): Record<string, unknown> {
   const merged: Record<string, unknown> = { ...base };
   for (const [key, patchValue] of Object.entries(patch)) {
     const baseValue = merged[key];
-    const baseRecord = baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue) ? baseValue as Record<string, unknown> : null;
-    const patchRecord = patchValue && typeof patchValue === 'object' && !Array.isArray(patchValue) ? patchValue as Record<string, unknown> : null;
-    merged[key] = baseRecord && patchRecord ? mergeRecords(baseRecord, patchRecord) : patchValue;
+    const baseRecord =
+      baseValue && typeof baseValue === 'object' && !Array.isArray(baseValue)
+        ? (baseValue as Record<string, unknown>)
+        : null;
+    const patchRecord =
+      patchValue && typeof patchValue === 'object' && !Array.isArray(patchValue)
+        ? (patchValue as Record<string, unknown>)
+        : null;
+    merged[key] =
+      baseRecord && patchRecord
+        ? mergeRecords(baseRecord, patchRecord)
+        : patchValue;
   }
   return merged;
 }
 
-function mergeJsonEnv(key: string, value: string | Record<string, unknown>): void {
+function mergeJsonEnv(
+  key: string,
+  value: string | Record<string, unknown>,
+): void {
   const existing = jsonRecord(process.env[key]);
   const incoming = jsonRecord(value);
   process.env[key] = JSON.stringify(mergeRecords(incoming, existing));
 }
 
-// ─── Public API ───────────────────────────────────────────────────────────────
-
-/**
- * Load and return the merged settings without mutating process.env.
- * Useful for testing and introspection.
- */
+/** Loads merged settings without changing process.env. */
 export function loadFibeSettings(): FibeSettings {
   return { ...readYaml(), ...readJson() } as FibeSettings;
 }
 
 /**
- * Load, merge, and promote fibe settings into process.env.
- *
- * Call once at startup **before** any service reads process.env.
- * Safe to call multiple times — setIfAbsent ensures idempotency.
- *
- * Priority (highest → lowest):
- *   1. Individual env vars (always win)
- *   2. FIBE_SETTINGS_JSON
- *   3. /app/fibe.yml  (or ./fibe.yml in dev)
+ * Promotes merged settings before services start. Existing variables override
+ * FIBE_SETTINGS_JSON, which overrides fibe.yml. Repeated calls are safe.
  */
 export function applyFibeSettings(): void {
   const promotedCredentialEnvKeys = promoteToEnv(loadFibeSettings());
   if (promotedCredentialEnvKeys.length > 0) {
-    console.info(`[fibe-settings] Promoted credential env keys: ${promotedCredentialEnvKeys.join(', ')}`);
+    console.info(
+      `[fibe-settings] Promoted credential env keys: ${promotedCredentialEnvKeys.join(', ')}`,
+    );
   }
 }

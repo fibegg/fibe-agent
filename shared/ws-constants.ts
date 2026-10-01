@@ -19,7 +19,7 @@ export const WS_ACTION = {
   ANSWER_USER_QUESTION: 'answer_user_question',
   /** Reply to a confirm_action_prompt from the agent (yes/no). */
   CONFIRM_ACTION_RESPONSE: 'confirm_action_response',
-  /** Reset the conversation — archives current messages and starts fresh. */
+  /** Reset the conversation: archives current messages and starts fresh. */
   RESET_CONVERSATION: 'reset_conversation',
 } as const;
 
@@ -50,18 +50,18 @@ export const WS_EVENT = {
   ACTIVITY_UPDATED: 'activity_updated',
   PLAYGROUND_CHANGED: 'playground_changed',
   AGENT_MODE_UPDATED: 'agent_mode_updated',
-  /** Agent is asking the operator a question — display an inline input card. */
+  /** Agent is asking the operator a question: display an inline input card. */
   ASK_USER_PROMPT: 'ask_user_prompt',
-  /** Agent needs a yes/no confirmation — display confirm card. */
+  /** Agent needs a yes/no confirmation: display confirm card. */
   CONFIRM_ACTION_PROMPT: 'confirm_action_prompt',
   /** Agent is showing an image inline in the chat thread. */
   SHOW_IMAGE: 'show_image',
   /** Agent sends a non-blocking notification/toast. */
   NOTIFY: 'notify',
   SET_TITLE: 'set_title',
-  /** Conversation was reset — all clients should clear their message list and show a separator. */
+  /** Conversation was reset: all clients should clear their message list and show a separator. */
   CONVERSATION_RESET: 'conversation_reset',
-  /** Emitted to all sessions whenever a client connects or disconnects — carries active session count. */
+  /** Emitted to all sessions whenever a client connects or disconnects: carries active session count. */
   SESSIONS_UPDATED: 'sessions_updated',
   /** Sent to a client right after WS connect to identify which conversation this session is for. */
   CONVERSATION_ID: 'conversation_id',

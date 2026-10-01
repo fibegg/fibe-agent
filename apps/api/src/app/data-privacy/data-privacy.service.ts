@@ -15,7 +15,7 @@ export class DataPrivacyService {
     private readonly messageStore: MessageStoreService,
     private readonly activityStore: ActivityStoreService,
     private readonly modelStore: ModelStoreService,
-    private readonly effortStore: EffortStoreService
+    private readonly effortStore: EffortStoreService,
   ) {}
 
   exportData(): Record<string, unknown> {
@@ -31,12 +31,11 @@ export class DataPrivacyService {
 
   deleteData(): void {
     const dataDir = this.config.getConversationDataDir();
-    
+
     // 1. Clear in-memory stores so they don't rewrite to disk
     this.messageStore.clear();
     this.activityStore.clear();
-    
-    // 2. Erase the directory from disk
+
     try {
       rmSync(dataDir, { recursive: true, force: true });
       this.logger.log(`Deleted user data directory: ${dataDir}`);

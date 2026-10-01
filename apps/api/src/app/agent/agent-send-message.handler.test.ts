@@ -9,8 +9,6 @@ import { handleSendMessage } from './agent-send-message.handler';
 import { ERROR_CODE } from '@shared/ws-constants';
 
 describe('handleSendMessage', () => {
-  // ─── Success paths ──────────────────────────────────────────────────────────
-
   test('returns accepted + messageId when result is accepted', () => {
     const result = handleSendMessage({ accepted: true, messageId: 'msg-123' });
     expect(result.accepted).toBe(true);
@@ -18,7 +16,11 @@ describe('handleSendMessage', () => {
   });
 
   test('includes resolvedPolicy when present', () => {
-    const result = handleSendMessage({ accepted: true, messageId: 'msg-456', resolvedPolicy: 'queue' });
+    const result = handleSendMessage({
+      accepted: true,
+      messageId: 'msg-456',
+      resolvedPolicy: 'queue',
+    });
     expect(result.resolvedPolicy).toBe('queue');
   });
 
@@ -28,50 +30,58 @@ describe('handleSendMessage', () => {
   });
 
   test('omits resolvedPolicy when empty string', () => {
-    const result = handleSendMessage({ accepted: true, messageId: 'msg-000', resolvedPolicy: '' });
+    const result = handleSendMessage({
+      accepted: true,
+      messageId: 'msg-000',
+      resolvedPolicy: '',
+    });
     expect('resolvedPolicy' in result).toBe(false);
   });
 
-  // ─── Error: not accepted ────────────────────────────────────────────────────
-
   test('throws ForbiddenException when error is NEED_AUTH', () => {
-    expect(() => handleSendMessage({ accepted: false, error: ERROR_CODE.NEED_AUTH }))
-      .toThrow(ForbiddenException);
+    expect(() =>
+      handleSendMessage({ accepted: false, error: ERROR_CODE.NEED_AUTH }),
+    ).toThrow(ForbiddenException);
   });
 
   test('throws ConflictException when error is AGENT_BUSY', () => {
-    expect(() => handleSendMessage({ accepted: false, error: ERROR_CODE.AGENT_BUSY }))
-      .toThrow(ConflictException);
+    expect(() =>
+      handleSendMessage({ accepted: false, error: ERROR_CODE.AGENT_BUSY }),
+    ).toThrow(ConflictException);
   });
 
   test('throws NotFoundException when error is "Conversation not found"', () => {
-    expect(() => handleSendMessage({ accepted: false, error: 'Conversation not found' }))
-      .toThrow(NotFoundException);
+    expect(() =>
+      handleSendMessage({ accepted: false, error: 'Conversation not found' }),
+    ).toThrow(NotFoundException);
   });
 
   test('throws BadRequestException for unknown errors', () => {
-    expect(() => handleSendMessage({ accepted: false, error: 'Something unexpected' }))
-      .toThrow(BadRequestException);
+    expect(() =>
+      handleSendMessage({ accepted: false, error: 'Something unexpected' }),
+    ).toThrow(BadRequestException);
   });
 
   test('throws BadRequestException with "Unknown error" when error is undefined', () => {
-    expect(() => handleSendMessage({ accepted: false }))
-      .toThrow(BadRequestException);
+    expect(() => handleSendMessage({ accepted: false })).toThrow(
+      BadRequestException,
+    );
   });
 
-  // ─── Error: accepted but missing messageId ──────────────────────────────────
-
   test('throws BadRequestException when accepted but messageId is undefined', () => {
-    expect(() => handleSendMessage({ accepted: true, messageId: undefined }))
-      .toThrow(BadRequestException);
+    expect(() =>
+      handleSendMessage({ accepted: true, messageId: undefined }),
+    ).toThrow(BadRequestException);
   });
 
   test('throws BadRequestException when accepted but messageId is null', () => {
-    expect(() => handleSendMessage({ accepted: true, messageId: null as unknown as string }))
-      .toThrow(BadRequestException);
+    expect(() =>
+      handleSendMessage({
+        accepted: true,
+        messageId: null as unknown as string,
+      }),
+    ).toThrow(BadRequestException);
   });
-
-  // ─── Exception message content ──────────────────────────────────────────────
 
   test('ForbiddenException message contains NEED_AUTH code', () => {
     try {

@@ -20,7 +20,7 @@ mock.module('node:util', () => {
         return mockExecFileAsync;
       }
       return util.promisify(fn);
-    }
+    },
   };
 });
 
@@ -47,7 +47,10 @@ describe('PlaygroundsService', () => {
     };
   }
 
-  function repoEntry(repoRoot = playgroundDir, overrides: Record<string, unknown> = {}) {
+  function repoEntry(
+    repoRoot = playgroundDir,
+    overrides: Record<string, unknown> = {},
+  ) {
     return {
       id: '1',
       service: 'web',
@@ -61,7 +64,10 @@ describe('PlaygroundsService', () => {
   }
 
   function mockRepoList(repos: Record<string, unknown>[]) {
-    mockExecFileAsync.mockResolvedValue({ stdout: JSON.stringify(repos), stderr: '' });
+    mockExecFileAsync.mockResolvedValue({
+      stdout: JSON.stringify(repos),
+      stderr: '',
+    });
   }
 
   test('getTree returns empty array when directory is empty', async () => {
@@ -133,41 +139,50 @@ describe('PlaygroundsService', () => {
   });
 
   test('getTree returns git status for files in a git repository', async () => {
-    // 1. Initialize a git repository in the playground directory
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@example.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@example.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
 
-    // 2. Create some files
     writeFileSync(join(playgroundDir, 'untracked.txt'), 'untracked');
     writeFileSync(join(playgroundDir, 'tracked.txt'), 'tracked');
     writeFileSync(join(playgroundDir, 'modified.txt'), 'modified');
-    
-    // 3. Mark tracked and modified as tracked by git
-    execSync('git add tracked.txt modified.txt', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git commit -m "initial commit"', { cwd: playgroundDir, stdio: 'ignore' });
-    
-    // 4. Modify 'modified.txt' so git sees it as changed
+
+    execSync('git add tracked.txt modified.txt', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git commit -m "initial commit"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+
     writeFileSync(join(playgroundDir, 'modified.txt'), 'modified-changed');
-    
-    // 5. Check tree output
+
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
     const tree = await service.getTree();
-    
+
     expect(tree.length).toBeGreaterThanOrEqual(3);
-    
-    const untrackedNode = tree.find(n => n.name === 'untracked.txt');
-    const modifiedNode = tree.find(n => n.name === 'modified.txt');
-    const trackedNode = tree.find(n => n.name === 'tracked.txt');
-    
+
+    const untrackedNode = tree.find((n) => n.name === 'untracked.txt');
+    const modifiedNode = tree.find((n) => n.name === 'modified.txt');
+    const trackedNode = tree.find((n) => n.name === 'tracked.txt');
+
     expect(untrackedNode?.gitStatus).toBe('untracked');
     expect(modifiedNode?.gitStatus).toBe('modified');
     expect(trackedNode?.gitStatus).toBeUndefined(); // clean files have no status
   }, 15000);
 
   test('getTree returns empty array when directory does not exist', async () => {
-    const config = { getPlaygroundsDir: () => join(playgroundDir, 'nonexistent') };
+    const config = {
+      getPlaygroundsDir: () => join(playgroundDir, 'nonexistent'),
+    };
     const service = new PlaygroundsService(config as never);
     expect(await service.getTree()).toEqual([]);
   });
@@ -190,20 +205,26 @@ describe('PlaygroundsService', () => {
   test('getFileContent throws NotFoundException for path traversal', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFileContent('../../etc/passwd')).rejects.toThrow(NotFoundException);
+    await expect(service.getFileContent('../../etc/passwd')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   test('getFileContent throws NotFoundException for directory', async () => {
     mkdirSync(join(playgroundDir, 'dir'));
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFileContent('dir')).rejects.toThrow(NotFoundException);
+    await expect(service.getFileContent('dir')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   test('getFileContent throws NotFoundException for missing file', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFileContent('missing.txt')).rejects.toThrow(NotFoundException);
+    await expect(service.getFileContent('missing.txt')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   test('getFileContent throws NotFoundException for path under node_modules or .git', async () => {
@@ -213,16 +234,27 @@ describe('PlaygroundsService', () => {
     writeFileSync(join(playgroundDir, '.git', 'config'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFileContent('node_modules/pkg.js')).rejects.toThrow(NotFoundException);
-    await expect(service.getFileContent('.git/config')).rejects.toThrow(NotFoundException);
+    await expect(service.getFileContent('node_modules/pkg.js')).rejects.toThrow(
+      NotFoundException,
+    );
+    await expect(service.getFileContent('.git/config')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   test('getFileContent throws NotFoundException when path has node_modules or .git as segment', async () => {
-    mkdirSync(join(playgroundDir, 'foo', 'node_modules', 'pkg'), { recursive: true });
-    writeFileSync(join(playgroundDir, 'foo', 'node_modules', 'pkg', 'index.js'), '');
+    mkdirSync(join(playgroundDir, 'foo', 'node_modules', 'pkg'), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(playgroundDir, 'foo', 'node_modules', 'pkg', 'index.js'),
+      '',
+    );
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFileContent('foo/node_modules/pkg/index.js')).rejects.toThrow(NotFoundException);
+    await expect(
+      service.getFileContent('foo/node_modules/pkg/index.js'),
+    ).rejects.toThrow(NotFoundException);
   });
 
   test('getFolderFileContents returns all file contents under folder', async () => {
@@ -238,7 +270,9 @@ describe('PlaygroundsService', () => {
     const paths = result.map((r) => r.path).sort();
     expect(paths).toEqual(['docs/a.md', 'docs/b.md', 'docs/nested/c.txt']);
     expect(result.find((r) => r.path === 'docs/a.md')?.content).toBe('# A');
-    expect(result.find((r) => r.path === 'docs/nested/c.txt')?.content).toBe('C');
+    expect(result.find((r) => r.path === 'docs/nested/c.txt')?.content).toBe(
+      'C',
+    );
   });
 
   test('getFolderFileContents skips node_modules and .git', async () => {
@@ -260,21 +294,30 @@ describe('PlaygroundsService', () => {
     mkdirSync(join(playgroundDir, '.git'), { recursive: true });
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFolderFileContents('node_modules')).rejects.toThrow(NotFoundException);
-    await expect(service.getFolderFileContents('.git')).rejects.toThrow(NotFoundException);
+    await expect(service.getFolderFileContents('node_modules')).rejects.toThrow(
+      NotFoundException,
+    );
+    await expect(service.getFolderFileContents('.git')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   test('getFolderFileContents throws NotFoundException for file path', async () => {
     writeFileSync(join(playgroundDir, 'file.txt'), '');
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.getFolderFileContents('file.txt')).rejects.toThrow(NotFoundException);
+    await expect(service.getFolderFileContents('file.txt')).rejects.toThrow(
+      NotFoundException,
+    );
   });
 
   test('getTree handles symlink to file correctly', async () => {
     const { symlinkSync } = require('node:fs');
     writeFileSync(join(playgroundDir, 'real.txt'), 'content');
-    symlinkSync(join(playgroundDir, 'real.txt'), join(playgroundDir, 'link.txt'));
+    symlinkSync(
+      join(playgroundDir, 'real.txt'),
+      join(playgroundDir, 'link.txt'),
+    );
 
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
@@ -288,7 +331,10 @@ describe('PlaygroundsService', () => {
   test('countStats follows symlinks to files', async () => {
     const { symlinkSync } = require('node:fs');
     writeFileSync(join(playgroundDir, 'real.txt'), 'line1\nline2\n');
-    symlinkSync(join(playgroundDir, 'real.txt'), join(playgroundDir, 'link.txt'));
+    symlinkSync(
+      join(playgroundDir, 'real.txt'),
+      join(playgroundDir, 'link.txt'),
+    );
 
     const config = configFor();
     const service = new PlaygroundsService(config as never);
@@ -310,7 +356,9 @@ describe('PlaygroundsService', () => {
   test('getStats reports hasGitRepo=true when canonical state lists a child repository', async () => {
     const nested = join(playgroundDir, 'project');
     mkdirSync(nested);
-    mockRepoList([repoEntry(nested, { service: 'project', link_path: nested })]);
+    mockRepoList([
+      repoEntry(nested, { service: 'project', link_path: nested }),
+    ]);
     const config = configFor();
     const service = new PlaygroundsService(config as never);
     const stats = await service.getStats();
@@ -320,7 +368,10 @@ describe('PlaygroundsService', () => {
 
   test('getTree does not crash on broken symlinks', async () => {
     const { symlinkSync } = require('node:fs');
-    symlinkSync(join(playgroundDir, 'nonexistent'), join(playgroundDir, 'broken-link'));
+    symlinkSync(
+      join(playgroundDir, 'nonexistent'),
+      join(playgroundDir, 'broken-link'),
+    );
 
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
@@ -332,14 +383,22 @@ describe('PlaygroundsService', () => {
   test('getTree with symlink cycle does not hang or crash (BUG: no cycle detection)', async () => {
     const { symlinkSync } = require('node:fs');
     mkdirSync(join(playgroundDir, 'dir-a'));
-    symlinkSync(join(playgroundDir, 'dir-a'), join(playgroundDir, 'dir-a', 'self-loop'));
+    symlinkSync(
+      join(playgroundDir, 'dir-a'),
+      join(playgroundDir, 'dir-a', 'self-loop'),
+    );
 
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
 
-    const timeout = new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 3000));
+    const timeout = new Promise<'timeout'>((resolve) =>
+      setTimeout(() => resolve('timeout'), 3000),
+    );
     const result = await Promise.race([
-      service.getTree().then(() => 'done' as const).catch(() => 'error' as const),
+      service
+        .getTree()
+        .then(() => 'done' as const)
+        .catch(() => 'error' as const),
       timeout,
     ]);
 
@@ -355,7 +414,9 @@ describe('PlaygroundsService', () => {
   test('saveFileContent rejects path traversal', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never);
-    await expect(service.saveFileContent('../../etc/evil', 'pwned')).rejects.toThrow(NotFoundException);
+    await expect(
+      service.saveFileContent('../../etc/evil', 'pwned'),
+    ).rejects.toThrow(NotFoundException);
   });
 
   test('saveFileContent creates parent directories', async () => {
@@ -366,7 +427,9 @@ describe('PlaygroundsService', () => {
     await service.saveFileContent('new-dir/sub/file.txt', 'content');
 
     const { readFileSync: rfs } = require('node:fs');
-    expect(rfs(join(playgroundDir, 'new-dir', 'sub', 'file.txt'), 'utf8')).toBe('content');
+    expect(rfs(join(playgroundDir, 'new-dir', 'sub', 'file.txt'), 'utf8')).toBe(
+      'content',
+    );
   });
 
   test('collectFileContents handles deeply nested directories without stack overflow', async () => {
@@ -392,8 +455,13 @@ describe('PlaygroundsService', () => {
       getMarqueeRootDomain: () => 'example.test',
     };
     const playroomBrowser = { getCurrentLink: async () => 'project' };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
-    mockExecFileAsync.mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]) });
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
+    mockExecFileAsync.mockResolvedValueOnce({
+      stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]),
+    });
 
     const urls = await service.getUrls();
 
@@ -411,8 +479,12 @@ describe('PlaygroundsService', () => {
       '--playground',
       'project',
     ]);
-    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe('/opt/fibe/playgrounds');
-    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT_DOMAIN).toBe('example.test');
+    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(
+      '/opt/fibe/playgrounds',
+    );
+    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT_DOMAIN).toBe(
+      'example.test',
+    );
   });
 
   test('getUrls uses current playground inferred by the browser service', async () => {
@@ -421,7 +493,10 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => 'alice' };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
         { service: 'api', url: 'http://alice-api.phoenix.test' },
@@ -431,7 +506,10 @@ describe('PlaygroundsService', () => {
 
     const urls = await service.getUrls();
 
-    expect(urls).toEqual(['api|http://alice-api.phoenix.test', 'frontend|http://alice.phoenix.test']);
+    expect(urls).toEqual([
+      'api|http://alice-api.phoenix.test',
+      'frontend|http://alice.phoenix.test',
+    ]);
     expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
       '--output',
@@ -452,7 +530,10 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: mock(async () => 'bob') };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
         { service: 'api', url: 'api-alice.example.test' },
@@ -462,7 +543,10 @@ describe('PlaygroundsService', () => {
 
     const urls = await service.getUrls('alice');
 
-    expect(urls).toEqual(['api|api-alice.example.test', 'frontend|alice.example.test']);
+    expect(urls).toEqual([
+      'api|api-alice.example.test',
+      'frontend|alice.example.test',
+    ]);
     expect(playroomBrowser.getCurrentLink).not.toHaveBeenCalled();
     expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
@@ -484,7 +568,10 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => 'project' };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
         { service: 'api', url: 'api.example.test' },
@@ -495,7 +582,10 @@ describe('PlaygroundsService', () => {
 
     const urls = await service.getUrls();
 
-    expect(urls).toEqual(['api|api.example.test', 'frontend|frontend.example.test']);
+    expect(urls).toEqual([
+      'api|api.example.test',
+      'frontend|frontend.example.test',
+    ]);
   });
 
   test('getUrls accepts a static-only playground as the current selection', async () => {
@@ -504,8 +594,13 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => 'static-site--24' };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
-    mockExecFileAsync.mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]) });
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
+    mockExecFileAsync.mockResolvedValueOnce({
+      stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]),
+    });
 
     const urls = await service.getUrls();
 
@@ -529,17 +624,42 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => null };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
     mockExecFileAsync
-      .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }]) })
-      .mockResolvedValueOnce({ stdout: JSON.stringify([{ service: 'web', url: 'web1.example.test' }]) });
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }]),
+      })
+      .mockResolvedValueOnce({
+        stdout: JSON.stringify([{ service: 'web', url: 'web1.example.test' }]),
+      });
 
     const urls = await service.getUrls();
 
     expect(urls).toEqual(['web|web1.example.test']);
     expect(mockExecFileAsync).toHaveBeenCalledTimes(2);
-    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
-    expect(mockExecFileAsync.mock.calls[1][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'urls', '--playground', '1']);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+      '--output',
+      'json',
+      'local',
+      'playgrounds',
+      'info',
+      '--view',
+      'names',
+    ]);
+    expect(mockExecFileAsync.mock.calls[1][1]).toEqual([
+      '--output',
+      'json',
+      'local',
+      'playgrounds',
+      'info',
+      '--view',
+      'urls',
+      '--playground',
+      '1',
+    ]);
   });
 
   test('getUrls returns empty urls when multiple playgrounds exist without a current link', async () => {
@@ -548,15 +668,30 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => null };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
-    mockExecFileAsync
-      .mockResolvedValueOnce({ stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }, { id: '2', name: 'pg2', playspec: 'spec2' }]) });
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
+    mockExecFileAsync.mockResolvedValueOnce({
+      stdout: JSON.stringify([
+        { id: '1', name: 'pg1', playspec: 'spec1' },
+        { id: '2', name: 'pg2', playspec: 'spec2' },
+      ]),
+    });
 
     const urls = await service.getUrls();
 
     expect(urls).toEqual([]);
     expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
-    expect(mockExecFileAsync.mock.calls[0][1]).toEqual(['--output', 'json', 'local', 'playgrounds', 'info', '--view', 'names']);
+    expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
+      '--output',
+      'json',
+      'local',
+      'playgrounds',
+      'info',
+      '--view',
+      'names',
+    ]);
   });
 
   test('getUrls returns empty array when local playgrounds directory is missing', async () => {
@@ -565,9 +700,18 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => null };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
     const err = new Error('fibe failed') as Error & { stderr: string };
-    err.stderr = JSON.stringify({ error: { code: 'LOCAL_PLAYGROUNDS_DIR_MISSING', status: 404, message: 'missing' } });
+    err.stderr = JSON.stringify({
+      error: {
+        code: 'LOCAL_PLAYGROUNDS_DIR_MISSING',
+        status: 404,
+        message: 'missing',
+      },
+    });
     mockExecFileAsync.mockRejectedValueOnce(err);
 
     expect(await service.getUrls()).toEqual([]);
@@ -579,9 +723,14 @@ describe('PlaygroundsService', () => {
       getMarqueeRoot: () => '/opt/fibe',
     };
     const playroomBrowser = { getCurrentLink: async () => null };
-    const service = new PlaygroundsService(config as never, playroomBrowser as never);
+    const service = new PlaygroundsService(
+      config as never,
+      playroomBrowser as never,
+    );
     mockExecFileAsync.mockRejectedValueOnce(new Error('fibe failed'));
-    const consoleError = mock(() => { /* noop */ });
+    const consoleError = mock(() => {
+      /* noop */
+    });
     const originalConsoleError = console.error;
     console.error = consoleError as unknown as typeof console.error;
 
@@ -611,8 +760,14 @@ describe('PlaygroundsService', () => {
 
   test('getDiff returns hasDiff=false on a clean git repository', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@test.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
     writeFileSync(join(playgroundDir, 'readme.md'), '# hi');
     execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
@@ -630,13 +785,18 @@ describe('PlaygroundsService', () => {
 
   test('getDiff detects modified file and returns diff output', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@test.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
     writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 1;');
     execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
 
-    // Modify the file
     writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 2;');
 
     mockRepoList([repoEntry(playgroundDir)]);
@@ -659,13 +819,18 @@ describe('PlaygroundsService', () => {
     mkdirSync(nested);
     execSync('git init', { cwd: nested, stdio: 'ignore' });
     execSync('git config user.name "Test"', { cwd: nested, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: nested, stdio: 'ignore' });
+    execSync('git config user.email "test@test.com"', {
+      cwd: nested,
+      stdio: 'ignore',
+    });
     writeFileSync(join(nested, 'app.ts'), 'const x = 1;');
     execSync('git add .', { cwd: nested, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: nested, stdio: 'ignore' });
     writeFileSync(join(nested, 'app.ts'), 'const x = 2;');
 
-    mockRepoList([repoEntry(nested, { service: 'project', link_path: nested })]);
+    mockRepoList([
+      repoEntry(nested, { service: 'project', link_path: nested }),
+    ]);
     const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
@@ -678,13 +843,18 @@ describe('PlaygroundsService', () => {
 
   test('getDiff detects untracked file with ? status', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@test.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
     writeFileSync(join(playgroundDir, 'existing.ts'), 'export {};');
     execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
 
-    // Add a new untracked file
     writeFileSync(join(playgroundDir, 'new.ts'), 'export const a = 1;');
 
     mockRepoList([repoEntry(playgroundDir)]);
@@ -703,8 +873,14 @@ describe('PlaygroundsService', () => {
 
   test('getGitFileDiff includes untracked file content', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@test.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
     writeFileSync(join(playgroundDir, 'existing.ts'), 'export {};');
     execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
@@ -723,14 +899,24 @@ describe('PlaygroundsService', () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never, {} as never);
 
-    await expect(service.stageGitFiles(['app.ts'], false)).rejects.toThrow(/confirm=true/);
-    await expect(service.commitGit('test', false)).rejects.toThrow(/confirm=true/);
+    await expect(service.stageGitFiles(['app.ts'], false)).rejects.toThrow(
+      /confirm=true/,
+    );
+    await expect(service.commitGit('test', false)).rejects.toThrow(
+      /confirm=true/,
+    );
   });
 
   test('stageGitFiles and commitGit stage selected files and commit only staged changes', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@test.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
     writeFileSync(join(playgroundDir, 'app.ts'), 'const x = 1;');
     execSync('git add .', { cwd: playgroundDir, stdio: 'ignore' });
     execSync('git commit -m "init"', { cwd: playgroundDir, stdio: 'ignore' });
@@ -746,7 +932,10 @@ describe('PlaygroundsService', () => {
     const commitResult = await service.commitGit('update app', true);
     expect(commitResult.ok).toBe(true);
 
-    const status = execSync('git status --short', { cwd: playgroundDir, encoding: 'utf8' });
+    const status = execSync('git status --short', {
+      cwd: playgroundDir,
+      encoding: 'utf8',
+    });
     expect(status).not.toContain('app.ts');
     expect(status).toContain('skip.ts');
   }, 15000);
@@ -756,13 +945,21 @@ describe('PlaygroundsService', () => {
     mockRepoList([repoEntry(playgroundDir)]);
     const config = configFor();
     const service = new PlaygroundsService(config as never, {} as never);
-    await expect(service.getGitFileDiff('../outside.ts')).rejects.toThrow(/Unsafe git path/);
+    await expect(service.getGitFileDiff('../outside.ts')).rejects.toThrow(
+      /Unsafe git path/,
+    );
   });
 
   test('getDiff handles repository with no commits and includes untracked content', async () => {
     execSync('git init', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.name "Test"', { cwd: playgroundDir, stdio: 'ignore' });
-    execSync('git config user.email "test@test.com"', { cwd: playgroundDir, stdio: 'ignore' });
+    execSync('git config user.name "Test"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
+    execSync('git config user.email "test@test.com"', {
+      cwd: playgroundDir,
+      stdio: 'ignore',
+    });
     writeFileSync(join(playgroundDir, 'file.ts'), 'hello');
 
     mockRepoList([repoEntry(playgroundDir)]);
@@ -770,9 +967,7 @@ describe('PlaygroundsService', () => {
     const service = new PlaygroundsService(config as never, {} as never);
     const result = await service.getDiff();
 
-    // isGitRepo is true since rev-parse succeeded
     expect(result.isGitRepo).toBe(true);
-    // untracked file appears in status
     expect(result.files.some((f) => f.path === 'file.ts')).toBe(true);
     expect(result.diff).toContain('file.ts');
     expect(result.diff).toContain('+hello');
@@ -786,8 +981,18 @@ describe('PlaygroundsService', () => {
     execSync('git init', { cwd: web, stdio: 'ignore' });
     execSync('git init', { cwd: api, stdio: 'ignore' });
     mockRepoList([
-      repoEntry(web, { id: 'web-id', service: 'web', prop: 'web', link_path: web }),
-      repoEntry(api, { id: 'api-id', service: 'api', prop: 'api', link_path: api }),
+      repoEntry(web, {
+        id: 'web-id',
+        service: 'web',
+        prop: 'web',
+        link_path: web,
+      }),
+      repoEntry(api, {
+        id: 'api-id',
+        service: 'api',
+        prop: 'api',
+        link_path: api,
+      }),
     ]);
 
     const service = new PlaygroundsService(configFor() as never, {} as never);
@@ -803,20 +1008,27 @@ describe('PlaygroundsService', () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never, {} as never);
     const buffer = Buffer.from('hello world');
-    
-    const result = await service.uploadFile('sub', '../../../unsafe/file!name.txt', buffer);
-    
-    // basename strips directory, regex replaces ! with _
+
+    const result = await service.uploadFile(
+      'sub',
+      '../../../unsafe/file!name.txt',
+      buffer,
+    );
+
     expect(result).toBe('sub/file_name.txt');
     const { readFileSync: rfs } = require('node:fs');
-    expect(rfs(join(playgroundDir, 'sub', 'file_name.txt'), 'utf8')).toBe('hello world');
+    expect(rfs(join(playgroundDir, 'sub', 'file_name.txt'), 'utf8')).toBe(
+      'hello world',
+    );
   });
 
   test('uploadFile rejects directory traversal in relativeDir', async () => {
     const config = { getPlaygroundsDir: () => playgroundDir };
     const service = new PlaygroundsService(config as never, {} as never);
     const buffer = Buffer.from('test');
-    await expect(service.uploadFile('../outside', 'file.txt', buffer)).rejects.toThrow(NotFoundException);
+    await expect(
+      service.uploadFile('../outside', 'file.txt', buffer),
+    ).rejects.toThrow(NotFoundException);
   });
 
   test('uploadFile reports an unavailable playground root without leaking filesystem errors', async () => {
@@ -825,6 +1037,8 @@ describe('PlaygroundsService', () => {
     const config = { getPlaygroundsDir: () => rootFile };
     const service = new PlaygroundsService(config as never, {} as never);
 
-    await expect(service.uploadFile('', 'file.txt', Buffer.from('test'))).rejects.toThrow(NotFoundException);
+    await expect(
+      service.uploadFile('', 'file.txt', Buffer.from('test')),
+    ).rejects.toThrow(NotFoundException);
   });
 });

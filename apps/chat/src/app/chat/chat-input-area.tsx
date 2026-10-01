@@ -108,7 +108,6 @@ export function ChatInputArea({
     isReady &&
     pendingImages.length + pendingAttachments.length < maxPendingTotal;
 
-  // Resolve the voice error message — translate mic-denied specifically
   const rawVoiceError = voiceRecorder.error;
   const isMicDenied =
     rawVoiceError !== null &&
@@ -131,8 +130,7 @@ export function ChatInputArea({
     <div
       className="shrink-0 p-3 sm:p-4 md:p-6 border-t border-border bg-[var(--pwa-safe-area-bg)]"
       style={{
-        paddingBottom:
-          'max(0.75rem, env(safe-area-inset-bottom, 0px))',
+        paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom, 0px))',
       }}
     >
       <div className="flex flex-col gap-2">

@@ -60,7 +60,7 @@ function getRuntimeConfig(): RuntimeConfig {
   };
 }
 
-describe('RuntimeConfigController — getConfig logic', () => {
+describe('RuntimeConfigController: getConfig logic', () => {
   const envBackup: Record<string, string | undefined> = {};
 
   beforeEach(() => {
@@ -100,13 +100,18 @@ describe('RuntimeConfigController — getConfig logic', () => {
   });
 
   test('returns userAvatarUrl when USER_AVATAR_URL is set', () => {
-    process.env.USER_AVATAR_URL = 'https://avatars.githubusercontent.com/u/3822576?v=4';
-    expect(getRuntimeConfig().userAvatarUrl).toBe('https://avatars.githubusercontent.com/u/3822576?v=4');
+    process.env.USER_AVATAR_URL =
+      'https://avatars.githubusercontent.com/u/3822576?v=4';
+    expect(getRuntimeConfig().userAvatarUrl).toBe(
+      'https://avatars.githubusercontent.com/u/3822576?v=4',
+    );
   });
 
   test('trims whitespace from USER_AVATAR_URL', () => {
     process.env.USER_AVATAR_URL = '  https://example.com/avatar.png  ';
-    expect(getRuntimeConfig().userAvatarUrl).toBe('https://example.com/avatar.png');
+    expect(getRuntimeConfig().userAvatarUrl).toBe(
+      'https://example.com/avatar.png',
+    );
   });
 
   test('returns null when USER_AVATAR_URL is whitespace-only', () => {
@@ -121,7 +126,9 @@ describe('RuntimeConfigController — getConfig logic', () => {
 
   test('returns assistantAvatarUrl when ASSISTANT_AVATAR_URL is set', () => {
     process.env.ASSISTANT_AVATAR_URL = 'https://example.com/bot.png';
-    expect(getRuntimeConfig().assistantAvatarUrl).toBe('https://example.com/bot.png');
+    expect(getRuntimeConfig().assistantAvatarUrl).toBe(
+      'https://example.com/bot.png',
+    );
   });
 
   test('returns assistantAvatarBase64 when ASSISTANT_AVATAR_BASE64 is set', () => {

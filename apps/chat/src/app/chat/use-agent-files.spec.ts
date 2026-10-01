@@ -11,7 +11,10 @@ vi.mock('../api-url', () => ({
 }));
 
 vi.mock('@shared/api-paths', () => ({
-  API_PATHS: { AGENT_FILES: '/agent/files', AGENT_FILES_STATS: '/agent/files/stats' },
+  API_PATHS: {
+    AGENT_FILES: '/agent/files',
+    AGENT_FILES_STATS: '/agent/files/stats',
+  },
 }));
 
 vi.mock('../layout-constants', () => ({
@@ -22,7 +25,6 @@ vi.mock('../layout-constants', () => ({
   persistRightSidebarCollapsed: vi.fn(),
 }));
 
-// Helper: flush all pending microtasks by awaiting multiple promise resolutions
 async function flushAll() {
   await act(async () => {
     await Promise.resolve();
@@ -43,15 +45,25 @@ describe('useAgentFiles', () => {
   });
 
   it('starts with loading=true and empty tree', () => {
-    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
     const { result } = renderHook(() => useAgentFiles());
     expect(result.current.loading).toBe(true);
     expect(result.current.tree).toEqual([]);
   });
 
   it('loads tree data from API', async () => {
-    const fakeTree = [{ name: 'file.ts', path: 'file.ts', type: 'file' as const }];
-    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => fakeTree });
+    const fakeTree = [
+      { name: 'file.ts', path: 'file.ts', type: 'file' as const },
+    ];
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => fakeTree,
+    });
 
     const { result } = renderHook(() => useAgentFiles());
     await flushAll();
@@ -62,7 +74,11 @@ describe('useAgentFiles', () => {
   });
 
   it('returns hasFiles=false when tree is empty', async () => {
-    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
 
     const { result } = renderHook(() => useAgentFiles());
     await flushAll();
@@ -92,8 +108,14 @@ describe('useAgentFiles', () => {
   });
 
   it('does not clear existing tree on network failure', async () => {
-    const fakeTree = [{ name: 'file.ts', path: 'file.ts', type: 'file' as const }];
-    mockApiRequest.mockResolvedValueOnce({ ok: true, status: 200, json: async () => fakeTree });
+    const fakeTree = [
+      { name: 'file.ts', path: 'file.ts', type: 'file' as const },
+    ];
+    mockApiRequest.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => fakeTree,
+    });
 
     const { result } = renderHook(() => useAgentFiles());
     await flushAll();
@@ -130,8 +152,15 @@ describe('useAgentFiles', () => {
   it('fetchStats updates stats when API returns ok', async () => {
     const fakeTree = [{ name: 'a.ts', path: 'a.ts', type: 'file' as const }];
     mockApiRequest
-      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => fakeTree })
-      .mockResolvedValue({ ok: true, json: async () => ({ fileCount: 5, totalLines: 100 }) });
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => fakeTree,
+      })
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({ fileCount: 5, totalLines: 100 }),
+      });
 
     const { result } = renderHook(() => useAgentFiles());
     await flushAll();
@@ -142,7 +171,14 @@ describe('useAgentFiles', () => {
   it('exposes workspace availability from stats', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
-      .mockResolvedValue({ ok: true, json: async () => ({ fileCount: 0, totalLines: 0, workspaceAvailable: true }) });
+      .mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          fileCount: 0,
+          totalLines: 0,
+          workspaceAvailable: true,
+        }),
+      });
 
     const { result } = renderHook(() => useAgentFiles('thread-a'));
     await flushAll();
@@ -154,7 +190,14 @@ describe('useAgentFiles', () => {
   it('resets workspace availability when switching conversations', async () => {
     mockApiRequest
       .mockResolvedValueOnce({ ok: true, status: 200, json: async () => [] })
-      .mockResolvedValueOnce({ ok: true, json: async () => ({ fileCount: 0, totalLines: 0, workspaceAvailable: true }) })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          fileCount: 0,
+          totalLines: 0,
+          workspaceAvailable: true,
+        }),
+      })
       .mockResolvedValue({ ok: true, status: 200, json: async () => [] });
 
     const { result, rerender } = renderHook(
@@ -177,12 +220,15 @@ describe('useAgentFiles', () => {
     const { result } = renderHook(() => useAgentFiles());
     await flushAll();
 
-    // Stats should remain at default
     expect(result.current.stats.fileCount).toBe(0);
   });
 
   it('exposes a refetch function', async () => {
-    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
 
     const { result } = renderHook(() => useAgentFiles());
     await flushAll();
@@ -191,15 +237,24 @@ describe('useAgentFiles', () => {
   });
 
   it('refetches on visibilitychange when visible', async () => {
-    mockApiRequest.mockResolvedValue({ ok: true, status: 200, json: async () => [] });
+    mockApiRequest.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => [],
+    });
 
     renderHook(() => useAgentFiles());
     await flushAll();
 
     const callsBefore = mockApiRequest.mock.calls.length;
 
-    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
-    act(() => { document.dispatchEvent(new Event('visibilitychange')); });
+    Object.defineProperty(document, 'visibilityState', {
+      value: 'visible',
+      configurable: true,
+    });
+    act(() => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
     await flushAll();
 
     expect(mockApiRequest.mock.calls.length).toBeGreaterThan(callsBefore);

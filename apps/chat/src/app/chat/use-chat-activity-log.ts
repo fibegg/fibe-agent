@@ -1,5 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import type { ThinkingStep, ThinkingActivity, ToolOrFileEvent } from './thinking-types';
+import type {
+  ThinkingStep,
+  ThinkingActivity,
+  ToolOrFileEvent,
+} from './thinking-types';
 
 function nextActivityId(): string {
   return `act-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -23,7 +27,7 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
         return next;
       });
     },
-    []
+    [],
   );
 
   const thinkingCallbacks = useMemo(
@@ -84,10 +88,18 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
           {
             id: nextActivityId(),
             type: 'step',
-            message: `${step.title} – ${step.status}`,
-            timestamp: step.timestamp instanceof Date ? step.timestamp : new Date(step.timestamp),
+            message: `${step.title}: ${step.status}`,
+            timestamp:
+              step.timestamp instanceof Date
+                ? step.timestamp
+                : new Date(step.timestamp),
             details: step.details,
-            debug: { id: step.id, title: step.title, status: step.status, details: step.details },
+            debug: {
+              id: step.id,
+              title: step.title,
+              status: step.status,
+              details: step.details,
+            },
           },
         ]);
       },
@@ -108,33 +120,42 @@ export function useChatActivityLog(refetchPlaygrounds: () => void) {
             timestamp: new Date(),
             details:
               event.kind === 'tool_call'
-                ? event.details ?? event.summary
-                : event.summary ?? (event.kind === 'file_created' ? event.path : undefined),
+                ? (event.details ?? event.summary)
+                : (event.summary ??
+                  (event.kind === 'file_created' ? event.path : undefined)),
             command: event.kind === 'tool_call' ? event.command : undefined,
             path: event.path,
-            debug: { kind: event.kind, name: event.name, path: event.path, summary: event.summary },
+            debug: {
+              kind: event.kind,
+              name: event.name,
+              path: event.path,
+              summary: event.summary,
+            },
           },
         ]);
       },
     }),
-    [refetchPlaygrounds, setActivityLogSync]
+    [refetchPlaygrounds, setActivityLogSync],
   );
 
-  const resetForNewStream = useCallback((data?: { model?: string }) => {
-    setReasoningText('');
-    setThinkingSteps([]);
-    reasoningTextRef.current = '';
-    thinkingEntryIdRef.current = null;
-    setActivityLogSync([
-      {
-        id: nextActivityId(),
-        type: 'stream_start',
-        message: 'Response started',
-        timestamp: new Date(),
-        details: data?.model ? `Model: ${data.model}` : undefined,
-      },
-    ]);
-  }, [setActivityLogSync]);
+  const resetForNewStream = useCallback(
+    (data?: { model?: string }) => {
+      setReasoningText('');
+      setThinkingSteps([]);
+      reasoningTextRef.current = '';
+      thinkingEntryIdRef.current = null;
+      setActivityLogSync([
+        {
+          id: nextActivityId(),
+          type: 'stream_start',
+          message: 'Response started',
+          timestamp: new Date(),
+          details: data?.model ? `Model: ${data.model}` : undefined,
+        },
+      ]);
+    },
+    [setActivityLogSync],
+  );
 
   const resetActivityState = useCallback(() => {
     setReasoningText('');

@@ -8,89 +8,94 @@ import { useT } from '../i18n';
 
 import '@xterm/xterm/css/xterm.css';
 
-// ─── Terminal configuration ────────────────────────────────────────────────────
-
 const TERMINAL_OPTIONS = {
-  cursorBlink:      true,
-  fontSize:         13,
-  fontFamily:       '"JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, monospace',
+  cursorBlink: true,
+  fontSize: 13,
+  fontFamily:
+    '"JetBrains Mono", "Fira Code", "Cascadia Code", Menlo, monospace',
   allowProposedApi: true,
-  scrollback:       5000,
+  scrollback: 5000,
   theme: {
-    background:      '#191c14',
-    foreground:      '#e5e2cf',
-    cursor:          '#79d44e',
-    cursorAccent:    '#191c14',
+    background: '#191c14',
+    foreground: '#e5e2cf',
+    cursor: '#79d44e',
+    cursorAccent: '#191c14',
     selectionBackground: '#79d44e55',
-    black:           '#1e293b',
-    red:             '#f87171',
-    green:           '#4ade80',
-    yellow:          '#facc15',
-    blue:            '#818cf8',
-    magenta:         '#c084fc',
-    cyan:            '#22d3ee',
-    white:           '#e2e8f0',
-    brightBlack:     '#475569',
-    brightRed:       '#fca5a5',
-    brightGreen:     '#86efac',
-    brightYellow:    '#fde047',
-    brightBlue:      '#a5b4fc',
-    brightMagenta:   '#d8b4fe',
-    brightCyan:      '#67e8f9',
-    brightWhite:     '#f8fafc',
+    black: '#1e293b',
+    red: '#f87171',
+    green: '#4ade80',
+    yellow: '#facc15',
+    blue: '#818cf8',
+    magenta: '#c084fc',
+    cyan: '#22d3ee',
+    white: '#e2e8f0',
+    brightBlack: '#475569',
+    brightRed: '#fca5a5',
+    brightGreen: '#86efac',
+    brightYellow: '#fde047',
+    brightBlue: '#a5b4fc',
+    brightMagenta: '#d8b4fe',
+    brightCyan: '#67e8f9',
+    brightWhite: '#f8fafc',
   },
 } as const;
 
-/** Build the WebSocket URL for /ws-terminal, appending the auth token if present. */
 export function buildTerminalWsUrl(): string {
   const token = getAuthTokenForRequest();
-  const base   = getWsUrl();
+  const base = getWsUrl();
   return token
     ? `${base}/ws-terminal?token=${encodeURIComponent(token)}`
     : `${base}/ws-terminal`;
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
-
 interface TerminalPanelProps {
-  /** Called when the close button is clicked. Optional — drawer handles close. */
   onClose?: () => void;
 }
 
-export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps) {
+export function TerminalPanel({
+  onClose = () => undefined,
+}: TerminalPanelProps) {
   const t = useT();
-  const containerRef  = useRef<HTMLDivElement | null>(null);
-  const termRef       = useRef<Terminal | null>(null);
-  const fitAddonRef   = useRef<FitAddon | null>(null);
-  const wsRef         = useRef<WebSocket | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const termRef = useRef<Terminal | null>(null);
+  const fitAddonRef = useRef<FitAddon | null>(null);
+  const wsRef = useRef<WebSocket | null>(null);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    // ── xterm.js setup ────────────────────────────────────────────
-    const term      = new Terminal(TERMINAL_OPTIONS);
-    const fitAddon  = new FitAddon();
+    const term = new Terminal(TERMINAL_OPTIONS);
+    const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
     term.open(container);
 
-    termRef.current     = term;
+    termRef.current = term;
     fitAddonRef.current = fitAddon;
 
-    requestAnimationFrame(() => { try { fitAddon.fit(); } catch { /* ignore */ } });
+    requestAnimationFrame(() => {
+      try {
+        fitAddon.fit();
+      } catch {
+        /* ignore */
+      }
+    });
 
-    // ── WebSocket connection ───────────────────────────────────────
     const ws = new WebSocket(buildTerminalWsUrl());
-    wsRef.current   = ws;
-    ws.binaryType   = 'arraybuffer';
+    wsRef.current = ws;
+    ws.binaryType = 'arraybuffer';
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+      ws.send(
+        JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }),
+      );
     };
 
     ws.onmessage = ({ data }) => {
-      term.write(typeof data === 'string' ? data : new Uint8Array(data as ArrayBuffer));
+      term.write(
+        typeof data === 'string' ? data : new Uint8Array(data as ArrayBuffer),
+      );
     };
 
     ws.onclose = () => {
@@ -98,15 +103,15 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
     };
 
     ws.onerror = () => {
-      term.write('\r\n\x1b[31m[WebSocket error — could not connect to terminal]\x1b[0m\r\n');
+      term.write(
+        '\r\n\x1b[31m[WebSocket error: could not connect to terminal]\x1b[0m\r\n',
+      );
     };
 
-    // ── Input → WebSocket ──────────────────────────────────────────
     const onDataDisposable = term.onData((data) => {
       if (ws.readyState === WebSocket.OPEN) ws.send(data);
     });
 
-    // ── Resize observer ────────────────────────────────────────────
     let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
     const doResize = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
@@ -114,14 +119,23 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
         try {
           fitAddon.fit();
           if (ws.readyState === WebSocket.OPEN) {
-            ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+            ws.send(
+              JSON.stringify({
+                type: 'resize',
+                cols: term.cols,
+                rows: term.rows,
+              }),
+            );
           }
-        } catch { /* ignore */ }
+        } catch {
+          /* ignore */
+        }
       }, 50);
     };
-    const ro = typeof ResizeObserver === 'undefined'
-      ? null
-      : new ResizeObserver(doResize);
+    const ro =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(doResize);
     if (ro) {
       ro.observe(container);
     } else {
@@ -140,8 +154,8 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
       onDataDisposable.dispose();
       ws.close();
       term.dispose();
-      wsRef.current     = null;
-      termRef.current   = null;
+      wsRef.current = null;
+      termRef.current = null;
       fitAddonRef.current = null;
     };
   }, []);
@@ -150,7 +164,9 @@ export function TerminalPanel({ onClose = () => undefined }: TerminalPanelProps)
     <div className="flex flex-col h-full min-h-0 bg-[#191c14]">
       {/* ── Sub-header: shell info bar ────────────────────────── */}
       <div className="flex items-center gap-2 px-3 py-1 bg-[#191c14]/90 border-b border-primary/10 shrink-0">
-        <span className="text-[10px] font-medium text-primary/70 tracking-wide">bash</span>
+        <span className="text-[10px] font-medium text-primary/70 tracking-wide">
+          bash
+        </span>
         <span className="text-[10px] text-muted-foreground/40">·</span>
         <span className="text-[10px] text-muted-foreground/50">fibe-agent</span>
       </div>

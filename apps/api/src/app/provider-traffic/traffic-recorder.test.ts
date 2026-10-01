@@ -5,10 +5,20 @@ import type { CapturedProviderRequest } from './types';
 
 function makeRecorder(
   hostname = 'api.anthropic.com',
-  options?: { maxBodySize?: number; redactBodies?: boolean }
-): { recorder: TrafficRecorder; getResult: () => CapturedProviderRequest | null } {
+  options?: { maxBodySize?: number; redactBodies?: boolean },
+): {
+  recorder: TrafficRecorder;
+  getResult: () => CapturedProviderRequest | null;
+} {
   let result: CapturedProviderRequest | null = null;
-  const recorder = new TrafficRecorder(hostname, 443, (record) => { result = record; }, options);
+  const recorder = new TrafficRecorder(
+    hostname,
+    443,
+    (record) => {
+      result = record;
+    },
+    options,
+  );
   return { recorder, getResult: () => result };
 }
 
@@ -18,20 +28,20 @@ describe('TrafficRecorder', () => {
 
     const reqBytes = Buffer.from(
       'POST /v1/messages HTTP/1.1\r\n' +
-      'Host: api.anthropic.com\r\n' +
-      'Content-Type: application/json\r\n' +
-      'Authorization: Bearer sk-secret\r\n' +
-      'Content-Length: 27\r\n' +
-      '\r\n' +
-      '{"model":"claude-sonnet-4-20250514"}'
+        'Host: api.anthropic.com\r\n' +
+        'Content-Type: application/json\r\n' +
+        'Authorization: Bearer sk-secret\r\n' +
+        'Content-Length: 27\r\n' +
+        '\r\n' +
+        '{"model":"claude-sonnet-4-20250514"}',
     );
 
     const resBytes = Buffer.from(
       'HTTP/1.1 200 OK\r\n' +
-      'Content-Type: application/json\r\n' +
-      'Content-Length: 17\r\n' +
-      '\r\n' +
-      '{"result":"done"}'
+        'Content-Type: application/json\r\n' +
+        'Content-Length: 17\r\n' +
+        '\r\n' +
+        '{"result":"done"}',
     );
 
     recorder.feedRequest(reqBytes);
@@ -54,26 +64,30 @@ describe('TrafficRecorder', () => {
   test('handles chunked transfer encoding', () => {
     const { recorder, getResult } = makeRecorder();
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/messages HTTP/1.1\r\n' +
-      'Host: api.anthropic.com\r\n' +
-      'Content-Length: 2\r\n' +
-      '\r\n' +
-      '{}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/messages HTTP/1.1\r\n' +
+          'Host: api.anthropic.com\r\n' +
+          'Content-Length: 2\r\n' +
+          '\r\n' +
+          '{}',
+      ),
+    );
 
-    recorder.feedResponse(Buffer.from(
-      'HTTP/1.1 200 OK\r\n' +
-      'Transfer-Encoding: chunked\r\n' +
-      'Content-Type: text/event-stream\r\n' +
-      '\r\n' +
-      '5\r\n' +
-      'Hello\r\n' +
-      '6\r\n' +
-      ' World\r\n' +
-      '0\r\n' +
-      '\r\n'
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        'HTTP/1.1 200 OK\r\n' +
+          'Transfer-Encoding: chunked\r\n' +
+          'Content-Type: text/event-stream\r\n' +
+          '\r\n' +
+          '5\r\n' +
+          'Hello\r\n' +
+          '6\r\n' +
+          ' World\r\n' +
+          '0\r\n' +
+          '\r\n',
+      ),
+    );
 
     recorder.end();
 
@@ -89,19 +103,21 @@ describe('TrafficRecorder', () => {
     const compressed = gzipSync(Buffer.from(responseBody));
     const headers = Buffer.from(
       'HTTP/1.1 200 OK\r\n' +
-      'Content-Type: application/json\r\n' +
-      'Content-Encoding: gzip\r\n' +
-      `Content-Length: ${compressed.length}\r\n` +
-      '\r\n'
+        'Content-Type: application/json\r\n' +
+        'Content-Encoding: gzip\r\n' +
+        `Content-Length: ${compressed.length}\r\n` +
+        '\r\n',
     );
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/messages HTTP/1.1\r\n' +
-      'Host: api.anthropic.com\r\n' +
-      'Content-Length: 2\r\n' +
-      '\r\n' +
-      '{}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/messages HTTP/1.1\r\n' +
+          'Host: api.anthropic.com\r\n' +
+          'Content-Length: 2\r\n' +
+          '\r\n' +
+          '{}',
+      ),
+    );
     recorder.feedResponse(Buffer.concat([headers, compressed]));
     recorder.end();
 
@@ -111,22 +127,22 @@ describe('TrafficRecorder', () => {
   test('handles streaming data arriving in multiple chunks', () => {
     const { recorder, getResult } = makeRecorder();
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/messages HTTP/1.1\r\n' +
-      'Host: api.anthropic.com\r\n' +
-      'Content-Length: 2\r\n' +
-      '\r\n' +
-      '{}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/messages HTTP/1.1\r\n' +
+          'Host: api.anthropic.com\r\n' +
+          'Content-Length: 2\r\n' +
+          '\r\n' +
+          '{}',
+      ),
+    );
 
-    // Headers arrive first
-    recorder.feedResponse(Buffer.from(
-      'HTTP/1.1 200 OK\r\n' +
-      'Transfer-Encoding: chunked\r\n' +
-      '\r\n'
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        'HTTP/1.1 200 OK\r\n' + 'Transfer-Encoding: chunked\r\n' + '\r\n',
+      ),
+    );
 
-    // Then chunks arrive over time
     recorder.feedResponse(Buffer.from('5\r\nHello\r\n'));
     recorder.feedResponse(Buffer.from('1\r\n \r\n'));
     recorder.feedResponse(Buffer.from('5\r\nWorld\r\n'));
@@ -139,22 +155,25 @@ describe('TrafficRecorder', () => {
   });
 
   test('truncates bodies exceeding max size', () => {
-    const { recorder, getResult } = makeRecorder('api.openai.com', { maxBodySize: 10 });
+    const { recorder, getResult } = makeRecorder('api.openai.com', {
+      maxBodySize: 10,
+    });
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/chat/completions HTTP/1.1\r\n' +
-      'Host: api.openai.com\r\n' +
-      'Content-Length: 20\r\n' +
-      '\r\n' +
-      '12345678901234567890'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/chat/completions HTTP/1.1\r\n' +
+          'Host: api.openai.com\r\n' +
+          'Content-Length: 20\r\n' +
+          '\r\n' +
+          '12345678901234567890',
+      ),
+    );
 
-    recorder.feedResponse(Buffer.from(
-      'HTTP/1.1 200 OK\r\n' +
-      'Content-Length: 5\r\n' +
-      '\r\n' +
-      'short'
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        'HTTP/1.1 200 OK\r\n' + 'Content-Length: 5\r\n' + '\r\n' + 'short',
+      ),
+    );
 
     recorder.end();
 
@@ -165,22 +184,25 @@ describe('TrafficRecorder', () => {
   });
 
   test('redacts bodies when option is set', () => {
-    const { recorder, getResult } = makeRecorder('api.anthropic.com', { redactBodies: true });
+    const { recorder, getResult } = makeRecorder('api.anthropic.com', {
+      redactBodies: true,
+    });
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/messages HTTP/1.1\r\n' +
-      'Host: api.anthropic.com\r\n' +
-      'Content-Length: 13\r\n' +
-      '\r\n' +
-      '{"secret": 1}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/messages HTTP/1.1\r\n' +
+          'Host: api.anthropic.com\r\n' +
+          'Content-Length: 13\r\n' +
+          '\r\n' +
+          '{"secret": 1}',
+      ),
+    );
 
-    recorder.feedResponse(Buffer.from(
-      'HTTP/1.1 200 OK\r\n' +
-      'Content-Length: 4\r\n' +
-      '\r\n' +
-      'data'
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        'HTTP/1.1 200 OK\r\n' + 'Content-Length: 4\r\n' + '\r\n' + 'data',
+      ),
+    );
 
     recorder.end();
 
@@ -192,20 +214,21 @@ describe('TrafficRecorder', () => {
   test('records error on abnormal end', () => {
     const { recorder, getResult } = makeRecorder();
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/messages HTTP/1.1\r\n' +
-      'Host: api.anthropic.com\r\n' +
-      'Content-Length: 2\r\n' +
-      '\r\n' +
-      '{}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/messages HTTP/1.1\r\n' +
+          'Host: api.anthropic.com\r\n' +
+          'Content-Length: 2\r\n' +
+          '\r\n' +
+          '{}',
+      ),
+    );
 
-    // Response headers arrive but stream is interrupted
-    recorder.feedResponse(Buffer.from(
-      'HTTP/1.1 200 OK\r\n' +
-      'Transfer-Encoding: chunked\r\n' +
-      '\r\n'
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        'HTTP/1.1 200 OK\r\n' + 'Transfer-Encoding: chunked\r\n' + '\r\n',
+      ),
+    );
 
     recorder.end('client_disconnected');
 
@@ -216,10 +239,16 @@ describe('TrafficRecorder', () => {
 
   test('only emits once even if end() called multiple times', () => {
     let callCount = 0;
-    const recorder = new TrafficRecorder('api.anthropic.com', 443, () => { callCount++; });
+    const recorder = new TrafficRecorder('api.anthropic.com', 443, () => {
+      callCount++;
+    });
 
-    recorder.feedRequest(Buffer.from('GET / HTTP/1.1\r\nHost: api.anthropic.com\r\n\r\n'));
-    recorder.feedResponse(Buffer.from('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'));
+    recorder.feedRequest(
+      Buffer.from('GET / HTTP/1.1\r\nHost: api.anthropic.com\r\n\r\n'),
+    );
+    recorder.feedResponse(
+      Buffer.from('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'),
+    );
 
     recorder.end();
     recorder.end();
@@ -241,13 +270,17 @@ describe('TrafficRecorder', () => {
       'event: message_stop\n' +
       'data: {"type":"message_stop"}\n\n';
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/messages HTTP/1.1\r\nHost: api.anthropic.com\r\nContent-Length: 2\r\n\r\n{}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/messages HTTP/1.1\r\nHost: api.anthropic.com\r\nContent-Length: 2\r\n\r\n{}',
+      ),
+    );
 
-    recorder.feedResponse(Buffer.from(
-      `HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: ${Buffer.byteLength(sseBody)}\r\n\r\n${sseBody}`
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        `HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: ${Buffer.byteLength(sseBody)}\r\n\r\n${sseBody}`,
+      ),
+    );
 
     recorder.end();
 
@@ -266,13 +299,17 @@ describe('TrafficRecorder', () => {
       'data: {"choices":[],"usage":{"prompt_tokens":80,"completion_tokens":15}}\n\n' +
       'data: [DONE]\n\n';
 
-    recorder.feedRequest(Buffer.from(
-      'POST /v1/chat/completions HTTP/1.1\r\nHost: api.openai.com\r\nContent-Length: 2\r\n\r\n{}'
-    ));
+    recorder.feedRequest(
+      Buffer.from(
+        'POST /v1/chat/completions HTTP/1.1\r\nHost: api.openai.com\r\nContent-Length: 2\r\n\r\n{}',
+      ),
+    );
 
-    recorder.feedResponse(Buffer.from(
-      `HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: ${Buffer.byteLength(sseBody)}\r\n\r\n${sseBody}`
-    ));
+    recorder.feedResponse(
+      Buffer.from(
+        `HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nContent-Length: ${Buffer.byteLength(sseBody)}\r\n\r\n${sseBody}`,
+      ),
+    );
 
     recorder.end();
 
@@ -293,8 +330,12 @@ describe('TrafficRecorder', () => {
 
     for (const [hostname, expected] of domains) {
       const { recorder, getResult } = makeRecorder(hostname);
-      recorder.feedRequest(Buffer.from(`GET / HTTP/1.1\r\nHost: ${hostname}\r\n\r\n`));
-      recorder.feedResponse(Buffer.from('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'));
+      recorder.feedRequest(
+        Buffer.from(`GET / HTTP/1.1\r\nHost: ${hostname}\r\n\r\n`),
+      );
+      recorder.feedResponse(
+        Buffer.from('HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n'),
+      );
       recorder.end();
       expect(getResult()?.provider).toBe(expected);
     }

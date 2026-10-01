@@ -2,19 +2,32 @@ import { describe, it, test, expect, beforeEach, afterEach } from 'bun:test';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { parseYaml, loadFibeSettings, applyFibeSettings } from './fibe-settings';
-
-// ─── parseYaml ───────────────────────────────────────────────────────────────
+import {
+  parseYaml,
+  loadFibeSettings,
+  applyFibeSettings,
+} from './fibe-settings';
 
 describe('parseYaml', () => {
   it('parses flat string scalars', () => {
-    const result = parseYaml('agentProvider: gemini\nollamaUrl: http://localhost:11434\n');
-    expect(result).toEqual({ agentProvider: 'gemini', ollamaUrl: 'http://localhost:11434' });
+    const result = parseYaml(
+      'agentProvider: gemini\nollamaUrl: http://localhost:11434\n',
+    );
+    expect(result).toEqual({
+      agentProvider: 'gemini',
+      ollamaUrl: 'http://localhost:11434',
+    });
   });
 
   it('parses boolean scalars', () => {
-    const result = parseYaml('gemmaRouterEnabled: true\nlockChatModel: false\nsimplicate: true\n');
-    expect(result).toEqual({ gemmaRouterEnabled: true, lockChatModel: false, simplicate: true });
+    const result = parseYaml(
+      'gemmaRouterEnabled: true\nlockChatModel: false\nsimplicate: true\n',
+    );
+    expect(result).toEqual({
+      gemmaRouterEnabled: true,
+      lockChatModel: false,
+      simplicate: true,
+    });
   });
 
   it('parses integer scalars', () => {
@@ -43,12 +56,18 @@ describe('parseYaml', () => {
   });
 
   it('parses nested objects', () => {
-    const result = parseYaml('mcpConfig:\n  serverUrl: https://mcp.example.com\n  auth: Bearer token\n');
-    expect(result).toEqual({ mcpConfig: { serverUrl: 'https://mcp.example.com', auth: 'Bearer token' } });
+    const result = parseYaml(
+      'mcpConfig:\n  serverUrl: https://mcp.example.com\n  auth: Bearer token\n',
+    );
+    expect(result).toEqual({
+      mcpConfig: { serverUrl: 'https://mcp.example.com', auth: 'Bearer token' },
+    });
   });
 
   it('parses scalar arrays', () => {
-    const result = parseYaml('modelOptions:\n  - flash-lite\n  - flash\n  - pro\n');
+    const result = parseYaml(
+      'modelOptions:\n  - flash-lite\n  - flash\n  - pro\n',
+    );
     expect(result).toEqual({ modelOptions: ['flash-lite', 'flash', 'pro'] });
   });
 
@@ -114,9 +133,6 @@ describe('parseYaml', () => {
   });
 });
 
-// ─── Helpers for file-based tests ────────────────────────────────────────────
-
-// ─── loadFibeSettings ────────────────────────────────────────────────────────
 describe('loadFibeSettings', () => {
   const MANAGED = ['FIBE_SETTINGS_JSON'];
   const savedEnv: Record<string, string | undefined> = {};
@@ -128,13 +144,17 @@ describe('loadFibeSettings', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'fibe-settings-'));
     process.chdir(tempDir);
     localYml = join(tempDir, 'fibe.yml');
-    for (const k of MANAGED) { savedEnv[k] = process.env[k]; delete process.env[k]; }
+    for (const k of MANAGED) {
+      savedEnv[k] = process.env[k];
+      delete process.env[k];
+    }
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
     }
     rmSync(tempDir, { recursive: true, force: true });
   });
@@ -144,7 +164,11 @@ describe('loadFibeSettings', () => {
   });
 
   test('reads from FIBE_SETTINGS_JSON', () => {
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock', lockChatModel: true, simplicate: true });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      agentProvider: 'mock',
+      lockChatModel: true,
+      simplicate: true,
+    });
     const result = loadFibeSettings();
     expect(result.agentProvider).toBe('mock');
     expect(result.lockChatModel).toBe(true);
@@ -161,13 +185,15 @@ describe('loadFibeSettings', () => {
     writeFileSync(localYml, 'agentProvider: gemini\ngemmaTimeoutMs: 5000\n');
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ agentProvider: 'mock' });
     const result = loadFibeSettings();
-    expect(result.agentProvider).toBe('mock');     // JSON wins
-    expect(result.gemmaTimeoutMs).toBe(5000);      // YAML fills the gap
+    expect(result.agentProvider).toBe('mock'); // JSON wins
+    expect(result.gemmaTimeoutMs).toBe(5000); // YAML fills the gap
   });
 
   test('FIBE_SETTINGS_JSON wins over YAML on websocketMaxConnections conflict', () => {
     writeFileSync(localYml, 'websocketMaxConnections: 6\n');
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 8 });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      websocketMaxConnections: 8,
+    });
     expect(loadFibeSettings().websocketMaxConnections).toBe(8);
   });
 
@@ -178,35 +204,65 @@ describe('loadFibeSettings', () => {
   });
 
   test('handles missing YAML file gracefully (no file = no error)', () => {
-    // No file written — loader should silently skip
     expect(() => loadFibeSettings()).not.toThrow();
   });
 });
 
-// ─── applyFibeSettings ───────────────────────────────────────────────────────
-
 describe('applyFibeSettings', () => {
   const MANAGED_KEYS = [
     'FIBE_SETTINGS_JSON',
-    'AGENT_PROVIDER', 'AGENT_PASSWORD', 'AGENT_AUTH_MODE', 'MODEL_OPTIONS', 'DEFAULT_MODEL', 'CLAUDE_EFFORT',
-    'DATA_DIR', 'SESSION_DIR', 'SYSTEM_PROMPT', 'ENCRYPTION_KEY', 'FIBE_AGENT_ID', 'CONVERSATION_ID',
-    'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN', 'FIBE_API_KEY', 'POST_INIT_SCRIPT',
-    'USER_AVATAR_URL', 'USER_AVATAR_BASE64',
-    'ASSISTANT_AVATAR_URL', 'ASSISTANT_AVATAR_BASE64',
-    'LOCK_CHAT_MODEL', 'SIMPLICATE',
+    'AGENT_PROVIDER',
+    'AGENT_PASSWORD',
+    'AGENT_AUTH_MODE',
+    'MODEL_OPTIONS',
+    'DEFAULT_MODEL',
+    'CLAUDE_EFFORT',
+    'DATA_DIR',
+    'SESSION_DIR',
+    'SYSTEM_PROMPT',
+    'ENCRYPTION_KEY',
+    'FIBE_AGENT_ID',
+    'CONVERSATION_ID',
+    'MARQUEE_ROOT',
+    'MARQUEE_ROOT_DOMAIN',
+    'FIBE_API_KEY',
+    'POST_INIT_SCRIPT',
+    'USER_AVATAR_URL',
+    'USER_AVATAR_BASE64',
+    'ASSISTANT_AVATAR_URL',
+    'ASSISTANT_AVATAR_BASE64',
+    'LOCK_CHAT_MODEL',
+    'SIMPLICATE',
     'WEBSOCKET_MAX_CONNECTIONS',
-    'GEMMA_ROUTER_ENABLED', 'OLLAMA_URL', 'GEMMA_MODEL',
-    'GEMMA_CONFIDENCE_THRESHOLD', 'GEMMA_TIMEOUT_MS',
-    'ASK_USER_TIMEOUT_MS', 'MCP_CONFIG_JSON', 'OPENCODE_CONFIG_CONTENT',
+    'GEMMA_ROUTER_ENABLED',
+    'OLLAMA_URL',
+    'GEMMA_MODEL',
+    'GEMMA_CONFIDENCE_THRESHOLD',
+    'GEMMA_TIMEOUT_MS',
+    'ASK_USER_TIMEOUT_MS',
+    'MCP_CONFIG_JSON',
+    'OPENCODE_CONFIG_CONTENT',
     'FIBE_SYNC_ENABLED',
-    'CORS_ORIGINS', 'FRAME_ANCESTORS',
-    'FIBE_OCR_CONVERSION_MAX_BYTES', 'FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES',
-    'FIBE_CLI_VERSION', 'PROVIDER_ARGS', 'SKILL_TOGGLES', 'SYSCHECK_ENABLED',
-    'AGENT_CREDENTIALS_JSON', 'AGENT_RUNTIME_FILES_JSON',
+    'CORS_ORIGINS',
+    'FRAME_ANCESTORS',
+    'FIBE_OCR_CONVERSION_MAX_BYTES',
+    'FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES',
+    'FIBE_CLI_VERSION',
+    'PROVIDER_ARGS',
+    'SKILL_TOGGLES',
+    'SYSCHECK_ENABLED',
+    'AGENT_CREDENTIALS_JSON',
+    'AGENT_RUNTIME_FILES_JSON',
     // Credential env keys injected from credentialEnv
-    'GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_API_KEY',
-    'CLAUDE_CODE_OAUTH_TOKEN', 'OPENAI_API_KEY', 'CURSOR_API_KEY',
-    'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_AUTH_TOKEN',
+    'GEMINI_API_KEY',
+    'GOOGLE_GENERATIVE_AI_API_KEY',
+    'GOOGLE_API_KEY',
+    'CLAUDE_CODE_OAUTH_TOKEN',
+    'OPENAI_API_KEY',
+    'CURSOR_API_KEY',
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_BASE_URL',
+    'ANTHROPIC_AUTH_TOKEN',
   ];
   const savedEnv: Record<string, string | undefined> = {};
   const originalCwd = process.cwd();
@@ -217,13 +273,17 @@ describe('applyFibeSettings', () => {
     tempDir = mkdtempSync(join(tmpdir(), 'fibe-settings-'));
     process.chdir(tempDir);
     localYml = join(tempDir, 'fibe.yml');
-    for (const k of MANAGED_KEYS) { savedEnv[k] = process.env[k]; delete process.env[k]; }
+    for (const k of MANAGED_KEYS) {
+      savedEnv[k] = process.env[k];
+      delete process.env[k];
+    }
   });
 
   afterEach(() => {
     process.chdir(originalCwd);
     for (const [k, v] of Object.entries(savedEnv)) {
-      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
     }
     rmSync(tempDir, { recursive: true, force: true });
   });
@@ -235,68 +295,71 @@ describe('applyFibeSettings', () => {
   });
 
   test('promotes the complete fibe.yml settings object to runtime env vars', () => {
-    writeFileSync(localYml, [
-      'agentPassword: pass',
-      'agentProvider: gemini',
-      'agentAuthMode: api-token',
-      'modelOptions:',
-      '  - flash-lite',
-      '  - flash',
-      'defaultModel: flash',
-      'claudeEffort: high',
-      'dataDir: /app/data',
-      'sessionDir: /app/data/42/.gemini',
-      'systemPrompt: Use the repo rules.',
-      'encryptionKey: enc-key',
-      'fibeAgentId: agent-42',
-      'conversationId: conversation-42',
-      'marqueeRoot: /opt/fibe',
-      'marqueeRootDomain: example.test',
-      'fibeApiKey: fibe-key',
-      'fibeSyncEnabled: true',
-      'postInitScript: echo ready',
-      'corsOrigins: https://app.example.test',
-      'frameAncestors: https://frame.example.test',
-      'cliVersion: v1.2.3',
-      'providerArgs:',
-      '  sandbox: false',
-      '  max-tokens: 4096',
-      '  temperature: 0.2',
-      '  config: value with spaces',
-      '  c: never',
-      'skillToggles:',
-      '  fibe-hunks.md: false',
-      'syscheckEnabled: false',
-      'agentCredentials:',
-      '  auth.json: "{}"',
-      'agentRuntimeFiles:',
-      '  version: 1',
-      '  files:',
-      '    - path: /app/data/42/.gemini/settings.json',
-      '      format: json',
-      '      content:',
-      '        theme: monokai',
-      'credentialEnv:',
-      '  GEMINI_API_KEY: gemini-key',
-      'mcpConfig:',
-      '  mcpServers:',
-      '    fibe:',
-      '      command: fibe',
-      'askUserTimeoutMs: 1234',
-      'gemmaRouterEnabled: true',
-      'ollamaUrl: http://ollama:11434',
-      'gemmaModel: gemma3:12b',
-      'gemmaConfidenceThreshold: 0.65',
-      'gemmaTimeoutMs: 9876',
-      'ocrConversionMaxBytes: 1048576',
-      'ocrConversionMaxOutputBytes: 4194304',
-      'userAvatarUrl: https://example.test/user.png',
-      'userAvatarBase64: user-base64',
-      'assistantAvatarUrl: https://example.test/bot.png',
-      'assistantAvatarBase64: assistant-base64',
-      'lockChatModel: true',
-      'simplicate: true',
-    ].join('\n') + '\n');
+    writeFileSync(
+      localYml,
+      [
+        'agentPassword: pass',
+        'agentProvider: gemini',
+        'agentAuthMode: api-token',
+        'modelOptions:',
+        '  - flash-lite',
+        '  - flash',
+        'defaultModel: flash',
+        'claudeEffort: high',
+        'dataDir: /app/data',
+        'sessionDir: /app/data/42/.gemini',
+        'systemPrompt: Use the repo rules.',
+        'encryptionKey: enc-key',
+        'fibeAgentId: agent-42',
+        'conversationId: conversation-42',
+        'marqueeRoot: /opt/fibe',
+        'marqueeRootDomain: example.test',
+        'fibeApiKey: fibe-key',
+        'fibeSyncEnabled: true',
+        'postInitScript: echo ready',
+        'corsOrigins: https://app.example.test',
+        'frameAncestors: https://frame.example.test',
+        'cliVersion: v1.2.3',
+        'providerArgs:',
+        '  sandbox: false',
+        '  max-tokens: 4096',
+        '  temperature: 0.2',
+        '  config: value with spaces',
+        '  c: never',
+        'skillToggles:',
+        '  fibe-hunks.md: false',
+        'syscheckEnabled: false',
+        'agentCredentials:',
+        '  auth.json: "{}"',
+        'agentRuntimeFiles:',
+        '  version: 1',
+        '  files:',
+        '    - path: /app/data/42/.gemini/settings.json',
+        '      format: json',
+        '      content:',
+        '        theme: monokai',
+        'credentialEnv:',
+        '  GEMINI_API_KEY: gemini-key',
+        'mcpConfig:',
+        '  mcpServers:',
+        '    fibe:',
+        '      command: fibe',
+        'askUserTimeoutMs: 1234',
+        'gemmaRouterEnabled: true',
+        'ollamaUrl: http://ollama:11434',
+        'gemmaModel: gemma3:12b',
+        'gemmaConfidenceThreshold: 0.65',
+        'gemmaTimeoutMs: 9876',
+        'ocrConversionMaxBytes: 1048576',
+        'ocrConversionMaxOutputBytes: 4194304',
+        'userAvatarUrl: https://example.test/user.png',
+        'userAvatarBase64: user-base64',
+        'assistantAvatarUrl: https://example.test/bot.png',
+        'assistantAvatarBase64: assistant-base64',
+        'lockChatModel: true',
+        'simplicate: true',
+      ].join('\n') + '\n',
+    );
 
     applyFibeSettings();
 
@@ -320,13 +383,19 @@ describe('applyFibeSettings', () => {
     expect(process.env.CORS_ORIGINS).toBe('https://app.example.test');
     expect(process.env.FRAME_ANCESTORS).toBe('https://frame.example.test');
     expect(process.env.FIBE_CLI_VERSION).toBe('v1.2.3');
-    expect(process.env.PROVIDER_ARGS).toBe('{"sandbox":false,"max-tokens":4096,"temperature":0.2,"config":"value with spaces","c":"never"}');
+    expect(process.env.PROVIDER_ARGS).toBe(
+      '{"sandbox":false,"max-tokens":4096,"temperature":0.2,"config":"value with spaces","c":"never"}',
+    );
     expect(process.env.SKILL_TOGGLES).toBe('{"fibe-hunks.md":false}');
     expect(process.env.SYSCHECK_ENABLED).toBe('false');
     expect(process.env.AGENT_CREDENTIALS_JSON).toBe('{"auth.json":"{}"}');
-    expect(process.env.AGENT_RUNTIME_FILES_JSON).toBe('{"version":1,"files":[{"path":"/app/data/42/.gemini/settings.json","format":"json","content":{"theme":"monokai"}}]}');
+    expect(process.env.AGENT_RUNTIME_FILES_JSON).toBe(
+      '{"version":1,"files":[{"path":"/app/data/42/.gemini/settings.json","format":"json","content":{"theme":"monokai"}}]}',
+    );
     expect(process.env.GEMINI_API_KEY).toBe('gemini-key');
-    expect(process.env.MCP_CONFIG_JSON).toBe('{"mcpServers":{"fibe":{"command":"fibe"}}}');
+    expect(process.env.MCP_CONFIG_JSON).toBe(
+      '{"mcpServers":{"fibe":{"command":"fibe"}}}',
+    );
     expect(process.env.ASK_USER_TIMEOUT_MS).toBe('1234');
     expect(process.env.GEMMA_ROUTER_ENABLED).toBe('true');
     expect(process.env.OLLAMA_URL).toBe('http://ollama:11434');
@@ -337,7 +406,9 @@ describe('applyFibeSettings', () => {
     expect(process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES).toBe('4194304');
     expect(process.env.USER_AVATAR_URL).toBe('https://example.test/user.png');
     expect(process.env.USER_AVATAR_BASE64).toBe('user-base64');
-    expect(process.env.ASSISTANT_AVATAR_URL).toBe('https://example.test/bot.png');
+    expect(process.env.ASSISTANT_AVATAR_URL).toBe(
+      'https://example.test/bot.png',
+    );
     expect(process.env.ASSISTANT_AVATAR_BASE64).toBe('assistant-base64');
     expect(process.env.LOCK_CHAT_MODEL).toBe('true');
     expect(process.env.SIMPLICATE).toBe('true');
@@ -356,14 +427,18 @@ describe('applyFibeSettings', () => {
   });
 
   test('promotes websocketMaxConnections to WEBSOCKET_MAX_CONNECTIONS', () => {
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 10 });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      websocketMaxConnections: 10,
+    });
     applyFibeSettings();
     expect(process.env.WEBSOCKET_MAX_CONNECTIONS).toBe('10');
   });
 
   test('does NOT overwrite existing websocket env var', () => {
     process.env.WEBSOCKET_MAX_CONNECTIONS = '4';
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ websocketMaxConnections: 10 });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      websocketMaxConnections: 10,
+    });
     applyFibeSettings();
     expect(process.env.WEBSOCKET_MAX_CONNECTIONS).toBe('4');
   });
@@ -386,24 +461,32 @@ describe('applyFibeSettings', () => {
     });
     applyFibeSettings();
     expect(process.env.USER_AVATAR_URL).toBe('https://example.com/user.png');
-    expect(process.env.ASSISTANT_AVATAR_URL).toBe('https://example.com/bot.png');
+    expect(process.env.ASSISTANT_AVATAR_URL).toBe(
+      'https://example.com/bot.png',
+    );
   });
 
   test('promotes mcpConfig as JSON string to MCP_CONFIG_JSON', () => {
-    const mcpConfig = { mcpServers: { fibe: { serverUrl: 'https://mcp.example.com' } } };
+    const mcpConfig = {
+      mcpServers: { fibe: { serverUrl: 'https://mcp.example.com' } },
+    };
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({ mcpConfig });
     applyFibeSettings();
     expect(process.env.MCP_CONFIG_JSON).toBe(JSON.stringify(mcpConfig));
   });
 
   test('promotes modelOptions array to comma-separated MODEL_OPTIONS', () => {
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ modelOptions: ['flash-lite', 'flash', 'pro'] });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      modelOptions: ['flash-lite', 'flash', 'pro'],
+    });
     applyFibeSettings();
     expect(process.env.MODEL_OPTIONS).toBe('flash-lite,flash,pro');
   });
 
   test('promotes string modelOptions as-is to MODEL_OPTIONS', () => {
-    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ modelOptions: 'flash,pro' });
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({
+      modelOptions: 'flash,pro',
+    });
     applyFibeSettings();
     expect(process.env.MODEL_OPTIONS).toBe('flash,pro');
   });
@@ -445,7 +528,10 @@ describe('applyFibeSettings', () => {
   });
 
   test('reads YAML and applies env vars from it', () => {
-    writeFileSync(localYml, 'agentProvider: gemini\nlockChatModel: false\nsimplicate: true\n');
+    writeFileSync(
+      localYml,
+      'agentProvider: gemini\nlockChatModel: false\nsimplicate: true\n',
+    );
     applyFibeSettings();
     expect(process.env.AGENT_PROVIDER).toBe('gemini');
     expect(process.env.LOCK_CHAT_MODEL).toBe('false');
@@ -471,9 +557,15 @@ describe('applyFibeSettings', () => {
   test('promotes credentialEnv entries to process.env', () => {
     const originalInfo = console.info;
     const infoMessages: string[] = [];
-    console.info = (message?: unknown) => { infoMessages.push(String(message)); };
+    console.info = (message?: unknown) => {
+      infoMessages.push(String(message));
+    };
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({
-      credentialEnv: { GEMINI_API_KEY: 'AIza-test', GOOGLE_API_KEY: 'AIza-test', ANTHROPIC_API_KEY: 'sk-ant-test' },
+      credentialEnv: {
+        GEMINI_API_KEY: 'AIza-test',
+        GOOGLE_API_KEY: 'AIza-test',
+        ANTHROPIC_API_KEY: 'sk-ant-test',
+      },
     });
     try {
       applyFibeSettings();
@@ -483,7 +575,9 @@ describe('applyFibeSettings', () => {
     expect(process.env.GEMINI_API_KEY).toBe('AIza-test');
     expect(process.env.GOOGLE_API_KEY).toBe('AIza-test');
     expect(process.env.ANTHROPIC_API_KEY).toBe('sk-ant-test');
-    expect(infoMessages.join('\n')).toContain('ANTHROPIC_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY');
+    expect(infoMessages.join('\n')).toContain(
+      'ANTHROPIC_API_KEY, GEMINI_API_KEY, GOOGLE_API_KEY',
+    );
     expect(infoMessages.join('\n')).not.toContain('AIza-test');
     expect(infoMessages.join('\n')).not.toContain('sk-ant-test');
   });
@@ -515,7 +609,9 @@ describe('applyFibeSettings', () => {
   });
 
   test('merges opencodeConfig into OPENCODE_CONFIG_CONTENT', () => {
-    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ permission: 'allow' });
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({
+      permission: 'allow',
+    });
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({
       opencodeConfig: {
         provider: {
@@ -541,26 +637,36 @@ describe('applyFibeSettings', () => {
   });
 
   test('promotes credentialEnv from YAML file', () => {
-    writeFileSync(localYml, 'credentialEnv:\n  CLAUDE_CODE_OAUTH_TOKEN: test-token\n');
+    writeFileSync(
+      localYml,
+      'credentialEnv:\n  CLAUDE_CODE_OAUTH_TOKEN: test-token\n',
+    );
     applyFibeSettings();
     expect(process.env.CLAUDE_CODE_OAUTH_TOKEN).toBe('test-token');
   });
 
   test('promotes agentCredentials object to AGENT_CREDENTIALS_JSON string', () => {
-    writeFileSync(localYml, 'agentCredentials:\n  agent_token.txt: sk-ant-123\n');
+    writeFileSync(
+      localYml,
+      'agentCredentials:\n  agent_token.txt: sk-ant-123\n',
+    );
     applyFibeSettings();
-    expect(process.env.AGENT_CREDENTIALS_JSON).toBe('{"agent_token.txt":"sk-ant-123"}');
+    expect(process.env.AGENT_CREDENTIALS_JSON).toBe(
+      '{"agent_token.txt":"sk-ant-123"}',
+    );
   });
 
   test('promotes mcpConfig from nested YAML to MCP_CONFIG_JSON string', () => {
-    writeFileSync(localYml, [
-      'mcpConfig:',
-      '  mcpServers:',
-      '    fibe:',
-      '      command: fibe',
-    ].join('\n') + '\n');
+    writeFileSync(
+      localYml,
+      ['mcpConfig:', '  mcpServers:', '    fibe:', '      command: fibe'].join(
+        '\n',
+      ) + '\n',
+    );
     applyFibeSettings();
-    expect(process.env.MCP_CONFIG_JSON).toBe('{"mcpServers":{"fibe":{"command":"fibe"}}}');
+    expect(process.env.MCP_CONFIG_JSON).toBe(
+      '{"mcpServers":{"fibe":{"command":"fibe"}}}',
+    );
   });
 
   test('agentCredentialsJson string takes precedence over agentCredentials object', () => {

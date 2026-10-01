@@ -9,6 +9,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
@@ -27,13 +28,15 @@ export class AgentController {
 
   @Throttle({ default: { limit: 600, ttl: 60_000 } })
   @Get('status')
-  getStatus(): {
+  getStatus(@Query('deliveryScope') deliveryScope?: string, @Query('conversationId') conversationId?: string): {
     authenticated: boolean;
     isProcessing: boolean;
     queueCount: number;
     lastError?: string;
+    deliveryScope?: ReturnType<OrchestratorService['resolveDeliveryScope']>;
   } {
     return {
+      ...(deliveryScope === 'true' ? { deliveryScope: this.orchestrator.resolveDeliveryScope(conversationId) } : {}),
       authenticated: this.orchestrator.isAuthenticated,
       isProcessing: this.orchestrator.isProcessing,
       queueCount: this.orchestrator.queueCount,
@@ -58,6 +61,8 @@ export class AgentController {
       body.images,
       body.attachmentFilenames,
       body.busyPolicy,
+      body.requestId,
+      body.storeGeneration,
     );
     return handleSendMessage(result);
   }

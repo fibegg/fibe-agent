@@ -2,7 +2,11 @@ import { ArrowLeft, Maximize2, Minus, X as CloseIcon } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import { useActivityReviewData } from '../use-activity-review-data';
 import { formatRelativeTime } from '../format-relative-time';
-import { commandLabel, highlightText, reasoningBodyWithHighlights } from '../activity-review-utils';
+import {
+  commandLabel,
+  highlightText,
+  reasoningBodyWithHighlights,
+} from '../activity-review-utils';
 import { useEffect, useRef, useState } from 'react';
 import { CountUpNumber } from '../count-up-number';
 import { getActivityLabel, type StoryEntry } from '../agent-thinking-utils';
@@ -17,27 +21,39 @@ function StarkArcReactor() {
   );
 }
 
-function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQuery: string; index: number }) {
+function StarkWindow({
+  story,
+  searchQuery,
+  index,
+}: {
+  story: StoryEntry;
+  searchQuery: string;
+  index: number;
+}) {
   const t = useT();
-  const isThinkingBlock = story.type === 'reasoning_start' && (story.details ?? '').trim().length > 0;
-  const isSingleRow = ['file_created', 'tool_call', 'step'].includes(story.type);
+  const isThinkingBlock =
+    story.type === 'reasoning_start' && (story.details ?? '').trim().length > 0;
+  const isSingleRow = ['file_created', 'tool_call', 'step'].includes(
+    story.type,
+  );
   const label = getActivityLabel(story.type);
 
-  // Pseudo-random position constraints for the "floating window" effect
   const [isMinimized, setIsMinimized] = useState(false);
 
-  // To simulate popping up in a holographic grid, let's just make it look like a window with title bar
   return (
-    <div className={`relative flex flex-col border border-cyan-500/40 bg-cyan-950/40 backdrop-blur-md rounded-sm shadow-[0_0_15px_rgba(6,182,212,0.15)] overflow-hidden transition-all duration-300 ${isMinimized ? 'h-8' : 'h-full max-h-[400px]'}`}>
+    <div
+      className={`relative flex flex-col border border-cyan-500/40 bg-cyan-950/40 backdrop-blur-md rounded-sm shadow-[0_0_15px_rgba(6,182,212,0.15)] overflow-hidden transition-all duration-300 ${isMinimized ? 'h-8' : 'h-full max-h-[400px]'}`}
+    >
       <div className="absolute top-0 left-0 w-4 h-4 border-t border-l border-cyan-300"></div>
       <div className="absolute top-0 right-0 w-4 h-4 border-t border-r border-cyan-300"></div>
       <div className="absolute bottom-0 left-0 w-4 h-4 border-b border-l border-cyan-300"></div>
       <div className="absolute bottom-0 right-0 w-4 h-4 border-b border-r border-cyan-300"></div>
 
-      {/* Window Header */}
       <div className="flex items-center justify-between px-2 py-1 bg-cyan-900/40 border-b border-cyan-500/30 cursor-default select-none shrink-0">
         <div className="flex items-center gap-2">
-          <span className="text-[9px] font-mono font-bold text-cyan-200">WIN_{String(index).padStart(3, '0')}</span>
+          <span className="text-[9px] font-mono font-bold text-cyan-200">
+            WIN_{String(index).padStart(3, '0')}
+          </span>
           <span className="text-[10px] font-mono text-cyan-400 tracking-wider uppercase truncate max-w-[150px]">
             {label}
           </span>
@@ -49,7 +65,11 @@ function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQ
             className="hover:text-cyan-200 text-cyan-500 transition-colors"
             aria-label={isMinimized ? t('stark.maximize') : t('stark.minimize')}
           >
-            {isMinimized ? <Maximize2 className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+            {isMinimized ? (
+              <Maximize2 className="w-3 h-3" />
+            ) : (
+              <Minus className="w-3 h-3" />
+            )}
           </button>
           <div className="hover:text-red-400 text-cyan-500 transition-colors cursor-pointer">
             <CloseIcon className="w-3 h-3" />
@@ -60,24 +80,41 @@ function StarkWindow({ story, searchQuery, index }: { story: StoryEntry; searchQ
       {!isMinimized && (
         <div className="p-3 overflow-y-auto custom-scrollbar flex-1 min-h-0">
           <div className="flex justify-between items-center mb-2 pb-1 border-b border-cyan-500/20">
-            <span className="text-cyan-600 font-mono text-[9px]">{formatRelativeTime(story.timestamp)}</span>
-            {story.type === 'tool_call' && <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 rounded">{t('stark.exec')}</span>}
+            <span className="text-cyan-600 font-mono text-[9px]">
+              {formatRelativeTime(story.timestamp)}
+            </span>
+            {story.type === 'tool_call' && (
+              <span className="text-[9px] bg-cyan-500/20 text-cyan-300 px-1 rounded">
+                {t('stark.exec')}
+              </span>
+            )}
           </div>
 
           {isSingleRow ? (
             <p className="text-cyan-300 font-mono text-xs tracking-wide uppercase break-words">
-              {highlightText(String(
-                story.type === 'file_created' ? story.path ?? story.details ?? story.message :
-                story.type === 'tool_call' ? commandLabel(story) : story.message
-              ), searchQuery)}
+              {highlightText(
+                String(
+                  story.type === 'file_created'
+                    ? (story.path ?? story.details ?? story.message)
+                    : story.type === 'tool_call'
+                      ? commandLabel(story)
+                      : story.message,
+                ),
+                searchQuery,
+              )}
             </p>
           ) : isThinkingBlock ? (
             <p className="text-cyan-200 text-[11px] font-mono whitespace-pre-wrap leading-relaxed">
-              {reasoningBodyWithHighlights(story.details as string, searchQuery)}
+              {reasoningBodyWithHighlights(
+                story.details as string,
+                searchQuery,
+              )}
             </p>
           ) : (
             <div className="text-cyan-100/90 text-xs font-mono break-words leading-relaxed">
-              {story.message && <p>{highlightText(story.message, searchQuery)}</p>}
+              {story.message && (
+                <p>{highlightText(story.message, searchQuery)}</p>
+              )}
               {story.details && String(story.details).trim() !== '{}' && (
                 <p className="text-[10px] text-cyan-500 mt-2 opacity-80">
                   {highlightText(story.details, searchQuery)}
@@ -102,41 +139,45 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
     liveResponseText,
     brainState,
     isFollowing,
-    loading
+    loading,
   } = useActivityReviewData({
     activityId,
     storyId,
   });
 
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  
+
   useEffect(() => {
     if (isFollowing && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({
         top: scrollContainerRef.current.scrollHeight,
-        behavior: 'smooth'
+        behavior: 'smooth',
       });
     }
   }, [liveResponseText, isFollowing, filteredStories.length]);
 
   return (
-    <div className={`relative flex flex-col ${inline ? 'h-full' : 'h-screen'} w-full bg-slate-950 overflow-hidden font-mono selection:bg-cyan-900 selection:text-cyan-100`}>
+    <div
+      className={`relative flex flex-col ${inline ? 'h-full' : 'h-screen'} w-full bg-slate-950 overflow-hidden font-mono selection:bg-cyan-900 selection:text-cyan-100`}
+    >
       <div className="absolute inset-0 stark-grid opacity-30 pointer-events-none"></div>
       <div className="animate-stark-scanline"></div>
-      
+
       <div className="relative z-10 flex flex-col h-full pointer-events-auto">
         <header className="flex items-center justify-between gap-3 p-4 border-b border-cyan-500/30 bg-cyan-950/40 backdrop-blur-md shrink-0">
           <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             {!inline && (
               <>
-                <Link 
-                  to="/" 
+                <Link
+                  to="/"
                   className="group flex items-center gap-2 text-cyan-500 hover:text-cyan-300 transition-colors"
                 >
                   <div className="p-1.5 border border-cyan-800 rounded group-hover:border-cyan-400 group-hover:bg-cyan-900/50 transition-all">
                     <ArrowLeft className="w-4 h-4" />
                   </div>
-                  <span className="text-xs tracking-widest uppercase font-bold">{t('stark.terminate')}</span>
+                  <span className="text-xs tracking-widest uppercase font-bold">
+                    {t('stark.terminate')}
+                  </span>
                 </Link>
                 <div className="h-4 w-px bg-cyan-800"></div>
               </>
@@ -146,18 +187,22 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                 {t('stark.mode')}
               </span>
               <span className="max-w-[12rem] truncate text-cyan-600 text-[9px] uppercase tracking-widest sm:max-w-none">
-                {t('stark.systemActive', { target: activityId ?? t('stark.globalMonitor') })}
+                {t('stark.systemActive', {
+                  target: activityId ?? t('stark.globalMonitor'),
+                })}
               </span>
             </div>
           </div>
-          
+
           <div className="flex shrink-0 items-center gap-3 sm:gap-6">
             <div className="flex items-center gap-3 bg-cyan-950/50 border border-cyan-800/50 rounded p-1.5 backdrop-blur hidden sm:flex">
-              <span className="text-cyan-500 text-[9px] uppercase tracking-widest ml-1 opacity-70">{t('stark.query')}</span>
-              <input 
-                type="text" 
+              <span className="text-cyan-500 text-[9px] uppercase tracking-widest ml-1 opacity-70">
+                {t('stark.query')}
+              </span>
+              <input
+                type="text"
                 value={detailSearchQuery}
-                onChange={e => setDetailSearchQuery(e.target.value)}
+                onChange={(e) => setDetailSearchQuery(e.target.value)}
                 placeholder={t('stark.placeholder')}
                 className="bg-transparent border-none text-cyan-300 text-[10px] uppercase font-mono w-40 focus:outline-none placeholder:text-cyan-800"
               />
@@ -171,7 +216,8 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                   {t('stark.idle')}
                 </span>
                 <span className="text-cyan-700 text-[9px] tracking-[0.2em] mt-0.5">
-                  <CountUpNumber value={activityStories.length} /> {t('stark.logs')}
+                  <CountUpNumber value={activityStories.length} />{' '}
+                  {t('stark.logs')}
                 </span>
               </div>
             )}
@@ -201,7 +247,10 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
                   </div>
                   <div className="bg-emerald-950/30 p-3 border-l-2 border-emerald-500 max-h-[30vh] overflow-y-auto custom-scrollbar">
                     <p className="text-emerald-300 text-[11px] font-mono whitespace-pre-wrap leading-relaxed">
-                      {reasoningBodyWithHighlights(liveResponseText, detailSearchQuery)}
+                      {reasoningBodyWithHighlights(
+                        liveResponseText,
+                        detailSearchQuery,
+                      )}
                       <span className="inline-block w-2 h-3 ml-1 bg-emerald-400 animate-pulse"></span>
                     </p>
                   </div>
@@ -209,7 +258,7 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
               </div>
             )}
 
-            <div 
+            <div
               ref={scrollContainerRef}
               className="flex-1 overflow-y-auto p-4 md:p-8 relative"
               style={{ scrollBehavior: 'smooth' }}
@@ -217,16 +266,22 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
               {/* Top decorative corners */}
               <div className="absolute top-4 left-4 w-4 h-4 border-t-2 border-l-2 border-cyan-500/50 pointer-events-none z-20"></div>
               <div className="absolute top-4 right-4 w-4 h-4 border-t-2 border-r-2 border-cyan-500/50 pointer-events-none z-20"></div>
-              
+
               {/* Grid layout for chronological LTR reading order */}
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-12 w-full auto-rows-max items-start">
                 {filteredStories.map((story, i) => (
-                  <div 
-                    key={story.id} 
-                    className="w-full opacity-0" 
-                    style={{ animation: `thinking-fade 0.4s ease-out ${(i % 10) * 0.05}s forwards` }}
+                  <div
+                    key={story.id}
+                    className="w-full opacity-0"
+                    style={{
+                      animation: `thinking-fade 0.4s ease-out ${(i % 10) * 0.05}s forwards`,
+                    }}
                   >
-                    <StarkWindow story={story} searchQuery={detailSearchQuery} index={i} />
+                    <StarkWindow
+                      story={story}
+                      searchQuery={detailSearchQuery}
+                      index={i}
+                    />
                   </div>
                 ))}
               </div>
@@ -238,7 +293,7 @@ export function StarkReasoningPage({ inline }: { inline?: boolean }) {
           </div>
         )}
       </div>
-      
+
       <style>{`
         .custom-scrollbar::-webkit-scrollbar {
           width: 4px;

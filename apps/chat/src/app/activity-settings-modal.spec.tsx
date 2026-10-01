@@ -1,7 +1,9 @@
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { ActivitySettingsModal, type ActivitySettingsModalProps } from './activity-settings-modal';
+import {
+  ActivitySettingsModal,
+  type ActivitySettingsModalProps,
+} from './activity-settings-modal';
 
 vi.mock('./theme-selector', () => ({
   ThemeSelector: () => <div data-testid="theme-selector">Themes</div>,
@@ -14,9 +16,16 @@ vi.mock('./embed-config', () => ({
 }));
 
 vi.mock('./activity-type-filters', () => ({
-  ActivityTypeFilters: ({ onTypeFilterChange }: { typeFilter: string[]; onTypeFilterChange: (f: string[]) => void }) => (
+  ActivityTypeFilters: ({
+    onTypeFilterChange,
+  }: {
+    typeFilter: string[];
+    onTypeFilterChange: (f: string[]) => void;
+  }) => (
     <div data-testid="activity-type-filters">
-      <button onClick={() => onTypeFilterChange(['tool_call'])}>Apply filter</button>
+      <button onClick={() => onTypeFilterChange(['tool_call'])}>
+        Apply filter
+      </button>
     </div>
   ),
 }));
@@ -53,7 +62,6 @@ describe('ActivitySettingsModal', () => {
   it('calls onClose when overlay is clicked', () => {
     const onClose = vi.fn();
     renderModal({ onClose });
-    // The backdrop has aria-hidden and onClick=onClose
     const backdrop = document.querySelector('[aria-hidden="true"]');
     expect(backdrop).toBeTruthy();
     fireEvent.click(backdrop!);
@@ -118,7 +126,11 @@ describe('ActivitySettingsModal', () => {
   it('uses aria-labelledby to reference title', () => {
     renderModal();
     const dialog = screen.getByRole('dialog');
-    expect(dialog.getAttribute('aria-labelledby')).toBe('activity-settings-dialog-title');
-    expect(screen.getByText('Settings').id).toBe('activity-settings-dialog-title');
+    expect(dialog.getAttribute('aria-labelledby')).toBe(
+      'activity-settings-dialog-title',
+    );
+    expect(screen.getByText('Settings').id).toBe(
+      'activity-settings-dialog-title',
+    );
   });
 });

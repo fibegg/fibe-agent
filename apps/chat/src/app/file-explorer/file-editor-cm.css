@@ -1,13 +1,11 @@
-/* CodeMirror 6 Integration Styles */
-
-/* Container */
 .cm-editor {
   height: 100%;
   outline: none !important;
-  font-feature-settings: 'liga' 1, 'calt' 1;
+  font-feature-settings:
+    'liga' 1,
+    'calt' 1;
 }
 
-/* Scrollbars — match app style */
 .cm-scroller {
   overflow: auto;
   scrollbar-width: thin;
@@ -30,13 +28,11 @@
   background-color: var(--scrollbar-thumb-hover);
 }
 
-/* Smooth cursor */
 .cm-cursor {
   border-left-width: 2px !important;
   transition: top 0.05s ease;
 }
 
-/* Fold marker tweak */
 .cm-foldPlaceholder {
   background: hsl(var(--muted));
   border: 1px solid hsl(var(--border));
@@ -46,7 +42,6 @@
   cursor: pointer;
 }
 
-/* Search panel */
 .cm-search {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -55,7 +50,6 @@
   margin: 4px;
 }
 
-/* Tooltip / autocomplete */
 .cm-tooltip {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -68,7 +62,6 @@
   color: hsl(var(--foreground));
 }
 
-/* Selection in non-focused editor */
 .cm-selectionBackground {
   background: hsl(var(--muted) / 0.5) !important;
 }

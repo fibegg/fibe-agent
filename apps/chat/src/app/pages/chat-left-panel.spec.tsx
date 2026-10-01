@@ -4,7 +4,6 @@ import { MemoryRouter } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { ChatLeftPanel } from './chat-left-panel';
 
-// Mock the heavy child components
 vi.mock('../file-explorer/file-explorer', () => ({
   FileExplorer: (props: Record<string, unknown>) => (
     <div
@@ -20,7 +19,10 @@ vi.mock('../file-explorer/file-explorer', () => ({
 
 vi.mock('../chat/conversation-sidebar', () => ({
   ConversationSidebar: (props: { collapsed?: boolean }) => (
-    <div data-testid="conversation-sidebar" data-collapsed={String(props.collapsed)} />
+    <div
+      data-testid="conversation-sidebar"
+      data-collapsed={String(props.collapsed)}
+    />
   ),
 }));
 
@@ -62,7 +64,7 @@ describe('ChatLeftPanel', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
   });
@@ -71,44 +73,57 @@ describe('ChatLeftPanel', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} agentWorkspaceAvailable />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByTestId('file-explorer').getAttribute('data-agent-workspace')).toBe('true');
+    expect(
+      screen.getByTestId('file-explorer').getAttribute('data-agent-workspace'),
+    ).toBe('true');
   });
 
   it('lets the parent panel own the right divider', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByTestId('file-explorer').getAttribute('data-show-right-border')).toBe('false');
+    expect(
+      screen
+        .getByTestId('file-explorer')
+        .getAttribute('data-show-right-border'),
+    ).toBe('false');
   });
 
   it('passes collapsed=true when sidebarCollapsed is true', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} sidebarCollapsed={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByTestId('file-explorer').getAttribute('data-collapsed')).toBe('true');
+    expect(
+      screen.getByTestId('file-explorer').getAttribute('data-collapsed'),
+    ).toBe('true');
   });
 
   it('shows icon-rail (collapsed FileExplorer) when no files and no conversations provided', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} hasAnyFiles={false} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    // FileExplorer still rendered as icon rail
-    expect(screen.getByTestId('file-explorer').getAttribute('data-collapsed')).toBe('true');
+    expect(
+      screen.getByTestId('file-explorer').getAttribute('data-collapsed'),
+    ).toBe('true');
   });
 
   it('renders SidebarToggle centered over full panel when expanded and has files', () => {
     render(
       <MemoryRouter>
-        <ChatLeftPanel {...baseProps} hasAnyFiles={true} sidebarCollapsed={false} />
-      </MemoryRouter>
+        <ChatLeftPanel
+          {...baseProps}
+          hasAnyFiles={true}
+          sidebarCollapsed={false}
+        />
+      </MemoryRouter>,
     );
     const toggle = screen.getByTestId('sidebar-toggle');
     expect(toggle).toBeTruthy();
@@ -119,7 +134,7 @@ describe('ChatLeftPanel', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} hasAnyFiles={true} hideToggle />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.queryByTestId('sidebar-toggle')).toBeNull();
   });
@@ -128,16 +143,18 @@ describe('ChatLeftPanel', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} sidebarCollapsed={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByTestId('sidebar-toggle').getAttribute('data-collapsed')).toBe('true');
+    expect(
+      screen.getByTestId('sidebar-toggle').getAttribute('data-collapsed'),
+    ).toBe('true');
   });
 
   it('does not render resize handle when explicitly collapsed', () => {
     const { container } = render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} sidebarCollapsed={true} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(container.querySelector('[role="separator"]')).toBeNull();
   });
@@ -146,20 +163,25 @@ describe('ChatLeftPanel', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} {...conversationProps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByTestId('conversation-sidebar')).toBeTruthy();
-    // File explorer also still present (files exist)
     expect(screen.getByTestId('file-explorer')).toBeTruthy();
   });
 
   it('passes collapsed state to ConversationSidebar', () => {
     render(
       <MemoryRouter>
-        <ChatLeftPanel {...baseProps} {...conversationProps} conversationsCollapsed />
-      </MemoryRouter>
+        <ChatLeftPanel
+          {...baseProps}
+          {...conversationProps}
+          conversationsCollapsed
+        />
+      </MemoryRouter>,
     );
-    expect(screen.getByTestId('conversation-sidebar').getAttribute('data-collapsed')).toBe('true');
+    expect(
+      screen.getByTestId('conversation-sidebar').getAttribute('data-collapsed'),
+    ).toBe('true');
   });
 
   it('renders playground selector inside the file explorer', () => {
@@ -169,18 +191,23 @@ describe('ChatLeftPanel', () => {
           {...baseProps}
           playgroundSelector={<button type="button">Link Playground</button>}
         />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByRole('button', { name: /link playground/i })).toBeTruthy();
+    expect(
+      screen.getByRole('button', { name: /link playground/i }),
+    ).toBeTruthy();
   });
 
   it('shows ConversationSidebar at full height when there are no files', () => {
     render(
       <MemoryRouter>
-        <ChatLeftPanel {...baseProps} hasAnyFiles={false} {...conversationProps} />
-      </MemoryRouter>
+        <ChatLeftPanel
+          {...baseProps}
+          hasAnyFiles={false}
+          {...conversationProps}
+        />
+      </MemoryRouter>,
     );
-    // Conversations take full height — no file explorer rendered
     expect(screen.getByTestId('conversation-sidebar')).toBeTruthy();
     expect(screen.queryByTestId('file-explorer')).toBeNull();
   });
@@ -188,10 +215,13 @@ describe('ChatLeftPanel', () => {
   it('hides ConversationSidebar when panel is explicitly collapsed', () => {
     render(
       <MemoryRouter>
-        <ChatLeftPanel {...baseProps} sidebarCollapsed={true} {...conversationProps} />
-      </MemoryRouter>
+        <ChatLeftPanel
+          {...baseProps}
+          sidebarCollapsed={true}
+          {...conversationProps}
+        />
+      </MemoryRouter>,
     );
-    // No room in icon-rail for conversations
     expect(screen.queryByTestId('conversation-sidebar')).toBeNull();
   });
 
@@ -199,7 +229,7 @@ describe('ChatLeftPanel', () => {
     render(
       <MemoryRouter>
         <ChatLeftPanel {...baseProps} />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.queryByTestId('conversation-sidebar')).toBeNull();
   });

@@ -1,289 +1,393 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import {
   AntigravityStrategy,
   buildAntigravityArgs,
-  extractAntigravityLatestOutput,
-  readAntigravityLastConversation,
 } from './antigravity.strategy';
+import type { AuthConnection, ToolEvent } from './strategy.types';
 
-describe('AntigravityStrategy', () => {
-  let testHome: string;
-  let envBackup: Record<string, string | undefined>;
-
+describe('Antigravity CLI contract', () => {
+  let home: string;
+  let env: NodeJS.ProcessEnv;
   beforeEach(() => {
-    testHome = mkdtempSync(join(tmpdir(), 'antigravity-strategy-test-'));
-    envBackup = {
-      ANTIGRAVITY_BIN: process.env.ANTIGRAVITY_BIN,
-      ANTIGRAVITY_FAKE_MESSAGE: process.env.ANTIGRAVITY_FAKE_MESSAGE,
-      ANTIGRAVITY_FAKE_MISSING: process.env.ANTIGRAVITY_FAKE_MISSING,
-      ANTIGRAVITY_FAKE_SESSION_ID: process.env.ANTIGRAVITY_FAKE_SESSION_ID,
-      ANTIGRAVITY_FAKE_STDERR: process.env.ANTIGRAVITY_FAKE_STDERR,
-      ANTIGRAVITY_FAKE_WAIT_STDIN: process.env.ANTIGRAVITY_FAKE_WAIT_STDIN,
-      ANTIGRAVITY_HOME: process.env.ANTIGRAVITY_HOME,
-      PROVIDER_ARGS: process.env.PROVIDER_ARGS,
-      SESSION_DIR: process.env.SESSION_DIR,
-    };
-    delete process.env.ANTIGRAVITY_FAKE_MESSAGE;
-    delete process.env.ANTIGRAVITY_FAKE_MISSING;
-    delete process.env.ANTIGRAVITY_FAKE_SESSION_ID;
-    delete process.env.ANTIGRAVITY_FAKE_STDERR;
-    delete process.env.ANTIGRAVITY_FAKE_WAIT_STDIN;
-    delete process.env.ANTIGRAVITY_HOME;
-    delete process.env.PROVIDER_ARGS;
-    process.env.SESSION_DIR = join(testHome, '.gemini');
-  });
-
-  afterEach(() => {
-    for (const [key, value] of Object.entries(envBackup)) {
-      if (value === undefined) delete process.env[key];
-      else process.env[key] = value;
-    }
-    rmSync(testHome, { recursive: true, force: true });
-  });
-
-  function makeConversationProvider() {
-    return {
-      getConversationDataDir: () => join(testHome, 'conversation-1'),
-      getDefaultConversationDataDir: () => join(testHome, 'default-conversation'),
-      getConversationId: () => 'conversation-1',
-    };
-  }
-
-  function writeFakeAgy(argsPath: string, envPath?: string): string {
-    const fakePath = join(testHome, 'fake-agy');
-    writeFileSync(fakePath, `#!/bin/sh
-printf '%s\\n' "$@" > "${argsPath}"
-${envPath ? `printf '%s' "$HOME" > "${envPath}"` : ''}
-if [ "$ANTIGRAVITY_FAKE_MISSING" = "1" ]; then
-  echo 'Warning: conversation "stale-session" not found.'
-  echo 'fresh answer'
-  exit 0
-fi
-if [ "$ANTIGRAVITY_FAKE_WAIT_STDIN" = "1" ]; then
-  cat >/dev/null
-fi
-session_id="\${ANTIGRAVITY_FAKE_SESSION_ID:-session-new}"
-mkdir -p "$HOME/.gemini/antigravity-cli/cache"
-escaped_pwd=$(printf '%s' "$PWD" | sed 's/\\\\/\\\\\\\\/g; s/"/\\\\"/g')
-printf '{"%s":"%s"}\\n' "$escaped_pwd" "$session_id" > "$HOME/.gemini/antigravity-cli/cache/last_conversations.json"
-if [ -n "$ANTIGRAVITY_FAKE_STDERR" ]; then
-  printf '%s' "$ANTIGRAVITY_FAKE_STDERR" >&2
-fi
-printf '%s' "\${ANTIGRAVITY_FAKE_MESSAGE:-antigravity response}"
-`);
-    chmodSync(fakePath, 0o755);
-    process.env.ANTIGRAVITY_BIN = fakePath;
-    return fakePath;
-  }
-
-  test('buildAntigravityArgs enforces headless flags and owns conversation state', () => {
-    process.env.PROVIDER_ARGS = JSON.stringify({
-      '--conversation': 'user-session',
-      '--print': true,
-      '--prompt': 'bad',
-      '--print-timeout': '1s',
-      'add-dir': '/tmp/extra',
-    });
-
-    const args = buildAntigravityArgs('-starts with a dash', 'session-123');
-
-    expect(args).not.toContain('--print');
-    expect(args).not.toContain('--prompt');
-    expect(args).toContain('--sandbox');
-    expect(args).toContain('--dangerously-skip-permissions');
-    expect(args).toContain('--add-dir');
-    expect(args).toContain('/tmp/extra');
-    expect(args).toContain('--print-timeout');
-    expect(args).toContain('1s');
-    expect(args.slice(args.indexOf('--conversation'))).toEqual([
-      '--conversation',
-      'session-123',
-      '--prompt=-starts with a dash',
-    ]);
-  });
-
-  test('reads Antigravity last conversation cache by workspace path', () => {
-    const workspaceDir = join(testHome, 'workspace');
-    const geminiDir = join(testHome, '.gemini');
-    mkdirSync(join(geminiDir, 'antigravity-cli', 'cache'), { recursive: true });
+    home = mkdtempSync(join(tmpdir(), 'agy-contract-'));
+    env = { ...process.env };
+    for (const key of [
+      'ANTIGRAVITY_HOME',
+      'PROVIDER_ARGS',
+      'GEMINI_API_KEY',
+      'GOOGLE_API_KEY',
+      'GOOGLE_GENERATIVE_AI_API_KEY',
+      'AGY_EVENTS',
+      'AGY_EXIT',
+      'AGY_AUTH',
+    ])
+      delete process.env[key];
+    process.env.SESSION_DIR = join(home, '.gemini');
+    const bin = join(home, 'agy');
     writeFileSync(
-      join(geminiDir, 'antigravity-cli', 'cache', 'last_conversations.json'),
-      JSON.stringify({ [workspaceDir]: 'session-cached' })
+      bin,
+      `#!/usr/bin/env node
+const fs = require('node:fs');
+fs.writeFileSync(process.env.HOME + '/args.json', JSON.stringify(process.argv.slice(2)));
+if (process.argv[2] === 'models') { console.log('gemini-3.8-flash-high  Gemini Flash\\nclaude-sonnet-4-6 Claude Sonnet\\ngemini-3.8-flash-high duplicate'); }
+else if (process.env.AGY_AUTH === '1') {
+  if (!process.stdin.isTTY) process.exit(9);
+  console.log('https://accounts.google.com/o/oauth2/auth?test=1');
+  process.stdin.on('data', () => { console.log('authenticated'); process.exit(0); });
+} else {
+  if (process.env.GEMINI_API_KEY) fs.writeFileSync(process.env.HOME + '/key.txt', 'present');
+  (async () => { for (const event of JSON.parse(process.env.AGY_EVENTS || '[]')) {
+    console.log(typeof event === 'string' ? event : JSON.stringify(event));
+    await new Promise(r => setTimeout(r, 30));
+  } process.exit(Number(process.env.AGY_EXIT || 0)); })();
+}
+`,
     );
-
-    expect(readAntigravityLastConversation(geminiDir, workspaceDir)).toBe('session-cached');
+    chmodSync(bin, 0o755);
+    process.env.ANTIGRAVITY_BIN = bin;
   });
-
-  test('extractAntigravityLatestOutput strips cumulative provider stdout', () => {
-    expect(extractAntigravityLatestOutput('first\nsecond', 'first')).toBe('second');
-    expect(extractAntigravityLatestOutput('first\nsecond\nthird', null, ['first', 'second'])).toBe('second\nthird');
-    expect(extractAntigravityLatestOutput('first\nsecond\nthird', null, ['first\nsecond'])).toBe('third');
-    expect(extractAntigravityLatestOutput('fresh', 'previous')).toBe('fresh');
+  afterEach(() => {
+    for (const key of Object.keys(process.env))
+      if (!(key in env)) delete process.env[key];
+    Object.assign(process.env, env);
+    rmSync(home, { recursive: true, force: true });
   });
-
-  test('extractAntigravityLatestOutput removes internal prompt-context mode blocks', () => {
-    expect(extractAntigravityLatestOutput('[MODE]Dialog[/MODE]\nvisible', null)).toBe('visible');
-    expect(
-      extractAntigravityLatestOutput(
-        '[MODE]Dialog[/MODE]\nfirst\n[MODE]Dialog[/MODE]\nsecond',
-        null,
-        ['first'],
-      ),
-    ).toBe('second');
+  const success = (response = 'hello', id = 'session-new') => ({
+    event: 'result',
+    result: {
+      status: 'SUCCESS',
+      response,
+      conversation_id: id,
+      usage: { input_tokens: 30, output_tokens: 4 },
+    },
   });
+  function agent(api = false, name = 'conversation-1') {
+    return new AntigravityStrategy(api, {
+      getConversationDataDir: () => join(home, name),
+      getConversationId: () => name,
+    });
+  }
+  function events(...values: unknown[]) {
+    process.env.AGY_EVENTS = JSON.stringify(values);
+  }
+  function connection(onUrl?: () => void) {
+    const received: string[] = [];
+    const conn: AuthConnection = {
+      sendAuthUrlGenerated: () => {
+        received.push('url');
+        onUrl?.();
+      },
+      sendDeviceCode: () => undefined,
+      sendAuthManualToken: () => received.push('manual'),
+      sendAuthSuccess: () => received.push('success'),
+      sendAuthStatus: (status) => received.push(status),
+      sendError: (message) => received.push(message),
+    };
+    return { received, conn };
+  }
 
-  test('treats an injected Secret Service keyring as authenticated state', async () => {
-    const geminiDir = join(testHome, '.gemini');
-    mkdirSync(join(geminiDir, '.local', 'share', 'keyrings'), { recursive: true });
-    writeFileSync(join(geminiDir, '.local', 'share', 'keyrings', 'login.keyring'), Buffer.from([0, 1, 2, 3]));
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-
-    await expect(strategy.checkAuthStatus()).resolves.toBe(true);
-  });
-
-  test('runs agy headlessly and persists the captured conversation id', async () => {
-    const argsPath = join(testHome, 'args.txt');
-    const envPath = join(testHome, 'home.txt');
-    writeFakeAgy(argsPath, envPath);
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-    const chunks: string[] = [];
-
-    await strategy.executePromptStreaming('hello', '', (chunk) => chunks.push(chunk));
-
-    const stateDir = join(testHome, 'conversation-1');
-    expect(chunks).toEqual(['antigravity response']);
-    expect(readFileSync(join(stateDir, '.antigravity_session'), 'utf8')).toBe('session-new');
-    expect(readFileSync(envPath, 'utf8')).toBe(testHome);
-    expect(readFileSync(argsPath, 'utf8')).toContain('--prompt=hello');
-  });
-
-  test('does not keep stdin open for headless prompt execution', async () => {
-    const argsPath = join(testHome, 'stdin-args.txt');
-    writeFakeAgy(argsPath);
-    process.env.ANTIGRAVITY_FAKE_WAIT_STDIN = '1';
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-    const chunks: string[] = [];
-    const execution = strategy.executePromptStreaming('hello', '', (chunk) => chunks.push(chunk));
-    const result = await Promise.race([
-      execution.then(() => 'completed' as const),
-      new Promise<'timeout'>((resolve) => setTimeout(() => resolve('timeout'), 1000)),
-    ]);
-
-    if (result === 'timeout') {
-      strategy.interruptAgent();
-      await expect(execution).rejects.toThrow();
-      throw new Error('Timed out waiting for Antigravity stdin to close');
-    }
-
-    expect(chunks).toEqual(['antigravity response']);
-  });
-
-  test('emits only the latest response when Antigravity returns cumulative stdout', async () => {
-    const argsPath = join(testHome, 'cumulative-args.txt');
-    writeFakeAgy(argsPath);
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-    const firstChunks: string[] = [];
-    process.env.ANTIGRAVITY_FAKE_MESSAGE = 'first response';
-
-    await strategy.executePromptStreaming('first', '', (chunk) => firstChunks.push(chunk));
-    expect(firstChunks).toEqual(['first response']);
-
-    const secondChunks: string[] = [];
-    process.env.ANTIGRAVITY_FAKE_MESSAGE = 'first response\nsecond response';
-    await strategy.executePromptStreaming('second', '', (chunk) => secondChunks.push(chunk));
-
-    expect(secondChunks).toEqual(['second response']);
-    expect(readFileSync(join(testHome, 'conversation-1', '.antigravity_stdout'), 'utf8')).toBe(
-      'first response\nsecond response',
+  test('owns protocol, model, effort and conversation flags and safely binds prompts', () => {
+    process.env.PROVIDER_ARGS = JSON.stringify({
+      model: 'bad',
+      effort: 'ultra',
+      conversation: 'bad',
+      'output-format': 'text',
+      'input-format': 'stream-json',
+      'print-timeout': '1s',
+    });
+    const args = buildAntigravityArgs(
+      '-dash',
+      'session-123',
+      'gemini-3.8-flash-high',
+      'max',
     );
+    expect(args[args.indexOf('--output-format') + 1]).toBe('stream-json');
+    expect(args).not.toContain('--input-format');
+    expect(args[args.indexOf('--model') + 1]).toBe('gemini-3.8-flash-high');
+    expect(args[args.indexOf('--effort') + 1]).toBe('high');
+    expect(args[args.indexOf('--conversation') + 1]).toBe('session-123');
+    expect(args).toContain('--prompt=-dash');
+    expect(args).toContain('--dangerously-skip-permissions');
   });
 
-  test('uses prior assistant messages to recover from a missing stdout cursor', async () => {
-    const argsPath = join(testHome, 'fallback-cumulative-args.txt');
-    writeFakeAgy(argsPath);
-    const stateDir = join(testHome, 'conversation-1');
-    mkdirSync(stateDir, { recursive: true });
-    writeFileSync(join(stateDir, '.antigravity_session'), 'session-existing');
-    process.env.ANTIGRAVITY_FAKE_MESSAGE = 'first response\nsecond response';
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-    const chunks: string[] = [];
+  test('keeps configured model and effort arguments when Chat has no override', () => {
+    process.env.PROVIDER_ARGS = JSON.stringify({
+      model: 'configured-model',
+      effort: 'medium',
+    });
+    const args = buildAntigravityArgs('hello', null);
+    expect(args[args.indexOf('--model') + 1]).toBe('configured-model');
+    expect(args[args.indexOf('--effort') + 1]).toBe('medium');
+  });
 
-    await strategy.executePromptStreaming(
-      'second',
-      '',
-      (chunk) => chunks.push(chunk),
-      undefined,
-      undefined,
-      { previousAssistantMessages: ['first response'] },
+  test('streams AGY deltas before exit, forwards tool and usage events, and avoids duplicate response', async () => {
+    events(
+      { event: 'init', conversation_id: 'session-new', init: {} },
+      {
+        event: 'step_update',
+        step_update: {
+          step_index: 3,
+          state: 'ACTIVE',
+          step_type: 'agent_response',
+          text_delta: 'hel',
+        },
+      },
+      {
+        event: 'step_update',
+        step_update: {
+          step_index: 3,
+          state: 'DONE',
+          step_type: 'agent_response',
+          text_delta: 'lo',
+        },
+      },
+      {
+        event: 'step_update',
+        step_update: {
+          step_index: 4,
+          state: 'DONE',
+          step_type: 'tool',
+          tool_name: 'run_command',
+          tool_info: {
+            name: 'run_command',
+            parameters: { CommandLine: 'echo hello' },
+            output: 'hello',
+          },
+        },
+      },
+      success(),
     );
-
-    expect(chunks).toEqual(['second response']);
-  });
-
-  test('streams stderr as best-effort reasoning diagnostics', async () => {
-    const argsPath = join(testHome, 'stderr-args.txt');
-    writeFakeAgy(argsPath);
-    process.env.ANTIGRAVITY_FAKE_STDERR = 'diagnostic line\n';
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-    const events: string[] = [];
-
-    await strategy.executePromptStreaming(
+    const chunks: string[] = [],
+      tools: ToolEvent[] = [],
+      counts: unknown[] = [];
+    let completed = false;
+    await agent().executePromptStreaming(
       'hello',
+      'gemini-3.8-flash-high',
+      (text) => {
+        expect(completed).toBe(false);
+        chunks.push(text);
+      },
+      {
+        onTool: (event) => tools.push(event),
+        onUsage: (value) => counts.push(value),
+      },
+      undefined,
+      { effort: 'low' },
+    );
+    completed = true;
+    expect(chunks).toEqual(['hel', 'lo']);
+    expect(tools[0].command).toBe('echo hello');
+    expect(counts).toEqual([{ inputTokens: 30, outputTokens: 4 }]);
+    expect(
+      readFileSync(
+        join(home, 'conversation-1', '.antigravity_session'),
+        'utf8',
+      ),
+    ).toBe('session-new');
+  });
+
+  test('resumes the scoped session with current-turn response and isolates other conversations', async () => {
+    events(success('repeat'));
+    const runtime = agent();
+    await runtime.executePromptStreaming('first', '', () => undefined);
+    events(success('repeat this is new'));
+    const chunks: string[] = [];
+    await runtime.executePromptStreaming('second', '', (text) =>
+      chunks.push(text),
+    );
+    const args: string[] = JSON.parse(
+      readFileSync(join(home, 'args.json'), 'utf8'),
+    );
+    expect(args[args.indexOf('--conversation') + 1]).toBe('session-new');
+    expect(chunks).toEqual(['repeat this is new']);
+    events(success('different', 'session-other'));
+    await agent(false, 'conversation-2').executePromptStreaming(
+      'other',
       '',
       () => undefined,
-      {
-        onReasoningStart: () => events.push('start'),
-        onReasoningChunk: (chunk) => events.push(chunk),
-        onReasoningEnd: () => events.push('end'),
-      },
     );
-
-    expect(events).toEqual(['start', 'diagnostic line\n', 'end']);
+    expect(
+      JSON.parse(readFileSync(join(home, 'args.json'), 'utf8')),
+    ).not.toContain('--conversation');
   });
 
-  test('resumes a stored Antigravity conversation id', async () => {
-    const argsPath = join(testHome, 'resume-args.txt');
-    writeFakeAgy(argsPath);
-    const stateDir = join(testHome, 'conversation-1');
-    mkdirSync(stateDir, { recursive: true });
-    writeFileSync(join(stateDir, '.antigravity_session'), 'session-existing');
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-
-    await strategy.executePromptStreaming('continue', '', () => undefined);
-
-    const args = readFileSync(argsPath, 'utf8').trim().split(/\r?\n/);
-    expect(args).toContain('--conversation');
-    expect(args[args.indexOf('--conversation') + 1]).toBe('session-existing');
+  for (const status of [
+    'ERROR',
+    'CANCELED',
+    'INTERRUPTED',
+    'INVALID',
+    'WAITING',
+    'RUNNING',
+  ]) {
+    test(`rejects ${status} despite zero exit without saving session`, async () => {
+      events({
+        event: 'result',
+        result: {
+          status,
+          response: 'partial',
+          error: 'provider did not finish',
+        },
+      });
+      await expect(
+        agent().executePromptStreaming('hello', '', () => undefined),
+      ).rejects.toThrow('provider did not finish');
+      expect(
+        existsSync(join(home, 'conversation-1', '.antigravity_session')),
+      ).toBe(false);
+    });
+  }
+  test('rejects malformed stream or missing result even after text output', async () => {
+    events({
+      event: 'step_update',
+      step_update: { step_type: 'agent_response', text_delta: 'partial' },
+    });
+    await expect(
+      agent().executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow('did not complete');
+    events('not-json', success());
+    await expect(
+      agent().executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow('did not complete');
   });
-
-  test('queues steering for the next Antigravity turn instead of interrupting print mode', async () => {
-    const argsPath = join(testHome, 'steer-args.txt');
-    writeFakeAgy(argsPath);
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-
-    expect(strategy.steerAgent('operator update')).toBe('queued');
-    await strategy.executePromptStreaming('continue', '', () => undefined);
-
-    expect(readFileSync(argsPath, 'utf8')).toContain('[Operator Interruption]');
-    expect(readFileSync(argsPath, 'utf8')).toContain('operator update');
+  test('clears missing session marker for a fresh retry', async () => {
+    mkdirSync(join(home, 'conversation-1'), { recursive: true });
+    const marker = join(home, 'conversation-1', '.antigravity_session');
+    writeFileSync(marker, 'stale');
+    events({
+      event: 'result',
+      result: { status: 'ERROR', error: 'conversation stale not found' },
+    });
+    await expect(
+      agent().executePromptStreaming('continue', '', () => undefined),
+    ).rejects.toThrow('conversation was not found');
+    expect(existsSync(marker)).toBe(false);
   });
-
-  test('clears stale session marker when Antigravity starts fresh after a missing conversation', async () => {
-    const argsPath = join(testHome, 'missing-args.txt');
-    writeFakeAgy(argsPath);
-    process.env.ANTIGRAVITY_FAKE_MISSING = '1';
-    const stateDir = join(testHome, 'conversation-1');
-    mkdirSync(stateDir, { recursive: true });
-    const markerPath = join(stateDir, '.antigravity_session');
-    writeFileSync(markerPath, 'stale-session');
-    const strategy = new AntigravityStrategy(false, makeConversationProvider());
-
-    await expect(strategy.executePromptStreaming('continue', '', () => undefined)).rejects.toThrow(
-      /Stored Antigravity conversation was not found/
+  test('rejects nonzero exits and empty success', async () => {
+    events(success());
+    process.env.AGY_EXIT = '1';
+    await expect(
+      agent().executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow('did not complete');
+    process.env.AGY_EXIT = '0';
+    events(success(''));
+    await expect(
+      agent().executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow('without a response');
+  });
+  test('configures Gemini API-key auth, preserves settings and passes saved key', async () => {
+    const dir = join(home, '.gemini', 'antigravity-cli');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      join(dir, 'settings.json'),
+      JSON.stringify({ permissions: { allow: ['command(git)'] } }),
     );
-    expect(existsSync(markerPath)).toBe(false);
+    const runtime = agent(true);
+    const { conn, received } = connection();
+    runtime.executeAuth(conn);
+    expect(received).toEqual(['manual']);
+    runtime.submitAuthCode('test-key');
+    expect(received).toEqual(['manual', 'success']);
+    expect(
+      JSON.parse(readFileSync(join(dir, 'settings.json'), 'utf8')),
+    ).toEqual({
+      permissions: { allow: ['command(git)'] },
+      modelProvider: 'gemini',
+    });
+    await expect(runtime.checkAuthStatus()).resolves.toBe(true);
+    events(success());
+    await runtime.executePromptStreaming('hello', '', () => undefined);
+    expect(readFileSync(join(home, 'key.txt'), 'utf8')).toBe('present');
+    runtime.clearCredentials();
+    await expect(runtime.checkAuthStatus()).resolves.toBe(false);
+  });
+  test('submits OAuth code through a real Node terminal and cancels without reporting success', () => {
+    process.env.AGY_AUTH = '1';
+    // Bun on macOS does not deliver node-pty data callbacks. Exercise the
+    // complete strategy under Node, matching the deployed runtime.
+    const script = `
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const Module = require('node:module');
+      const ts = require('typescript');
+      const resolveFilename = Module._resolveFilename;
+      Module._resolveFilename = function(id, ...args) {
+        if (id.startsWith('@shared/')) id = path.resolve('../../shared', id.slice(8)) + '.ts';
+        return resolveFilename.call(this, id, ...args);
+      };
+      require.extensions['.ts'] = (module, filename) => module._compile(
+        ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+          compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
+        }).outputText, filename);
+      const { AntigravityStrategy } = require('./src/app/strategies/antigravity.strategy.ts');
+      const runtime = new AntigravityStrategy(false, {
+        getConversationDataDir: () => path.join(process.env.HOME, 'auth-conversation')
+      });
+      const received = [];
+      const deadline = setTimeout(() => { runtime.cancelAuth(); process.exit(1); }, 3000);
+      const conn = {
+        sendAuthUrlGenerated: () => { received.push('url'); runtime.submitAuthCode('test-code'); },
+        sendDeviceCode: () => {}, sendAuthManualToken: () => {},
+        sendError: (message) => { console.error(message); process.exit(2); },
+        sendAuthStatus: () => process.exit(3),
+        sendAuthSuccess: () => {
+          received.push('success');
+          runtime.executeAuth({ ...conn, sendAuthUrlGenerated: () => {
+            received.push('cancel-url'); runtime.cancelAuth();
+            clearTimeout(deadline);
+            setTimeout(() => { console.log(JSON.stringify(received)); process.exit(0); }, 100);
+          }, sendAuthSuccess: () => process.exit(4) });
+        }
+      };
+      runtime.executeAuth(conn);
+    `;
+    const nodeEnv = { ...process.env, HOME: home };
+    delete nodeEnv.FORCE_COLOR;
+    const run = spawnSync('node', ['-e', script], {
+      cwd: resolve(import.meta.dir, '../../..'),
+      env: nodeEnv,
+      encoding: 'utf8',
+      timeout: 5000,
+    });
+    expect(run.stderr).toBe('');
+    expect(run.status).toBe(0);
+    expect(JSON.parse(run.stdout.trim())).toEqual([
+      'url',
+      'success',
+      'cancel-url',
+    ]);
+  });
+  test('discovers model slugs without display labels or duplicates', async () => {
+    await expect(agent().listModels()).resolves.toEqual([
+      'gemini-3.8-flash-high',
+      'claude-sonnet-4-6',
+    ]);
+  });
+  test('queues steering for the next turn', async () => {
+    events(success());
+    const runtime = agent();
+    expect(runtime.steerAgent('operator update')).toBe('queued');
+    await runtime.executePromptStreaming('continue', '', () => undefined);
+    expect(readFileSync(join(home, 'args.json'), 'utf8')).toContain(
+      'operator update',
+    );
+  });
+  test('preserves injected legacy keyring authentication', async () => {
+    const dir = join(home, '.gemini', '.local', 'share', 'keyrings');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, 'login.keyring'), Buffer.from([0, 1, 2]));
+    await expect(agent().checkAuthStatus()).resolves.toBe(true);
   });
 });

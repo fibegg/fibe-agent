@@ -25,13 +25,16 @@ describe('ConfigService', () => {
     envBackup.FIBE_DOMAIN = process.env.FIBE_DOMAIN;
     envBackup.FIBE_SYNC_ENABLED = process.env.FIBE_SYNC_ENABLED;
     envBackup.WEBSOCKET_MAX_CONNECTIONS = process.env.WEBSOCKET_MAX_CONNECTIONS;
-    envBackup.FIBE_OCR_CONVERSION_MAX_BYTES = process.env.FIBE_OCR_CONVERSION_MAX_BYTES;
-    envBackup.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES = process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES;
+    envBackup.FIBE_OCR_CONVERSION_MAX_BYTES =
+      process.env.FIBE_OCR_CONVERSION_MAX_BYTES;
+    envBackup.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES =
+      process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES;
     envBackup.CLAUDE_EFFORT = process.env.CLAUDE_EFFORT;
     envBackup.GEMMA_ROUTER_ENABLED = process.env.GEMMA_ROUTER_ENABLED;
     envBackup.OLLAMA_URL = process.env.OLLAMA_URL;
     envBackup.GEMMA_MODEL = process.env.GEMMA_MODEL;
-    envBackup.GEMMA_CONFIDENCE_THRESHOLD = process.env.GEMMA_CONFIDENCE_THRESHOLD;
+    envBackup.GEMMA_CONFIDENCE_THRESHOLD =
+      process.env.GEMMA_CONFIDENCE_THRESHOLD;
     envBackup.GEMMA_TIMEOUT_MS = process.env.GEMMA_TIMEOUT_MS;
     // Clear to avoid cross-test leakage
     delete process.env.FIBE_SETTINGS_JSON;
@@ -80,7 +83,10 @@ describe('ConfigService', () => {
   });
 
   test('getDefaultModel returns defaultModel from settings', () => {
-    const config = withSettings({ defaultModel: 'pro', modelOptions: 'flash,flash-lite' });
+    const config = withSettings({
+      defaultModel: 'pro',
+      modelOptions: 'flash,flash-lite',
+    });
     expect(config.getDefaultModel()).toBe('pro');
   });
 
@@ -118,7 +124,9 @@ describe('ConfigService', () => {
   });
 
   test('getSystemPrompt returns systemPrompt from settings', () => {
-    const config = withSettings({ systemPrompt: 'You are a helpful assistant' });
+    const config = withSettings({
+      systemPrompt: 'You are a helpful assistant',
+    });
     expect(config.getSystemPrompt()).toBe('You are a helpful assistant');
   });
 
@@ -142,7 +150,9 @@ describe('ConfigService', () => {
 
   test('getPlaygroundsDir returns default under cwd when not set', () => {
     delete process.env.PLAYGROUNDS_DIR;
-    expect(new ConfigService().getPlaygroundsDir()).toBe(join(process.cwd(), 'playground'));
+    expect(new ConfigService().getPlaygroundsDir()).toBe(
+      join(process.cwd(), 'playground'),
+    );
   });
 
   test('getPostInitScript returns undefined when not set', () => {
@@ -217,7 +227,7 @@ describe('ConfigService', () => {
     expect(config.getConversationDataDir()).toBe('/data/abc-123_XYZ');
   });
 
-  // Go SDK vars — still read from process.env
+  // Go SDK vars: still read from process.env
   test('getFibeApiKey returns FIBE_API_KEY when set', () => {
     process.env.FIBE_API_KEY = 'test-key-123';
     expect(new ConfigService().getFibeApiKey()).toBe('test-key-123');
@@ -245,12 +255,16 @@ describe('ConfigService', () => {
 
   test('getFibeApiUrl derives http for Docker service hostnames', () => {
     process.env.FIBE_DOMAIN = 'app-playwright-web:3001';
-    expect(new ConfigService().getFibeApiUrl()).toBe('http://app-playwright-web:3001');
+    expect(new ConfigService().getFibeApiUrl()).toBe(
+      'http://app-playwright-web:3001',
+    );
   });
 
   test('getFibeApiUrl derives http for Docker E2E callback IPs', () => {
     process.env.FIBE_DOMAIN = '192.168.97.42:3001';
-    expect(new ConfigService().getFibeApiUrl()).toBe('http://192.168.97.42:3001');
+    expect(new ConfigService().getFibeApiUrl()).toBe(
+      'http://192.168.97.42:3001',
+    );
   });
 
   test('getFibeApiUrl does not duplicate an explicit scheme', () => {
@@ -303,10 +317,20 @@ describe('ConfigService', () => {
   });
 
   test('getWebsocketMaxConnections falls back to 5 for invalid values', () => {
-    expect(withSettings({ websocketMaxConnections: 0 }).getWebsocketMaxConnections()).toBe(5);
-    expect(withSettings({ websocketMaxConnections: 'abc' }).getWebsocketMaxConnections()).toBe(5);
+    expect(
+      withSettings({ websocketMaxConnections: 0 }).getWebsocketMaxConnections(),
+    ).toBe(5);
+    expect(
+      withSettings({
+        websocketMaxConnections: 'abc',
+      }).getWebsocketMaxConnections(),
+    ).toBe(5);
     process.env.WEBSOCKET_MAX_CONNECTIONS = '-1';
-    expect(withSettings({ websocketMaxConnections: 10 }).getWebsocketMaxConnections()).toBe(5);
+    expect(
+      withSettings({
+        websocketMaxConnections: 10,
+      }).getWebsocketMaxConnections(),
+    ).toBe(5);
   });
 
   test('returns OCR conversion limits from settings', () => {
@@ -332,10 +356,20 @@ describe('ConfigService', () => {
   });
 
   test('falls back to OCR conversion defaults for invalid values', () => {
-    expect(withSettings({ ocrConversionMaxBytes: 0 }).getOcrConversionMaxBytes()).toBe(10 * 1024 * 1024);
-    expect(withSettings({ ocrConversionMaxOutputBytes: 'abc' }).getOcrConversionMaxOutputBytes()).toBe(25 * 1024 * 1024);
+    expect(
+      withSettings({ ocrConversionMaxBytes: 0 }).getOcrConversionMaxBytes(),
+    ).toBe(10 * 1024 * 1024);
+    expect(
+      withSettings({
+        ocrConversionMaxOutputBytes: 'abc',
+      }).getOcrConversionMaxOutputBytes(),
+    ).toBe(25 * 1024 * 1024);
     process.env.FIBE_OCR_CONVERSION_MAX_BYTES = '-1';
-    expect(withSettings({ ocrConversionMaxBytes: 1048576 }).getOcrConversionMaxBytes()).toBe(10 * 1024 * 1024);
+    expect(
+      withSettings({
+        ocrConversionMaxBytes: 1048576,
+      }).getOcrConversionMaxBytes(),
+    ).toBe(10 * 1024 * 1024);
   });
 
   test('returns storage and platform routing settings from fibe settings', () => {
@@ -377,7 +411,9 @@ describe('ConfigService', () => {
 
   test('isSyscheckEnabled defaults to true unless settings explicitly disable it', () => {
     expect(new ConfigService().isSyscheckEnabled()).toBe(true);
-    expect(withSettings({ syscheckEnabled: true }).isSyscheckEnabled()).toBe(true);
+    expect(withSettings({ syscheckEnabled: true }).isSyscheckEnabled()).toBe(
+      true,
+    );
   });
 
   test('returns Gemma router settings from fibe settings with bounds applied', () => {

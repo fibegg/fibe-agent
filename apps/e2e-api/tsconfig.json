@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "out-tsc/e2e-api",
     "esModuleInterop": true,
+    "types": ["node"],
     "noUnusedLocals": false,
     "noImplicitAny": false
   },

@@ -11,7 +11,7 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible={false}
-      />
+      />,
     );
     expect(container.firstChild).toBeNull();
   });
@@ -25,7 +25,7 @@ describe('ModelSelector', () => {
         onInputChange={vi.fn()}
         visible
         modelLocked
-      />
+      />,
     );
     expect(screen.getByLabelText('Model in use')).toBeTruthy();
     expect(screen.getByText('flash')).toBeTruthy();
@@ -40,7 +40,7 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     expect(screen.getByRole('button', { name: 'Select model' })).toBeTruthy();
     expect(screen.getByText('Model (default)')).toBeTruthy();
@@ -54,17 +54,22 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     expect(screen.getByRole('listbox', { name: 'Model options' })).toBeTruthy();
-    expect(screen.getByRole('option', { name: 'Model (default)' })).toBeTruthy();
+    expect(
+      screen.getByRole('option', { name: 'Model (default)' }),
+    ).toBeTruthy();
     expect(screen.getByRole('option', { name: 'flash' })).toBeTruthy();
     expect(screen.getByRole('option', { name: 'pro' })).toBeTruthy();
   });
 
   it('can force the dropdown to open below the trigger with scrollable height', () => {
-    Object.defineProperty(window, 'innerHeight', { value: 500, configurable: true });
+    Object.defineProperty(window, 'innerHeight', {
+      value: 500,
+      configurable: true,
+    });
     const options = Array.from({ length: 30 }, (_, index) => `model-${index}`);
     render(
       <ModelSelector
@@ -75,7 +80,7 @@ describe('ModelSelector', () => {
         visible
         variant="settings"
         dropdownPlacement="bottom"
-      />
+      />,
     );
 
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
@@ -98,7 +103,7 @@ describe('ModelSelector', () => {
         onSelect={onSelect}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     fireEvent.click(screen.getByRole('option', { name: 'pro' }));
@@ -114,7 +119,7 @@ describe('ModelSelector', () => {
         onSelect={onSelect}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     fireEvent.click(screen.getByRole('option', { name: 'Model (default)' }));
@@ -131,10 +136,10 @@ describe('ModelSelector', () => {
         onSelect={onSelect}
         onInputChange={onInputChange}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
-    fireEvent.click(screen.getByRole('option', { name: 'Custom model...' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Custom model…' }));
     const input = screen.getByLabelText('Custom model name');
     expect(input).toBeTruthy();
     fireEvent.change(input, { target: { value: 'custom' } });
@@ -152,7 +157,7 @@ describe('ModelSelector', () => {
         onInputChange={vi.fn()}
         visible
         onRefresh={vi.fn()}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     expect(screen.getByRole('button', { name: 'Refresh models' })).toBeTruthy();
@@ -166,7 +171,7 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     expect(screen.queryByRole('button', { name: 'Refresh models' })).toBeNull();
@@ -182,7 +187,7 @@ describe('ModelSelector', () => {
         onInputChange={vi.fn()}
         visible
         onRefresh={onRefresh}
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     fireEvent.click(screen.getByRole('button', { name: 'Refresh models' }));
@@ -199,7 +204,7 @@ describe('ModelSelector', () => {
         visible
         onRefresh={vi.fn()}
         refreshing
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     const btn = screen.getByRole('button', { name: 'Refresh models' });
@@ -214,7 +219,7 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
     const searchInput = screen.getByLabelText('Search models');
@@ -233,18 +238,16 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
-    fireEvent.change(screen.getByLabelText('Search models'), { target: { value: 'xyz' } });
+    fireEvent.change(screen.getByLabelText('Search models'), {
+      target: { value: 'xyz' },
+    });
     expect(screen.getByText(/No models match/)).toBeTruthy();
   });
 
-  // ─── Mobile visibility ────────────────────────────────────────────────────
-
   it('trigger button is present in the DOM regardless of viewport width', () => {
-    // Previously the trigger was hidden with "hidden md:flex" — it should now be
-    // always present so mobile users can change the model.
     render(
       <ModelSelector
         currentModel=""
@@ -252,7 +255,7 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     const btn = screen.getByRole('button', { name: 'Select model' });
     expect(btn).toBeTruthy();
@@ -268,20 +271,22 @@ describe('ModelSelector', () => {
         onSelect={vi.fn()}
         onInputChange={vi.fn()}
         visible
-      />
+      />,
     );
     // The wrapper div must NOT hide below md breakpoint
     const wrapper = container.firstElementChild as HTMLElement;
     expect(wrapper?.className ?? '').not.toContain('hidden md:block');
   });
 
-  // ─── Outside-tap close (touchstart) ───────────────────────────────────────
-
   describe('touchstart closes dropdown', () => {
     beforeEach(() => {
       // Provide a minimal visualViewport stub so effect runs without error
       Object.defineProperty(window, 'visualViewport', {
-        value: { height: 800, addEventListener: vi.fn(), removeEventListener: vi.fn() },
+        value: {
+          height: 800,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        },
         configurable: true,
       });
     });
@@ -301,7 +306,7 @@ describe('ModelSelector', () => {
           onSelect={vi.fn()}
           onInputChange={vi.fn()}
           visible
-        />
+        />,
       );
       fireEvent.click(screen.getByRole('button', { name: 'Select model' }));
       // Dropdown is open (panelRect is set asynchronously via getBoundingClientRect;

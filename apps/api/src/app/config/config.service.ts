@@ -1,7 +1,12 @@
 import { join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { loadFibeSettings, type FibeSettings } from './fibe-settings';
-import { DEFAULT_EFFORT, normalizeEffort, resolveEffort, type EffortValue } from '@shared/effort.constants';
+import {
+  DEFAULT_EFFORT,
+  normalizeEffort,
+  resolveEffort,
+  type EffortValue,
+} from '@shared/effort.constants';
 
 const DEFAULT_WEBSOCKET_MAX_CONNECTIONS = 5;
 export const DEFAULT_OCR_CONVERSION_MAX_BYTES = 10 * 1024 * 1024;
@@ -24,7 +29,11 @@ function parsePositiveInteger(value: unknown): number | undefined {
 }
 
 function isIpLiteral(host: string): boolean {
-  return /^(\d{1,3}\.){3}\d{1,3}$/.test(host) || /^\[[0-9a-f:]+\]$/i.test(host) || /^[0-9a-f:]+$/i.test(host);
+  return (
+    /^(\d{1,3}\.){3}\d{1,3}$/.test(host) ||
+    /^\[[0-9a-f:]+\]$/i.test(host) ||
+    /^[0-9a-f:]+$/i.test(host)
+  );
 }
 
 @Injectable()
@@ -42,7 +51,10 @@ export class ConfigService {
   getModelOptions(): string[] {
     const raw = this.settings.modelOptions ?? '';
     const str = Array.isArray(raw) ? raw.join(',') : raw;
-    return str.split(',').map((s: string) => s.trim()).filter(Boolean);
+    return str
+      .split(',')
+      .map((s: string) => s.trim())
+      .filter(Boolean);
   }
 
   getDefaultModel(): string {
@@ -71,7 +83,10 @@ export class ConfigService {
   }
 
   getConversationDataDir(): string {
-    return join(this.getDataDir(), sanitizeConversationId(this.getConversationId()));
+    return join(
+      this.getDataDir(),
+      sanitizeConversationId(this.getConversationId()),
+    );
   }
 
   getSystemPrompt(): string | undefined {
@@ -86,20 +101,27 @@ export class ConfigService {
     return this.settings.marqueeRoot ?? '/opt/fibe';
   }
 
-  // Go SDK vars — from process.env (shared with CLI binary)
+  // Go SDK vars: from process.env (shared with CLI binary)
   getFibeApiKey(): string | undefined {
     return process.env.FIBE_API_KEY;
   }
 
-  // Derived from FIBE_DOMAIN — no separate FIBE_API_URL env var
   getFibeApiUrl(): string | undefined {
     const domain = process.env.FIBE_DOMAIN?.trim();
     if (!domain) return undefined;
 
-    const withoutScheme = domain.replace(/^https?:\/\//i, '').replace(/\/+$/, '');
+    const withoutScheme = domain
+      .replace(/^https?:\/\//i, '')
+      .replace(/\/+$/, '');
     const host = withoutScheme.replace(/:\d+$/, '');
-    const localHost = host === 'localhost' || host.endsWith('.test') || !host.includes('.') || isIpLiteral(host);
-    const protocol = domain.match(/^https?:\/\//i)?.[0].replace('://', '') ?? (localHost ? 'http' : 'https');
+    const localHost =
+      host === 'localhost' ||
+      host.endsWith('.test') ||
+      !host.includes('.') ||
+      isIpLiteral(host);
+    const protocol =
+      domain.match(/^https?:\/\//i)?.[0].replace('://', '') ??
+      (localHost ? 'http' : 'https');
     return `${protocol}://${withoutScheme}`;
   }
 
@@ -108,7 +130,10 @@ export class ConfigService {
   }
 
   isFibeSyncEnabled(): boolean {
-    return this.settings.fibeSyncEnabled === true || process.env.FIBE_SYNC_ENABLED === 'true';
+    return (
+      this.settings.fibeSyncEnabled === true ||
+      process.env.FIBE_SYNC_ENABLED === 'true'
+    );
   }
 
   isFibeHydrateEnabled(): boolean {
@@ -153,52 +178,78 @@ export class ConfigService {
 
   getWebsocketMaxConnections(): number {
     if (process.env.WEBSOCKET_MAX_CONNECTIONS !== undefined) {
-      return parsePositiveInteger(process.env.WEBSOCKET_MAX_CONNECTIONS) ??
-        DEFAULT_WEBSOCKET_MAX_CONNECTIONS;
+      return (
+        parsePositiveInteger(process.env.WEBSOCKET_MAX_CONNECTIONS) ??
+        DEFAULT_WEBSOCKET_MAX_CONNECTIONS
+      );
     }
-    return parsePositiveInteger(this.settings.websocketMaxConnections) ??
-      DEFAULT_WEBSOCKET_MAX_CONNECTIONS;
+    return (
+      parsePositiveInteger(this.settings.websocketMaxConnections) ??
+      DEFAULT_WEBSOCKET_MAX_CONNECTIONS
+    );
   }
 
   getOcrConversionMaxBytes(): number {
     if (process.env.FIBE_OCR_CONVERSION_MAX_BYTES !== undefined) {
-      return parsePositiveInteger(process.env.FIBE_OCR_CONVERSION_MAX_BYTES) ??
-        DEFAULT_OCR_CONVERSION_MAX_BYTES;
+      return (
+        parsePositiveInteger(process.env.FIBE_OCR_CONVERSION_MAX_BYTES) ??
+        DEFAULT_OCR_CONVERSION_MAX_BYTES
+      );
     }
-    return parsePositiveInteger(this.settings.ocrConversionMaxBytes) ??
-      DEFAULT_OCR_CONVERSION_MAX_BYTES;
+    return (
+      parsePositiveInteger(this.settings.ocrConversionMaxBytes) ??
+      DEFAULT_OCR_CONVERSION_MAX_BYTES
+    );
   }
 
   getOcrConversionMaxOutputBytes(): number {
     if (process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES !== undefined) {
-      return parsePositiveInteger(process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES) ??
-        DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES;
+      return (
+        parsePositiveInteger(
+          process.env.FIBE_OCR_CONVERSION_MAX_OUTPUT_BYTES,
+        ) ?? DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES
+      );
     }
-    return parsePositiveInteger(this.settings.ocrConversionMaxOutputBytes) ??
-      DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES;
+    return (
+      parsePositiveInteger(this.settings.ocrConversionMaxOutputBytes) ??
+      DEFAULT_OCR_CONVERSION_MAX_OUTPUT_BYTES
+    );
   }
 
-  // ─── Gemma Router (local LLM pre-processor via Ollama) ───────────
-
   isGemmaRouterEnabled(): boolean {
-    return this.settings.gemmaRouterEnabled === true || process.env.GEMMA_ROUTER_ENABLED === 'true';
+    return (
+      this.settings.gemmaRouterEnabled === true ||
+      process.env.GEMMA_ROUTER_ENABLED === 'true'
+    );
   }
 
   getGemmaUrl(): string {
-    return this.settings.ollamaUrl?.trim() || process.env.OLLAMA_URL?.trim() || 'http://localhost:11434';
+    return (
+      this.settings.ollamaUrl?.trim() ||
+      process.env.OLLAMA_URL?.trim() ||
+      'http://localhost:11434'
+    );
   }
 
   getGemmaModel(): string {
-    return this.settings.gemmaModel?.trim() || process.env.GEMMA_MODEL?.trim() || 'gemma3:4b';
+    return (
+      this.settings.gemmaModel?.trim() ||
+      process.env.GEMMA_MODEL?.trim() ||
+      'gemma3:4b'
+    );
   }
 
   getGemmaConfidenceThreshold(): number {
-    const val = this.settings.gemmaConfidenceThreshold ?? parseFloat(process.env.GEMMA_CONFIDENCE_THRESHOLD ?? '');
+    const val =
+      this.settings.gemmaConfidenceThreshold ??
+      parseFloat(process.env.GEMMA_CONFIDENCE_THRESHOLD ?? '');
     return isNaN(val) ? 0.8 : Math.max(0, Math.min(1, val));
   }
 
   getGemmaTimeoutMs(): number {
-    const val = this.settings.gemmaTimeoutMs ?? parseInt(process.env.GEMMA_TIMEOUT_MS ?? '', 10);
+    const val =
+      this.settings.gemmaTimeoutMs ??
+      parseInt(process.env.GEMMA_TIMEOUT_MS ?? '', 10);
     return isNaN(val) ? 30000 : Math.max(500, val);
   }
 }

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -12,6 +13,11 @@ import {
   setupGhcrImageContext,
   tryCaptureText,
 } from './lib.mjs';
+
+const fibeCliVersion = process.env.FIBE_CLI_VERSION
+  || JSON.parse(readFileSync(new URL('../provider-versions.json', import.meta.url))).fibeCli.version;
+if (!/^\d+\.\d+\.\d+$/.test(fibeCliVersion)) throw new Error('FIBE_CLI_VERSION must be an exact stable version');
+console.log(`--> Pinned Fibe CLI release: ${fibeCliVersion}`);
 
 console.log('--> Preparing for Docker Build & Push');
 await run('git', ['config', '--global', '--add', 'safe.directory', '/app']);
@@ -96,6 +102,8 @@ await run('docker', [
   '--build-arg',
   `GIT_SHA=${gitSha}`,
   '--build-arg',
+  `FIBE_CLI_VERSION=${fibeCliVersion}`,
+  '--build-arg',
   `SOURCE_DATE_EPOCH=${sourceDateEpoch}`,
   '--build-arg',
   `NPM_CONFIG_JOBS=${buildConfig.npmJobs}`,
@@ -103,6 +111,8 @@ await run('docker', [
   `NX_PARALLEL=${buildConfig.nxParallel}`,
   `--provenance=${buildConfig.provenance}`,
   `--sbom=${buildConfig.sbom}`,
+  '--label',
+  `gg.fibe.cli.version=${fibeCliVersion}`,
   '--label',
   `org.opencontainers.image.title=${imageTitle}`,
   '--label',

@@ -115,7 +115,7 @@ function schedulePrismHighlightForRoot(
       try {
         m.highlightCodeElement(el as HTMLElement);
       } catch {
-        /* keep plain text */
+        // Plain text remains usable if highlighting fails.
       }
     }
   });
@@ -414,7 +414,7 @@ const MessageRow = memo(
     maxWidthClass?: string;
     onRetry?: () => void;
     isNoOutput?: boolean;
-    /** Scroll-container pixel width — used to compute tight bubble widths. */
+    /** Scroll-container pixel width: used to compute tight bubble widths. */
     containerWidthPx?: number;
     onPlay?: (id: string, text: string) => void;
     playingId?: string | null;
@@ -607,7 +607,7 @@ const MessageRow = memo(
                     }
                   >
                     <Brain className="size-3 shrink-0" aria-hidden />
-                    {msg.model ?? '—'}
+                    {msg.model ?? t('message.modelUnknown')}
                   </p>
                 </div>
               </>
@@ -684,9 +684,7 @@ export const MessageList = forwardRef<
 ) {
   const maxWidthClass = bothSidebarsCollapsed ? FULL_WIDTH : DEFAULT_MAX_WIDTH;
 
-  // Read the scroll-container pixel width for tight-bubble computation.
-  // TanStack Virtual already uses a ResizeObserver internally — when the
-  // container resizes, the virtualizer re-renders, which re-reads this value.
+  // TanStack Virtual rerenders on resize, keeping this value current.
   const containerWidthPx = scrollRef?.current?.clientWidth ?? 640;
 
   const localTts = useLocalTts();
@@ -700,7 +698,7 @@ export const MessageList = forwardRef<
   const localTtsRef = useRef(localTts);
   localTtsRef.current = localTts;
 
-  // Stable identity — never changes, so MessageRow memo is not invalidated
+  // Stable identity: never changes, so MessageRow memo is not invalidated
   // when playingId changes on an unrelated row.
   const handlePlay = useCallback((id: string, text: string) => {
     const tts = localTtsRef.current;
@@ -969,7 +967,6 @@ export const MessageList = forwardRef<
       lastLen !== null &&
       Math.abs(len - lastLen) < STREAMING_HEIGHT_THROTTLE_CHARS
     ) {
-      // Not enough new text to justify a full layout pass — reuse cached value.
       return streamingHeightCacheRef.current;
     }
     streamingHeightLenRef.current = len;

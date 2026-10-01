@@ -16,34 +16,16 @@ FROM cli-base AS cli
 ARG AGENT_PROVIDER=gemini
 
 COPY --link package.json ./
+COPY --link scripts/install-provider.mjs scripts/provider-versions.json ./scripts/
 RUN --mount=type=cache,target=/root/.npm \
-    if [ "$AGENT_PROVIDER" = "gemini" ]; then \
-    npm install -g @google/gemini-cli; \
-    elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
-    CLAUDE_VER=$(grep '"@anthropic-ai/claude-code"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
-    npm install -g "@anthropic-ai/claude-code@${CLAUDE_VER:-latest}"; \
-    elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
-    CODEX_VER=$(grep '"@openai/codex"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
-    npm install -g "@openai/codex@${CODEX_VER:-latest}"; \
-    elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
-    OPENCODE_VER=$(grep '"opencode-ai"' package.json | grep -o '[0-9]*\.[0-9]*\.[0-9]*' | head -1); \
-    npm install -g "opencode-ai@${OPENCODE_VER:-latest}"; \
-    elif [ "$AGENT_PROVIDER" = "cursor" ]; then \
-    curl -fsSL -o /tmp/cursor-install.sh https://cursor.com/install; \
-    bash /tmp/cursor-install.sh; \
-    rm -f /tmp/cursor-install.sh; \
-    /root/.local/bin/cursor-agent --help >/dev/null; \
-    elif [ "$AGENT_PROVIDER" = "antigravity" ]; then \
-    curl -fsSL https://antigravity.google/cli/install.sh | bash -s -- --dir /usr/local/bin; \
-    agy --help >/dev/null; \
-    fi
+    node scripts/install-provider.mjs "$AGENT_PROVIDER"
 
-RUN mkdir -p /root/.local/share/cursor-agent
+RUN mkdir -p /usr/local/share/cursor-agent
 
 RUN find /usr/local/lib/node_modules -type f -name "*.map" -delete 2>/dev/null || true
 
 FROM node:24-slim AS builder
-COPY --link --from=oven/bun:1.3.11-slim /usr/local/bin/bun /usr/local/bin/bun
+COPY --link --from=oven/bun:1.4.2-slim /usr/local/bin/bun /usr/local/bin/bun
 
 ARG BUILDKIT_INLINE_CACHE=1
 ARG NPM_CONFIG_JOBS
@@ -58,7 +40,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         python3 make g++ \
     && rm -rf /var/lib/apt/lists/* \
-    && npm install -g node-gyp
+    && npm install -g node-gyp@13.0.2
 
 WORKDIR /app
 
@@ -86,9 +68,9 @@ RUN --mount=type=cache,target=/app/.nx/cache \
     NX_PARALLEL="${NX_PARALLEL:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
     npx nx run-many --targets=build --projects=api,chat --parallel="${NX_PARALLEL}"
 
-FROM golang:1.26.4-alpine AS gitea-mcp
+FROM golang:1.27.1-alpine AS gitea-mcp
 
-ARG GITEA_MCP_VERSION=1.1.0
+ARG GITEA_MCP_VERSION=1.8.0
 
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
@@ -97,12 +79,12 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM node:24-slim AS runtime-base
 
 ARG BUILDKIT_INLINE_CACHE=1
-ARG GITHUB_MCP_VERSION=1.0.0
+ARG GITHUB_MCP_VERSION=1.12.2
 ARG NPM_CONFIG_JOBS
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean && echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 
-# Unconditional packages — cached across all provider variants
+# Unconditional packages: cached across all provider variants
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
@@ -123,8 +105,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then DOCKER_ARCH="x86_64"; \
     elif [ "$ARCH" = "aarch64" ]; then DOCKER_ARCH="aarch64"; \
-    else DOCKER_ARCH="x86_64"; fi && \
-    curl -fsSL -o docker.tgz "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-27.4.1.tgz" && \
+    else echo "Unsupported Docker CLI architecture: $ARCH" >&2; exit 1; fi && \
+    curl -fsSL -o docker.tgz "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-29.8.1.tgz" && \
     tar -xzf docker.tgz docker/docker && \
     mv docker/docker /usr/local/bin/docker && \
     chmod +x /usr/local/bin/docker && \
@@ -140,7 +122,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
       > /etc/apt/sources.list.d/github-cli.list && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh && \
+    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh=2.102.0 && \
     rm -rf /var/lib/apt/lists/*
 
 # Official GitHub MCP server. `mcp-github` is kept as a compatibility wrapper
@@ -148,7 +130,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 RUN ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then GITHUB_MCP_ARCH="x86_64"; \
     elif [ "$ARCH" = "aarch64" ]; then GITHUB_MCP_ARCH="arm64"; \
-    else GITHUB_MCP_ARCH="x86_64"; fi && \
+    else echo "Unsupported GitHub MCP architecture: $ARCH" >&2; exit 1; fi && \
     curl -fsSL -o github-mcp-server.tgz \
       "https://github.com/github/github-mcp-server/releases/download/v${GITHUB_MCP_VERSION}/github-mcp-server_Linux_${GITHUB_MCP_ARCH}.tar.gz" && \
     tar -xzf github-mcp-server.tgz -C /usr/local/bin github-mcp-server && \
@@ -159,27 +141,24 @@ RUN ARCH=$(uname -m) && \
 
 COPY --link --from=gitea-mcp /go/bin/gitea-mcp /usr/local/bin/gitea-mcp
 
-COPY --link --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
-RUN printf '#!/bin/sh\nexec /usr/local/bin/uv tool run "$@"\n' > /usr/local/bin/uvx \
-    && chmod +x /usr/local/bin/uvx
+COPY --link --from=ghcr.io/astral-sh/uv:0.12.21 /uv /uvx /usr/local/bin/
 
 ENV DENO_INSTALL=/usr/local
-RUN curl -fsSL https://deno.land/install.sh | sh
+RUN curl -fsSL https://deno.land/install.sh | sh -s -- v2.9.7
 
 WORKDIR /app
 
-# ---- HEAVY NPM DEPS AND BROWSER INSTALLATION ----
-COPY --link apps/api/package.json ./package.json
+COPY --link apps/api/package.json apps/api/package-lock.json ./
 
 # node-gyp must be globally available for native addon compilation.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g node-gyp
+    npm install -g node-gyp@13.0.2
 
 # Install production JS deps AND mcp-remote
 RUN --mount=type=cache,target=/root/.npm \
     NPM_CONFIG_JOBS="${NPM_CONFIG_JOBS:-$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || echo 4)}" && \
-    npm_config_jobs="${NPM_CONFIG_JOBS}" npm install --omit=dev --ignore-scripts && \
-    npm install -g mcp-remote
+    npm_config_jobs="${NPM_CONFIG_JOBS}" npm ci --omit=dev --ignore-scripts && \
+    npm install -g mcp-remote@0.14.3
 
 # Compile node-pty native addon for the target platform.
 RUN --mount=type=cache,target=/root/.npm \
@@ -188,16 +167,16 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # npm-distributed MCP helper.
 RUN --mount=type=cache,target=/root/.npm \
-    npm install -g @playwright/mcp@0.0.68
+    npm install -g @playwright/mcp@0.0.83
 
 # System libraries and Chrome channel required by Playwright. Install this as
 # root at build time so non-root agent sessions do not try to elevate later.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
-    DEBIAN_FRONTEND=noninteractive npx -y playwright install-deps chromium && \
+    DEBIAN_FRONTEND=noninteractive npx -y playwright@1.64.0-alpha-1790635538000 install-deps chromium && \
     if [ "$(dpkg --print-architecture)" = "amd64" ]; then \
-        DEBIAN_FRONTEND=noninteractive npx -y playwright install chrome; \
+        DEBIAN_FRONTEND=noninteractive npx -y playwright@1.64.0-alpha-1790635538000 install chrome; \
     else \
         apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends chromium && \
         mkdir -p /opt/google/chrome && \
@@ -210,43 +189,40 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 ENV CHROME_BIN=/opt/google/chrome/chrome \
     GOOGLE_CHROME_BIN=/opt/google/chrome/chrome
 
-# ---- FIX FILE DESCRIPTOR LIMITS ----
-# Ensures su/sudo sessions inherit high nofile — prevents EMFILE in dev mode
+# Ensures su/sudo sessions inherit high nofile: prevents EMFILE in dev mode
 RUN mkdir -p /etc/security/limits.d \
     && printf "*  soft  nofile  1048576\n*  hard  nofile  1048576\n" > /etc/security/limits.d/99-nofile.conf
 
-# ---- PREPARE DIRS AND USER ----
 RUN mkdir -p /app/data /app/playground /home/node/.cache \
     && chown -R node:node /app/data /app/playground /home/node/.cache
 
 USER node
 
 # Download Chromium browser binary as node and verify Chrome is non-root usable.
-RUN npx -y playwright install chromium && /opt/google/chrome/chrome --version
+RUN npx -y playwright@1.64.0-alpha-1790635538000 install chromium && /opt/google/chrome/chrome --version
 
 USER root
 
-# ---- MCP REMOTE RECONNECTION WRAPPER ----
 COPY --link scripts/mcp-remote-wrapper.sh /usr/local/bin/mcp-remote-wrapper
 RUN chmod +x /usr/local/bin/mcp-remote-wrapper
 
-# ---- SMART ENTRYPOINT ----
 # Detects prod (dist/ present) vs dev (source code mounted, no dist/) at runtime.
 # In dev mode it runs `npm install` then `nx serve` so the container works
 # when the entire project root is volume-mounted (e.g. local Rails orchestration).
 COPY --link docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# ---- MODE HELPER (agent mode switcher) ----
 COPY --link mode /app/mode
 RUN chmod +x /app/mode
 
-# ---- FIBE CLI (downloaded from fibegg/sdk GitHub Releases) ----
 COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
+ARG FIBE_CLI_VERSION=0.2.46
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
     && /usr/local/bin/fibe local playgrounds --help >/dev/null
+
+COPY --link --from=oven/bun:1.4.2-slim /usr/local/bin/bun /usr/local/bin/bun
 
 FROM runtime-base
 
@@ -255,7 +231,7 @@ ARG AGENT_PROVIDER=gemini
 
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    if [ "$AGENT_PROVIDER" = "claude_code" ] || [ "$AGENT_PROVIDER" = "antigravity" ]; then \
+    if [ "$AGENT_PROVIDER" = "claude_code" ] || [ "$AGENT_PROVIDER" = "claude-code" ] || [ "$AGENT_PROVIDER" = "antigravity" ]; then \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     dbus dbus-x11 gnome-keyring libsecret-1-0 \
@@ -264,7 +240,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 COPY --link --from=cli /usr/local/lib/node_modules /usr/local/lib/node_modules
 COPY --link --from=cli /usr/local/bin /usr/local/bin
-COPY --link --from=cli /root/.local/share/cursor-agent /usr/local/share/cursor-agent
+COPY --link --from=cli /usr/local/share/cursor-agent /usr/local/share/cursor-agent
 
 # The provider CLI stage inherits node's default docker-entrypoint.sh in
 # /usr/local/bin. Re-apply fibe-agent's smart entrypoint after copying CLI bins.
@@ -274,25 +250,13 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
 
 WORKDIR /app
 
-RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then \
-    CURSOR_BIN=$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
-    test -n "$CURSOR_BIN"; \
-    ln -sf "$CURSOR_BIN" /usr/local/bin/cursor-agent; \
-    ln -sf "$CURSOR_BIN" /usr/local/bin/agent; \
-    cursor-agent --help >/dev/null; \
-    elif [ -d /usr/local/share/cursor-agent ]; then \
-    CURSOR_BIN=$(find /usr/local/share/cursor-agent -type f -name cursor-agent | head -n 1); \
-    if [ -n "$CURSOR_BIN" ]; then \
-    ln -sf "$CURSOR_BIN" /usr/local/bin/cursor-agent; \
-    ln -sf "$CURSOR_BIN" /usr/local/bin/agent; \
-    fi; \
-    fi
+RUN if [ "$AGENT_PROVIDER" = "cursor" ]; then cursor-agent --version && cursor-agent --help >/dev/null; fi
 
 RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini && chown -R node:node /home/node/.gemini; \
-    elif [ "$AGENT_PROVIDER" = "openai_codex" ]; then \
+    elif [ "$AGENT_PROVIDER" = "openai_codex" ] || [ "$AGENT_PROVIDER" = "openai-codex" ]; then \
     mkdir -p /home/node/.codex && chown -R node:node /home/node/.codex; \
-    elif [ "$AGENT_PROVIDER" = "claude_code" ]; then \
+    elif [ "$AGENT_PROVIDER" = "claude_code" ] || [ "$AGENT_PROVIDER" = "claude-code" ]; then \
     mkdir -p /home/node/.claude && chown -R node:node /home/node/.claude; \
     elif [ "$AGENT_PROVIDER" = "opencode" ]; then \
     mkdir -p /home/node/.local/share/opencode && chown -R node:node /home/node/.local; \
@@ -302,7 +266,6 @@ RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini/antigravity-cli && chown -R node:node /home/node/.gemini; \
     fi
 
-# ---- FINALLY COPY DIST FILES ----
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
 COPY --link --from=builder /app/apps/api/dist ./dist/
 COPY --link --from=builder /app/apps/chat/dist ./chat/

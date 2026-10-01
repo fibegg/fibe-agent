@@ -1,21 +1,19 @@
 import { randomUUID } from 'node:crypto';
 import { brotliDecompressSync, gunzipSync, inflateSync } from 'node:zlib';
 import type { CapturedProviderRequest, ProviderName } from './types';
-import { sanitizeHeaders, resolveProvider, DEFAULT_MAX_BODY_SIZE } from './types';
+import {
+  sanitizeHeaders,
+  resolveProvider,
+  DEFAULT_MAX_BODY_SIZE,
+} from './types';
 
-/**
- * Records a single HTTP request-response pair flowing through a decrypted
- * TLS tunnel. Bytes are fed in from each direction; when the connection
- * closes the assembled {@link CapturedProviderRequest} is emitted via the
- * `onComplete` callback.
- */
+/** Assembles one decrypted request-response exchange and emits it on close. */
 export class TrafficRecorder {
   private readonly id = randomUUID();
   private readonly startTime = Date.now();
   private readonly maxBodySize: number;
   private readonly redactBodies: boolean;
 
-  // --- request side ---
   private reqHeadersDone = false;
   private reqHeaderBuf = '';
   private reqMethod = '';
@@ -25,9 +23,12 @@ export class TrafficRecorder {
   private reqBodyTruncated = false;
   private reqBodyBytesRead = 0;
   private reqChunked = false;
-  private reqChunkState: ChunkParseState = { phase: 'size', sizeBuf: '', remaining: 0 };
+  private reqChunkState: ChunkParseState = {
+    phase: 'size',
+    sizeBuf: '',
+    remaining: 0,
+  };
 
-  // --- response side ---
   private resHeadersDone = false;
   private resHeaderBuf = Buffer.alloc(0);
   private resStatusCode = 0;
@@ -38,7 +39,11 @@ export class TrafficRecorder {
   private resBodyTruncated = false;
   private resBodyBytesRead = 0;
   private resChunked = false;
-  private resChunkState: ChunkParseState = { phase: 'size', sizeBuf: '', remaining: 0 };
+  private resChunkState: ChunkParseState = {
+    phase: 'size',
+    sizeBuf: '',
+    remaining: 0,
+  };
 
   private bytesSent = 0;
   private bytesReceived = 0;
@@ -49,7 +54,7 @@ export class TrafficRecorder {
     private readonly hostname: string,
     private readonly port: number,
     private readonly onComplete: (record: CapturedProviderRequest) => void,
-    options?: { maxBodySize?: number; redactBodies?: boolean }
+    options?: { maxBodySize?: number; redactBodies?: boolean },
   ) {
     this.maxBodySize = options?.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
     this.redactBodies = options?.redactBodies ?? false;
@@ -85,7 +90,9 @@ export class TrafficRecorder {
       const headerEnd = this.resHeaderBuf.indexOf('\r\n\r\n');
       if (headerEnd === -1) return;
 
-      const headerSection = this.resHeaderBuf.subarray(0, headerEnd).toString('utf-8');
+      const headerSection = this.resHeaderBuf
+        .subarray(0, headerEnd)
+        .toString('utf-8');
       const bodyStart = this.resHeaderBuf.subarray(headerEnd + 4);
       this.parseResponseHeaders(headerSection);
       this.resHeadersDone = true;
@@ -139,15 +146,15 @@ export class TrafficRecorder {
     this.onComplete(record);
   }
 
-  // ── Header parsing ─────────────────────────────────────────────
-
   private parseRequestHeaders(raw: string): void {
     const lines = raw.split('\r\n');
     const [method, path] = (lines[0] ?? '').split(' ');
     this.reqMethod = method ?? '';
     this.reqUrl = path ?? '';
     this.reqHeaders = parseHeaderLines(lines.slice(1));
-    this.reqChunked = (this.reqHeaders['transfer-encoding'] ?? '').toLowerCase().includes('chunked');
+    this.reqChunked = (this.reqHeaders['transfer-encoding'] ?? '')
+      .toLowerCase()
+      .includes('chunked');
   }
 
   private parseResponseHeaders(raw: string): void {
@@ -157,10 +164,10 @@ export class TrafficRecorder {
     this.resStatusCode = match ? parseInt(match[1], 10) : 0;
     this.resStatusMessage = match?.[2] ?? '';
     this.resHeaders = parseHeaderLines(lines.slice(1));
-    this.resChunked = (this.resHeaders['transfer-encoding'] ?? '').toLowerCase().includes('chunked');
+    this.resChunked = (this.resHeaders['transfer-encoding'] ?? '')
+      .toLowerCase()
+      .includes('chunked');
   }
-
-  // ── Body accumulation ──────────────────────────────────────────
 
   private appendReqBody(data: string): void {
     if (this.reqBodyTruncated) return;
@@ -178,18 +185,22 @@ export class TrafficRecorder {
 
   private appendResBody(data: Buffer): void {
     if (this.resBodyTruncated) return;
-    const bodyChunk = this.resChunked ? dechunkBuffer(data, this.resChunkState) : data;
+    const bodyChunk = this.resChunked
+      ? dechunkBuffer(data, this.resChunkState)
+      : data;
     this.resBodyBytesRead += bodyChunk.length;
     if (this.resBodyBytesRead > this.maxBodySize) {
-      const remaining = Math.max(this.maxBodySize - (this.resBodyBytesRead - bodyChunk.length), 0);
-      if (remaining > 0) this.resBodyBuffers.push(bodyChunk.subarray(0, remaining));
+      const remaining = Math.max(
+        this.maxBodySize - (this.resBodyBytesRead - bodyChunk.length),
+        0,
+      );
+      if (remaining > 0)
+        this.resBodyBuffers.push(bodyChunk.subarray(0, remaining));
       this.resBodyTruncated = true;
       return;
     }
     if (bodyChunk.length > 0) this.resBodyBuffers.push(bodyChunk);
   }
-
-  // ── Usage extraction ───────────────────────────────────────────
 
   private extractUsage(): CapturedProviderRequest['usage'] | undefined {
     const body = this.resBody;
@@ -208,13 +219,14 @@ export class TrafficRecorder {
         return this.extractGoogleUsage(body);
       }
     } catch {
-      // non-critical — skip usage extraction
+      // Usage metadata is optional and may be malformed.
     }
     return undefined;
   }
 
-  private extractAnthropicUsage(body: string): CapturedProviderRequest['usage'] | undefined {
-    // SSE stream: look for message_delta with usage, or message_start
+  private extractAnthropicUsage(
+    body: string,
+  ): CapturedProviderRequest['usage'] | undefined {
     const lines = body.split('\n');
     let usage: CapturedProviderRequest['usage'] | undefined;
     for (const line of lines) {
@@ -226,7 +238,8 @@ export class TrafficRecorder {
             inputTokens: parsed.message.usage.input_tokens,
             outputTokens: parsed.message.usage.output_tokens,
             cacheReadTokens: parsed.message.usage.cache_read_input_tokens,
-            cacheCreationTokens: parsed.message.usage.cache_creation_input_tokens,
+            cacheCreationTokens:
+              parsed.message.usage.cache_creation_input_tokens,
           };
         }
         if (parsed.type === 'message_delta' && parsed.usage) {
@@ -236,10 +249,9 @@ export class TrafficRecorder {
           };
         }
       } catch {
-        // skip unparseable lines
+        // Ignore malformed stream chunks and inspect the remaining response.
       }
     }
-    // Non-streaming: try direct JSON parse
     if (!usage) {
       try {
         const parsed = JSON.parse(body);
@@ -252,14 +264,15 @@ export class TrafficRecorder {
           };
         }
       } catch {
-        // not JSON
+        // The response may contain only stream chunks.
       }
     }
     return usage;
   }
 
-  private extractOpenAIUsage(body: string): CapturedProviderRequest['usage'] | undefined {
-    // SSE: look for [DONE] predecessor chunk with usage
+  private extractOpenAIUsage(
+    body: string,
+  ): CapturedProviderRequest['usage'] | undefined {
     const lines = body.split('\n');
     for (let i = lines.length - 1; i >= 0; i--) {
       const line = lines[i];
@@ -273,10 +286,9 @@ export class TrafficRecorder {
           };
         }
       } catch {
-        // skip
+        // Ignore malformed stream chunks and inspect the remaining response.
       }
     }
-    // Non-streaming
     try {
       const parsed = JSON.parse(body);
       if (parsed.usage) {
@@ -286,12 +298,14 @@ export class TrafficRecorder {
         };
       }
     } catch {
-      // not JSON
+      // A response without valid usage metadata has no usage record.
     }
     return undefined;
   }
 
-  private extractGoogleUsage(body: string): CapturedProviderRequest['usage'] | undefined {
+  private extractGoogleUsage(
+    body: string,
+  ): CapturedProviderRequest['usage'] | undefined {
     try {
       const parsed = JSON.parse(body);
       const meta = parsed.usageMetadata;
@@ -302,7 +316,7 @@ export class TrafficRecorder {
         };
       }
     } catch {
-      // ignore
+      // A response without valid usage metadata has no usage record.
     }
     return undefined;
   }
@@ -314,8 +328,10 @@ export class TrafficRecorder {
     const encoding = (this.resHeaders['content-encoding'] ?? '').toLowerCase();
     try {
       if (encoding.includes('gzip')) return gunzipSync(raw).toString('utf-8');
-      if (encoding.includes('br')) return brotliDecompressSync(raw).toString('utf-8');
-      if (encoding.includes('deflate')) return inflateSync(raw).toString('utf-8');
+      if (encoding.includes('br'))
+        return brotliDecompressSync(raw).toString('utf-8');
+      if (encoding.includes('deflate'))
+        return inflateSync(raw).toString('utf-8');
     } catch {
       return raw.toString('utf-8');
     }
@@ -323,8 +339,6 @@ export class TrafficRecorder {
     return raw.toString('utf-8');
   }
 }
-
-// ── Helpers ────────────────────────────────────────────────────
 
 function parseHeaderLines(lines: string[]): Record<string, string> {
   const headers: Record<string, string> = {};
@@ -381,7 +395,6 @@ function dechunk(data: string, state: ChunkParseState): string {
         state.phase = 'size';
       }
     } else {
-      // trailer phase — ignore
       break;
     }
   }

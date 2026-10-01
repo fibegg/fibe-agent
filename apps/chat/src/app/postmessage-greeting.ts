@@ -1,46 +1,34 @@
-/**
- * PostMessage Greeting Listener
- *
- * Listens for `{ action: "initial_greeting", text: string }` messages from
- * the parent window (Phoenix Bridge iframe host). Stores the greeting text
- * so that ChatPage can consume it once after authentication completes and
- * the initial message history has been loaded.
- *
- * This mirrors postmessage-auth.ts in structure — a module-level listener
- * that captures data before React components mount.
- */
+/** Buffers the parent's initial greeting until ChatPage consumes it. */
 
 let pendingGreeting: string | null = null;
 
 function onMessage(event: MessageEvent): void {
   const data = event.data as { action?: string; text?: string } | undefined;
-  if (!data || data.action !== 'initial_greeting' || typeof data.text !== 'string') return;
+  if (
+    !data ||
+    data.action !== 'initial_greeting' ||
+    typeof data.text !== 'string'
+  )
+    return;
 
-  // Only store the first greeting — subsequent retries from the parent are idempotent
+  // The parent retries, so only keep the first greeting.
   if (pendingGreeting === null) {
     pendingGreeting = data.text;
   }
 }
 
-/**
- * Returns the stored greeting text and clears it (one-shot).
- * Returns null if no greeting has been received.
- */
+/** Returns and clears the pending greeting. */
 export function consumeGreeting(): string | null {
   const text = pendingGreeting;
   pendingGreeting = null;
   return text;
 }
 
-/**
- * Peek at the pending greeting without consuming it.
- * Useful for conditional checks before the right moment to consume.
- */
+/** Returns the pending greeting without clearing it. */
 export function peekGreeting(): string | null {
   return pendingGreeting;
 }
 
-// Attach the listener only when running inside an iframe
 const LISTENER_KEY = '__initial_greeting_listener';
 if (typeof window !== 'undefined' && window !== window.parent) {
   const existing = window[LISTENER_KEY];

@@ -29,8 +29,9 @@ describe('AgentModeStoreService', () => {
   });
 
   afterEach(async () => {
+    const cleanupDir = dataDir;
     await Promise.all(services.map((service) => service.onModuleDestroy()));
-    rmSync(dataDir, { recursive: true, force: true });
+    rmSync(cleanupDir, { recursive: true, force: true });
   });
 
   test('get returns default mode when no file exists', () => {
@@ -119,7 +120,6 @@ describe('AgentModeStoreService', () => {
     service1.set('casting');
     await service1.flush();
 
-    // Simulate restart with a fresh instance
     const service2 = makeService();
     expect(service2.get()).toBe(AGENT_MODES.casting);
   });

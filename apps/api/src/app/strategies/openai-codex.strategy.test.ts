@@ -1,5 +1,12 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -12,8 +19,6 @@ import {
 import type { ToolEvent } from './strategy.types';
 
 const TEST_HOME = join(tmpdir(), `codex-test-home-${process.pid}`);
-
-/* ---------- helpers ---------- */
 
 function mkEvent(obj: Record<string, unknown>): string {
   return JSON.stringify(obj);
@@ -51,14 +56,18 @@ function createSpy(): Spy {
     onReasoningChunk: (t) => spy.reasoning.push(t),
     onReasoningEnd: () => spy.reasoningEndCount++,
     onTool: (e) => spy.tools.push(e),
-    onUsage: (u) => { spy.usage = u; },
+    onUsage: (u) => {
+      spy.usage = u;
+    },
     onThreadId: (threadId) => spy.threadIds.push(threadId),
   };
   return spy;
 }
 
 function writeFakeCodex(path: string): void {
-  writeFileSync(path, `#!/usr/bin/env node
+  writeFileSync(
+    path,
+    `#!/usr/bin/env node
 const fs = require('node:fs');
 const args = process.argv.slice(2);
 if (process.env.CODEX_FAKE_ARGS_PATH) {
@@ -90,12 +99,16 @@ if (process.env.CODEX_FAKE_EMIT_THREAD !== 'false') {
 console.log(JSON.stringify({ type: 'turn.started' }));
 console.log(JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: process.env.CODEX_FAKE_MESSAGE || 'fake response' } }));
 console.log(JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 2 } }));
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   chmodSync(path, 0o755);
 }
 
 function writeFakeCodexAppServer(path: string): void {
-  writeFileSync(path, `#!/usr/bin/env node
+  writeFileSync(
+    path,
+    `#!/usr/bin/env node
 const fs = require('node:fs');
 const readline = require('node:readline');
 
@@ -146,6 +159,19 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
 
   if (msg.method === 'initialized') return;
 
+  if (msg.method === 'model/list') {
+    if (process.env.CODEX_FAKE_MODE === 'model-error') {
+      process.stdout.write(JSON.stringify({ id: msg.id, error: { message: 'catalog unavailable' } }) + '\\n');
+    } else if (process.env.CODEX_FAKE_MODE === 'model-loop') {
+      respond(msg.id, { data: [], nextCursor: 'same' });
+    } else if (msg.params.cursor) {
+      respond(msg.id, { data: [{ model: 'gpt-6-luna' }, { model: 'gpt-6.1-sol' }], nextCursor: null });
+    } else {
+      respond(msg.id, { data: [{ model: 'gpt-6.1-sol', isDefault: true }, { model: 'hidden-model', hidden: true }], nextCursor: 'page-2' });
+    }
+    return;
+  }
+
   if (msg.method === 'thread/start') {
     respond(msg.id, {
       thread: {
@@ -192,12 +218,17 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       itemId: 'assistant-1',
       delta: message,
     });
-    setTimeout(() => completeTurn(msg.params.threadId), delay);
+    if (process.env.CODEX_FAKE_MODE !== 'complete-on-steer') {
+      setTimeout(() => completeTurn(msg.params.threadId), delay);
+    }
     return;
   }
 
   if (msg.method === 'turn/steer') {
     respond(msg.id, { turnId });
+    if (process.env.CODEX_FAKE_MODE === 'complete-on-steer') {
+      completeTurn(msg.params.threadId);
+    }
     return;
   }
 
@@ -206,14 +237,20 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
     process.exit(0);
   }
 });
-`, { mode: 0o755 });
+`,
+    { mode: 0o755 },
+  );
   chmodSync(path, 0o755);
 }
 
-async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
+async function waitFor(
+  predicate: () => boolean,
+  timeoutMs = 1000,
+): Promise<void> {
   const started = Date.now();
   while (!predicate()) {
-    if (Date.now() - started > timeoutMs) throw new Error('Timed out waiting for condition');
+    if (Date.now() - started > timeoutMs)
+      throw new Error('Timed out waiting for condition');
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 }
@@ -226,9 +263,7 @@ function readJsonl(path: string): Array<Record<string, unknown>> {
     .map((line) => JSON.parse(line) as Record<string, unknown>);
 }
 
-/* ================================================ */
 /*           handleCodexExecJsonLine tests           */
-/* ================================================ */
 
 describe('handleCodexExecJsonLine', () => {
   test('ignores empty and whitespace-only lines', () => {
@@ -244,7 +279,11 @@ describe('handleCodexExecJsonLine', () => {
   test('turn.started opens reasoning', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.started' }), state, spy.handlers);
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'turn.started' }),
+      state,
+      spy.handlers,
+    );
     expect(spy.reasoningStartCount).toBe(1);
     expect(state.inReasoning).toBe(true);
   });
@@ -252,8 +291,16 @@ describe('handleCodexExecJsonLine', () => {
   test('turn.started is idempotent when already in reasoning', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.started' }), state, spy.handlers);
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.started' }), state, spy.handlers);
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'turn.started' }),
+      state,
+      spy.handlers,
+    );
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'turn.started' }),
+      state,
+      spy.handlers,
+    );
     expect(spy.reasoningStartCount).toBe(1);
   });
 
@@ -262,9 +309,12 @@ describe('handleCodexExecJsonLine', () => {
     state.inReasoning = true;
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'agent_message', text: 'Hello world' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: 'Hello world' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.reasoning).toEqual(['Hello world']);
     expect(spy.reasoningEndCount).toBe(1);
@@ -278,9 +328,12 @@ describe('handleCodexExecJsonLine', () => {
     const spy = createSpy();
     const longText = 'a'.repeat(300);
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'agent_message', text: longText } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: longText },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.reasoning[0]).toBe('a'.repeat(200) + '…');
     expect(spy.chunks[0]).toBe(longText); // Full text goes to chunk
@@ -290,9 +343,12 @@ describe('handleCodexExecJsonLine', () => {
     const state = freshState();
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'agent_message', text: '' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: '' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual([]);
     expect(spy.reasoning).toEqual([]);
@@ -303,9 +359,12 @@ describe('handleCodexExecJsonLine', () => {
     state.inReasoning = true;
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'message', text: 'test' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'message', text: 'test' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual(['test']);
     expect(spy.reasoningEndCount).toBe(1);
@@ -315,9 +374,12 @@ describe('handleCodexExecJsonLine', () => {
     const state = freshState();
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'reasoning', text: 'thinking hard' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'reasoning', text: 'thinking hard' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.reasoningStartCount).toBe(1);
     expect(spy.reasoning).toEqual(['thinking hard']);
@@ -330,7 +392,7 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({ type: 'item.completed', item: { type: 'reasoning' } }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.reasoningStartCount).toBe(1);
     expect(spy.reasoning).toEqual([]);
@@ -339,21 +401,34 @@ describe('handleCodexExecJsonLine', () => {
   test('full turn flow: started → reasoning → agent_message → completed', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.started' }), state, spy.handlers);
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'reasoning', text: 'thinking' } }),
+      mkEvent({ type: 'turn.started' }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'agent_message', text: 'done' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'reasoning', text: 'thinking' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     handleCodexExecJsonLine(
-      mkEvent({ type: 'turn.completed', usage: { input_tokens: 100, output_tokens: 50 } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: 'done' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
+    );
+    handleCodexExecJsonLine(
+      mkEvent({
+        type: 'turn.completed',
+        usage: { input_tokens: 100, output_tokens: 50 },
+      }),
+      state,
+      spy.handlers,
     );
 
     expect(spy.reasoningStartCount).toBe(1);
@@ -378,15 +453,20 @@ describe('handleCodexExecJsonLine', () => {
         },
       }),
       state,
-      spy.handlers
+      spy.handlers,
     );
-    expect(spy.tools).toEqual([{
-      kind: 'tool_call',
-      name: 'command',
-      command: 'npm test',
-      summary: 'tests passed',
-      details: JSON.stringify({ command: 'npm test', output: 'tests passed' }),
-    }]);
+    expect(spy.tools).toEqual([
+      {
+        kind: 'tool_call',
+        name: 'command',
+        command: 'npm test',
+        summary: 'tests passed',
+        details: JSON.stringify({
+          command: 'npm test',
+          output: 'tests passed',
+        }),
+      },
+    ]);
     expect(spy.reasoning).toEqual(['$ npm test\n']);
   });
 
@@ -396,7 +476,7 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({ type: 'item.completed', item: { type: 'command_execution' } }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.tools).toEqual([]);
   });
@@ -408,10 +488,14 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({
         type: 'item.completed',
-        item: { type: 'command_execution', command: 'ls', aggregated_output: longOutput },
+        item: {
+          type: 'command_execution',
+          command: 'ls',
+          aggregated_output: longOutput,
+        },
       }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.tools[0].summary).toBe('x'.repeat(200));
   });
@@ -431,11 +515,23 @@ describe('handleCodexExecJsonLine', () => {
         },
       }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.tools).toEqual([
-      { kind: 'file_created', name: 'a.ts', path: 'src/a.ts', summary: 'add', details: JSON.stringify({ path: 'src/a.ts', kind: 'add' }) },
-      { kind: 'file_created', name: 'b.ts', path: 'src/b.ts', summary: 'modify', details: JSON.stringify({ path: 'src/b.ts', kind: 'modify' }) },
+      {
+        kind: 'file_created',
+        name: 'a.ts',
+        path: 'src/a.ts',
+        summary: 'add',
+        details: JSON.stringify({ path: 'src/a.ts', kind: 'add' }),
+      },
+      {
+        kind: 'file_created',
+        name: 'b.ts',
+        path: 'src/b.ts',
+        summary: 'modify',
+        details: JSON.stringify({ path: 'src/b.ts', kind: 'modify' }),
+      },
     ]);
     expect(spy.reasoning).toEqual(['add: src/a.ts\n', 'modify: src/b.ts\n']);
   });
@@ -449,7 +545,7 @@ describe('handleCodexExecJsonLine', () => {
         item: { type: 'file_change', changes: [{ kind: 'add' }] },
       }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.tools).toEqual([]);
   });
@@ -458,9 +554,12 @@ describe('handleCodexExecJsonLine', () => {
     const state = freshState();
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'file_change', changes: [] } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'file_change', changes: [] },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.tools).toEqual([]);
   });
@@ -471,25 +570,41 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({
         type: 'item.completed',
-        item: { type: 'local_shell_call', name: 'bash', command: 'echo hi', summary: 'greeting' },
+        item: {
+          type: 'local_shell_call',
+          name: 'bash',
+          command: 'echo hi',
+          summary: 'greeting',
+        },
       }),
       state,
-      spy.handlers
+      spy.handlers,
     );
-    expect(spy.tools).toEqual([{
-      kind: 'tool_call',
-      name: 'bash',
-      command: 'echo hi',
-      path: undefined,
-      summary: 'greeting',
-      details: JSON.stringify({ type: 'local_shell_call', name: 'bash', command: 'echo hi', summary: 'greeting' }),
-    }]);
+    expect(spy.tools).toEqual([
+      {
+        kind: 'tool_call',
+        name: 'bash',
+        command: 'echo hi',
+        path: undefined,
+        summary: 'greeting',
+        details: JSON.stringify({
+          type: 'local_shell_call',
+          name: 'bash',
+          command: 'echo hi',
+          summary: 'greeting',
+        }),
+      },
+    ]);
   });
 
   test('turn.completed without usage does not call onUsage', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.completed' }), state, spy.handlers);
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'turn.completed' }),
+      state,
+      spy.handlers,
+    );
     expect(spy.usage).toBeUndefined();
   });
 
@@ -498,9 +613,12 @@ describe('handleCodexExecJsonLine', () => {
     state.inReasoning = true;
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 5 } }),
+      mkEvent({
+        type: 'turn.completed',
+        usage: { input_tokens: 10, output_tokens: 5 },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.reasoningEndCount).toBe(1);
     expect(state.inReasoning).toBe(false);
@@ -514,7 +632,7 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({ type: 'turn.failed', error: { message: 'rate limited' } }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual(['⚠️ rate limited']);
     expect(state.errorResult).toBe('rate limited');
@@ -524,7 +642,11 @@ describe('handleCodexExecJsonLine', () => {
   test('turn.failed without error message uses default', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.failed' }), state, spy.handlers);
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'turn.failed' }),
+      state,
+      spy.handlers,
+    );
     expect(spy.chunks).toEqual(['⚠️ Turn failed']);
   });
 
@@ -534,7 +656,7 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({ type: 'error', message: 'boom' }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual(['⚠️ boom']);
     expect(state.errorResult).toBe('boom');
@@ -546,7 +668,7 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({ type: 'error', error: { message: 'nested boom' } }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual(['⚠️ nested boom']);
   });
@@ -561,7 +683,11 @@ describe('handleCodexExecJsonLine', () => {
   test('non-JSON line is passed through with ANSI stripped', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine('\u001b[31mplain text\u001b[0m', state, spy.handlers);
+    handleCodexExecJsonLine(
+      '\u001b[31mplain text\u001b[0m',
+      state,
+      spy.handlers,
+    );
     expect(spy.chunks).toEqual(['plain text']);
   });
 
@@ -578,7 +704,7 @@ describe('handleCodexExecJsonLine', () => {
     handleCodexExecJsonLine(
       mkEvent({ type: 'thread.started', thread_id: 'abc' }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual([]);
     expect(spy.reasoning).toEqual([]);
@@ -590,9 +716,12 @@ describe('handleCodexExecJsonLine', () => {
     const state = freshState();
     const spy = createSpy();
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'unknown_future_type' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'unknown_future_type' },
+      }),
       state,
-      spy.handlers
+      spy.handlers,
     );
     expect(spy.chunks).toEqual([]);
     expect(spy.tools).toEqual([]);
@@ -605,21 +734,34 @@ describe('handleCodexExecJsonLine', () => {
       onChunk: (c) => chunks.push(c),
     };
     // These should not throw even without optional handlers
-    handleCodexExecJsonLine(mkEvent({ type: 'turn.started' }), state, minimalHandlers);
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'agent_message', text: 'hi' } }),
+      mkEvent({ type: 'turn.started' }),
       state,
-      minimalHandlers
+      minimalHandlers,
     );
     handleCodexExecJsonLine(
-      mkEvent({ type: 'item.completed', item: { type: 'command_execution', command: 'ls' } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'agent_message', text: 'hi' },
+      }),
       state,
-      minimalHandlers
+      minimalHandlers,
     );
     handleCodexExecJsonLine(
-      mkEvent({ type: 'turn.completed', usage: { input_tokens: 1, output_tokens: 1 } }),
+      mkEvent({
+        type: 'item.completed',
+        item: { type: 'command_execution', command: 'ls' },
+      }),
       state,
-      minimalHandlers
+      minimalHandlers,
+    );
+    handleCodexExecJsonLine(
+      mkEvent({
+        type: 'turn.completed',
+        usage: { input_tokens: 1, output_tokens: 1 },
+      }),
+      state,
+      minimalHandlers,
     );
     expect(chunks).toEqual(['hi']);
   });
@@ -627,15 +769,21 @@ describe('handleCodexExecJsonLine', () => {
   test('errorResult accumulates across multiple error events', () => {
     const state = freshState();
     const spy = createSpy();
-    handleCodexExecJsonLine(mkEvent({ type: 'error', message: 'first' }), state, spy.handlers);
-    handleCodexExecJsonLine(mkEvent({ type: 'error', message: ' second' }), state, spy.handlers);
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'error', message: 'first' }),
+      state,
+      spy.handlers,
+    );
+    handleCodexExecJsonLine(
+      mkEvent({ type: 'error', message: ' second' }),
+      state,
+      spy.handlers,
+    );
     expect(state.errorResult).toBe('first second');
   });
 });
 
-/* ================================================ */
 /*           OpenaiCodexStrategy tests               */
-/* ================================================ */
 
 describe('OpenaiCodexStrategy', () => {
   const savedEnv: Record<string, string | undefined> = {};
@@ -673,35 +821,50 @@ describe('OpenaiCodexStrategy', () => {
     process.env.HOME = savedEnv.HOME;
     if (savedEnv.SESSION_DIR === undefined) delete process.env.SESSION_DIR;
     else process.env.SESSION_DIR = savedEnv.SESSION_DIR;
-    if (savedEnv.OPENAI_API_KEY === undefined) delete process.env.OPENAI_API_KEY;
+    if (savedEnv.OPENAI_API_KEY === undefined)
+      delete process.env.OPENAI_API_KEY;
     else process.env.OPENAI_API_KEY = savedEnv.OPENAI_API_KEY;
     if (savedEnv.CODEX_HOME === undefined) delete process.env.CODEX_HOME;
     else process.env.CODEX_HOME = savedEnv.CODEX_HOME;
     if (savedEnv.CODEX_BIN === undefined) delete process.env.CODEX_BIN;
     else process.env.CODEX_BIN = savedEnv.CODEX_BIN;
-    if (savedEnv.CODEX_AGENT_TRANSPORT === undefined) delete process.env.CODEX_AGENT_TRANSPORT;
+    if (savedEnv.CODEX_AGENT_TRANSPORT === undefined)
+      delete process.env.CODEX_AGENT_TRANSPORT;
     else process.env.CODEX_AGENT_TRANSPORT = savedEnv.CODEX_AGENT_TRANSPORT;
-    if (savedEnv.CODEX_USE_APP_SERVER === undefined) delete process.env.CODEX_USE_APP_SERVER;
+    if (savedEnv.CODEX_USE_APP_SERVER === undefined)
+      delete process.env.CODEX_USE_APP_SERVER;
     else process.env.CODEX_USE_APP_SERVER = savedEnv.CODEX_USE_APP_SERVER;
-    if (savedEnv.CODEX_FAKE_ARGS_PATH === undefined) delete process.env.CODEX_FAKE_ARGS_PATH;
+    if (savedEnv.CODEX_FAKE_ARGS_PATH === undefined)
+      delete process.env.CODEX_FAKE_ARGS_PATH;
     else process.env.CODEX_FAKE_ARGS_PATH = savedEnv.CODEX_FAKE_ARGS_PATH;
-    if (savedEnv.CODEX_FAKE_CWD_PATH === undefined) delete process.env.CODEX_FAKE_CWD_PATH;
+    if (savedEnv.CODEX_FAKE_CWD_PATH === undefined)
+      delete process.env.CODEX_FAKE_CWD_PATH;
     else process.env.CODEX_FAKE_CWD_PATH = savedEnv.CODEX_FAKE_CWD_PATH;
-    if (savedEnv.CODEX_FAKE_ENV_PATH === undefined) delete process.env.CODEX_FAKE_ENV_PATH;
+    if (savedEnv.CODEX_FAKE_ENV_PATH === undefined)
+      delete process.env.CODEX_FAKE_ENV_PATH;
     else process.env.CODEX_FAKE_ENV_PATH = savedEnv.CODEX_FAKE_ENV_PATH;
-    if (savedEnv.CODEX_FAKE_REQUESTS_PATH === undefined) delete process.env.CODEX_FAKE_REQUESTS_PATH;
-    else process.env.CODEX_FAKE_REQUESTS_PATH = savedEnv.CODEX_FAKE_REQUESTS_PATH;
-    if (savedEnv.CODEX_FAKE_MODE === undefined) delete process.env.CODEX_FAKE_MODE;
+    if (savedEnv.CODEX_FAKE_REQUESTS_PATH === undefined)
+      delete process.env.CODEX_FAKE_REQUESTS_PATH;
+    else
+      process.env.CODEX_FAKE_REQUESTS_PATH = savedEnv.CODEX_FAKE_REQUESTS_PATH;
+    if (savedEnv.CODEX_FAKE_MODE === undefined)
+      delete process.env.CODEX_FAKE_MODE;
     else process.env.CODEX_FAKE_MODE = savedEnv.CODEX_FAKE_MODE;
-    if (savedEnv.CODEX_FAKE_THREAD_ID === undefined) delete process.env.CODEX_FAKE_THREAD_ID;
+    if (savedEnv.CODEX_FAKE_THREAD_ID === undefined)
+      delete process.env.CODEX_FAKE_THREAD_ID;
     else process.env.CODEX_FAKE_THREAD_ID = savedEnv.CODEX_FAKE_THREAD_ID;
-    if (savedEnv.CODEX_FAKE_TURN_ID === undefined) delete process.env.CODEX_FAKE_TURN_ID;
+    if (savedEnv.CODEX_FAKE_TURN_ID === undefined)
+      delete process.env.CODEX_FAKE_TURN_ID;
     else process.env.CODEX_FAKE_TURN_ID = savedEnv.CODEX_FAKE_TURN_ID;
-    if (savedEnv.CODEX_FAKE_TURN_DELAY_MS === undefined) delete process.env.CODEX_FAKE_TURN_DELAY_MS;
-    else process.env.CODEX_FAKE_TURN_DELAY_MS = savedEnv.CODEX_FAKE_TURN_DELAY_MS;
-    if (savedEnv.CODEX_FAKE_EMIT_THREAD === undefined) delete process.env.CODEX_FAKE_EMIT_THREAD;
+    if (savedEnv.CODEX_FAKE_TURN_DELAY_MS === undefined)
+      delete process.env.CODEX_FAKE_TURN_DELAY_MS;
+    else
+      process.env.CODEX_FAKE_TURN_DELAY_MS = savedEnv.CODEX_FAKE_TURN_DELAY_MS;
+    if (savedEnv.CODEX_FAKE_EMIT_THREAD === undefined)
+      delete process.env.CODEX_FAKE_EMIT_THREAD;
     else process.env.CODEX_FAKE_EMIT_THREAD = savedEnv.CODEX_FAKE_EMIT_THREAD;
-    if (savedEnv.CODEX_FAKE_MESSAGE === undefined) delete process.env.CODEX_FAKE_MESSAGE;
+    if (savedEnv.CODEX_FAKE_MESSAGE === undefined)
+      delete process.env.CODEX_FAKE_MESSAGE;
     else process.env.CODEX_FAKE_MESSAGE = savedEnv.CODEX_FAKE_MESSAGE;
     if (existsSync(TEST_HOME)) {
       rmSync(TEST_HOME, { recursive: true, force: true });
@@ -733,9 +896,13 @@ describe('OpenaiCodexStrategy', () => {
   test('checkAuthStatus returns true when auth.json has api_key', async () => {
     const codexDir = join(TEST_HOME, '.codex');
     mkdirSync(codexDir, { recursive: true });
-    writeFileSync(join(codexDir, 'auth.json'), JSON.stringify({ api_key: 'sk-test' }), {
-      mode: 0o600,
-    });
+    writeFileSync(
+      join(codexDir, 'auth.json'),
+      JSON.stringify({ api_key: 'sk-test' }),
+      {
+        mode: 0o600,
+      },
+    );
     process.env.SESSION_DIR = codexDir;
     const strategy = new OpenaiCodexStrategy();
     const result = await strategy.checkAuthStatus();
@@ -745,9 +912,13 @@ describe('OpenaiCodexStrategy', () => {
   test('checkAuthStatus returns true when auth.json has access_token', async () => {
     const codexDir = join(TEST_HOME, '.codex');
     mkdirSync(codexDir, { recursive: true });
-    writeFileSync(join(codexDir, 'auth.json'), JSON.stringify({ access_token: 'tok' }), {
-      mode: 0o600,
-    });
+    writeFileSync(
+      join(codexDir, 'auth.json'),
+      JSON.stringify({ access_token: 'tok' }),
+      {
+        mode: 0o600,
+      },
+    );
     process.env.SESSION_DIR = codexDir;
     const strategy = new OpenaiCodexStrategy();
     const result = await strategy.checkAuthStatus();
@@ -760,7 +931,7 @@ describe('OpenaiCodexStrategy', () => {
     writeFileSync(
       join(codexDir, 'auth.json'),
       JSON.stringify({ auth_mode: 'chatgpt', tokens: { access_token: 'tok' } }),
-      { mode: 0o600 }
+      { mode: 0o600 },
     );
     process.env.SESSION_DIR = codexDir;
     const strategy = new OpenaiCodexStrategy();
@@ -774,7 +945,7 @@ describe('OpenaiCodexStrategy', () => {
     writeFileSync(
       join(codexDir, 'auth.json'),
       JSON.stringify({ auth_mode: 'chatgpt', tokens: { access_token: ' ' } }),
-      { mode: 0o600 }
+      { mode: 0o600 },
     );
     process.env.SESSION_DIR = codexDir;
     const strategy = new OpenaiCodexStrategy();
@@ -831,7 +1002,10 @@ describe('OpenaiCodexStrategy', () => {
     strategy.ensureSettings();
     expect(existsSync(join(codexDir, 'auth.json'))).toBe(true);
     const content = readFileSync(join(codexDir, 'auth.json'), 'utf8');
-    expect(JSON.parse(content)).toEqual({ auth_mode: 'apikey', OPENAI_API_KEY: 'sk-env-key' });
+    expect(JSON.parse(content)).toEqual({
+      auth_mode: 'apikey',
+      OPENAI_API_KEY: 'sk-env-key',
+    });
   });
 
   test('ensureSettings in api-token mode migrates legacy api_key auth.json', () => {
@@ -839,7 +1013,9 @@ describe('OpenaiCodexStrategy', () => {
     process.env.SESSION_DIR = codexDir;
     mkdirSync(codexDir, { recursive: true });
     const authPath = join(codexDir, 'auth.json');
-    writeFileSync(authPath, JSON.stringify({ api_key: 'sk-legacy-key' }), { mode: 0o600 });
+    writeFileSync(authPath, JSON.stringify({ api_key: 'sk-legacy-key' }), {
+      mode: 0o600,
+    });
     const strategy = new OpenaiCodexStrategy(true);
     strategy.ensureSettings();
     expect(JSON.parse(readFileSync(authPath, 'utf8'))).toEqual({
@@ -862,12 +1038,16 @@ describe('OpenaiCodexStrategy', () => {
     process.env.OPENAI_API_KEY = 'sk-ok';
     const strategy = new OpenaiCodexStrategy(true);
     let successCalled = false;
-    const noop = () => { return; };
+    const noop = () => {
+      return;
+    };
     const connection = {
       sendAuthUrlGenerated: noop,
       sendDeviceCode: noop,
       sendAuthManualToken: noop,
-      sendAuthSuccess: () => { successCalled = true; },
+      sendAuthSuccess: () => {
+        successCalled = true;
+      },
       sendAuthStatus: noop,
       sendError: noop,
     };
@@ -895,6 +1075,38 @@ describe('OpenaiCodexStrategy', () => {
     expect(strategy.getModelArgs('gpt-5.4')).toEqual(['-m', 'gpt-5.4']);
     expect(strategy.getModelArgs('')).toEqual([]);
     expect(strategy.getModelArgs('undefined')).toEqual([]);
+  });
+
+  test('listModels initializes the installed app-server and follows visible model pages', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    const requestsPath = join(TEST_HOME, 'model-requests.jsonl');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+    const strategy = new OpenaiCodexStrategy();
+
+    expect(await strategy.listModels()).toEqual(['gpt-6.1-sol', 'gpt-6-luna']);
+    const requests = readJsonl(requestsPath);
+    expect(requests.map((r) => r.method)).toEqual(['initialize', 'initialized', 'model/list', 'model/list']);
+    expect(requests[2].params).toEqual({ cursor: null, limit: 100, includeHidden: false });
+    expect(requests[3].params).toEqual({ cursor: 'page-2', limit: 100, includeHidden: false });
+    expect(strategy.hasNativeSessionSupport()).toBe(false);
+  });
+
+  test('listModels exposes discovery failures rather than returning an invented catalog', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_MODE = 'model-error';
+    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow('catalog unavailable');
+  });
+
+  test('listModels rejects a repeated pagination cursor', async () => {
+    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+    writeFakeCodexAppServer(fakeCodexPath);
+    process.env.CODEX_BIN = fakeCodexPath;
+    process.env.CODEX_FAKE_MODE = 'model-loop';
+    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow('repeated a cursor');
   });
 
   test('constructor with conversationDataDir', () => {
@@ -962,7 +1174,9 @@ describe('OpenaiCodexStrategy', () => {
     });
     const chunks: string[] = [];
 
-    await strategy.executePromptStreaming('hello', 'gpt-5.4', (chunk) => chunks.push(chunk));
+    await strategy.executePromptStreaming('hello', 'gpt-5.4', (chunk) =>
+      chunks.push(chunk),
+    );
 
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       'exec',
@@ -975,7 +1189,9 @@ describe('OpenaiCodexStrategy', () => {
       '--',
       'hello',
     ]);
-    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-new');
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
+      'thread-new',
+    );
     expect(chunks).toEqual(['fake response']);
     expect(strategy.hasNativeSessionSupport()).toBe(true);
   });
@@ -1018,7 +1234,11 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined);
+    await strategy.executePromptStreaming(
+      'continue',
+      'gpt-5.4',
+      () => undefined,
+    );
 
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       'exec',
@@ -1033,7 +1253,9 @@ describe('OpenaiCodexStrategy', () => {
       '--',
       'continue',
     ]);
-    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-existing');
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
+      'thread-existing',
+    );
   });
 
   test('executePromptStreaming places `--` before a dash-prefixed prompt so Codex arg parsing does not treat it as a flag', async () => {
@@ -1051,7 +1273,11 @@ describe('OpenaiCodexStrategy', () => {
     });
 
     const dashPrompt = '- bullet from system prompt\n[SYSCHECK]';
-    await strategy.executePromptStreaming(dashPrompt, 'gpt-5.4', () => undefined);
+    await strategy.executePromptStreaming(
+      dashPrompt,
+      'gpt-5.4',
+      () => undefined,
+    );
 
     const recordedArgs = JSON.parse(readFileSync(argsPath, 'utf8')) as string[];
     const separatorIndex = recordedArgs.indexOf('--');
@@ -1072,8 +1298,10 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('hello', '', () => undefined)).rejects.toThrow(
-      'Agent process completed successfully but returned no output'
+    await expect(
+      strategy.executePromptStreaming('hello', '', () => undefined),
+    ).rejects.toThrow(
+      'Agent process completed successfully but returned no output',
     );
     expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
   });
@@ -1095,9 +1323,9 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await expect(strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined)).rejects.toThrow(
-      'No conversation found with session ID: stale-thread-id'
-    );
+    await expect(
+      strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined),
+    ).rejects.toThrow('No conversation found with session ID: stale-thread-id');
     expect(JSON.parse(readFileSync(argsPath, 'utf8'))).toEqual([
       'exec',
       'resume',
@@ -1114,7 +1342,7 @@ describe('OpenaiCodexStrategy', () => {
     expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
   });
 
-  test('executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker', async () => {
+  test.each(['high', 'max', 'ultra'])('executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker at %s effort', async (effort) => {
     process.env.CODEX_AGENT_TRANSPORT = 'app-server';
     const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
     const requestsPath = join(TEST_HOME, 'codex-app-requests.jsonl');
@@ -1141,17 +1369,23 @@ describe('OpenaiCodexStrategy', () => {
       (chunk) => chunks.push(chunk),
       { onUsage: (u) => usage.push(u) },
       undefined,
-      { effort: 'high' },
+      { effort },
     );
 
     const requests = readJsonl(requestsPath);
-    const threadStart = requests.find((request) => request.method === 'thread/start') as { params: Record<string, unknown> };
-    const turnStart = requests.find((request) => request.method === 'turn/start') as { params: Record<string, unknown> };
+    const threadStart = requests.find(
+      (request) => request.method === 'thread/start',
+    ) as { params: Record<string, unknown> };
+    const turnStart = requests.find(
+      (request) => request.method === 'turn/start',
+    ) as { params: Record<string, unknown> };
 
     expect(threadStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
     expect(turnStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
-    expect(turnStart.params.effort).toBe('high');
-    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-app-new');
+    expect(turnStart.params.effort).toBe(effort);
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
+      'thread-app-new',
+    );
     expect(existsSync(join(defaultDir, 'codex_workspace'))).toBe(true);
     expect(chunks).toEqual(['from app server']);
     expect(usage).toEqual([{ inputTokens: 3, outputTokens: 4 }]);
@@ -1175,13 +1409,23 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
-    await strategy.executePromptStreaming('continue', 'gpt-5.4', () => undefined);
+    await strategy.executePromptStreaming(
+      'continue',
+      'gpt-5.4',
+      () => undefined,
+    );
 
     const requests = readJsonl(requestsPath);
-    const resume = requests.find((request) => request.method === 'thread/resume') as { params: Record<string, unknown> };
+    const resume = requests.find(
+      (request) => request.method === 'thread/resume',
+    ) as { params: Record<string, unknown> };
     expect(resume.params.threadId).toBe('thread-existing-app');
-    expect(requests.some((request) => request.method === 'thread/start')).toBe(false);
-    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe('thread-existing-app');
+    expect(requests.some((request) => request.method === 'thread/start')).toBe(
+      false,
+    );
+    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
+      'thread-existing-app',
+    );
   });
 
   test('executePromptStreaming starts one Codex app-server turn per user turn', async () => {
@@ -1203,18 +1447,32 @@ describe('OpenaiCodexStrategy', () => {
     const chunks: string[] = [];
 
     process.env.CODEX_FAKE_MESSAGE = 'first app response';
-    await strategy.executePromptStreaming('first turn', 'gpt-5.4', (chunk) => chunks.push(chunk));
+    await strategy.executePromptStreaming('first turn', 'gpt-5.4', (chunk) =>
+      chunks.push(chunk),
+    );
     process.env.CODEX_FAKE_MESSAGE = 'second app response';
-    await strategy.executePromptStreaming('second turn', 'gpt-5.4', (chunk) => chunks.push(chunk));
+    await strategy.executePromptStreaming('second turn', 'gpt-5.4', (chunk) =>
+      chunks.push(chunk),
+    );
 
     const requests = readJsonl(requestsPath);
-    const turnStarts = requests.filter((request) => request.method === 'turn/start') as Array<{ params: Record<string, unknown> }>;
+    const turnStarts = requests.filter(
+      (request) => request.method === 'turn/start',
+    ) as Array<{ params: Record<string, unknown> }>;
     expect(chunks).toEqual(['first app response', 'second app response']);
     expect(turnStarts).toHaveLength(2);
-    expect(turnStarts[0].params.input).toEqual([{ type: 'text', text: 'first turn', text_elements: [] }]);
-    expect(turnStarts[1].params.input).toEqual([{ type: 'text', text: 'second turn', text_elements: [] }]);
-    expect(requests.filter((request) => request.method === 'thread/start')).toHaveLength(1);
-    expect(requests.filter((request) => request.method === 'thread/resume')).toHaveLength(1);
+    expect(turnStarts[0].params.input).toEqual([
+      { type: 'text', text: 'first turn', text_elements: [] },
+    ]);
+    expect(turnStarts[1].params.input).toEqual([
+      { type: 'text', text: 'second turn', text_elements: [] },
+    ]);
+    expect(
+      requests.filter((request) => request.method === 'thread/start'),
+    ).toHaveLength(1);
+    expect(
+      requests.filter((request) => request.method === 'thread/resume'),
+    ).toHaveLength(1);
   });
 
   test('steerAgent sends turn/steer to active Codex app-server turn', async () => {
@@ -1224,7 +1482,7 @@ describe('OpenaiCodexStrategy', () => {
     writeFakeCodexAppServer(fakeCodexPath);
     process.env.CODEX_BIN = fakeCodexPath;
     process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
-    process.env.CODEX_FAKE_TURN_DELAY_MS = '120';
+    process.env.CODEX_FAKE_MODE = 'complete-on-steer';
 
     const convDir = join(TEST_HOME, 'conversations', 'app-steer');
     const strategy = new OpenaiCodexStrategy(false, {
@@ -1234,14 +1492,28 @@ describe('OpenaiCodexStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
-    const promise = strategy.executePromptStreaming('hello', 'gpt-5.4', () => undefined);
-    await waitFor(() => existsSync(requestsPath) && readJsonl(requestsPath).some((request) => request.method === 'turn/start'));
-    await strategy.steerAgent('adjust course');
-    await promise;
+    let receivedAssistantDelta = false;
+    const promise = strategy.executePromptStreaming(
+      'hello',
+      'gpt-5.4',
+      () => { receivedAssistantDelta = true; },
+    );
+    try {
+      await waitFor(() => receivedAssistantDelta);
+      expect(await strategy.steerAgent('adjust course')).toBe('handled');
+      await promise;
+    } finally {
+      strategy.interruptAgent();
+      await promise.catch(() => undefined);
+    }
 
-    const steer = readJsonl(requestsPath).find((request) => request.method === 'turn/steer') as { params: Record<string, unknown> };
+    const steer = readJsonl(requestsPath).find(
+      (request) => request.method === 'turn/steer',
+    ) as { params: Record<string, unknown> };
     expect(steer.params.threadId).toBe('thread-app');
     expect(steer.params.expectedTurnId).toBe('turn-app');
-    expect(steer.params.input).toEqual([{ type: 'text', text: 'adjust course', text_elements: [] }]);
+    expect(steer.params.input).toEqual([
+      { type: 'text', text: 'adjust course', text_elements: [] },
+    ]);
   });
 });

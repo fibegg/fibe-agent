@@ -1,12 +1,7 @@
 #!/bin/sh
 set -e
 
-# ---------------------------------------------------------------------------
-# Smart entrypoint: detect whether the container is running in production
-# (built dist/ is present) or development (source code is mounted, no dist/).
-# ---------------------------------------------------------------------------
-
-# Default to container-safe Nx behavior, but let compose/environment override it.
+# Use container-safe Nx defaults while honoring explicit overrides.
 export NX_DAEMON="${NX_DAEMON:-false}"
 export NX_NATIVE_FILE_WATCHER="${NX_NATIVE_FILE_WATCHER:-false}"
 export npm_config_cache="${npm_config_cache:-/home/node/.npm}"
@@ -355,13 +350,11 @@ fi
 ensure_runtime_fibe
 
 if [ -f /app/dist/main.js ]; then
-  # ── PRODUCTION: pre-built image, just run the compiled bundle ──────────────
-  echo "[entrypoint] dist/main.js found — starting production server"
+  echo "[entrypoint] dist/main.js found: starting production server"
   start_secret_service
   exec node /app/dist/main.js
 else
-  # ── DEVELOPMENT: source code is mounted, dist/ is absent ──────────────────
-  echo "[entrypoint] No dist/main.js — running in dev mode (source mounted)"
+  echo "[entrypoint] No dist/main.js: running in dev mode (source mounted)"
 
   cd /app
   fix_file_limits || true # WIP
