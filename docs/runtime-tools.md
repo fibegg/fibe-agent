@@ -20,7 +20,7 @@ Reviewed on 2026-09-30:
 | OpenCode | 1.18.34 | [npm](https://www.npmjs.com/package/opencode-ai) |
 | Cursor Agent | 2026.09.28-64d2043 | [installer](https://cursor.com/install) |
 | Antigravity | 1.2.14 | [installer](https://antigravity.google/cli/install.sh) |
-| Fibe CLI | 0.2.45 | [release](https://github.com/fibegg/sdk/releases/tag/v0.2.45) |
+| Fibe CLI | 0.2.46 | [release](https://github.com/fibegg/sdk/releases/tag/v0.2.46) |
 | Bun | 1.4.2 | [release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2) |
 | Docker CLI | 29.8.1 | [release](https://github.com/moby/moby/releases/tag/docker-v29.8.1) |
 | GitHub CLI | 2.102.0 | [release](https://github.com/cli/cli/releases/tag/v2.102.0) |

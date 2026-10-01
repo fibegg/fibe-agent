@@ -19,7 +19,7 @@
     }
   },
   "fibeCli": {
-    "version": "0.2.45",
-    "source": "https://github.com/fibegg/sdk/releases/tag/v0.2.45"
+    "version": "0.2.46",
+    "source": "https://github.com/fibegg/sdk/releases/tag/v0.2.46"
   }
 }

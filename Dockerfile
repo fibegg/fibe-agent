@@ -216,7 +216,7 @@ COPY --link mode /app/mode
 RUN chmod +x /app/mode
 
 COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
-ARG FIBE_CLI_VERSION=0.2.45
+ARG FIBE_CLI_VERSION=0.2.46
 RUN chmod +x /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
