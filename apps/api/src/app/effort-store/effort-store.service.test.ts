@@ -1,5 +1,5 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { EffortStoreService } from './effort-store.service';
@@ -13,14 +13,19 @@ describe('EffortStoreService', () => {
     services = [];
   });
 
-  afterEach(async () => {
-    await Promise.all(services.map((service) => service.onModuleDestroy()));
-    rmSync(dataDir, { recursive: true, force: true });
-  });
+  async function disposeFixture() {
+    const fixtureDir = dataDir;
+    const ownedServices = services;
+    await Promise.all(ownedServices.map((service) => service.onModuleDestroy()));
+    rmSync(fixtureDir, { recursive: true, force: true });
+  }
+
+  afterEach(disposeFixture);
 
   function makeConfig(defaultEffort = 'max') {
+    const fixtureDir = dataDir;
     return {
-      getConversationDataDir: () => dataDir,
+      getConversationDataDir: () => fixtureDir,
       getEncryptionKey: () => undefined,
       getDefaultEffort: () => defaultEffort,
     };
@@ -67,5 +72,46 @@ describe('EffortStoreService', () => {
 
     const raw = readFileSync(join(dataDir, 'effort.json'), 'utf8');
     expect(JSON.parse(raw)).toEqual({ effort: 'high' });
+  });
+
+  test('delayed fixture disposal flushes its own services and preserves the next fixture', async () => {
+    const firstDir = dataDir;
+    const firstConfig = makeConfig();
+    const first = makeService();
+    first.set('high');
+    const flush = first.flush.bind(first);
+    let releaseFlush!: () => void;
+    let firstPersisted: unknown;
+    const pendingFlush = new Promise<void>((resolve) => { releaseFlush = resolve; });
+    const heldFlush = spyOn(first, 'flush').mockImplementation(async () => {
+      await pendingFlush;
+      await flush();
+      firstPersisted = JSON.parse(readFileSync(join(firstDir, 'effort.json'), 'utf8'));
+    });
+    const disposal = disposeFixture();
+
+    // Model the runner advancing after a hook timeout without extending its deadline.
+    dataDir = mkdtempSync(join(tmpdir(), 'effort-store-'));
+    services = [];
+    const secondDir = dataDir;
+    const second = makeService();
+    second.set('low');
+
+    try {
+      await second.flush();
+      expect(existsSync(firstDir)).toBe(true);
+      releaseFlush();
+      await disposal;
+
+      expect(firstPersisted).toEqual({ effort: 'high' });
+      expect({ firstRemoved: !existsSync(firstDir), secondExists: existsSync(secondDir), firstConfigDir: firstConfig.getConversationDataDir() })
+        .toEqual({ firstRemoved: true, secondExists: true, firstConfigDir: firstDir });
+      expect(JSON.parse(readFileSync(join(secondDir, 'effort.json'), 'utf8'))).toEqual({ effort: 'low' });
+    } finally {
+      releaseFlush();
+      await disposal;
+      heldFlush.mockRestore();
+      rmSync(firstDir, { recursive: true, force: true });
+    }
   });
 });
