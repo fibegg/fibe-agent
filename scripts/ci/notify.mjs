@@ -2,6 +2,7 @@ import { readFile, readdir, rm } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
+import { failurePayload, redactSecrets } from './diagnostics.mjs';
 
 const resultsDir = process.env.CI_RESULTS_DIR || '/results';
 const branch = process.env.FIBE_BRANCH || '';
@@ -42,7 +43,7 @@ async function notifySlack(notification) {
       console.log(`WARNING: Failed to notify Slack webhook: ${response.status} ${response.statusText}`);
     }
   } catch (error) {
-    console.log(`WARNING: Failed to notify Slack webhook: ${error.message}`);
+    console.log(redactSecrets(`WARNING: Failed to notify Slack webhook: ${error.message}`));
   }
 }
 
@@ -117,8 +118,7 @@ async function collectVerifiedImagePulls(summary, detail) {
 
 async function uploadFailurePayload(payload) {
   if (!process.env.DPASTE_TOKEN) {
-    console.log('--> DPASTE_TOKEN is not set; printing failure payload to stdout');
-    printFailurePayload(payload);
+    console.log('--> DPASTE_TOKEN is not set; failure payload retained in stdout');
     return '';
   }
 
@@ -135,14 +135,12 @@ async function uploadFailurePayload(payload) {
 
     if (!response.ok) {
       console.log(`WARNING: Dpaste upload failed: ${response.status} ${response.statusText}`);
-      printFailurePayload(payload);
       return '';
     }
 
     return (await response.text()).trim();
   } catch (error) {
-    console.log(`WARNING: Dpaste upload failed: ${error.message}`);
-    printFailurePayload(payload);
+    console.log(redactSecrets(`WARNING: Dpaste upload failed: ${error.message}`));
     return '';
   }
 }
@@ -183,7 +181,7 @@ if (resultFiles.length === 0 && missingExpectedResults.length === 0) {
     if (status !== 'passed') {
       failures += 1;
       detail.push(`---- ${service}: ${status} (exit code ${exitCode}) ----`);
-      detail.push(decodeOutput(result.output_base64).split(/\r?\n/).slice(-1000).join('\n') || '(no captured output)');
+      detail.push(redactSecrets(decodeOutput(result.output_base64)).split(/\r?\n/).slice(-1000).join('\n') || '(no captured output)');
       detail.push('');
     }
   }
@@ -198,7 +196,7 @@ if (failures === 0) {
   }
 }
 
-console.log(summary.join('\n'));
+console.log(redactSecrets(summary.join('\n')));
 
 if (failures === 0) {
   const formattedPulls = imagePulls.map(({ label, command }) => `- ${label}\n  ${command}`).join('\n');
@@ -229,7 +227,9 @@ if (failures === 0) {
   process.exit(0);
 }
 
-const failedServiceError = `${summary.join('\n')}\n\n${detail.join('\n')}`;
+const failedServiceError = failurePayload(`${summary.join('\n')}\n\n${detail.join('\n')}`);
+// The watched notifier's logs survive job teardown even when uploads succeed.
+printFailurePayload(failedServiceError);
 const dpasteUrl = await uploadFailurePayload(failedServiceError);
 
 if (dpasteUrl) {
