@@ -575,6 +575,12 @@ ghcr.io/<owner>/fibe-agent:<provider>-<git-sha>
 
 The provider is baked in at build time via `--build-arg AGENT_PROVIDER=<value>`. The image installs the corresponding CLI tool plus system dependencies: git, docker, ripgrep, fd, Python, Deno, uv, ffmpeg, ImageMagick, Playwright/Chromium (for MCP), sqlite3, pandoc, and more. The built `dist/` (API) and `chat/` (frontend) bundles are copied in last to maximise layer cache reuse.
 
+Failed managed CI runs retain their bounded failure details in the watched
+`ci-results-notify` service's cached logs, including when the external report
+upload succeeds. Configured secrets and authorization values are redacted before
+line or byte truncation. Read that service's logs after teardown to recover the
+failed assertion; the other CI services remain unobserved for job completion.
+
 ### Run with Docker
 
 ```sh
