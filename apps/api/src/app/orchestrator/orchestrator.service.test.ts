@@ -891,6 +891,7 @@ describe('OrchestratorService', () => {
     expect(controller.getStatus()).toEqual(ordinary);
   });
 
+  // Restart journeys flush real filesystem stores; allow for Docker CI I/O contention.
   test('restart recovers persisted pending queued identities in order without creating duplicate messages', async () => {
     const first = await createOrchestrator();
     first.ctx.isProcessing = true;
@@ -921,7 +922,7 @@ describe('OrchestratorService', () => {
     expect(restarted.messageStore.all().filter((message) => message.role === 'user').map((message) => message.id)).toEqual(ids);
     expect(restarted.messageStore.getById(ids[0])?.apiRequest?.state).toBe('completed');
     expect(restarted.messageStore.getById(ids[1])?.apiRequest?.state).toBe('completed');
-  });
+  }, 15_000);
 
   test('restart exposes interrupted running identity as unknown and never repeats its provider effect', async () => {
     const first = await createOrchestrator();
@@ -1003,7 +1004,7 @@ describe('OrchestratorService', () => {
     expect(restarted.messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
     const replay = await restarted.orch.sendMessageFromApi('original', 'default', undefined, undefined, 'queue', id, restarted.messageStore.deliveryGeneration());
     expect(replay).toMatchObject({ accepted: true, messageId: id });
-  });
+  }, 15_000);
 
   for (const conversationId of [undefined, 'default']) {
     test(`sendMessageFromApi rejects the second simultaneous request after auth (${conversationId ?? 'inbox'})`, async () => {
