@@ -1,6 +1,6 @@
-import { readFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { resolveCliBuild, stageCandidateCli, cliBuildArgs, cliImageLabels, providerImageTags } from './cli-build.mjs';
 import {
   cacheFromArgsForExistingRefs,
   captureText,
@@ -14,10 +14,10 @@ import {
   tryCaptureText,
 } from './lib.mjs';
 
-const fibeCliVersion = process.env.FIBE_CLI_VERSION
-  || JSON.parse(readFileSync(new URL('../provider-versions.json', import.meta.url))).fibeCli.version;
-if (!/^\d+\.\d+\.\d+$/.test(fibeCliVersion)) throw new Error('FIBE_CLI_VERSION must be an exact stable version');
-console.log(`--> Pinned Fibe CLI release: ${fibeCliVersion}`);
+const cliBuild = resolveCliBuild();
+stageCandidateCli(cliBuild);
+const fibeCliVersion = cliBuild.version;
+console.log(`--> Pinned Fibe CLI ${cliBuild.candidate ? 'candidate' : 'release'}: ${fibeCliVersion}`);
 
 console.log('--> Preparing for Docker Build & Push');
 await run('git', ['config', '--global', '--add', 'safe.directory', '/app']);
@@ -28,15 +28,12 @@ logGhcrImageContext(context);
 const sourceBranch = process.env.FIBE_BRANCH || 'main';
 const tagName = process.env.TAG_NAME;
 const provider = process.env.PROVIDER;
-let latestTag = 'latest';
 
 if (!tagName || !provider) {
   throw new Error('PROVIDER and TAG_NAME are required for provider image builds');
 }
 
-if (sourceBranch !== 'main' && sourceBranch !== 'master') {
-  latestTag = `latest-${sourceBranch.replace(/[/:@ ]/g, '-')}`;
-}
+const imageTags = providerImageTags({ provider, tagName, sourceBranch, gitSha }, cliBuild);
 
 const providerName = providerDisplayName(provider);
 const imageSource = process.env.FIBE_REPOSITORY_URL || 'https://github.com/fibegg/fibe-agent';
@@ -49,12 +46,12 @@ const resultsDir = process.env.CI_RESULTS_DIR || '/results';
 const imageResultFile = path.join(resultsDir, 'images', `${process.env.CI_STEP_NAME || tagName}.txt`);
 
 await mkdir(path.dirname(imageResultFile), { recursive: true });
-requireGhToken(`build, push, and verify ${context.image}:${tagName}-${gitSha}`);
+requireGhToken(`build, push, and verify ${context.image}:${imageTags[0]}`);
 await ghcrLogin(context);
 
-const cacheRef = `${context.cacheImage}:${tagName}`;
-const runtimeCacheRef = `${context.cacheImage}:runtime-base`;
-const builderCacheRef = `${context.cacheImage}:builder`;
+const cacheRef = `${context.cacheImage}:${tagName}${cliBuild.cacheSuffix}`;
+const runtimeCacheRef = `${context.cacheImage}:runtime-base${cliBuild.cacheSuffix}`;
+const builderCacheRef = `${context.cacheImage}:builder${cliBuild.cacheSuffix}`;
 const legacyCacheRef = `${context.image}:buildcache-${tagName}`;
 const legacyRuntimeCacheRef = `${context.image}:buildcache-runtime-base`;
 const legacyBuilderCacheRef = `${context.image}:buildcache-builder`;
@@ -66,7 +63,7 @@ const cacheFromArgs = await cacheFromArgsForExistingRefs([
   legacyRuntimeCacheRef,
   legacyBuilderCacheRef,
   legacyCacheRef,
-  `${context.image}:${tagName}-${latestTag}`,
+  `${context.image}:${imageTags[0]}`,
 ], { logMissing: false });
 const exportProviderCache = process.env.CI_PROVIDER_CACHE_EXPORT === 'true';
 const cacheExportArgs = exportProviderCache
@@ -80,7 +77,7 @@ if (exportProviderCache) {
 }
 
 console.log('=========================================');
-console.log(`--> Building ${provider} (linux/amd64 + linux/arm64)`);
+console.log(`--> Building ${provider} (${cliBuild.platforms.join(' + ')})`);
 console.log('=========================================');
 
 await run('docker', [
@@ -92,17 +89,16 @@ await run('docker', [
   '--progress',
   buildConfig.progress,
   '--platform',
-  'linux/amd64,linux/arm64',
-  '-t',
-  `${context.image}:${tagName}-${latestTag}`,
-  '-t',
-  `${context.image}:${tagName}-${gitSha}`,
+  cliBuild.platforms.join(','),
+  ...imageTags.flatMap(tag => ['-t', `${context.image}:${tag}`]),
   '--build-arg',
   `AGENT_PROVIDER=${provider}`,
   '--build-arg',
   `GIT_SHA=${gitSha}`,
   '--build-arg',
   `FIBE_CLI_VERSION=${fibeCliVersion}`,
+  ...cliBuildArgs(cliBuild),
+  ...cliImageLabels(cliBuild),
   '--build-arg',
   `SOURCE_DATE_EPOCH=${sourceDateEpoch}`,
   '--build-arg',
@@ -152,12 +148,12 @@ await run('docker', [
   '--push',
 ]);
 
-console.log('--> Verifying multi-arch manifests');
-await Promise.all([`${tagName}-${latestTag}`, `${tagName}-${gitSha}`].map(async (tag) => {
+console.log(`--> Verifying image platforms: ${cliBuild.platforms.join(', ')}`);
+await Promise.all(imageTags.map(async (tag) => {
   const manifestInfo = await captureText('docker', ['buildx', 'imagetools', 'inspect', `${context.image}:${tag}`]);
   const platforms = [...manifestInfo.matchAll(/Platform:\s+([^\n]+)/g)].map((match) => match[1].trim());
 
-  for (const platform of ['linux/amd64', 'linux/arm64']) {
+  for (const platform of cliBuild.platforms) {
     if (!platforms.includes(platform)) {
       throw new Error(`${context.image}:${tag} is missing ${platform}`);
     }
@@ -166,4 +162,4 @@ await Promise.all([`${tagName}-${latestTag}`, `${tagName}-${gitSha}`].map(async 
   console.log(`--> Verified ${context.image}:${tag}: ${platforms.join(', ')}`);
 }));
 
-await writeFile(imageResultFile, `${context.image}:${tagName}-${gitSha}\n`);
+await writeFile(imageResultFile, `${context.image}:${imageTags.at(-1)}\n`);

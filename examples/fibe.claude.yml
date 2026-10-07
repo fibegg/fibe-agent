@@ -18,7 +18,7 @@ systemPrompt: |
 
 dataDir: /app/data
 sessionDir: /app/data/42/.claude
-marqueeRootDomain: my-marquee.fibe.gg
+hostRootDomain: my-marquee.fibe.gg
 
 fibeSyncEnabled: true
 
@@ -35,7 +35,7 @@ agentCredentials:
 credentialEnv:
   ANTHROPIC_API_KEY: sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# Settings cascade from Marquee to Playspec to Agent to fibe.yml.
+# Settings cascade from Host to Spec to Agent to fibe.yml.
 # Provider CLI snapshot: 2.1.286 (pinned by the agent image).
 # cliVersion selects the FIBE CLI used by MCP tools.
 cliVersion: '0.2.46'

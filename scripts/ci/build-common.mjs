@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { resolveCliBuild, stageCandidateCli, cliBuildArgs, cliImageLabels } from './cli-build.mjs';
 import {
   cacheFromArgsForExistingRefs,
   configureBuildResources,
@@ -11,10 +11,10 @@ import {
   setupGhcrImageContext,
 } from './lib.mjs';
 
-const fibeCliVersion = process.env.FIBE_CLI_VERSION
-  || JSON.parse(readFileSync(new URL('../provider-versions.json', import.meta.url))).fibeCli.version;
-if (!/^\d+\.\d+\.\d+$/.test(fibeCliVersion)) throw new Error('FIBE_CLI_VERSION must be an exact stable version');
-console.log(`--> Pinned Fibe CLI release: ${fibeCliVersion}`);
+const cliBuild = resolveCliBuild();
+stageCandidateCli(cliBuild);
+const fibeCliVersion = cliBuild.version;
+console.log(`--> Pinned Fibe CLI ${cliBuild.candidate ? 'candidate' : 'release'}: ${fibeCliVersion}`);
 
 console.log('--> Preparing shared Docker build cache');
 
@@ -23,8 +23,8 @@ logGhcrImageContext(context);
 requireGhToken('warm Docker build cache and push images');
 await ghcrLogin(context);
 
-const runtimeCacheRef = `${context.cacheImage}:runtime-base`;
-const builderCacheRef = `${context.cacheImage}:builder`;
+const runtimeCacheRef = `${context.cacheImage}:runtime-base${cliBuild.cacheSuffix}`;
+const builderCacheRef = `${context.cacheImage}:builder${cliBuild.cacheSuffix}`;
 const legacyRuntimeCacheRef = `${context.image}:buildcache-runtime-base`;
 const legacyBuilderCacheRef = `${context.image}:buildcache-builder`;
 const buildConfig = await configureBuildResources();
@@ -66,7 +66,7 @@ async function warmRuntimeBaseCache() {
   }
 
   console.log('=========================================');
-  console.log('--> Warming runtime-base cache (linux/amd64 + linux/arm64)');
+  console.log(`--> Warming runtime-base cache (${cliBuild.platforms.join(' + ')})`);
   console.log('=========================================');
   await run('docker', [
     'buildx',
@@ -77,11 +77,13 @@ async function warmRuntimeBaseCache() {
     '--progress',
     buildConfig.progress,
     '--platform',
-    'linux/amd64,linux/arm64',
+    cliBuild.platforms.join(','),
     '--target',
     'runtime-base',
     '--build-arg',
     `FIBE_CLI_VERSION=${fibeCliVersion}`,
+    ...cliBuildArgs(cliBuild),
+    ...cliImageLabels(cliBuild),
     '--label',
     `gg.fibe.cli.version=${fibeCliVersion}`,
     '--build-arg',
@@ -98,7 +100,7 @@ async function warmBuilderCache() {
   }
 
   console.log('=========================================');
-  console.log('--> Warming builder cache (linux/amd64 + linux/arm64)');
+  console.log(`--> Warming builder cache (${cliBuild.platforms.join(' + ')})`);
   console.log('=========================================');
   await run('docker', [
     'buildx',
@@ -109,7 +111,7 @@ async function warmBuilderCache() {
     '--progress',
     buildConfig.progress,
     '--platform',
-    'linux/amd64,linux/arm64',
+    cliBuild.platforms.join(','),
     '--target',
     'builder',
     '--build-arg',

@@ -47,3 +47,6 @@ apps/e2e-chat/node_modules
 apps/e2e-chat/node_modules/**
 shared/node_modules
 shared/node_modules/**
+
+!.candidate-cli/
+!.candidate-cli/fibe

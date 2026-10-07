@@ -31,7 +31,7 @@ import { PlaygroundsService } from './playgrounds/playgrounds.service';
 import { InitStatusController } from './init-status/init-status.controller';
 import { AgentController } from './agent/agent.controller';
 import { PlaygroundWatcherService } from './playgrounds/playground-watcher.service';
-import { PlayroomBrowserService } from './playgrounds/playroom-browser.service';
+import { PlaygroundBrowserService } from './playgrounds/playground-browser.service';
 import { FibeSyncService } from './fibe-sync/fibe-sync.service';
 import { FibeSyncSettingsController } from './fibe-sync/fibe-sync-settings.controller';
 import { FibeSyncSettingsStoreService } from './fibe-sync/fibe-sync-settings-store.service';
@@ -98,7 +98,7 @@ import { ConversationsController } from './conversation/conversations.controller
     UploadsService,
     PlaygroundsService,
     PlaygroundWatcherService,
-    PlayroomBrowserService,
+    PlaygroundBrowserService,
     AgentFilesService,
     AgentFilesWatcherService,
     FibeSyncService,

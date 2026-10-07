@@ -1,5 +1,8 @@
 # syntax=docker/dockerfile:1.7
 
+ARG FIBE_CANDIDATE_BUILD=0
+ARG FIBE_CLI_VERSION=0.2.46
+
 FROM node:24-slim AS cli-base
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -76,7 +79,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
     /usr/local/go/bin/go install "gitea.com/gitea/gitea-mcp@v${GITEA_MCP_VERSION}"
 
-FROM node:24-slim AS runtime-base
+FROM node:24-slim AS runtime-packages
 
 ARG BUILDKIT_INLINE_CACHE=1
 ARG GITHUB_MCP_VERSION=1.12.2
@@ -216,11 +219,34 @@ COPY --link mode /app/mode
 RUN chmod +x /app/mode
 
 COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
-ARG FIBE_CLI_VERSION=0.2.46
-RUN chmod +x /usr/local/bin/install-fibe.sh \
-    && /usr/local/bin/install-fibe.sh \
+RUN chmod +x /usr/local/bin/install-fibe.sh
+
+FROM runtime-packages AS runtime-cli-0
+ARG FIBE_CLI_VERSION
+RUN /usr/local/bin/install-fibe.sh \
     && /usr/local/bin/fibe version \
     && /usr/local/bin/fibe local playgrounds --help >/dev/null
+LABEL gg.fibe.cli.version=$FIBE_CLI_VERSION
+
+FROM runtime-packages AS runtime-cli-1
+ARG FIBE_CLI_VERSION
+ARG FIBE_CLI_BINARY_SHA256
+ARG FIBE_SDK_SHA
+COPY --link .candidate-cli/fibe /usr/local/bin/fibe
+RUN set -eu; \
+    printf '%s\n' "$FIBE_CLI_VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+-[0-9A-Za-z]'; \
+    printf '%s\n' "$FIBE_SDK_SHA" | grep -Eq '^[0-9a-f]{40}$'; \
+    printf '%s  /usr/local/bin/fibe\n' "$FIBE_CLI_BINARY_SHA256" | sha256sum --check --strict -; \
+    chmod 755 /usr/local/bin/fibe; \
+    test "$(/usr/local/bin/fibe version | awk 'NR==1 {print $2}')" = "$FIBE_CLI_VERSION"; \
+    /usr/local/bin/fibe local playgrounds --help >/dev/null
+ENV FIBE_CANDIDATE_BUILD=1 \
+    FIBE_CANDIDATE_CLI_VERSION=$FIBE_CLI_VERSION
+LABEL gg.fibe.cli.version=$FIBE_CLI_VERSION \
+    gg.fibe.cli.sdk.sha=$FIBE_SDK_SHA \
+    gg.fibe.cli.binary.sha256=$FIBE_CLI_BINARY_SHA256
+
+FROM runtime-cli-${FIBE_CANDIDATE_BUILD} AS runtime-base
 
 COPY --link --from=oven/bun:1.4.2-slim /usr/local/bin/bun /usr/local/bin/bun
 

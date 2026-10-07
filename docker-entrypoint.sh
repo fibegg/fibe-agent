@@ -290,10 +290,30 @@ ensure_runtime_fibe() {
   if [ -z "$desired_version" ]; then
     desired_version="$(runtime_fibe_config_version)"
   fi
+  if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ] && [ -z "$desired_version" ]; then
+    desired_version="${FIBE_CANDIDATE_CLI_VERSION:-}"
+    if [ -z "$desired_version" ]; then
+      echo "[entrypoint] ERROR: candidate image has no baked CLI version" >&2
+      return 1
+    fi
+  fi
   if [ "$desired_version" = "latest" ]; then
+    if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ]; then
+      echo "[entrypoint] ERROR: candidate images require their exact baked CLI version" >&2
+      return 1
+    fi
     desired_version=""
   fi
   normalized_desired="${desired_version#v}"
+
+  if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ]; then
+    expected_candidate="${FIBE_CANDIDATE_CLI_VERSION:-}"
+    expected_candidate="${expected_candidate#v}"
+    if [ "$normalized_desired" != "$expected_candidate" ] || [ "$baked_version" != "$expected_candidate" ]; then
+      echo "[entrypoint] ERROR: candidate images require baked CLI ${expected_candidate}; release downloads are disabled" >&2
+      return 1
+    fi
+  fi
 
   if [ -n "$normalized_desired" ] && [ "$current_version" = "$normalized_desired" ]; then
     echo "[entrypoint] Using cached runtime fibe ${current_version}"
@@ -303,6 +323,11 @@ ensure_runtime_fibe() {
   if [ -n "$normalized_desired" ] && [ "$baked_version" = "$normalized_desired" ]; then
     copy_baked_runtime_fibe
     return
+  fi
+
+  if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ]; then
+    echo "[entrypoint] ERROR: candidate CLI ${normalized_desired} does not match baked version ${baked_version:-missing}; release downloads are disabled" >&2
+    return 1
   fi
 
   if [ -n "$normalized_desired" ]; then

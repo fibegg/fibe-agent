@@ -4,7 +4,7 @@ import { createReadStream } from 'node:fs';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { contentTypeFromFilename } from '../uploads/uploads-handler';
 import { PlaygroundsService } from './playgrounds.service';
-import { PlayroomBrowserService } from './playroom-browser.service';
+import { PlaygroundBrowserService } from './playground-browser.service';
 import { diagnosePreviewUrl } from './preview-diagnostics';
 
 @Controller()
@@ -12,7 +12,7 @@ import { diagnosePreviewUrl } from './preview-diagnostics';
 export class PlaygroundsController {
   constructor(
     private readonly playgrounds: PlaygroundsService,
-    private readonly playroomBrowser: PlayroomBrowserService,
+    private readonly playgroundBrowser: PlaygroundBrowserService,
   ) {}
 
   @Get('playgrounds')
@@ -131,32 +131,32 @@ export class PlaygroundsController {
     return { ok: true, path: savedPath };
   }
 
-  @Get('playrooms/browse')
+  @Get('playgrounds/browse')
   async browsePlayrooms(@Query('path') path?: string) {
-    return this.playroomBrowser.browse(path ?? '');
+    return this.playgroundBrowser.browse(path ?? '');
   }
 
-  @Post('playrooms/link')
+  @Post('playgrounds/link')
   @HttpCode(HttpStatus.OK)
   async linkPlayroom(@Body() body: { path?: string }) {
     const { path } = body ?? {};
     if (!path || typeof path !== 'string') {
       throw new NotFoundException('Invalid path');
     }
-    const result = await this.playroomBrowser.linkPlayground(path);
+    const result = await this.playgroundBrowser.linkPlayground(path);
     return { ok: true, ...result };
   }
 
-  @Post('playrooms/unlink')
+  @Post('playgrounds/unlink')
   @HttpCode(HttpStatus.OK)
   async unlinkPlayroom(@Body() body: { confirm?: boolean }) {
-    await this.playroomBrowser.unlinkPlayground(body?.confirm === true);
+    await this.playgroundBrowser.unlinkPlayground(body?.confirm === true);
     return { ok: true };
   }
 
-  @Get('playrooms/current')
+  @Get('playgrounds/current')
   async getCurrentPlayroom() {
-    const current = await this.playroomBrowser.getCurrentLink();
+    const current = await this.playgroundBrowser.getCurrentLink();
     return { current };
   }
 

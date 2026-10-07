@@ -134,13 +134,13 @@ describe('ConfigService', () => {
     expect(new ConfigService().getSystemPrompt()).toBeUndefined();
   });
 
-  test('getMarqueeRoot returns marqueeRoot from settings', () => {
-    const config = withSettings({ marqueeRoot: '/custom/marquee' });
-    expect(config.getMarqueeRoot()).toBe('/custom/marquee');
+  test('getHostRoot returns hostRoot from settings', () => {
+    const config = withSettings({ hostRoot: '/custom/host' });
+    expect(config.getHostRoot()).toBe('/custom/host');
   });
 
-  test('getMarqueeRoot returns /opt/fibe when not set', () => {
-    expect(new ConfigService().getMarqueeRoot()).toBe('/opt/fibe');
+  test('getHostRoot returns /opt/fibe when not set', () => {
+    expect(new ConfigService().getHostRoot()).toBe('/opt/fibe');
   });
 
   test('getPlaygroundsDir returns PLAYGROUNDS_DIR when set', () => {
@@ -376,12 +376,12 @@ describe('ConfigService', () => {
     const config = withSettings({
       encryptionKey: 'enc-key',
       sessionDir: '/app/data/42/.codex',
-      marqueeRootDomain: 'marquee.example.test',
+      hostRootDomain: 'host.example.test',
     });
 
     expect(config.getEncryptionKey()).toBe('enc-key');
     expect(config.getSessionDir()).toBe('/app/data/42/.codex');
-    expect(config.getMarqueeRootDomain()).toBe('marquee.example.test');
+    expect(config.getHostRootDomain()).toBe('host.example.test');
   });
 
   test('returns MCP config and cascade settings from fibe settings', () => {

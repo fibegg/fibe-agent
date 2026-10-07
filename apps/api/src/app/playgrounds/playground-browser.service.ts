@@ -17,7 +17,7 @@ export interface BrowseEntry {
 interface LocalPlaygroundName {
   id?: string;
   name: string;
-  playspec?: string;
+  spec?: string;
   path?: string;
 }
 
@@ -25,7 +25,7 @@ interface CurrentPlaygroundState {
   id?: string;
   name?: string;
   dir_name?: string;
-  playspec?: string;
+  spec?: string;
 }
 
 interface LocalPlaygroundMount {
@@ -34,7 +34,7 @@ interface LocalPlaygroundMount {
 }
 
 @Injectable()
-export class PlayroomBrowserService {
+export class PlaygroundBrowserService {
   constructor(private readonly config: ConfigService) {}
 
   /** List local playgrounds through the Fibe CLI. */
@@ -134,7 +134,7 @@ export class PlayroomBrowserService {
     try {
       const content = await readFile(stateFile, 'utf8');
       const state = JSON.parse(content) as CurrentPlaygroundState;
-      return state.name || state.dir_name || state.id || state.playspec || null;
+      return state.name || state.dir_name || state.id || state.spec || null;
     } catch {
       return this.inferCurrentLinkFromMountedTargets(playgroundDir);
     }

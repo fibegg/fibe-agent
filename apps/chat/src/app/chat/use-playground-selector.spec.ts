@@ -60,7 +60,7 @@ describe('usePlaygroundSelector', () => {
 
     expect(result.current.currentLink).toBe('alice');
     expect(result.current.entries).toEqual([]);
-    expect(mockApiRequest).toHaveBeenCalledWith('/api/playrooms/current');
+    expect(mockApiRequest).toHaveBeenCalledWith('/api/playgrounds/current');
   });
 
   it('browseTo navigates to a subdirectory and updates breadcrumbs', async () => {
@@ -155,7 +155,7 @@ describe('usePlaygroundSelector', () => {
     expect(success).toBe(true);
     expect(result.current.currentLink).toBe('project');
     expect(mockApiRequest).toHaveBeenCalledWith(
-      '/api/playrooms/link',
+      '/api/playgrounds/link',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ path: 'project' }),
@@ -208,7 +208,7 @@ describe('usePlaygroundSelector', () => {
     expect(success).toBe(true);
     expect(result.current.currentLink).toBeNull();
     expect(mockApiRequest).toHaveBeenCalledWith(
-      '/api/playrooms/unlink',
+      '/api/playgrounds/unlink',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ confirm: true }),
@@ -277,7 +277,7 @@ describe('usePlaygroundSelector', () => {
     expect(success).toBe(true);
     expect(result.current.currentLink).toBe('dir');
     expect(mockApiRequest).toHaveBeenCalledWith(
-      '/api/playrooms/link',
+      '/api/playgrounds/link',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ path: 'dir' }),
@@ -375,7 +375,7 @@ describe('usePlaygroundSelector', () => {
 
     expect(result.current.currentLink).toBeNull();
     expect(mockApiRequest).not.toHaveBeenCalledWith(
-      '/api/playrooms/link',
+      '/api/playgrounds/link',
       expect.anything(),
     );
   });

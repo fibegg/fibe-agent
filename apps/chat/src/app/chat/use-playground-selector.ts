@@ -25,8 +25,8 @@ export function usePlaygroundSelector() {
     setError(null);
     try {
       const url = path
-        ? `${API_PATHS.PLAYROOMS_BROWSE}?path=${encodeURIComponent(path)}`
-        : API_PATHS.PLAYROOMS_BROWSE;
+        ? `${API_PATHS.PLAYGROUNDS_BROWSE}?path=${encodeURIComponent(path)}`
+        : API_PATHS.PLAYGROUNDS_BROWSE;
       const res = await apiRequest(url);
       if (!res.ok) throw new Error(res.status === 404 ? 'Path not found' : 'Failed to browse');
       const data = (await res.json()) as BrowseEntry[];
@@ -42,7 +42,7 @@ export function usePlaygroundSelector() {
 
   const fetchCurrentLink = useCallback(async () => {
     try {
-      const res = await apiRequest(API_PATHS.PLAYROOMS_CURRENT);
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS_CURRENT);
       if (res.ok) {
         const data = (await res.json()) as { current: string | null };
         setCurrentLink(data.current);
@@ -75,7 +75,7 @@ export function usePlaygroundSelector() {
   const linkPlayground = useCallback(async (path: string): Promise<boolean> => {
     setLinking(true);
     try {
-      const res = await apiRequest(API_PATHS.PLAYROOMS_LINK, {
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS_LINK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path }),
@@ -103,7 +103,7 @@ export function usePlaygroundSelector() {
       let targetPath = browsePath;
 
       if (!targetPath) {
-        const res = await apiRequest(API_PATHS.PLAYROOMS_BROWSE);
+        const res = await apiRequest(API_PATHS.PLAYGROUNDS_BROWSE);
         if (!res.ok) throw new Error('Failed to fetch playgrounds for smart mount');
         const rootEntries = (await res.json()) as BrowseEntry[];
         const firstDir = rootEntries.find(e => e.type === 'directory' || e.type === 'symlink');
@@ -114,7 +114,7 @@ export function usePlaygroundSelector() {
         targetPath = firstDir.path;
       }
 
-      const linkRes = await apiRequest(API_PATHS.PLAYROOMS_LINK, {
+      const linkRes = await apiRequest(API_PATHS.PLAYGROUNDS_LINK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: targetPath }),
@@ -140,7 +140,7 @@ export function usePlaygroundSelector() {
     setUnlinking(true);
     setError(null);
     try {
-      const res = await apiRequest(API_PATHS.PLAYROOMS_UNLINK, {
+      const res = await apiRequest(API_PATHS.PLAYGROUNDS_UNLINK, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ confirm: true }),

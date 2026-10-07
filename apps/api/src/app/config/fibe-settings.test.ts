@@ -1,5 +1,5 @@
 import { describe, it, test, expect, beforeEach, afterEach } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -9,6 +9,11 @@ import {
 } from './fibe-settings';
 
 describe('parseYaml', () => {
+  it('rejects removed FIBE settings with their canonical replacement', () => {
+    expect(() => parseYaml('marqueeRoot: /opt/fibe\n')).toThrow('marqueeRoot was removed; use hostRoot');
+    expect(() => parseYaml('marqueeRootDomain: example.test\n')).toThrow('marqueeRootDomain was removed; use hostRootDomain');
+    expect(parseYaml('hostRoot: /opt/fibe\nhostRootDomain: example.test\n')).toEqual({ hostRoot: '/opt/fibe', hostRootDomain: 'example.test' });
+  });
   it('parses flat string scalars', () => {
     const result = parseYaml(
       'agentProvider: gemini\nollamaUrl: http://localhost:11434\n',
@@ -134,7 +139,7 @@ describe('parseYaml', () => {
 });
 
 describe('loadFibeSettings', () => {
-  const MANAGED = ['FIBE_SETTINGS_JSON'];
+  const MANAGED = ['FIBE_SETTINGS_JSON', 'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN', 'FIBE_MARQUEE_ID', 'FIBE_PLAYSPEC_ID', 'FIBE_PROP_ID'];
   const savedEnv: Record<string, string | undefined> = {};
   const originalCwd = process.cwd();
   let tempDir = '';
@@ -161,6 +166,45 @@ describe('loadFibeSettings', () => {
 
   test('returns empty object when no sources configured', () => {
     expect(loadFibeSettings()).toEqual({});
+  });
+
+  test('shared naming contract feeds the real YAML and JSON loaders', () => {
+    const fixture = JSON.parse(readFileSync(join(import.meta.dir, 'fixtures/naming-v1.json'), 'utf8'));
+    writeFileSync(localYml, JSON.stringify(fixture.agent_settings));
+    expect(loadFibeSettings()).toEqual(fixture.agent_settings);
+    writeFileSync(localYml, '');
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify(fixture.agent_settings);
+    expect(loadFibeSettings()).toEqual(fixture.agent_settings);
+    for (const [removed, replacement] of Object.entries(fixture.removed_keys)) {
+      if (removed !== 'marqueeRoot' && removed !== 'marqueeRootDomain') continue;
+      process.env.FIBE_SETTINGS_JSON = JSON.stringify({ [removed]: 'old-value' });
+      expect(() => loadFibeSettings()).toThrow(`${removed} was removed; use ${replacement}`);
+    }
+  });
+
+  test('rejects obsolete YAML even when JSON supplies the replacement', () => {
+    writeFileSync(localYml, 'marqueeRoot: /legacy\n');
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ hostRoot: '/canonical' });
+    expect(() => loadFibeSettings()).toThrow('marqueeRoot was removed; use hostRoot');
+  });
+
+  test('rejects obsolete JSON keys and renamed environment variables without logging values', () => {
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ marqueeRootDomain: 'private-value' });
+    expect(() => loadFibeSettings()).toThrow('marqueeRootDomain was removed; use hostRootDomain');
+    process.env.FIBE_SETTINGS_JSON = '{}';
+    for (const [oldName, newName] of [['MARQUEE_ROOT', 'HOST_ROOT'], ['MARQUEE_ROOT_DOMAIN', 'HOST_ROOT_DOMAIN'], ['FIBE_MARQUEE_ID', 'FIBE_HOST_ID'], ['FIBE_PLAYSPEC_ID', 'FIBE_SPEC_ID'], ['FIBE_PROP_ID', 'FIBE_REPOSITORY_ID']]) {
+      process.env[oldName] = 'private-value';
+      expect(() => loadFibeSettings()).toThrow(`${oldName} was removed; use ${newName}`);
+      delete process.env[oldName];
+    }
+  });
+
+  test('rejects obsolete credential env in both YAML and JSON sources', () => {
+    writeFileSync(localYml, 'credentialEnv:\n  FIBE_MARQUEE_ID: 21\n');
+    expect(() => loadFibeSettings()).toThrow('FIBE_MARQUEE_ID was removed; use FIBE_HOST_ID');
+    writeFileSync(localYml, '');
+    process.env.FIBE_SETTINGS_JSON = JSON.stringify({ credentialEnv: { MARQUEE_ROOT: '/legacy' } });
+    expect(() => loadFibeSettings()).toThrow('MARQUEE_ROOT was removed; use HOST_ROOT');
   });
 
   test('reads from FIBE_SETTINGS_JSON', () => {
@@ -223,8 +267,8 @@ describe('applyFibeSettings', () => {
     'ENCRYPTION_KEY',
     'FIBE_AGENT_ID',
     'CONVERSATION_ID',
-    'MARQUEE_ROOT',
-    'MARQUEE_ROOT_DOMAIN',
+    'HOST_ROOT',
+    'HOST_ROOT_DOMAIN',
     'FIBE_API_KEY',
     'POST_INIT_SCRIPT',
     'USER_AVATAR_URL',
@@ -312,8 +356,8 @@ describe('applyFibeSettings', () => {
         'encryptionKey: enc-key',
         'fibeAgentId: agent-42',
         'conversationId: conversation-42',
-        'marqueeRoot: /opt/fibe',
-        'marqueeRootDomain: example.test',
+        'hostRoot: /opt/fibe',
+        'hostRootDomain: example.test',
         'fibeApiKey: fibe-key',
         'fibeSyncEnabled: true',
         'postInitScript: echo ready',
@@ -375,8 +419,8 @@ describe('applyFibeSettings', () => {
     expect(process.env.ENCRYPTION_KEY).toBe('enc-key');
     expect(process.env.FIBE_AGENT_ID).toBe('agent-42');
     expect(process.env.CONVERSATION_ID).toBe('conversation-42');
-    expect(process.env.MARQUEE_ROOT).toBe('/opt/fibe');
-    expect(process.env.MARQUEE_ROOT_DOMAIN).toBe('example.test');
+    expect(process.env.HOST_ROOT).toBe('/opt/fibe');
+    expect(process.env.HOST_ROOT_DOMAIN).toBe('example.test');
     expect(process.env.FIBE_API_KEY).toBe('fibe-key');
     expect(process.env.FIBE_SYNC_ENABLED).toBe('true');
     expect(process.env.POST_INIT_SCRIPT).toBe('echo ready');

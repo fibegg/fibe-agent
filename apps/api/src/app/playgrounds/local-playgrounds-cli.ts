@@ -11,12 +11,12 @@ export async function runLocalPlaygroundsCli(
   config: ConfigService,
   args: string[],
 ): Promise<string> {
-  const targetBase = resolve(config.getMarqueeRoot(), 'playgrounds');
-  const rootDomain = config.getMarqueeRootDomain?.();
+  const targetBase = resolve(config.getHostRoot(), 'playgrounds');
+  const rootDomain = config.getHostRootDomain?.();
   const env = {
     ...process.env,
-    MARQUEE_ROOT: targetBase,
-    ...(rootDomain ? { MARQUEE_ROOT_DOMAIN: rootDomain } : {}),
+    HOST_ROOT: targetBase,
+    ...(rootDomain ? { HOST_ROOT_DOMAIN: rootDomain } : {}),
   };
   const { stdout } = await execFileAsync('fibe', [...BASE_ARGS, ...args], {
     env,

@@ -25,10 +25,10 @@ export const API_PATHS = {
   FIBE_SYNC_SETTINGS: '/api/fibe-sync-settings',
   PROVIDER_TRAFFIC: '/api/provider-traffic',
   AGENT_SEND_MESSAGE: '/api/agent/send-message',
-  PLAYROOMS_BROWSE: '/api/playrooms/browse',
-  PLAYROOMS_LINK: '/api/playrooms/link',
-  PLAYROOMS_UNLINK: '/api/playrooms/unlink',
-  PLAYROOMS_CURRENT: '/api/playrooms/current',
+  PLAYGROUNDS_BROWSE: '/api/playgrounds/browse',
+  PLAYGROUNDS_LINK: '/api/playgrounds/link',
+  PLAYGROUNDS_UNLINK: '/api/playgrounds/unlink',
+  PLAYGROUNDS_CURRENT: '/api/playgrounds/current',
 } as const;
 
 export const API_PATH_UPLOADS_BY_FILENAME = (filename: string) =>

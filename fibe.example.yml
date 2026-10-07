@@ -3,7 +3,7 @@
 #   1. Individual environment variables such as AGENT_PROVIDER
 #   2. FIBE_SETTINGS_JSON env var (JSON blob)
 #   3. This file (fibe.yml)
-# FIBE_API_KEY, FIBE_DOMAIN, FIBE_AGENT_ID, and FIBE_MARQUEE_ID always come
+# FIBE_API_KEY, FIBE_DOMAIN, FIBE_AGENT_ID, and FIBE_HOST_ID always come
 # from the environment because the Go SDK and CLI consume them directly.
 
 # Agent Core
@@ -58,13 +58,13 @@
 # Provider session workspace, used by Cursor and derived from dataDir if unset.
 # sessionDir: /app/sessions
 
-# Marquee root used to find and link local Playgrounds.
+# Host root used to find and link local Playgrounds.
 # Default: /opt/fibe
-# marqueeRoot: /opt/fibe
+# hostRoot: /opt/fibe
 
 # Root domain for Playground routing. "dev.example.com" yields subdomains such
 # as "web.dev.example.com".
-# marqueeRootDomain: dev.example.com
+# hostRootDomain: dev.example.com
 
 # Encryption key for at-rest data encryption.
 # When unset, data is stored unencrypted.

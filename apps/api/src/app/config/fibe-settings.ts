@@ -17,8 +17,8 @@ export interface FibeSettings {
   encryptionKey?: string;
   fibeAgentId?: string;
   conversationId?: string;
-  marqueeRoot?: string;
-  marqueeRootDomain?: string;
+  hostRoot?: string;
+  hostRootDomain?: string;
   fibeApiKey?: string;
   fibeSyncEnabled?: boolean;
   postInitScript?: string;
@@ -71,16 +71,39 @@ export interface FibeSettings {
 
 import jsYaml from 'js-yaml';
 
-export function parseYaml(content: string): Record<string, unknown> {
-  try {
-    const result = jsYaml.load(content);
-    if (result && typeof result === 'object' && !Array.isArray(result)) {
-      return result as Record<string, unknown>;
+const REMOVED_FIBE_SETTINGS = {
+  marqueeRoot: 'hostRoot',
+  marqueeRootDomain: 'hostRootDomain',
+} as const;
+const REMOVED_FIBE_ENV = {
+  MARQUEE_ROOT: 'HOST_ROOT',
+  MARQUEE_ROOT_DOMAIN: 'HOST_ROOT_DOMAIN',
+  FIBE_MARQUEE_ID: 'FIBE_HOST_ID',
+  FIBE_PLAYSPEC_ID: 'FIBE_SPEC_ID',
+  FIBE_PROP_ID: 'FIBE_REPOSITORY_ID',
+} as const;
+class RemovedFibeKeyError extends Error {}
+
+function rejectRemovedKeys(settings: Record<string, unknown>, source: string): void {
+  for (const [removed, replacement] of Object.entries(REMOVED_FIBE_SETTINGS)) {
+    if (Object.hasOwn(settings, removed)) {
+      throw new RemovedFibeKeyError(`${source}: ${removed} was removed; use ${replacement}`);
     }
-    return {};
+  }
+}
+
+export function parseYaml(content: string): Record<string, unknown> {
+  let result: unknown;
+  try {
+    result = jsYaml.load(content);
   } catch {
     return {};
   }
+  if (result && typeof result === 'object' && !Array.isArray(result)) {
+    rejectRemovedKeys(result as Record<string, unknown>, 'fibe.yml');
+    return result as Record<string, unknown>;
+  }
+  return {};
 }
 
 function yamlCandidates(): string[] {
@@ -96,6 +119,7 @@ function readYaml(): Record<string, unknown> {
     try {
       return parseYaml(readFileSync(path, 'utf8'));
     } catch (err) {
+      if (err instanceof RemovedFibeKeyError) throw err;
       console.warn(`[fibe-settings] Cannot parse ${path}: ${err}`);
     }
   }
@@ -146,8 +170,8 @@ function promoteToEnv(s: FibeSettings): string[] {
   set('ENCRYPTION_KEY', s.encryptionKey);
   set('FIBE_AGENT_ID', s.fibeAgentId);
   set('CONVERSATION_ID', s.conversationId);
-  set('MARQUEE_ROOT', s.marqueeRoot);
-  set('MARQUEE_ROOT_DOMAIN', s.marqueeRootDomain);
+  set('HOST_ROOT', s.hostRoot);
+  set('HOST_ROOT_DOMAIN', s.hostRootDomain);
   set('FIBE_API_KEY', s.fibeApiKey);
   if (s.fibeSyncEnabled !== undefined)
     set('FIBE_SYNC_ENABLED', bool(s.fibeSyncEnabled));
@@ -268,7 +292,26 @@ function mergeJsonEnv(
 
 /** Loads merged settings without changing process.env. */
 export function loadFibeSettings(): FibeSettings {
-  return { ...readYaml(), ...readJson() } as FibeSettings;
+  for (const [removed, replacement] of Object.entries(REMOVED_FIBE_ENV)) {
+    if (Object.hasOwn(process.env, removed)) {
+      throw new Error(`${removed} was removed; use ${replacement}`);
+    }
+  }
+  const yaml = readYaml();
+  const json = readJson();
+  // Validate both sources independently: an override cannot conceal an obsolete key.
+  rejectRemovedKeys(yaml, 'fibe.yml');
+  rejectRemovedKeys(json, 'FIBE_SETTINGS_JSON');
+  for (const settings of [yaml, json]) {
+    if (settings.credentialEnv && typeof settings.credentialEnv === 'object') {
+      for (const [removed, replacement] of Object.entries(REMOVED_FIBE_ENV)) {
+        if (Object.hasOwn(settings.credentialEnv, removed)) {
+          throw new RemovedFibeKeyError(`credentialEnv: ${removed} was removed; use ${replacement}`);
+        }
+      }
+    }
+  }
+  return { ...yaml, ...json } as FibeSettings;
 }
 
 /**

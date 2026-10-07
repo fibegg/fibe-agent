@@ -97,8 +97,8 @@ export class ConfigService {
     return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
   }
 
-  getMarqueeRoot(): string {
-    return this.settings.marqueeRoot ?? '/opt/fibe';
+  getHostRoot(): string {
+    return this.settings.hostRoot ?? '/opt/fibe';
   }
 
   // Go SDK vars: from process.env (shared with CLI binary)
@@ -152,8 +152,8 @@ export class ConfigService {
     return this.settings.sessionDir;
   }
 
-  getMarqueeRootDomain(): string | undefined {
-    return this.settings.marqueeRootDomain;
+  getHostRootDomain(): string | undefined {
+    return this.settings.hostRootDomain;
   }
 
   getMcpConfig(): { mcpServers: Record<string, unknown> } | undefined {

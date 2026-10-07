@@ -106,7 +106,7 @@ Every provider implements `AgentStrategy` from `strategy.types.ts`:
 
 ## Environment variables
 
-See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env.example` for local process variables and `FIBE_SETTINGS_JSON`. Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `marqueeRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables.
+See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env.example` for local process variables and `FIBE_SETTINGS_JSON`. Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `hostRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables.
 
 ### API (`apps/api`)
 
@@ -124,7 +124,7 @@ See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env.example`
 | `CONVERSATION_ID`                                                                             | None                            | env            | Fallback default conversation storage id                                                                                                                                                                             |
 | `systemPrompt`                                                                                | bundled prompt                  | setting        | Inline system prompt content. If unset, `dist/assets/SYSTEM_PROMPT.md` is loaded.                                                                                                                                    |
 | `PLAYGROUNDS_DIR`                                                                             | `./playground`                  | env            | Root for the file explorer and shell sessions                                                                                                                                                                        |
-| `marqueeRoot`                                                                                 | `/opt/fibe`                     | setting        | Root directory for Marquee local data; the Fibe CLI receives its `playgrounds` subdirectory                                                                                                                          |
+| `hostRoot`                                                                                 | `/opt/fibe`                     | setting        | Root directory for Host local data; the Fibe CLI receives its `playgrounds` subdirectory                                                                                                                          |
 | `postInitScript`                                                                              | None                            | setting        | Shell script run once on first boot; state at `GET /api/init-status`                                                                                                                                                 |
 | `SESSION_DIR` / `sessionDir`                                                                  | provider default                | env or setting | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`)                                                                                                                                                           |
 | `AGENT_CREDENTIALS_JSON` / `agentCredentials`                                                 | None                            | env or setting | JSON map of credential file names to content, injected at startup                                                                                                                                                    |
@@ -513,9 +513,9 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `GET`    | `/api/playgrounds/file?path=…`              | Bearer | Read a playground file → `{ content }`                                                                                                                                                    |
 | `PUT`    | `/api/playgrounds/file`                     | Bearer | `{ path, content }`: save a playground file → `{ ok }`                                                                                                                                    |
 | `GET`    | `/api/playgrounds/stats`                    | Bearer | Playground directory stats                                                                                                                                                                |
-| `GET`    | `/api/playrooms/browse?path=…`              | Bearer | Flat local playground names from `fibe --output json local playgrounds info --view names`, limited to selector-visible playgrounds with source mounts; non-empty `path` returns `[]`      |
-| `POST`   | `/api/playrooms/link`                       | Bearer | `{ path }`: delegates linking to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>`                                                                                        |
-| `GET`    | `/api/playrooms/current`                    | Bearer | Current `.current_playground` value → `{ current }`                                                                                                                                       |
+| `GET`    | `/api/playgrounds/browse?path=…`              | Bearer | Flat local playground names from `fibe --output json local playgrounds info --view names`, limited to selector-visible playgrounds with source mounts; non-empty `path` returns `[]`      |
+| `POST`   | `/api/playgrounds/link`                       | Bearer | `{ path }`: delegates linking to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>`                                                                                        |
+| `GET`    | `/api/playgrounds/current`                    | Bearer | Current `.current_playground` value → `{ current }`                                                                                                                                       |
 | `GET`    | `/api/agent-files`                          | Bearer | Agent-generated file tree                                                                                                                                                                 |
 | `GET`    | `/api/agent-files/file?path=…`              | Bearer | Read an agent-generated file                                                                                                                                                              |
 | `POST`   | `/api/uploads`                              | Bearer | Upload file (multipart, ≤ 20 MB) → `{ filename }`                                                                                                                                         |
@@ -555,6 +555,37 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 ---
 
 ## Docker images
+
+### Candidate CLI builds
+
+The breaking staging line uses `hostRoot` / `hostRootDomain`, `HOST_ROOT` /
+`HOST_ROOT_DOMAIN`, and `FIBE_HOST_ID`. Removed Marquee settings/ENV fail with an
+error naming the replacement; there is no runtime alias. Local selector routes
+are `/api/playgrounds/{browse,link,unlink,current}` and CLI JSON uses `spec`.
+
+Set `FIBE_CANDIDATE_BUILD=1`, `FIBE_CLI_VERSION=0.3.0-rc.1+<sdk-sha7>`,
+`FIBE_SDK_SHA=<full SDK SHA>`, `FIBE_CLI_BINARY_PATH=<local Linux binary>`, and
+`FIBE_CLI_BINARY_SHA256=<64 hex checksum>`. `FIBE_CANDIDATE_PLATFORM` selects
+`linux/amd64` (default) or `linux/arm64`. Candidate invocations build one
+architecture per checksum; ordinary release builds still produce both.
+
+The shared build helper verifies checksum and ELF architecture before registry
+authentication, stages an ignored `.candidate-cli/fibe`, and refuses to overwrite
+a different staged binary. Preserve or move that file before selecting another
+candidate. Both Docker recipes COPY and verify it, check its reported version,
+and record `gg.fibe.cli.version`, `gg.fibe.cli.sdk.sha`, and
+`gg.fibe.cli.binary.sha256` labels. No candidate release is downloaded.
+
+Provider builds emit only `<provider>-cand-<cli-version>-<agent-sha7>-<arch>`
+tags and use separate candidate cache refs. They never emit `latest*` or ordinary
+SHA tags. Existing candidate images should be selected by digest. The entrypoint
+uses its matching baked/cached candidate and fails before downloads on an
+explicit mismatched or `latest` request. Normal stable installer/channel behavior
+is preserved. Building/pushing images remains a separate authorized operation.
+
+The Compose CI build environment forwards these candidate inputs. Its binary
+path must be readable inside the `/app` source mount (for example, an already
+staged `/app/.candidate-cli/fibe`). Stable CI leaves the candidate inputs unset.
 
 The root Compose CI pipeline publishes multi-arch (`linux/amd64`, `linux/arm64`) images to GHCR when its `ci-build-<provider>` services run:
 
@@ -723,7 +754,7 @@ flowchart LR
 | `messages` / `message-store`                     | `app/messages/`, `app/message-store/`                         | Message history REST + in-memory store                                        |
 | `activity` / `activity-store`                    | `app/activity/`, `app/activity-store/`                        | Activity timeline REST + in-memory store                                      |
 | `model-options` / `model-store` / `effort-store` | `app/model-options/`, `app/model-store/`, `app/effort-store/` | Model list + model/effort selection state                                     |
-| `playgrounds`                                    | `app/playgrounds/`                                            | File tree watcher, REST, playroom browser + linker                            |
+| `playgrounds`                                    | `app/playgrounds/`                                            | File tree watcher, REST, playground browser + linker                            |
 | `uploads`                                        | `app/uploads/`                                                | Multipart upload validation + file serving                                    |
 | `terminal`                                       | `app/terminal/`                                               | `node-pty` shell sessions over `/ws-terminal`                                 |
 | `fibe-sync`                                      | `app/fibe-sync/`                                              | Syncs conversation state to the Fibe platform                                 |

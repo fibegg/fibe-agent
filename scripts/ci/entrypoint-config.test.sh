@@ -66,7 +66,7 @@ run_case() (
   case_expected_version="$3"
   case_expected_installer="$4"
   case_expected_success="$5"
-  unset FIBE_VERSION FIBE_CLI_VERSION
+  unset FIBE_VERSION FIBE_CLI_VERSION FIBE_CANDIDATE_BUILD FIBE_CANDIDATE_CLI_VERSION
   export DATA_DIR="$fixture/data" FIBE_AGENT_ENTRYPOINT_SOURCE_ONLY=1
   export FIBE_ENTRYPOINT_CONFIG_CANDIDATES="$fixture/fibe.yml"
   export FIBE_TEST_INSTALL_LOG="$fixture/install.log"
@@ -96,6 +96,11 @@ INSTALLER
     missing-pinned) rm "$fixture/install-fibe.sh" ;;
     missing-default) rm "$fixture/install-fibe.sh"; printf 'agentProvider: mock\n' > "$fixture/fibe.yml" ;;
     wrong-install) export FIBE_TEST_INSTALLED_VERSION=0.2.43 ;;
+    candidate-baked) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567; write_binary "$fixture/baked-fibe" "$FIBE_CANDIDATE_CLI_VERSION"; printf 'cliVersion: %s\n' "$FIBE_CANDIDATE_CLI_VERSION" > "$fixture/fibe.yml" ;;
+    candidate-default) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567; write_binary "$fixture/baked-fibe" "$FIBE_CANDIDATE_CLI_VERSION"; printf 'agentProvider: mock\n' > "$fixture/fibe.yml" ;;
+    candidate-mismatch) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567 ;;
+    candidate-latest) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567; printf 'cliVersion: latest\n' > "$fixture/fibe.yml" ;;
+    candidate-old-cache) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567; write_binary "$fixture/baked-fibe" "$FIBE_CANDIDATE_CLI_VERSION"; write_binary "$DATA_DIR/.fibe/bin/fibe" 0.2.45 ;;
   esac
   if ( . "$fixture/entrypoint.sh"; ensure_runtime_fibe ) > "$fixture/$name.log" 2>&1; then
     actual_success=yes
@@ -126,3 +131,8 @@ run_case matching-baked-copied baked 0.2.46 skip yes
 run_case missing-installer-rejects-pin-mismatch missing-pinned '' skip no
 run_case missing-installer-default-keeps-baked-fallback missing-default 0.2.46 skip yes
 run_case wrong-installed-version-rejected wrong-install '' unchecked no
+run_case candidate-matching-baked-never-downloads candidate-baked 0.3.0-rc.1+1234567 skip yes
+run_case candidate-default-keeps-baked-version candidate-default 0.3.0-rc.1+1234567 skip yes
+run_case candidate-mismatch-refuses-release-download candidate-mismatch '' skip no
+run_case candidate-latest-refuses-release-download candidate-latest '' skip no
+run_case candidate-old-matching-cache-refused candidate-old-cache '' skip no

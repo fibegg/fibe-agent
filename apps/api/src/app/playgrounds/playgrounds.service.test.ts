@@ -42,8 +42,8 @@ describe('PlaygroundsService', () => {
   function configFor(dir = playgroundDir) {
     return {
       getPlaygroundsDir: () => dir,
-      getMarqueeRoot: () => '/opt/fibe',
-      getMarqueeRootDomain: () => undefined,
+      getHostRoot: () => '/opt/fibe',
+      getHostRootDomain: () => undefined,
     };
   }
 
@@ -451,13 +451,13 @@ describe('PlaygroundsService', () => {
   test('getUrls uses local playgrounds info urls view when a current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
-      getMarqueeRootDomain: () => 'example.test',
+      getHostRoot: () => '/opt/fibe',
+      getHostRootDomain: () => 'example.test',
     };
-    const playroomBrowser = { getCurrentLink: async () => 'project' };
+    const playgroundBrowser = { getCurrentLink: async () => 'project' };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]),
@@ -479,10 +479,10 @@ describe('PlaygroundsService', () => {
       '--playground',
       'project',
     ]);
-    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(
+    expect(mockExecFileAsync.mock.calls[0][2].env.HOST_ROOT).toBe(
       '/opt/fibe/playgrounds',
     );
-    expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT_DOMAIN).toBe(
+    expect(mockExecFileAsync.mock.calls[0][2].env.HOST_ROOT_DOMAIN).toBe(
       'example.test',
     );
   });
@@ -490,12 +490,12 @@ describe('PlaygroundsService', () => {
   test('getUrls uses current playground inferred by the browser service', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => 'alice' };
+    const playgroundBrowser = { getCurrentLink: async () => 'alice' };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
@@ -527,12 +527,12 @@ describe('PlaygroundsService', () => {
   test('getUrls uses the explicit selected playground before current discovery', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: mock(async () => 'bob') };
+    const playgroundBrowser = { getCurrentLink: mock(async () => 'bob') };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
@@ -547,7 +547,7 @@ describe('PlaygroundsService', () => {
       'api|api-alice.example.test',
       'frontend|alice.example.test',
     ]);
-    expect(playroomBrowser.getCurrentLink).not.toHaveBeenCalled();
+    expect(playgroundBrowser.getCurrentLink).not.toHaveBeenCalled();
     expect(mockExecFileAsync).toHaveBeenCalledTimes(1);
     expect(mockExecFileAsync.mock.calls[0][1]).toEqual([
       '--output',
@@ -565,12 +565,12 @@ describe('PlaygroundsService', () => {
   test('getUrls deduplicates repeated service-url rows from the CLI', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => 'project' };
+    const playgroundBrowser = { getCurrentLink: async () => 'project' };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
@@ -591,12 +591,12 @@ describe('PlaygroundsService', () => {
   test('getUrls accepts a static-only playground as the current selection', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => 'static-site--24' };
+    const playgroundBrowser = { getCurrentLink: async () => 'static-site--24' };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([{ service: 'web', url: 'web.example.test' }]),
@@ -621,16 +621,16 @@ describe('PlaygroundsService', () => {
   test('getUrls uses the single local playground when no current link exists', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => null };
+    const playgroundBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync
       .mockResolvedValueOnce({
-        stdout: JSON.stringify([{ id: '1', name: 'pg1', playspec: 'spec1' }]),
+        stdout: JSON.stringify([{ id: '1', name: 'pg1', spec: 'spec1' }]),
       })
       .mockResolvedValueOnce({
         stdout: JSON.stringify([{ service: 'web', url: 'web1.example.test' }]),
@@ -665,17 +665,17 @@ describe('PlaygroundsService', () => {
   test('getUrls returns empty urls when multiple playgrounds exist without a current link', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => null };
+    const playgroundBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockResolvedValueOnce({
       stdout: JSON.stringify([
-        { id: '1', name: 'pg1', playspec: 'spec1' },
-        { id: '2', name: 'pg2', playspec: 'spec2' },
+        { id: '1', name: 'pg1', spec: 'spec1' },
+        { id: '2', name: 'pg2', spec: 'spec2' },
       ]),
     });
 
@@ -697,12 +697,12 @@ describe('PlaygroundsService', () => {
   test('getUrls returns empty array when local playgrounds directory is missing', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => null };
+    const playgroundBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     const err = new Error('fibe failed') as Error & { stderr: string };
     err.stderr = JSON.stringify({
@@ -720,12 +720,12 @@ describe('PlaygroundsService', () => {
   test('getUrls returns empty array on local playgrounds failure', async () => {
     const config = {
       getPlaygroundsDir: () => playgroundDir,
-      getMarqueeRoot: () => '/opt/fibe',
+      getHostRoot: () => '/opt/fibe',
     };
-    const playroomBrowser = { getCurrentLink: async () => null };
+    const playgroundBrowser = { getCurrentLink: async () => null };
     const service = new PlaygroundsService(
       config as never,
-      playroomBrowser as never,
+      playgroundBrowser as never,
     );
     mockExecFileAsync.mockRejectedValueOnce(new Error('fibe failed'));
     const consoleError = mock(() => {

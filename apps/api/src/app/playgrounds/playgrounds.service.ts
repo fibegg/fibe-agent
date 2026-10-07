@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
-import { PlayroomBrowserService } from './playroom-browser.service';
+import { PlaygroundBrowserService } from './playground-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 import { exec, execFile } from 'node:child_process';
@@ -113,7 +113,7 @@ const MAX_DEPTH = 50;
 interface LocalPlaygroundName {
   id?: string;
   name: string;
-  playspec?: string;
+  spec?: string;
 }
 
 interface LocalPlaygroundUrl {
@@ -158,7 +158,7 @@ export class PlaygroundsService {
 
   constructor(
     private readonly config: ConfigService,
-    private readonly playroomBrowser: PlayroomBrowserService,
+    private readonly playgroundBrowser: PlaygroundBrowserService,
   ) {}
 
   async getTree(): Promise<PlaygroundEntry[]> {
@@ -436,7 +436,7 @@ export class PlaygroundsService {
         return parseLocalPlaygroundUrls(stdout);
       }
 
-      const currentLink = await this.playroomBrowser.getCurrentLink();
+      const currentLink = await this.playgroundBrowser.getCurrentLink();
       if (currentLink) {
         const stdout = await runLocalPlaygroundsCli(this.config, [
           'info',

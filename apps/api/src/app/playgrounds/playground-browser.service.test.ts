@@ -31,7 +31,7 @@ mock.module('node:util', () => {
   };
 });
 
-const { PlayroomBrowserService } = require('./playroom-browser.service');
+const { PlaygroundBrowserService } = require('./playground-browser.service');
 
 function tmpDir(prefix: string): string {
   return mkdtempSync(join(tmpdir(), prefix));
@@ -39,20 +39,20 @@ function tmpDir(prefix: string): string {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function makeService(rootDir: string, playgroundDir: string): any {
-  return new PlayroomBrowserService({
-    getMarqueeRoot: () => rootDir,
+  return new PlaygroundBrowserService({
+    getHostRoot: () => rootDir,
     getPlaygroundsDir: () => playgroundDir,
   } as never);
 }
 
-describe('PlayroomBrowserService', () => {
+describe('PlaygroundBrowserService', () => {
   let rootDir: string;
   let playgroundDir: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let service: any;
 
   beforeEach(() => {
-    rootDir = tmpDir('playrooms-');
+    rootDir = tmpDir('playgrounds-');
     playgroundDir = tmpDir('playground-');
     service = makeService(rootDir, playgroundDir);
     mockExecFileAsync.mockClear();
@@ -78,13 +78,13 @@ describe('PlayroomBrowserService', () => {
           {
             id: '1',
             name: 'proj1',
-            playspec: 'fibe.gg/play1',
+            spec: 'fibe.gg/play1',
             path: `${rootDir}/playgrounds/proj1`,
           },
           {
             id: '2',
             name: 'proj2',
-            playspec: 'fibe.gg/play2',
+            spec: 'fibe.gg/play2',
             path: `${rootDir}/playgrounds/proj2`,
           },
         ]),
@@ -115,7 +115,7 @@ describe('PlayroomBrowserService', () => {
         '--view',
         'names',
       ]);
-      expect(mockExecFileAsync.mock.calls[0][2].env.MARQUEE_ROOT).toBe(
+      expect(mockExecFileAsync.mock.calls[0][2].env.HOST_ROOT).toBe(
         join(rootDir, 'playgrounds'),
       );
     });
@@ -123,7 +123,7 @@ describe('PlayroomBrowserService', () => {
     test('trusts the CLI names view to return only mountable playgrounds', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
         stdout: JSON.stringify([
-          { id: '23', name: 'source-app--23', playspec: 'source-app' },
+          { id: '23', name: 'source-app--23', spec: 'source-app' },
         ]),
       });
 
@@ -137,10 +137,10 @@ describe('PlayroomBrowserService', () => {
     test('deduplicates repeated playground records and ignores missing names', async () => {
       mockExecFileAsync.mockResolvedValueOnce({
         stdout: JSON.stringify([
-          { id: '1', name: 'alice2', playspec: 'eotm-2' },
-          { id: '1', name: 'alice2', playspec: 'eotm-2' },
-          { id: '2', name: '', playspec: 'eotm-2' },
-          { id: '3', name: 'alice3', playspec: 'eotm-2' },
+          { id: '1', name: 'alice2', spec: 'eotm-2' },
+          { id: '1', name: 'alice2', spec: 'eotm-2' },
+          { id: '2', name: '', spec: 'eotm-2' },
+          { id: '3', name: 'alice3', spec: 'eotm-2' },
         ]),
       });
 
@@ -311,8 +311,8 @@ describe('PlayroomBrowserService', () => {
       mockExecFileAsync
         .mockResolvedValueOnce({
           stdout: JSON.stringify([
-            { id: '10', name: 'alice', playspec: 'eotm-2' },
-            { id: '11', name: 'bob', playspec: 'eotm-2' },
+            { id: '10', name: 'alice', spec: 'eotm-2' },
+            { id: '11', name: 'bob', spec: 'eotm-2' },
           ]),
         })
         .mockResolvedValueOnce({

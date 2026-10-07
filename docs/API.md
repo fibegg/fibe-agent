@@ -8,6 +8,13 @@ Chat and tests share route constants from `shared/api-paths.ts` (`API_PATHS.*`, 
 
 ## Configuration and authentication
 
+Canonical FIBE configuration uses `hostRoot` and `hostRootDomain`; child CLI
+environment uses `HOST_ROOT` and `HOST_ROOT_DOMAIN`. Removed Marquee keys are
+rejected with the replacement name, including settings overridden by another
+source. Local Playground browser operations use `/api/playgrounds/` routes;
+legacy Playroom routes are absent. Candidate CLI/image preparation is documented
+in `AGENTS.md` under Candidate CLI builds.
+
 Set `agentPassword` in `fibe.yml` or `FIBE_SETTINGS_JSON` to protect the API. `AGENT_PASSWORD` alone does not enable HTTP or WebSocket guards; it is an output passed to child processes after settings load.
 
 With `agentPassword` set, `Bearer` routes require `Authorization: Bearer <password>` or `?token=<password>`, and WebSockets use the query token. `No` routes remain public. Without a password, guarded routes are open and login reports `No authentication required`.
@@ -21,7 +28,7 @@ Several values that look like env vars are Fibe settings first:
 | `defaultModel`            | `DEFAULT_MODEL`             | Initial model; falls back to the first `modelOptions` entry.                                                                                                                                                                              |
 | `dataDir`                 | `DATA_DIR`                  | Base persistence dir, default `<cwd>/data`.                                                                                                                                                                                               |
 | `systemPrompt`            | `SYSTEM_PROMPT`             | Inline prompt content from `fibe.yml` or `FIBE_SETTINGS_JSON`; settings promotion exposes it to child processes. A bare process env value is not a direct API input. If absent, the API loads the bundled `dist/assets/SYSTEM_PROMPT.md`. |
-| `marqueeRoot`             | `MARQUEE_ROOT`              | Host Marquee root, default `/opt/fibe`; the local playground CLI receives `<marqueeRoot>/playgrounds` as `MARQUEE_ROOT`.                                                                                                                  |
+| `hostRoot`             | `HOST_ROOT`              | Host root, default `/opt/fibe`; the local playground CLI receives `<hostRoot>/playgrounds` as `HOST_ROOT`.                                                                                                                  |
 | `postInitScript`          | `POST_INIT_SCRIPT`          | Shell command run once after startup; state is exposed at `GET /api/init-status`.                                                                                                                                                         |
 | `websocketMaxConnections` | `WEBSOCKET_MAX_CONNECTIONS` | Maximum connected chat WebSockets before oldest-client eviction; default `5`.                                                                                                                                                             |
 
@@ -58,10 +65,10 @@ All paths below include the `/api` global prefix.
 | POST   | `/api/playgrounds/git-branch`                  | Bearer | Body `{ create, repo? }`. Create or inspect branch state in the selected repo.                                                                                                                                                                   |
 | POST   | `/api/playgrounds/git-push`                    | Bearer | Body `{ remote?, branch?, confirm, repo? }`. Push playground git changes from the selected repo.                                                                                                                                                 |
 | POST   | `/api/playgrounds/git-pr`                      | Bearer | Body `{ title?, body?, confirm, repo? }`. Create a draft PR with `gh` from the selected repo.                                                                                                                                                    |
-| GET    | `/api/playrooms/browse?path=...`               | Bearer | Flat Fibe CLI listing from `fibe --output json local playgrounds info --view names`; only selector-visible playgrounds with source mounts are returned. Any non-empty `path` currently returns `[]`; `404` means the CLI/listing is unavailable. |
-| POST   | `/api/playrooms/link`                          | Bearer | Body `{ path }`, where `path` is the Fibe local playground name. Delegates to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>`. Missing/invalid `path` returns `404`; CLI/link failure returns `400`.                           |
-| POST   | `/api/playrooms/unlink`                        | Bearer | Body `{ confirm: true }`. Clears the current `PLAYGROUNDS_DIR` link directory while preserving the directory itself, so a playground can be linked again from the UI.                                                                            |
-| GET    | `/api/playrooms/current`                       | Bearer | Returns `{ current }` from `PLAYGROUNDS_DIR/.current_playground.json`, or `null`.                                                                                                                                                                |
+| GET    | `/api/playgrounds/browse?path=...`               | Bearer | Flat Fibe CLI listing from `fibe --output json local playgrounds info --view names`; only selector-visible playgrounds with source mounts are returned. Any non-empty `path` currently returns `[]`; `404` means the CLI/listing is unavailable. |
+| POST   | `/api/playgrounds/link`                          | Bearer | Body `{ path }`, where `path` is the Fibe local playground name. Delegates to `fibe local playgrounds link <name> --link-dir <PLAYGROUNDS_DIR>`. Missing/invalid `path` returns `404`; CLI/link failure returns `400`.                           |
+| POST   | `/api/playgrounds/unlink`                        | Bearer | Body `{ confirm: true }`. Clears the current `PLAYGROUNDS_DIR` link directory while preserving the directory itself, so a playground can be linked again from the UI.                                                                            |
+| GET    | `/api/playgrounds/current`                       | Bearer | Returns `{ current }` from `PLAYGROUNDS_DIR/.current_playground.json`, or `null`.                                                                                                                                                                |
 | GET    | `/api/agent-files`                             | Bearer | Agent-generated file tree, optionally scoped by `?conversationId=`.                                                                                                                                                                              |
 | GET    | `/api/agent-files/stats`                       | Bearer | Agent-generated file stats.                                                                                                                                                                                                                      |
 | GET    | `/api/agent-files/file?path=...`               | Bearer | Read an agent-generated file.                                                                                                                                                                                                                    |
@@ -119,7 +126,7 @@ The API writes one JSON object per line to stdout or stderr for filtering by lev
 | `LOG_LEVEL`       | `error`, `warn`, `info` (default), `log`, `debug`, `verbose` (case-insensitive). `info` and `log` are equivalent.                                                                               |
 | `dataDir`         | Base directory for persistence. Configure via `fibe.yml` or `FIBE_SETTINGS_JSON`; it is promoted to `DATA_DIR` for child/runtime helpers.                                                       |
 | `postInitScript`  | Optional shell script run once on first container load. Configure via Fibe settings.                                                                                                            |
-| `marqueeRoot`     | Base Marquee directory for Fibe local playground discovery. Configure via Fibe settings.                                                                                                        |
+| `hostRoot`     | Base Host directory for Fibe local playground discovery. Configure via Fibe settings.                                                                                                        |
 | `PLAYGROUNDS_DIR` | Active workspace path for file explorer, editor, uploads into playground, and terminal cwd. The Fibe CLI manages local playground linking; fibe-agent does not validate symlink targets itself. |
 
 ### Provider and frontend environment

@@ -172,7 +172,7 @@ fibe-agent/
 
 ## Environment
 
-See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env` for process variables and `FIBE_SETTINGS_JSON`. Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `marqueeRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables.
+See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env` for process variables and `FIBE_SETTINGS_JSON`. Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `hostRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables.
 
 ### API
 
@@ -237,9 +237,9 @@ Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSo
 | `POST`   | `/api/model-options/refresh`   | Bearer | Configured models plus provider-discovered models                                                |
 | `GET`    | `/api/playgrounds`             | Bearer | Playground file tree                                                                             |
 | `GET`    | `/api/playgrounds/file?path=…` | Bearer | Read a playground file                                                                           |
-| `GET`    | `/api/playrooms/browse`        | Bearer | Flat Fibe CLI local playground list, limited to selector-visible playgrounds with source mounts  |
-| `POST`   | `/api/playrooms/link`          | Bearer | Link a named local playground through the Fibe CLI                                               |
-| `GET`    | `/api/playrooms/current`       | Bearer | Current `.current_playground.json` selection                                                     |
+| `GET`    | `/api/playgrounds/browse`        | Bearer | Flat Fibe CLI local playground list, limited to selector-visible playgrounds with source mounts  |
+| `POST`   | `/api/playgrounds/link`          | Bearer | Link a named local playground through the Fibe CLI                                               |
+| `GET`    | `/api/playgrounds/current`       | Bearer | Current `.current_playground.json` selection                                                     |
 | `POST`   | `/api/uploads`                 | Bearer | Upload file (≤ 20 MB)                                                                            |
 | `GET`    | `/api/uploads/:filename`       | Bearer | Serve uploaded file                                                                              |
 | `POST`   | `/api/agent/send-message`      | Bearer | Async message (webhooks/integrations) → `202`                                                    |

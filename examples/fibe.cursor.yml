@@ -15,7 +15,7 @@ systemPrompt: |
 
 dataDir: /app/data
 sessionDir: /app/data/42/.cursor
-marqueeRootDomain: my-marquee.fibe.gg
+hostRootDomain: my-marquee.fibe.gg
 
 fibeSyncEnabled: true
 

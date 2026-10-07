@@ -56,3 +56,6 @@ bin/fibe-*
 /app/fibe.yml
 fibe.yml
 # Allow the repo template to be tracked (do NOT add /fibe.yml here)
+
+# Untagged candidate CLI copied into an isolated Docker build context.
+.candidate-cli/
