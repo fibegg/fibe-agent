@@ -22,7 +22,7 @@ describe('DiffPanel', () => {
           {
             id: 'backend',
             service: 'api',
-            prop: 'backend',
+            repository: 'backend',
             link_path: '/app/playground/backend',
             target: '/opt/fibe/playgrounds/alice/backend',
             repo_root: '/opt/fibe/playgrounds/alice/backend',
@@ -30,7 +30,7 @@ describe('DiffPanel', () => {
           {
             id: 'frontend',
             service: 'frontend',
-            prop: 'frontend',
+            repository: 'frontend',
             link_path: '/app/playground/frontend',
             target: '/opt/fibe/playgrounds/alice/frontend',
             repo_root: '/opt/fibe/playgrounds/alice/frontend',

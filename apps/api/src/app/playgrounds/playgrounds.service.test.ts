@@ -54,7 +54,7 @@ describe('PlaygroundsService', () => {
     return {
       id: '1',
       service: 'web',
-      prop: 'web',
+      repository: 'web',
       branch: 'main',
       link_path: repoRoot,
       target: repoRoot,
@@ -984,13 +984,13 @@ describe('PlaygroundsService', () => {
       repoEntry(web, {
         id: 'web-id',
         service: 'web',
-        prop: 'web',
+        repository: 'web',
         link_path: web,
       }),
       repoEntry(api, {
         id: 'api-id',
         service: 'api',
-        prop: 'api',
+        repository: 'backend-repository',
         link_path: api,
       }),
     ]);
@@ -998,7 +998,7 @@ describe('PlaygroundsService', () => {
     const service = new PlaygroundsService(configFor() as never, {} as never);
 
     await expect(service.getDiff()).rejects.toThrow(/Multiple repositories/);
-    const result = await service.getDiff('api');
+    const result = await service.getDiff('backend-repository');
     expect(result.isGitRepo).toBe(true);
     expect(result.repoRoot).toBe(api);
     expect(result.repo?.service).toBe('api');

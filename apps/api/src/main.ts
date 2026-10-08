@@ -21,7 +21,7 @@ import { attachWebSocketServer } from './attach-websocket-server';
 import { ContainerLoggerService, logRequest } from './container-logger';
 import { loadInjectedCredentials } from './credential-injector';
 import { writeRuntimeFiles } from './runtime-files-writer';
-import { runPostInitOnce } from './post-init-runner';
+import { recoverPostInitOnBoot, runPostInitOnce } from './post-init-runner';
 import { ensureJune1815Bootstrap } from './june1815-bootstrap';
 import { TerminalService } from './app/terminal/terminal.service';
 import { ConversationManagerService } from './app/conversation/conversation-manager.service';
@@ -145,13 +145,8 @@ if (process.env.FIBE_LOCAL_MCP_SERVER === '1') {
     logger.log('WebSocket server listening on paths /ws and /ws-terminal');
 
     const postInitScript = config.getPostInitScript();
-    if (postInitScript) {
-      void runPostInitOnce(
-        config.getConversationDataDir(),
-        postInitScript,
-        config.getPlaygroundsDir(),
-      );
-    }
+    recoverPostInitOnBoot(config.getConversationDataDir());
+    void runPostInitOnce(config.getConversationDataDir(), postInitScript, config.getPlaygroundsDir());
   }
 
   bootstrap();

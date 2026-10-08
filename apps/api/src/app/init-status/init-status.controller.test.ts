@@ -2,15 +2,15 @@ import { describe, test, expect } from 'bun:test';
 import { buildInitStatusResponse } from './init-status.logic';
 
 describe('InitStatusController: buildInitStatusResponse', () => {
-  test('returns disabled when no script', () => {
+  test('returns succeeded without setup when no script', () => {
     expect(buildInitStatusResponse(undefined, undefined, null)).toEqual({
-      state: 'disabled',
+      state: 'succeeded', noSetupRequired: true,
     });
   });
 
-  test('returns disabled when script is empty string', () => {
+  test('returns succeeded without setup when script is empty string', () => {
     expect(buildInitStatusResponse('', undefined, null)).toEqual({
-      state: 'disabled',
+      state: 'succeeded', noSetupRequired: true,
     });
   });
 
@@ -39,12 +39,12 @@ describe('InitStatusController: buildInitStatusResponse', () => {
   test('returns done with output and finishedAt when state file says done', () => {
     expect(
       buildInitStatusResponse('echo hi', undefined, {
-        state: 'done',
+        state: 'succeeded',
         output: 'hello',
         finishedAt: '2026-03-18T12:00:00.000Z',
       }),
     ).toEqual({
-      state: 'done',
+      state: 'succeeded',
       output: 'hello',
       finishedAt: '2026-03-18T12:00:00.000Z',
     });
@@ -68,7 +68,7 @@ describe('InitStatusController: buildInitStatusResponse', () => {
     expect(
       buildInitStatusResponse(undefined, 'my custom prompt', null),
     ).toEqual({
-      state: 'disabled',
+      state: 'succeeded', noSetupRequired: true,
       systemPrompt: 'my custom prompt',
     });
   });

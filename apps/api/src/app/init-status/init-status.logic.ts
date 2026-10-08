@@ -1,6 +1,6 @@
 import type { PostInitStateFile } from '../../post-init-runner';
 
-export type InitStatusState = 'disabled' | 'pending' | 'running' | 'done' | 'failed';
+export type InitStatusState = 'pending' | 'running' | 'succeeded' | 'failed';
 
 export interface InitStatusResponse {
   state: InitStatusState;
@@ -8,6 +8,9 @@ export interface InitStatusResponse {
   error?: string;
   finishedAt?: string;
   systemPrompt?: string;
+  runId?: string;
+  scriptDigest?: string;
+  noSetupRequired?: boolean;
 }
 
 export function buildInitStatusResponse(
@@ -15,9 +18,10 @@ export function buildInitStatusResponse(
   systemPrompt: string | undefined,
   stateFile: PostInitStateFile | null
 ): InitStatusResponse {
-  if (!script) {
+  if (!stateFile && !script) {
     return {
-      state: 'disabled',
+      state: 'succeeded',
+      noSetupRequired: true,
       ...(systemPrompt !== undefined && { systemPrompt }) 
     };
   }
@@ -29,6 +33,9 @@ export function buildInitStatusResponse(
   }
   return {
     state: stateFile.state,
+    ...(stateFile.runId !== undefined && { runId: stateFile.runId }),
+    ...(stateFile.scriptDigest !== undefined && { scriptDigest: stateFile.scriptDigest }),
+    ...(stateFile.noSetupRequired !== undefined && { noSetupRequired: stateFile.noSetupRequired }),
     ...(stateFile.output !== undefined && { output: stateFile.output }),
     ...(stateFile.error !== undefined && { error: stateFile.error }),
     ...(stateFile.finishedAt !== undefined && { finishedAt: stateFile.finishedAt }),

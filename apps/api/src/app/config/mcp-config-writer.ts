@@ -19,6 +19,8 @@ interface McpServerEntry {
   command?: string;
   args?: string[];
   env?: Record<string, string>;
+  headers?: Record<string, string>;
+  envHeaders?: Record<string, string>;
 }
 
 function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
@@ -38,6 +40,13 @@ function toNativeJsonEntry(entry: McpServerEntry): Record<string, unknown> {
   }
   if (entry.authHeader) {
     args.push('--header', `Authorization:${entry.authHeader}`);
+  }
+  for (const [name, value] of Object.entries(entry.headers ?? {})) {
+    args.push('--header', `${name}:${value}`);
+  }
+  for (const [name, variable] of Object.entries(entry.envHeaders ?? {})) {
+    const value = process.env[variable];
+    if (value !== undefined) args.push('--header', `${name}:${value}`);
   }
   return { command: 'mcp-remote-wrapper', args };
 }
@@ -250,6 +259,12 @@ function toTomlBlock(name: string, entry: McpServerEntry): string {
   const bearerTokenEnvVar = codexBearerTokenEnvVar(entry);
   if (bearerTokenEnvVar) {
     lines.push(`bearer_token_env_var = ${quotedTomlString(bearerTokenEnvVar)}`);
+  }
+  if (entry.headers && Object.keys(entry.headers).length) {
+    lines.push(`http_headers = { ${Object.entries(entry.headers).map(([name, value]) => `${quotedTomlString(name)} = ${quotedTomlString(value)}`).join(', ')} }`);
+  }
+  if (entry.envHeaders && Object.keys(entry.envHeaders).length) {
+    lines.push(`env_http_headers = { ${Object.entries(entry.envHeaders).map(([name, variable]) => `${quotedTomlString(name)} = ${quotedTomlString(variable)}`).join(', ')} }`);
   }
   return lines.join('\n');
 }
@@ -492,12 +507,18 @@ const PROVIDER_WRITERS: Record<
         };
       } else if (entry.serverUrl) {
         const authorization = opencodeAuthorizationHeader(entry);
+        const headers = { ...(entry.headers ?? {}) };
+        for (const [name, variable] of Object.entries(entry.envHeaders ?? {})) {
+          const value = process.env[variable];
+          if (value !== undefined) headers[name] = value;
+        }
+        if (authorization) headers.Authorization = authorization;
         nativeServers[name] = {
           type: 'remote',
           enabled: true,
           url: entry.serverUrl,
-          ...(authorization
-            ? { headers: { Authorization: authorization } }
+          ...(Object.keys(headers).length
+            ? { headers }
             : {}),
         };
       }

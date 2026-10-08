@@ -20,6 +20,11 @@ export interface FibeSettings {
   hostRoot?: string;
   hostRootDomain?: string;
   fibeApiKey?: string;
+  fibeOwnerType?: string;
+  fibeOwnerId?: string;
+  fibePrincipalType?: string;
+  fibePrincipalId?: string;
+  fibeAuthorizationVersion?: string;
   fibeSyncEnabled?: boolean;
   postInitScript?: string;
   corsOrigins?: string;
@@ -173,6 +178,11 @@ function promoteToEnv(s: FibeSettings): string[] {
   set('HOST_ROOT', s.hostRoot);
   set('HOST_ROOT_DOMAIN', s.hostRootDomain);
   set('FIBE_API_KEY', s.fibeApiKey);
+  set('FIBE_OWNER_TYPE', s.fibeOwnerType);
+  set('FIBE_OWNER_ID', s.fibeOwnerId);
+  set('FIBE_PRINCIPAL_TYPE', s.fibePrincipalType);
+  set('FIBE_PRINCIPAL_ID', s.fibePrincipalId);
+  set('FIBE_AUTHORIZATION_VERSION', s.fibeAuthorizationVersion);
   if (s.fibeSyncEnabled !== undefined)
     set('FIBE_SYNC_ENABLED', bool(s.fibeSyncEnabled));
   set('POST_INIT_SCRIPT', s.postInitScript);

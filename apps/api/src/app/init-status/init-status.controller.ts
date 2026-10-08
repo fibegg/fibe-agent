@@ -1,7 +1,7 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { ConflictException, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { ConfigService } from '../config/config.service';
-import { readPostInitState } from '../../post-init-runner';
+import { PostInitConflict, readPostInitState, retryPostInitFailed } from '../../post-init-runner';
 import {
   buildInitStatusResponse,
   type InitStatusResponse,
@@ -13,6 +13,17 @@ export type { InitStatusResponse } from './init-status.logic';
 @UseGuards(AgentAuthGuard)
 export class InitStatusController {
   constructor(private readonly config: ConfigService) {}
+
+  @Post('init-status/retry')
+  retry(): InitStatusResponse {
+    try {
+      void retryPostInitFailed(this.config.getConversationDataDir(), this.config.getPostInitScript(), this.config.getPlaygroundsDir());
+      return this.getStatus();
+    } catch (error) {
+      if (error instanceof PostInitConflict) throw new ConflictException(error.message);
+      throw error;
+    }
+  }
 
   @Get('init-status')
   getStatus(): InitStatusResponse {

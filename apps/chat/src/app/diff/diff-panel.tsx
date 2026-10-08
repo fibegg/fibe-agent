@@ -38,7 +38,7 @@ interface DiffResult {
 interface LocalRepo {
   id?: string;
   service: string;
-  prop?: string;
+  repository?: string;
   branch?: string;
   link_path: string;
   target: string;
@@ -122,12 +122,12 @@ function DiffLine({ line, idx }: { line: string; idx: number }) {
 }
 
 function repoKey(repo: LocalRepo): string {
-  return repo.id || repo.service || repo.prop || repo.repo_root;
+  return repo.id || repo.service || repo.repository || repo.repo_root;
 }
 
 function repoLabel(repo: LocalRepo): string {
   const base =
-    repo.prop ||
+    repo.repository ||
     repo.service ||
     repo.id ||
     repo.repo_root.split('/').pop() ||

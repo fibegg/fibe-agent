@@ -1,0 +1,170 @@
+{
+  "format": 1,
+  "providers": {
+    "gemini": {
+      "agentProvider": "gemini",
+      "defaultModel": "model-two",
+      "postInitScript": "printf \"%s\" \"$FIBE_PRESET_INPUT_TOKEN\"",
+      "mcpConfig": {
+        "mcpServers": {
+          "local_fixture": {
+            "command": "fixture-server",
+            "args": [
+              "--fixture"
+            ],
+            "env": {
+              "TOKEN": "preset-fixture-token"
+            }
+          },
+          "remote_fixture": {
+            "serverUrl": "https://fixture-presets.test/mcp",
+            "authHeader": "Bearer preset-fixture-token",
+            "headers": {
+              "User-Agent": "Fixture preset"
+            }
+          }
+        }
+      },
+      "presetEnvironment": {
+        "FIBE_PRESET_INPUT_TOKEN": "preset-fixture-token"
+      }
+    },
+    "antigravity": {
+      "agentProvider": "antigravity",
+      "defaultModel": "model-two",
+      "postInitScript": "printf \"%s\" \"$FIBE_PRESET_INPUT_TOKEN\"",
+      "mcpConfig": {
+        "mcpServers": {
+          "local_fixture": {
+            "command": "fixture-server",
+            "args": [
+              "--fixture"
+            ],
+            "env": {
+              "TOKEN": "preset-fixture-token"
+            }
+          },
+          "remote_fixture": {
+            "serverUrl": "https://fixture-presets.test/mcp",
+            "authHeader": "Bearer preset-fixture-token"
+          }
+        }
+      },
+      "presetEnvironment": {
+        "FIBE_PRESET_INPUT_TOKEN": "preset-fixture-token"
+      }
+    },
+    "claude-code": {
+      "agentProvider": "claude-code",
+      "defaultModel": "model-two",
+      "postInitScript": "printf \"%s\" \"$FIBE_PRESET_INPUT_TOKEN\"",
+      "mcpConfig": {
+        "mcpServers": {
+          "local_fixture": {
+            "command": "fixture-server",
+            "args": [
+              "--fixture"
+            ],
+            "env": {
+              "TOKEN": "preset-fixture-token"
+            }
+          },
+          "remote_fixture": {
+            "serverUrl": "https://fixture-presets.test/mcp",
+            "authHeader": "Bearer preset-fixture-token",
+            "headers": {
+              "User-Agent": "Fixture preset"
+            }
+          }
+        }
+      },
+      "presetEnvironment": {
+        "FIBE_PRESET_INPUT_TOKEN": "preset-fixture-token"
+      }
+    },
+    "openai-codex": {
+      "agentProvider": "openai-codex",
+      "defaultModel": "model-two",
+      "postInitScript": "printf \"%s\" \"$FIBE_PRESET_INPUT_TOKEN\"",
+      "mcpConfig": {
+        "mcpServers": {
+          "local_fixture": {
+            "command": "fixture-server",
+            "args": [
+              "--fixture"
+            ],
+            "env": {
+              "TOKEN": "preset-fixture-token"
+            }
+          },
+          "remote_fixture": {
+            "serverUrl": "https://fixture-presets.test/mcp",
+            "bearerTokenEnvVar": "FIBE_PRESET_INPUT_TOKEN",
+            "headers": {
+              "User-Agent": "Fixture preset"
+            }
+          }
+        }
+      },
+      "presetEnvironment": {
+        "FIBE_PRESET_INPUT_TOKEN": "preset-fixture-token"
+      }
+    },
+    "cursor": {
+      "agentProvider": "cursor",
+      "defaultModel": "model-two",
+      "postInitScript": "printf \"%s\" \"$FIBE_PRESET_INPUT_TOKEN\"",
+      "mcpConfig": {
+        "mcpServers": {
+          "local_fixture": {
+            "command": "fixture-server",
+            "args": [
+              "--fixture"
+            ],
+            "env": {
+              "TOKEN": "preset-fixture-token"
+            }
+          },
+          "remote_fixture": {
+            "serverUrl": "https://fixture-presets.test/mcp",
+            "authHeader": "Bearer preset-fixture-token",
+            "headers": {
+              "User-Agent": "Fixture preset"
+            }
+          }
+        }
+      },
+      "presetEnvironment": {
+        "FIBE_PRESET_INPUT_TOKEN": "preset-fixture-token"
+      }
+    },
+    "opencode": {
+      "agentProvider": "opencode",
+      "defaultModel": "model-two",
+      "postInitScript": "printf \"%s\" \"$FIBE_PRESET_INPUT_TOKEN\"",
+      "mcpConfig": {
+        "mcpServers": {
+          "local_fixture": {
+            "command": "fixture-server",
+            "args": [
+              "--fixture"
+            ],
+            "env": {
+              "TOKEN": "preset-fixture-token"
+            }
+          },
+          "remote_fixture": {
+            "serverUrl": "https://fixture-presets.test/mcp",
+            "authHeader": "Bearer preset-fixture-token",
+            "headers": {
+              "User-Agent": "Fixture preset"
+            }
+          }
+        }
+      },
+      "presetEnvironment": {
+        "FIBE_PRESET_INPUT_TOKEN": "preset-fixture-token"
+      }
+    }
+  }
+}

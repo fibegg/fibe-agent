@@ -873,7 +873,7 @@ Fibe sync:
 - fibe-agent sends `conversation_id` with messages/activity/raw-provider sync.
 - Missing legacy sync maps to `default`.
 - Fibe backfills old records to `default`.
-- Fibe groups Scrolls/history by `agent_conversation_id`.
+- Fibe groups Library/history by `agent_conversation_id`.
 
 ## Operational Debug Notes
 
@@ -1027,7 +1027,7 @@ Planned:
 
 - Ensure every sync payload includes `conversation_id`.
 - Add Fibe API coverage for messages/activity/raw providers by conversation.
-- Add Scrolls grouping and filters by conversation.
+- Add Library grouping and filters by conversation.
 - Add SDK/CLI flags for conversation list/get/send.
 - Distinguish `default` and `inbox` clearly in Fibe mirror records.
 

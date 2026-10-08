@@ -69,7 +69,14 @@ export class GithubTokenRefreshService
       return null;
     }
 
-    const url = `${apiUrl}/api/installations/${connectionId}/token`;
+    const ownerType = process.env.FIBE_GITHUB_CONNECTION_OWNER;
+    if (ownerType && ownerType !== 'Team') {
+      this.clearToken();
+      this.logger.warn('GitHub connection owner is invalid');
+      return null;
+    }
+    const endpoint = ownerType === 'Team' ? 'company_git_installations' : 'installations';
+    const url = `${apiUrl}/api/${endpoint}/${connectionId}/token`;
     this.nextRefreshMs = 60_000;
 
     try {
@@ -80,6 +87,7 @@ export class GithubTokenRefreshService
           AbortSignal.timeout(30_000),
         ]),
         headers: {
+          ...this.config.getFibeOwnerProofHeaders?.(),
           Authorization: `Bearer ${apiKey}`,
         },
       });

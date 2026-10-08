@@ -132,13 +132,13 @@ export class PlaygroundsController {
   }
 
   @Get('playgrounds/browse')
-  async browsePlayrooms(@Query('path') path?: string) {
+  async browsePlaygrounds(@Query('path') path?: string) {
     return this.playgroundBrowser.browse(path ?? '');
   }
 
   @Post('playgrounds/link')
   @HttpCode(HttpStatus.OK)
-  async linkPlayroom(@Body() body: { path?: string }) {
+  async linkPlayground(@Body() body: { path?: string }) {
     const { path } = body ?? {};
     if (!path || typeof path !== 'string') {
       throw new NotFoundException('Invalid path');
@@ -149,13 +149,13 @@ export class PlaygroundsController {
 
   @Post('playgrounds/unlink')
   @HttpCode(HttpStatus.OK)
-  async unlinkPlayroom(@Body() body: { confirm?: boolean }) {
+  async unlinkPlayground(@Body() body: { confirm?: boolean }) {
     await this.playgroundBrowser.unlinkPlayground(body?.confirm === true);
     return { ok: true };
   }
 
   @Get('playgrounds/current')
-  async getCurrentPlayroom() {
+  async getCurrentPlayground() {
     const current = await this.playgroundBrowser.getCurrentLink();
     return { current };
   }

@@ -124,7 +124,7 @@ interface LocalPlaygroundUrl {
 export interface LocalPlaygroundRepo {
   id?: string;
   service: string;
-  prop?: string;
+  repository?: string;
   branch?: string;
   link_path: string;
   target: string;
@@ -531,7 +531,7 @@ export class PlaygroundsService {
     if (!trimmed) {
       if (repos.length === 1) return { repo: repos[0], repos };
       throw new Error(
-        'Multiple repositories are linked; pass repo as service, prop, id, link path, or repo root',
+        'Multiple repositories are linked; pass repo as service, repository, id, link path, or repo root',
       );
     }
     const matches = repos.filter((repo) => this.repoMatches(repo, trimmed));
@@ -555,7 +555,7 @@ export class PlaygroundsService {
     const values = [
       repo.id,
       repo.service,
-      repo.prop,
+      repo.repository,
       repo.branch,
       repo.link_path,
       repo.target,

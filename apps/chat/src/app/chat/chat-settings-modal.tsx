@@ -38,7 +38,10 @@ import { setUiEffectsEnabled } from '../ui-effects';
 import { useUiEffectsEnabled } from '../use-ui-effects';
 
 interface InitStatusResponse {
-  state: 'disabled' | 'pending' | 'running' | 'done' | 'failed';
+  state: 'pending' | 'running' | 'succeeded' | 'failed';
+  runId?: string;
+  scriptDigest?: string;
+  noSetupRequired?: boolean;
   output?: string;
   error?: string;
   finishedAt?: string;
@@ -227,8 +230,7 @@ export function ChatSettingsModal({
   const uiEffectsEnabled = useUiEffectsEnabled();
 
   useEffect(() => {
-    if (!open || !isStandalone) {
-      if (!isStandalone) setInitStatus(null);
+    if (!open) {
       return;
     }
     let cancelled = false;
@@ -466,7 +468,7 @@ export function ChatSettingsModal({
               )}
             </div>
           )}
-          {isStandalone && initStatus && (
+          {initStatus && (
             <div className="border-t border-border pt-4 space-y-3">
               <div className="rounded-lg border border-border/40 bg-muted/20 px-3.5 py-2.5">
                 <div className="flex items-center gap-2 text-sm">
@@ -475,13 +477,14 @@ export function ChatSettingsModal({
                     <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
                   )}
                   <span className="text-muted-foreground">
-                    {initStatus.state === 'disabled' && t('settings.notConfigured')}
+                    {initStatus.noSetupRequired && t('settings.notConfigured')}
                     {initStatus.state === 'pending' && t('settings.pending')}
                     {initStatus.state === 'running' && t('settings.running')}
-                    {initStatus.state === 'done' && t('settings.done')}
+                    {initStatus.state === 'succeeded' && !initStatus.noSetupRequired && t('settings.done')}
                     {initStatus.state === 'failed' && t('settings.failed')}
                   </span>
                 </div>
+                {initStatus.state === 'failed' && (<button type="button" className="text-sm underline mt-2" onClick={() => { void apiRequest(`${API_PATHS.INIT_STATUS}/retry`, { method: 'POST' }).then(response => { if (!response.ok) throw new Error('Retry unavailable'); return response.json(); }).then((data: InitStatusResponse) => setInitStatus(data)).catch(() => { setInitStatus(current => current ? { ...current, error: 'Failed to retry setup. Please try again.' } : current); }); }}>Retry failed setup</button>)}
                 {(initStatus.error || (initStatus.output && initStatus.output.trim())) && (
                   <pre className="mt-2 max-h-24 overflow-auto break-all rounded-md bg-background/60 p-2.5 text-xs text-muted-foreground">
                     {initStatus.error}

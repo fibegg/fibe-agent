@@ -135,6 +135,7 @@ export class FibeSyncService {
       const res = await fetch(url, {
         method: 'PUT',
         headers: {
+          ...this.config.getFibeOwnerProofHeaders?.(),
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
@@ -188,7 +189,7 @@ export class FibeSyncService {
     try {
       const res = await fetch(url, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { ...this.config.getFibeOwnerProofHeaders?.(), Authorization: `Bearer ${apiKey}` },
       });
 
       if (!res.ok) {

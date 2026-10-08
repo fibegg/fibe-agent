@@ -2,13 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ChatSettingsModal } from './chat-settings-modal';
 import { CHAT_STATES } from './chat-state';
+import { API_PATHS } from '@shared/api-paths';
 
 vi.mock('../api-url', () => ({
   apiRequest: vi
     .fn()
     .mockResolvedValue({
       ok: true,
-      json: async () => ({ state: 'done', output: 'ok' }),
+      json: async () => ({ state: 'succeeded', output: 'ok' }),
     }),
   getToken: vi.fn().mockReturnValue('tok'),
   buildApiUrl: vi.fn().mockReturnValue('/api/init-status'),
@@ -34,7 +35,7 @@ describe('ChatSettingsModal', () => {
     const { apiRequest } = await import('../api-url');
     vi.mocked(apiRequest).mockResolvedValue({
       ok: true,
-      json: async () => ({ state: 'done', output: 'ok' }),
+      json: async () => ({ state: 'succeeded', output: 'ok' }),
     } as Response);
     localStorage.clear();
     document.documentElement.removeAttribute('data-ui-effects');
@@ -397,7 +398,7 @@ describe('ChatSettingsModal', () => {
     vi.mocked(apiRequest).mockResolvedValue({
       ok: true,
       json: async () => ({
-        state: 'done',
+        state: 'succeeded',
         output: 'Script ran successfully',
         systemPrompt: 'You are helpful',
       }),
@@ -465,6 +466,42 @@ describe('ChatSettingsModal', () => {
     });
   });
 
+  it.each(['http', 'network'])('reports a %s setup retry failure and preserves the setup output', async (failure) => {
+    const { apiRequest } = await import('../api-url');
+    const retryPath = `${API_PATHS.INIT_STATUS}/retry`;
+    vi.mocked(apiRequest).mockImplementation(async (path) => {
+      if (path === retryPath) {
+        if (failure === 'network') throw new Error('Bearer private-fixture-token');
+        return { ok: false, status: 409 } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ state: 'failed', output: 'visible setup output', error: 'Initial setup failed' }),
+      } as Response;
+    });
+
+    render(
+      <ChatSettingsModal
+        open={true}
+        onClose={vi.fn()}
+        state={CHAT_STATES.AUTHENTICATED}
+        onStartAuth={vi.fn()}
+        onReauthenticate={vi.fn()}
+        onLogout={vi.fn()}
+      />,
+    );
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry failed setup' }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Failed to retry setup\. Please try again\./)).toBeTruthy();
+    });
+    expect(screen.getByText(/visible setup output/)).toBeTruthy();
+    expect(screen.queryByText(/private-fixture-token/)).toBeNull();
+    expect(vi.mocked(apiRequest).mock.calls.filter(([path]) => path === retryPath)).toEqual([
+      [retryPath, { method: 'POST' }],
+    ]);
+  });
+
   it('does not render auth buttons when state is ERROR', () => {
     render(
       <ChatSettingsModal
@@ -503,7 +540,7 @@ describe('ChatSettingsModal', () => {
     vi.mocked(apiRequest).mockResolvedValue({
       ok: true,
       blob: async () => fakeBlob,
-      json: async () => ({ state: 'done' }),
+      json: async () => ({ state: 'succeeded' }),
     } as unknown as Response);
 
     const createObjectURL = vi.fn().mockReturnValue('blob:fake');
@@ -552,7 +589,7 @@ describe('ChatSettingsModal', () => {
     const { apiRequest } = await import('../api-url');
     vi.mocked(apiRequest).mockResolvedValue({
       ok: true,
-      json: async () => ({ state: 'done' }),
+      json: async () => ({ state: 'succeeded' }),
     } as Response);
     vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
 
@@ -588,7 +625,7 @@ describe('ChatSettingsModal', () => {
           deleteCallMade = true;
           return { ok: true } as Response;
         }
-        return { ok: true, json: async () => ({ state: 'done' }) } as Response;
+        return { ok: true, json: async () => ({ state: 'succeeded' }) } as Response;
       },
     );
 

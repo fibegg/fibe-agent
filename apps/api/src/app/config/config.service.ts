@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { loadFibeSettings, type FibeSettings } from './fibe-settings';
+import { readFibeOwnerContext, fibeOwnerProofHeaders } from './owner-context';
 import {
   DEFAULT_EFFORT,
   normalizeEffort,
@@ -106,6 +107,14 @@ export class ConfigService {
     return process.env.FIBE_API_KEY;
   }
 
+  getFibeOwnerContext() {
+    return readFibeOwnerContext(process.env);
+  }
+
+  getFibeOwnerProofHeaders(): Record<string, string> {
+    return fibeOwnerProofHeaders(this.getFibeOwnerContext());
+  }
+
   getFibeApiUrl(): string | undefined {
     const domain = process.env.FIBE_DOMAIN?.trim();
     if (!domain) return undefined;
@@ -141,7 +150,8 @@ export class ConfigService {
   }
 
   getPostInitScript(): string | undefined {
-    return this.settings.postInitScript?.trim() || undefined;
+    const script = this.settings.postInitScript;
+    return script?.trim() ? script : undefined;
   }
 
   getEncryptionKey(): string | undefined {

@@ -33,6 +33,7 @@ describe('GithubTokenRefreshService', () => {
     for (const key of [
       'MCP_CONFIG_JSON',
       'FIBE_GITHUB_CONNECTION_ID',
+      'FIBE_GITHUB_CONNECTION_OWNER',
       'SESSION_DIR',
       'AGENT_PROVIDER',
     ])
@@ -42,6 +43,7 @@ describe('GithubTokenRefreshService', () => {
     );
     process.env.AGENT_PROVIDER = 'gemini';
     process.env.FIBE_GITHUB_CONNECTION_ID = '42';
+    delete process.env.FIBE_GITHUB_CONNECTION_OWNER;
     delete process.env.MCP_CONFIG_JSON;
     mockConfig.getFibeApiUrl = () => 'https://fibe.test';
     mockConfig.getFibeApiKey = () => 'fibe_test123';
@@ -90,6 +92,22 @@ describe('GithubTokenRefreshService', () => {
       args: [],
       env: { GITHUB_PERSONAL_ACCESS_TOKEN: 'ghs_fresh_token' },
     });
+  });
+
+  test('refreshes a company-owned connection through its owner-bound endpoint', async () => {
+    process.env.FIBE_GITHUB_CONNECTION_OWNER = 'Team';
+    expect(await service.refreshToken()).toBe('ghs_fresh_token');
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      'https://fibe.test/api/company_git_installations/42/token',
+      expect.any(Object),
+    );
+  });
+
+  test('rejects an invalid connection-owner marker before contacting an endpoint', async () => {
+    process.env.FIBE_GITHUB_CONNECTION_OWNER = 'another-team';
+    expect(await service.refreshToken()).toBeNull();
+    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(writtenServers().github.env.GITHUB_PERSONAL_ACCESS_TOKEN).toBe('');
   });
 
   test('preserves custom servers and the existing GitHub command, arguments and unrelated environment', async () => {
