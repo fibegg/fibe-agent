@@ -36,7 +36,7 @@ export function SidebarToggle({
         ${positionClass}
         size-8 md:size-9 lg:size-8
         rounded-full
-        bg-card/90 backdrop-blur-md
+        bg-card
         hover:bg-card
         active:scale-95
         flex items-center justify-center

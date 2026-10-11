@@ -51,7 +51,7 @@ export function ActivityTypeFilters({ typeFilter, onTypeFilterChange }: Activity
     `h-8 shrink-0 px-3 text-[11px] font-medium transition-colors ${
       active
         ? `bg-primary text-primary-foreground shadow-none ${activeRadiusClass(index)}`
-        : 'rounded-md text-muted-foreground hover:bg-background/70 hover:text-foreground'
+        : 'rounded-md text-muted-foreground hover:bg-background hover:text-foreground'
     }`;
 
   return (

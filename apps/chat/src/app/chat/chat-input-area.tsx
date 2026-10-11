@@ -139,7 +139,7 @@ export function ChatInputArea({
           pendingAttachments.length > 0) && (
           <div className="flex flex-wrap gap-2 items-center">
             {pendingVoice && (
-              <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-card/60">
+              <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl border border-border/50 bg-card">
                 <audio
                   src={pendingVoice}
                   controls
@@ -175,7 +175,7 @@ export function ChatInputArea({
             {pendingAttachments.map((a, i) => (
               <div
                 key={`att-${i}`}
-                className="relative flex items-center gap-2 pl-2 pr-1 py-1.5 min-h-9 rounded-xl border border-border/50 bg-card/60 max-w-[180px]"
+                className="relative flex items-center gap-2 pl-2 pr-1 py-1.5 min-h-9 rounded-xl border border-border/50 bg-card max-w-[180px]"
               >
                 <FileIcon
                   pathOrName={a.name}
@@ -237,10 +237,10 @@ export function ChatInputArea({
               </span>
             </div>
             <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="rounded-full bg-background/70 px-2 py-1">
+              <span className="rounded-full bg-background px-2 py-1">
                 {t('chat.input.queueHint')}
               </span>
-              <span className="rounded-full bg-background/70 px-2 py-1">
+              <span className="rounded-full bg-background px-2 py-1">
                 {t(
                   steerIsLive
                     ? 'chat.input.steerHint'
@@ -352,7 +352,7 @@ export function ChatInputArea({
                   onRequestInputFocus();
                 }}
                 disabled={!inputValue.trim()}
-                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 bg-gradient-to-r from-primary to-secondary px-2.5 hover:from-primary hover:to-secondary text-white disabled:opacity-30 transition-opacity"
+                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 bg-primary px-2.5 hover:from-primary hover:to-secondary text-primary-foreground disabled:opacity-30 transition-opacity"
                 aria-label={t('chat.input.queueMessage')}
                 title={t('chat.input.queueMessageTitle')}
               >
@@ -408,7 +408,7 @@ export function ChatInputArea({
                 onRequestInputFocus();
               }}
               disabled={!isReady}
-              className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
+              className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
               aria-label={t('chat.input.send')}
             >
               <Send className="size-3.5 sm:size-4" />

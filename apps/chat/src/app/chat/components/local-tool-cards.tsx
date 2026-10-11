@@ -67,7 +67,7 @@ export function QuestionCard({
               <textarea
                 ref={inputRef}
                 id={`question-input-${questionId}`}
-                className="w-full rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
+                className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-amber-500/40 resize-none"
                 placeholder={placeholder ?? t('localTools.answerPlaceholder')}
                 rows={2}
                 value={answer}
@@ -156,7 +156,7 @@ export function ConfirmCard({
               <button
                 type="button"
                 onClick={() => decide(false)}
-                className="rounded-lg px-4 py-1.5 text-sm font-medium border border-border bg-background/60 text-foreground hover:bg-muted/60 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
+                className="rounded-lg px-4 py-1.5 text-sm font-medium border border-border bg-background text-foreground hover:bg-muted/60 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring"
                 aria-label={noLabel}
               >
                 {noLabel}
@@ -190,7 +190,7 @@ export function ShowImageCard({
     <div className="my-3 flex gap-2 sm:gap-3">
       <div className="flex-shrink-0 size-7 sm:size-8" aria-hidden />
       <div className="flex-1 min-w-0">
-        <div className="rounded-2xl rounded-tl-sm border border-border bg-background/40 px-4 py-3 inline-flex flex-col gap-2 max-w-sm">
+        <div className="rounded-2xl rounded-tl-sm border border-border bg-background px-4 py-3 inline-flex flex-col gap-2 max-w-sm">
           <img
             src={src}
             alt={caption ?? t('localTools.agentImage')}
@@ -240,7 +240,7 @@ export function NotifyToast({
     <div
       role="status"
       aria-live="polite"
-      className={`flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm shadow-lg backdrop-blur-sm animate-in slide-in-from-bottom-2 fade-in duration-200 ${style}`}
+      className={`flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm shadow-lg animate-in slide-in-from-bottom-2 fade-in duration-200 ${style}`}
       id={`notify-toast-${id}`}
     >
       <span className="flex-1 min-w-0 leading-snug">{message}</span>

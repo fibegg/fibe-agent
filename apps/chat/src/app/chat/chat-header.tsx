@@ -6,7 +6,7 @@ import {
   MessageSquare,
   MonitorUp,
   Search,
-  Sparkles,
+  CirclePlay,
   X,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -313,7 +313,7 @@ export function ChatHeader({
               <button
                 type="button"
                 onClick={onReconnect}
-                className="h-8 rounded-lg bg-gradient-to-r from-primary to-secondary px-2.5 text-xs font-medium text-white shadow-lg shadow-primary/25 transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:h-9 sm:px-3"
+                className="h-8 rounded-lg bg-primary px-2.5 text-xs font-medium text-primary-foreground shadow-lg transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-primary/30 sm:h-9 sm:px-3"
               >
                 {t('header.reconnect')}
               </button>
@@ -536,7 +536,7 @@ export function ChatHeader({
                   aria-hidden
                 />
               ) : (
-                <Sparkles
+                <CirclePlay
                   className={`size-5 ${mobileBrainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
                   aria-hidden
                 />
@@ -547,7 +547,7 @@ export function ChatHeader({
             <button
               type="button"
               onClick={onReconnect}
-              className="px-3 py-1.5 rounded-md text-xs font-medium bg-gradient-to-r from-primary to-secondary text-white border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-opacity"
+              className="px-3 py-1.5 rounded-md text-xs font-medium bg-primary text-primary-foreground border-0 shadow-lg hover:opacity-90 transition-opacity"
             >
               {t('header.reconnect')}
             </button>
@@ -626,7 +626,7 @@ export function ChatHeader({
             <button
               type="button"
               onClick={onStartAuth}
-              className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-gradient-to-r from-primary to-secondary text-white border-0 shadow-lg shadow-primary/30 hover:opacity-90 transition-opacity"
+              className="px-3 py-1.5 rounded-md text-[10px] sm:text-xs font-medium bg-primary text-primary-foreground border-0 shadow-lg hover:opacity-90 transition-opacity"
             >
               {t('header.startAuth')}
             </button>

@@ -1,4 +1,3 @@
-
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
 import { ThinkingState, ThinkingAvatar } from './thinking-state';
@@ -9,7 +8,10 @@ vi.mock('../avatar-config-context', () => ({
 
 describe('ThinkingState', () => {
   beforeEach(() => vi.useFakeTimers());
-  afterEach(() => { vi.useRealTimers(); vi.clearAllMocks(); });
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.clearAllMocks();
+  });
 
   it('renders without error', () => {
     const { container } = render(<ThinkingState />);
@@ -34,26 +36,21 @@ describe('ThinkingState', () => {
     expect(dots.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('uses easter egg lines when lastUserMessage matches', () => {
+  it('uses ordinary status for a formerly special prompt', () => {
     render(<ThinkingState lastUserMessage="42" />);
-    const text = screen.getByText(/ultimate answer|Don't panic/i);
+    const text = screen.getByText('Thinking...');
     expect(text).toBeTruthy();
   });
 
-  it('cycles text after an interval tick', () => {
+  it('keeps status stable while waiting', () => {
     render(<ThinkingState />);
     const before = screen.getByText(/\.\.\./).textContent;
-    act(() => { vi.advanceTimersByTime(2400); });
+    act(() => {
+      vi.advanceTimersByTime(2400);
+    });
     const after = screen.getByText(/\.\.\./).textContent;
     expect(typeof after).toBe('string');
     expect(before).toBeTruthy();
-  });
-
-  it('clears interval on unmount', () => {
-    const spy = vi.spyOn(global, 'clearInterval');
-    const { unmount } = render(<ThinkingState />);
-    unmount();
-    expect(spy).toHaveBeenCalled();
   });
 });
 
@@ -65,7 +62,7 @@ describe('ThinkingAvatar', () => {
     expect(container.firstChild).toBeTruthy();
   });
 
-  it('contains Sparkles icon when no avatarUrl', () => {
+  it('contains a bot icon when no avatarUrl', () => {
     const { container } = render(<ThinkingAvatar />);
     const svg = container.querySelector('svg');
     expect(svg).toBeTruthy();
@@ -73,7 +70,10 @@ describe('ThinkingAvatar', () => {
 
   it('renders img when assistantAvatarUrl is set', async () => {
     const { useAvatarConfig } = await import('../avatar-config-context');
-    vi.mocked(useAvatarConfig).mockReturnValue({ assistantAvatarUrl: 'https://example.com/bot.png', userAvatarUrl: undefined });
+    vi.mocked(useAvatarConfig).mockReturnValue({
+      assistantAvatarUrl: 'https://example.com/bot.png',
+      userAvatarUrl: undefined,
+    });
     const { container } = render(<ThinkingAvatar />);
     const img = container.querySelector('img');
     expect(img).toBeTruthy();

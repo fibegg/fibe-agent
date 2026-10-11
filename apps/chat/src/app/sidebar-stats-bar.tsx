@@ -1,5 +1,5 @@
 import { memo, useRef, useState, useCallback } from 'react';
-import { Brain, Loader2, Sparkles } from 'lucide-react';
+import { Brain, Loader2, CirclePlay } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { CountUpNumber } from './count-up-number';
 import type { StoryEntry } from './agent-thinking-utils';
@@ -89,7 +89,7 @@ export const SidebarStatsBar = memo(function SidebarStatsBar({
                   aria-hidden
                 />
               ) : (
-                <Sparkles
+                <CirclePlay
                   className={`size-5 ${brainClasses.accent} absolute -top-0.5 -right-0.5 animate-pulse transition-colors`}
                   aria-hidden
                 />

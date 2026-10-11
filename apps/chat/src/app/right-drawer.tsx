@@ -118,7 +118,7 @@ export function RightDrawer({
       >
         {/* ── Header ──────────────────────────────────────────────────────── */}
         <div
-          className="flex items-center justify-between px-4 pb-3 border-b border-primary/15 shrink-0 bg-background/95 backdrop-blur-sm"
+          className="flex items-center justify-between px-4 pb-3 border-b border-primary/15 shrink-0 bg-background "
           style={{
             paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
           }}

@@ -5,6 +5,7 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 
 import { getWsUrl, getAuthTokenForRequest } from '../api-url';
 import { useT } from '../i18n';
+import { getEffectiveTheme, onThemeChanged } from '../theme';
 
 import '@xterm/xterm/css/xterm.css';
 
@@ -16,11 +17,6 @@ const TERMINAL_OPTIONS = {
   allowProposedApi: true,
   scrollback: 5000,
   theme: {
-    background: '#191c14',
-    foreground: '#e5e2cf',
-    cursor: '#79d44e',
-    cursorAccent: '#191c14',
-    selectionBackground: '#79d44e55',
     black: '#1e293b',
     red: '#f87171',
     green: '#4ade80',
@@ -65,7 +61,40 @@ export function TerminalPanel({
     const container = containerRef.current;
     if (!container) return;
 
-    const term = new Terminal(TERMINAL_OPTIONS);
+    const browserTheme = () => {
+      const dark = getEffectiveTheme() === 'dark';
+      return {
+        ...TERMINAL_OPTIONS.theme,
+        background: dark ? '#09090b' : '#fafafa',
+        foreground: dark ? '#fafafa' : '#18181b',
+        cursor: dark ? '#fafafa' : '#18181b',
+        cursorAccent: dark ? '#09090b' : '#fafafa',
+        selectionBackground: dark ? '#3f3f46' : '#e4e4e7',
+        ...(dark
+          ? {}
+          : {
+              red: '#b91c1c',
+              green: '#15803d',
+              yellow: '#a16207',
+              blue: '#4338ca',
+              magenta: '#7e22ce',
+              cyan: '#0e7490',
+              white: '#71717a',
+              brightBlack: '#71717a',
+              brightRed: '#dc2626',
+              brightGreen: '#16a34a',
+              brightYellow: '#b45309',
+              brightBlue: '#4f46e5',
+              brightMagenta: '#9333ea',
+              brightCyan: '#0891b2',
+              brightWhite: '#18181b',
+            }),
+      };
+    };
+    const term = new Terminal({ ...TERMINAL_OPTIONS, theme: browserTheme() });
+    const unsubscribeTheme = onThemeChanged(() => {
+      term.options.theme = browserTheme();
+    });
     const fitAddon = new FitAddon();
     term.loadAddon(fitAddon);
     term.loadAddon(new WebLinksAddon());
@@ -147,6 +176,7 @@ export function TerminalPanel({
     if (vv) vv.addEventListener('resize', doResize);
 
     return () => {
+      unsubscribeTheme();
       if (resizeTimeout) clearTimeout(resizeTimeout);
       ro?.disconnect();
       if (!ro) window.removeEventListener('resize', doResize);
@@ -161,9 +191,9 @@ export function TerminalPanel({
   }, []);
 
   return (
-    <div className="flex flex-col h-full min-h-0 bg-[#191c14]">
+    <div className="flex flex-col h-full min-h-0 bg-background">
       {/* ── Sub-header: shell info bar ────────────────────────── */}
-      <div className="flex items-center gap-2 px-3 py-1 bg-[#191c14]/90 border-b border-primary/10 shrink-0">
+      <div className="flex items-center gap-2 px-3 py-1 bg-background border-b border-border shrink-0">
         <span className="text-[10px] font-medium text-primary/70 tracking-wide">
           bash
         </span>
@@ -175,7 +205,7 @@ export function TerminalPanel({
       <div
         ref={containerRef}
         className="flex-1 min-h-0 overflow-hidden px-2 py-1"
-        style={{ background: '#191c14' }}
+        style={{ background: 'var(--background)' }}
         aria-label={t('header.terminal')}
       />
     </div>

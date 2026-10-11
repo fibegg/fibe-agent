@@ -2,52 +2,59 @@ import { getThemeSource } from './embed-config';
 
 const STORAGE_KEY = 'chat-theme';
 const THEME_CHANGED_EVENT = 'fibe_theme_changed';
+let transientTheme: Theme | null = null;
 
-export type Theme = 'light' | 'dark' | 'dracula' | 'midnight' | 'contrast';
-export type LegacyTheme = 'winter' | 'halloween';
+export type Theme = 'light' | 'dark';
+export type LegacyTheme =
+  | 'winter'
+  | 'halloween'
+  | 'dracula'
+  | 'midnight'
+  | 'contrast';
 export type ThemeInput = Theme | LegacyTheme;
 
-export const THEMES = ['light', 'dark', 'dracula', 'midnight', 'contrast'] as const;
+export const THEMES = ['light', 'dark'] as const;
 const LEGACY_THEME_ALIASES: Record<LegacyTheme, Theme> = {
   winter: 'light',
   halloween: 'dark',
+  dracula: 'dark',
+  midnight: 'dark',
+  contrast: 'dark',
 };
 const PWA_THEME_COLORS: Record<Theme, string> = {
-  light: '#f5f0e6',
-  dark: '#191c14',
-  dracula: '#282a36',
-  midnight: '#07111f',
-  contrast: '#000000',
+  light: '#fafafa',
+  dark: '#09090b',
 };
 const PWA_STATUS_BAR_STYLES: Record<Theme, 'default' | 'black'> = {
   light: 'default',
   dark: 'black',
-  dracula: 'black',
-  midnight: 'black',
-  contrast: 'black',
 };
 
 export interface ThemeOption {
   value: Theme;
-  labelKey:
-    | 'theme.option.light'
-    | 'theme.option.dark'
-    | 'theme.option.dracula'
-    | 'theme.option.midnight'
-    | 'theme.option.contrast';
+  labelKey: 'theme.option.light' | 'theme.option.dark';
   dark: boolean;
   accent: string;
 }
 
 export const THEME_OPTIONS: ThemeOption[] = [
-  { value: 'light', labelKey: 'theme.option.light', dark: false, accent: '#5cb43a' },
-  { value: 'dark', labelKey: 'theme.option.dark', dark: true, accent: '#79d44e' },
-  { value: 'dracula', labelKey: 'theme.option.dracula', dark: true, accent: '#bd93f9' },
-  { value: 'midnight', labelKey: 'theme.option.midnight', dark: true, accent: '#38bdf8' },
-  { value: 'contrast', labelKey: 'theme.option.contrast', dark: true, accent: '#facc15' },
+  {
+    value: 'light',
+    labelKey: 'theme.option.light',
+    dark: false,
+    accent: '#18181b',
+  },
+  {
+    value: 'dark',
+    labelKey: 'theme.option.dark',
+    dark: true,
+    accent: '#fafafa',
+  },
 ];
 
-export function isSetThemeMessage(data: unknown): data is { action: 'set_theme'; theme: ThemeInput } {
+export function isSetThemeMessage(
+  data: unknown,
+): data is { action: 'set_theme'; theme: ThemeInput } {
   const o = data as Record<string, unknown> | null;
   return (
     o !== null &&
@@ -63,7 +70,12 @@ export function isTheme(value: unknown): value is Theme {
 
 export function normalizeTheme(value: unknown): Theme | null {
   if (isTheme(value)) return value;
-  if (value === 'winter' || value === 'halloween') return LEGACY_THEME_ALIASES[value];
+  if (
+    typeof value === 'string' &&
+    Object.prototype.hasOwnProperty.call(LEGACY_THEME_ALIASES, value)
+  ) {
+    return LEGACY_THEME_ALIASES[value as LegacyTheme];
+  }
   return null;
 }
 
@@ -84,13 +96,15 @@ export function getStoredTheme(): Theme | null {
     if (theme && s !== theme) localStorage.setItem(STORAGE_KEY, theme);
     return theme;
   } catch {
-    return null;
+    return transientTheme;
   }
 }
 
 function prefersLight(): boolean {
   if (typeof window === 'undefined') return false;
-  const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)');
+  const m =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-color-scheme: light)');
   return m ? m.matches : false;
 }
 
@@ -100,12 +114,10 @@ export function getEffectiveTheme(): Theme {
   return prefersLight() ? 'light' : 'dark';
 }
 
-function getEffectiveDark(): boolean {
-  return THEME_OPTIONS.find((option) => option.value === getEffectiveTheme())?.dark ?? false;
-}
-
 function setMetaContent(name: string, content: string): void {
-  let meta = document.head.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  let meta = document.head.querySelector<HTMLMetaElement>(
+    `meta[name="${name}"]`,
+  );
   if (!meta) {
     meta = document.createElement('meta');
     meta.setAttribute('name', name);
@@ -119,32 +131,40 @@ function applyBrowserTheme(theme: Theme): void {
   document.documentElement.style.backgroundColor = color;
   if (document.body) document.body.style.backgroundColor = color;
   setMetaContent('theme-color', color);
-  setMetaContent('apple-mobile-web-app-status-bar-style', PWA_STATUS_BAR_STYLES[theme]);
+  setMetaContent(
+    'apple-mobile-web-app-status-bar-style',
+    PWA_STATUS_BAR_STYLES[theme],
+  );
 }
 
-function applyTheme(): void {
+function applyTheme(theme: Theme = getEffectiveTheme()): void {
   if (typeof document === 'undefined') return;
-  const theme = getEffectiveTheme();
-  document.documentElement.classList.toggle('dark', getEffectiveDark());
+  document.documentElement.classList.toggle('dark', theme === 'dark');
   document.documentElement.dataset.theme = theme;
   applyBrowserTheme(theme);
+  window.dispatchEvent(
+    new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme } }),
+  );
 }
 
 export function setStoredTheme(theme: ThemeInput): void {
   if (typeof window === 'undefined') return;
   const normalized = normalizeTheme(theme);
   if (!normalized) return;
+  transientTheme = normalized;
   try {
     localStorage.setItem(STORAGE_KEY, normalized);
   } catch {
     // localStorage can be unavailable in restrictive embed contexts.
   }
-  applyTheme();
-  window.dispatchEvent(new CustomEvent(THEME_CHANGED_EVENT, { detail: { theme: normalized } }));
+  applyTheme(normalized);
 }
 
 export function isDark(): boolean {
-  return typeof document !== 'undefined' && document.documentElement.classList.contains('dark');
+  return (
+    typeof document !== 'undefined' &&
+    document.documentElement.classList.contains('dark')
+  );
 }
 
 export function toggleTheme(): Theme {
@@ -165,8 +185,11 @@ export function initTheme(): void {
   if (typeof window === 'undefined') return;
   applyTheme();
   initFrameThemeListener();
-  const m = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: light)');
-  if (m) m.addEventListener('change', () => {
-    if (getStoredTheme() === null) applyTheme();
-  });
+  const m =
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(prefers-color-scheme: light)');
+  if (m)
+    m.addEventListener('change', () => {
+      if (getStoredTheme() === null) applyTheme();
+    });
 }

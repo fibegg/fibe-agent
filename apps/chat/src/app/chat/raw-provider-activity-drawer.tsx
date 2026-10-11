@@ -134,7 +134,7 @@ export function RawProviderActivityDrawerContent({ open }: { open: boolean }) {
           <details key={record.id} className="overflow-hidden rounded-lg border border-border/50 bg-muted/10 shadow-sm">
             <summary className="cursor-pointer border-b border-transparent px-3 py-2.5 hover:bg-muted/25">
               <div className="inline-flex max-w-full items-center gap-2 text-sm">
-                <span className="rounded-md border border-border/40 bg-background/60 px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
+                <span className="rounded-md border border-border/40 bg-background px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
                   {record.request?.method || 'REQ'}
                 </span>
                 <span className="truncate text-foreground">{record.request?.url || record.provider}</span>

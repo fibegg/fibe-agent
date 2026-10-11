@@ -119,7 +119,7 @@ const ConversationItem = memo(function ConversationItem({
           className={`h-3.5 w-3.5 ${isActive ? 'text-primary' : 'text-muted-foreground/50'}`}
         />
         {conv.isProcessing && (
-          <span className="absolute -right-1 -top-1 size-2 rounded-full bg-primary shadow-[0_0_8px_rgba(121,212,78,0.75)]" />
+          <span className="absolute -right-1 -top-1 size-2 rounded-full bg-primary " />
         )}
       </div>
       <div className="min-w-0 flex-1">

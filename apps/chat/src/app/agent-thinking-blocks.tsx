@@ -260,7 +260,7 @@ export const ActivityBlock = memo(function ActivityBlock({
         </span>
       </div>
       {isThinkingBlock ? (
-        <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-32 overflow-y-auto">
+        <div className="mt-0.5 rounded-md bg-background px-2 py-1.5 max-h-32 overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO}`}>
             <ThinkingTextWithHighlights text={entry.details ?? ''} />
           </p>
@@ -325,7 +325,7 @@ export const CommandGroupBlock = memo(function CommandGroupBlock({
           {entries.map((entry) => (
             <div
               key={entry.id}
-              className="flex items-center gap-2 min-w-0 py-0.5 px-2 rounded bg-background/40 text-[11px] font-mono text-green-300/95 truncate"
+              className="flex items-center gap-2 min-w-0 py-0.5 px-2 rounded bg-background text-[11px] font-mono text-green-300/95 truncate"
               title={entry.details ?? entry.command}
             >
               <span className="text-amber-400/80 shrink-0 select-none">$</span>

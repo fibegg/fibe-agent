@@ -5,7 +5,7 @@ import * as themeModule from './theme';
 
 describe('ThemeSelector', () => {
   beforeEach(() => {
-    vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dracula');
+    vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dark');
     vi.spyOn(themeModule, 'setStoredTheme').mockImplementation(() => undefined);
     vi.spyOn(themeModule, 'onThemeChanged').mockReturnValue(() => undefined);
   });
@@ -14,23 +14,23 @@ describe('ThemeSelector', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders all theme options', () => {
+  it('renders exactly Light and Dark options', () => {
     render(<ThemeSelector />);
-    expect(screen.getByRole('radio', { name: 'Fibe Light' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Fibe Dark' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Dracula' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'Midnight' })).toBeTruthy();
-    expect(screen.getByRole('radio', { name: 'High Contrast' })).toBeTruthy();
+    expect(screen.getAllByRole('radio')).toHaveLength(2);
+    expect(screen.getByRole('radio', { name: 'Light' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'Dark' })).toBeTruthy();
   });
 
   it('marks the active theme', () => {
     render(<ThemeSelector />);
-    expect(screen.getByRole('radio', { name: 'Dracula' }).getAttribute('aria-checked')).toBe('true');
+    expect(
+      screen.getByRole('radio', { name: 'Dark' }).getAttribute('aria-checked'),
+    ).toBe('true');
   });
 
   it('stores the selected theme', () => {
     render(<ThemeSelector />);
-    fireEvent.click(screen.getByRole('radio', { name: 'Midnight' }));
-    expect(themeModule.setStoredTheme).toHaveBeenCalledWith('midnight');
+    fireEvent.click(screen.getByRole('radio', { name: 'Light' }));
+    expect(themeModule.setStoredTheme).toHaveBeenCalledWith('light');
   });
 });

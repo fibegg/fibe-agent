@@ -92,7 +92,7 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
         className={
           tone === 'stark'
             ? 'z-[300] overflow-y-auto rounded-sm border border-cyan-500/60 bg-slate-950/95 p-1 shadow-[0_0_20px_rgba(6,182,212,0.25)] backdrop-blur-md'
-            : 'z-[300] overflow-y-auto rounded-lg border border-border bg-card/95 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl'
+            : 'z-[300] overflow-y-auto rounded-lg border border-border bg-card p-1.5 shadow-xl shadow-black/30 '
         }
         style={style}
       >
@@ -149,7 +149,7 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
                 className={`h-8 rounded-md border px-2 text-xs font-medium transition-colors ${
                   option === locale
                     ? 'border-primary/60 bg-primary/20 text-primary'
-                    : 'border-border/50 bg-background/40 text-muted-foreground hover:bg-primary/10 hover:text-foreground'
+                    : 'border-border/50 bg-background text-muted-foreground hover:bg-primary/10 hover:text-foreground'
                 }`}
                 aria-pressed={option === locale}
               >
@@ -166,7 +166,7 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
     return (
       <div className="flex items-center justify-between py-1">
         <span className="text-sm font-medium text-foreground">{t('common.language')}</span>
-        <div className="inline-flex max-w-[13rem] flex-wrap rounded-lg border border-border/50 bg-background/60 p-0.5">
+        <div className="inline-flex max-w-[13rem] flex-wrap rounded-lg border border-border/50 bg-background p-0.5">
           {LOCALES.map((option) => {
             const optionMeta = LOCALE_OPTIONS[option];
             return (

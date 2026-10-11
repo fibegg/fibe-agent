@@ -18,7 +18,7 @@ import {
   CornerDownRight,
   RefreshCcw,
   RotateCw,
-  Sparkles,
+  Bot,
   User,
   Play,
   Square,
@@ -445,7 +445,7 @@ const MessageRow = memo(
         data-message-id={msg.id}
         data-message-created-at={msg.created_at}
         data-conversation-id={conversationId}
-        className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-primary/10 shadow-[0_0_0_2px_rgba(121,212,78,0.35)]' : ''}`}
+        className={`scroll-mt-24 flex gap-2 sm:gap-3 md:gap-4 rounded-2xl transition-[background-color,box-shadow] duration-300 ${msg.role === 'user' ? 'flex-row-reverse' : ''} ${isFocused ? 'bg-muted ring-2 ring-ring' : ''}`}
       >
         <div className="flex-shrink-0">
           {msg.role === 'user' ? (
@@ -472,7 +472,7 @@ const MessageRow = memo(
             </div>
           ) : (
             <div className={AVATAR_ASSISTANT}>
-              <Sparkles className="size-3.5 sm:size-4" />
+              <Bot className="size-3.5 sm:size-4" />
             </div>
           )}
         </div>

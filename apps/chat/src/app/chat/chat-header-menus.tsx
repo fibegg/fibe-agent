@@ -8,7 +8,7 @@ import {
   Plus,
   RefreshCcw,
   Search,
-  Sparkles,
+  CirclePlay,
   TerminalSquare,
   X,
 } from 'lucide-react';
@@ -231,7 +231,7 @@ export function ProviderModelMenu({
             data-provider-model-menu=""
             role="dialog"
             aria-label={panelLabel}
-            className="z-[100] flex flex-col gap-3 overflow-y-auto rounded-lg border border-border bg-card/95 p-3 shadow-xl shadow-black/30 backdrop-blur-xl"
+            className="z-[100] flex flex-col gap-3 overflow-y-auto rounded-lg border border-border bg-card p-3 shadow-xl shadow-black/30 "
             style={{
               position: 'fixed',
               top: panelRect.top,
@@ -394,7 +394,7 @@ export function MoreActionsMenu({
             data-chat-header-more-menu=""
             role="menu"
             aria-label={t('header.chatActions')}
-            className="z-[100] flex flex-col overflow-hidden rounded-lg border border-border bg-card/95 p-1.5 shadow-xl shadow-black/30 backdrop-blur-xl"
+            className="z-[100] flex flex-col overflow-hidden rounded-lg border border-border bg-card p-1.5 shadow-xl shadow-black/30 "
             style={{
               position: 'fixed',
               top: panelRect.top,
@@ -470,7 +470,7 @@ export function MoreActionsMenu({
                   onClick={() => runAndClose(onStartAuth)}
                   className={MORE_MENU_ITEM_CLASS}
                 >
-                  <Sparkles className="size-4 shrink-0 text-primary" />
+                  <CirclePlay className="size-4 shrink-0 text-primary" />
                   <span className="min-w-0 flex-1 truncate">
                     {t('header.startAuth')}
                   </span>
@@ -638,7 +638,7 @@ export function CompactConversationPicker({
             ref={menuRef}
             role="menu"
             aria-label={t('header.conversations')}
-            className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card/95 shadow-xl shadow-black/30 backdrop-blur-xl py-1"
+            className="fixed z-[200] min-w-[180px] overflow-hidden rounded-lg border border-border bg-card shadow-xl shadow-black/30 py-1"
             style={{ top: rect.top, left: rect.left, width: rect.width }}
           >
             <div className="max-h-60 overflow-y-auto">

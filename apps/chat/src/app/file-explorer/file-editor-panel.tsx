@@ -92,7 +92,7 @@ function StatusBar({
 }) {
   const t = useT();
   return (
-    <div className="flex items-center justify-between gap-3 border-t border-border/50 bg-card/40 px-4 py-1.5 text-[10px] text-muted-foreground select-none">
+    <div className="flex items-center justify-between gap-3 border-t border-border/50 bg-card px-4 py-1.5 text-[10px] text-muted-foreground select-none">
       <div className="flex items-center gap-3">
         <span className="font-medium">{language}</span>
         <span>─</span>
@@ -549,7 +549,7 @@ export function FileEditorPanel({
     ? 'flex flex-col overflow-hidden bg-card flex-1 min-h-0 rounded-none border-0'
     : 'flex flex-col overflow-hidden bg-card w-full max-w-[95vw] sm:max-w-[92vw] sm:w-[92vw] h-[90vh] max-h-[calc(100vh-2rem)] border border-border rounded-xl shadow-card';
   const headerClasses = inline
-    ? 'border-b border-border/50 bg-card/40 px-2 py-2 sm:px-4 backdrop-blur-xl shrink-0'
+    ? 'border-b border-border/50 bg-card px-2 py-2 sm:px-4 shrink-0'
     : CARD_HEADER;
   const headerStyle = inline
     ? undefined
@@ -558,7 +558,7 @@ export function FileEditorPanel({
     ? 'min-h-10 flex-shrink-0 flex-wrap sm:flex-nowrap'
     : HEADER_FIRST_ROW;
   const logoClasses = inline
-    ? 'size-8 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0'
+    ? 'size-8 rounded-lg bg-primary flex items-center justify-center shadow-lg shrink-0'
     : LOGO_ICON_BOX;
 
   return (
@@ -579,7 +579,7 @@ export function FileEditorPanel({
             >
               <div className={logoClasses}>
                 <Edit3
-                  className={inline ? 'size-4 text-white' : 'size-5 text-white'}
+                  className={inline ? 'size-4 text-primary-foreground' : 'size-5 text-primary-foreground'}
                 />
               </div>
               <div className="min-w-0 flex-1">
@@ -632,7 +632,7 @@ export function FileEditorPanel({
             {/* Toolbar Buttons */}
             <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:flex-none">
               {isHtmlFile && (
-                <div className="mr-1 flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border/60 bg-background/60">
+                <div className="mr-1 flex h-8 shrink-0 items-center overflow-hidden rounded-lg border border-border/60 bg-background">
                   <button
                     type="button"
                     onClick={() => setPreviewMode('preview')}
@@ -853,7 +853,7 @@ export function FileEditorPanel({
         )}
 
         {!isImageFile && fileSearchOpen && (
-          <div className="flex shrink-0 items-center gap-1.5 border-b border-border/50 bg-card/60 px-3 py-2">
+          <div className="flex shrink-0 items-center gap-1.5 border-b border-border/50 bg-card px-3 py-2">
             <Search className="size-3.5 shrink-0 text-muted-foreground" />
             <input
               ref={fileSearchInputRef}
@@ -1037,7 +1037,7 @@ export function FileEditorDialog({
 }) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 "
       onClick={onClose}
     >
       <div

@@ -53,10 +53,10 @@ describe('ThemeToggle', () => {
   });
 
   it('shows current theme title', () => {
-    vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dracula');
+    vi.spyOn(themeModule, 'getEffectiveTheme').mockReturnValue('dark');
     render(<ThemeToggle />);
     expect(screen.getByRole('button').getAttribute('title')).toBe(
-      'Current theme: Dracula',
+      'Current theme: Dark',
     );
   });
 
@@ -65,7 +65,7 @@ describe('ThemeToggle', () => {
     const button = screen.getByRole('button');
     fireEvent.click(button);
     expect(themeModule.toggleTheme).toHaveBeenCalled();
-    expect(button.getAttribute('title')).toBe('Current theme: Fibe Dark');
+    expect(button.getAttribute('title')).toBe('Current theme: Dark');
   });
 
   it('adds matchMedia listener when matchMedia is available', () => {

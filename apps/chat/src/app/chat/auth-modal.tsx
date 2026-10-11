@@ -76,7 +76,7 @@ export function AuthModal({
         style={{ backgroundColor: 'var(--card)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border-subtle bg-gradient-to-br from-primary/5 to-transparent">
+        <div className="flex items-center justify-between p-4 sm:p-5 border-b border-border-subtle bg-card">
           <h3 className="text-base sm:text-lg font-semibold text-card-foreground flex items-center gap-2">
             <span className="p-1.5 rounded-lg bg-primary/10 border border-primary/20">
               <KeyIcon className="size-4 text-primary" />
@@ -169,7 +169,7 @@ export function AuthModal({
                   type="button"
                   onClick={handleSubmit}
                   disabled={submitting}
-                  className={`${BUTTON_PRIMARY_ROUNDED} w-full shadow-primary/20 disabled:opacity-50`}
+                  className={`${BUTTON_PRIMARY_ROUNDED} w-full disabled:opacity-50`}
                 >
                   {submitting ? (
                     <span className="flex items-center justify-center gap-2">

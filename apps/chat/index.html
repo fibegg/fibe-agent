@@ -48,7 +48,7 @@
       name="description"
       content="Chat, edit code, use a terminal, and control your Fibe agent."
     />
-    <meta name="theme-color" content="#191c14" />
+    <meta name="theme-color" content="#09090b" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
@@ -81,37 +81,29 @@
     <script>
       (function () {
         var colors = {
-          light: '#f5f0e6',
-          dark: '#191c14',
-          dracula: '#282a36',
-          midnight: '#07111f',
-          contrast: '#000000',
+          light: '#fafafa',
+          dark: '#09090b',
         };
         var statusBarStyles = {
           light: 'default',
           dark: 'black',
-          dracula: 'black',
-          midnight: 'black',
-          contrast: 'black',
         };
         var s = null;
         try {
           s = localStorage.getItem('chat-theme');
         } catch (_) {}
+        var stored = s;
         if (s === 'winter') s = 'light';
-        if (s === 'halloween') s = 'dark';
-        var valid =
-          s === 'light' ||
-          s === 'dark' ||
-          s === 'dracula' ||
-          s === 'midnight' ||
-          s === 'contrast';
+        if (['halloween', 'dracula', 'midnight', 'contrast'].indexOf(s) !== -1)
+          s = 'dark';
+        var valid = s === 'light' || s === 'dark';
         var prefersLight =
           window.matchMedia &&
           window.matchMedia('(prefers-color-scheme: light)').matches;
         var theme = valid ? s : prefersLight ? 'light' : 'dark';
         try {
-          localStorage.setItem('chat-theme', theme);
+          if (valid && stored !== theme)
+            localStorage.setItem('chat-theme', theme);
         } catch (_) {}
         var dark = theme !== 'light';
         var color = colors[theme] || colors.dark;

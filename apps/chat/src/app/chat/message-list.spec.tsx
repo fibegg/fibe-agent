@@ -596,7 +596,7 @@ describe('MessageList', () => {
 
     await waitFor(() => {
       const target = container.querySelector('[data-message-id="target"]');
-      expect(target?.className).toContain('bg-primary/10');
+      expect(target?.className).toContain('ring-ring');
     });
   });
 

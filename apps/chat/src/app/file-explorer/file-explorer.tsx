@@ -532,7 +532,7 @@ export function FileExplorer({
 
   const collapsedContent = (
     <div
-      className={`flex min-h-0 w-full flex-1 flex-col items-center bg-card/30 pt-3 pb-4 backdrop-blur-xl ${rightDividerClass}`}
+      className={`flex min-h-0 w-full flex-1 flex-col items-center bg-card pt-3 pb-4 ${rightDividerClass}`}
     >
       <div className="flex flex-col items-center gap-3">
         {playgroundSelector}
@@ -552,10 +552,10 @@ export function FileExplorer({
 
   const expandedContent = (
     <div
-      className={`min-h-0 flex w-full flex-1 flex-col bg-card/30 backdrop-blur-xl ${rightDividerClass}`}
+      className={`min-h-0 flex w-full flex-1 flex-col bg-card ${rightDividerClass}`}
     >
       <div
-        className={`border-b border-border/50 bg-gradient-to-br from-primary/10 via-transparent to-secondary/5 backdrop-blur-sm shrink-0 px-4 pb-3`}
+        className={`border-b border-border/50 bg-card shrink-0 px-4 pb-3`}
         style={{
           minHeight: PANEL_HEADER_MIN_HEIGHT_PX,
           paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
@@ -782,7 +782,7 @@ export function FileExplorer({
     <>
       {quickOpen && (
         <div
-          className="fixed inset-0 z-[90] flex items-start justify-center bg-black/35 px-4 pt-[12vh] backdrop-blur-sm"
+          className="fixed inset-0 z-[90] flex items-start justify-center bg-black/35 px-4 pt-[12vh] "
           role="dialog"
           aria-modal="true"
           aria-label={t('fileExplorer.quickOpen')}

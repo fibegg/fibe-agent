@@ -1300,7 +1300,7 @@ export function ChatPage() {
               onClick={closeMobileSidebar}
             />
             <div
-              className={`${MOBILE_SHEET_PANEL} left-0 bg-gradient-to-br from-background via-background to-primary/5 border border-primary/20 flex flex-col`}
+              className={`${MOBILE_SHEET_PANEL} left-0 bg-background border border-primary/20 flex flex-col`}
             >
               <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
                 <FileExplorer
@@ -1559,7 +1559,7 @@ export function ChatPage() {
             <button
               type="button"
               onClick={() => setCompactFileBrowserOpen(true)}
-              className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card/90 text-muted-foreground shadow-lg shadow-black/20 backdrop-blur-md transition-all hover:scale-105 hover:bg-card hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+              className="absolute left-0 top-1/2 z-30 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-border/60 bg-card text-muted-foreground shadow-lg shadow-black/20 transition-all hover:scale-105 hover:bg-card hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
               aria-label={t('fileExplorer.expand')}
               title={t('fileExplorer.expand')}
             >

@@ -110,9 +110,10 @@ describe('getStoredTheme', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
   });
 
-  it('returns dracula when stored', () => {
+  it('migrates retired dracula storage to dark', () => {
     localStorage.setItem(STORAGE_KEY, 'dracula');
-    expect(getStoredTheme()).toBe('dracula');
+    expect(getStoredTheme()).toBe('dark');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
   });
 
   it('returns null when stored value is invalid', () => {
@@ -138,14 +139,14 @@ describe('setStoredTheme', () => {
 
   it('updates browser theme metadata for light PWAs', () => {
     setStoredTheme('light');
-    expect(metaContent('theme-color')).toBe('#f5f0e6');
+    expect(metaContent('theme-color')).toBe('#fafafa');
     expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe(
       'default',
     );
     expect(document.documentElement.style.backgroundColor).toBe(
-      'rgb(245, 240, 230)',
+      'rgb(250, 250, 250)',
     );
-    expect(document.body.style.backgroundColor).toBe('rgb(245, 240, 230)');
+    expect(document.body.style.backgroundColor).toBe('rgb(250, 250, 250)');
   });
 
   it('stores dark and adds dark class', () => {
@@ -157,19 +158,19 @@ describe('setStoredTheme', () => {
 
   it('updates browser theme metadata for dark PWAs', () => {
     setStoredTheme('dark');
-    expect(metaContent('theme-color')).toBe('#191c14');
+    expect(metaContent('theme-color')).toBe('#09090b');
     expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black');
     expect(document.documentElement.style.backgroundColor).toBe(
-      'rgb(25, 28, 20)',
+      'rgb(9, 9, 11)',
     );
-    expect(document.body.style.backgroundColor).toBe('rgb(25, 28, 20)');
+    expect(document.body.style.backgroundColor).toBe('rgb(9, 9, 11)');
   });
 
-  it('stores dracula and keeps dark class for dark-compatible styles', () => {
+  it('normalizes retired dracula input before applying it', () => {
     setStoredTheme('dracula');
-    expect(localStorage.getItem(STORAGE_KEY)).toBe('dracula');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(document.documentElement.dataset.theme).toBe('dracula');
+    expect(document.documentElement.dataset.theme).toBe('dark');
   });
 
   it('normalizes legacy winter input before storing', () => {
@@ -183,13 +184,30 @@ describe('setStoredTheme', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('dark');
     expect(document.documentElement.dataset.theme).toBe('dark');
   });
+
+  it('applies an explicit selection when browser storage is blocked', () => {
+    stubMatchMedia(false);
+    const write = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new Error('Storage blocked');
+    });
+    const read = vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      throw new Error('Storage blocked');
+    });
+    setStoredTheme('light');
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(getEffectiveTheme()).toBe('light');
+    read.mockRestore();
+    write.mockRestore();
+  });
 });
 
 describe('normalizeTheme', () => {
   it('keeps canonical themes unchanged', () => {
     expect(normalizeTheme('light')).toBe('light');
     expect(normalizeTheme('dark')).toBe('dark');
-    expect(normalizeTheme('dracula')).toBe('dracula');
+    expect(normalizeTheme('dracula')).toBe('dark');
+    expect(normalizeTheme('midnight')).toBe('dark');
+    expect(normalizeTheme('contrast')).toBe('dark');
   });
 
   it('maps legacy themes to canonical themes', () => {
@@ -247,11 +265,11 @@ describe('toggleTheme', () => {
     expect(getStoredTheme()).toBe('dark');
   });
 
-  it('switches to dracula when currently dark', () => {
+  it('switches to light when currently dark', () => {
     setStoredTheme('dark');
-    expect(toggleTheme()).toBe('dracula');
-    expect(isDark()).toBe(true);
-    expect(getStoredTheme()).toBe('dracula');
+    expect(toggleTheme()).toBe('light');
+    expect(isDark()).toBe(false);
+    expect(getStoredTheme()).toBe('light');
   });
 
   it('wraps back to light after the last theme', () => {

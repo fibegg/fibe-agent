@@ -58,7 +58,7 @@ export function PlaygroundServicePreviewPanel({
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-background" aria-label={t('preview.title')}>
-      <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-card/70 px-3 py-2 backdrop-blur-xl sm:px-4">
+      <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 border-b border-border/50 bg-card px-3 py-2 sm:px-4">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <h2 className="truncate text-sm font-semibold text-foreground">{t('preview.title')}</h2>
           {selected && (
@@ -184,7 +184,7 @@ function PreviewDiagnosticsBanner({
 
   if (loading && !diagnostics) {
     return (
-      <div className="absolute left-3 right-3 top-3 z-10 rounded-md border border-border/70 bg-background/95 px-3 py-2 text-xs text-muted-foreground shadow-lg shadow-black/10 backdrop-blur">
+      <div className="absolute left-3 right-3 top-3 z-10 rounded-md border border-border/70 bg-background px-3 py-2 text-xs text-muted-foreground shadow-lg shadow-black/10 ">
         {t('preview.checkingDiagnostics')}
       </div>
     );
@@ -192,7 +192,7 @@ function PreviewDiagnosticsBanner({
 
   if (error) {
     return (
-      <div className="absolute left-3 right-3 top-3 z-10 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs text-amber-200 shadow-lg shadow-black/10 backdrop-blur">
+      <div className="absolute left-3 right-3 top-3 z-10 flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/15 px-3 py-2 text-xs text-amber-200 shadow-lg shadow-black/10 ">
         <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
         <span>{error}</span>
       </div>
@@ -202,14 +202,14 @@ function PreviewDiagnosticsBanner({
   if (visibleIssues.length === 0) return null;
 
   return (
-    <div className="absolute left-3 right-3 top-3 z-10 max-h-40 overflow-auto rounded-md border border-border/70 bg-background/95 p-2 text-xs shadow-lg shadow-black/10 backdrop-blur">
+    <div className="absolute left-3 right-3 top-3 z-10 max-h-40 overflow-auto rounded-md border border-border/70 bg-background p-2 text-xs shadow-lg shadow-black/10 ">
       <div className="mb-1 flex items-center gap-1.5 font-medium text-foreground">
         <AlertTriangle className="size-3.5 text-amber-300" />
         {t('preview.diagnostics')}
       </div>
       <div className="flex flex-col gap-1.5">
         {visibleIssues.map((issue) => (
-          <div key={`${issue.code}:${issue.detail}`} className="flex gap-2 rounded border border-border/50 bg-card/60 px-2 py-1.5">
+          <div key={`${issue.code}:${issue.detail}`} className="flex gap-2 rounded border border-border/50 bg-card px-2 py-1.5">
             {issue.severity === 'error' ? (
               <ShieldAlert className="mt-0.5 size-3.5 shrink-0 text-red-300" />
             ) : issue.severity === 'warning' ? (

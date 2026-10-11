@@ -4,7 +4,7 @@ import {
   ChevronRight,
   Loader2,
   Search,
-  Sparkles,
+  CirclePlay,
   Terminal,
   X,
 } from 'lucide-react';
@@ -170,7 +170,7 @@ export function StoryDetail({
         </span>
       </div>
       {isThinkingBlock ? (
-        <div className="mt-0.5 rounded-md bg-background/40 px-2 py-1.5 max-h-[70vh] overflow-y-auto">
+        <div className="mt-0.5 rounded-md bg-background px-2 py-1.5 max-h-[70vh] overflow-y-auto">
           <p className={`text-[11px] ${ACTIVITY_MONO} whitespace-pre-wrap`}>
             {reasoningBodyWithHighlights(story.details as string, q)}
           </p>
@@ -475,7 +475,7 @@ export function ActivityStoryDetailPanel({
                       aria-hidden
                     />
                   ) : (
-                    <Sparkles
+                    <CirclePlay
                       className={`size-5 ${accentColor} absolute -top-0.5 -right-0.5 ${
                         isComplete ? '' : 'animate-pulse'
                       } transition-colors`}
@@ -563,7 +563,7 @@ export function ActivityStoryDetailPanel({
         {liveResponseText && (
           <div
             ref={liveResponseRef}
-            className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm shadow-primary/10"
+            className="mb-4 rounded-lg border border-primary/40 bg-primary/10 px-3 py-2.5 flex flex-col gap-1.5 shadow-sm "
           >
             <div className="flex items-center gap-2 shrink-0">
               <span className="relative flex size-2 shrink-0">

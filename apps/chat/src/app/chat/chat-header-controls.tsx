@@ -98,8 +98,8 @@ export function CliButton({
       onClick={onToggle}
       className={`${className} rounded-md flex items-center justify-center transition-colors shrink-0 ${
         open
-          ? 'bg-blue-500/20 text-blue-300 hover:bg-blue-500/30'
-          : 'text-muted-foreground hover:bg-blue-500/10 hover:text-blue-300'
+          ? 'bg-muted text-foreground hover:bg-accent'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
       title={label}
       aria-label={label}
@@ -127,8 +127,8 @@ export function DiffButton({
       onClick={onToggle}
       className={`${className} rounded-md flex items-center justify-center transition-colors shrink-0 ${
         open
-          ? 'bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30'
-          : 'text-muted-foreground hover:bg-emerald-500/10 hover:text-emerald-300'
+          ? 'bg-muted text-foreground hover:bg-accent'
+          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
       }`}
       title={label}
       aria-label={label}
@@ -174,7 +174,7 @@ export function FileBrowserButton({ onClick }: { onClick: () => void }) {
     <button
       type="button"
       onClick={onClick}
-      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-amber-500/10 hover:text-amber-300 sm:size-9"
+      className="flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:size-9"
       title={t('header.files')}
       aria-label={t('header.files')}
     >

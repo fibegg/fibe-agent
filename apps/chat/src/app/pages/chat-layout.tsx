@@ -38,7 +38,7 @@ export function ChatLayout({
 }: ChatLayoutProps) {
   return (
     <div
-      className={`flex w-full min-h-0 overflow-hidden bg-gradient-to-br from-background via-background to-primary/10 relative ${isDragOver ? 'ring-2 ring-inset ring-primary ring-offset-2 ring-offset-background' : ''}`}
+      className={`flex w-full min-h-0 overflow-hidden bg-background relative ${isDragOver ? 'ring-2 ring-inset ring-primary ring-offset-2 ring-offset-background' : ''}`}
       style={{
         ...(isPanelResizing ? { userSelect: 'none', cursor: 'col-resize' } : {}),
         // Match the active visual viewport so iOS PWA keyboards shrink the
@@ -52,12 +52,12 @@ export function ChatLayout({
     >
       {isDragOver && dragOverlay}
       {modals}
-      
+
       {mobileSidebar}
       {mobileActivity}
-      
+
       {leftPanel}
-      
+
       <main
         className="relative z-10 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-transparent"
         style={{
@@ -71,7 +71,7 @@ export function ChatLayout({
           {children}
         </div>
       </main>
-      
+
       {rightPanel}
     </div>
   );

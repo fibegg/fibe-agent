@@ -62,7 +62,7 @@ export function ActivityReviewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/10">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="size-8 animate-spin text-primary" />
           <span className="text-sm text-muted-foreground">{t('activity.loadingActivities')}</span>
@@ -73,7 +73,7 @@ export function ActivityReviewPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/10">
+      <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4 text-center px-4">
           <p className="text-sm text-destructive">{error}</p>
           <Link
@@ -89,10 +89,10 @@ export function ActivityReviewPage() {
   }
 
   return (
-    <div className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-gradient-to-br from-background via-background to-primary/10">
+    <div className="flex h-screen w-full min-h-0 flex-col overflow-hidden bg-background">
       <div className="flex-1 flex min-h-0 min-w-0 overflow-hidden">
         <aside
-          className="flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-primary/5 border-r border-primary/20 transition-all duration-300 overflow-hidden"
+          className="flex flex-col flex-shrink-0 bg-background border-r border-primary/20 transition-all duration-300 overflow-hidden"
           style={{ width: RIGHT_SIDEBAR_WIDTH_PX, minWidth: 0 }}
         >
           {/* Header: nav + settings/theme + search */}

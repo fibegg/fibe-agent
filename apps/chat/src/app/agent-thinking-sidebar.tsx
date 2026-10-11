@@ -1,5 +1,5 @@
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Brain, CheckCircle2, Loader2, Search, Sparkles, X } from 'lucide-react';
+import { Brain, CheckCircle2, Loader2, Search, CirclePlay, X } from 'lucide-react';
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { SidebarToggle } from './sidebar-toggle';
 import {
@@ -385,7 +385,7 @@ export function AgentThinkingSidebar({
                   className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-spin transition-colors`}
                 />
               ) : (
-                <Sparkles
+                <CirclePlay
                   className={`size-3 ${brainClasses.accent} absolute -top-1 -right-1 animate-pulse transition-colors`}
                 />
               )}

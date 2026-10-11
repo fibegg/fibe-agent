@@ -105,7 +105,7 @@ function ResetConversationButton({ onReset }: { onReset: () => void }) {
         <button
           type="button"
           onClick={cancelConfirm}
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border/60 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-background/70 hover:text-foreground"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md border border-border/60 px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
           aria-label={t('settings.cancelReset')}
         >
           <X className="size-3.5" aria-hidden />
@@ -486,7 +486,7 @@ export function ChatSettingsModal({
                 </div>
                 {initStatus.state === 'failed' && (<button type="button" className="text-sm underline mt-2" onClick={() => { void apiRequest(`${API_PATHS.INIT_STATUS}/retry`, { method: 'POST' }).then(response => { if (!response.ok) throw new Error('Retry unavailable'); return response.json(); }).then((data: InitStatusResponse) => setInitStatus(data)).catch(() => { setInitStatus(current => current ? { ...current, error: 'Failed to retry setup. Please try again.' } : current); }); }}>Retry failed setup</button>)}
                 {(initStatus.error || (initStatus.output && initStatus.output.trim())) && (
-                  <pre className="mt-2 max-h-24 overflow-auto break-all rounded-md bg-background/60 p-2.5 text-xs text-muted-foreground">
+                  <pre className="mt-2 max-h-24 overflow-auto break-all rounded-md bg-background p-2.5 text-xs text-muted-foreground">
                     {initStatus.error}
                     {initStatus.error && initStatus.output?.trim() ? '\n\n' : ''}
                     {initStatus.output?.trim()}
@@ -501,7 +501,7 @@ export function ChatSettingsModal({
                   )}
                 </div>
                 {initStatus.systemPrompt && (
-                  <pre className="mt-2 max-h-24 overflow-auto break-words rounded-md bg-background/60 p-2.5 text-xs text-muted-foreground whitespace-pre-wrap">
+                  <pre className="mt-2 max-h-24 overflow-auto break-words rounded-md bg-background p-2.5 text-xs text-muted-foreground whitespace-pre-wrap">
                     {initStatus.systemPrompt}
                   </pre>
                 )}

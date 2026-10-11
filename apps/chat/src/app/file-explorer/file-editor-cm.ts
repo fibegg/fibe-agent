@@ -15,7 +15,12 @@ import {
   crosshairCursor,
   highlightSpecialChars,
 } from '@codemirror/view';
-import { EditorState, Compartment, type Extension } from '@codemirror/state';
+import {
+  EditorState,
+  Compartment,
+  Prec,
+  type Extension,
+} from '@codemirror/state';
 import {
   defaultKeymap,
   history,
@@ -168,79 +173,49 @@ const FONT_FAMILY =
   "'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'SF Mono', Menlo, Monaco, 'Courier New', monospace";
 
 function buildTheme(dark: boolean): Extension {
-  if (dark) {
-    return EditorView.theme(
+  return Prec.highest(
+    EditorView.theme(
       {
         '&': {
-          backgroundColor: 'transparent',
+          backgroundColor: 'var(--card)',
+          color: 'var(--foreground)',
           height: '100%',
           fontSize: '13px',
           fontFamily: FONT_FAMILY,
         },
-        '.cm-content': { padding: '8px 0', caretColor: '#79d44e' },
-        '.cm-focused': { outline: 'none' },
-        '&.cm-focused .cm-cursor': { borderLeftColor: '#79d44e' },
+        '.cm-content': { padding: '8px 0', caretColor: 'var(--foreground)' },
+        '.cm-scroller': {
+          backgroundColor: 'var(--card)',
+          color: 'var(--foreground)',
+        },
+        '&.cm-focused': { outline: 'none' },
+        '&.cm-focused .cm-cursor': { borderLeftColor: 'var(--foreground)' },
         '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-          backgroundColor: 'rgba(92,180,58,0.3)',
+          backgroundColor:
+            'color-mix(in srgb, var(--foreground) 18%, transparent)',
         },
         '.cm-gutters': {
-          backgroundColor: 'rgba(0,0,0,0.2)',
-          color: '#5a5a7a',
+          backgroundColor: 'var(--muted)',
+          color: 'var(--muted-foreground)',
           border: 'none',
-          borderRight: '1px solid rgba(255,255,255,0.06)',
+          borderRight: '1px solid var(--border)',
           paddingRight: '8px',
           minWidth: '48px',
         },
-        '.cm-lineNumbers': { color: '#4a4a6a' },
-        '.cm-activeLine': { backgroundColor: 'rgba(92,180,58,0.06)' },
+        '.cm-lineNumbers': { color: 'var(--muted-foreground)' },
+        '.cm-activeLine': { backgroundColor: 'var(--muted)' },
         '.cm-activeLineGutter': {
-          backgroundColor: 'rgba(92,180,58,0.12)',
-          color: '#c4c4dc',
+          backgroundColor: 'var(--muted)',
+          color: 'var(--foreground)',
         },
-        '.cm-foldGutter span': { color: '#5a5a7a' },
+        '.cm-foldGutter span': { color: 'var(--muted-foreground)' },
         '.cm-matchingBracket': {
-          backgroundColor: 'rgba(92,180,58,0.2)',
-          outline: '1px solid rgba(121,212,78,0.4)',
+          backgroundColor: 'var(--muted)',
+          outline: '1px solid var(--border)',
         },
       },
-      { dark: true },
-    );
-  }
-  return EditorView.theme(
-    {
-      '&': {
-        backgroundColor: 'transparent',
-        height: '100%',
-        fontSize: '13px',
-        fontFamily: FONT_FAMILY,
-      },
-      '.cm-content': { padding: '8px 0', caretColor: '#5cb43a' },
-      '.cm-focused': { outline: 'none' },
-      '&.cm-focused .cm-cursor': { borderLeftColor: '#5cb43a' },
-      '&.cm-focused .cm-selectionBackground, .cm-selectionBackground': {
-        backgroundColor: '#ddd6fe',
-      },
-      '.cm-gutters': {
-        backgroundColor: 'hsl(var(--card)/0.5)',
-        color: 'hsl(var(--muted-foreground))',
-        border: 'none',
-        borderRight: '1px solid hsl(var(--border)/0.5)',
-        paddingRight: '8px',
-        minWidth: '48px',
-      },
-      '.cm-lineNumbers': { color: 'hsl(var(--muted-foreground)/0.7)' },
-      '.cm-activeLine': { backgroundColor: 'hsl(var(--muted)/0.3)' },
-      '.cm-activeLineGutter': {
-        backgroundColor: 'hsl(var(--muted)/0.4)',
-        color: 'hsl(var(--foreground))',
-      },
-      '.cm-foldGutter span': { color: 'hsl(var(--muted-foreground))' },
-      '.cm-matchingBracket': {
-        backgroundColor: '#5cb43a22',
-        outline: '1px solid #5cb43a55',
-      },
-    },
-    { dark: false },
+      { dark },
+    ),
   );
 }
 

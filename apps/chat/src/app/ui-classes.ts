@@ -1,11 +1,11 @@
 export const INPUT =
   'rounded-md border border-border text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30';
-export const INPUT_BG = 'bg-input-background dark:bg-input/30';
+export const INPUT_BG = 'bg-input-background dark:bg-input';
 export const INPUT_FOCUS_BORDER =
   'focus:border-primary dark:focus:border-primary';
 
 export const INPUT_SEARCH =
-  'h-8 w-full pl-8 pr-8 text-xs rounded-xl ' +
+  'h-8 w-full pl-8 pr-8 text-xs rounded-md ' +
   INPUT_BG +
   ' border border-border ' +
   INPUT_FOCUS_BORDER +
@@ -16,7 +16,7 @@ export const INPUT_SEARCH =
 export const INPUT_SM =
   'w-28 sm:w-32 h-7 sm:h-8 px-2.5 rounded-md text-[10px] sm:text-xs ' +
   INPUT_BG +
-  ' backdrop-blur-sm border border-border-subtle ' +
+  ' border border-border-subtle ' +
   INPUT +
   ' focus:border-primary/50 dark:focus:border-primary focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30';
 
@@ -37,7 +37,7 @@ export const CLEAR_BUTTON_POSITION =
 export const SEARCH_ROW_WRAPPER = 'relative h-8 mt-2';
 export const HEADER_FIRST_ROW =
   'h-[3.25rem] mb-2 overflow-hidden flex-shrink-0';
-export const HEADER_BORDER = 'border-border/50';
+export const HEADER_BORDER = 'border-border';
 export const HEADER_PADDING = 'px-4 py-3';
 
 export const FLEX_ROW_CENTER = 'flex items-center gap-2 min-w-0';
@@ -52,7 +52,7 @@ export const ACTIVITY_BLOCK_VARIANTS = {
   tool_call: '',
   file_created: 'rounded-lg border border-green-500/30 bg-green-500/10',
   task_complete: 'rounded-lg border border-green-500/30 bg-green-500/10',
-  default: 'rounded-lg border border-primary/20 bg-primary/5',
+  default: 'rounded-lg border border-border bg-primary/5',
 } as const;
 
 export const ACTIVITY_ICON_COLOR: Record<string, string> = {
@@ -70,47 +70,46 @@ export const ACTIVITY_MONO =
   'text-xs text-foreground/90 whitespace-pre-wrap font-mono leading-relaxed break-words';
 
 export const BADGE_CARD =
-  'shrink-0 text-xs bg-card/50 backdrop-blur-sm border border-border/50 h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
+  'shrink-0 text-xs bg-card border border-border h-auto py-1 px-2 rounded-md truncate max-w-[120px]';
 
 export const AVATAR_USER =
-  'size-7 sm:size-8 rounded-full flex items-center justify-center text-white ring-2 ring-background';
+  'size-7 sm:size-8 rounded-full bg-muted flex items-center justify-center text-foreground ring-2 ring-background';
 export const AVATAR_ASSISTANT =
-  'size-7 sm:size-8 rounded-lg flex items-center justify-center relative text-white ring-2 ring-background';
+  'size-7 sm:size-8 rounded-lg bg-muted flex items-center justify-center text-foreground ring-2 ring-background';
 
 export const BUBBLE_ASSISTANT =
-  'rounded-2xl rounded-tl-md bg-card/60 backdrop-blur-md border border-border/50 shadow-sm text-card-foreground';
+  'rounded-lg rounded-tl-md bg-card border border-border shadow-sm text-card-foreground';
 export const BUBBLE_TYPING =
-  'rounded-2xl rounded-tl-md bg-card border border-border text-card-foreground';
+  'rounded-lg rounded-tl-md bg-card border border-border text-card-foreground';
 export const BUBBLE_USER =
-  'rounded-2xl rounded-tr-sm bg-gradient-to-br from-user-bubble-from to-user-bubble-to text-user-bubble-foreground shadow-md shadow-primary/15';
+  'rounded-lg rounded-tr-sm bg-primary text-user-bubble-foreground shadow-md ';
 
 export const PROSE_MESSAGE =
   'markdown-body prose prose-sm max-w-none min-w-0 dark:prose-invert text-sm sm:text-[14px] break-words';
 
 export const SIDEBAR_PANEL =
-  'relative h-full flex flex-col flex-shrink-0 bg-gradient-to-br from-background via-background to-primary/5 border-l border-primary/20 transition-all duration-300';
+  'relative h-full flex flex-col flex-shrink-0 bg-card border-l border-border transition-all duration-300';
 export const SIDEBAR_HEADER = `border-b ${HEADER_BORDER} shrink-0 ${HEADER_PADDING}`;
-export const CARD_HEADER = `border-b ${HEADER_BORDER} bg-card/40 backdrop-blur-xl shrink-0 ${HEADER_PADDING}`;
+export const CARD_HEADER = `border-b ${HEADER_BORDER} bg-card shrink-0 ${HEADER_PADDING}`;
 
 export const MODAL_OVERLAY =
-  'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 backdrop-blur-sm';
-export const MODAL_OVERLAY_DARK =
-  'fixed inset-0 z-50 bg-black/60 backdrop-blur-sm';
+  'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 dark:bg-black/50 ';
+export const MODAL_OVERLAY_DARK = 'fixed inset-0 z-50 bg-black/60 ';
 export const MOBILE_SHEET_PANEL =
   'fixed top-0 bottom-0 z-50 w-[85vw] sm:w-[400px] max-w-full flex flex-col lg:hidden';
 export const MODAL_OVERLAY_CENTER =
-  'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm';
+  'fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 ';
 
 export const LOGO_ICON_BOX =
-  'size-10 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/30 shrink-0';
+  'size-10 rounded-md bg-primary flex items-center justify-center shadow-sm shrink-0';
 
 export const SESSION_STATS_PANEL =
-  'rounded-lg border border-primary/20 bg-primary/5 overflow-hidden shrink-0';
+  'rounded-lg border border-border bg-primary/5 overflow-hidden shrink-0';
 export const SESSION_STATS_HEADING =
-  'flex items-center gap-1.5 text-xs font-semibold px-3 py-2 text-primary dark:text-primary border-b border-primary/20';
+  'flex items-center gap-1.5 text-xs font-semibold px-3 py-2 text-primary dark:text-primary border-b border-border';
 
 export const MODEL_OPTION_SELECTED =
-  'bg-gradient-to-r from-primary to-secondary text-white shadow shadow-primary/20';
+  'bg-primary text-primary-foreground shadow ';
 export const MODEL_OPTION_UNSELECTED =
   'bg-input-bg border border-border-subtle text-muted-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30';
 
@@ -123,18 +122,17 @@ export const CLOSE_BUTTON_SIZE = 'size-8';
 export const SETTINGS_CLOSE_BUTTON =
   'size-8 rounded-md flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10';
 export const MODAL_CARD =
-  'rounded-2xl bg-card backdrop-blur-2xl border border-primary/15 shadow-[var(--shadow-elevated)] overflow-hidden animate-modal-enter';
+  'rounded-lg bg-card border border-border shadow-[var(--shadow-elevated)] overflow-hidden animate-modal-enter';
 export const BUTTON_OUTLINE_ACCENT =
-  'rounded-lg border border-primary/20 text-sm font-medium text-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors flex items-center gap-2 w-full px-4 py-2.5';
+  'rounded-lg border border-border text-sm font-medium text-foreground hover:bg-primary/10 hover:text-primary hover:border-primary/30 transition-colors flex items-center gap-2 w-full px-4 py-2.5';
 export const BUTTON_DESTRUCTIVE_GHOST =
   'rounded-lg bg-destructive/10 text-destructive hover:bg-destructive/20 text-sm font-medium transition-colors flex items-center gap-2 w-full px-4 py-2.5';
 export const INPUT_ROUNDED =
-  'rounded-xl bg-input-background dark:bg-input/30 border border-border text-foreground placeholder-muted-foreground focus:border-primary dark:focus:border-primary focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30 outline-none transition-shadow w-full px-3 py-2.5';
+  'rounded-md bg-input-background dark:bg-input border border-border text-foreground placeholder-muted-foreground focus:border-primary dark:focus:border-primary focus:ring-2 focus:ring-primary/20 dark:focus:ring-primary/30 outline-none transition-shadow w-full px-3 py-2.5';
 export const BUTTON_PRIMARY_ROUNDED =
-  'rounded-xl bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white text-sm font-medium shadow-lg shadow-primary/30 transition-opacity flex items-center gap-2 px-4 py-2.5';
+  'rounded-md bg-primary text-primary-foreground text-sm font-medium shadow-sm transition-opacity flex items-center gap-2 px-4 py-2.5';
 
-export const RIGHT_DRAWER_OVERLAY =
-  'fixed inset-0 z-[240] bg-black/60 backdrop-blur-sm';
+export const RIGHT_DRAWER_OVERLAY = 'fixed inset-0 z-[240] bg-black/60 ';
 
 export const RIGHT_DRAWER_PANEL =
-  'fixed top-0 bottom-0 right-0 z-[250] flex flex-col bg-background border-l border-primary/20 shadow-2xl shadow-black/40 will-change-transform';
+  'fixed top-0 bottom-0 right-0 z-[250] flex flex-col bg-background border-l border-border shadow-2xl shadow-black/40 will-change-transform';

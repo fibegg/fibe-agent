@@ -27,7 +27,7 @@
 
 ---
 
-**Fibe Agent** combines a **NestJS + Fastify** API with a **React + Vite** client. It runs Gemini, Antigravity, Claude Code, OpenAI Codex, Cursor, OpenCode, or a mock provider over a streaming WebSocket. The client includes chat, a **CodeMirror 6 editor**, an **xterm.js terminal**, activity history, file editing, voice input, attachments, `@` file references, OAuth, themes, and iframe support.
+**Fibe Agent** combines a **NestJS + Fastify** API with a **React + Vite** client. It runs Gemini, Antigravity, Claude Code, OpenAI Codex, Cursor, OpenCode, or a mock provider over a streaming WebSocket. The client includes chat, a **CodeMirror 6 editor**, an **xterm.js terminal**, activity history, file editing, voice input, attachments, `@` file references, OAuth, Light/Dark themes, and iframe support.
 
 ## Features at a glance
 
@@ -301,3 +301,17 @@ The chat can run inside a `<iframe>` in another app (e.g. Fibe):
 ## License
 
 MIT. See `package.json`.
+
+### Light and Dark appearance
+
+The normal interface uses a neutral monochrome palette, Plus Jakarta Sans,
+solid surfaces and standard controls. Editor and terminal chrome follow the
+selected theme; syntax, ANSI and status colors remain meaningful. Tony Stark
+mode retains its separate interface. Waiting messages use ordinary operational
+status text regardless of prompt keywords.
+
+The `chat-theme` storage key and `fibe_theme_changed` event are unchanged.
+Canonical themes are `light` and `dark`; `winter` migrates to `light`, while
+`halloween`, `dracula`, `midnight` and `contrast` migrate to `dark`. Startup
+respects the system preference without saving an inferred choice. Embedded
+instances continue to accept the parent’s canonical `set_theme` message.

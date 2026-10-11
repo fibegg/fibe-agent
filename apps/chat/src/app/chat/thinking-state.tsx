@@ -1,23 +1,16 @@
-import { Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Bot } from 'lucide-react';
 import { getThinkingLineKeys } from './thinking-copy';
 import { useAvatarConfig } from '../avatar-config-context';
 import { useT } from '../i18n';
 
-const CYCLE_MS = 2400;
-
-export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | null }) {
+export function ThinkingState({
+  lastUserMessage,
+}: {
+  lastUserMessage?: string | null;
+}) {
   const t = useT();
   const lines = getThinkingLineKeys(lastUserMessage).map((key) => t(key));
-  const [index, setIndex] = useState(0);
-  const line = lines[index] ?? lines[0] ?? t('chat.state.working');
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setIndex((i) => (i + 1) % lines.length);
-    }, CYCLE_MS);
-    return () => clearInterval(id);
-  }, [lines.length]);
+  const line = lines[0] ?? t('chat.state.working');
 
   return (
     <div className="flex items-center gap-3 py-0.5">
@@ -35,12 +28,7 @@ export function ThinkingState({ lastUserMessage }: { lastUserMessage?: string | 
           style={{ animationDelay: '300ms' }}
         />
       </div>
-      <span
-        key={index}
-        className="text-sm text-muted-foreground"
-      >
-        {line}
-      </span>
+      <span className="text-sm text-muted-foreground">{line}</span>
     </div>
   );
 }
@@ -50,14 +38,17 @@ export function ThinkingAvatar() {
   if (assistantAvatarUrl) {
     return (
       <div className="size-8 rounded-lg flex-shrink-0 overflow-hidden bg-muted">
-        <img src={assistantAvatarUrl} alt="" className="size-full object-cover" />
+        <img
+          src={assistantAvatarUrl}
+          alt=""
+          className="size-full object-cover"
+        />
       </div>
     );
   }
   return (
-    <div className="size-8 rounded-lg flex items-center justify-center relative text-white flex-shrink-0 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-thinking-shine" />
-      <Sparkles className="size-4 relative z-10 animate-thinking-pulse" />
+    <div className="size-8 rounded-lg flex items-center justify-center bg-muted text-foreground flex-shrink-0 overflow-hidden">
+      <Bot className="size-4" />
     </div>
   );
 }

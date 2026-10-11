@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import { TerminalPanel, buildTerminalWsUrl } from './terminal-panel';
+import * as theme from '../theme';
 
 const mockWrite = vi.fn();
 const mockDispose = vi.fn();
 const mockOpen = vi.fn();
 const mockLoadAddon = vi.fn();
+const terminalOptions: Array<{ theme?: Record<string, string> }> = [];
 const mockOnData = vi.fn().mockReturnValue({ dispose: vi.fn() }) as ReturnType<
   typeof vi.fn
 > &
@@ -13,6 +15,11 @@ const mockOnData = vi.fn().mockReturnValue({ dispose: vi.fn() }) as ReturnType<
 
 vi.mock('@xterm/xterm', () => ({
   Terminal: class {
+    options: { theme?: Record<string, string> };
+    constructor(options: { theme?: Record<string, string> }) {
+      this.options = options;
+      terminalOptions.push(options);
+    }
     cols = 80;
     rows = 24;
     write = mockWrite;
@@ -98,6 +105,24 @@ describe('buildTerminalWsUrl', () => {
 });
 
 describe('TerminalPanel', () => {
+  it('changes terminal chrome without restarting the terminal session', () => {
+    const effectiveTheme = vi
+      .spyOn(theme, 'getEffectiveTheme')
+      .mockReturnValue('light');
+    const { unmount } = render(<TerminalPanel />);
+    const options = terminalOptions[terminalOptions.length - 1];
+    expect(options.theme?.background).toBe('#fafafa');
+    expect(options.theme?.green).toBe('#15803d');
+    const count = wsInstances.length;
+    effectiveTheme.mockReturnValue('dark');
+    window.dispatchEvent(new CustomEvent('fibe_theme_changed'));
+    expect(options.theme?.background).toBe('#09090b');
+    expect(options.theme?.green).toBe('#4ade80');
+    expect(wsInstances).toHaveLength(count);
+    unmount();
+    effectiveTheme.mockRestore();
+  });
+
   it('renders the bash shell sub-header', () => {
     render(<TerminalPanel />);
     expect(screen.getByText('bash')).toBeTruthy();
