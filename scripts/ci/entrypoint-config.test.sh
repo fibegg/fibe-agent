@@ -101,6 +101,13 @@ INSTALLER
     candidate-mismatch) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567 ;;
     candidate-latest) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567; printf 'cliVersion: latest\n' > "$fixture/fibe.yml" ;;
     candidate-old-cache) export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567; write_binary "$fixture/baked-fibe" "$FIBE_CANDIDATE_CLI_VERSION"; write_binary "$DATA_DIR/.fibe/bin/fibe" 0.2.45 ;;
+    candidate-same-version-different-bytes)
+      export FIBE_CANDIDATE_BUILD=1 FIBE_CANDIDATE_CLI_VERSION=0.3.0-rc.1+1234567
+      write_binary "$fixture/baked-fibe" "$FIBE_CANDIDATE_CLI_VERSION"
+      printf 'cliVersion: %s\n' "$FIBE_CANDIDATE_CLI_VERSION" > "$fixture/fibe.yml"
+      write_binary "$DATA_DIR/.fibe/bin/fibe" "$FIBE_CANDIDATE_CLI_VERSION"
+      printf 'touch "%s"\n' "$fixture/untrusted-cache-executed" >> "$DATA_DIR/.fibe/bin/fibe"
+      ;;
   esac
   if ( . "$fixture/entrypoint.sh"; ensure_runtime_fibe ) > "$fixture/$name.log" 2>&1; then
     actual_success=yes
@@ -109,6 +116,10 @@ INSTALLER
   fi
   assert_eq "$case_expected_success" "$actual_success" "$name outcome"
   if [ "$case_expected_success" = yes ]; then
+    if [ "$selection" = candidate-same-version-different-bytes ]; then
+      cmp "$fixture/baked-fibe" "$DATA_DIR/.fibe/bin/fibe"
+      assert_eq no "$([ -f "$fixture/untrusted-cache-executed" ] && printf yes || printf no)" "$name cached bytes never executed"
+    fi
     assert_eq "$case_expected_version" "$("$DATA_DIR/.fibe/bin/fibe" version | awk '{print $2}')" "$name installed version"
   fi
   if [ "$case_expected_installer" = skip ]; then
@@ -136,3 +147,4 @@ run_case candidate-default-keeps-baked-version candidate-default 0.3.0-rc.1+1234
 run_case candidate-mismatch-refuses-release-download candidate-mismatch '' skip no
 run_case candidate-latest-refuses-release-download candidate-latest '' skip no
 run_case candidate-old-matching-cache-refused candidate-old-cache '' skip no
+run_case candidate-same-version-replaced-before-execution candidate-same-version-different-bytes 0.3.0-rc.1+1234567 skip yes

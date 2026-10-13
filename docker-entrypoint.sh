@@ -50,8 +50,12 @@ runtime_fibe_config_version() {
 
 copy_baked_runtime_fibe() {
   echo "[entrypoint] Using baked runtime fibe from /usr/local/bin/fibe"
-  cp /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"
-  chmod +x "$RUNTIME_FIBE_BIN"
+  copied_fibe="${RUNTIME_FIBE_BIN}.copy.$$"
+  cp /usr/local/bin/fibe "$copied_fibe" || return 1
+  if ! chmod +x "$copied_fibe" || ! cmp -s /usr/local/bin/fibe "$copied_fibe" || ! mv -f "$copied_fibe" "$RUNTIME_FIBE_BIN"; then
+    rm -f "$copied_fibe"
+    return 1
+  fi
   if [ "$(id -u)" = "0" ]; then
     chown -R node:node "${DATA_DIR:-/app/data}/.fibe" 2>/dev/null || true
   fi
@@ -277,10 +281,6 @@ run_dev_command() {
 ensure_runtime_fibe() {
   mkdir -p "$RUNTIME_FIBE_BIN_DIR"
 
-  current_version=""
-  if [ -x "$RUNTIME_FIBE_BIN" ]; then
-    current_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
-  fi
   baked_version=""
   if [ -x /usr/local/bin/fibe ]; then
     baked_version=$(/usr/local/bin/fibe version 2>/dev/null | awk 'NR==1 { print $2 }')
@@ -313,6 +313,15 @@ ensure_runtime_fibe() {
       echo "[entrypoint] ERROR: candidate images require baked CLI ${expected_candidate}; release downloads are disabled" >&2
       return 1
     fi
+    # Candidate identity is the checksum-verified baked bytes, not a version
+    # reported by an executable retained in a writable data volume.
+    copy_baked_runtime_fibe || return 1
+    return
+  fi
+
+  current_version=""
+  if [ -x "$RUNTIME_FIBE_BIN" ]; then
+    current_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
   fi
 
   if [ -n "$normalized_desired" ] && [ "$current_version" = "$normalized_desired" ]; then
