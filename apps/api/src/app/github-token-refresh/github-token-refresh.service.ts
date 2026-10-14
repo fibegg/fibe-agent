@@ -75,7 +75,7 @@ export class GithubTokenRefreshService
       this.logger.warn('GitHub connection owner is invalid');
       return null;
     }
-    const endpoint = ownerType === 'Team' ? 'company_git_installations' : 'installations';
+    const endpoint = ownerType === 'Team' ? 'team_git_installations' : 'installations';
     const url = `${apiUrl}/api/${endpoint}/${connectionId}/token`;
     this.nextRefreshMs = 60_000;
 

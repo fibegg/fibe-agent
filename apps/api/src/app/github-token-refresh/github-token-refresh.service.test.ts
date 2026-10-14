@@ -98,7 +98,7 @@ describe('GithubTokenRefreshService', () => {
     process.env.FIBE_GITHUB_CONNECTION_OWNER = 'Team';
     expect(await service.refreshToken()).toBe('ghs_fresh_token');
     expect(globalThis.fetch).toHaveBeenCalledWith(
-      'https://fibe.test/api/company_git_installations/42/token',
+      'https://fibe.test/api/team_git_installations/42/token',
       expect.any(Object),
     );
   });
