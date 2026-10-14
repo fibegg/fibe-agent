@@ -44,7 +44,7 @@ providerArgs:
   json: true
   output-format: stream-json
 skillToggles:
-  fibe-hunks.md: false
+  example-skill.md: false
   fibe-planning.md: true
 syscheckEnabled: false
 mcpConfig:

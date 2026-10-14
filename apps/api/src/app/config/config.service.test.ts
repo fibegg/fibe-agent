@@ -393,7 +393,7 @@ describe('ConfigService', () => {
       config: 'value with spaces',
       c: 'never',
     };
-    const skillToggles = { 'fibe-hunks.md': false };
+    const skillToggles = { 'example-skill.md': false };
     const config = withSettings({
       mcpConfig,
       providerArgs,

@@ -173,7 +173,7 @@ describe('API e2e', () => {
     });
     expect(promoted.FIBE_CLI_VERSION).toBe('0.78.0-e2e');
     expect(JSON.parse(promoted.SKILL_TOGGLES)).toEqual({
-      'fibe-hunks.md': false,
+      'example-skill.md': false,
       'fibe-planning.md': true,
     });
     expect(promoted.SYSCHECK_ENABLED).toBe('false');

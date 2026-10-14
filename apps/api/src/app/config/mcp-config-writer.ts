@@ -7,8 +7,6 @@ const getSessionDir = () => process.env.SESSION_DIR;
 const CLAUDE_WORKSPACE_SUBDIR = 'claude_workspace';
 const CURSOR_WORKSPACE_SUBDIR = 'cursor_workspace';
 const logger = new Logger('McpConfigWriter');
-const CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY =
-  'skipDangerousModePermissionPrompt';
 
 /** A streamable-HTTP entry has serverUrl; a stdio entry has command and args. */
 interface McpServerEntry {
@@ -112,14 +110,6 @@ function getConversationId(): string {
     process.env.CONVERSATION_ID?.trim() ||
     '';
   return raw || 'default';
-}
-
-function truthy(value: string | undefined): boolean {
-  return value === '1' || value?.toLowerCase() === 'true';
-}
-
-function june1815Enabled(): boolean {
-  return truthy(process.env.JUNE1815_ENABLED);
 }
 
 function getClaudeProjectMcpConfigPath(): string {
@@ -418,9 +408,6 @@ const PROVIDER_WRITERS: Record<
 
     const settingsConfig = {
       ...settingsExisting,
-      ...(june1815Enabled()
-        ? { [CLAUDE_SKIP_DANGEROUS_MODE_PROMPT_KEY]: true }
-        : {}),
       mcpServers: mergeMcpServers(
         settingsExisting.mcpServers,
         nativeServers,

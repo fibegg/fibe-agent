@@ -233,10 +233,6 @@ function isRecoverableResumeExit(message: string): boolean {
   );
 }
 
-function truthyEnv(value: string | undefined): boolean {
-  return value === '1' || value?.toLowerCase() === 'true';
-}
-
 function claudeSdkEventTimeoutMs(): number {
   const configured = Number(process.env.CLAUDE_SDK_EVENT_TIMEOUT_MS);
   if (Number.isFinite(configured) && configured >= 0) return configured;
@@ -707,10 +703,6 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
 
   hasNativeSessionSupport(): boolean {
     return true;
-  }
-
-  shouldInjectPromptHistory(): boolean {
-    return truthyEnv(process.env.JUNE1815_ENABLED);
   }
 
   private async getOrCreateRecord(

@@ -22,7 +22,6 @@ import { ContainerLoggerService, logRequest } from './container-logger';
 import { loadInjectedCredentials } from './credential-injector';
 import { writeRuntimeFiles } from './runtime-files-writer';
 import { recoverPostInitOnBoot, runPostInitOnce } from './post-init-runner';
-import { ensureJune1815Bootstrap } from './june1815-bootstrap';
 import { TerminalService } from './app/terminal/terminal.service';
 import { ConversationManagerService } from './app/conversation/conversation-manager.service';
 
@@ -35,7 +34,6 @@ if (process.env.FIBE_LOCAL_MCP_SERVER === '1') {
   loadDevEnv();
   // Apply unified settings after dotenv so explicit .env values win.
   loadFibeEnv();
-  ensureJune1815Bootstrap();
 
   const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
   const DEFAULT_PORT = 3000;

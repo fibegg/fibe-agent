@@ -1172,14 +1172,7 @@ export class OrchestratorService implements OnModuleInit {
       } else if (ctx.cachedSystemPromptFromFile !== null) {
         systemPrompt = ctx.cachedSystemPromptFromFile;
       }
-      // Most native-session strategies restore context through their own resume
-      // primitive. Some wrappers, like june1815, intentionally start a fresh
-      // provider query per turn so model/effort changes apply; they request a
-      // prompt-level history bridge even when the underlying provider has a
-      // native session concept.
-      const injectPromptHistory =
-        ctx.strategy.shouldInjectPromptHistory?.() ??
-        !ctx.strategy.hasNativeSessionSupport?.();
+      const injectPromptHistory = !ctx.strategy.hasNativeSessionSupport?.();
       const historyMessages = injectPromptHistory
         ? (() => {
             const allMessages = this.stores(ctx).messageStore.all();

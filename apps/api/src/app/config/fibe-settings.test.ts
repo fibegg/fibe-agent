@@ -371,7 +371,7 @@ describe('applyFibeSettings', () => {
         '  config: value with spaces',
         '  c: never',
         'skillToggles:',
-        '  fibe-hunks.md: false',
+        '  example-skill.md: false',
         'syscheckEnabled: false',
         'agentCredentials:',
         '  auth.json: "{}"',
@@ -430,7 +430,7 @@ describe('applyFibeSettings', () => {
     expect(process.env.PROVIDER_ARGS).toBe(
       '{"sandbox":false,"max-tokens":4096,"temperature":0.2,"config":"value with spaces","c":"never"}',
     );
-    expect(process.env.SKILL_TOGGLES).toBe('{"fibe-hunks.md":false}');
+    expect(process.env.SKILL_TOGGLES).toBe('{"example-skill.md":false}');
     expect(process.env.SYSCHECK_ENABLED).toBe('false');
     expect(process.env.AGENT_CREDENTIALS_JSON).toBe('{"auth.json":"{}"}');
     expect(process.env.AGENT_RUNTIME_FILES_JSON).toBe(

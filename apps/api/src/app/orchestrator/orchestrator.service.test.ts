@@ -99,7 +99,6 @@ describe('OrchestratorService', () => {
     systemPrompt?: string;
     cachedSystemPromptFromFile?: string | null;
     nativeSessionSupport?: boolean;
-    injectPromptHistory?: boolean;
     beforeStrategyResponse?: () => Promise<void>;
   };
 
@@ -197,9 +196,6 @@ describe('OrchestratorService', () => {
       ensureSettings: () => undefined,
       interruptAgent: () => undefined,
       hasNativeSessionSupport: () => options.nativeSessionSupport ?? true,
-      ...(options.injectPromptHistory !== undefined
-        ? { shouldInjectPromptHistory: () => options.injectPromptHistory }
-        : {}),
       steerAgent: undefined,
     };
     const strategyRegistry = {
@@ -1202,31 +1198,6 @@ describe('OrchestratorService', () => {
       systemPrompt: 'System prompt from fibe.yml',
       effort: 'max',
     });
-  });
-
-  test('injects stored history when a native-session strategy requests prompt history', async () => {
-    const { orch, ctx, promptBuilds } = await createOrchestrator(undefined, {
-      nativeSessionSupport: true,
-      injectPromptHistory: true,
-    });
-    ctx.isAuthenticated = true;
-    orch.isAuthenticated = true;
-
-    await orch.handleClientMessage(ctx, {
-      action: WS_ACTION.SEND_CHAT_MESSAGE,
-      text: 'first',
-    });
-    await orch.handleClientMessage(ctx, {
-      action: WS_ACTION.SEND_CHAT_MESSAGE,
-      text: 'second',
-    });
-
-    const secondPrompt = promptBuilds.at(-1);
-    expect(secondPrompt?.text).toBe('second');
-    expect(secondPrompt?.historyMessages).toEqual([
-      { role: 'user', body: 'first' },
-      { role: 'assistant', body: 'test response' },
-    ]);
   });
 
   test('does not inject stored history for native-session strategies by default', async () => {

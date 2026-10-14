@@ -77,7 +77,6 @@ export interface AgentStrategy {
   interruptAgent?(): void;
   steerAgent?(message: string): void | SteerAgentResult | Promise<void | SteerAgentResult>;
   hasNativeSessionSupport?(): boolean;
-  shouldInjectPromptHistory?(): boolean;
   executePromptStreaming(
     prompt: string,
     model: string,
