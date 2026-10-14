@@ -169,7 +169,7 @@ describe('loadFibeSettings', () => {
   });
 
   test('shared naming contract feeds the real YAML and JSON loaders', () => {
-    const fixture = JSON.parse(readFileSync(join(import.meta.dir, 'fixtures/naming-v1.json'), 'utf8'));
+    const fixture = JSON.parse(readFileSync(join(import.meta.dir, 'fixtures/naming-v2.json'), 'utf8'));
     writeFileSync(localYml, JSON.stringify(fixture.agent_settings));
     expect(loadFibeSettings()).toEqual(fixture.agent_settings);
     writeFileSync(localYml, '');

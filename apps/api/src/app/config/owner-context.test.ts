@@ -6,7 +6,7 @@ import { fibeOwnerProofHeaders, readFibeOwnerContext } from './owner-context';
 
 // One credential-metadata fixture is shared with the Rails contract and the Go SDK. Every repository pins the
 // same digest, so a change to one copy fails the others until all are updated together.
-const SHARED_FIXTURE_SHA256 = 'b0fdea43bb72126b5bf7dd744eb41cdc748db25775f385c29ebee762705d1085';
+const SHARED_FIXTURE_SHA256 = '4aecc6625d01c2566752c3e33819ed91aa286988411d09d5b59433ab9b5a772b';
 
 describe('FIBE credential owner context', () => {
   test('retains exact stable identities and exposes only owner proof headers', () => {
@@ -42,7 +42,7 @@ describe('FIBE credential owner context', () => {
       }>;
     };
     expect(fixture.cases.map((entry) => entry.name)).toEqual([
-      'company_service_principal', 'company_member_player', 'personal_player', 'largest_safe_bigint',
+      'team_service_principal', 'team_member_player', 'personal_player', 'largest_safe_bigint',
     ]);
     for (const entry of fixture.cases) {
       const context = readFibeOwnerContext(entry.container_env);
