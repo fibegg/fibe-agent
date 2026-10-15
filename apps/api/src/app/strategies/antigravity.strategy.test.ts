@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
+import { afterAll, afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import {
   chmodSync,
   existsSync,
@@ -16,6 +16,25 @@ import {
   buildAntigravityArgs,
 } from './antigravity.strategy';
 import type { AuthConnection, ToolEvent } from './strategy.types';
+
+// The real-terminal OAuth test runs the strategy under Node (see below). Bundle
+// it once at load time, outside every timed region, so the timed Node child
+// only loads plain JavaScript instead of compiling TypeScript on a slow host.
+const repoRoot = resolve(import.meta.dir, '../../../../..');
+const nodeBundleDir = mkdtempSync(join(tmpdir(), 'agy-node-bundle-'));
+const nodeBundle = await Bun.build({
+  entrypoints: [resolve(import.meta.dir, 'antigravity.strategy.ts')],
+  outdir: nodeBundleDir,
+  naming: 'antigravity.strategy.cjs',
+  target: 'node',
+  format: 'cjs',
+  packages: 'external',
+});
+if (!nodeBundle.success) {
+  throw new AggregateError(nodeBundle.logs, 'bundling antigravity.strategy.ts for Node failed');
+}
+const nodeStrategyPath = join(nodeBundleDir, 'antigravity.strategy.cjs');
+afterAll(() => rmSync(nodeBundleDir, { recursive: true, force: true }));
 
 describe('Antigravity CLI contract', () => {
   let home: string;
@@ -318,20 +337,8 @@ else if (process.env.AGY_AUTH === '1') {
     // Bun on macOS does not deliver node-pty data callbacks. Exercise the
     // complete strategy under Node, matching the deployed runtime.
     const script = `
-      const fs = require('node:fs');
       const path = require('node:path');
-      const Module = require('node:module');
-      const ts = require('typescript');
-      const resolveFilename = Module._resolveFilename;
-      Module._resolveFilename = function(id, ...args) {
-        if (id.startsWith('@shared/')) id = path.resolve('../../shared', id.slice(8)) + '.ts';
-        return resolveFilename.call(this, id, ...args);
-      };
-      require.extensions['.ts'] = (module, filename) => module._compile(
-        ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-          compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
-        }).outputText, filename);
-      const { AntigravityStrategy } = require('./src/app/strategies/antigravity.strategy.ts');
+      const { AntigravityStrategy } = require(process.env.AGY_NODE_STRATEGY);
       const runtime = new AntigravityStrategy(false, {
         getConversationDataDir: () => path.join(process.env.HOME, 'auth-conversation')
       });
@@ -353,7 +360,13 @@ else if (process.env.AGY_AUTH === '1') {
       };
       runtime.executeAuth(conn);
     `;
-    const nodeEnv = { ...process.env, HOME: home };
+    const nodeEnv = {
+      ...process.env,
+      HOME: home,
+      AGY_NODE_STRATEGY: nodeStrategyPath,
+      // The bundle keeps npm packages external; resolve them from the workspace.
+      NODE_PATH: [join(repoRoot, 'apps/api/node_modules'), join(repoRoot, 'node_modules')].join(':'),
+    };
     delete nodeEnv.FORCE_COLOR;
     const run = spawnSync('node', ['-e', script], {
       cwd: resolve(import.meta.dir, '../../..'),

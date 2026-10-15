@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, jest } from 'bun:test';
 import { MockStrategy } from './mock.strategy';
 import { INTERRUPTED_MESSAGE } from './strategy.types';
 
@@ -55,13 +55,23 @@ describe('MockStrategy', () => {
     });
     const chunks: string[] = [];
 
-    await strategy.executePromptStreaming(
-      'user prompt',
-      'model',
-      (chunk) => chunks.push(chunk),
-      undefined,
-      'system prompt'
-    );
+    // The mock answers after a fixed delay; advance it instead of waiting on
+    // the wall clock so a slow host cannot stretch the test.
+    jest.useFakeTimers();
+    try {
+      const streaming = strategy.executePromptStreaming(
+        'user prompt',
+        'model',
+        (chunk) => chunks.push(chunk),
+        undefined,
+        'system prompt'
+      );
+      expect(chunks).toEqual([]);
+      jest.runOnlyPendingTimers();
+      await streaming;
+    } finally {
+      jest.useRealTimers();
+    }
 
     const output = chunks.join('');
     const tokenJson = output.match(/PROVIDER_CLI_TOKENS_JSON:\n([^\n]+)/)?.[1];

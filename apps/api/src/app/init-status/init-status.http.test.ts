@@ -41,8 +41,9 @@ test('actual managed HTTP status/retry requires authentication and admits only f
   const claimed=await response.json() as {runId:string;scriptDigest:string};
   expect(claimed.runId).toBeTruthy();
   expect(claimed.scriptDigest).toBeTruthy();
-  const deadline=Date.now()+2000;
-  while (readPostInitState(root)?.state==='running' && Date.now()<deadline) await new Promise(resolve=>setTimeout(resolve,10));
+  // Wait for the retried run itself to finish (bounded by the test timeout)
+  // rather than a wall-clock deadline that a slow host can outlast.
+  while (readPostInitState(root)?.state==='running') await new Promise(resolve=>setTimeout(resolve,10));
   const status=await (await fetch(`${url}/api/init-status`,{headers})).json() as {state:string;runId:string};
   expect(status.state).toBe('failed');
   expect(status.runId).toBe(claimed.runId);

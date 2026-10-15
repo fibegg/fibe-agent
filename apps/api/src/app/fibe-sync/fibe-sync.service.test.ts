@@ -1,5 +1,18 @@
-import { describe, test, expect, beforeEach, afterEach, mock } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, mock, jest } from 'bun:test';
 import { FibeSyncService } from './fibe-sync.service';
+
+/**
+ * Advances the service's debounce/retry timers deterministically. Each step
+ * lets the mocked fetch and response promises settle before time moves on, so
+ * a slow host cannot make a timer fire after the assertion.
+ */
+async function elapse(ms: number, stepMs = 50): Promise<void> {
+  for (let passed = 0; passed < ms; passed += stepMs) {
+    jest.advanceTimersByTime(Math.min(stepMs, ms - passed));
+    await new Promise((resolve) => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+}
 
 describe('FibeSyncService', () => {
   const envBackup: Record<string, string | undefined> = {};
@@ -12,6 +25,7 @@ describe('FibeSyncService', () => {
   };
 
   beforeEach(() => {
+    jest.useFakeTimers();
     envBackup.FIBE_SYNC_ENABLED = process.env.FIBE_SYNC_ENABLED;
     mockConfig.isFibeSyncEnabled = () => false;
     mockConfig.getFibeApiUrl = () => undefined;
@@ -20,6 +34,7 @@ describe('FibeSyncService', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     process.env.FIBE_SYNC_ENABLED = envBackup.FIBE_SYNC_ENABLED;
   });
 
@@ -54,7 +69,7 @@ describe('FibeSyncService', () => {
     try {
       const service = new FibeSyncService(mockConfig as never);
       service.syncMessages(() => '{"data":"test"}');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://fibe.test/api/agents/agent-1/messages',
@@ -89,7 +104,7 @@ describe('FibeSyncService', () => {
     try {
       const service = new FibeSyncService(mockConfig as never);
       service.syncActivity(() => '[]');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://fibe.test/api/agents/agent-1/activity',
@@ -114,7 +129,7 @@ describe('FibeSyncService', () => {
     try {
       const service = new FibeSyncService(mockConfig as never);
       service.syncRawProviders(() => '[{"id":"raw-1"}]');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
 
       expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://fibe.test/api/agents/agent-1/provider_traffic',
@@ -146,7 +161,7 @@ describe('FibeSyncService', () => {
     try {
       service.syncMessages(() => '{"conversation":"a"}', 'conv-a');
       service.syncMessages(() => '{"conversation":"b"}', 'conv-b');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -190,9 +205,9 @@ describe('FibeSyncService', () => {
     const service = new FibeSyncService(mockConfig as never);
     try {
       service.syncMessages(() => content, 'conv-retry');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
       content = '{"attempt":"second"}';
-      await new Promise((r) => setTimeout(r, 1200));
+      await elapse(1200);
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(2);
       expect(globalThis.fetch).toHaveBeenLastCalledWith(
@@ -224,7 +239,7 @@ describe('FibeSyncService', () => {
     const service = new FibeSyncService(mockConfig as never);
     try {
       service.syncMessages(() => '{"kept":true}', 'conv-auth');
-      await new Promise((r) => setTimeout(r, 1800));
+      await elapse(1800);
 
       expect(globalThis.fetch).toHaveBeenCalledTimes(1);
       expect(globalThis.fetch).toHaveBeenLastCalledWith(
@@ -256,7 +271,7 @@ describe('FibeSyncService', () => {
     const service = new FibeSyncService(mockConfig as never);
     try {
       service.syncMessages(() => '{}');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
     } finally {
       service.onModuleDestroy();
       globalThis.fetch = originalFetch;
@@ -277,7 +292,7 @@ describe('FibeSyncService', () => {
     const service = new FibeSyncService(mockConfig as never);
     try {
       service.syncMessages(() => '{}');
-      await new Promise((r) => setTimeout(r, 600));
+      await elapse(600);
     } finally {
       service.onModuleDestroy();
       globalThis.fetch = originalFetch;
