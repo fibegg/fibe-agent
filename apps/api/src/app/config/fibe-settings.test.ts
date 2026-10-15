@@ -6,6 +6,7 @@ import {
   parseYaml,
   loadFibeSettings,
   applyFibeSettings,
+  REMOVED_FIBE_ENV,
 } from './fibe-settings';
 
 describe('parseYaml', () => {
@@ -139,7 +140,7 @@ describe('parseYaml', () => {
 });
 
 describe('loadFibeSettings', () => {
-  const MANAGED = ['FIBE_SETTINGS_JSON', 'MARQUEE_ROOT', 'MARQUEE_ROOT_DOMAIN', 'FIBE_MARQUEE_ID', 'FIBE_PLAYSPEC_ID', 'FIBE_PROP_ID'];
+  const MANAGED = ['FIBE_SETTINGS_JSON', ...Object.keys(REMOVED_FIBE_ENV)];
   const savedEnv: Record<string, string | undefined> = {};
   const originalCwd = process.cwd();
   let tempDir = '';
@@ -307,6 +308,8 @@ describe('applyFibeSettings', () => {
     'ANTHROPIC_API_KEY',
     'ANTHROPIC_BASE_URL',
     'ANTHROPIC_AUTH_TOKEN',
+    // Removed names may be inherited from an older control plane's CI env.
+    ...Object.keys(REMOVED_FIBE_ENV),
   ];
   const savedEnv: Record<string, string | undefined> = {};
   const originalCwd = process.cwd();

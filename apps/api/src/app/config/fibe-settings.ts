@@ -80,7 +80,8 @@ const REMOVED_FIBE_SETTINGS = {
   marqueeRoot: 'hostRoot',
   marqueeRootDomain: 'hostRootDomain',
 } as const;
-const REMOVED_FIBE_ENV = {
+/** Renamed environment variables that fail at startup; tests clear them so inherited CI env cannot leak in. */
+export const REMOVED_FIBE_ENV = {
   MARQUEE_ROOT: 'HOST_ROOT',
   MARQUEE_ROOT_DOMAIN: 'HOST_ROOT_DOMAIN',
   FIBE_MARQUEE_ID: 'FIBE_HOST_ID',

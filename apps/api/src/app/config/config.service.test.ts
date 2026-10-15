@@ -1,5 +1,6 @@
 import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
 import { ConfigService } from './config.service';
+import { REMOVED_FIBE_ENV } from './fibe-settings';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -36,6 +37,12 @@ describe('ConfigService', () => {
     envBackup.GEMMA_CONFIDENCE_THRESHOLD =
       process.env.GEMMA_CONFIDENCE_THRESHOLD;
     envBackup.GEMMA_TIMEOUT_MS = process.env.GEMMA_TIMEOUT_MS;
+    // Removed names may be inherited from an older control plane's CI env;
+    // ConfigService rejects them at construction, so isolate every test.
+    for (const removed of Object.keys(REMOVED_FIBE_ENV)) {
+      envBackup[removed] = process.env[removed];
+      delete process.env[removed];
+    }
     // Clear to avoid cross-test leakage
     delete process.env.FIBE_SETTINGS_JSON;
     delete process.env.FIBE_SYNC_ENABLED;
@@ -63,6 +70,14 @@ describe('ConfigService', () => {
     process.env.FIBE_SETTINGS_JSON = JSON.stringify(settings);
     return new ConfigService();
   }
+
+  test('still rejects a removed environment variable set explicitly', () => {
+    for (const [removed, replacement] of Object.entries(REMOVED_FIBE_ENV)) {
+      process.env[removed] = 'legacy-value';
+      expect(() => new ConfigService()).toThrow(`${removed} was removed; use ${replacement}`);
+      delete process.env[removed];
+    }
+  });
 
   test('getAgentPassword returns undefined when not set', () => {
     expect(new ConfigService().getAgentPassword()).toBeUndefined();
