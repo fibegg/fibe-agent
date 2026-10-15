@@ -558,7 +558,7 @@ export function FileExplorer({
         className={`border-b border-border/50 bg-card shrink-0 px-4 pb-3`}
         style={{
           minHeight: PANEL_HEADER_MIN_HEIGHT_PX,
-          paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
+          paddingTop: 'max(0.75rem, var(--sat))',
         }}
       >
         <div

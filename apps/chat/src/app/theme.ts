@@ -25,10 +25,7 @@ const PWA_THEME_COLORS: Record<Theme, string> = {
   light: '#fafafa',
   dark: '#09090b',
 };
-const PWA_STATUS_BAR_STYLES: Record<Theme, 'default' | 'black'> = {
-  light: 'default',
-  dark: 'black',
-};
+const PWA_STATUS_BAR_STYLE = 'black-translucent';
 
 export interface ThemeOption {
   value: Theme;
@@ -133,7 +130,7 @@ function applyBrowserTheme(theme: Theme): void {
   setMetaContent('theme-color', color);
   setMetaContent(
     'apple-mobile-web-app-status-bar-style',
-    PWA_STATUS_BAR_STYLES[theme],
+    PWA_STATUS_BAR_STYLE,
   );
 }
 

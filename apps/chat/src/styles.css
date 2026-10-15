@@ -26,6 +26,10 @@
       var(--parent-visual-frame-left, 0px),
       var(--visual-viewport-offset-left, 0px)
     );
+    --sat: var(--parent-safe-top, env(safe-area-inset-top, 0px));
+    --sar: var(--parent-safe-right, env(safe-area-inset-right, 0px));
+    --sab: var(--parent-safe-bottom, env(safe-area-inset-bottom, 0px));
+    --sal: var(--parent-safe-left, env(safe-area-inset-left, 0px));
     --background: #fafafa;
     --pwa-safe-area-bg: #fafafa;
     --foreground: #18181b;

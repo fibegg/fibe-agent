@@ -141,7 +141,7 @@ describe('setStoredTheme', () => {
     setStoredTheme('light');
     expect(metaContent('theme-color')).toBe('#fafafa');
     expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe(
-      'default',
+      'black-translucent',
     );
     expect(document.documentElement.style.backgroundColor).toBe(
       'rgb(250, 250, 250)',
@@ -159,7 +159,7 @@ describe('setStoredTheme', () => {
   it('updates browser theme metadata for dark PWAs', () => {
     setStoredTheme('dark');
     expect(metaContent('theme-color')).toBe('#09090b');
-    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black');
+    expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe('black-translucent');
     expect(document.documentElement.style.backgroundColor).toBe(
       'rgb(9, 9, 11)',
     );

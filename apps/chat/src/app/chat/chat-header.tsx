@@ -236,7 +236,7 @@ export function ChatHeader({
       <header
         className="border-b border-border bg-[var(--pwa-safe-area-bg)] px-3 pb-2 shrink-0 sm:px-4 relative z-30"
         style={{
-          paddingTop: 'max(0.5rem, env(safe-area-inset-top, 0.5rem))',
+          paddingTop: 'max(0.5rem, var(--sat))',
         }}
       >
         <div className="flex h-10 items-center justify-between gap-2">
@@ -398,7 +398,7 @@ export function ChatHeader({
       className="border-b border-border bg-[var(--pwa-safe-area-bg)] shrink-0 px-4 pb-3"
       style={{
         minHeight: PANEL_HEADER_MIN_HEIGHT_PX,
-        paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
+        paddingTop: 'max(0.75rem, var(--sat))',
       }}
     >
       {isMobile && (

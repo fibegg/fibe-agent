@@ -51,7 +51,7 @@
     <meta name="theme-color" content="#09090b" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="fibe AI Agent" />
@@ -84,10 +84,6 @@
           light: '#fafafa',
           dark: '#09090b',
         };
-        var statusBarStyles = {
-          light: 'default',
-          dark: 'black',
-        };
         var s = null;
         try {
           s = localStorage.getItem('chat-theme');
@@ -107,7 +103,7 @@
         } catch (_) {}
         var dark = theme !== 'light';
         var color = colors[theme] || colors.dark;
-        var statusBarStyle = statusBarStyles[theme] || statusBarStyles.dark;
+        var statusBarStyle = 'black-translucent';
         document.documentElement.dataset.theme = theme;
         document.documentElement.classList.toggle('dark', dark);
         document.documentElement.style.backgroundColor = color;

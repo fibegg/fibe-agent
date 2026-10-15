@@ -8,7 +8,17 @@ export interface ParentViewportMessage {
   frameLeft?: number;
   pageTop?: number;
   pageLeft?: number;
+  safeArea?: ParentSafeArea;
 }
+
+export interface ParentSafeArea {
+  top: number;
+  right: number;
+  bottom: number;
+  left: number;
+}
+
+const MAX_SAFE_AREA_PX = 200;
 
 const MAX_VIEWPORT_PX = 10000;
 
@@ -30,6 +40,17 @@ function isOptionalScrollNumber(value: unknown): value is number | undefined {
   return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
 }
 
+function isSafeAreaInset(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_SAFE_AREA_PX;
+}
+
+function isOptionalSafeArea(value: unknown): value is ParentSafeArea | undefined {
+  if (value === undefined) return true;
+  if (value === null || typeof value !== 'object') return false;
+  const o = value as Record<string, unknown>;
+  return isSafeAreaInset(o.top) && isSafeAreaInset(o.right) && isSafeAreaInset(o.bottom) && isSafeAreaInset(o.left);
+}
+
 export function isParentViewportMessage(data: unknown): data is ParentViewportMessage {
   const o = data as Record<string, unknown> | null;
   return (
@@ -43,7 +64,8 @@ export function isParentViewportMessage(data: unknown): data is ParentViewportMe
     isOptionalViewportOffset(o.frameTop) &&
     isOptionalViewportOffset(o.frameLeft) &&
     isOptionalScrollNumber(o.pageTop) &&
-    isOptionalScrollNumber(o.pageLeft)
+    isOptionalScrollNumber(o.pageLeft) &&
+    isOptionalSafeArea(o.safeArea)
   );
 }
 
@@ -63,6 +85,12 @@ export function applyParentViewport(message: ParentViewportMessage): void {
   setOptionalPixelProperty('--parent-visual-frame-left', message.frameLeft);
   setOptionalPixelProperty('--parent-visual-page-top', message.pageTop);
   setOptionalPixelProperty('--parent-visual-page-left', message.pageLeft);
+  if (message.safeArea) {
+    setOptionalPixelProperty('--parent-safe-top', message.safeArea.top);
+    setOptionalPixelProperty('--parent-safe-right', message.safeArea.right);
+    setOptionalPixelProperty('--parent-safe-bottom', message.safeArea.bottom);
+    setOptionalPixelProperty('--parent-safe-left', message.safeArea.left);
+  }
 }
 
 export function initParentViewport(): void {
@@ -70,6 +98,7 @@ export function initParentViewport(): void {
   parentViewportListenerInitialized = true;
 
   window.addEventListener('message', (event: MessageEvent) => {
+    if (event.source !== window.parent) return;
     if (!isParentViewportMessage(event.data)) return;
     applyParentViewport(event.data);
   });

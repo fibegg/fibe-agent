@@ -77,7 +77,7 @@ export function RightDrawer({
   const panelStyle: React.CSSProperties = isExpanded
     ? {
         width: '100vw',
-        height: '100vh',
+        height: 'var(--app-visual-height)',
         top: 0,
         right: 0,
         bottom: 0,
@@ -120,7 +120,7 @@ export function RightDrawer({
         <div
           className="flex items-center justify-between px-4 pb-3 border-b border-primary/15 shrink-0 bg-background "
           style={{
-            paddingTop: 'max(0.75rem, env(safe-area-inset-top, 0.75rem))',
+            paddingTop: 'max(0.75rem, var(--sat))',
           }}
         >
           <div className="flex items-center gap-2 min-w-0">
