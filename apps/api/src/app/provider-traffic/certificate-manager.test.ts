@@ -1,7 +1,23 @@
-import { describe, test, expect, afterEach } from 'bun:test';
+import { describe, test, expect, afterEach, spyOn } from 'bun:test';
 import { existsSync, readFileSync } from 'node:fs';
 import forge from 'node-forge';
 import { CertificateManager } from './certificate-manager';
+
+// Cache behavior needs real keys and signatures, but does not measure RSA key
+// generation. Prepare distinct 2048-bit pairs outside timed tests. The CA and
+// signed-leaf tests below still use the real generator.
+const cacheTestKeys = Array.from({ length: 3 }, () =>
+  forge.pki.rsa.generateKeyPair(2048),
+);
+
+function preparedKeys() {
+  let next = 0;
+  return spyOn(forge.pki.rsa, 'generateKeyPair').mockImplementation(() => {
+    const keys = cacheTestKeys[next++];
+    if (!keys) throw new Error('Unexpected extra RSA generation');
+    return keys;
+  });
+}
 
 describe('CertificateManager', () => {
   let manager: CertificateManager | null = null;
@@ -61,20 +77,36 @@ describe('CertificateManager', () => {
   }, 10000);
 
   test('caches leaf certs per domain', () => {
-    manager = new CertificateManager();
-    const first = manager.getLeafCert('api.openai.com');
-    const second = manager.getLeafCert('api.openai.com');
+    const generator = preparedKeys();
+    try {
+      manager = new CertificateManager();
+      const first = manager.getLeafCert('api.openai.com');
+      const second = manager.getLeafCert('api.openai.com');
 
-    expect(first.cert).toBe(second.cert);
-    expect(first.key).toBe(second.key);
+      expect(first.cert).toBe(second.cert);
+      expect(first.key).toBe(second.key);
+      expect(generator).toHaveBeenCalledTimes(2); // CA + one cached leaf.
+    } finally {
+      generator.mockRestore();
+    }
   });
 
   test('generates different certs for different domains', () => {
-    manager = new CertificateManager();
-    const anthro = manager.getLeafCert('api.anthropic.com');
-    const openai = manager.getLeafCert('api.openai.com');
+    const generator = preparedKeys();
+    try {
+      manager = new CertificateManager();
+      const anthro = manager.getLeafCert('api.anthropic.com');
+      const openai = manager.getLeafCert('api.openai.com');
 
-    expect(anthro.cert).not.toBe(openai.cert);
+      expect(anthro.cert).not.toBe(openai.cert);
+      expect(anthro.key).not.toBe(openai.key);
+      expect(generator).toHaveBeenCalledTimes(3);
+      const ca = forge.pki.certificateFromPem(manager.getCaCertPem());
+      expect(ca.verify(forge.pki.certificateFromPem(anthro.cert))).toBe(true);
+      expect(ca.verify(forge.pki.certificateFromPem(openai.cert))).toBe(true);
+    } finally {
+      generator.mockRestore();
+    }
   });
 
   test('cleanup removes temp CA file', () => {
