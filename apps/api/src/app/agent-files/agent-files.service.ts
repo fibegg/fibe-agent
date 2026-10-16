@@ -12,7 +12,7 @@ import {
   readTrustedFile,
   writeTrustedFile,
   inspectTrustedFile,
-  listTrustedDirectory,
+  inspectTrustedDirectory,
   type TrustedFileScope,
 } from '../trusted-files';
 
@@ -98,6 +98,7 @@ export class AgentFilesService {
     settings: ResolvedFibeSettings,
     scope: TrustedFileScope,
     depth = 0,
+    ancestors: ReadonlySet<string> = new Set(),
   ): Promise<{ fileCount: number; totalLines: number }> {
     if (depth > 50) return { fileCount: 0, totalLines: 0 };
     let fileCount = 0;
@@ -108,10 +109,12 @@ export class AgentFilesService {
           'utf8',
         ),
       );
-      const entries = await listTrustedDirectory(
+      const { entries, identity } = await inspectTrustedDirectory(
         scope,
         relative(scope.root, absPath),
       );
+      if (ancestors.has(identity)) return { fileCount: 0, totalLines: 0 };
+      const nextAncestors = new Set(ancestors).add(identity);
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
@@ -141,6 +144,7 @@ export class AgentFilesService {
             settings,
             scope,
             depth + 1,
+            nextAncestors,
           );
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
@@ -233,6 +237,7 @@ export class AgentFilesService {
     settings: ResolvedFibeSettings,
     scope: TrustedFileScope,
     depth = 0,
+    ancestors: ReadonlySet<string> = new Set(),
   ): Promise<AgentFileEntry[]> {
     if (depth > 50 || settings.ignoredNames.has(basename(absPath))) return [];
     try {
@@ -241,10 +246,12 @@ export class AgentFilesService {
           'utf8',
         ),
       );
-      const entries = await listTrustedDirectory(
+      const { entries, identity } = await inspectTrustedDirectory(
         scope,
         relative(scope.root, absPath),
       );
+      if (ancestors.has(identity)) return [];
+      const nextAncestors = new Set(ancestors).add(identity);
       const result: AgentFileEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
       const files: { name: string; rel: string; mtime: number }[] = [];
@@ -280,6 +287,7 @@ export class AgentFilesService {
             settings,
             scope,
             depth + 1,
+            nextAncestors,
           ),
         });
       }

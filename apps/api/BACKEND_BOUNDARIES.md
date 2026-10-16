@@ -42,7 +42,9 @@ raw routes return those read bytes rather than reopening a validated path string
 Python 3 is required for these descriptor operations. Each operation has a
 ten-second child deadline, 32 MiB file limit and 48 MiB request/result limit.
 Directory metadata resolves links within one helper process and examines at most
-10,000 entries. Recursive browser traversal has a depth limit of 50.
+10,000 entries. Recursive traversal stops when a directory's descriptor identity
+(device and inode) repeats in its current ancestry. Separate repository aliases
+remain visible in separate branches. A depth limit of 50 also remains.
 
 Configured roots and current CLI repository metadata are administrative authority.
 An administrator moving an already admitted directory inode or creating hard-link

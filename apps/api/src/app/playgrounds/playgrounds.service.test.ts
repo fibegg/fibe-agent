@@ -380,7 +380,7 @@ describe('PlaygroundsService', () => {
     expect(tree).toEqual([]);
   });
 
-  test('getTree with symlink cycle does not hang or crash (BUG: no cycle detection)', async () => {
+  test('getTree stops at repeated directory identities in a symlink cycle', async () => {
     const { symlinkSync } = require('node:fs');
     mkdirSync(join(playgroundDir, 'dir-a'));
     symlinkSync(
@@ -403,6 +403,15 @@ describe('PlaygroundsService', () => {
     ]);
 
     expect(result).not.toBe('timeout');
+    const tree = await service.getTree();
+    expect(tree[0].children).toEqual([
+      {
+        name: 'self-loop',
+        path: 'dir-a/self-loop',
+        type: 'directory',
+        children: [],
+      },
+    ]);
   });
 
   test('getFileContent rejects paths with null bytes', async () => {

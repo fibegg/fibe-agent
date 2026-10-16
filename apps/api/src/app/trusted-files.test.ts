@@ -39,6 +39,48 @@ beforeEach(() => {
 afterEach(() => rmSync(fixture, { recursive: true, force: true }));
 
 for (const kind of ['agent', 'playground']) {
+  test(`${kind} bounds recursive links by descriptor ancestry and preserves independent repository aliases`, async () => {
+    mkdirSync(join(workspace, 'cycle'));
+    writeFileSync(join(workspace, 'cycle', 'note.txt'), 'one line');
+    symlinkSync(join(workspace, 'cycle'), join(workspace, 'cycle', 'self'));
+    symlinkSync(workspace, join(repo, 'back'));
+    symlinkSync(repo, join(workspace, 'second-repo'));
+    const playgrounds = new PlaygroundsService(
+      { getPlaygroundsDir: () => workspace } as never,
+      {} as never,
+    );
+    playgrounds.getRepos = async () => [{ repo_root: repo }] as never;
+    const service =
+      kind === 'playground'
+        ? playgrounds
+        : new AgentFilesService(
+            {
+              resolveStrategy: () => ({ getWorkingDir: () => workspace }),
+            } as never,
+            undefined,
+            playgrounds,
+          );
+    const tree = await service.getTree();
+    const cycle = tree.find((entry) => entry.name === 'cycle');
+    expect(
+      cycle?.children?.find((entry) => entry.name === 'self')?.children,
+    ).toEqual([]);
+    for (const alias of ['linked-repo', 'second-repo']) {
+      const children = tree.find((entry) => entry.name === alias)?.children;
+      expect(
+        children?.find((entry) => entry.name === 'back')?.children,
+      ).toEqual([]);
+      expect(children?.map((entry) => entry.name)).toContain('source.txt');
+    }
+    expect((await service.getStats()).fileCount).toBe(4);
+    if (kind === 'playground') {
+      const contents = await playgrounds.getFolderFileContents('cycle');
+      expect(contents.map((entry) => entry.path).sort()).toEqual([
+        'cycle/note.txt',
+      ]);
+    }
+  }, 15_000);
+
   test(`${kind} supports ordinary files and selected repository links but denies outside/broken links`, async () => {
     const playgrounds = new PlaygroundsService(
       { getPlaygroundsDir: () => workspace } as never,

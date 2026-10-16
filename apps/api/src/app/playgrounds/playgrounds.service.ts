@@ -10,6 +10,7 @@ import {
   readTrustedFile,
   writeTrustedFile,
   inspectTrustedFile,
+  inspectTrustedDirectory,
   listTrustedDirectory,
   type TrustedFileScope,
 } from '../trusted-files';
@@ -622,6 +623,7 @@ export class PlaygroundsService {
     settings: ResolvedFibeSettings,
     scope: TrustedFileScope,
     depth = 0,
+    ancestors: ReadonlySet<string> = new Set(),
   ): Promise<{ fileCount: number; totalLines: number }> {
     if (depth > MAX_DEPTH) return { fileCount: 0, totalLines: 0 };
     let fileCount = 0;
@@ -632,10 +634,12 @@ export class PlaygroundsService {
           'utf8',
         ),
       );
-      const entries = await listTrustedDirectory(
+      const { entries, identity } = await inspectTrustedDirectory(
         scope,
         relative(scope.root, absPath),
       );
+      if (ancestors.has(identity)) return { fileCount: 0, totalLines: 0 };
+      const nextAncestors = new Set(ancestors).add(identity);
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
@@ -668,6 +672,7 @@ export class PlaygroundsService {
             settings,
             scope,
             depth + 1,
+            nextAncestors,
           );
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
@@ -809,13 +814,18 @@ export class PlaygroundsService {
     settings: ResolvedFibeSettings,
     scope: TrustedFileScope,
     depth = 0,
+    ancestors: ReadonlySet<string> = new Set(),
   ): Promise<{ path: string; content: string }[]> {
     if (depth > MAX_DEPTH) return [];
     if (settings.ignoredNames.has(basename(absPath))) return [];
     const result: { path: string; content: string }[] = [];
     let entries;
+    let nextAncestors: ReadonlySet<string>;
     try {
-      entries = await listTrustedDirectory(scope, relPath);
+      const snapshot = await inspectTrustedDirectory(scope, relPath);
+      if (ancestors.has(snapshot.identity)) return [];
+      nextAncestors = new Set(ancestors).add(snapshot.identity);
+      entries = snapshot.entries;
     } catch {
       return [];
     }
@@ -850,6 +860,7 @@ export class PlaygroundsService {
           settings,
           scope,
           depth + 1,
+          nextAncestors,
         );
         result.push(...sub);
       }
@@ -865,6 +876,7 @@ export class PlaygroundsService {
     settings: ResolvedFibeSettings,
     scope: TrustedFileScope,
     depth = 0,
+    ancestors: ReadonlySet<string> = new Set(),
   ): Promise<PlaygroundEntry[]> {
     if (depth > MAX_DEPTH || settings.ignoredNames.has(basename(absPath)))
       return [];
@@ -874,10 +886,12 @@ export class PlaygroundsService {
           'utf8',
         ),
       );
-      const entries = await listTrustedDirectory(
+      const { entries, identity } = await inspectTrustedDirectory(
         scope,
         relative(scope.root, absPath),
       );
+      if (ancestors.has(identity)) return [];
+      const nextAncestors = new Set(ancestors).add(identity);
       const result: PlaygroundEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
       const files: { name: string; rel: string; mtime: number }[] = [];
@@ -917,6 +931,7 @@ export class PlaygroundsService {
             settings,
             scope,
             depth + 1,
+            nextAncestors,
           ),
         });
       }

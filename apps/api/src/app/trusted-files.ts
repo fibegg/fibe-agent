@@ -77,7 +77,8 @@ def run(p):
                             kind, mtime = target['type'], target['mtime']
                         except Exception: continue
                     entries.append({'name': name, 'type': kind, 'mtime': mtime})
-            return {'entries': entries}
+            st = os.fstat(fd)
+            return {'entries': entries, 'identity': str(st.st_dev) + ':' + str(st.st_ino)}
         flags = (os.O_WRONLY if p['action'] == 'write' else os.O_RDONLY) | os.O_NOFOLLOW | os.O_NONBLOCK
         try: file_fd = os.open(parts[-1], flags, dir_fd=fd)
         except FileNotFoundError:
@@ -119,6 +120,10 @@ export interface TrustedDirectoryEntry {
   name: string;
   type: 'file' | 'directory' | 'symlink' | 'other';
   mtime: number;
+}
+export interface TrustedDirectorySnapshot {
+  identity: string;
+  entries: TrustedDirectoryEntry[];
 }
 
 async function operate(
@@ -213,6 +218,16 @@ export async function listTrustedDirectory(
   scope: TrustedFileScope,
   path: string,
 ): Promise<TrustedDirectoryEntry[]> {
-  return (await operate(scope, 'list', path))
-    .entries as TrustedDirectoryEntry[];
+  return (await inspectTrustedDirectory(scope, path)).entries;
+}
+/** Directory identity comes from the same admitted descriptor as its listing. */
+export async function inspectTrustedDirectory(
+  scope: TrustedFileScope,
+  path: string,
+): Promise<TrustedDirectorySnapshot> {
+  return (await operate(
+    scope,
+    'list',
+    path,
+  )) as unknown as TrustedDirectorySnapshot;
 }
