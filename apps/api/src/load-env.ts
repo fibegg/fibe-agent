@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import { applyFibeSettings } from './app/config/fibe-settings';
+import { ConfigService } from './app/config/config.service';
 
 /** Loads .env outside production. */
 export function loadDevEnv(): void {
@@ -14,5 +15,8 @@ export function loadDevEnv(): void {
   }
 }
 
-/** Applies fibe.yml settings after .env overrides are loaded. */
-export { applyFibeSettings as loadFibeEnv };
+/** Applies settings and shares the UI's absolute link path with child tools. */
+export function loadFibeEnv(): void {
+  applyFibeSettings();
+  process.env.PLAYGROUNDS_DIR = new ConfigService().getPlaygroundsDir();
+}

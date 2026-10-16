@@ -70,7 +70,7 @@ export class PlaygroundBrowserService {
     }
   }
 
-  /** Links selected services to /app/playground through the Fibe CLI. */
+  /** Links selected services into the configured shared directory through the Fibe CLI. */
   async linkPlayground(relPath: string): Promise<{ linkedPath: string }> {
     if (!relPath?.trim()) {
       throw new BadRequestException('Path is required');

@@ -74,7 +74,9 @@ describe('ConfigService', () => {
   test('still rejects a removed environment variable set explicitly', () => {
     for (const [removed, replacement] of Object.entries(REMOVED_FIBE_ENV)) {
       process.env[removed] = 'legacy-value';
-      expect(() => new ConfigService()).toThrow(`${removed} was removed; use ${replacement}`);
+      expect(() => new ConfigService()).toThrow(
+        `${removed} was removed; use ${replacement}`,
+      );
       delete process.env[removed];
     }
   });
@@ -163,10 +165,27 @@ describe('ConfigService', () => {
     expect(new ConfigService().getPlaygroundsDir()).toBe('/custom/playground');
   });
 
-  test('getPlaygroundsDir returns default under cwd when not set', () => {
+  test('getPlaygroundsDir defaults beneath persistent agent data', () => {
     delete process.env.PLAYGROUNDS_DIR;
+    process.env.FIBE_AGENT_ID = 'agent-77';
+    const config = withSettings({ dataDir: '/persistent/data' });
+    expect(config.getPlaygroundsDir()).toBe(
+      '/persistent/data/agent-77/playground',
+    );
+  });
+
+  test('getPlaygroundsDir normalizes a relative override before child tools change cwd', () => {
+    process.env.PLAYGROUNDS_DIR = 'shared/playground';
     expect(new ConfigService().getPlaygroundsDir()).toBe(
-      join(process.cwd(), 'playground'),
+      join(process.cwd(), 'shared/playground'),
+    );
+  });
+
+  test('getPlaygroundsDir treats a blank override as unset and sanitizes agent identity', () => {
+    process.env.PLAYGROUNDS_DIR = '   ';
+    process.env.FIBE_AGENT_ID = 'agent/unsafe';
+    expect(withSettings({ dataDir: '/persistent' }).getPlaygroundsDir()).toBe(
+      '/persistent/agent_unsafe/playground',
     );
   });
 

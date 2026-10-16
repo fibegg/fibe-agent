@@ -123,7 +123,7 @@ See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env.example`
 | `FIBE_AGENT_ID`                                                                               | None                            | env            | Default conversation storage id set by Fibe                                                                                                                                                                          |
 | `CONVERSATION_ID`                                                                             | None                            | env            | Fallback default conversation storage id                                                                                                                                                                             |
 | `systemPrompt`                                                                                | bundled prompt                  | setting        | Inline system prompt content. If unset, `dist/assets/SYSTEM_PROMPT.md` is loaded.                                                                                                                                    |
-| `PLAYGROUNDS_DIR`                                                                             | `./playground`                  | env            | Root for the file explorer and shell sessions                                                                                                                                                                        |
+| `PLAYGROUNDS_DIR`                                                                             | `<dataDir>/<storage-id>/playground`                  | env            | Shared root for the file explorer, shell sessions and CLI/MCP tools; explicit override wins                                                                                                                                                                        |
 | `hostRoot`                                                                                 | `/opt/fibe`                     | setting        | Root directory for Host local data; the Fibe CLI receives its `playgrounds` subdirectory                                                                                                                          |
 | `postInitScript`                                                                              | None                            | setting        | Shell script run once on first boot; state at `GET /api/init-status`                                                                                                                                                 |
 | `SESSION_DIR` / `sessionDir`                                                                  | provider default                | env or setting | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`)                                                                                                                                                           |
@@ -137,6 +137,17 @@ See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env.example`
 | `MCP_CONFIG_JSON` / `mcpConfig`                                                               | None                            | env or setting | Stdio/HTTP MCP servers injected into provider config. Fibe deployments include the canonical local `fibe mcp serve --tools core --yolo` entry with `FIBE_API_KEY` and `FIBE_DOMAIN`; keep it unique per environment. |
 | `DOCKER_MCP_CONFIG_JSON`                                                                      | None                            | env            | Additional Docker-specific MCP servers merged with `MCP_CONFIG_JSON`                                                                                                                                                 |
 | `gemmaRouterEnabled`, `ollamaUrl`, `gemmaModel`, `gemmaConfidenceThreshold`, `gemmaTimeoutMs` | see `fibe.example.yml`          | setting or env | Optional local Gemma intent router via Ollama                                                                                                                                                                        |
+
+At startup, the API resolves `PLAYGROUNDS_DIR` to an absolute path and exports
+it to provider and MCP child processes. When unset or blank it defaults to
+`<dataDir>/<storage-id>/playground`, using the same sanitized agent/conversation
+storage ID as other persistent data (or `default`). The data directory must be
+writable by the runtime user. An explicit override is preserved, including an
+existing linked directory; relative overrides are resolved before tools change
+working directory. Linking replaces the directory atomically, so its parent
+must also be writable. No `/app` ownership change or per-agent override is
+required for the default. The SDK/CLI must support `PLAYGROUNDS_DIR` for bare
+provider tool calls to use this shared default.
 
 ### Provider API keys (`AGENT_AUTH_MODE=api-token`)
 
@@ -691,6 +702,20 @@ AGENT_PROVIDER=mock bunx nx serve api
 ### Testing
 
 Unit tests are co-located with source files (`*.spec.ts` / `*.test.ts`). Coverage is enforced at 100%.
+
+The cross-repository link-path regression runs the candidate CLI and actual API
+file-browser services as UID 1000 with root-owned `/app`. Build the matching
+Linux CLI for the Docker engine architecture, then run:
+
+```sh
+scripts/ci/playground-link-path.test.sh /absolute/path/to/linux/fibe /absolute/path/to/artifacts/link-path
+```
+
+It reproduces the legacy permission failure, checks the bare CLI from a different
+working directory, verifies UI tree/file reads and repeated linking, and covers
+agent IDs, custom data directories and explicit path overrides. The isolated
+container has no network access and does not use live agent data. This focused
+regression complements the complete workspace Docker E2E matrix.
 
 ```sh
 bun run test                    # all projects
