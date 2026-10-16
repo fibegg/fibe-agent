@@ -42,3 +42,13 @@ export function stopChild(child, graceMs = 3000, killGraceMs = 1000) {
   stopping.set(child, promise);
   return promise;
 }
+
+/** Let a watcher finish its own child deadline before escalating the watcher. */
+export function watcherShutdownGraceMs(rawGrace, allowanceMs = 2000) {
+  const grace = Number(rawGrace || 3000);
+  return Number.isFinite(grace) &&
+    grace >= 0 &&
+    grace <= 2 ** 31 - 1 - allowanceMs
+    ? grace + allowanceMs
+    : 3000 + allowanceMs;
+}

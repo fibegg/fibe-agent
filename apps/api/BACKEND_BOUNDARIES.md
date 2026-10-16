@@ -60,5 +60,6 @@ of pending state after shutdown.
 
 The Docker development runner waits for actual child exit or close, not signal
 delivery. It sends TERM, waits three seconds, then sends KILL and waits one further
-second. It reports failure if the owned child still has not exited; it does not
+second. The API watcher gets its configured inner child grace plus two seconds
+(default five seconds) so it can finish its own child cleanup before escalation. It reports failure if the owned child still has not exited; it does not
 signal unrelated processes.

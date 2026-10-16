@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
-import { stopChild } from './dev-child-shutdown.mjs';
+import { stopChild, watcherShutdownGraceMs } from './dev-child-shutdown.mjs';
 
 function child(onSignal) {
   return Object.assign(new EventEmitter(), {
@@ -47,4 +47,26 @@ test('already exited children receive no signal; failed kills reject within the 
   assert.equal(stopChild(stubborn, 5, 5), first);
   await assert.rejects(first, /did not exit/);
   assert.deepEqual(stubborn.signals, ['SIGTERM', 'SIGKILL']);
+});
+
+test('a watcher gets time to finish stopping its own child', async () => {
+  const inner = child((process, signal) => {
+    if (signal === 'SIGKILL') {
+      process.signalCode = signal;
+      process.emit('exit', null, signal);
+    }
+  });
+  const watcher = child((process, signal) => {
+    if (signal === 'SIGTERM')
+      void stopChild(inner, 10, 10).then(() => {
+        process.exitCode = 0;
+        process.emit('exit', 0);
+      });
+  });
+  await stopChild(watcher, watcherShutdownGraceMs(10, 20), 10);
+  assert.deepEqual(inner.signals, ['SIGTERM', 'SIGKILL']);
+  assert.deepEqual(watcher.signals, ['SIGTERM']);
+  assert.equal(watcherShutdownGraceMs(undefined), 5000);
+  assert.equal(watcherShutdownGraceMs('invalid'), 5000);
+  assert.equal(watcherShutdownGraceMs(''), 5000);
 });
