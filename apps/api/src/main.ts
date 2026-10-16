@@ -8,7 +8,6 @@ import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
-import { join } from 'node:path';
 import { loadDevEnv, loadFibeEnv } from './load-env';
 import { AppModule } from './app/app.module';
 import { ConfigService } from './app/config/config.service';
@@ -38,8 +37,7 @@ if (process.env.FIBE_LOCAL_MCP_SERVER === '1') {
   const MULTIPART_LIMIT_BYTES = 20 * 1024 * 1024;
   const DEFAULT_PORT = 3000;
 
-  const playgroundsDir =
-    process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
+  const playgroundsDir = new ConfigService().getPlaygroundsDir();
   try {
     mkdirSync(playgroundsDir, { recursive: true });
   } catch {
@@ -144,7 +142,11 @@ if (process.env.FIBE_LOCAL_MCP_SERVER === '1') {
 
     const postInitScript = config.getPostInitScript();
     recoverPostInitOnBoot(config.getConversationDataDir());
-    void runPostInitOnce(config.getConversationDataDir(), postInitScript, config.getPlaygroundsDir());
+    void runPostInitOnce(
+      config.getConversationDataDir(),
+      postInitScript,
+      config.getPlaygroundsDir(),
+    );
   }
 
   bootstrap();

@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { Injectable } from '@nestjs/common';
 import { loadFibeSettings, type FibeSettings } from './fibe-settings';
 import { readFibeOwnerContext, fibeOwnerProofHeaders } from './owner-context';
@@ -95,7 +95,10 @@ export class ConfigService {
   }
 
   getPlaygroundsDir(): string {
-    return process.env.PLAYGROUNDS_DIR ?? join(process.cwd(), 'playground');
+    const configured = process.env.PLAYGROUNDS_DIR?.trim();
+    return resolve(
+      configured || join(this.getConversationDataDir(), 'playground'),
+    );
   }
 
   getHostRoot(): string {
