@@ -46,10 +46,13 @@ def run(p):
     parts = os.path.relpath(canonical, authority).split(os.sep)
     if any(x in ignored for x in parts): raise ValueError()
     if parts == ['.']:
-        if p['action'] != 'list': raise ValueError()
+        if p['action'] not in ['list', 'stat']: raise ValueError()
         parts = []
     fd = directory(authority)
     try:
+        if not parts and p['action'] == 'stat':
+            st = os.fstat(fd)
+            return {'type': 'directory', 'mtime': st.st_mtime * 1000}
         parents = parts if p['action'] == 'list' else parts[:-1]
         for part in parents:
             if p['action'] == 'write':

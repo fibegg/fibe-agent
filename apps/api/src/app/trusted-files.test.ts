@@ -55,6 +55,13 @@ for (const kind of ['agent', 'playground']) {
             undefined,
             playgrounds,
           );
+    const tree = await service.getTree();
+    const linked = tree.find((entry) => entry.name === 'linked-repo');
+    expect(linked?.type).toBe('directory');
+    expect(linked?.children?.map((entry) => entry.name)).toContain(
+      'source.txt',
+    );
+    expect(tree.map((entry) => entry.name)).not.toContain('escape');
     expect(await service.getFileContent('ordinary.txt')).toBe('ordinary');
     expect(await service.getFileContent('linked-repo/source.txt')).toBe(
       'repository',
