@@ -148,6 +148,9 @@ working directory. Linking replaces the directory atomically, so its parent
 must also be writable. No `/app` ownership change or per-agent override is
 required for the default. Bare provider tool calls require SDK/CLI 0.3.3 or newer to honor this shared
 default; both Docker recipes pin the verified release archives.
+Fibe stdio MCP entries explicitly receive the shared path and Host variables,
+because MCP clients may filter inherited environment variables. Server-specific
+path overrides and unrelated MCP servers remain intact.
 
 ### Provider API keys (`AGENT_AUTH_MODE=api-token`)
 
@@ -712,7 +715,8 @@ scripts/ci/playground-link-path.test.sh /absolute/path/to/linux/fibe /absolute/p
 ```
 
 It reproduces the legacy permission failure, checks the bare CLI from a different
-working directory, verifies UI tree/file reads and repeated linking, and covers
+working directory, uses the real MCP stdio transport with filtered inheritance, verifies UI
+tree/file reads and repeated linking, and covers
 agent IDs, custom data directories and explicit path overrides. The isolated
 container has no network access and does not use live agent data. This focused
 regression complements the complete workspace Docker E2E matrix.
