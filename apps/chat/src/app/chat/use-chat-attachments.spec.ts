@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import {
   getClipboardTextForContentEditablePaste,
@@ -16,6 +16,7 @@ function mockClipboard(getData: (type: string) => string) {
 }
 
 global.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
+global.URL.revokeObjectURL = vi.fn();
 
 describe('getClipboardTextForContentEditablePaste', () => {
   it('returns null when clipboardData is null', () => {
@@ -92,6 +93,71 @@ describe('hasNonEmptyPlainTextOnClipboard', () => {
 });
 
 describe('useChatAttachments', () => {
+  beforeEach(() => vi.clearAllMocks());
+  it('releases previews on clear and conversation change without revoking external URLs', async () => {
+    const { apiRequest } = await import('../api-url');
+    vi.mocked(apiRequest).mockResolvedValue({ ok: true, json: async () => ({ filename: 'owned' }) } as Response);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+    const { result, rerender } = renderHook(({ id }) => useChatAttachments({ isAuthenticated: true, conversationId: id }), { initialProps: { id: 'first' } });
+    const file = new File(['x'], 'image.png', { type: 'image/png' });
+    await act(async () => { await result.current.addFiles([file]); });
+    act(() => { result.current.addImage('https://external.test/preview', 'external'); result.current.clearPending(); });
+    expect(revoke).toHaveBeenCalledWith('blob:mock-url');
+    expect(revoke).not.toHaveBeenCalledWith('https://external.test/preview');
+    await act(async () => { await result.current.addFiles([file]); });
+    rerender({ id: 'second' });
+    expect(result.current.pendingImages).toEqual([]);
+    expect(revoke).toHaveBeenCalledTimes(2);
+  });
+  it('limits overlapping upload batches before network work and releases owned previews', async () => {
+    const { apiRequest } = await import('../api-url');
+    const completions: (() => void)[] = [];
+    vi.mocked(apiRequest).mockImplementation(() => new Promise<Response>((resolve) => {
+      completions.push(() => resolve({ ok: true, json: async () => ({ filename: `image-${completions.length}` }) } as Response));
+    }));
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation(() => `blob:owned-${Math.random()}`);
+    const revoke = vi.spyOn(URL, 'revokeObjectURL');
+    const { result, unmount } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const image = new File(['pixel'], 'test.png', { type: 'image/png' });
+    let first!: Promise<void>, second!: Promise<void>;
+    act(() => {
+      first = result.current.addFiles(Array(8).fill(image));
+      second = result.current.addFiles(Array(8).fill(image));
+    });
+    await act(async () => {
+      for (let i = 0; i < 12; i++) {
+        for (const complete of completions.splice(0)) complete();
+        await new Promise<void>((resolve) => queueMicrotask(resolve));
+      }
+      await Promise.all([first, second]);
+    });
+    expect(vi.mocked(apiRequest).mock.calls).toHaveLength(10);
+    expect(result.current.pendingImages).toHaveLength(5);
+    expect(result.current.pendingAttachments).toHaveLength(5);
+    const removed = result.current.pendingImages[0].url;
+    act(() => result.current.removePendingImage(0));
+    expect(revoke).toHaveBeenCalledWith(removed);
+    unmount();
+    expect(revoke.mock.calls.map(([url]) => url).sort()).toEqual(create.mock.results.map((r) => r.value).sort());
+  });
+
+  it('ignores uploads completed after clear and permits another upload after a rejection', async () => {
+    const { apiRequest } = await import('../api-url');
+    let complete!: (response: Response) => void;
+    vi.mocked(apiRequest).mockImplementationOnce(() => new Promise((resolve) => { complete = resolve; }));
+    const { result } = renderHook(() => useChatAttachments({ isAuthenticated: true }));
+    const file = new File(['x'], 'file.txt', { type: 'text/plain' });
+    let pending!: Promise<void>;
+    act(() => { pending = result.current.addFiles([file]); result.current.clearPending(); });
+    await act(async () => { complete({ ok: true, json: async () => ({ filename: 'stale' }) } as Response); await pending; });
+    expect(result.current.pendingAttachments).toEqual([]);
+    vi.mocked(apiRequest).mockRejectedValueOnce(new Error('offline'));
+    await act(async () => { await result.current.addFiles([file]); });
+    expect(result.current.attachmentUploadError).toBe('Could not upload file.txt');
+    vi.mocked(apiRequest).mockResolvedValueOnce({ ok: true, json: async () => ({ filename: 'fresh' }) } as Response);
+    await act(async () => { await result.current.addFiles([file]); });
+    expect(result.current.pendingAttachments).toEqual([{ filename: 'fresh', name: 'file.txt' }]);
+  });
   afterEach(() => {
     vi.restoreAllMocks();
   });

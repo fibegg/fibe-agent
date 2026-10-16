@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiRequest } from '../api-url';
 import { API_PATHS } from '@shared/api-paths';
 
@@ -47,14 +47,32 @@ export function useChatAttachments({ isAuthenticated, conversationId = 'default'
   const [attachmentUploadError, setAttachmentUploadError] = useState<string | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const dragCounterRef = useRef(0);
+  const imagesRef = useRef(pendingImages);
+  const attachmentsRef = useRef(pendingAttachments);
+  const reservedRef = useRef({ images: 0, attachments: 0 });
+  const ownedUrlsRef = useRef(new Set<string>());
+  const generationRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  const releaseUrl = useCallback((url: string) => {
+    if (ownedUrlsRef.current.delete(url)) URL.revokeObjectURL(url);
+  }, []);
 
   const addImage = useCallback((url: string, filename: string) => {
-    setPendingImages((prev) => (prev.length < MAX_PENDING_IMAGES ? [...prev, { url, filename }] : prev));
-  }, []);
+    if (imagesRef.current.length >= MAX_PENDING_IMAGES) {
+      releaseUrl(url);
+      return;
+    }
+    imagesRef.current = [...imagesRef.current, { url, filename }];
+    setPendingImages(imagesRef.current);
+  }, [releaseUrl]);
 
   const removePendingImage = useCallback((index: number) => {
-    setPendingImages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+    const removed = imagesRef.current[index];
+    if (removed) releaseUrl(removed.url);
+    imagesRef.current = imagesRef.current.filter((_, i) => i !== index);
+    setPendingImages(imagesRef.current);
+  }, [releaseUrl]);
 
   const removePendingVoice = useCallback(() => {
     setPendingVoice(null);
@@ -73,39 +91,52 @@ export function useChatAttachments({ isAuthenticated, conversationId = 'default'
   }, [conversationId]);
 
   const addAttachment = useCallback((filename: string, name: string) => {
-    setPendingAttachments((prev) =>
-      prev.length < MAX_PENDING_ATTACHMENTS ? [...prev, { filename, name }] : prev
-    );
+    if (attachmentsRef.current.length >= MAX_PENDING_ATTACHMENTS) return;
+    attachmentsRef.current = [...attachmentsRef.current, { filename, name }];
+    setPendingAttachments(attachmentsRef.current);
   }, []);
 
   const removePendingAttachment = useCallback((index: number) => {
-    setPendingAttachments((prev) => prev.filter((_, i) => i !== index));
+    attachmentsRef.current = attachmentsRef.current.filter((_, i) => i !== index);
+    setPendingAttachments(attachmentsRef.current);
   }, []);
 
   const addFiles = useCallback(
     async (files: FileList | File[]) => {
       const arr = Array.from(files);
       setAttachmentUploadError(null);
+      const generation = generationRef.current;
       for (const file of arr) {
-        const total = pendingImages.length + pendingAttachments.length;
+        if (!mountedRef.current || generation !== generationRef.current) break;
+        const reserved = reservedRef.current;
+        const total = imagesRef.current.length + attachmentsRef.current.length + reserved.images + reserved.attachments;
         if (total >= MAX_PENDING_TOTAL) break;
-        
-        if (file.type.startsWith('image/') && pendingImages.length < MAX_PENDING_IMAGES) {
+        const image = file.type.startsWith('image/') && imagesRef.current.length + reserved.images < MAX_PENDING_IMAGES;
+        const kind = image ? 'images' : 'attachments';
+        if (!image && attachmentsRef.current.length + reserved.attachments >= MAX_PENDING_ATTACHMENTS) break;
+        reserved[kind] += 1;
+        try {
           const filename = await uploadAttachment(file);
+          if (!mountedRef.current || generation !== generationRef.current) continue;
           if (filename) {
-            const url = URL.createObjectURL(file);
-            addImage(url, filename);
+            if (image) {
+              const url = URL.createObjectURL(file);
+              ownedUrlsRef.current.add(url);
+              addImage(url, filename);
+            } else {
+              addAttachment(filename, file.name);
+            }
           } else {
             setAttachmentUploadError(`Could not upload ${file.name}`);
           }
-        } else if (pendingAttachments.length < MAX_PENDING_ATTACHMENTS) {
-          const filename = await uploadAttachment(file);
-          if (filename) addAttachment(filename, file.name);
-          else setAttachmentUploadError(`Could not upload ${file.name}`);
+        } catch {
+          if (mountedRef.current && generation === generationRef.current) setAttachmentUploadError(`Could not upload ${file.name}`);
+        } finally {
+          if (generation === generationRef.current) reserved[kind] -= 1;
         }
       }
     },
-    [addImage, addAttachment, uploadAttachment, pendingImages.length, pendingAttachments.length]
+    [addImage, addAttachment, uploadAttachment]
   );
 
   const handleFileChange = useCallback(
@@ -119,11 +150,26 @@ export function useChatAttachments({ isAuthenticated, conversationId = 'default'
   );
 
   const clearPending = useCallback(() => {
+    generationRef.current += 1;
+    reservedRef.current = { images: 0, attachments: 0 };
+    for (const url of ownedUrlsRef.current) releaseUrl(url);
+    imagesRef.current = [];
+    attachmentsRef.current = [];
     setPendingImages([]);
     setPendingAttachments([]);
     setPendingVoice(null);
     setPendingVoiceFilename(null);
-  }, []);
+  }, [releaseUrl]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    clearPending();
+    return () => {
+      mountedRef.current = false;
+      generationRef.current += 1;
+      for (const url of ownedUrlsRef.current) releaseUrl(url);
+    };
+  }, [conversationId, clearPending, releaseUrl]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -174,16 +220,9 @@ export function useChatAttachments({ isAuthenticated, conversationId = 'default'
       const file = item.getAsFile();
       if (!file) return;
       
-      void uploadAttachment(file).then((filename) => {
-        if (filename) {
-          const url = URL.createObjectURL(file);
-          addImage(url, filename);
-        } else {
-          setAttachmentUploadError('Could not upload pasted image');
-        }
-      });
+      void addFiles([file]);
     },
-    [addImage, uploadAttachment, pendingImages.length]
+    [addFiles, pendingImages.length]
   );
 
   return {

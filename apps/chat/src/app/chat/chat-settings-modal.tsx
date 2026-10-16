@@ -226,6 +226,7 @@ export function ChatSettingsModal({
   const [syncSettings, setSyncSettings] = useState<FibeSyncSettings | null>(null);
   const [syncSaving, setSyncSaving] = useState(false);
   const [rawDrawerOpen, setRawDrawerOpen] = useState(false);
+  const [privacyError, setPrivacyError] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = usePersistedTypeFilter();
   const uiEffectsEnabled = useUiEffectsEnabled();
 
@@ -296,8 +297,12 @@ export function ChatSettingsModal({
   };
 
   const handleExportData = () => {
+    setPrivacyError(null);
     apiRequest('/data-privacy/export')
-      .then((r) => r.blob())
+      .then((r) => {
+        if (!r.ok) throw new Error('Export request failed');
+        return r.blob();
+      })
       .then((blob) => {
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -308,18 +313,20 @@ export function ChatSettingsModal({
         a.remove();
         window.URL.revokeObjectURL(url);
       })
-      .catch((err) => console.error('Export failed', err));
+      .catch(() => setPrivacyError(t('settings.exportFailed')));
   };
 
   const handleDeleteData = () => {
     if (!window.confirm(t('settings.deleteConfirm'))) {
       return;
     }
+    setPrivacyError(null);
     apiRequest('/data-privacy', { method: 'DELETE' })
       .then((r) => {
-        if (r.ok) window.location.reload();
+        if (!r.ok) throw new Error('Delete request failed');
+        window.location.reload();
       })
-      .catch((err) => console.error('Delete failed', err));
+      .catch(() => setPrivacyError(t('settings.deleteFailed')));
   };
 
   return (
@@ -424,6 +431,7 @@ export function ChatSettingsModal({
           {isStandalone && (
             <div className="space-y-2.5 border-t border-border pt-4">
               <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{t('settings.dataPrivacy')}</span>
+              {privacyError && <p role="alert" className="text-sm text-destructive">{privacyError}</p>}
               <div className="flex flex-col gap-2">
                 <button
                   type="button"

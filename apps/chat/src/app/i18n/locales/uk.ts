@@ -171,6 +171,8 @@ export const uk: Record<TranslationKey, string> = {
   'settings.confirmReset': 'Підтвердити скидання',
   'settings.dataPrivacy': 'Приватність даних (GDPR/CCPA)',
   'settings.exportData': 'Експортувати мої дані',
+  'settings.exportFailed': 'Не вдалося експортувати дані. Спробуйте ще раз.',
+  'settings.deleteFailed': 'Не вдалося видалити дані. Спробуйте ще раз.',
   'settings.deleteData': 'Видалити мої дані',
   'settings.deleteConfirm':
     'Назавжди видалити всі дані розмов? Цю дію не можна скасувати.',

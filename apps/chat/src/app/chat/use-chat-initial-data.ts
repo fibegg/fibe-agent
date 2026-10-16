@@ -6,7 +6,7 @@ import {
   type SetStateAction,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { apiRequest } from '../api-url';
+import { apiRequest, buildApiUrl } from '../api-url';
 import { API_PATHS, API_PATH_CONVERSATION_MESSAGES } from '@shared/api-paths';
 import type { ChatListItem } from './message-list';
 
@@ -106,7 +106,7 @@ export function useChatInitialData(
 
   const loadRuntimeConfig = useCallback(async () => {
     try {
-      const res = await fetch('/api/runtime-config');
+      const res = await fetch(buildApiUrl('/api/runtime-config'));
       if (res.ok) {
         const data = (await res.json()) as { agentProvider: string | null };
         setAgentProvider(data.agentProvider);

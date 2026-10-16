@@ -1,12 +1,13 @@
 import React from 'react';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useChatInitialData } from './use-chat-initial-data';
 import type { ChatListItem } from './message-list';
 
 const mockApiRequest = vi.fn();
-vi.mock('../api-url', () => ({
+vi.mock('../api-url', async () => ({
+  ...await vi.importActual<typeof import('../api-url')>('../api-url'),
   apiRequest: (path: string, opts?: RequestInit) => mockApiRequest(path, opts),
 }));
 
@@ -15,6 +16,27 @@ function wrapper({ children }: { children: React.ReactNode }) {
 }
 
 describe('useChatInitialData', () => {
+  afterEach(() => {
+    delete (window as Window & { __BASENAME__?: string }).__BASENAME__;
+    vi.unstubAllGlobals();
+  });
+
+  it.each(['', '/agents/first', '/agents/second%20agent'])('loads optional runtime configuration through prefix %s', async (prefix) => {
+    (window as Window & { __BASENAME__?: string }).__BASENAME__ = prefix;
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ agentProvider: 'mock' }) });
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useChatInitialData(false), { wrapper });
+    await waitFor(() => expect(result.current.agentProvider).toBe('mock'));
+    expect(fetchMock).toHaveBeenCalledWith(`${prefix}/api/runtime-config`);
+    expect(mockApiRequest).not.toHaveBeenCalled();
+  });
+
+  it('keeps runtime configuration optional when the request fails', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('offline')));
+    const { result } = renderHook(() => useChatInitialData(false), { wrapper });
+    await act(async () => { await Promise.resolve(); });
+    expect(result.current.agentProvider).toBeNull();
+  });
   beforeEach(() => {
     mockApiRequest.mockReset();
   });

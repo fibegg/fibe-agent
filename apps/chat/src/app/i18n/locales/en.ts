@@ -167,6 +167,8 @@ export const en = {
   'settings.confirmReset': 'Confirm reset',
   'settings.dataPrivacy': 'Data privacy (GDPR/CCPA)',
   'settings.exportData': 'Export my data',
+  'settings.exportFailed': 'Could not export your data. Please try again.',
+  'settings.deleteFailed': 'Could not delete your data. Please try again.',
   'settings.deleteData': 'Delete my data',
   'settings.deleteConfirm':
     'Permanently delete all conversation data? This cannot be undone.',

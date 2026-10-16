@@ -30,6 +30,18 @@ vi.mock('../activity-type-filters', () => ({
 }));
 
 describe('ChatSettingsModal', () => {
+  it.each(['export', 'delete'])('surfaces non-OK %s instead of claiming success', async (operation) => {
+    const { apiRequest } = await import('../api-url');
+    const blob = vi.fn();
+    vi.mocked(apiRequest).mockImplementation(async (path) => path.startsWith('/data-privacy')
+      ? { ok: false, status: 503, blob } as unknown as Response
+      : { ok: true, json: async () => ({ state: 'succeeded' }) } as Response);
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    render(<ChatSettingsModal open={true} isStandalone={true} onClose={vi.fn()} state={CHAT_STATES.AUTHENTICATED} onStartAuth={vi.fn()} onReauthenticate={vi.fn()} onLogout={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: operation === 'export' ? /export my data/i : /delete my data/i }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toMatch(/Could not/));
+    expect(blob).not.toHaveBeenCalled();
+  });
   beforeEach(async () => {
     vi.stubGlobal('__APP_VERSION__', '1.0.0');
     const { apiRequest } = await import('../api-url');
