@@ -4,6 +4,7 @@ import {
   type Server as HttpsServer,
 } from 'node:https';
 import { request as httpRequest } from 'node:http';
+import { createServer as createTcpServer } from 'node:net';
 import forge from 'node-forge';
 import { CertificateManager } from './certificate-manager';
 import { ConnectProxy } from './connect-proxy';
@@ -87,6 +88,50 @@ describe('ConnectProxy', () => {
 
     await proxy.stop();
     proxy = null;
+  });
+
+  test('disable closes an owned CONNECT tunnel and its loopback upstream', async () => {
+    certManager = new CertificateManager();
+    let closed!: () => void;
+    const upstreamClosed = new Promise<void>((resolve) => {
+      closed = resolve;
+    });
+    const upstream = createTcpServer((socket) => {
+      socket.on('data', () => undefined);
+      socket.once('close', closed);
+    });
+    await new Promise<void>((resolve) =>
+      upstream.listen(0, '127.0.0.1', resolve),
+    );
+    const address = upstream.address();
+    if (!address || typeof address === 'string')
+      throw new Error('Missing fixture port');
+    proxy = new ConnectProxy({
+      certManager,
+      onCapturedRequest: () => undefined,
+    });
+    const port = await proxy.start();
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const request = httpRequest({
+          host: '127.0.0.1',
+          port,
+          method: 'CONNECT',
+          path: `127.0.0.1:${address.port}`,
+        });
+        request.once('error', reject);
+        request.once('connect', (_response, socket) => {
+          socket.on('error', () => undefined);
+          resolve();
+        });
+        request.end();
+      });
+      await proxy.stop();
+      await upstreamClosed;
+      expect(proxy.getPort()).toBe(port);
+    } finally {
+      await new Promise<void>((resolve) => upstream.close(() => resolve()));
+    }
   });
 
   test('intercepts CONNECT to known provider domain and captures traffic', async () => {

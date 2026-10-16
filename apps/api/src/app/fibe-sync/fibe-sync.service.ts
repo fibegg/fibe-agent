@@ -17,6 +17,9 @@ interface PendingSync {
 @Injectable()
 export class FibeSyncService {
   private readonly logger = new Logger(FibeSyncService.name);
+  private stopped = false;
+  private readonly requests = new Set<AbortController>();
+  private static readonly REQUEST_TIMEOUT_MS = 30_000;
   private readonly pendingSyncs = new Map<string, PendingSync>();
   private static readonly DEBOUNCE_MS = 500;
   private static readonly RETRY_INITIAL_MS = 1000;
@@ -24,7 +27,7 @@ export class FibeSyncService {
 
   constructor(
     private readonly config: ConfigService,
-    @Optional() private readonly settingsStore?: FibeSyncSettingsStoreService
+    @Optional() private readonly settingsStore?: FibeSyncSettingsStoreService,
   ) {}
 
   syncMessages(getContent: () => string, conversationId?: string): void {
@@ -40,14 +43,21 @@ export class FibeSyncService {
   }
 
   onModuleDestroy(): void {
+    this.stopped = true;
+    for (const request of this.requests) request.abort();
+    this.requests.clear();
     for (const pending of this.pendingSyncs.values()) {
       if (pending.timer) clearTimeout(pending.timer);
     }
     this.pendingSyncs.clear();
   }
 
-  private scheduleSync(type: SyncType, getContent: () => string, conversationId?: string): void {
-    if (!this.syncTarget(type)) return;
+  private scheduleSync(
+    type: SyncType,
+    getContent: () => string,
+    conversationId?: string,
+  ): void {
+    if (this.stopped || !this.syncTarget(type)) return;
 
     const normalizedConversationId = conversationId || 'default';
     const key = this.syncKey(type, normalizedConversationId);
@@ -72,13 +82,16 @@ export class FibeSyncService {
     pending.timer = null;
 
     if (!pending.syncing) {
-      pending.timer = setTimeout(() => void this.flushPendingSync(key), FibeSyncService.DEBOUNCE_MS);
+      pending.timer = setTimeout(
+        () => void this.flushPendingSync(key),
+        FibeSyncService.DEBOUNCE_MS,
+      );
     }
   }
 
   private async flushPendingSync(key: string): Promise<void> {
     const pending = this.pendingSyncs.get(key);
-    if (!pending || pending.syncing) return;
+    if (this.stopped || !pending || pending.syncing) return;
 
     if (pending.timer) clearTimeout(pending.timer);
     pending.timer = null;
@@ -89,7 +102,9 @@ export class FibeSyncService {
     try {
       content = pending.getContent();
     } catch (err) {
-      this.logger.error(`Error resolving ${pending.type} content for sync: ${err}`);
+      this.logger.error(
+        `Error resolving ${pending.type} content for sync: ${err}`,
+      );
       this.pendingSyncs.delete(key);
       return;
     }
@@ -103,7 +118,10 @@ export class FibeSyncService {
       if (current.version === version) {
         this.pendingSyncs.delete(key);
       } else {
-        current.timer = setTimeout(() => void this.flushPendingSync(key), FibeSyncService.DEBOUNCE_MS);
+        current.timer = setTimeout(
+          () => void this.flushPendingSync(key),
+          FibeSyncService.DEBOUNCE_MS,
+        );
       }
       return;
     }
@@ -124,7 +142,7 @@ export class FibeSyncService {
   private async sync(
     type: SyncType,
     content: string,
-    conversationId: string
+    conversationId: string,
   ): Promise<boolean> {
     const target = this.syncTarget(type);
     if (!target) return true;
@@ -132,35 +150,60 @@ export class FibeSyncService {
     const url = `${apiUrl}/api/agents/${agentId}/${type}`;
 
     try {
-      const res = await fetch(url, {
-        method: 'PUT',
-        headers: {
-          ...this.config.getFibeOwnerProofHeaders?.(),
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          content,
-          conversation_id: conversationId || 'default',
-        }),
-      });
+      return await this.withRequest(async (signal) => {
+        const res = await fetch(url, {
+          signal,
+          method: 'PUT',
+          headers: {
+            ...this.config.getFibeOwnerProofHeaders?.(),
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            content,
+            conversation_id: conversationId || 'default',
+          }),
+        });
 
-      if (!res.ok) {
-        const body = await res.text().catch(() => '');
-        this.logger.warn(
-          `Fibe sync ${type} failed: ${res.status} ${res.statusText}${body ? ` ${body.slice(0, 200)}` : ''}`
-        );
-        return res.status === 401 || res.status === 403;
-      }
-      return true;
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          this.logger.warn(
+            `Fibe sync ${type} failed: ${res.status} ${res.statusText}${body ? ` ${body.slice(0, 200)}` : ''}`,
+          );
+          return res.status === 401 || res.status === 403;
+        }
+        return true;
+      });
     } catch (err) {
       this.logger.warn(`Fibe sync ${type} error: ${err}`);
       return false;
     }
   }
 
-  private syncTarget(type: SyncType): { apiUrl: string; apiKey: string; agentId: string } | null {
-    const enabled = this.settingsStore?.isEnabled(type) ?? this.config.isFibeSyncEnabled();
+  /** The deadline includes response-body reads. Shutdown aborts every owned request. */
+  private async withRequest<T>(
+    operation: (signal: AbortSignal) => Promise<T>,
+  ): Promise<T> {
+    if (this.stopped) throw new Error('Fibe sync is stopped');
+    const controller = new AbortController();
+    this.requests.add(controller);
+    const timer = setTimeout(
+      () => controller.abort(),
+      FibeSyncService.REQUEST_TIMEOUT_MS,
+    );
+    try {
+      return await operation(controller.signal);
+    } finally {
+      clearTimeout(timer);
+      this.requests.delete(controller);
+    }
+  }
+
+  private syncTarget(
+    type: SyncType,
+  ): { apiUrl: string; apiKey: string; agentId: string } | null {
+    const enabled =
+      this.settingsStore?.isEnabled(type) ?? this.config.isFibeSyncEnabled();
     if (!enabled) return null;
 
     const apiUrl = this.config.getFibeApiUrl();
@@ -176,7 +219,12 @@ export class FibeSyncService {
   }
 
   async hydrate(type: 'messages' | 'activity'): Promise<string | null> {
-    if (!this.config.isFibeSyncEnabled() || !this.config.isFibeHydrateEnabled()) return null;
+    if (
+      this.stopped ||
+      !this.config.isFibeSyncEnabled() ||
+      !this.config.isFibeHydrateEnabled()
+    )
+      return null;
 
     const apiUrl = this.config.getFibeApiUrl();
     const apiKey = this.config.getFibeApiKey();
@@ -187,20 +235,28 @@ export class FibeSyncService {
     const url = `${apiUrl}/api/agents/${agentId}/${type}`;
 
     try {
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: { ...this.config.getFibeOwnerProofHeaders?.(), Authorization: `Bearer ${apiKey}` },
-      });
+      return await this.withRequest(async (signal) => {
+        const res = await fetch(url, {
+          signal,
+          method: 'GET',
+          headers: {
+            ...this.config.getFibeOwnerProofHeaders?.(),
+            Authorization: `Bearer ${apiKey}`,
+          },
+        });
 
-      if (!res.ok) {
-        if (res.status !== 404) {
-          this.logger.warn(`Fibe hydrate ${type} failed: ${res.status} ${res.statusText}`);
+        if (!res.ok) {
+          if (res.status !== 404) {
+            this.logger.warn(
+              `Fibe hydrate ${type} failed: ${res.status} ${res.statusText}`,
+            );
+          }
+          return null;
         }
-        return null;
-      }
 
-      const data = (await res.json()) as { content?: string };
-      return data?.content ?? null;
+        const data = (await res.json()) as { content?: string };
+        return data?.content ?? null;
+      });
     } catch (err) {
       this.logger.warn(`Fibe hydrate ${type} error: ${err}`);
       return null;

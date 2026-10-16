@@ -117,8 +117,8 @@ export class CertificateManager {
       if (existsSync(this.caCertPath)) {
         unlinkSync(this.caCertPath);
       }
-    } catch {
-      // best-effort cleanup
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
   }
 

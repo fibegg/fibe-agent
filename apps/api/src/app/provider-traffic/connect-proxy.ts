@@ -29,6 +29,7 @@ export class ConnectProxy {
   private readonly logger = new Logger('ConnectProxy');
   private readonly server: Server;
   private port = 0;
+  private readonly sockets = new Set<Socket>();
 
   constructor(private readonly options: ConnectProxyOptions) {
     this.server = createServer((_req, res) => {
@@ -36,6 +37,8 @@ export class ConnectProxy {
       res.writeHead(405, { 'Content-Type': 'text/plain' });
       res.end('This proxy only supports CONNECT tunneling.');
     });
+
+    this.server.on('connection', (socket) => this.trackSocket(socket));
 
     this.server.on(
       'connect',
@@ -51,7 +54,10 @@ export class ConnectProxy {
 
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
+      const onError = (error: Error) => reject(error);
+      this.server.once('error', onError);
       this.server.listen(0, '127.0.0.1', () => {
+        this.server.removeListener('error', onError);
         const addr = this.server.address();
         if (addr && typeof addr === 'object') {
           this.port = addr.port;
@@ -61,15 +67,34 @@ export class ConnectProxy {
           reject(new Error('Failed to determine proxy port'));
         }
       });
-      this.server.once('error', reject);
     });
   }
 
   async stop(): Promise<void> {
-    return new Promise((resolve) => {
-      this.server.close(() => resolve());
-      setTimeout(() => resolve(), 2000);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(
+        () =>
+          reject(new Error('Provider proxy did not close within 2 seconds')),
+        2000,
+      );
+      // CONNECT sockets are not closed by Server.closeAllConnections(). They and
+      // their upstream peers are owned by this proxy and must close on disable.
+      for (const socket of this.sockets) socket.destroy();
+      this.server.close((error?: Error) => {
+        clearTimeout(timer);
+        if (
+          error &&
+          (error as NodeJS.ErrnoException).code !== 'ERR_SERVER_NOT_RUNNING'
+        )
+          reject(error);
+        else resolve();
+      });
     });
+  }
+
+  private trackSocket(socket: Socket): void {
+    this.sockets.add(socket);
+    socket.once('close', () => this.sockets.delete(socket));
   }
 
   getPort(): number {
@@ -172,6 +197,9 @@ export class ConnectProxy {
           },
         );
 
+        this.trackSocket(serverTls);
+        this.trackSocket(cleartextClientStream);
+
         serverTls.on('error', (err) => {
           this.logger.warn(`Server TLS error (${hostname}): ${err.message}`);
           recorder.end(`server_error: ${err.message}`);
@@ -231,6 +259,10 @@ export class ConnectProxy {
         serverSocket.pipe(clientSocket);
       },
     );
+
+    this.trackSocket(serverSocket);
+    clientSocket.once('close', () => serverSocket.destroy());
+    serverSocket.once('close', () => clientSocket.destroy());
 
     serverSocket.on('error', (err: Error) => {
       this.logger.warn(

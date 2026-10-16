@@ -17,6 +17,8 @@ export class ProxyService implements OnModuleInit, OnModuleDestroy {
   private certManager: CertificateManager | null = null;
   private proxy: ConnectProxy | null = null;
   private enabled = false;
+  private destroyed = false;
+  private transition: Promise<void> = Promise.resolve();
 
   constructor(
     private readonly trafficStore: ProviderTrafficStoreService,
@@ -34,20 +36,23 @@ export class ProxyService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
-    await this.startCapture();
+    await this.setCaptureEnabled(true);
   }
 
   async setCaptureEnabled(enabled: boolean): Promise<void> {
-    if (enabled) {
-      await this.startCapture();
-    } else {
-      await this.stopCapture();
-    }
+    const operation = this.transition.then(() => {
+      if (enabled && this.destroyed)
+        throw new Error('Provider capture is shutting down');
+      return enabled ? this.startCapture() : this.stopCapture();
+    });
+    this.transition = operation.catch(() => undefined);
+    return operation;
   }
 
   private async startCapture(): Promise<void> {
     if (this.enabled) return;
-    this.enabled = true;
+    // Failed starts may still own resources whose cleanup must be retried.
+    if (this.proxy || this.certManager) await this.stopCapture();
     this.logger.log('Initializing MITM provider traffic capture...');
 
     CertificateManager.cleanupStale();
@@ -58,47 +63,58 @@ export class ProxyService implements OnModuleInit, OnModuleDestroy {
     const redactBodies =
       process.env['PROVIDER_TRAFFIC_REDACT_BODIES'] === 'true';
 
-    this.certManager = new CertificateManager();
+    try {
+      this.certManager = new CertificateManager();
 
-    this.proxy = new ConnectProxy({
-      certManager: this.certManager,
-      onCapturedRequest: (record, conversationId) => {
-        this.logger.debug(
-          `Captured ${record.request.method} ${record.request.url} → ${record.response.statusCode} (${record.durationMs}ms)`,
-        );
-        this.trafficStore.append(record, conversationId);
-      },
-      maxBodySize,
-      redactBodies,
-    });
+      this.proxy = new ConnectProxy({
+        certManager: this.certManager,
+        onCapturedRequest: (record, conversationId) => {
+          this.logger.debug(
+            `Captured ${record.request.method} ${record.request.url} → ${record.response.statusCode} (${record.durationMs}ms)`,
+          );
+          this.trafficStore.append(record, conversationId);
+        },
+        maxBodySize,
+        redactBodies,
+      });
 
-    const port = await this.proxy.start();
+      const port = await this.proxy.start();
 
-    process.env['__FIBE_PROXY_PORT'] = String(port);
-    process.env['__FIBE_PROXY_CA_PATH'] = this.certManager.getCaCertPath();
+      const caPath = this.certManager.getCaCertPath();
+      process.env['__FIBE_PROXY_PORT'] = String(port);
+      process.env['__FIBE_PROXY_CA_PATH'] = caPath;
+      this.enabled = true;
 
-    this.logger.log(
-      `MITM proxy active on 127.0.0.1:${port}: CA cert at ${this.certManager.getCaCertPath()}`,
-    );
+      this.logger.log(
+        `MITM proxy active on 127.0.0.1:${port}: CA cert at ${this.certManager.getCaCertPath()}`,
+      );
+    } catch (error) {
+      // Retain references if cleanup itself fails so a later request can retry it.
+      try {
+        await this.stopCapture();
+      } catch {
+        /* The failed transition remains failed. */
+      }
+      throw error;
+    }
   }
 
   async onModuleDestroy(): Promise<void> {
-    await this.stopCapture();
+    this.destroyed = true;
+    await this.setCaptureEnabled(false);
   }
 
   private async stopCapture(): Promise<void> {
-    if (!this.enabled) return;
+    if (!this.enabled && !this.proxy && !this.certManager) return;
 
     this.logger.log('Shutting down MITM proxy...');
-    this.enabled = false;
-
-    delete process.env['__FIBE_PROXY_PORT'];
-    delete process.env['__FIBE_PROXY_CA_PATH'];
-
     if (this.proxy) {
       await this.proxy.stop();
       this.proxy = null;
     }
+    this.enabled = false;
+    delete process.env['__FIBE_PROXY_PORT'];
+    delete process.env['__FIBE_PROXY_CA_PATH'];
 
     if (this.certManager) {
       this.certManager.cleanup();

@@ -1,5 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  renameSync,
+  unlinkSync,
+} from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
 
@@ -31,11 +39,12 @@ export class FibeSyncSettingsStoreService {
   }
 
   update(patch: FibeSyncSettingsPatch): FibeSyncSettings {
-    this.settings = {
+    const next = {
       ...this.settings,
       ...this.sanitizePatch(patch),
     };
-    this.persist();
+    this.persist(next);
+    this.settings = next;
     return this.get();
   }
 
@@ -58,7 +67,9 @@ export class FibeSyncSettingsStoreService {
   private load(): FibeSyncSettings {
     if (!existsSync(this.filePath)) return this.defaults();
     try {
-      const parsed = JSON.parse(readFileSync(this.filePath, 'utf8')) as FibeSyncSettingsPatch;
+      const parsed = JSON.parse(
+        readFileSync(this.filePath, 'utf8'),
+      ) as FibeSyncSettingsPatch;
       return { ...this.defaults(), ...this.sanitizePatch(parsed) };
     } catch {
       return this.defaults();
@@ -69,12 +80,35 @@ export class FibeSyncSettingsStoreService {
     const clean: FibeSyncSettingsPatch = {};
     if (typeof patch.messages === 'boolean') clean.messages = patch.messages;
     if (typeof patch.activity === 'boolean') clean.activity = patch.activity;
-    if (typeof patch.rawProviders === 'boolean') clean.rawProviders = patch.rawProviders;
-    if (typeof patch.rawProviderCapture === 'boolean') clean.rawProviderCapture = patch.rawProviderCapture;
+    if (typeof patch.rawProviders === 'boolean')
+      clean.rawProviders = patch.rawProviders;
+    if (typeof patch.rawProviderCapture === 'boolean')
+      clean.rawProviderCapture = patch.rawProviderCapture;
     return clean;
   }
 
-  private persist(): void {
-    writeFileSync(this.filePath, JSON.stringify(this.settings, null, 2), 'utf8');
+  private persist(settings: FibeSyncSettings): void {
+    // Publish only a complete new state; this is not a copy of the old file.
+    const temporary = `${this.filePath}.${randomUUID()}.tmp`;
+    try {
+      writeFileSync(temporary, JSON.stringify(settings, null, 2), {
+        encoding: 'utf8',
+        flag: 'wx',
+        mode: 0o600,
+      });
+      renameSync(temporary, this.filePath);
+    } catch (error) {
+      try {
+        unlinkSync(temporary);
+      } catch (cleanupError) {
+        if ((cleanupError as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw new AggregateError(
+            [error, cleanupError],
+            'Settings write and temporary state cleanup failed',
+          );
+        }
+      }
+      throw error;
+    }
   }
 }

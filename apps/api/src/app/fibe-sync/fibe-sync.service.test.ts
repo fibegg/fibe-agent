@@ -1,4 +1,12 @@
-import { describe, test, expect, beforeEach, afterEach, mock, jest } from 'bun:test';
+import {
+  describe,
+  test,
+  expect,
+  beforeEach,
+  afterEach,
+  mock,
+  jest,
+} from 'bun:test';
 import { FibeSyncService } from './fibe-sync.service';
 
 /**
@@ -75,6 +83,7 @@ describe('FibeSyncService', () => {
         'https://fibe.test/api/agents/agent-1/messages',
         {
           method: 'PUT',
+          signal: expect.any(AbortSignal),
           headers: {
             'Content-Type': 'application/json',
             Authorization: 'Bearer key123',
