@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG FIBE_CANDIDATE_BUILD=0
-ARG FIBE_CLI_VERSION=0.3.1
+ARG FIBE_CLI_VERSION=0.3.2
 
 FROM node:24-slim AS cli-base
 
