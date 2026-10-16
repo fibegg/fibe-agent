@@ -13,7 +13,9 @@ describe('preview diagnostics', () => {
   });
 
   test('normalizes host-only urls to https', () => {
-    expect(normalizeProbeUrl('app.example.test')).toBe('https://app.example.test/');
+    expect(normalizeProbeUrl('app.example.test')).toBe(
+      'https://app.example.test/',
+    );
   });
 
   test('reports iframe blocking headers', async () => {
@@ -25,8 +27,12 @@ describe('preview diagnostics', () => {
     const result = await diagnosePreviewUrl('https://app.example.test');
 
     expect(result.displayable).toBe(false);
-    expect(result.issues.map((issue) => issue.code)).toContain('iframe_x_frame_options');
-    expect(result.issues.map((issue) => issue.code)).toContain('iframe_csp_frame_ancestors');
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'iframe_x_frame_options',
+    );
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'iframe_csp_frame_ancestors',
+    );
   });
 
   test('reports broken cookie attributes for embedded previews', async () => {
@@ -58,14 +64,63 @@ describe('preview diagnostics', () => {
   test('captures redirects and final host changes', async () => {
     const fetchMock = globalThis.fetch as unknown as ReturnType<typeof mock>;
     fetchMock
-      .mockResolvedValueOnce(makeResponse(302, { location: 'https://admin.example.test' }))
+      .mockResolvedValueOnce(
+        makeResponse(302, { location: 'https://admin.example.test' }),
+      )
       .mockResolvedValueOnce(makeResponse(200));
 
     const result = await diagnosePreviewUrl('https://app.example.test');
 
     expect(result.finalUrl).toBe('https://admin.example.test/');
     expect(result.redirects).toHaveLength(1);
-    expect(result.issues.map((issue) => issue.code)).toContain('redirect_cross_host');
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'redirect_cross_host',
+    );
+  });
+
+  test('redirect exhaustion attributes headers/status to the last fetched URL', async () => {
+    const calls: string[] = [];
+    globalThis.fetch = mock(async (url: string) => {
+      calls.push(url);
+      return makeResponse(302, {
+        location: `/step${calls.length}`,
+        'x-frame-options': 'DENY',
+      });
+    }) as never;
+    const result = await diagnosePreviewUrl('https://app.example.test/');
+    expect(calls).toHaveLength(6);
+    expect(result.finalUrl).toBe(calls.at(-1));
+    expect(result.nextUrl).toBe('https://app.example.test/step6');
+    expect(result.status).toBe(302);
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'too_many_redirects',
+    );
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'iframe_x_frame_options',
+    );
+  });
+
+  test('cycles stop at the last fetched response rather than claiming a new fetch', async () => {
+    mockFetchResponse(302, { location: '/' });
+    const result = await diagnosePreviewUrl('https://app.example.test/');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(result.nextUrl).toBe(result.finalUrl);
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'redirect_cycle',
+    );
+  });
+
+  test('invalid and missing Location remain finite response diagnostics', async () => {
+    mockFetchResponse(302, { location: 'http://[' });
+    const invalid = await diagnosePreviewUrl('https://app.example.test/');
+    expect(invalid.finalUrl).toBe('https://app.example.test/');
+    expect(invalid.issues.map((issue) => issue.code)).toContain(
+      'invalid_redirect',
+    );
+    mockFetchResponse(302);
+    const missing = await diagnosePreviewUrl('https://app.example.test/');
+    expect(missing.nextUrl).toBeUndefined();
+    expect(missing.status).toBe(302);
   });
 
   test('reports wildcard cors with credentials', async () => {
@@ -76,7 +131,9 @@ describe('preview diagnostics', () => {
 
     const result = await diagnosePreviewUrl('https://app.example.test');
 
-    expect(result.issues.map((issue) => issue.code)).toContain('cors_wildcard_with_credentials');
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'cors_wildcard_with_credentials',
+    );
   });
 
   test('reports fetch failures as unreachable diagnostics', async () => {
@@ -86,17 +143,27 @@ describe('preview diagnostics', () => {
     const result = await diagnosePreviewUrl('https://app.example.test');
 
     expect(result.reachable).toBe(false);
-    expect(result.issues.map((issue) => issue.code)).toContain('preview_tls_untrusted_in_agent_container');
-    expect(result.issues.map((issue) => issue.code)).toContain('preview_unreachable');
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'preview_tls_untrusted_in_agent_container',
+    );
+    expect(result.issues.map((issue) => issue.code)).toContain(
+      'preview_unreachable',
+    );
   });
 });
 
-function mockFetchResponse(status: number, headers: Record<string, string | string[]> = {}) {
+function mockFetchResponse(
+  status: number,
+  headers: Record<string, string | string[]> = {},
+) {
   const fetchMock = globalThis.fetch as unknown as ReturnType<typeof mock>;
   fetchMock.mockResolvedValue(makeResponse(status, headers));
 }
 
-function makeResponse(status: number, headers: Record<string, string | string[]> = {}) {
+function makeResponse(
+  status: number,
+  headers: Record<string, string | string[]> = {},
+) {
   const headerBag = new Headers();
   const setCookie: string[] = [];
   for (const [key, value] of Object.entries(headers)) {
@@ -107,7 +174,8 @@ function makeResponse(status: number, headers: Record<string, string | string[]>
     headerBag.set(key, Array.isArray(value) ? value.join(', ') : value);
   }
   if (setCookie.length > 0) {
-    (headerBag as Headers & { getSetCookie?: () => string[] }).getSetCookie = () => setCookie;
+    (headerBag as Headers & { getSetCookie?: () => string[] }).getSetCookie =
+      () => setCookie;
   }
   return {
     ok: status >= 200 && status < 300,

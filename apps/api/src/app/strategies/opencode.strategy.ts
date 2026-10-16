@@ -1151,6 +1151,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
           state.errorResult,
         );
         if (authError) throw authError;
+        throw new Error(state.errorResult.trim());
       }
       if (!state.hasVisibleOutput) {
         this.clearStoredSession();

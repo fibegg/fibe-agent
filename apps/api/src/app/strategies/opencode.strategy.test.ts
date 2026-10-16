@@ -1056,13 +1056,24 @@ describe('OpencodeStrategy', () => {
       getEncryptionKey: () => undefined,
     });
 
+    const chunks: string[] = [];
     await expect(
-      strategy.executePromptStreaming(
-        'hello',
-        'openai/gpt-5.4',
-        () => undefined,
+      strategy.executePromptStreaming('hello', 'openai/gpt-5.4', (chunk) =>
+        chunks.push(chunk),
       ),
     ).rejects.toThrow('delayed provider failure');
+    expect(chunks.join('')).toContain('json response before delayed error');
+    // This is a resumable session identity created before the turn, not a success receipt.
+    expect(
+      readFileSync(
+        join(
+          TEST_HOME,
+          'response-before-session-error-conv',
+          '.opencode_session',
+        ),
+        'utf8',
+      ),
+    ).toBe('ses_fakeOpenCodeSession');
   });
 
   test('executePromptStreaming times out and clears session when app-server returns no output or idle event', async () => {

@@ -503,14 +503,16 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       let cursor: string | null = null;
       do {
         const page: CodexModelListResponse = await appServer.request(
-          'model/list', { cursor, limit: 100, includeHidden: false },
+          'model/list',
+          { cursor, limit: 100, includeHidden: false },
         );
         for (const entry of page.data) {
           if (!entry.hidden && entry.model.trim()) models.add(entry.model);
         }
         cursor = page.nextCursor;
         if (cursor) {
-          if (cursors.has(cursor)) throw new Error('Codex model listing repeated a cursor');
+          if (cursors.has(cursor))
+            throw new Error('Codex model listing repeated a cursor');
           cursors.add(cursor);
         }
       } while (cursor);
@@ -1300,6 +1302,14 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         new Error(
           completedTurn.error?.message ??
             (turn.errorResult.trim() || 'Codex app-server turn failed'),
+        ),
+      );
+      return;
+    }
+    if (completedTurn?.status !== 'completed') {
+      turn.reject(
+        new Error(
+          'Codex app-server returned an unrecognized terminal status. Session not saved.',
         ),
       );
       return;

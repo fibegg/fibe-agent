@@ -138,7 +138,7 @@ function completeTurn(activeThreadId) {
   });
   notify('turn/completed', {
     threadId: activeThreadId,
-    turn: { id: turnId, items: [], status: 'completed', error: null },
+    turn: { id: turnId, items: [], status: process.env.CODEX_FAKE_MODE === 'unknown-terminal' ? 'mystery' : process.env.CODEX_FAKE_MODE === 'missing-terminal' ? undefined : 'completed', error: null },
   });
 }
 
@@ -1087,9 +1087,22 @@ describe('OpenaiCodexStrategy', () => {
 
     expect(await strategy.listModels()).toEqual(['gpt-6.1-sol', 'gpt-6-luna']);
     const requests = readJsonl(requestsPath);
-    expect(requests.map((r) => r.method)).toEqual(['initialize', 'initialized', 'model/list', 'model/list']);
-    expect(requests[2].params).toEqual({ cursor: null, limit: 100, includeHidden: false });
-    expect(requests[3].params).toEqual({ cursor: 'page-2', limit: 100, includeHidden: false });
+    expect(requests.map((r) => r.method)).toEqual([
+      'initialize',
+      'initialized',
+      'model/list',
+      'model/list',
+    ]);
+    expect(requests[2].params).toEqual({
+      cursor: null,
+      limit: 100,
+      includeHidden: false,
+    });
+    expect(requests[3].params).toEqual({
+      cursor: 'page-2',
+      limit: 100,
+      includeHidden: false,
+    });
     expect(strategy.hasNativeSessionSupport()).toBe(false);
   });
 
@@ -1098,7 +1111,9 @@ describe('OpenaiCodexStrategy', () => {
     writeFakeCodexAppServer(fakeCodexPath);
     process.env.CODEX_BIN = fakeCodexPath;
     process.env.CODEX_FAKE_MODE = 'model-error';
-    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow('catalog unavailable');
+    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow(
+      'catalog unavailable',
+    );
   });
 
   test('listModels rejects a repeated pagination cursor', async () => {
@@ -1106,7 +1121,9 @@ describe('OpenaiCodexStrategy', () => {
     writeFakeCodexAppServer(fakeCodexPath);
     process.env.CODEX_BIN = fakeCodexPath;
     process.env.CODEX_FAKE_MODE = 'model-loop';
-    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow('repeated a cursor');
+    await expect(new OpenaiCodexStrategy().listModels()).rejects.toThrow(
+      'repeated a cursor',
+    );
   });
 
   test('constructor with conversationDataDir', () => {
@@ -1342,54 +1359,84 @@ describe('OpenaiCodexStrategy', () => {
     expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
   });
 
-  test.each(['high', 'max', 'ultra'])('executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker at %s effort', async (effort) => {
-    process.env.CODEX_AGENT_TRANSPORT = 'app-server';
-    const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
-    const requestsPath = join(TEST_HOME, 'codex-app-requests.jsonl');
-    writeFakeCodexAppServer(fakeCodexPath);
-    process.env.CODEX_BIN = fakeCodexPath;
-    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
-    process.env.CODEX_FAKE_THREAD_ID = 'thread-app-new';
-    process.env.CODEX_FAKE_MESSAGE = 'from app server';
+  test.each(['unknown-terminal', 'missing-terminal'])(
+    'rejects %s after partial app-server output without saving success',
+    async (mode) => {
+      process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+      process.env.CODEX_FAKE_MODE = mode;
+      const fake = join(TEST_HOME, 'fake-codex-app-server');
+      writeFakeCodexAppServer(fake);
+      process.env.CODEX_BIN = fake;
+      process.env.CODEX_FAKE_MESSAGE = 'partial result';
+      const convDir = join(TEST_HOME, mode);
+      const strategy = new OpenaiCodexStrategy(false, {
+        getConversationDataDir: () => convDir,
+        getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
+        getConversationId: () => mode,
+        getEncryptionKey: () => undefined,
+      });
+      const chunks: string[] = [];
+      await expect(
+        strategy.executePromptStreaming('hello', 'gpt-5.4', (chunk) =>
+          chunks.push(chunk),
+        ),
+      ).rejects.toThrow('unrecognized terminal status');
+      expect(chunks.join('')).toContain('partial result');
+      expect(existsSync(join(convDir, '.codex_session'))).toBe(false);
+    },
+  );
 
-    const defaultDir = join(TEST_HOME, 'default-data');
-    const convDir = join(TEST_HOME, 'conversations', 'app-new');
-    const strategy = new OpenaiCodexStrategy(false, {
-      getConversationDataDir: () => convDir,
-      getDefaultConversationDataDir: () => defaultDir,
-      getConversationId: () => 'app-new',
-      getEncryptionKey: () => undefined,
-    });
-    const chunks: string[] = [];
-    const usage: Array<{ inputTokens: number; outputTokens: number }> = [];
+  test.each(['high', 'max', 'ultra'])(
+    'executePromptStreaming uses Codex app-server with shared workspace and per-conversation marker at %s effort',
+    async (effort) => {
+      process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+      const fakeCodexPath = join(TEST_HOME, 'fake-codex-app-server');
+      const requestsPath = join(TEST_HOME, 'codex-app-requests.jsonl');
+      writeFakeCodexAppServer(fakeCodexPath);
+      process.env.CODEX_BIN = fakeCodexPath;
+      process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+      process.env.CODEX_FAKE_THREAD_ID = 'thread-app-new';
+      process.env.CODEX_FAKE_MESSAGE = 'from app server';
 
-    await strategy.executePromptStreaming(
-      'hello',
-      'gpt-5.4',
-      (chunk) => chunks.push(chunk),
-      { onUsage: (u) => usage.push(u) },
-      undefined,
-      { effort },
-    );
+      const defaultDir = join(TEST_HOME, 'default-data');
+      const convDir = join(TEST_HOME, 'conversations', 'app-new');
+      const strategy = new OpenaiCodexStrategy(false, {
+        getConversationDataDir: () => convDir,
+        getDefaultConversationDataDir: () => defaultDir,
+        getConversationId: () => 'app-new',
+        getEncryptionKey: () => undefined,
+      });
+      const chunks: string[] = [];
+      const usage: Array<{ inputTokens: number; outputTokens: number }> = [];
 
-    const requests = readJsonl(requestsPath);
-    const threadStart = requests.find(
-      (request) => request.method === 'thread/start',
-    ) as { params: Record<string, unknown> };
-    const turnStart = requests.find(
-      (request) => request.method === 'turn/start',
-    ) as { params: Record<string, unknown> };
+      await strategy.executePromptStreaming(
+        'hello',
+        'gpt-5.4',
+        (chunk) => chunks.push(chunk),
+        { onUsage: (u) => usage.push(u) },
+        undefined,
+        { effort },
+      );
 
-    expect(threadStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
-    expect(turnStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
-    expect(turnStart.params.effort).toBe(effort);
-    expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
-      'thread-app-new',
-    );
-    expect(existsSync(join(defaultDir, 'codex_workspace'))).toBe(true);
-    expect(chunks).toEqual(['from app server']);
-    expect(usage).toEqual([{ inputTokens: 3, outputTokens: 4 }]);
-  });
+      const requests = readJsonl(requestsPath);
+      const threadStart = requests.find(
+        (request) => request.method === 'thread/start',
+      ) as { params: Record<string, unknown> };
+      const turnStart = requests.find(
+        (request) => request.method === 'turn/start',
+      ) as { params: Record<string, unknown> };
+
+      expect(threadStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
+      expect(turnStart.params.cwd).toBe(join(defaultDir, 'codex_workspace'));
+      expect(turnStart.params.effort).toBe(effort);
+      expect(readFileSync(join(convDir, '.codex_session'), 'utf8')).toBe(
+        'thread-app-new',
+      );
+      expect(existsSync(join(defaultDir, 'codex_workspace'))).toBe(true);
+      expect(chunks).toEqual(['from app server']);
+      expect(usage).toEqual([{ inputTokens: 3, outputTokens: 4 }]);
+    },
+  );
 
   test('executePromptStreaming resumes Codex app-server thread from conversation marker', async () => {
     process.env.CODEX_AGENT_TRANSPORT = 'app-server';
@@ -1493,11 +1540,9 @@ describe('OpenaiCodexStrategy', () => {
     });
 
     let receivedAssistantDelta = false;
-    const promise = strategy.executePromptStreaming(
-      'hello',
-      'gpt-5.4',
-      () => { receivedAssistantDelta = true; },
-    );
+    const promise = strategy.executePromptStreaming('hello', 'gpt-5.4', () => {
+      receivedAssistantDelta = true;
+    });
     try {
       await waitFor(() => receivedAssistantDelta);
       expect(await strategy.steerAgent('adjust course')).toBe('handled');

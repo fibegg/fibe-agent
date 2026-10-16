@@ -16,6 +16,8 @@ export interface PreviewDiagnosticRedirect {
 export interface PreviewDiagnosticsResult {
   url: string;
   finalUrl: string;
+  /** A redirect target that was observed but not fetched. */
+  nextUrl?: string;
   ok: boolean;
   status?: number;
   statusText?: string;
@@ -28,7 +30,9 @@ export interface PreviewDiagnosticsResult {
 const MAX_REDIRECTS = 5;
 const PREVIEW_PROBE_TIMEOUT_MS = 5000;
 
-export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnosticsResult> {
+export async function diagnosePreviewUrl(
+  rawUrl: string,
+): Promise<PreviewDiagnosticsResult> {
   const normalized = normalizeProbeUrl(rawUrl);
   const base: PreviewDiagnosticsResult = {
     url: normalized,
@@ -42,8 +46,11 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
 
   let currentUrl = normalized;
   let response: Response | null = null;
+  let nextUrl: string | undefined;
+  const visited = new Set<string>();
 
   for (let redirectCount = 0; redirectCount <= MAX_REDIRECTS; redirectCount++) {
+    visited.add(currentUrl);
     try {
       response = await fetch(currentUrl, {
         method: 'GET',
@@ -55,7 +62,10 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
         },
       });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : 'The preview URL could not be fetched.';
+      const detail =
+        error instanceof Error
+          ? error.message
+          : 'The preview URL could not be fetched.';
       const certIssue = diagnoseCertificateFailure(detail);
       return {
         ...base,
@@ -77,9 +87,37 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
     const location = response.headers.get('location');
     if (!location) break;
 
-    const nextUrl = new URL(location, currentUrl).toString();
-    base.redirects.push({ from: currentUrl, to: nextUrl, status: response.status });
+    try {
+      const target = new URL(location, currentUrl);
+      if (!['http:', 'https:'].includes(target.protocol))
+        throw new Error('unsupported redirect');
+      nextUrl = target.toString();
+    } catch {
+      base.issues.push({
+        code: 'invalid_redirect',
+        severity: 'error',
+        title: 'Invalid redirect',
+        detail: 'The response contains an invalid or unsupported Location.',
+      });
+      break;
+    }
+    base.redirects.push({
+      from: currentUrl,
+      to: nextUrl,
+      status: response.status,
+    });
+    if (visited.has(nextUrl)) {
+      base.issues.push({
+        code: 'redirect_cycle',
+        severity: 'error',
+        title: 'Redirect cycle',
+        detail: 'The response redirects to a URL already fetched.',
+      });
+      break;
+    }
+    if (redirectCount === MAX_REDIRECTS) break;
     currentUrl = nextUrl;
+    nextUrl = undefined;
   }
 
   if (!response) return base;
@@ -93,11 +131,14 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
     ...diagnoseCors(response.headers),
     ...diagnoseStatus(response.status, response.statusText),
   ];
-  const displayBlocked = issues.some((issue) => issue.code.startsWith('iframe_') && issue.severity === 'error');
+  const displayBlocked = issues.some(
+    (issue) => issue.code.startsWith('iframe_') && issue.severity === 'error',
+  );
 
   return {
     url: normalized,
     finalUrl,
+    ...(nextUrl ? { nextUrl } : {}),
     ok: response.ok && !displayBlocked,
     status: response.status,
     statusText: response.statusText,
@@ -108,22 +149,31 @@ export async function diagnosePreviewUrl(rawUrl: string): Promise<PreviewDiagnos
   };
 }
 
-function diagnoseCertificateFailure(message: string): PreviewDiagnosticIssue | null {
-  if (!/(certificate|cert|self-signed|unable to get local issuer|unknown ca|expired)/i.test(message)) {
+function diagnoseCertificateFailure(
+  message: string,
+): PreviewDiagnosticIssue | null {
+  if (
+    !/(certificate|cert|self-signed|unable to get local issuer|unknown ca|expired)/i.test(
+      message,
+    )
+  ) {
     return null;
   }
   return {
     code: 'preview_tls_untrusted_in_agent_container',
     severity: 'warning',
     title: 'Preview TLS is not trusted inside the agent container',
-    detail: 'Local development HTTPS may use a certificate the agent container does not trust. Disable local HTTPS for development or install the local CA in the container.',
+    detail:
+      'Local development HTTPS may use a certificate the agent container does not trust. Disable local HTTPS for development or install the local CA in the container.',
   };
 }
 
 export function normalizeProbeUrl(rawUrl: string): string {
   const trimmed = rawUrl.trim();
   if (!trimmed) throw new Error('Preview URL is required');
-  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const withScheme = /^https?:\/\//i.test(trimmed)
+    ? trimmed
+    : `https://${trimmed}`;
   const parsed = new URL(withScheme);
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
     throw new Error('Preview URL must use http or https');
@@ -131,7 +181,11 @@ export function normalizeProbeUrl(rawUrl: string): string {
   return parsed.toString();
 }
 
-function diagnoseUrlShape(originalUrl: string, finalUrl: string, redirects: PreviewDiagnosticRedirect[]): PreviewDiagnosticIssue[] {
+function diagnoseUrlShape(
+  originalUrl: string,
+  finalUrl: string,
+  redirects: PreviewDiagnosticRedirect[],
+): PreviewDiagnosticIssue[] {
   const issues: PreviewDiagnosticIssue[] = [];
   const original = new URL(originalUrl);
   const final = new URL(finalUrl);
@@ -141,7 +195,8 @@ function diagnoseUrlShape(originalUrl: string, finalUrl: string, redirects: Prev
       code: 'url_insecure_http',
       severity: 'warning',
       title: 'Preview uses HTTP',
-      detail: 'Secure cookies, CHIPS/Partitioned cookies, and many browser APIs require HTTPS.',
+      detail:
+        'Secure cookies, CHIPS/Partitioned cookies, and many browser APIs require HTTPS.',
     });
   }
   if (original.protocol === 'https:' && final.protocol === 'http:') {
@@ -149,7 +204,8 @@ function diagnoseUrlShape(originalUrl: string, finalUrl: string, redirects: Prev
       code: 'redirect_downgrade_http',
       severity: 'error',
       title: 'Redirect downgrades to HTTP',
-      detail: 'The preview starts on HTTPS but redirects to HTTP, which will break Secure cookies and can be blocked by browsers.',
+      detail:
+        'The preview starts on HTTPS but redirects to HTTP, which will break Secure cookies and can be blocked by browsers.',
     });
   }
   if (redirects.length > MAX_REDIRECTS) {
@@ -172,12 +228,29 @@ function diagnoseUrlShape(originalUrl: string, finalUrl: string, redirects: Prev
   return issues;
 }
 
-function diagnoseStatus(status: number, statusText: string): PreviewDiagnosticIssue[] {
+function diagnoseStatus(
+  status: number,
+  statusText: string,
+): PreviewDiagnosticIssue[] {
   if (status >= 500) {
-    return [{ code: 'status_server_error', severity: 'error', title: 'Preview server error', detail: `The preview returned ${status} ${statusText}.` }];
+    return [
+      {
+        code: 'status_server_error',
+        severity: 'error',
+        title: 'Preview server error',
+        detail: `The preview returned ${status} ${statusText}.`,
+      },
+    ];
   }
   if (status >= 400) {
-    return [{ code: 'status_client_error', severity: 'warning', title: 'Preview returned an error page', detail: `The preview returned ${status} ${statusText}.` }];
+    return [
+      {
+        code: 'status_client_error',
+        severity: 'warning',
+        title: 'Preview returned an error page',
+        detail: `The preview returned ${status} ${statusText}.`,
+      },
+    ];
   }
   return [];
 }
@@ -187,7 +260,11 @@ function diagnoseFrameHeaders(headers: Headers): PreviewDiagnosticIssue[] {
   const xfo = headers.get('x-frame-options')?.trim();
   if (xfo) {
     const normalized = xfo.toLowerCase();
-    if (normalized === 'deny' || normalized === 'sameorigin' || normalized.startsWith('allow-from')) {
+    if (
+      normalized === 'deny' ||
+      normalized === 'sameorigin' ||
+      normalized.startsWith('allow-from')
+    ) {
       issues.push({
         code: 'iframe_x_frame_options',
         severity: 'error',
@@ -198,7 +275,10 @@ function diagnoseFrameHeaders(headers: Headers): PreviewDiagnosticIssue[] {
   }
 
   const csp = headers.get('content-security-policy')?.trim();
-  const frameAncestors = csp?.split(';').map((part) => part.trim()).find((part) => part.toLowerCase().startsWith('frame-ancestors'));
+  const frameAncestors = csp
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.toLowerCase().startsWith('frame-ancestors'));
   if (frameAncestors) {
     const normalized = frameAncestors.toLowerCase();
     if (normalized.includes("'none'") || normalized.includes("'self'")) {
@@ -221,7 +301,10 @@ function diagnoseFrameHeaders(headers: Headers): PreviewDiagnosticIssue[] {
   return issues;
 }
 
-function diagnoseCookies(headers: Headers, finalUrl: string): PreviewDiagnosticIssue[] {
+function diagnoseCookies(
+  headers: Headers,
+  finalUrl: string,
+): PreviewDiagnosticIssue[] {
   const final = new URL(finalUrl);
   const cookies = getSetCookieHeaders(headers);
   const issues: PreviewDiagnosticIssue[] = [];
@@ -290,20 +373,28 @@ function diagnoseCookies(headers: Headers, finalUrl: string): PreviewDiagnosticI
 
 function diagnoseCors(headers: Headers): PreviewDiagnosticIssue[] {
   const allowOrigin = headers.get('access-control-allow-origin')?.trim();
-  const allowCredentials = headers.get('access-control-allow-credentials')?.trim().toLowerCase();
+  const allowCredentials = headers
+    .get('access-control-allow-credentials')
+    ?.trim()
+    .toLowerCase();
   if (allowOrigin === '*' && allowCredentials === 'true') {
-    return [{
-      code: 'cors_wildcard_with_credentials',
-      severity: 'warning',
-      title: 'CORS wildcard conflicts with credentials',
-      detail: 'Access-Control-Allow-Origin: * cannot be used with credentialed requests. Use an explicit origin when cookies/auth are needed.',
-    }];
+    return [
+      {
+        code: 'cors_wildcard_with_credentials',
+        severity: 'warning',
+        title: 'CORS wildcard conflicts with credentials',
+        detail:
+          'Access-Control-Allow-Origin: * cannot be used with credentialed requests. Use an explicit origin when cookies/auth are needed.',
+      },
+    ];
   }
   return [];
 }
 
 function getSetCookieHeaders(headers: Headers): string[] {
-  const maybeGetSetCookie = headers as Headers & { getSetCookie?: () => string[] };
+  const maybeGetSetCookie = headers as Headers & {
+    getSetCookie?: () => string[];
+  };
   if (typeof maybeGetSetCookie.getSetCookie === 'function') {
     return maybeGetSetCookie.getSetCookie();
   }
@@ -312,11 +403,20 @@ function getSetCookieHeaders(headers: Headers): string[] {
 }
 
 function splitCombinedSetCookie(value: string): string[] {
-  return value.split(/,(?=\s*[^;,=\s]+=[^;,]+)/g).map((part) => part.trim()).filter(Boolean);
+  return value
+    .split(/,(?=\s*[^;,=\s]+=[^;,]+)/g)
+    .map((part) => part.trim())
+    .filter(Boolean);
 }
 
-function parseSetCookie(cookie: string): { name: string; attrs: Map<string, string> } {
-  const parts = cookie.split(';').map((part) => part.trim()).filter(Boolean);
+function parseSetCookie(cookie: string): {
+  name: string;
+  attrs: Map<string, string>;
+} {
+  const parts = cookie
+    .split(';')
+    .map((part) => part.trim())
+    .filter(Boolean);
   const [namePair = ''] = parts;
   const name = namePair.split('=')[0]?.trim() ?? '';
   const attrs = new Map<string, string>();
