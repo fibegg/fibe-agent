@@ -556,6 +556,18 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 
 ## Docker images
 
+### Stable CLI checksum pin
+
+`scripts/provider-versions.json` pins one stable Fibe CLI version and the SHA-256
+of its Linux amd64/arm64 release archives. Both Docker recipes ship this pin.
+The stable installer verifies downloaded bytes before extraction and rejects a
+version override that differs from the pin. Runtime launch policy must select
+that same CLI version (or inherit the matching default). When publishing a new
+SDK patch, first verify the exact SDK tag/release workflow and published
+checksums, then update this pin and both Dockerfile defaults before pushing an
+Agent publication branch. Existing running images keep their original CLI until
+their separately authorized restart.
+
 ### Candidate CLI builds
 
 The breaking staging line uses `hostRoot` / `hostRootDomain`, `HOST_ROOT` /
@@ -580,8 +592,7 @@ Provider builds emit only `<provider>-cand-<cli-version>-<agent-sha7>-<arch>`
 tags and use separate candidate cache refs. They never emit `latest*` or ordinary
 SHA tags. Existing candidate images should be selected by digest. The entrypoint
 uses its matching baked/cached candidate and fails before downloads on an
-explicit mismatched or `latest` request. Normal stable installer/channel behavior
-is preserved. Building/pushing images remains a separate authorized operation.
+explicit mismatched or `latest` request. Stable release builds use the source checksum pin described above. Building/pushing images remains a separate authorized operation.
 
 The Compose CI build environment forwards these candidate inputs. Its binary
 path must be readable inside the `/app` source mount (for example, an already

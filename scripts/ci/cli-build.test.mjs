@@ -18,10 +18,11 @@ function fixture(arch = 'amd64') {
 }
 
 test('normal builds preserve stable versions, both architectures and branch channels', () => {
-  const build = resolveCliBuild({ FIBE_CLI_VERSION: '0.2.46' });
+  const build = resolveCliBuild({});
   assert.deepEqual(build.platforms, ['linux/amd64', 'linux/arm64']);
   assert.deepEqual(providerImageTags({ provider: 'opencode', tagName: 'opencode', sourceBranch: 'dev', gitSha: 'abc' }, build), ['opencode-latest-dev', 'opencode-abc']);
   assert.throws(() => resolveCliBuild({ FIBE_CLI_VERSION: '0.3.0-rc.1' }), /stable/);
+  assert.throws(() => resolveCliBuild({ FIBE_CLI_VERSION: '0.2.46' }), /checksum pin/);
 });
 
 test('candidate build refuses missing or mismatched immutable inputs before publication', () => {

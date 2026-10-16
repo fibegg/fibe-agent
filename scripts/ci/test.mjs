@@ -4,8 +4,8 @@ import { run } from './lib.mjs';
 
 const geminiBin = 'tests/bin/gemini';
 
-console.log('--> Checking retained CI failure diagnostics');
-await run('node', ['--test', 'scripts/ci/notify.test.mjs']);
+console.log('--> Checking release integrity and retained CI failure diagnostics');
+await run('node', ['--test', 'scripts/ci/notify.test.mjs', 'scripts/ci/install-provider.test.mjs', 'scripts/ci/install-fibe.test.mjs', 'scripts/ci/cli-build.test.mjs']);
 
 console.log('--> Running unit tests');
 await run('bun', ['run', 'test']);

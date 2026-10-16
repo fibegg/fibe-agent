@@ -16,7 +16,7 @@ delete process.env.npm_config_jobs;
 console.log('--> Installing native build dependencies');
 const hasNativeBuildDeps = await run('sh', [
   '-lc',
-  'command -v python3 >/dev/null 2>&1 && command -v make >/dev/null 2>&1 && command -v g++ >/dev/null 2>&1 && test -r /etc/ssl/certs/ca-certificates.crt',
+  'command -v python3 >/dev/null 2>&1 && command -v make >/dev/null 2>&1 && command -v g++ >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 && command -v sha256sum >/dev/null 2>&1 && test -r /etc/ssl/certs/ca-certificates.crt',
 ])
   .then(() => true)
   .catch(() => false);
@@ -25,7 +25,7 @@ if (hasNativeBuildDeps) {
   console.log('--> Native build dependencies already present');
 } else {
   await run('apt-get', ['update']);
-  await run('apt-get', ['install', '-y', '--no-install-recommends', 'python3', 'make', 'g++', 'ca-certificates']);
+  await run('apt-get', ['install', '-y', '--no-install-recommends', 'python3', 'make', 'g++', 'ca-certificates', 'jq', 'coreutils']);
   await run('sh', ['-lc', 'rm -rf /var/lib/apt/lists/*']);
 }
 

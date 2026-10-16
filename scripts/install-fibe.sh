@@ -5,6 +5,14 @@ set -eu
 REPO_OWNER="${FIBE_REPO_OWNER:-fibegg}"
 REPO_NAME="${FIBE_REPO_NAME:-sdk}"
 VERSION="${FIBE_VERSION:-${FIBE_CLI_VERSION:-}}"
+PIN_FILE="${FIBE_CLI_PIN_FILE:-/usr/local/share/fibe/provider-versions.json}"
+PIN_VERSION=$(jq -er '.fibeCli.version' "$PIN_FILE")
+VERSION="${VERSION#v}"
+VERSION="${VERSION:-$PIN_VERSION}"
+if [ "$VERSION" != "$PIN_VERSION" ]; then
+  echo "ERROR: Requested Fibe CLI version does not match its checksum pin" >&2
+  exit 1
+fi
 INSTALL_DIR="${FIBE_INSTALL_DIR:-/usr/local/bin}"
 TOKEN=""
 
@@ -23,22 +31,16 @@ case "$ARCH" in
     FIBE_ARCH="arm64"
     ;;
   *)
-    FIBE_ARCH="amd64"
+    echo "ERROR: Unsupported Fibe CLI architecture: $ARCH" >&2
+    exit 1
     ;;
 esac
 
-if [ -n "$VERSION" ]; then
-  TAG="$VERSION"
-  case "$TAG" in
-    v*) ;;
-    *) TAG="v$TAG" ;;
-  esac
-  RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/${TAG}"
-  echo "--> Installing pinned Fibe CLI release ${TAG} from ${REPO_OWNER}/${REPO_NAME}"
-else
-  RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
-  echo "--> Resolving latest Fibe CLI release from ${REPO_OWNER}/${REPO_NAME}"
-fi
+EXPECTED_SHA256=$(jq -er --arg arch "$FIBE_ARCH" '.fibeCli.linuxArchiveSha256[$arch] | select(test("^[0-9a-f]{64}$"))' "$PIN_FILE")
+
+TAG="v$VERSION"
+RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/${TAG}"
+echo "--> Installing checksum-pinned Fibe CLI release ${TAG} from ${REPO_OWNER}/${REPO_NAME}"
 
 RELEASE_JSON=$(mktemp)
 ARCHIVE_PATH=$(mktemp)
@@ -61,8 +63,8 @@ else
 fi
 
 TAG=$(jq -r '.tag_name // empty' "$RELEASE_JSON")
-if [ -z "$TAG" ]; then
-  echo "ERROR: Could not resolve Fibe CLI release tag from ${RELEASE_URL}" >&2
+if [ "$TAG" != "v$PIN_VERSION" ]; then
+  echo "ERROR: Release tag does not match the source checksum pin" >&2
   exit 1
 fi
 
@@ -88,6 +90,9 @@ if [ -n "$TOKEN" ] && [ -n "$ASSET_API_URL" ] && [ "$ASSET_API_URL" != "null" ];
 else
   curl -fsSL "$ASSET_BROWSER_URL" -o "$ARCHIVE_PATH"
 fi
+
+# Verify the downloaded archive before extraction or changing the install directory.
+printf '%s  %s\n' "$EXPECTED_SHA256" "$ARCHIVE_PATH" | sha256sum --check --strict -
 
 mkdir -p "$INSTALL_DIR"
 tar -xzf "$ARCHIVE_PATH" -C "$INSTALL_DIR" fibe

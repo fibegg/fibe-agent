@@ -14,6 +14,10 @@ export function resolveCliBuild(env = process.env) {
   const version = env.FIBE_CLI_VERSION || versions.fibeCli.version;
   if (!candidate) {
     if (!stable.test(version)) throw new Error('FIBE_CLI_VERSION must be an exact stable version');
+    if (version !== versions.fibeCli.version) throw new Error('FIBE_CLI_VERSION must match the source checksum pin');
+    for (const arch of ['amd64', 'arm64']) {
+      if (!/^[0-9a-f]{64}$/.test(versions.fibeCli.linuxArchiveSha256?.[arch] || '')) throw new Error(`Missing Fibe CLI archive checksum for ${arch}`);
+    }
     return { candidate, version, platforms: ['linux/amd64', 'linux/arm64'], cacheSuffix: '' };
   }
   if (!prerelease.test(version)) throw new Error('Candidate FIBE_CLI_VERSION must be an exact prerelease version');

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG FIBE_CANDIDATE_BUILD=0
-ARG FIBE_CLI_VERSION=0.3.0
+ARG FIBE_CLI_VERSION=0.3.1
 
 FROM node:24-slim AS cli-base
 
@@ -218,6 +218,7 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 COPY --link mode /app/mode
 RUN chmod +x /app/mode
 
+COPY --link scripts/provider-versions.json /usr/local/share/fibe/provider-versions.json
 COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh
 
