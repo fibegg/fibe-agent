@@ -19,13 +19,13 @@
     }
   },
   "fibeCli": {
-    "version": "0.3.1",
-    "source": "https://github.com/fibegg/sdk/releases/tag/v0.3.1",
-    "sourceRevision": "52a043c7011dd37bb63c774ccc59f5e231b3e155",
+    "version": "0.3.2",
+    "source": "https://github.com/fibegg/sdk/releases/tag/v0.3.2",
+    "sourceRevision": "f5d1af24708b184fe1d8467f6f2a5dc74db6e663",
     "reviewedAt": "2026-10-16",
     "linuxArchiveSha256": {
-      "amd64": "588961cbff676ca0081b9f34e348cf09cfb4549ce1c9fb77b85c94e6cba6471a",
-      "arm64": "debadc5313474f86fac5d98eb80c7402d32362aa1700aaeed732ecc2f2e00ceb"
+      "amd64": "d19fd0962591a7adf0c46efcd71ea642b67c5c059e3cee04d3f97cb170f74b3d",
+      "arm64": "06f3fc012bef0d0fceca18a1bfd91a79399271f92ea33df09b89af5eb50f3cb7"
     }
   }
 }
