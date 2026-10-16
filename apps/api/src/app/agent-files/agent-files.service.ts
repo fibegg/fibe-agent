@@ -1,5 +1,4 @@
-import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
-import { join, resolve, relative, basename, dirname } from 'node:path';
+import { join, relative, basename } from 'node:path';
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 import {
@@ -8,6 +7,14 @@ import {
 } from '../conversation/conversation-manager.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
+import { PlaygroundsService } from '../playgrounds/playgrounds.service';
+import {
+  readTrustedFile,
+  writeTrustedFile,
+  inspectTrustedFile,
+  listTrustedDirectory,
+  type TrustedFileScope,
+} from '../trusted-files';
 
 export interface AgentFileEntry {
   name: string;
@@ -31,6 +38,7 @@ export class AgentFilesService {
     private readonly strategyRegistry: StrategyRegistryService,
     @Optional()
     private readonly conversationManager?: ConversationManagerService,
+    @Optional() private readonly playgrounds?: PlaygroundsService,
   ) {}
 
   getAgentWorkingDir(conversationId = DEFAULT_CONVERSATION_ID): string | null {
@@ -58,9 +66,14 @@ export class AgentFilesService {
   ): Promise<AgentFileEntry[]> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return [];
-    const settings = await loadFibeSettings(dir);
-    const ig = await loadGitignore(dir);
-    return this.readDir(dir, '', ig, settings);
+    const scope = await this.fileScope(conversationId, dir);
+    const read = async (path: string) =>
+      (await readTrustedFile(scope, relative(scope.root, path))).toString(
+        'utf8',
+      );
+    const settings = await loadFibeSettings(dir, read);
+    const ig = await loadGitignore(dir, undefined, read);
+    return this.readDir(dir, '', ig, settings, scope);
   }
 
   async getStats(
@@ -68,9 +81,14 @@ export class AgentFilesService {
   ): Promise<AgentWorkspaceStats> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return { fileCount: 0, totalLines: 0, workspaceAvailable: false };
-    const settings = await loadFibeSettings(dir);
-    const ig = await loadGitignore(dir);
-    const stats = await this.countStats(dir, ig, settings);
+    const scope = await this.fileScope(conversationId, dir);
+    const read = async (path: string) =>
+      (await readTrustedFile(scope, relative(scope.root, path))).toString(
+        'utf8',
+      );
+    const settings = await loadFibeSettings(dir, read);
+    const ig = await loadGitignore(dir, undefined, read);
+    const stats = await this.countStats(dir, ig, settings, scope);
     return { ...stats, workspaceAvailable: true };
   }
 
@@ -78,12 +96,22 @@ export class AgentFilesService {
     absPath: string,
     parentIg: GitignoreFilter,
     settings: ResolvedFibeSettings,
+    scope: TrustedFileScope,
+    depth = 0,
   ): Promise<{ fileCount: number; totalLines: number }> {
+    if (depth > 50) return { fileCount: 0, totalLines: 0 };
     let fileCount = 0;
     let totalLines = 0;
     try {
-      const ig = await loadGitignore(absPath, parentIg);
-      const entries = await readdir(absPath, { withFileTypes: true });
+      const ig = await loadGitignore(absPath, parentIg, async (path) =>
+        (await readTrustedFile(scope, relative(scope.root, path))).toString(
+          'utf8',
+        ),
+      );
+      const entries = await listTrustedDirectory(
+        scope,
+        relative(scope.root, absPath),
+      );
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
@@ -96,16 +124,24 @@ export class AgentFilesService {
         }
         if (ig.ignores(name)) continue;
         const childAbs = join(absPath, name);
-        if (e.isFile()) {
+        if (e.type === 'file') {
           fileCount++;
           try {
-            const content = await readFile(childAbs, 'utf-8');
+            const content = (
+              await readTrustedFile(scope, relative(scope.root, childAbs))
+            ).toString('utf8');
             totalLines += content.split('\n').length;
           } catch {
             /* skip binary/unreadable */
           }
-        } else if (e.isDirectory()) {
-          const sub = await this.countStats(childAbs, ig, settings);
+        } else if (e.type === 'directory') {
+          const sub = await this.countStats(
+            childAbs,
+            ig,
+            settings,
+            scope,
+            depth + 1,
+          );
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
         }
@@ -116,13 +152,41 @@ export class AgentFilesService {
     return { fileCount, totalLines };
   }
 
+  private async fileScope(
+    conversationId: string,
+    preparedRoot?: string,
+  ): Promise<TrustedFileScope> {
+    const root = preparedRoot ?? this.getAgentWorkingDir(conversationId);
+    if (!root) throw new NotFoundException('No agent working directory');
+    const baseScope = {
+      root,
+      trustedRoots: [],
+      ignoredNames: ['.git', 'node_modules'],
+    };
+    const settings = await loadFibeSettings(root, async (path) =>
+      (await readTrustedFile(baseScope, relative(root, path))).toString('utf8'),
+    );
+    const repos = (await this.playgrounds?.getRepos().catch(() => [])) ?? [];
+    return {
+      root,
+      trustedRoots: repos.map((repo) => repo.repo_root),
+      ignoredNames: [...settings.ignoredNames],
+    };
+  }
+
+  async getFileBuffer(
+    relativePath: string,
+    conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<Buffer> {
+    return readTrustedFile(await this.fileScope(conversationId), relativePath);
+  }
+
   async getFileContent(
     relativePath: string,
     conversationId = DEFAULT_CONVERSATION_ID,
   ): Promise<string> {
-    return readFile(
-      await this.getFilePath(relativePath, conversationId),
-      'utf-8',
+    return (await this.getFileBuffer(relativePath, conversationId)).toString(
+      'utf8',
     );
   }
 
@@ -131,52 +195,22 @@ export class AgentFilesService {
     content: string,
     conversationId = DEFAULT_CONVERSATION_ID,
   ): Promise<void> {
-    const dir = this.getAgentWorkingDir(conversationId);
-    if (!dir) throw new NotFoundException('No agent working directory');
-    const settings = await loadFibeSettings(dir);
-    const base = resolve(dir);
-    const absPath = resolve(base, relativePath);
-    const rel = relative(base, absPath);
-    const segments = rel.replace(/\\/g, '/').split('/');
-    if (
-      rel.startsWith('..') ||
-      absPath === base ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
-      throw new NotFoundException('File not found');
-    }
-    await mkdir(dirname(absPath), { recursive: true });
-    await writeFile(absPath, content, 'utf-8');
+    await writeTrustedFile(
+      await this.fileScope(conversationId),
+      relativePath,
+      Buffer.from(content, 'utf8'),
+    );
   }
 
+  /** Metadata only. Raw responses use getFileBuffer rather than reopening a path. */
   async getFilePath(
     relativePath: string,
     conversationId = DEFAULT_CONVERSATION_ID,
   ): Promise<string> {
-    const dir = this.getAgentWorkingDir(conversationId);
-    if (!dir) throw new NotFoundException('No agent working directory');
-    const settings = await loadFibeSettings(dir);
-    const base = resolve(dir);
-    const absPath = resolve(base, relativePath);
-    const rel = relative(base, absPath);
-    const segments = rel.replace(/\\/g, '/').split('/');
-    if (
-      rel.startsWith('..') ||
-      absPath === base ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
-      throw new NotFoundException('File not found');
-    }
-    let st: Awaited<ReturnType<typeof stat>>;
-    try {
-      st = await stat(absPath);
-    } catch {
-      throw new NotFoundException('File not found');
-    }
-    if (!st.isFile()) {
-      throw new NotFoundException('File not found');
-    }
-    return absPath;
+    return inspectTrustedFile(
+      await this.fileScope(conversationId),
+      relativePath,
+    );
   }
 
   async uploadFile(
@@ -185,26 +219,11 @@ export class AgentFilesService {
     buffer: Buffer,
     conversationId = DEFAULT_CONVERSATION_ID,
   ): Promise<string> {
-    const dir = this.getAgentWorkingDir(conversationId);
-    if (!dir) throw new NotFoundException('No agent working directory');
-    const base = resolve(dir);
-    const settings = await loadFibeSettings(base);
-    // Sanitise filename: strip any path separators so callers can't traverse
     const safeName =
       basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
-    const targetDir = relativeDir ? resolve(base, relativeDir) : base;
-    const relDir = relative(base, targetDir);
-    const segments = relDir.replace(/\\/g, '/').split('/');
-    if (
-      relDir.startsWith('..') ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
-      throw new NotFoundException('Invalid upload path');
-    }
-    await mkdir(targetDir, { recursive: true });
-    const absPath = join(targetDir, safeName);
-    await writeFile(absPath, buffer);
-    return relativeDir ? `${relDir}/${safeName}` : safeName;
+    const path = relativeDir ? `${relativeDir}/${safeName}` : safeName;
+    await writeTrustedFile(await this.fileScope(conversationId), path, buffer);
+    return path;
   }
 
   private async readDir(
@@ -212,14 +231,23 @@ export class AgentFilesService {
     relativePath: string,
     parentIg: GitignoreFilter,
     settings: ResolvedFibeSettings,
+    scope: TrustedFileScope,
+    depth = 0,
   ): Promise<AgentFileEntry[]> {
-    if (settings.ignoredNames.has(basename(absPath))) return [];
+    if (depth > 50 || settings.ignoredNames.has(basename(absPath))) return [];
     try {
-      const ig = await loadGitignore(absPath, parentIg);
-      const entries = await readdir(absPath, { withFileTypes: true });
+      const ig = await loadGitignore(absPath, parentIg, async (path) =>
+        (await readTrustedFile(scope, relative(scope.root, path))).toString(
+          'utf8',
+        ),
+      );
+      const entries = await listTrustedDirectory(
+        scope,
+        relative(scope.root, absPath),
+      );
       const result: AgentFileEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
-      const files: { name: string; rel: string }[] = [];
+      const files: { name: string; rel: string; mtime: number }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
@@ -232,10 +260,10 @@ export class AgentFilesService {
         }
         const rel = relativePath ? `${relativePath}/${name}` : name;
         if (ig.ignores(name)) continue;
-        if (e.isDirectory()) {
+        if (e.type === 'directory') {
           dirs.push({ name, abs: join(absPath, name), rel });
-        } else if (e.isFile()) {
-          files.push({ name, rel });
+        } else if (e.type === 'file') {
+          files.push({ name, rel, mtime: e.mtime });
         }
       }
       dirs.sort((a, b) => a.name.localeCompare(b.name));
@@ -245,17 +273,18 @@ export class AgentFilesService {
           name: d.name,
           path: d.rel,
           type: 'directory',
-          children: await this.readDir(d.abs, d.rel, ig, settings),
+          children: await this.readDir(
+            d.abs,
+            d.rel,
+            ig,
+            settings,
+            scope,
+            depth + 1,
+          ),
         });
       }
       for (const f of files) {
-        let mtime: number | undefined;
-        try {
-          const st = await stat(join(absPath, f.name));
-          mtime = st.mtimeMs;
-        } catch {
-          /* ignore */
-        }
+        const mtime = f.mtime;
         result.push({ name: f.name, path: f.rel, type: 'file', mtime });
       }
       return result;

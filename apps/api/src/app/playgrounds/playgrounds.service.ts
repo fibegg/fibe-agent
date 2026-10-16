@@ -1,12 +1,18 @@
-import { readdir, readFile, stat, writeFile, mkdir } from 'node:fs/promises';
+import { stat } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
-import { dirname } from 'node:path';
 import { join, resolve, relative, basename } from 'node:path';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { PlaygroundBrowserService } from './playground-browser.service';
 import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
+import {
+  readTrustedFile,
+  writeTrustedFile,
+  inspectTrustedFile,
+  listTrustedDirectory,
+  type TrustedFileScope,
+} from '../trusted-files';
 import { exec, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import {
@@ -162,8 +168,13 @@ export class PlaygroundsService {
   ) {}
 
   async getTree(): Promise<PlaygroundEntry[]> {
-    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
-    const ig = await loadGitignore(this.config.getPlaygroundsDir());
+    const scope = await this.fileScope();
+    const read = async (path: string) =>
+      (await readTrustedFile(scope, relative(scope.root, path))).toString(
+        'utf8',
+      );
+    const settings = await loadFibeSettings(scope.root, read);
+    const ig = await loadGitignore(scope.root, undefined, read);
     const statuses = await this.getGitStatuses(this.config.getPlaygroundsDir());
     return this.readDir(
       this.config.getPlaygroundsDir(),
@@ -171,6 +182,7 @@ export class PlaygroundsService {
       ig,
       statuses,
       settings,
+      scope,
     );
   }
 
@@ -180,10 +192,15 @@ export class PlaygroundsService {
     hasGitRepo: boolean;
   }> {
     const dir = this.config.getPlaygroundsDir();
-    const settings = await loadFibeSettings(dir);
-    const ig = await loadGitignore(dir);
+    const scope = await this.fileScope();
+    const read = async (path: string) =>
+      (await readTrustedFile(scope, relative(scope.root, path))).toString(
+        'utf8',
+      );
+    const settings = await loadFibeSettings(dir, read);
+    const ig = await loadGitignore(dir, undefined, read);
     const [counts, repos] = await Promise.all([
-      this.countStats(dir, ig, settings),
+      this.countStats(dir, ig, settings, scope),
       this.getRepos().catch(() => []),
     ]);
     return { ...counts, hasGitRepo: repos.length > 0 };
@@ -519,9 +536,7 @@ export class PlaygroundsService {
     return chunks.join('\n');
   }
 
-  private async resolveRepo(
-    selector?: string,
-  ): Promise<{
+  private async resolveRepo(selector?: string): Promise<{
     repo: LocalPlaygroundRepo;
     repos: LocalPlaygroundRepo[];
   } | null> {
@@ -605,14 +620,22 @@ export class PlaygroundsService {
     absPath: string,
     parentIg: GitignoreFilter,
     settings: ResolvedFibeSettings,
+    scope: TrustedFileScope,
     depth = 0,
   ): Promise<{ fileCount: number; totalLines: number }> {
     if (depth > MAX_DEPTH) return { fileCount: 0, totalLines: 0 };
     let fileCount = 0;
     let totalLines = 0;
     try {
-      const ig = await loadGitignore(absPath, parentIg);
-      const entries = await readdir(absPath, { withFileTypes: true });
+      const ig = await loadGitignore(absPath, parentIg, async (path) =>
+        (await readTrustedFile(scope, relative(scope.root, path))).toString(
+          'utf8',
+        ),
+      );
+      const entries = await listTrustedDirectory(
+        scope,
+        relative(scope.root, absPath),
+      );
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
@@ -625,29 +648,27 @@ export class PlaygroundsService {
         }
         if (ig.ignores(name)) continue;
         const childAbs = join(absPath, name);
-        let isDir = e.isDirectory();
-        let isFile = e.isFile();
-
-        if (e.isSymbolicLink()) {
-          try {
-            const st = await stat(childAbs);
-            isDir = st.isDirectory();
-            isFile = st.isFile();
-          } catch {
-            continue;
-          }
-        }
+        const isDir = e.type === 'directory';
+        const isFile = e.type === 'file';
 
         if (isFile) {
           fileCount++;
           try {
-            const content = await readFile(childAbs, 'utf-8');
+            const content = (
+              await readTrustedFile(scope, relative(scope.root, childAbs))
+            ).toString('utf8');
             totalLines += content.split('\n').length;
           } catch {
             /* skip binary/unreadable */
           }
         } else if (isDir) {
-          const sub = await this.countStats(childAbs, ig, settings, depth + 1);
+          const sub = await this.countStats(
+            childAbs,
+            ig,
+            settings,
+            scope,
+            depth + 1,
+          );
           fileCount += sub.fileCount;
           totalLines += sub.totalLines;
         }
@@ -658,50 +679,44 @@ export class PlaygroundsService {
     return { fileCount, totalLines };
   }
 
-  async getFileContent(relativePath: string): Promise<string> {
-    return readFile(await this.getFilePath(relativePath), 'utf-8');
+  private async fileScope(): Promise<TrustedFileScope> {
+    const root = this.config.getPlaygroundsDir();
+    const baseScope = {
+      root,
+      trustedRoots: [],
+      ignoredNames: ['.git', 'node_modules'],
+    };
+    const settings = await loadFibeSettings(root, async (path) =>
+      (await readTrustedFile(baseScope, relative(root, path))).toString('utf8'),
+    );
+    // Only the current CLI-selected repositories grant external target authority.
+    const repos = await this.getRepos().catch(() => []);
+    return {
+      root,
+      trustedRoots: repos.map((repo) => repo.repo_root),
+      ignoredNames: [...settings.ignoredNames],
+    };
   }
 
+  async getFileBuffer(relativePath: string): Promise<Buffer> {
+    return readTrustedFile(await this.fileScope(), relativePath);
+  }
+
+  async getFileContent(relativePath: string): Promise<string> {
+    return (await this.getFileBuffer(relativePath)).toString('utf8');
+  }
+
+  /** Metadata only. Raw responses use getFileBuffer rather than reopening a path. */
   async getFilePath(relativePath: string): Promise<string> {
-    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
-    const base = resolve(this.config.getPlaygroundsDir());
-    const absPath = resolve(base, relativePath);
-    const rel = relative(base, absPath);
-    const segments = rel.replace(/\\/g, '/').split('/');
-    if (
-      rel.startsWith('..') ||
-      absPath === base ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
-      throw new NotFoundException('File not found');
-    }
-    let st: Awaited<ReturnType<typeof stat>>;
-    try {
-      st = await stat(absPath);
-    } catch {
-      throw new NotFoundException('File not found');
-    }
-    if (!st.isFile()) {
-      throw new NotFoundException('File not found');
-    }
-    return absPath;
+    return inspectTrustedFile(await this.fileScope(), relativePath);
   }
 
   async saveFileContent(relativePath: string, content: string): Promise<void> {
-    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
-    const base = resolve(this.config.getPlaygroundsDir());
-    const absPath = resolve(base, relativePath);
-    const rel = relative(base, absPath);
-    const segments = rel.replace(/\\/g, '/').split('/');
-    if (
-      rel.startsWith('..') ||
-      absPath === base ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
-      throw new NotFoundException('File not found');
-    }
-    await mkdir(dirname(absPath), { recursive: true });
-    await writeFile(absPath, content, 'utf-8');
+    await writeTrustedFile(
+      await this.fileScope(),
+      relativePath,
+      Buffer.from(content, 'utf8'),
+    );
   }
 
   async uploadFile(
@@ -709,69 +724,29 @@ export class PlaygroundsService {
     filename: string,
     buffer: Buffer,
   ): Promise<string> {
-    const base = resolve(this.config.getPlaygroundsDir());
-    const settings = await loadFibeSettings(base);
-    // Sanitise filename: strip any path separators so callers can't traverse
     const safeName =
       basename(filename).replace(/[^a-zA-Z0-9._-]/g, '_') || 'upload';
-    const targetDir = relativeDir ? resolve(base, relativeDir) : base;
-    const relDir = relative(base, targetDir);
-    const segments = relDir.replace(/\\/g, '/').split('/');
-    if (
-      relDir.startsWith('..') ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
-      throw new NotFoundException('Invalid upload path');
-    }
-
-    try {
-      const baseStat = await stat(base).catch((err: NodeJS.ErrnoException) => {
-        if (err.code === 'ENOENT') return null;
-        throw err;
-      });
-      if (baseStat && !baseStat.isDirectory()) {
-        throw new NotFoundException('Playgrounds directory is unavailable');
-      }
-      await mkdir(targetDir, { recursive: true });
-    } catch (err) {
-      if (err instanceof NotFoundException) throw err;
-      throw new NotFoundException('Playgrounds directory is unavailable');
-    }
-
-    const absPath = join(targetDir, safeName);
-    try {
-      await writeFile(absPath, buffer);
-    } catch {
-      throw new NotFoundException('Playgrounds directory is unavailable');
-    }
-    return relativeDir ? `${relDir}/${safeName}` : safeName;
+    const path = relativeDir ? `${relativeDir}/${safeName}` : safeName;
+    await writeTrustedFile(await this.fileScope(), path, buffer);
+    return path;
   }
 
   async getFolderFileContents(
     relativePath: string,
   ): Promise<{ path: string; content: string }[]> {
-    const settings = await loadFibeSettings(this.config.getPlaygroundsDir());
-    const base = resolve(this.config.getPlaygroundsDir());
+    const scope = await this.fileScope();
+    const settings = await loadFibeSettings(scope.root, async (path) =>
+      (await readTrustedFile(scope, relative(scope.root, path))).toString(
+        'utf8',
+      ),
+    );
+    const base = resolve(scope.root);
     const absPath = resolve(base, relativePath);
     const rel = relative(base, absPath);
-    const segments = rel.replace(/\\/g, '/').split('/');
-    if (
-      rel.startsWith('..') ||
-      absPath === base ||
-      segments.some((seg) => settings.ignoredNames.has(seg))
-    ) {
+    if (!rel || rel.startsWith('..'))
       throw new NotFoundException('Folder not found');
-    }
-    let st: Awaited<ReturnType<typeof stat>>;
-    try {
-      st = await stat(absPath);
-    } catch {
-      throw new NotFoundException('Folder not found');
-    }
-    if (!st.isDirectory()) {
-      throw new NotFoundException('Folder not found');
-    }
-    return this.collectFileContents(absPath, rel, settings);
+    await listTrustedDirectory(scope, rel);
+    return this.collectFileContents(absPath, rel, settings, scope);
   }
 
   private async getGitStatuses(
@@ -832,12 +807,15 @@ export class PlaygroundsService {
     absPath: string,
     relPath: string,
     settings: ResolvedFibeSettings,
+    scope: TrustedFileScope,
+    depth = 0,
   ): Promise<{ path: string; content: string }[]> {
+    if (depth > MAX_DEPTH) return [];
     if (settings.ignoredNames.has(basename(absPath))) return [];
     const result: { path: string; content: string }[] = [];
     let entries;
     try {
-      entries = await readdir(absPath, { withFileTypes: true });
+      entries = await listTrustedDirectory(scope, relPath);
     } catch {
       return [];
     }
@@ -853,22 +831,14 @@ export class PlaygroundsService {
       }
       const childRel = relPath ? `${relPath}/${name}` : name;
       const childAbs = join(absPath, name);
-      let isDir = e.isDirectory();
-      let isFile = e.isFile();
-
-      if (e.isSymbolicLink?.()) {
-        try {
-          const st = await stat(childAbs);
-          isDir = st.isDirectory();
-          isFile = st.isFile();
-        } catch {
-          continue;
-        }
-      }
+      const isDir = e.type === 'directory';
+      const isFile = e.type === 'file';
 
       if (isFile) {
         try {
-          const content = await readFile(childAbs, 'utf-8');
+          const content = (await readTrustedFile(scope, childRel)).toString(
+            'utf8',
+          );
           result.push({ path: childRel, content });
         } catch {
           /* skip unreadable files */
@@ -878,6 +848,8 @@ export class PlaygroundsService {
           childAbs,
           childRel,
           settings,
+          scope,
+          depth + 1,
         );
         result.push(...sub);
       }
@@ -891,16 +863,24 @@ export class PlaygroundsService {
     parentIg: GitignoreFilter,
     statuses: Map<string, PlaygroundEntry['gitStatus']>,
     settings: ResolvedFibeSettings,
+    scope: TrustedFileScope,
     depth = 0,
   ): Promise<PlaygroundEntry[]> {
     if (depth > MAX_DEPTH || settings.ignoredNames.has(basename(absPath)))
       return [];
     try {
-      const ig = await loadGitignore(absPath, parentIg);
-      const entries = await readdir(absPath, { withFileTypes: true });
+      const ig = await loadGitignore(absPath, parentIg, async (path) =>
+        (await readTrustedFile(scope, relative(scope.root, path))).toString(
+          'utf8',
+        ),
+      );
+      const entries = await listTrustedDirectory(
+        scope,
+        relative(scope.root, absPath),
+      );
       const result: PlaygroundEntry[] = [];
       const dirs: { name: string; abs: string; rel: string }[] = [];
-      const files: { name: string; rel: string }[] = [];
+      const files: { name: string; rel: string; mtime: number }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
@@ -913,23 +893,13 @@ export class PlaygroundsService {
         }
         const rel = relativePath ? `${relativePath}/${name}` : name;
         if (ig.ignores(name)) continue;
-        let isDir = e.isDirectory();
-        let isFile = e.isFile();
-
-        if (e.isSymbolicLink()) {
-          try {
-            const st = await stat(join(absPath, name));
-            isDir = st.isDirectory();
-            isFile = st.isFile();
-          } catch {
-            continue;
-          }
-        }
+        const isDir = e.type === 'directory';
+        const isFile = e.type === 'file';
 
         if (isDir) {
           dirs.push({ name, abs: join(absPath, name), rel });
         } else if (isFile) {
-          files.push({ name, rel });
+          files.push({ name, rel, mtime: e.mtime });
         }
       }
       dirs.sort((a, b) => a.name.localeCompare(b.name));
@@ -945,19 +915,13 @@ export class PlaygroundsService {
             ig,
             statuses,
             settings,
+            scope,
             depth + 1,
           ),
         });
       }
       for (const f of files) {
-        let mtime: number | undefined;
-        const absFilePath = join(absPath, f.name);
-        try {
-          const st = await stat(absFilePath);
-          mtime = st.mtimeMs;
-        } catch {
-          /* ignore */
-        }
+        const mtime = f.mtime;
 
         const gitStatus = statuses.get(f.rel);
         result.push({

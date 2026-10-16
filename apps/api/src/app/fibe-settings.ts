@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { Logger } from '@nestjs/common';
+import { Logger, NotFoundException } from '@nestjs/common';
 
 const logger = new Logger('FibeSettings');
 
@@ -23,16 +23,21 @@ const DEFAULT_VISIBLE_HIDDEN = ['.claude', '.opencode'];
 
 export async function loadFibeSettings(
   dir: string,
+  read: (path: string) => Promise<string> = (path) => readFile(path, 'utf-8'),
 ): Promise<ResolvedFibeSettings> {
   let settings: FibeSettings = {};
 
   try {
     const settingsPath = join(dir, '.fibe', 'settings.json');
-    const content = await readFile(settingsPath, 'utf-8');
+    const content = await read(settingsPath);
     settings = JSON.parse(content) as FibeSettings;
   } catch (err: unknown) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code !== 'ENOENT' && code !== 'ENOTDIR') {
+    if (
+      !(err instanceof NotFoundException) &&
+      code !== 'ENOENT' &&
+      code !== 'ENOTDIR'
+    ) {
       logger.warn(
         `Failed to parse .fibe/settings.json in ${dir}: ${err instanceof Error ? err.message : String(err)}`,
       );

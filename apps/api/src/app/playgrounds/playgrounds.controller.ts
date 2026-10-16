@@ -1,6 +1,19 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { BadRequestException, Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { createReadStream } from 'node:fs';
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { contentTypeFromFilename } from '../uploads/uploads-handler';
 import { PlaygroundsService } from './playgrounds.service';
@@ -45,7 +58,9 @@ export class PlaygroundsController {
     try {
       return await diagnosePreviewUrl(url);
     } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : 'Invalid preview URL');
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Invalid preview URL',
+      );
     }
   }
 
@@ -56,32 +71,80 @@ export class PlaygroundsController {
 
   @Post('playgrounds/git-stage')
   @HttpCode(HttpStatus.OK)
-  async stageGitFiles(@Body() body: { files?: string[]; confirm?: boolean; repo?: string }) {
-    return this.gitOperation(() => this.playgrounds.stageGitFiles(body?.files ?? [], body?.confirm === true, body?.repo));
+  async stageGitFiles(
+    @Body() body: { files?: string[]; confirm?: boolean; repo?: string },
+  ) {
+    return this.gitOperation(() =>
+      this.playgrounds.stageGitFiles(
+        body?.files ?? [],
+        body?.confirm === true,
+        body?.repo,
+      ),
+    );
   }
 
   @Post('playgrounds/git-commit')
   @HttpCode(HttpStatus.OK)
-  async commitGit(@Body() body: { message?: string; confirm?: boolean; repo?: string }) {
-    return this.gitOperation(() => this.playgrounds.commitGit(body?.message ?? '', body?.confirm === true, body?.repo));
+  async commitGit(
+    @Body() body: { message?: string; confirm?: boolean; repo?: string },
+  ) {
+    return this.gitOperation(() =>
+      this.playgrounds.commitGit(
+        body?.message ?? '',
+        body?.confirm === true,
+        body?.repo,
+      ),
+    );
   }
 
   @Post('playgrounds/git-branch')
   @HttpCode(HttpStatus.OK)
   async branchGit(@Body() body: { create?: string; repo?: string }) {
-    return this.gitOperation(() => this.playgrounds.branchGit(body?.create, body?.repo));
+    return this.gitOperation(() =>
+      this.playgrounds.branchGit(body?.create, body?.repo),
+    );
   }
 
   @Post('playgrounds/git-push')
   @HttpCode(HttpStatus.OK)
-  async pushGit(@Body() body: { remote?: string; branch?: string; confirm?: boolean; repo?: string }) {
-    return this.gitOperation(() => this.playgrounds.pushGit(body?.confirm === true, body?.remote, body?.branch, body?.repo));
+  async pushGit(
+    @Body()
+    body: {
+      remote?: string;
+      branch?: string;
+      confirm?: boolean;
+      repo?: string;
+    },
+  ) {
+    return this.gitOperation(() =>
+      this.playgrounds.pushGit(
+        body?.confirm === true,
+        body?.remote,
+        body?.branch,
+        body?.repo,
+      ),
+    );
   }
 
   @Post('playgrounds/git-pr')
   @HttpCode(HttpStatus.OK)
-  async createDraftPr(@Body() body: { title?: string; body?: string; confirm?: boolean; repo?: string }) {
-    return this.gitOperation(() => this.playgrounds.createDraftPrWithGh(body?.confirm === true, body?.title, body?.body, body?.repo));
+  async createDraftPr(
+    @Body()
+    body: {
+      title?: string;
+      body?: string;
+      confirm?: boolean;
+      repo?: string;
+    },
+  ) {
+    return this.gitOperation(() =>
+      this.playgrounds.createDraftPrWithGh(
+        body?.confirm === true,
+        body?.title,
+        body?.body,
+        body?.repo,
+      ),
+    );
   }
 
   @Get('playgrounds/file')
@@ -98,17 +161,18 @@ export class PlaygroundsController {
     if (!path || typeof path !== 'string') {
       throw new NotFoundException('Invalid path');
     }
-    const filePath = await this.playgrounds.getFilePath(path);
+    const buffer = await this.playgrounds.getFileBuffer(path);
     res.header('Content-Type', contentTypeFromFilename(path));
-    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(path.split('/').pop() ?? 'file')}"`);
-    return res.send(createReadStream(filePath));
+    res.header(
+      'Content-Disposition',
+      `inline; filename="${safeHeaderFilename(path.split('/').pop() ?? 'file')}"`,
+    );
+    return res.send(buffer);
   }
 
   @Put('playgrounds/file')
   @HttpCode(HttpStatus.OK)
-  async saveFileContent(
-    @Body() body: { path?: string; content?: string },
-  ) {
+  async saveFileContent(@Body() body: { path?: string; content?: string }) {
     const { path, content } = body ?? {};
     if (!path || typeof path !== 'string') {
       throw new NotFoundException('Invalid path');
@@ -124,10 +188,16 @@ export class PlaygroundsController {
   @HttpCode(HttpStatus.OK)
   async uploadFile(@Req() req: FastifyRequest, @Query('dir') dir?: string) {
     type MultipartFile = { filename: string; toBuffer: () => Promise<Buffer> };
-    const data = await (req as unknown as { file: () => Promise<MultipartFile> }).file();
+    const data = await (
+      req as unknown as { file: () => Promise<MultipartFile> }
+    ).file();
     if (!data) throw new NotFoundException('No file uploaded');
     const buffer = await data.toBuffer();
-    const savedPath = await this.playgrounds.uploadFile(dir ?? '', data.filename, buffer);
+    const savedPath = await this.playgrounds.uploadFile(
+      dir ?? '',
+      data.filename,
+      buffer,
+    );
     return { ok: true, path: savedPath };
   }
 
@@ -164,7 +234,9 @@ export class PlaygroundsController {
     try {
       return await operation();
     } catch (error) {
-      throw new BadRequestException(error instanceof Error ? error.message : 'Git operation failed');
+      throw new BadRequestException(
+        error instanceof Error ? error.message : 'Git operation failed',
+      );
     }
   }
 }

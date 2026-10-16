@@ -99,9 +99,10 @@ const EMPTY_FILTER: GitignoreFilter = { ignores: () => false };
 export async function loadGitignore(
   dir: string,
   parent?: GitignoreFilter,
+  read: (path: string) => Promise<string> = (path) => readFile(path, 'utf-8'),
 ): Promise<GitignoreFilter> {
   try {
-    const content = await readFile(join(dir, '.gitignore'), 'utf-8');
+    const content = await read(join(dir, '.gitignore'));
     const localRules = parseGitignoreContent(content);
     if (parent && parent !== EMPTY_FILTER) {
       return {

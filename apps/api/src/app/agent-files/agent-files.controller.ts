@@ -1,6 +1,18 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import { Body, Controller, Get, HttpCode, HttpStatus, NotFoundException, Post, Put, Query, Req, Res, UseGuards } from '@nestjs/common';
-import { createReadStream } from 'node:fs';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  NotFoundException,
+  Post,
+  Put,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { contentTypeFromFilename } from '../uploads/uploads-handler';
 import { AgentFilesService } from './agent-files.service';
@@ -41,10 +53,13 @@ export class AgentFilesController {
     if (!path || typeof path !== 'string') {
       throw new NotFoundException('Invalid path');
     }
-    const filePath = await this.agentFiles.getFilePath(path, conversationId);
+    const buffer = await this.agentFiles.getFileBuffer(path, conversationId);
     res.header('Content-Type', contentTypeFromFilename(path));
-    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(path.split('/').pop() ?? 'file')}"`);
-    return res.send(createReadStream(filePath));
+    res.header(
+      'Content-Disposition',
+      `inline; filename="${safeHeaderFilename(path.split('/').pop() ?? 'file')}"`,
+    );
+    return res.send(buffer);
   }
 
   @Put('agent-files/file')
@@ -72,10 +87,17 @@ export class AgentFilesController {
     @Query('conversationId') conversationId?: string,
   ) {
     type MultipartFile = { filename: string; toBuffer: () => Promise<Buffer> };
-    const data = await (req as unknown as { file: () => Promise<MultipartFile> }).file();
+    const data = await (
+      req as unknown as { file: () => Promise<MultipartFile> }
+    ).file();
     if (!data) throw new NotFoundException('No file uploaded');
     const buffer = await data.toBuffer();
-    const savedPath = await this.agentFiles.uploadFile(dir ?? '', data.filename, buffer, conversationId);
+    const savedPath = await this.agentFiles.uploadFile(
+      dir ?? '',
+      data.filename,
+      buffer,
+      conversationId,
+    );
     return { ok: true, path: savedPath };
   }
 }
