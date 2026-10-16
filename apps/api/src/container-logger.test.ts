@@ -21,15 +21,15 @@ describe('containerLog', () => {
     realStderr = process.stderr.write.bind(process.stderr);
     logLevelBackup = process.env.LOG_LEVEL;
     resetLogLevelCache();
-    (process.stdout as { write: (chunk: unknown, cb?: () => void) => boolean }).write = (
-      chunk: unknown
-    ) => {
+    (
+      process.stdout as { write: (chunk: unknown, cb?: () => void) => boolean }
+    ).write = (chunk: unknown) => {
       stdout.push(String(chunk));
       return true;
     };
-    (process.stderr as { write: (chunk: unknown, cb?: () => void) => boolean }).write = (
-      chunk: unknown
-    ) => {
+    (
+      process.stderr as { write: (chunk: unknown, cb?: () => void) => boolean }
+    ).write = (chunk: unknown) => {
       stderr.push(String(chunk));
       return true;
     };
@@ -47,7 +47,10 @@ describe('containerLog', () => {
     expect(stderr).toHaveLength(1);
     const line = stderr[0];
     expect(line).toBeDefined();
-    expect(JSON.parse(line as string)).toMatchObject({ level: 'error', message: 'fail' });
+    expect(JSON.parse(line as string)).toMatchObject({
+      level: 'error',
+      message: 'fail',
+    });
   });
 
   test('error includes context when provided', () => {
@@ -81,7 +84,10 @@ describe('containerLog', () => {
     expect(stdout).toHaveLength(1);
     const line = stdout[0];
     expect(line).toBeDefined();
-    expect(JSON.parse(line as string)).toMatchObject({ level: 'log', message: 'hi' });
+    expect(JSON.parse(line as string)).toMatchObject({
+      level: 'log',
+      message: 'hi',
+    });
   });
 
   test('LOG_LEVEL error suppresses warn and log', () => {
@@ -138,11 +144,15 @@ describe('ContainerLoggerService', () => {
     realStderr = process.stderr.write.bind(process.stderr);
     resetLogLevelCache();
     process.env.LOG_LEVEL = 'verbose';
-    (process.stdout as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
+    (process.stdout as { write: (chunk: unknown) => boolean }).write = (
+      chunk: unknown,
+    ) => {
       stdout.push(String(chunk));
       return true;
     };
-    (process.stderr as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
+    (process.stderr as { write: (chunk: unknown) => boolean }).write = (
+      chunk: unknown,
+    ) => {
       stderr.push(String(chunk));
       return true;
     };
@@ -175,7 +185,11 @@ describe('ContainerLoggerService', () => {
     logger.log('m');
     const line = stdout[0];
     expect(line).toBeDefined();
-    expect(JSON.parse(line as string)).toMatchObject({ level: 'log', context: 'L', message: 'm' });
+    expect(JSON.parse(line as string)).toMatchObject({
+      level: 'log',
+      context: 'L',
+      message: 'm',
+    });
   });
 
   test('error forwards message and trace as extra', () => {
@@ -220,7 +234,9 @@ describe('logRequest', () => {
     realStdout = process.stdout.write.bind(process.stdout);
     resetLogLevelCache();
     process.env.LOG_LEVEL = 'log';
-    (process.stdout as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
+    (process.stdout as { write: (chunk: unknown) => boolean }).write = (
+      chunk: unknown,
+    ) => {
       stdout.push(String(chunk));
       return true;
     };
@@ -263,6 +279,18 @@ describe('logRequest', () => {
     expect(parsed.durationMs).toBe(10);
   });
 
+  test('redacts repeated and encoded query credentials in normal HTTP logs', () => {
+    logRequest({
+      requestId: 'redaction',
+      method: 'PATCH',
+      url: '/files?token=synthetic-secret&%74oken=synthetic-secret&api_key=synthetic-secret&view=tree',
+      statusCode: 200,
+      durationMs: 1,
+    });
+    expect(stdout[0]).not.toContain('synthetic-secret');
+    expect(JSON.parse(stdout[0]).url).toContain('view=tree');
+  });
+
   test('does not write when LOG_LEVEL is error', () => {
     process.env.LOG_LEVEL = 'error';
     logRequest({
@@ -285,7 +313,9 @@ describe('logWs', () => {
     realStdout = process.stdout.write.bind(process.stdout);
     resetLogLevelCache();
     process.env.LOG_LEVEL = 'log';
-    (process.stdout as { write: (chunk: unknown) => boolean }).write = (chunk: unknown) => {
+    (process.stdout as { write: (chunk: unknown) => boolean }).write = (
+      chunk: unknown,
+    ) => {
       stdout.push(String(chunk));
       return true;
     };

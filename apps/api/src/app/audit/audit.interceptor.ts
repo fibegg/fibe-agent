@@ -7,6 +7,7 @@ import {
 import { Observable } from 'rxjs';
 import { AuditService } from './audit.service';
 import { FastifyRequest } from 'fastify';
+import { isAuthenticated } from '../auth/auth-context';
 
 @Injectable()
 export class AuditInterceptor implements NestInterceptor {
@@ -17,9 +18,7 @@ export class AuditInterceptor implements NestInterceptor {
 
     // Only audit mutating or sensitive requests
     if (['POST', 'PUT', 'DELETE', 'PATCH'].includes(req.method)) {
-      const actor = req.headers.authorization
-        ? 'AuthenticatedUser'
-        : 'Anonymous';
+      const actor = isAuthenticated(req) ? 'AuthenticatedUser' : 'Anonymous';
       const action = req.method;
       const resource = req.url;
 

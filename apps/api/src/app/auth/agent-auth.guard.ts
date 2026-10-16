@@ -7,6 +7,7 @@ import {
 import { FastifyRequest } from 'fastify';
 import { timingSafeEqual } from 'node:crypto';
 import { ConfigService } from '../config/config.service';
+import { markAuthenticated } from './auth-context';
 
 @Injectable()
 export class AgentAuthGuard implements CanActivate {
@@ -24,11 +25,17 @@ export class AgentAuthGuard implements CanActivate {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith('Bearer ')) {
       token = authHeader.slice(7);
-    } else if (typeof request.query === 'object' && request.query && 'token' in request.query) {
-      token = (request.query as { token?: string }).token ?? null;
+    } else if (
+      typeof request.query === 'object' &&
+      request.query &&
+      'token' in request.query
+    ) {
+      const queryToken = (request.query as { token?: unknown }).token;
+      token = typeof queryToken === 'string' ? queryToken : null;
     }
 
     if (token && this.safeCompare(token, requiredPassword)) {
+      markAuthenticated(request);
       return true;
     }
 

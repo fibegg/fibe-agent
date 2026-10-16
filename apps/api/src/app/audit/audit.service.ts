@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { appendFile, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ConfigService } from '../config/config.service';
+import { sanitizeRequestUrl } from '../../request-url';
 
 @Injectable()
 export class AuditService {
@@ -20,7 +21,7 @@ export class AuditService {
     const entry = {
       timestamp: new Date().toISOString(),
       action,
-      resource,
+      resource: sanitizeRequestUrl(resource),
       actor,
       ...(details ? { details } : {}),
     };

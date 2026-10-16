@@ -3,6 +3,7 @@ import { AuditService } from './audit.service';
 import { AuditInterceptor } from './audit.interceptor';
 import { CallHandler, ExecutionContext } from '@nestjs/common';
 import { of } from 'rxjs';
+import { AgentAuthGuard } from '../auth/agent-auth.guard';
 
 vi.mock('node:fs/promises', () => ({
   appendFile: vi.fn().mockResolvedValue(undefined),
@@ -99,9 +100,14 @@ function makeContext(method: string, url: string, authorization?: string) {
     url,
     headers: { ...(authorization ? { authorization } : {}) },
   };
-  return {
+  const context = {
     switchToHttp: () => ({ getRequest: () => req }),
   } as unknown as ExecutionContext;
+  if (authorization)
+    new AgentAuthGuard({
+      getAgentPassword: () => authorization.slice(7),
+    } as never).canActivate(context);
+  return context;
 }
 
 function makeHandler() {
@@ -119,7 +125,7 @@ describe('AuditInterceptor', () => {
     interceptor = new AuditInterceptor(auditService as never);
   });
 
-  test('logs POST requests with actor=AuthenticatedUser when Authorization header present', () => {
+  test('logs POST requests with actor=AuthenticatedUser after guard validates Authorization header', () => {
     const ctx = makeContext('POST', '/conversations', 'Bearer token123');
     interceptor.intercept(ctx, makeHandler()).subscribe();
 
@@ -207,5 +213,62 @@ describe('AuditInterceptor', () => {
 
     const obs = interceptor.intercept(ctx, handler);
     expect(obs).toBeDefined();
+  });
+});
+
+describe('audit authentication and URL boundary', () => {
+  beforeEach(() => vi.clearAllMocks());
+  for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+    for (const mode of ['header', 'query']) {
+      test(`${method} ${mode} credentials are authenticated but never appended`, async () => {
+        const secret = 'synthetic-private-token';
+        const url = `/files?token=${secret}&%74oken=${secret}&TOKEN=${secret}&access_token=${secret}&view=tree`;
+        const req = {
+          method,
+          url,
+          query: { token: secret },
+          headers:
+            mode === 'header' ? { authorization: `Bearer ${secret}` } : {},
+        };
+        const context = {
+          switchToHttp: () => ({ getRequest: () => req }),
+        } as unknown as ExecutionContext;
+        new AgentAuthGuard({
+          getAgentPassword: () => secret,
+        } as never).canActivate(context);
+        new AuditInterceptor(new AuditService(makeConfig() as never)).intercept(
+          context,
+          makeHandler(),
+        );
+        await new Promise((resolve) => setImmediate(resolve));
+        const line = mockedAppend.mock.calls[0][1] as string;
+        expect(line).not.toContain(secret);
+        const entry = JSON.parse(line);
+        expect(entry.actor).toBe('AuthenticatedUser');
+        expect(entry.resource).toContain('view=tree');
+        expect(entry.resource.split('?')[0]).toBe('/files');
+      });
+    }
+  }
+  test('an unvalidated header on an open route does not assert an authenticated actor', async () => {
+    const req = {
+      method: 'POST',
+      url: '/x',
+      headers: { authorization: 'Bearer arbitrary' },
+    };
+    const context = {
+      switchToHttp: () => ({ getRequest: () => req }),
+    } as unknown as ExecutionContext;
+    new AgentAuthGuard({
+      getAgentPassword: () => undefined,
+    } as never).canActivate(context);
+    new AuditInterceptor(new AuditService(makeConfig() as never)).intercept(
+      context,
+      makeHandler(),
+    );
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(JSON.parse(mockedAppend.mock.calls[0][1] as string).actor).toBe(
+      'Anonymous',
+    );
   });
 });

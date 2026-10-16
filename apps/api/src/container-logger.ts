@@ -1,3 +1,4 @@
+import { sanitizeRequestUrl } from './request-url';
 import type { LoggerService } from '@nestjs/common';
 
 const LOG_LEVELS = ['error', 'warn', 'log', 'debug', 'verbose'] as const;
@@ -116,6 +117,7 @@ export function logRequest(payload: {
     context: 'http',
     message: 'request',
     ...payload,
+    url: sanitizeRequestUrl(payload.url),
   });
 }
 
