@@ -41,13 +41,13 @@ const ACTIVITY_VIRTUALIZE_THRESHOLD = 15;
 const REASONING_MAX_HEIGHT_RATIO = 0.75;
 
 const ACTIVITY_DOT_COLOR: Record<string, string> = {
-  stream_start: 'bg-blue-500',
-  reasoning: 'bg-primary',
-  step: 'bg-zinc-500',
-  tool_call: 'bg-amber-500',
-  file_created: 'bg-green-500',
-  task_complete: 'bg-green-500',
-  default: 'bg-primary',
+  stream_start: 'bg-blue-600 text-white',
+  reasoning: 'bg-primary text-primary-foreground',
+  step: 'bg-zinc-500 text-white',
+  tool_call: 'bg-amber-500 text-zinc-950',
+  file_created: 'bg-green-500 text-zinc-950',
+  task_complete: 'bg-green-500 text-zinc-950',
+  default: 'bg-primary text-primary-foreground',
 };
 
 
@@ -438,7 +438,7 @@ export function AgentThinkingSidebar({
                   />
                 )}
                 <span
-                  className={`relative inline-flex items-center justify-center size-5 rounded-full shrink-0 text-[10px] font-semibold text-white ${bgColor} ${isLast && isStreaming ? 'animate-pulse' : ''} cursor-default`}
+                  className={`relative inline-flex items-center justify-center size-5 rounded-full shrink-0 text-[10px] font-semibold ${bgColor} ${isLast && isStreaming ? 'animate-pulse' : ''} cursor-default`}
                   title={hoverText}
                   onMouseEnter={(e) =>
                     setActivityTooltip({

@@ -115,7 +115,7 @@ function ResetConversationButton({ onReset }: { onReset: () => void }) {
           id="reset-conversation-confirm-btn"
           type="button"
           onClick={confirmReset}
-          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-rose-500 px-2.5 text-xs font-semibold text-white transition-colors hover:bg-rose-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70"
+          className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-rose-600 px-2.5 text-xs font-semibold text-white transition-colors hover:bg-rose-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300/70"
           aria-label={t('settings.confirmReset')}
         >
           <Check className="size-3.5" aria-hidden />
@@ -166,7 +166,7 @@ function SettingsSwitch({
     >
       <span
         className={`pointer-events-none block size-5 rounded-full border shadow-sm transition-colors ${
-          checked ? 'border-white/70 bg-white' : 'border-muted-foreground/50 bg-muted-foreground'
+          checked ? 'border-primary-foreground/70 bg-primary-foreground' : 'border-muted-foreground/50 bg-muted-foreground'
         }`}
       />
     </button>

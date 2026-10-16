@@ -65,11 +65,11 @@ export function TerminalPanel({
       const dark = getEffectiveTheme() === 'dark';
       return {
         ...TERMINAL_OPTIONS.theme,
-        background: dark ? '#09090b' : '#fafafa',
-        foreground: dark ? '#fafafa' : '#18181b',
-        cursor: dark ? '#fafafa' : '#18181b',
-        cursorAccent: dark ? '#09090b' : '#fafafa',
-        selectionBackground: dark ? '#3f3f46' : '#e4e4e7',
+        background: dark ? '#09090b' : '#f1f1f3',
+        foreground: dark ? '#f4f4f6' : '#111114',
+        cursor: dark ? '#f4f4f6' : '#111114',
+        cursorAccent: dark ? '#09090b' : '#f1f1f3',
+        selectionBackground: dark ? '#313137' : '#dcdce2',
         ...(dark
           ? {}
           : {

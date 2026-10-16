@@ -61,7 +61,7 @@ export function SimplicateSwitch({
       <span
         className={`pointer-events-none block size-4 rounded-full border shadow-sm transition-colors ${
           checked
-            ? 'border-white/70 bg-white'
+            ? 'border-primary-foreground/70 bg-primary-foreground'
             : 'border-muted-foreground/50 bg-muted-foreground'
         }`}
       />

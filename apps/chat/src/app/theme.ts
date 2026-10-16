@@ -22,7 +22,7 @@ const LEGACY_THEME_ALIASES: Record<LegacyTheme, Theme> = {
   contrast: 'dark',
 };
 const PWA_THEME_COLORS: Record<Theme, string> = {
-  light: '#fafafa',
+  light: '#f1f1f3',
   dark: '#09090b',
 };
 const PWA_STATUS_BAR_STYLE = 'black-translucent';
@@ -39,13 +39,13 @@ export const THEME_OPTIONS: ThemeOption[] = [
     value: 'light',
     labelKey: 'theme.option.light',
     dark: false,
-    accent: '#18181b',
+    accent: '#111114',
   },
   {
     value: 'dark',
     labelKey: 'theme.option.dark',
     dark: true,
-    accent: '#fafafa',
+    accent: '#f4f4f6',
   },
 ];
 

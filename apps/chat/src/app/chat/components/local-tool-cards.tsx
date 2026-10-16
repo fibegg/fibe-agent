@@ -79,7 +79,7 @@ export function QuestionCard({
                 type="button"
                 onClick={handleSubmit}
                 disabled={!answer.trim()}
-                className="self-end rounded-lg px-4 py-1.5 text-sm font-medium bg-amber-500 text-white hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-400"
+                className="self-end rounded-lg px-4 py-1.5 text-sm font-medium bg-amber-500 text-zinc-950 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-amber-400"
                 aria-label={t('localTools.submitAnswer')}
               >
                 {t('common.submit')}
@@ -148,7 +148,7 @@ export function ConfirmCard({
               <button
                 type="button"
                 onClick={() => decide(true)}
-                className="rounded-lg px-4 py-1.5 text-sm font-medium bg-rose-500 text-white hover:bg-rose-400 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-400"
+                className="rounded-lg px-4 py-1.5 text-sm font-medium bg-rose-600 text-white hover:bg-rose-500 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-rose-400"
                 aria-label={yesLabel}
               >
                 {yesLabel}

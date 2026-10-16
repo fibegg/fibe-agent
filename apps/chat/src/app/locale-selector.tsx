@@ -175,7 +175,7 @@ export function LocaleSelector({ variant = 'icon' }: { variant?: 'icon' | 'menu'
                 type="button"
                 onClick={() => selectLocale(option)}
                 className={`h-7 min-w-10 rounded-md px-2 text-xs font-semibold transition-colors ${
-                  option === locale ? 'bg-primary text-white' : 'text-muted-foreground hover:text-foreground'
+                  option === locale ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground'
                 }`}
                 aria-label={t('locale.current', { locale: localeLabel(option) })}
                 aria-pressed={option === locale}

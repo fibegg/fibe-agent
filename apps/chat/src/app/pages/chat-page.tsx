@@ -1648,7 +1648,7 @@ export function ChatPage() {
               <ChevronDown className="size-4 shrink-0" aria-hidden />
               <span>{t('header.latest')}</span>
               {scroll.newMessageCount > 0 && (
-                <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white animate-pulse">
+                <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground animate-pulse">
                   {scroll.newMessageCount > 99 ? '99+' : scroll.newMessageCount}
                 </span>
               )}

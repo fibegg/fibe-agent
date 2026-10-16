@@ -30,7 +30,7 @@ describe('first-paint theme', () => {
       document
         .querySelector('meta[name="theme-color"]')
         ?.getAttribute('content'),
-    ).toBe('#fafafa');
+    ).toBe('#f1f1f3');
   });
 
   it.each(['halloween', 'dracula', 'midnight', 'contrast'])(

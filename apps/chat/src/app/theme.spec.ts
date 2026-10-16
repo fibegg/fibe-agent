@@ -139,14 +139,14 @@ describe('setStoredTheme', () => {
 
   it('updates browser theme metadata for light PWAs', () => {
     setStoredTheme('light');
-    expect(metaContent('theme-color')).toBe('#fafafa');
+    expect(metaContent('theme-color')).toBe('#f1f1f3');
     expect(metaContent('apple-mobile-web-app-status-bar-style')).toBe(
       'black-translucent',
     );
     expect(document.documentElement.style.backgroundColor).toBe(
-      'rgb(250, 250, 250)',
+      'rgb(241, 241, 243)',
     );
-    expect(document.body.style.backgroundColor).toBe('rgb(250, 250, 250)');
+    expect(document.body.style.backgroundColor).toBe('rgb(241, 241, 243)');
   });
 
   it('stores dark and adds dark class', () => {

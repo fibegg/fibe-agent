@@ -111,7 +111,7 @@ describe('TerminalPanel', () => {
       .mockReturnValue('light');
     const { unmount } = render(<TerminalPanel />);
     const options = terminalOptions[terminalOptions.length - 1];
-    expect(options.theme?.background).toBe('#fafafa');
+    expect(options.theme?.background).toBe('#f1f1f3');
     expect(options.theme?.green).toBe('#15803d');
     const count = wsInstances.length;
     effectiveTheme.mockReturnValue('dark');

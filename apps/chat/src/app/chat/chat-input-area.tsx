@@ -148,7 +148,7 @@ export function ChatInputArea({
                 <button
                   type="button"
                   onClick={onRemovePendingVoice}
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-90"
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90"
                   aria-label={t('chat.input.removeVoice')}
                 >
                   <X className="size-3" aria-hidden />
@@ -165,7 +165,7 @@ export function ChatInputArea({
                 <button
                   type="button"
                   onClick={() => onRemovePendingImage(i)}
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-90"
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90"
                   aria-label={t('chat.input.removeImage')}
                 >
                   <X className="size-3" aria-hidden />
@@ -191,7 +191,7 @@ export function ChatInputArea({
                 <button
                   type="button"
                   onClick={() => onRemovePendingAttachment(i)}
-                  className="shrink-0 size-5 rounded-full bg-destructive text-white flex items-center justify-center hover:opacity-90"
+                  className="shrink-0 size-5 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center hover:opacity-90"
                   aria-label={t('chat.input.removeAttachment')}
                 >
                   <X className="size-3" aria-hidden />
@@ -313,7 +313,7 @@ export function ChatInputArea({
               disabled={!isReady}
               className={`rounded-md flex items-center justify-center transition-colors shrink-0 ${
                 voiceRecorder.isRecording
-                  ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-white'
+                  ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-destructive-foreground'
                   : 'size-8 sm:size-9 text-primary hover:text-primary hover:bg-primary/10'
               }`}
               title={
@@ -329,7 +329,7 @@ export function ChatInputArea({
             >
               {voiceRecorder.isRecording ? (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                  <span className="w-2 h-2 rounded-full bg-current animate-pulse shrink-0" />
                   <span className="text-xs tabular-nums ml-1 truncate">
                     {Math.floor(voiceRecorder.recordingTimeSec / 60)}:
                     {(voiceRecorder.recordingTimeSec % 60)
