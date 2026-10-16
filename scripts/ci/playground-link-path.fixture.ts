@@ -9,6 +9,8 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { loadFibeEnv } from '../../apps/api/src/load-env';
 import { ConfigService } from '../../apps/api/src/app/config/config.service';
 import { PlaygroundBrowserService } from '../../apps/api/src/app/playgrounds/playground-browser.service';
@@ -124,12 +126,21 @@ async function verifySharedPaths() {
       'CONVERSATION_ID',
       'DATA_DIR',
       'HOST_ROOT',
+      'MCP_CONFIG_JSON',
     ])
       delete process.env[key];
     process.env.FIBE_SETTINGS_JSON = JSON.stringify({
       dataDir: scenario.data,
       fibeAgentId: scenario.id,
       hostRoot: '/host',
+      mcpConfig: {
+        mcpServers: {
+          fibe: {
+            command: 'fibe',
+            args: ['mcp', 'serve', '--tools', 'full', '--yolo'],
+          },
+        },
+      },
     });
     if (scenario.override !== undefined)
       process.env.PLAYGROUNDS_DIR = scenario.override;
@@ -152,6 +163,27 @@ async function verifySharedPaths() {
     const repos = JSON.parse(cli('info', '--view', 'repos'));
     assert.equal(repos.length, 1);
     assert.equal(repos[0].link_path, `${scenario.expected}/app`);
+    // Use the real MCP client transport: it filters inherited variables, so
+    // the generated server configuration must carry the shared local paths.
+    const mcp = JSON.parse(process.env.MCP_CONFIG_JSON!).mcpServers.fibe;
+    const client = new Client({ name: 'path-contract', version: '1.0.0' });
+    try {
+      await client.connect(
+        new StdioClientTransport({ ...mcp, stderr: 'pipe' }),
+      );
+      const linked = await client.callTool({
+        name: 'fibe_local_playgrounds_link',
+        arguments: { id_or_name: '77' },
+      });
+      assert.notEqual(linked.isError, true, JSON.stringify(linked));
+      const current = await client.callTool({
+        name: 'fibe_local_playgrounds_info',
+        arguments: { view: 'current' },
+      });
+      assert.notEqual(current.isError, true, JSON.stringify(current));
+    } finally {
+      await client.close();
+    }
     const browser = new PlaygroundBrowserService(config);
     const ui = new PlaygroundsService(config, browser);
     assert.equal(await browser.getCurrentLink(), 'app--77');
@@ -170,7 +202,9 @@ async function verifySharedPaths() {
       ),
       'preserved edit',
     );
-    console.log(`PASS non-root CLI and UI share ${scenario.expected}`);
+    console.log(
+      `PASS non-root CLI, filtered MCP transport and UI share ${scenario.expected}`,
+    );
   }
   assert.equal(statSync('/app').uid, 0);
   assert.equal(statSync('/app').mode & 0o777, 0o755);
