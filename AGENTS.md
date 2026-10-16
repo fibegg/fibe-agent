@@ -146,8 +146,8 @@ writable by the runtime user. An explicit override is preserved, including an
 existing linked directory; relative overrides are resolved before tools change
 working directory. Linking replaces the directory atomically, so its parent
 must also be writable. No `/app` ownership change or per-agent override is
-required for the default. The SDK/CLI must support `PLAYGROUNDS_DIR` for bare
-provider tool calls to use this shared default.
+required for the default. Bare provider tool calls require SDK/CLI 0.3.3 or newer to honor this shared
+default; both Docker recipes pin the verified release archives.
 
 ### Provider API keys (`AGENT_AUTH_MODE=api-token`)
 
