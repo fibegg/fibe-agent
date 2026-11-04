@@ -48,6 +48,14 @@ async function mcp(binary, args = [], env = {}) {
 }
 
 for (const binary of ['node', 'bun', 'docker', 'gh', 'uv', 'uvx', 'deno', 'node-gyp']) command(binary);
+for (const binary of ['gh', 'git', 'docker', 'python3', 'pip3', 'node', 'npm', 'npx', 'bun', 'yarn', 'pnpm', 'corepack', 'make', 'gcc', 'g++', 'pkg-config', 'openssl', 'jq', 'yq', 'rg', 'fd', 'tree', 'less', 'htop', 'curl', 'wget', 'unzip', 'zip', 'xz', 'ssh', 'sqlite3', 'file', 'tar', 'fibe', 'vi', 'vim', 'nano', 'tmux', 'rsync', 'psql', 'redis-cli', 'mysql', 'dig', 'ping', 'nc', 'ps', 'lsof', 'strace', 'ffmpeg']) {
+  command('sh', ['-c', 'command -v "$1"', '--', binary]);
+}
+assert.equal(process.env.EDITOR, 'vim');
+command('docker', ['compose', 'version']);
+command('docker', ['buildx', 'version']);
+command('git', ['lfs', 'version']);
+command('pnpm', ['--version']);
 command('fibe', ['version']);
 command('pdftotext', ['-v']);
 command('qpdf', ['--version']);

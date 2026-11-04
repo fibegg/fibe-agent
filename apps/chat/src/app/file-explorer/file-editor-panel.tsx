@@ -461,14 +461,25 @@ export function FileEditorPanel({
           body: JSON.stringify({ path: entry.path, content }),
         });
 
-        if (!res.ok) throw new Error(t('fileEditor.saveFailed'));
+        if (!res.ok) {
+          const detail = await res.json().catch(() => null);
+          throw new Error(
+            typeof detail?.message === 'string'
+              ? detail.message
+              : t('fileEditor.saveFailed'),
+          );
+        }
 
         setOriginalContent(content);
         setLiveContent(content);
         if (isHtmlFile || isImageFile) setRawFileRevision((value) => value + 1);
         setToast({ message: t('fileEditor.fileSaved'), type: 'success' });
-      } catch {
-        setToast({ message: t('fileEditor.saveFailed'), type: 'error' });
+      } catch (error) {
+        setToast({
+          message:
+            error instanceof Error ? error.message : t('fileEditor.saveFailed'),
+          type: 'error',
+        });
       } finally {
         setIsSaving(false);
       }
@@ -579,7 +590,11 @@ export function FileEditorPanel({
             >
               <div className={logoClasses}>
                 <Edit3
-                  className={inline ? 'size-4 text-primary-foreground' : 'size-5 text-primary-foreground'}
+                  className={
+                    inline
+                      ? 'size-4 text-primary-foreground'
+                      : 'size-5 text-primary-foreground'
+                  }
                 />
               </div>
               <div className="min-w-0 flex-1">

@@ -3,6 +3,8 @@
 ARG FIBE_CANDIDATE_BUILD=0
 ARG FIBE_CLI_VERSION=0.3.3
 
+FROM docker:29.8.1-cli AS docker-tools
+
 FROM node:24-slim AS cli-base
 
 ARG BUILDKIT_INLINE_CACHE=1
@@ -93,8 +95,11 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
     apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     dumb-init bash curl procps git \
+    vim-tiny nano tmux rsync netcat-openbsd iputils-ping dnsutils \
+    git-lfs pkg-config openssl xz-utils lsof yq \
+    postgresql-client redis-tools default-mysql-client \
     jq less tree wget zip unzip openssh-client \
-    python3 python3-venv python-is-python3 \
+    python3 python3-pip python3-venv python-is-python3 \
     ripgrep fd-find \
     make file patch \
     ca-certificates \
@@ -105,15 +110,17 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && rm -rf /var/lib/apt/lists/* \
     && ln -sf /usr/bin/fdfind /usr/local/bin/fd
 
-RUN ARCH=$(uname -m) && \
-    if [ "$ARCH" = "x86_64" ]; then DOCKER_ARCH="x86_64"; \
-    elif [ "$ARCH" = "aarch64" ]; then DOCKER_ARCH="aarch64"; \
-    else echo "Unsupported Docker CLI architecture: $ARCH" >&2; exit 1; fi && \
-    curl -fsSL -o docker.tgz "https://download.docker.com/linux/static/stable/${DOCKER_ARCH}/docker-29.8.1.tgz" && \
-    tar -xzf docker.tgz docker/docker && \
-    mv docker/docker /usr/local/bin/docker && \
-    chmod +x /usr/local/bin/docker && \
-    rm -rf docker docker.tgz
+ENV EDITOR=vim VISUAL=vim
+
+# Match Docker CLI/plugin versions using the official multi-arch CLI image.
+COPY --link --from=docker-tools /usr/local/bin/docker /usr/local/bin/docker
+COPY --link --from=docker-tools /usr/local/libexec/docker/cli-plugins/ /usr/local/lib/docker/cli-plugins/
+
+ENV COREPACK_HOME=/usr/local/share/corepack
+RUN npm install -g corepack@0.34.5 \
+    && corepack enable pnpm \
+    && corepack prepare pnpm@10.18.3 --activate \
+    && chown -R node:node /usr/local/share/corepack
 
 # Official GitHub CLI (`gh`) Debian repository.
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \

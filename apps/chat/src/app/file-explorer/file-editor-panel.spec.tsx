@@ -475,6 +475,29 @@ describe('FileEditorPanel', () => {
     );
   });
 
+  it('shows the API permission error and keeps unsaved content', async () => {
+    (apiRequest as Mock)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ content: 'original' }),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        json: async () => ({
+          message: "EACCES: permission denied, write 'src/app.ts'",
+        }),
+      });
+    render(<FileEditorPanel entry={ENTRY} onClose={mockClose} />);
+    const editor = (await screen.findByTestId(
+      'cm-mock',
+    )) as HTMLTextAreaElement;
+    fireEvent.input(editor, { target: { value: 'updated' } });
+    fireEvent.click(screen.getByRole('button', { name: /save/i }));
+    await screen.findByText("EACCES: permission denied, write 'src/app.ts'");
+    expect(editor.value).toBe('updated');
+    expect(screen.getByText('Unsaved changes')).toBeTruthy();
+  });
+
   it('toggles the optional file preview rail', async () => {
     (apiRequest as Mock).mockResolvedValue({
       ok: true,

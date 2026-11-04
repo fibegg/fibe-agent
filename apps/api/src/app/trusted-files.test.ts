@@ -233,3 +233,113 @@ test('oversized writes are rejected before a child can modify the target', async
     'ordinary',
   );
 });
+
+test('reused helper isolates concurrent scopes and survives rejected operations', async () => {
+  const scope = {
+    root: workspace,
+    trustedRoots: [repo],
+    ignoredNames: ['.git'],
+  };
+  const results = await Promise.all(
+    Array.from({ length: 40 }, (_, i) =>
+      readTrustedFile(
+        { ...scope, trustedRoots: i % 2 ? [] : [repo] },
+        'linked-repo/source.txt',
+      ).then(
+        (value) => value.toString(),
+        () => 'denied',
+      ),
+    ),
+  );
+  expect(results.filter((value) => value === 'repository').length).toBe(20);
+  expect(results.filter((value) => value === 'denied').length).toBe(20);
+  await writeTrustedFile(scope, 'empty.txt', Buffer.alloc(0));
+  expect((await readTrustedFile(scope, 'empty.txt')).length).toBe(0);
+  expect((await readTrustedFile(scope, 'ordinary.txt')).toString()).toBe(
+    'ordinary',
+  );
+});
+
+test('stream protocol continues after errors and keeps size limits', async () => {
+  const child = spawn('python3', [
+    '-I',
+    '-u',
+    '-c',
+    TRUSTED_FILES_PROGRAM,
+    '--stream',
+  ]);
+  const output: Buffer[] = [];
+  child.stdout.on('data', (chunk) => output.push(chunk));
+  const done = new Promise<void>((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', (code) =>
+      code === 0 ? resolve() : reject(new Error(`helper exit ${code}`)),
+    );
+  });
+  const scope = { root: workspace, trustedRoots: [], ignoredNames: ['.git'] };
+  for (const path of [
+    'escape.txt',
+    'ordinary.txt',
+    '../outside/private.txt',
+    'ordinary.txt',
+  ])
+    child.stdin.write(
+      JSON.stringify({ ...scope, path, action: 'read' }) + '\n',
+    );
+  child.stdin.end();
+  await done;
+  const results = Buffer.concat(output)
+    .toString()
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line));
+  expect(
+    results.map(
+      (result) =>
+        result.error ?? Buffer.from(result.content, 'base64').toString(),
+    ),
+  ).toEqual(['unavailable', 'ordinary', 'unavailable', 'ordinary']);
+});
+
+test('save permission errors name EACCES and the requested path', async () => {
+  if (process.getuid?.() === 0) return; // Root can write 0444; exercised as runtime uid 1000 too.
+  const { chmodSync } = await import('node:fs');
+  chmodSync(join(workspace, 'ordinary.txt'), 0o444);
+  await expect(
+    writeTrustedFile(
+      { root: workspace, trustedRoots: [], ignoredNames: [] },
+      'ordinary.txt',
+      Buffer.from('edited'),
+    ),
+  ).rejects.toThrow("EACCES: permission denied, write 'ordinary.txt'");
+});
+
+for (const kind of ['agent', 'playground']) {
+  test(`${kind} prunes generated trees from stats and listings while retaining explicit file access`, async () => {
+    mkdirSync(join(workspace, 'android/build'), { recursive: true });
+    writeFileSync(join(workspace, 'android/build/generated.txt'), 'generated');
+    const playgrounds = new PlaygroundsService(
+      { getPlaygroundsDir: () => workspace } as never,
+      {} as never,
+    );
+    playgrounds.getRepos = async () => [];
+    const service =
+      kind === 'playground'
+        ? playgrounds
+        : new AgentFilesService(
+            {
+              resolveStrategy: () => ({ getWorkingDir: () => workspace }),
+            } as never,
+            undefined,
+            playgrounds,
+          );
+    expect((await service.getStats()).fileCount).toBe(1);
+    const android = (await service.getTree()).find(
+      (entry) => entry.name === 'android',
+    );
+    expect(android?.children).toEqual([]);
+    expect(await service.getFileContent('android/build/generated.txt')).toBe(
+      'generated',
+    );
+  });
+}

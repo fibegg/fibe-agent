@@ -1,3 +1,4 @@
+import { isGeneratedWorkspacePath } from '../generated-workspace-paths';
 import { stat } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
 import { join, resolve, relative, basename } from 'node:path';
@@ -643,6 +644,11 @@ export class PlaygroundsService {
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
         if (
+          e.type === 'directory' &&
+          isGeneratedWorkspacePath(scope.root, join(absPath, name))
+        )
+          continue;
+        if (
           (name.startsWith(HIDDEN_PREFIX) &&
             !settings.showHidden &&
             !settings.visibleHidden.has(name)) ||
@@ -832,6 +838,11 @@ export class PlaygroundsService {
     for (const e of entries) {
       const name = typeof e.name === 'string' ? e.name : String(e.name);
       if (
+        e.type === 'directory' &&
+        isGeneratedWorkspacePath(scope.root, join(absPath, name))
+      )
+        continue;
+      if (
         (name.startsWith(HIDDEN_PREFIX) &&
           !settings.showHidden &&
           !settings.visibleHidden.has(name)) ||
@@ -897,6 +908,11 @@ export class PlaygroundsService {
       const files: { name: string; rel: string; mtime: number }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
+        if (
+          e.type === 'directory' &&
+          isGeneratedWorkspacePath(scope.root, join(absPath, name))
+        )
+          continue;
         if (
           (name.startsWith(HIDDEN_PREFIX) &&
             !settings.showHidden &&

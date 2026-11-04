@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import {
   NotFoundException,
+  ForbiddenException,
   PayloadTooLargeException,
   ServiceUnavailableException,
 } from '@nestjs/common';
@@ -8,6 +9,7 @@ import {
 const MAX_FILE_BYTES = 32 * 1024 * 1024;
 const MAX_ENVELOPE_BYTES = 48 * 1024 * 1024;
 
+// One reusable Python helper retains the descriptor-based race protections.
 // Python is already a runtime dependency. dir_fd + O_NOFOLLOW keep every open
 // relative to admitted directory descriptors, including missing write parents.
 // The configured roots are administrative authority; hard links and moving an
@@ -101,14 +103,24 @@ def run(p):
             return {'path': canonical}
         finally: os.close(file_fd)
     finally: os.close(fd)
-try:
-    raw = sys.stdin.buffer.read(48 * 1024 * 1024 + 1)
-    if len(raw) > 48 * 1024 * 1024: raise OverflowError()
-    print(json.dumps(run(json.loads(raw))))
-except OverflowError:
-    print(json.dumps({'error': 'too_large'}))
-except Exception:
-    print(json.dumps({'error': 'unavailable'}))
+def respond(raw):
+    try:
+        if len(raw) > 48 * 1024 * 1024: raise OverflowError()
+        return run(json.loads(raw))
+    except OverflowError:
+        return {'error': 'too_large'}
+    except PermissionError as e:
+        return {'error': 'permission', 'code': __import__('errno').errorcode.get(e.errno, 'EACCES')}
+    except Exception:
+        return {'error': 'unavailable'}
+if '--stream' in sys.argv:
+    while True:
+        raw = sys.stdin.buffer.readline(48 * 1024 * 1024 + 2)
+        if not raw: break
+        if len(raw) > 48 * 1024 * 1024 + 1: sys.exit(1)
+        print(json.dumps(respond(raw)), flush=True)
+else:
+    print(json.dumps(respond(sys.stdin.buffer.read(48 * 1024 * 1024 + 1))))
 `;
 
 export interface TrustedFileScope {
@@ -124,6 +136,109 @@ export interface TrustedDirectoryEntry {
 export interface TrustedDirectorySnapshot {
   identity: string;
   entries: TrustedDirectoryEntry[];
+}
+
+let operations: Promise<void> = Promise.resolve();
+let helper: ReturnType<typeof spawn> | null = null;
+
+function setReferenced(
+  child: ReturnType<typeof spawn>,
+  referenced: boolean,
+): void {
+  if (referenced) child.ref();
+  else child.unref();
+  for (const stream of [child.stdin, child.stdout, child.stderr]) {
+    const pipe = stream as unknown as { ref?: () => void; unref?: () => void };
+    if (referenced) pipe?.ref?.();
+    else pipe?.unref?.();
+  }
+}
+
+function request(
+  payload: string,
+  action: string,
+  path: string,
+): Promise<Record<string, unknown>> {
+  if (!helper) {
+    helper = spawn(
+      'python3',
+      ['-I', '-u', '-c', TRUSTED_FILES_PROGRAM, '--stream'],
+      {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        shell: false,
+      },
+    );
+    const child = helper;
+    // Keep idle pipe/child errors handled if the helper exits between requests.
+    child.on('error', () => {
+      if (helper === child) helper = null;
+    });
+    child.stdin?.on('error', () => {
+      if (helper === child) helper = null;
+    });
+    child.stderr?.resume();
+    child.once('close', () => {
+      if (helper === child) helper = null;
+    });
+  }
+  const child = helper;
+  setReferenced(child, true);
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    let bytes = 0;
+    const cleanup = () => {
+      clearTimeout(timer);
+      child.removeListener('error', fail);
+      child.removeListener('close', fail);
+      child.stdin?.removeListener('error', fail);
+      child.stdout?.removeListener('data', onData);
+      setReferenced(child, false);
+    };
+    const fail = () => {
+      cleanup();
+      if (helper === child) helper = null;
+      child.kill('SIGKILL');
+      reject(new ServiceUnavailableException('Safe file operation failed'));
+    };
+    const onData = (chunk: Buffer) => {
+      bytes += chunk.length;
+      if (bytes > MAX_ENVELOPE_BYTES) {
+        fail();
+        return;
+      }
+      chunks.push(chunk);
+      if (chunk[chunk.length - 1] !== 10) return;
+      cleanup();
+      try {
+        const result = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+        if (result.error === 'too_large')
+          reject(
+            new PayloadTooLargeException(
+              'File operation exceeds the size limit',
+            ),
+          );
+        else if (result.error === 'permission' && action === 'write')
+          reject(
+            new ForbiddenException(
+              `${result.code}: permission denied, write '${path}'`,
+            ),
+          );
+        else if (result.error)
+          reject(
+            new NotFoundException('File not found or outside trusted roots'),
+          );
+        else resolve(result);
+      } catch {
+        fail();
+      }
+    };
+    const timer = setTimeout(fail, 10_000);
+    child.once('error', fail);
+    child.once('close', fail);
+    child.stdin?.on('error', fail);
+    child.stdout?.on('data', onData);
+    child.stdin?.write(payload + '\n');
+  });
 }
 
 async function operate(
@@ -142,55 +257,13 @@ async function operate(
   });
   if (Buffer.byteLength(payload) > MAX_ENVELOPE_BYTES)
     throw new PayloadTooLargeException('File request too large');
-  return new Promise((resolve, reject) => {
-    const child = spawn('python3', ['-I', '-c', TRUSTED_FILES_PROGRAM], {
-      stdio: ['pipe', 'pipe', 'ignore'],
-      shell: false,
-    });
-    const chunks: Buffer[] = [];
-    let bytes = 0;
-    let failed = false;
-    const fail = () => {
-      if (failed) return;
-      failed = true;
-      clearTimeout(timer);
-      child.kill('SIGKILL');
-      reject(new ServiceUnavailableException('Safe file operation failed'));
-    };
-    const timer = setTimeout(fail, 10_000);
-    child.once('error', fail);
-    child.stdin.on('error', fail);
-    child.stdout.on('data', (chunk: Buffer) => {
-      bytes += chunk.length;
-      if (bytes > MAX_ENVELOPE_BYTES) fail();
-      else chunks.push(chunk);
-    });
-    child.once('close', (code) => {
-      clearTimeout(timer);
-      if (failed) return;
-      if (code !== 0) {
-        fail();
-        return;
-      }
-      try {
-        const result = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-        if (result.error === 'too_large')
-          reject(
-            new PayloadTooLargeException(
-              'File operation exceeds the size limit',
-            ),
-          );
-        else if (result.error)
-          reject(
-            new NotFoundException('File not found or outside trusted roots'),
-          );
-        else resolve(result);
-      } catch {
-        fail();
-      }
-    });
-    child.stdin.end(payload);
-  });
+  // Serialize requests to bound helper memory and preserve response ordering.
+  const operation = operations.then(() => request(payload, action, path));
+  operations = operation.then(
+    () => undefined,
+    () => undefined,
+  );
+  return operation;
 }
 
 export async function readTrustedFile(

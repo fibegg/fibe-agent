@@ -1,3 +1,4 @@
+import { isGeneratedWorkspacePath } from '../generated-workspace-paths';
 import { join, relative, basename } from 'node:path';
 import { Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { StrategyRegistryService } from '../strategies/strategy-registry.service';
@@ -117,6 +118,11 @@ export class AgentFilesService {
       const nextAncestors = new Set(ancestors).add(identity);
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
+        if (
+          e.type === 'directory' &&
+          isGeneratedWorkspacePath(scope.root, join(absPath, name))
+        )
+          continue;
         if (
           (name.startsWith(HIDDEN_PREFIX) &&
             !settings.showHidden &&
@@ -257,6 +263,11 @@ export class AgentFilesService {
       const files: { name: string; rel: string; mtime: number }[] = [];
       for (const e of entries) {
         const name = typeof e.name === 'string' ? e.name : String(e.name);
+        if (
+          e.type === 'directory' &&
+          isGeneratedWorkspacePath(scope.root, join(absPath, name))
+        )
+          continue;
         if (
           (name.startsWith(HIDDEN_PREFIX) &&
             !settings.showHidden &&
