@@ -230,6 +230,9 @@ COPY --link scripts/provider-versions.json /usr/local/share/fibe/provider-versio
 COPY --link scripts/install-fibe.sh /usr/local/bin/install-fibe.sh
 RUN chmod +x /usr/local/bin/install-fibe.sh
 
+# vim-tiny exposes vi/vim.tiny; EDITOR=vim also needs the usual command name.
+RUN ln -s /usr/bin/vim.tiny /usr/local/bin/vim
+
 FROM runtime-packages AS runtime-cli-0
 ARG FIBE_CLI_VERSION
 RUN /usr/local/bin/install-fibe.sh \
