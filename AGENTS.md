@@ -570,6 +570,10 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 
 ## Docker images
 
+GitHub CLI 2.102.0 uses immutable upstream release archives with an explicit
+SHA-256 for amd64 and arm64 in both Dockerfiles. Its rolling apt repository
+retains only the current version, so an older apt version pin is not rebuildable.
+
 ### Stable CLI checksum pin
 
 `scripts/provider-versions.json` pins one stable Fibe CLI version and the SHA-256

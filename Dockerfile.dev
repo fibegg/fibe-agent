@@ -81,18 +81,19 @@ RUN npm install -g corepack@0.34.5 \
     && corepack prepare pnpm@10.18.3 --activate \
     && chown -R node:node /usr/local/share/corepack
 
-# Official GitHub CLI (`gh`) Debian repository.
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    mkdir -p -m 755 /etc/apt/keyrings /etc/apt/sources.list.d && \
-    wget -nv -O /etc/apt/keyrings/githubcli-archive-keyring.gpg \
-      https://cli.github.com/packages/githubcli-archive-keyring.gpg && \
-    chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg && \
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-      > /etc/apt/sources.list.d/github-cli.list && \
-    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/* && \
-    apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends gh=2.102.0 && \
-    rm -rf /var/lib/apt/lists/*
+# The apt repository retains only its current version. Use immutable release
+# archives so the exact GitHub CLI pin remains rebuildable after a new release.
+RUN set -eu; \
+    case "$(dpkg --print-architecture)" in \
+      amd64) GH_ARCH=amd64; GH_SHA256=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386 ;; \
+      arm64) GH_ARCH=arm64; GH_SHA256=7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484 ;; \
+      *) echo "Unsupported GitHub CLI architecture" >&2; exit 1 ;; \
+    esac; \
+    curl -fsSL -o /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_${GH_ARCH}.tar.gz"; \
+    printf '%s  /tmp/gh.tar.gz\n' "$GH_SHA256" | sha256sum --check --strict -; \
+    tar -xzf /tmp/gh.tar.gz --strip-components=2 -C /usr/local/bin "gh_2.102.0_linux_${GH_ARCH}/bin/gh"; \
+    rm /tmp/gh.tar.gz; \
+    gh --version
 
 # Official GitHub MCP server. `mcp-github` is kept as a compatibility wrapper
 # for the MCP config currently emitted by Fibe.
