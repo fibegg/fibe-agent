@@ -343,3 +343,26 @@ for (const kind of ['agent', 'playground']) {
     );
   });
 }
+
+test('streamed binary frames span pipe chunks and a size error leaves the helper usable', async () => {
+  const scope = { root: workspace, trustedRoots: [], ignoredNames: [] };
+  const content = Buffer.alloc(256 * 1024);
+  for (let i = 0; i < content.length; i++) content[i] = i % 256;
+  await writeTrustedFile(scope, 'binary.dat', content);
+  expect((await readTrustedFile(scope, 'binary.dat')).equals(content)).toBe(
+    true,
+  );
+  const { openSync, ftruncateSync, closeSync } = await import('node:fs');
+  const fd = openSync(join(workspace, 'oversize.dat'), 'w');
+  try {
+    ftruncateSync(fd, 32 * 1024 * 1024 + 1);
+  } finally {
+    closeSync(fd);
+  }
+  await expect(readTrustedFile(scope, 'oversize.dat')).rejects.toThrow(
+    'size limit',
+  );
+  expect((await readTrustedFile(scope, 'ordinary.txt')).toString()).toBe(
+    'ordinary',
+  );
+});
