@@ -328,6 +328,34 @@ describe('PlaygroundsService', () => {
     expect(names).toContain('link.txt');
   });
 
+  test('getTree lists repositories after the link directory is swapped', async () => {
+    const { symlinkSync, renameSync } = require('node:fs');
+    // `fibe local playgrounds link` replaces the whole link directory at once.
+    const linkDir = join(playgroundDir, 'playground');
+    const repo = join(playgroundDir, 'repo');
+    mkdirSync(linkDir);
+    mkdirSync(join(repo, 'app'), { recursive: true });
+    writeFileSync(join(repo, 'app', 'main.py'), 'print(1)');
+    const service = new PlaygroundsService(
+      configFor(linkDir) as never,
+      {} as never,
+    );
+
+    expect(await service.getTree()).toEqual([]);
+
+    const next = join(playgroundDir, 'playground.next');
+    mkdirSync(next);
+    symlinkSync(repo, join(next, 'demo-api'));
+    renameSync(next, linkDir);
+    mockRepoList([repoEntry(repo, { link_path: join(linkDir, 'demo-api') })]);
+
+    const tree = await service.getTree();
+    expect(tree.map((e: { name: string }) => e.name)).toEqual(['demo-api']);
+    expect(tree[0].children?.map((e: { name: string }) => e.name)).toEqual([
+      'app',
+    ]);
+  });
+
   test('countStats follows symlinks to files', async () => {
     const { symlinkSync } = require('node:fs');
     writeFileSync(join(playgroundDir, 'real.txt'), 'line1\nline2\n');
