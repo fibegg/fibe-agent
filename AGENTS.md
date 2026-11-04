@@ -576,15 +576,17 @@ retains only the current version, so an older apt version pin is not rebuildable
 
 ### Stable CLI checksum pin
 
-`scripts/provider-versions.json` pins one stable Fibe CLI version and the SHA-256
-of its Linux amd64/arm64 release archives. Both Docker recipes ship this pin.
-The stable installer verifies downloaded bytes before extraction and rejects a
-version override that differs from the pin. Runtime launch policy must select
-that same CLI version (or inherit the matching default). When publishing a new
-SDK patch, first verify the exact SDK tag/release workflow and published
-checksums, then update this pin and both Dockerfile defaults before pushing an
-Agent publication branch. Existing running images keep their original CLI until
-their separately authorized restart.
+`scripts/provider-versions.json` pins the Fibe CLI version baked into the image
+and the SHA-256 of its Linux amd64/arm64 release archives. Both Docker recipes
+ship this pin, and image builds install exactly that version.
+
+At runtime an agent may request any released version, or `latest` / no version
+for the newest SDK release. The installer verifies every archive before
+extraction: the pinned version against the source pin, any other version
+against the `checksums.txt` its SDK release workflow published. A version whose
+release has no matching checksum is refused. A new SDK release therefore
+reaches agents on their next restart without an Agent release; bump the pin
+only to change the CLI baked into images.
 
 ### Candidate CLI builds
 
