@@ -2,6 +2,7 @@ import { expect, test } from 'bun:test';
 import {
   mkdtempSync,
   mkdirSync,
+  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -74,6 +75,38 @@ test('build storms open no generated watches; linked source changes are coalesce
     expect(count).toBe(1);
   } finally {
     await watcher.watcher.close();
+    rmSync(root, { recursive: true, force: true });
+  }
+}, 10000);
+
+test('a swapped link directory is still watched', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'agent-watch-swap-'));
+  let count = 0;
+  const linkDir = join(root, 'playground');
+  const repo = join(root, 'repo');
+  mkdirSync(linkDir);
+  mkdirSync(join(repo, 'src'), { recursive: true });
+  const watcher = new WorkspaceWatcher(linkDir, () => count++);
+  try {
+    await new Promise<void>((resolve) =>
+      watcher.watcher.once('ready', resolve),
+    );
+    // `fibe local playgrounds link` replaces the whole link directory at once.
+    const next = join(root, 'playground.next');
+    mkdirSync(next);
+    symlinkSync(repo, join(next, 'demo-api'));
+    renameSync(next, linkDir);
+    await new Promise((resolve) =>
+      setTimeout(resolve, WORKSPACE_REFRESH_MS + 250),
+    );
+    expect(count).toBe(1);
+    writeFileSync(join(repo, 'src', 'edited.ts'), 'source');
+    await new Promise((resolve) =>
+      setTimeout(resolve, WORKSPACE_REFRESH_MS + 250),
+    );
+    expect(count).toBe(2);
+  } finally {
+    watcher.close();
     rmSync(root, { recursive: true, force: true });
   }
 }, 10000);
