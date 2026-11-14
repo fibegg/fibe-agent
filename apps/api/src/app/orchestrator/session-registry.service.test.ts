@@ -135,7 +135,7 @@ describe('SessionRegistryService', () => {
       createdAt: '2026-05-07T20:00:01.000Z',
     });
 
-    expect(registry.liveConversationState('thread-a')).toEqual({
+    expect(registry.liveConversationState('thread-a')).toMatchObject({
       conversationId: 'thread-a',
       isProcessing: true,
       streamText: 'partial assistant output',

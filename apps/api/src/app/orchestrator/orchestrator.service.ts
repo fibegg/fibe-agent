@@ -593,8 +593,8 @@ export class OrchestratorService implements OnModuleInit {
         const outcome = await this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
           { id, metadata, existing: existing?.message });
         if (outcome.accepted) {
-          this.acceptedRequestIds.add(id);
-          const receipt = { ...outcome, executionState: metadata.state };
+          if (metadata.state === 'pending') this.acceptedRequestIds.add(id);
+          const receipt = metadata.outcome ?? { ...outcome, executionState: metadata.state };
           await scopedStore.saveRequestOutcome(id, receipt);
           return receipt;
         }
@@ -637,12 +637,14 @@ export class OrchestratorService implements OnModuleInit {
     if (!text.trim() && !images?.length && !attachmentFilenames?.length) {
       return { accepted: false, error: 'text is required and must be non-empty' };
     }
-    const scope = this.resolveDeliveryScope(conversationId, false);
-    if (!scope.accepted) return scope;
-    for (const filename of [...(images ?? []), ...(attachmentFilenames ?? [])]) {
-      if (text.trim() && images?.includes(filename) && filename.startsWith('data:image/')) continue;
-      if (!this.uploadsService.getPath(filename, scope.conversationId)) {
-        return { accepted: false, error: 'Uploaded file not found' };
+    if (images?.length || attachmentFilenames?.length) {
+      const scope = this.resolveDeliveryScope(conversationId, false);
+      if (!scope.accepted) return scope;
+      for (const filename of [...(images ?? []), ...(attachmentFilenames ?? [])]) {
+        if (text.trim() && images?.includes(filename) && filename.startsWith('data:image/')) continue;
+        if (!this.uploadsService.getPath(filename, scope.conversationId)) {
+          return { accepted: false, error: 'Uploaded file not found' };
+        }
       }
     }
     const requestedConversationId = conversationId?.trim();
@@ -796,6 +798,7 @@ export class OrchestratorService implements OnModuleInit {
     const [removed] = ctx.queuedTurns.splice(index, 1);
     this.emitQueueUpdate(ctx);
     if (removed?.messageId) {
+      this.acceptedRequestIds.delete(removed.messageId);
       this.stores(ctx).messageStore.removeById(removed.messageId);
     }
     return {
@@ -1193,6 +1196,7 @@ export class OrchestratorService implements OnModuleInit {
     if (requestMessageId && requestStore) {
       try {
         await requestStore.updateRequestState(requestMessageId, 'running');
+        this.acceptedRequestIds.delete(requestMessageId);
       } catch (error) {
         ctx.isProcessing = false;
         this.acceptedRequestIds.delete(requestMessageId);

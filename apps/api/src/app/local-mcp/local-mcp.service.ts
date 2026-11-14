@@ -213,7 +213,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       return Promise.reject(new Error('ask_user: question must not be empty'));
     }
     const questionId = randomUUID();
-    const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'question', question, placeholder: placeholder ?? '', ...(conversationId ? { conversationId } : {}) };
+    const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'question', question, placeholder: placeholder ?? '', conversationId: conversationId ?? 'default' };
     const reply = this.waitForReply<{ answer: string }>(prompt);
     this.outbound$.next({ type: WS_EVENT.ASK_USER_PROMPT, data: { ...prompt } });
     return reply;
@@ -228,7 +228,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     if (!message.trim()) return Promise.reject(new Error('confirm_action: message must not be empty'));
     const questionId = randomUUID();
     const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'confirmation', message,
-      confirmLabel: confirmLabel ?? 'Yes', cancelLabel: cancelLabel ?? 'No', ...(conversationId ? { conversationId } : {}) };
+      confirmLabel: confirmLabel ?? 'Yes', cancelLabel: cancelLabel ?? 'No', conversationId: conversationId ?? 'default' };
     const reply = this.waitForReply<{ confirmed: boolean }>(prompt);
     this.outbound$.next({ type: WS_EVENT.CONFIRM_ACTION_PROMPT, data: { ...prompt } });
     return reply;

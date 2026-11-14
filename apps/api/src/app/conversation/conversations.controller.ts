@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ConversationManagerService,
@@ -24,6 +25,7 @@ import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { SendMessageDto } from '../agent/dto/send-message.dto';
 import { InterruptAgentDto } from '../agent/dto/interrupt-agent.dto';
 import { handleSendMessage } from '../agent/agent-send-message.handler';
+import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { WS_EVENT } from '@shared/ws-constants';
 import { ProviderTrafficStoreService } from '../provider-traffic/provider-traffic-store.service';
 
@@ -124,6 +126,7 @@ export class ConversationsController {
   }
 
   @Post(':id/prompts/:promptId/answer')
+  @UseGuards(AgentAuthGuard)
   @HttpCode(HttpStatus.OK)
   answerPrompt(@Param('id') id: string, @Param('promptId') promptId: string, @Body() body: { answer?: string; confirmed?: boolean }) {
     this.requireBundle(id);
@@ -137,14 +140,13 @@ export class ConversationsController {
   }
 
   @Post(':id/agent/send-message')
-  @HttpCode(HttpStatus.ACCEPTED)
   async sendMessage(
     @Param('id') id: string,
     @Body() body: SendMessageDto,
   ): Promise<{ accepted: true; messageId: string; resolvedPolicy?: string }> {
     this.requireBundle(id);
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text && !body.images?.length && !body.attachmentFilenames?.length) {
+    if (!text && !body.images?.length && !body.attachmentFilenames?.length && !body.requestId) {
       throw new BadRequestException('text is required and must be non-empty');
     }
     const result = await this.orchestrator.sendMessageFromApi(

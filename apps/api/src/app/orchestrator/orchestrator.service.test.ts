@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { ConversationsController } from '../conversation/conversations.controller';
 import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
@@ -797,6 +798,24 @@ describe('OrchestratorService', () => {
     await waitForBackgroundTasks();
     expect(messageStore.all().filter(m => m.role === 'user')).toHaveLength(2);
     expect(strategyCalls).toHaveLength(2);
+  });
+
+  test('identified empty rejection is replayed and binds the request body', async () => {
+    const { orch, messageStore, strategyCalls } = await createOrchestrator();
+    const controller = new AgentController(orch);
+    const requestId = 'dceab946-4d81-489f-af64-b5c772267adc';
+    const storeGeneration = messageStore.deliveryGeneration();
+    const body = { text: '', conversationId: 'default', requestId, storeGeneration };
+    await expect(controller.sendMessage(body)).rejects.toThrow('text is required');
+    await expect(controller.sendMessage(body)).rejects.toThrow('text is required');
+    try {
+      await controller.sendMessage({ ...body, text: 'changed' });
+      throw new Error('expected conflict');
+    } catch (error) {
+      expect((error as ConflictException).getResponse()).toEqual({ error: 'request_conflict' });
+    }
+    expect(strategyCalls).toHaveLength(0);
+    expect(messageStore.all()).toEqual([]);
   });
 
   test('queue insertion and cancellation advance live snapshot revisions', async () => {
@@ -1768,7 +1787,7 @@ describe('OrchestratorService', () => {
     expect(controller.live('thread-a').pendingPrompts[0]).toEqual(first);
     expect(controller.answerPrompt('thread-a', first.promptId, { answer: 'yes' })).toEqual({ accepted: true });
     expect((await waiting).ok).toBe(true);
-    expect(() => controller.answerPrompt('thread-a', first.promptId, { answer: 'again' })).toThrow('stale_prompt');
+    expect(() => controller.answerPrompt('thread-a', first.promptId, { answer: 'again' })).toThrow(ConflictException);
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe(event => events.push(event));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.ANSWER_USER_QUESTION, promptId: first.promptId, answer: 'again' } as never);

@@ -52,7 +52,7 @@ export class AgentController {
     @Body() body: SendMessageDto
   ): Promise<{ accepted: true; messageId: string }> {
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text && !body.images?.length && !body.attachmentFilenames?.length) {
+    if (!text && !body.images?.length && !body.attachmentFilenames?.length && !body.requestId) {
       throw new BadRequestException('text is required and must be non-empty');
     }
     const result = await this.orchestrator.sendMessageFromApi(

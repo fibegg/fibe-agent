@@ -31,10 +31,10 @@ describe('useChatWebSocket', () => {
   });
 
   it('refreshes pending prompts on a stale_prompt 409 without aborting the stream', async () => {
-    let socket: { onmessage?: (event: MessageEvent) => void; close: () => void };
+    const socket: { onmessage?: (event: MessageEvent) => void } = {};
     vi.stubGlobal('WebSocket', class {
       close = vi.fn();
-      constructor() { socket = this; }
+      set onmessage(handler: (event: MessageEvent) => void) { socket.onmessage = handler; }
     });
     const onLocal = vi.fn();
     const abort = vi.fn();
