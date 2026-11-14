@@ -1,3 +1,4 @@
+import { ConflictException } from '@nestjs/common';
 import { describe, test, expect, afterEach } from 'bun:test';
 import { LocalMcpService } from './local-mcp.service';
 import { WS_EVENT } from '@shared/ws-constants';
@@ -209,6 +210,36 @@ describe('LocalMcpService', () => {
     expect((res.result as Record<string, unknown>)['answer']).toBe('Bob');
   });
 
+  test('conversation-less prompts survive reconnect snapshots and accept answers from any conversation', async () => {
+    const { svc } = makeService(5000);
+    for (const tool of [LOCAL_TOOL.ASK_USER, LOCAL_TOOL.CONFIRM_ACTION]) {
+      const waiting = svc.handleToolCall({ requestId: 'unscoped', tool, args: { question: 'Name?', message: 'Proceed?' } });
+      const prompt = svc.pendingPrompts('thread-a')[0];
+      expect(prompt.conversationId).toBeUndefined();
+      expect(svc.pendingPrompts('thread-b')[0]).toEqual(prompt);
+      const payload = tool === LOCAL_TOOL.ASK_USER ? { answer: 'Alice' } : { confirmed: true };
+      svc.resolveQuestion(prompt.promptId, payload, 'thread-b');
+      expect(await waiting).toMatchObject({ ok: true, result: payload });
+      expect(svc.pendingPrompts('thread-a')).toEqual([]);
+    }
+  });
+
+  test('pending prompts survive snapshot reads and reject wrong scope, kind, and duplicate answers', async () => {
+    const { svc } = makeService(5000);
+    const waiting = svc.handleToolCall({ requestId: 'fake-request', tool: LOCAL_TOOL.ASK_USER, args: { question: 'Name?' }, conversationId: 'thread-a' });
+    const prompt = svc.pendingPrompts('thread-a')[0];
+    expect(prompt).toMatchObject({ kind: 'question', question: 'Name?' });
+    expect(prompt.promptId).toBe(prompt.questionId);
+    expect(svc.pendingPrompts('thread-a')[0]).toEqual(prompt);
+    expect(svc.pendingPrompts('thread-b')).toEqual([]);
+    expect(() => svc.resolveQuestion(prompt.promptId, { answer: 'yes' }, 'thread-b')).toThrow(ConflictException);
+    expect(() => svc.resolveQuestion(prompt.promptId, { confirmed: true }, 'thread-a')).toThrow(ConflictException);
+    svc.resolveQuestion(prompt.promptId, { answer: 'Alice' }, 'thread-a');
+    expect((await waiting).ok).toBe(true);
+    expect(svc.pendingPrompts('thread-a')).toEqual([]);
+    expect(() => svc.resolveQuestion(prompt.promptId, { answer: 'twice' }, 'thread-a')).toThrow(ConflictException);
+  });
+
   test('ask_user with empty question returns error immediately', async () => {
     const { svc } = makeService();
     const res = await svc.handleToolCall({
@@ -282,8 +313,15 @@ describe('LocalMcpService', () => {
     await promise;
   });
 
-  test('resolveQuestion with unknown id is a no-op (no throw)', () => {
+  test('resolveQuestion with unknown id rejects as stale', () => {
     const { svc } = makeService();
-    expect(() => svc.resolveQuestion('ghost-id', {})).not.toThrow();
+    try {
+      svc.resolveQuestion('ghost-id', {});
+      throw new Error('expected conflict');
+    } catch (error) {
+      expect(error).toBeInstanceOf(ConflictException);
+      expect((error as ConflictException).getStatus()).toBe(409);
+      expect((error as ConflictException).getResponse()).toEqual({ error: 'stale_prompt' });
+    }
   });
 });

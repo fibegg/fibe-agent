@@ -8,6 +8,8 @@ import { ConversationManagerService } from '../conversation/conversation-manager
 
 export interface ConversationLiveState {
   conversationId: string;
+  streamId: string;
+  revision: number;
   isProcessing: boolean;
   streamText: string;
   currentActivityId: string | null;
@@ -18,6 +20,7 @@ export interface ConversationLiveState {
     text: string;
     policy: 'queue' | 'steer';
     attachmentFilenames?: string[];
+    imageUrls?: string[];
     createdAt?: string;
   }[];
   startedAt: string | null;
@@ -33,6 +36,7 @@ const RECENT_STREAM_RETENTION_MS = 30_000;
 @Injectable()
 export class SessionRegistryService {
   private readonly logger = new Logger(SessionRegistryService.name);
+  private readonly sequences = new Map<string, { streamId: string; revision: number }>();
   private readonly sessions = new Map<string, SessionContext>();
   /** Per-conversation session sets for O(k) broadcastToConversation. */
   private readonly byConversation = new Map<string, Set<SessionContext>>();
@@ -122,10 +126,13 @@ export class SessionRegistryService {
   }
 
   liveConversationState(conversationId: string): ConversationLiveState {
+    const sequence = this.sequence(conversationId);
     const processing = this.processingForConversation(conversationId);
     if (processing) {
       return {
         conversationId,
+        streamId: sequence.streamId,
+        revision: sequence.revision,
         isProcessing: true,
         streamText: processing.streamTextAccumulated,
         currentActivityId: processing.currentActivityId,
@@ -135,6 +142,7 @@ export class SessionRegistryService {
           messageId: turn.messageId,
           text: turn.displayText ?? turn.text,
           policy: turn.policy,
+          imageUrls: turn.imageUrls,
           createdAt: turn.createdAt,
           ...(turn.attachmentFilenames?.length
             ? { attachmentFilenames: turn.attachmentFilenames }
@@ -147,6 +155,8 @@ export class SessionRegistryService {
     const completed = this.recentCompletedStreamForConversation(conversationId);
     return {
       conversationId,
+      streamId: sequence.streamId,
+      revision: sequence.revision,
       isProcessing: false,
       streamText: completed?.lastStreamText ?? '',
       currentActivityId: null,
@@ -157,6 +167,7 @@ export class SessionRegistryService {
           messageId: turn.messageId,
           text: turn.displayText ?? turn.text,
           policy: turn.policy,
+          imageUrls: turn.imageUrls,
           createdAt: turn.createdAt,
           ...(turn.attachmentFilenames?.length
             ? { attachmentFilenames: turn.attachmentFilenames }
@@ -165,6 +176,15 @@ export class SessionRegistryService {
       startedAt: completed?.lastStreamStartedAt ?? null,
       finishedAt: completed?.lastStreamFinishedAt ?? null,
     };
+  }
+
+  private sequence(conversationId: string) {
+    let sequence = this.sequences.get(conversationId);
+    if (!sequence) {
+      sequence = { streamId: randomUUID(), revision: 0 };
+      this.sequences.set(conversationId, sequence);
+    }
+    return sequence;
   }
 
   private recentCompletedStreamForConversation(
@@ -205,6 +225,7 @@ export class SessionRegistryService {
     for (const ctx of this.sessionsForConversation(conversationId)) {
       this.destroy(ctx.sessionId);
     }
+    this.sequences.delete(conversationId);
   }
 
   /**
@@ -253,9 +274,15 @@ export class SessionRegistryService {
     type: string,
     data: Record<string, unknown> = {},
   ): void {
+    let sequencing: Record<string, unknown> = {};
+    if ([WS_EVENT.STREAM_START, WS_EVENT.STREAM_CHUNK, WS_EVENT.STREAM_END, WS_EVENT.QUEUE_UPDATED].includes(type as typeof WS_EVENT.STREAM_START)) {
+      const sequence = this.sequence(conversationId);
+      sequence.revision += 1;
+      sequencing = { streamId: sequence.streamId, revision: sequence.revision };
+    }
     const event: OutboundEvent = {
       type,
-      data: { conversationId, ...data },
+      data: { conversationId, ...data, ...sequencing },
     };
     const set = this.byConversation.get(conversationId);
     if (!set) return;

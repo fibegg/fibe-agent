@@ -33,8 +33,8 @@ export class UploadsController {
     @Query('conversationId') conversationId?: string,
   ): Promise<{ filename: string }> {
     const data = await readMultipartUploadFile(req);
-    return processUploadFile(data, (buffer, mimetype) =>
-      this.uploads.saveFileFromBuffer(buffer, mimetype, conversationId)
+    return processUploadFile(data, (buffer, mimetype, originalFilename) =>
+      this.uploads.saveFileFromBuffer(buffer, mimetype, conversationId, originalFilename)
     );
   }
 }

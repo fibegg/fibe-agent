@@ -8,6 +8,7 @@ export interface RuntimeConfig {
   agentProvider: string | null;
   agentProviderLabel: string | null;
   simplicate: boolean;
+  lockChatModel: boolean;
 }
 
 function providerLabel(provider: string | null): string | null {
@@ -53,6 +54,7 @@ export class RuntimeConfigController {
       agentProvider,
       agentProviderLabel: providerLabel(agentProvider),
       simplicate: truthy(process.env.SIMPLICATE),
+      lockChatModel: truthy(process.env.LOCK_CHAT_MODEL),
     };
   }
 }

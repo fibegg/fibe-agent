@@ -87,6 +87,22 @@ describe('RuntimeConfigController: getConfig logic', () => {
     process.env.SIMPLICATE = envBackup.SIMPLICATE;
   });
 
+  test('exposes the model lock from LOCK_CHAT_MODEL in the real runtime response', async () => {
+    const { RuntimeConfigController } = await import('./runtime-config.controller');
+    const previous = process.env.LOCK_CHAT_MODEL;
+    try {
+      const controller = new RuntimeConfigController();
+      for (const [value, expected] of [[undefined, false], ['', false], ['false', false], ['0', false], ['1', true], ['true', true], [' YES ', true]] as const) {
+        if (value === undefined) delete process.env.LOCK_CHAT_MODEL;
+        else process.env.LOCK_CHAT_MODEL = value;
+        expect(controller.getConfig().lockChatModel).toBe(expected);
+      }
+    } finally {
+      if (previous === undefined) delete process.env.LOCK_CHAT_MODEL;
+      else process.env.LOCK_CHAT_MODEL = previous;
+    }
+  });
+
   test('returns all nulls when no env vars are set', () => {
     expect(getRuntimeConfig()).toEqual({
       userAvatarUrl: null,

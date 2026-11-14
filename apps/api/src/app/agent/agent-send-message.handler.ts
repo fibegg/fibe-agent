@@ -14,6 +14,8 @@ export type SendMessageOrchestratorResult = {
   conversationId?: string;
   resolvedPolicy?: string;
   executionState?: string;
+  resolution?: 'started' | 'steered' | 'queued';
+  fallbackReason?: string;
 };
 
 export type SendMessageSuccess = {
@@ -22,6 +24,8 @@ export type SendMessageSuccess = {
   conversationId?: string;
   resolvedPolicy?: string;
   executionState?: string;
+  resolution?: 'started' | 'steered' | 'queued';
+  fallbackReason?: string;
 };
 
 export function handleSendMessage(
@@ -47,6 +51,8 @@ export function handleSendMessage(
   }
   return {
     accepted: true,
+    ...(result.resolution ? { resolution: result.resolution } : {}),
+    ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {}),
     messageId: result.messageId,
     ...(result.conversationId ? { conversationId: result.conversationId } : {}),
     ...(result.resolvedPolicy ? { resolvedPolicy: result.resolvedPolicy } : {}),

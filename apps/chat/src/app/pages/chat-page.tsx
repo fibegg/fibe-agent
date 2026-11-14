@@ -336,11 +336,18 @@ export function ChatPage() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const handleLocalToolEvent = useCallback((data: ServerMessage) => {
-    if (data.type === 'ask_user_prompt' && data.questionId && data.question) {
-      const questionId = data.questionId;
+    if (data.type === 'pending_prompts_snapshot') {
+      setLocalToolItems(prev => [
+        ...prev.filter(i => i.kind === 'image'),
+        ...(data.pendingPrompts ?? []).map(prompt => prompt.kind === 'question'
+          ? { kind: 'ask' as const, questionId: prompt.promptId, question: prompt.question, placeholder: prompt.placeholder }
+          : { kind: 'confirm' as const, questionId: prompt.promptId, message: prompt.message, confirmLabel: prompt.confirmLabel, cancelLabel: prompt.cancelLabel }),
+      ]);
+    } else if (data.type === 'ask_user_prompt' && data.questionId && data.question) {
+      const questionId = data.promptId ?? data.questionId;
       const question = data.question;
       setLocalToolItems((prev) => [
-        ...prev,
+        ...prev.filter(i => !('questionId' in i) || i.questionId !== questionId),
         { kind: 'ask', questionId, question, placeholder: data.placeholder },
       ]);
     } else if (
@@ -348,10 +355,10 @@ export function ChatPage() {
       data.questionId &&
       data.message
     ) {
-      const questionId = data.questionId;
+      const questionId = data.promptId ?? data.questionId;
       const message = data.message;
       setLocalToolItems((prev) => [
-        ...prev,
+        ...prev.filter(i => !('questionId' in i) || i.questionId !== questionId),
         {
           kind: 'confirm',
           questionId,
@@ -395,7 +402,7 @@ export function ChatPage() {
 
   const handleAnswerQuestion = useCallback(
     (questionId: string, answer: string) => {
-      sendRef.current({ action: 'answer_user_question', questionId, answer });
+      sendRef.current({ action: 'answer_user_question', questionId, promptId: questionId, answer });
       setLocalToolItems((prev) =>
         prev.filter((i) => !('questionId' in i) || i.questionId !== questionId),
       );
@@ -408,6 +415,7 @@ export function ChatPage() {
       sendRef.current({
         action: 'confirm_action_response',
         questionId,
+        promptId: questionId,
         confirmed,
       });
       setLocalToolItems((prev) =>
@@ -596,6 +604,8 @@ export function ChatPage() {
         const payload = data as {
           id?: string;
           imageUrls?: string[];
+          attachmentFilenames?: string[];
+          attachments?: ChatMessage['attachments'];
           model?: string;
         };
         const role = data.role as string;
@@ -610,6 +620,8 @@ export function ChatPage() {
           ...(payload.imageUrls?.length
             ? { imageUrls: payload.imageUrls }
             : {}),
+          ...(payload.attachmentFilenames?.length ? { attachmentFilenames: payload.attachmentFilenames } : {}),
+          ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
           ...(payload.model ? { model: payload.model } : {}),
         };
         setMessages((prev) => {

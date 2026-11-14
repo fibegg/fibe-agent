@@ -29,6 +29,23 @@ describe('MessageStoreService', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
+  test('attachment metadata survives history reload without synthesizing metadata for legacy records', async () => {
+    const store = makeService();
+    store.add('user', '', ['opaque.png'], undefined, ['opaque.pdf'], undefined, [
+      { storedFilename: 'opaque.png', originalFilename: 'Photo.png', mediaType: 'image/png', size: 3, kind: 'image' },
+      { storedFilename: 'opaque.pdf', originalFilename: 'Report.pdf', mediaType: 'application/pdf', size: 4, kind: 'document' },
+    ]);
+    store.add('user', '', undefined, undefined, ['legacy.txt']);
+    await store.flush();
+    const persisted = readFileSync(join(dataDir, 'messages.json'), 'utf8');
+    const reloaded = makeService();
+    expect(reloaded.all()[0].attachments).toEqual(store.all()[0].attachments);
+    expect(reloaded.all()[1].attachments).toBeUndefined();
+    expect(reloaded.all()[1].attachmentFilenames).toEqual(['legacy.txt']);
+    await reloaded.flush();
+    expect(readFileSync(join(dataDir, 'messages.json'), 'utf8')).toBe(persisted);
+  });
+
   test('all returns empty array initially', () => {
     expect(makeService().all()).toEqual([]);
   });

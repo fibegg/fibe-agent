@@ -75,6 +75,8 @@ export interface AgentStrategy {
   getModelArgs?(model: string): string[];
   listModels?(): Promise<string[]>;
   interruptAgent?(): void;
+  /** Accepts the same file-path/OCR context used by ordinary turns. */
+  supportsSteerContent?: boolean;
   steerAgent?(message: string): void | SteerAgentResult | Promise<void | SteerAgentResult>;
   hasNativeSessionSupport?(): boolean;
   executePromptStreaming(

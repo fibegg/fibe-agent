@@ -97,7 +97,7 @@ describe('processUploadFile', () => {
       toBuffer: async () => Buffer.from(''),
     };
     const result = await processUploadFile(fileResult, () => 'saved.webm');
-    expect(result).toEqual({ filename: 'saved.webm' });
+    expect(result).toEqual({ filename: 'saved.webm', storedFilename: 'saved.webm', originalFilename: 'saved.webm', mediaType: 'audio/webm', size: 0, kind: 'document' });
   });
 
   test('returns filename for valid image', async () => {
@@ -106,6 +106,6 @@ describe('processUploadFile', () => {
       toBuffer: async () => Buffer.from(''),
     };
     const result = await processUploadFile(fileResult, () => 'saved.png');
-    expect(result).toEqual({ filename: 'saved.png' });
+    expect(result).toEqual({ filename: 'saved.png', storedFilename: 'saved.png', originalFilename: 'saved.png', mediaType: 'image/png', size: 0, kind: 'image' });
   });
 });

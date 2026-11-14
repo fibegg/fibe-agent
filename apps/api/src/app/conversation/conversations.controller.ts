@@ -10,6 +10,7 @@ import {
   Param,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import {
   ConversationManagerService,
@@ -24,6 +25,7 @@ import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { SendMessageDto } from '../agent/dto/send-message.dto';
 import { InterruptAgentDto } from '../agent/dto/interrupt-agent.dto';
 import { handleSendMessage } from '../agent/agent-send-message.handler';
+import { AgentAuthGuard } from '../auth/agent-auth.guard';
 import { WS_EVENT } from '@shared/ws-constants';
 import { ProviderTrafficStoreService } from '../provider-traffic/provider-traffic-store.service';
 
@@ -120,7 +122,15 @@ export class ConversationsController {
   @Get(':id/live')
   live(@Param('id') id: string) {
     this.requireBundle(id);
-    return this.sessionRegistry.liveConversationState(id);
+    return { ...this.sessionRegistry.liveConversationState(id), pendingPrompts: this.orchestrator.pendingPrompts(id) };
+  }
+
+  @Post(':id/prompts/:promptId/answer')
+  @UseGuards(AgentAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  answerPrompt(@Param('id') id: string, @Param('promptId') promptId: string, @Body() body: { answer?: string; confirmed?: boolean }) {
+    this.requireBundle(id);
+    return this.orchestrator.answerPrompt(id, promptId, body);
   }
 
   @Get(':id/provider-traffic')
@@ -136,7 +146,7 @@ export class ConversationsController {
   ): Promise<{ accepted: true; messageId: string; resolvedPolicy?: string }> {
     this.requireBundle(id);
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text) {
+    if (!text && !body.images?.length && !body.attachmentFilenames?.length) {
       throw new BadRequestException('text is required and must be non-empty');
     }
     const result = await this.orchestrator.sendMessageFromApi(

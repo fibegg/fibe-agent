@@ -1,3 +1,4 @@
+import type { AttachmentMetadata } from '@shared/types';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -24,6 +25,7 @@ export interface StoredMessage {
   activityId?: string;
   imageUrls?: string[];
   attachmentFilenames?: string[];
+  attachments?: AttachmentMetadata[];
   apiRequest?: StoredApiRequest;
 }
 
@@ -36,6 +38,11 @@ export interface StoredApiRequest {
   busyPolicy: 'reject' | 'queue' | 'steer';
   images?: string[];
   queueOrder?: number;
+  outcome?: {
+    accepted: boolean; messageId?: string; conversationId?: string; resolvedPolicy?: string;
+    resolution?: 'started' | 'steered' | 'queued'; fallbackReason?: string;
+    executionState?: StoredApiRequest['state']; queueCount?: number; error?: string; reason?: string;
+  };
   state: 'pending' | 'running' | 'completed' | 'failed' | 'outcome_unknown';
 }
 
@@ -171,6 +178,7 @@ export class MessageStoreService implements OnModuleDestroy {
     model?: string,
     attachmentFilenames?: string[],
     request?: { id: string; metadata: StoredApiRequest },
+    attachments?: AttachmentMetadata[],
   ): StoredMessage {
     if (request && this.indexById.has(request.id)) throw new Error('request message already exists');
     const msg: StoredMessage = {
@@ -179,6 +187,7 @@ export class MessageStoreService implements OnModuleDestroy {
       body,
       created_at: new Date().toISOString(),
     };
+    if (attachments?.length) msg.attachments = attachments;
     if (request) msg.apiRequest = request.metadata;
     if (imageUrls?.length) msg.imageUrls = imageUrls;
     if (model) msg.model = model;
@@ -270,6 +279,15 @@ export class MessageStoreService implements OnModuleDestroy {
 
   flush(strict = false): Promise<void> {
     return this.jsonWriter.flush(strict);
+  }
+
+  async saveRequestOutcome(id: string, outcome: NonNullable<StoredApiRequest['outcome']>): Promise<void> {
+    const request = this.indexById.get(id)?.apiRequest;
+    if (!request) throw new StoreGenerationChangedError();
+    this.assertGeneration(request.storeGeneration);
+    request.outcome = { ...outcome };
+    this.jsonWriter.schedule();
+    await this.flush(true);
   }
 
   async updateRequestState(id: string, state: StoredApiRequest['state']): Promise<void> {

@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { exec } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -90,6 +90,8 @@ type ApiSendResult = {
   resolvedPolicy?: string;
   queueCount?: number;
   executionState?: StoredApiRequest['state'];
+  resolution?: 'started' | 'steered' | 'queued';
+  fallbackReason?: string;
 };
 
 type ApiAdmission = { id: string; metadata: StoredApiRequest; existing?: StoredMessage };
@@ -101,6 +103,7 @@ export class OrchestratorService implements OnModuleInit {
   private sharedIsAuthenticated = false;
   private readonly acceptedRequestIds = new Set<string>();
   private readonly steeredRequestIds = new Map<string, Set<string>>();
+  private readonly rejectedReceipts = new Map<string, { fingerprint: string; outcome: ApiSendResult }>();
   private readonly requestAdmissions = new Map<string, { fingerprint: string; result: Promise<ApiSendResult> }>();
   /** Cached system prompt shared across all sessions. */
   private sharedSystemPromptFromFile: string | null = null;
@@ -395,21 +398,28 @@ export class OrchestratorService implements OnModuleInit {
       [WS_ACTION.SET_AGENT_MODE]: () => this.handleSetAgentMode(msg.mode ?? ''),
       [WS_ACTION.ANSWER_USER_QUESTION]: () =>
         this.handleAnswerUserQuestion(
-          (msg as { questionId?: string; answer?: string }).questionId ?? '',
+          (msg as { promptId?: string }).promptId ?? (msg as { questionId?: string }).questionId ?? '',
           (msg as { answer?: string }).answer ?? '',
+          ctx.conversationId,
         ),
       [WS_ACTION.CONFIRM_ACTION_RESPONSE]: () =>
         this.handleConfirmActionResponse(
-          (msg as { questionId?: string; confirmed?: boolean }).questionId ??
-            '',
+          (msg as { promptId?: string }).promptId ?? (msg as { questionId?: string }).questionId ?? '',
           !!(msg as { confirmed?: boolean }).confirmed,
+          ctx.conversationId,
         ),
       [WS_ACTION.RESET_CONVERSATION]: () => this.handleResetConversation(ctx),
     };
 
     const handler = handlers[msg.action];
     if (handler) {
-      await handler();
+      try {
+        await handler();
+      } catch (error) {
+        if (!(error instanceof ConflictException) ||
+          (msg.action !== WS_ACTION.ANSWER_USER_QUESTION && msg.action !== WS_ACTION.CONFIRM_ACTION_RESPONSE)) throw error;
+        ctx.send(WS_EVENT.ERROR, { error: 'stale_prompt', statusCode: 409 });
+      }
     } else {
       this.logger.warn(`Unknown action: ${msg.action}`);
     }
@@ -554,6 +564,8 @@ export class OrchestratorService implements OnModuleInit {
     const fingerprint = createHash('sha256').update(JSON.stringify([
       text.trim(), conversationId?.trim() || null, images ?? [], attachmentFilenames ?? [], busyPolicy,
     ])).digest('hex');
+    const rejected = this.rejectedReceipts.get(requestId);
+    if (rejected) return rejected.fingerprint === fingerprint ? { ...rejected.outcome } : { accepted: false, error: 'REQUEST_ID_CONFLICT' };
     const inFlight = this.requestAdmissions.get(requestId);
     if (inFlight) return inFlight.fingerprint === fingerprint ? inFlight.result : { accepted: false, error: 'REQUEST_ID_CONFLICT' };
     const existing = this.apiRequestMessages().find(({ message }) => message.id === requestId);
@@ -566,6 +578,7 @@ export class OrchestratorService implements OnModuleInit {
         accepted: false, messageId: requestId, error: 'REQUEST_OUTCOME_UNKNOWN',
         conversationId: existing.conversationId, executionState: request.state,
       };
+      if (request.outcome && (request.state !== 'pending' || this.acceptedRequestIds.has(requestId))) return { ...request.outcome, executionState: request.state };
       if (request.state !== 'pending' || this.acceptedRequestIds.has(requestId)) {
         return { accepted: true, messageId: requestId, conversationId: existing.conversationId, executionState: request.state };
       }
@@ -575,19 +588,31 @@ export class OrchestratorService implements OnModuleInit {
       fingerprint, text: text.trim(), conversationId: conversationId?.trim() || undefined, busyPolicy,
       images, queueOrder: -1, state: 'pending' as const,
     };
-    const result = this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
-      { id: requestId, metadata, existing: existing?.message });
-    this.requestAdmissions.set(requestId, { fingerprint, result });
-    try {
-      const outcome = await result;
-      if (outcome.accepted) this.acceptedRequestIds.add(requestId);
-      return outcome.accepted ? { ...outcome, executionState: metadata.state } : outcome;
-    } catch (error) {
-      if (error instanceof StoreGenerationChangedError) return { accepted: false, messageId: requestId, error: 'STORE_GENERATION_CHANGED' };
-      throw error;
-    } finally {
-      this.requestAdmissions.delete(requestId);
-    }
+    const id = requestId;
+    const result = (async (): Promise<ApiSendResult> => {
+      try {
+        const outcome = await this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
+          { id, metadata, existing: existing?.message });
+        if (outcome.accepted) {
+          if (metadata.state === 'pending') this.acceptedRequestIds.add(id);
+          const receipt = metadata.outcome ?? { ...outcome, executionState: metadata.state };
+          await scopedStore.saveRequestOutcome(id, receipt);
+          return { ...receipt, executionState: metadata.state };
+        }
+        if (outcome.error === 'text is required and must be non-empty' || outcome.error === 'Uploaded file not found') {
+          this.rejectedReceipts.set(id, { fingerprint, outcome });
+          if (this.rejectedReceipts.size > 1000) this.rejectedReceipts.delete(this.rejectedReceipts.keys().next().value!);
+        }
+        return outcome;
+      } catch (error) {
+        if (error instanceof StoreGenerationChangedError) return { accepted: false, messageId: id, error: 'STORE_GENERATION_CHANGED' };
+        throw error;
+      } finally {
+        this.requestAdmissions.delete(id);
+      }
+    })();
+    this.requestAdmissions.set(id, { fingerprint, result });
+    return result;
   }
 
   /** Resolve once before the caller pins its receipt; ordinary status never calls this. */
@@ -612,6 +637,19 @@ export class OrchestratorService implements OnModuleInit {
     busyPolicy: BusyPolicy = 'reject',
     admission?: ApiAdmission,
   ): Promise<ApiSendResult> {
+    if (!text.trim() && !images?.length && !attachmentFilenames?.length) {
+      return { accepted: false, error: 'text is required and must be non-empty' };
+    }
+    if (!text.trim() && (images?.length || attachmentFilenames?.length)) {
+      const scope = this.resolveDeliveryScope(conversationId, false);
+      if (!scope.accepted) return scope;
+      for (const filename of [...(images ?? []), ...(attachmentFilenames ?? [])]) {
+        if (filename.startsWith('data:')) continue;
+        if (!this.uploadsService.getPath(filename, scope.conversationId)) {
+          return { accepted: false, error: 'Uploaded file not found' };
+        }
+      }
+    }
     const requestedConversationId = conversationId?.trim();
     const busyResult = this.routeBusyApiMessage(
       text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission,
@@ -657,7 +695,7 @@ export class OrchestratorService implements OnModuleInit {
       .catch((err) =>
         this.logger.warn('REST send-message agent run failed', err),
       );
-    return { accepted: true, messageId, conversationId: ctx.conversationId };
+    return { accepted: true, messageId, conversationId: ctx.conversationId, resolution: 'started' };
   }
 
   /** Synchronous idle inspection; only an already-busy route returns a promise. */
@@ -761,7 +799,9 @@ export class OrchestratorService implements OnModuleInit {
       };
 
     const [removed] = ctx.queuedTurns.splice(index, 1);
+    this.emitQueueUpdate(ctx);
     if (removed?.messageId) {
+      this.acceptedRequestIds.delete(removed.messageId);
       this.stores(ctx).messageStore.removeById(removed.messageId);
     }
     return {
@@ -818,16 +858,21 @@ export class OrchestratorService implements OnModuleInit {
         payload.policy === 'steer' &&
         previousPolicy !== 'steer' &&
         turn.displayText &&
-        ctx.strategy.steerAgent
+        ctx.strategy.steerAgent &&
+        (!(turn.imageUrls.length || turn.attachmentFilenames?.length || turn.audioFilename) || ctx.strategy.supportsSteerContent)
       ) {
         if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) {
           await this.stores(ctx).messageStore.updateRequestState(turn.messageId, 'running');
           this.stores(ctx).messageStore.assertRequestGeneration(turn.messageId);
         }
-        const steerResult = await ctx.strategy.steerAgent(turn.displayText);
+        const steerText = (turn.imageUrls.length || turn.attachmentFilenames?.length || turn.audioFilename)
+          ? await this.chatPromptContext.buildFullPrompt(turn.displayText, turn.imageUrls, turn.audioFilename, turn.attachmentFilenames, undefined, ctx.conversationId)
+          : turn.displayText;
+        const steerResult = await ctx.strategy.steerAgent(steerText);
         if (steerResult === 'handled') {
           if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) this.trackSteeredRequest(ctx, turn.messageId);
           ctx.queuedTurns = ctx.queuedTurns.filter((queued) => queued !== turn);
+          this.emitQueueUpdate(ctx);
           return {
             updated: true,
             conversationId: ctx.conversationId,
@@ -836,9 +881,15 @@ export class OrchestratorService implements OnModuleInit {
           };
         }
         turn.text = '';
+        if (steerResult === 'queued') {
+          turn.imageUrls = [];
+          turn.audioFilename = null;
+          turn.attachmentFilenames = undefined;
+        }
       }
     }
 
+    this.emitQueueUpdate(ctx);
     return {
       updated: true,
       conversationId: ctx.conversationId,
@@ -877,6 +928,7 @@ export class OrchestratorService implements OnModuleInit {
     );
     ctx.queuedTurns = [...ordered, ...rest];
     ctx.queuedTurns.forEach((turn, index) => this.stores(ctx).messageStore.updateRequestQueueOrder(turn.messageId, index));
+    this.emitQueueUpdate(ctx);
     return {
       reordered: true,
       conversationId: ctx.conversationId,
@@ -1105,6 +1157,10 @@ export class OrchestratorService implements OnModuleInit {
       undefined,
       attachmentFilenames?.length ? attachmentFilenames : undefined,
       admission,
+      [
+        ...imageUrls.map(filename => this.uploadsService.getAttachmentMetadata(filename, ctx.conversationId, 'image')),
+        ...(attachmentFilenames ?? []).map(filename => this.uploadsService.getAttachmentMetadata(filename, ctx.conversationId, 'document')),
+      ],
     );
     try {
       await ctxMsgStore.flush(!!admission);
@@ -1148,6 +1204,7 @@ export class OrchestratorService implements OnModuleInit {
     if (requestMessageId && requestStore) {
       try {
         await requestStore.updateRequestState(requestMessageId, 'running');
+        this.acceptedRequestIds.delete(requestMessageId);
       } catch (error) {
         ctx.isProcessing = false;
         this.acceptedRequestIds.delete(requestMessageId);
@@ -1558,9 +1615,11 @@ export class OrchestratorService implements OnModuleInit {
     messageId?: string;
     error?: string;
     resolvedPolicy?: string;
+    resolution?: 'started' | 'steered' | 'queued';
+    fallbackReason?: string;
   }> {
     const text = payload.text.trim();
-    if (!text)
+    if (!text && !payload.images?.length && !payload.attachmentFilenames?.length)
       return {
         accepted: false,
         error: 'text is required and must be non-empty',
@@ -1578,7 +1637,7 @@ export class OrchestratorService implements OnModuleInit {
         payload.audioFilename,
         payload.attachmentFilenames,
       );
-      return { accepted: true, resolvedPolicy: 'started' };
+      return { accepted: true, resolvedPolicy: 'started', resolution: 'started' };
     }
 
     if (policy === 'reject') {
@@ -1601,11 +1660,16 @@ export class OrchestratorService implements OnModuleInit {
 
     let resolvedPolicy: Exclude<BusyPolicy, 'reject'> = 'queue';
     let queuedText = saved.text;
-    if (policy === 'steer' && processingCtx.strategy.steerAgent) {
+    const hasContent = !!(saved.imageUrls.length || saved.attachmentFilenames?.length || saved.audioFilename);
+    const unsupportedContent = hasContent && !processingCtx.strategy.supportsSteerContent;
+    if (policy === 'steer' && processingCtx.strategy.steerAgent && !unsupportedContent) {
       if (payload.admission) await this.stores(processingCtx).messageStore.updateRequestState(saved.messageId, 'running');
       if (payload.admission) this.stores(processingCtx).messageStore.assertRequestGeneration(saved.messageId);
       processingCtx.pendingSteerRestart = true;
-      const steerResult = await processingCtx.strategy.steerAgent(saved.text);
+      const steerText = hasContent
+        ? await this.chatPromptContext.buildFullPrompt(saved.text, saved.imageUrls, saved.audioFilename, saved.attachmentFilenames, undefined, processingCtx.conversationId)
+        : saved.text;
+      const steerResult = await processingCtx.strategy.steerAgent(steerText);
       if (steerResult === 'handled') {
         if (payload.admission) this.trackSteeredRequest(processingCtx, saved.messageId);
         processingCtx.pendingSteerRestart = false;
@@ -1613,9 +1677,15 @@ export class OrchestratorService implements OnModuleInit {
           accepted: true,
           messageId: saved.messageId,
           resolvedPolicy: 'steer',
+          resolution: 'steered',
         };
       }
       queuedText = '';
+      if (steerResult === 'queued') {
+        saved.imageUrls = [];
+        saved.audioFilename = null;
+        saved.attachmentFilenames = undefined;
+      }
       resolvedPolicy = 'steer';
     }
 
@@ -1630,13 +1700,20 @@ export class OrchestratorService implements OnModuleInit {
       policy: resolvedPolicy,
       createdAt: new Date().toISOString(),
     });
-    return { accepted: true, messageId: saved.messageId, resolvedPolicy };
+    this.emitQueueUpdate(processingCtx);
+    return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: unsupportedContent ? 'steer_unsupported_content' : processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
+  }
+
+  private emitQueueUpdate(ctx: SessionContext): void {
+    const live = this.sessionRegistry.liveConversationState(ctx.conversationId);
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.QUEUE_UPDATED, { queue: live.queue, queuedTurns: live.queuedTurns });
   }
 
   private async drainQueuedTurns(ctx: SessionContext): Promise<void> {
     while (!ctx.isProcessing && ctx.queuedTurns.length > 0) {
       const next = ctx.queuedTurns.shift() as QueuedAgentTurn;
       ctx.isProcessing = true;
+      this.emitQueueUpdate(ctx);
       this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
         count: this.sessionRegistry.size,
         anyProcessing: true,
@@ -1780,15 +1857,25 @@ export class OrchestratorService implements OnModuleInit {
     this.sessionRegistry.broadcast(WS_EVENT.EFFORT_UPDATED, { effort: value });
   }
 
-  private handleAnswerUserQuestion(questionId: string, answer: string): void {
-    this.localMcp.resolveQuestion(questionId, { answer });
+  pendingPrompts(conversationId: string) {
+    return this.localMcp.pendingPrompts(conversationId);
+  }
+
+  answerPrompt(conversationId: string, promptId: string, payload: { answer?: string; confirmed?: boolean }): { accepted: true } {
+    this.localMcp.resolveQuestion(promptId, payload, conversationId);
+    return { accepted: true };
+  }
+
+  private handleAnswerUserQuestion(questionId: string, answer: string, conversationId: string): void {
+    this.localMcp.resolveQuestion(questionId, { answer }, conversationId);
   }
 
   private handleConfirmActionResponse(
     questionId: string,
     confirmed: boolean,
+    conversationId: string,
   ): void {
-    this.localMcp.resolveQuestion(questionId, { confirmed });
+    this.localMcp.resolveQuestion(questionId, { confirmed }, conversationId);
   }
 
   private handleSetAgentMode(mode: string): void {
@@ -1836,7 +1923,7 @@ export class OrchestratorService implements OnModuleInit {
     const streamStartedAt = new Date().toISOString();
     ctx.streamStartedAt = streamStartedAt;
     ctx.streamTextAccumulated = '';
-    ctx.send(WS_EVENT.STREAM_START, { model, startedAt: streamStartedAt });
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_START, { model, startedAt: streamStartedAt });
     const streamStartEntry: StoredStoryEntry = {
       id: randomUUID(),
       type: 'stream_start',
@@ -1851,7 +1938,8 @@ export class OrchestratorService implements OnModuleInit {
 
     const execAsync = promisify(exec);
     let cliOut = `> ${command}\n\n`;
-    ctx.send(WS_EVENT.STREAM_CHUNK, { text: cliOut });
+    ctx.streamTextAccumulated = cliOut;
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: cliOut });
 
     try {
       const envPath = `${process.env['DATA_DIR'] || '/app/data'}/.fibe/bin:/usr/local/bin:${process.env.PATH || ''}`;
@@ -1861,11 +1949,13 @@ export class OrchestratorService implements OnModuleInit {
       const output =
         stdout || stderr || 'Command executed successfully with no output.';
       cliOut += output;
-      ctx.send(WS_EVENT.STREAM_CHUNK, { text: output });
+      ctx.streamTextAccumulated = cliOut;
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: output });
     } catch (e) {
       const errText = e instanceof Error ? e.message : String(e);
       cliOut += `Error: ${errText}`;
-      ctx.send(WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
+      ctx.streamTextAccumulated = cliOut;
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
     }
     finishAgentStream(
       this.finishStreamDeps(ctx),

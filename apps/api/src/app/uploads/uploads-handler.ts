@@ -1,3 +1,4 @@
+import type { AttachmentMetadata } from '@shared/types';
 import { BadRequestException } from '@nestjs/common';
 
 const AUDIO_MIMES = new Set([
@@ -78,7 +79,7 @@ const EXT_TO_MIME: Record<string, string> = {
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
 
-export type MultipartFileResult = { mimetype: string; toBuffer: () => Promise<Buffer> } | undefined;
+export type MultipartFileResult = { mimetype: string; filename?: string; toBuffer: () => Promise<Buffer> } | undefined;
 
 function isAllowedMimetype(mimetype: string): boolean {
   const normalized = mimetype.split(';')[0].trim().toLowerCase();
@@ -123,12 +124,13 @@ export function contentTypeFromFilename(filename: string): string {
 
 export async function processUploadFile(
   fileResult: MultipartFileResult,
-  saveFromBuffer: (buffer: Buffer, mimetype: string) => string | Promise<string>
-): Promise<{ filename: string }> {
+  saveFromBuffer: (buffer: Buffer, mimetype: string, originalFilename?: string) => string | Promise<string>
+): Promise<{ filename: string } & AttachmentMetadata> {
   if (!fileResult) throw new BadRequestException('No file uploaded');
   const mimetype = fileResult.mimetype ?? 'application/octet-stream';
   validateUploadMimetype(mimetype);
   const buffer = await fileResult.toBuffer();
-  const filename = await saveFromBuffer(buffer, mimetype);
-  return { filename };
+  const filename = await saveFromBuffer(buffer, mimetype, fileResult.filename);
+  return { filename, storedFilename: filename, originalFilename: fileResult.filename?.split(/[\\/]/).pop() || filename,
+    mediaType: mimetype, size: buffer.length, kind: mimetype.startsWith('image/') ? 'image' : 'document' };
 }

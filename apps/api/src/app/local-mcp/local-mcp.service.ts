@@ -1,4 +1,6 @@
+import type { PendingPrompt } from '@shared/types';
 import {
+  ConflictException,
   Injectable,
   Logger,
   OnModuleDestroy,
@@ -37,6 +39,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
   private readonly pending = new Map<
     string,
     {
+      prompt: PendingPrompt;
       resolve: (v: unknown) => void;
       reject: (e: Error) => void;
       timer: ReturnType<typeof setTimeout>;
@@ -210,16 +213,10 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       return Promise.reject(new Error('ask_user: question must not be empty'));
     }
     const questionId = randomUUID();
-    this.outbound$.next({
-      type: WS_EVENT.ASK_USER_PROMPT,
-      data: {
-        questionId,
-        question,
-        placeholder: placeholder ?? '',
-        ...(conversationId ? { conversationId } : {}),
-      },
-    });
-    return this.waitForReply<{ answer: string }>(questionId);
+    const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'question', question, placeholder: placeholder ?? '', ...(conversationId ? { conversationId } : {}) };
+    const reply = this.waitForReply<{ answer: string }>(prompt);
+    this.outbound$.next({ type: WS_EVENT.ASK_USER_PROMPT, data: { ...prompt } });
+    return reply;
   }
 
   private confirmAction(
@@ -234,17 +231,11 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       );
     }
     const questionId = randomUUID();
-    this.outbound$.next({
-      type: WS_EVENT.CONFIRM_ACTION_PROMPT,
-      data: {
-        questionId,
-        message,
-        confirmLabel: confirmLabel ?? 'Yes',
-        cancelLabel: cancelLabel ?? 'No',
-        ...(conversationId ? { conversationId } : {}),
-      },
-    });
-    return this.waitForReply<{ confirmed: boolean }>(questionId);
+    const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'confirmation', message,
+      confirmLabel: confirmLabel ?? 'Yes', cancelLabel: cancelLabel ?? 'No', ...(conversationId ? { conversationId } : {}) };
+    const reply = this.waitForReply<{ confirmed: boolean }>(prompt);
+    this.outbound$.next({ type: WS_EVENT.CONFIRM_ACTION_PROMPT, data: { ...prompt } });
+    return reply;
   }
 
   private showImage(
@@ -284,7 +275,8 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     return Promise.resolve({ ok: true });
   }
 
-  private waitForReply<T>(questionId: string): Promise<T> {
+  private waitForReply<T>(prompt: PendingPrompt): Promise<T> {
+    const questionId = prompt.promptId;
     return new Promise<T>((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(questionId);
@@ -295,6 +287,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
         );
       }, this.askTimeoutMs);
       this.pending.set(questionId, {
+        prompt,
         resolve: resolve as (v: unknown) => void,
         reject,
         timer,
@@ -306,11 +299,16 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
    * Resolves a pending ask_user / confirm_action promise.
    * Called by OrchestratorService when the operator replies via WebSocket.
    */
-  resolveQuestion(questionId: string, payload: unknown): void {
+  pendingPrompts(conversationId: string): PendingPrompt[] {
+    return [...this.pending.values()].filter(p => !p.prompt.conversationId || p.prompt.conversationId === conversationId).map(p => ({ ...p.prompt }));
+  }
+
+  resolveQuestion(questionId: string, payload: unknown, conversationId?: string): void {
     const p = this.pending.get(questionId);
-    if (!p) {
-      this.logger.warn(`No pending question with id=${questionId}`);
-      return;
+    const body = payload as { answer?: unknown; confirmed?: unknown } | null;
+    if (!p || (conversationId !== undefined && p.prompt.conversationId && p.prompt.conversationId !== conversationId) ||
+      (p.prompt.kind === 'question' ? typeof body?.answer !== 'string' : typeof body?.confirmed !== 'boolean')) {
+      throw new ConflictException({ error: 'stale_prompt' });
     }
     clearTimeout(p.timer);
     this.pending.delete(questionId);

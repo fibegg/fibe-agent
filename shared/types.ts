@@ -19,3 +19,19 @@ export interface StoredActivityEntry {
   story: StoredStoryEntry[];
   usage?: TokenUsage;
 }
+
+export interface AttachmentMetadata {
+  storedFilename: string;
+  originalFilename: string;
+  mediaType?: string;
+  size?: number;
+  kind: 'image' | 'document';
+}
+
+export type PendingPrompt = {
+  promptId: string;
+  questionId: string;
+  conversationId?: string;
+} & ({ kind: 'question'; question: string; placeholder: string } | {
+  kind: 'confirmation'; message: string; confirmLabel: string; cancelLabel: string;
+});

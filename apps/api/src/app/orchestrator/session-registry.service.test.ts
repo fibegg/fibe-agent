@@ -43,6 +43,47 @@ describe('SessionRegistryService', () => {
     );
   });
 
+  it('orders snapshot revisions against lifecycle and queue events across reconnects', () => {
+    const ctx = registry.create('thread-a');
+    ctx.isProcessing = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe(event => events.push(event));
+    const initial = registry.liveConversationState('thread-a');
+    registry.broadcastToConversation('thread-a', 'stream_start');
+    ctx.streamTextAccumulated = 'one';
+    registry.broadcastToConversation('thread-a', 'stream_chunk', { text: 'one' });
+    const snapshot = registry.liveConversationState('thread-a');
+    registry.detach(ctx.sessionId);
+    const reconnected = registry.create('thread-a');
+    expect(reconnected.sessionId).toBe(ctx.sessionId);
+    expect(registry.liveConversationState('thread-a').revision).toBe(snapshot.revision);
+    registry.broadcastToConversation('thread-a', 'queue_updated', { queue: [] });
+    registry.broadcastToConversation('thread-a', 'stream_end');
+    const end = registry.liveConversationState('thread-a');
+    const sequenced = events.filter(event => typeof event.data.revision === 'number');
+    expect(sequenced.map(event => event.data.revision)).toEqual([initial.revision + 1, initial.revision + 2, initial.revision + 3, initial.revision + 4]);
+    expect(snapshot.revision).toBe(sequenced[1].data.revision);
+    expect(end.revision).toBe(sequenced.at(-1)?.data.revision);
+    expect(end.isProcessing).toBe(true);
+    expect(end.finishedAt).toBeNull();
+    expect(end.streamText).toBe('one');
+    expect(sequenced.every(event => event.data.streamId === snapshot.streamId)).toBe(true);
+    expect(registry.liveConversationState('thread-b').revision).toBe(0);
+  });
+
+  it('deleting a conversation releases its sequence without resetting other conversations', () => {
+    registry.create('thread-a');
+    registry.broadcastToConversation('thread-a', 'stream_start');
+    registry.broadcastToConversation('thread-b', 'stream_start');
+    const before = registry.liveConversationState('thread-a');
+    const other = registry.liveConversationState('thread-b');
+    registry.destroyConversation('thread-a');
+    const recreated = registry.liveConversationState('thread-a');
+    expect(recreated.streamId).not.toBe(before.streamId);
+    expect(recreated.revision).toBe(0);
+    expect(registry.liveConversationState('thread-b')).toEqual(other);
+  });
+
   it('starts with zero sessions', () => {
     expect(registry.size).toBe(0);
     expect(registry.all()).toHaveLength(0);
@@ -110,6 +151,8 @@ describe('SessionRegistryService', () => {
 
     expect(registry.liveConversationState('thread-a')).toEqual({
       conversationId: 'thread-a',
+      streamId: expect.any(String),
+      revision: 0,
       isProcessing: true,
       streamText: 'partial assistant output',
       currentActivityId: 'activity-1',
@@ -120,6 +163,7 @@ describe('SessionRegistryService', () => {
           messageId: 'msg-1',
           text: 'next',
           policy: 'queue',
+          imageUrls: [],
           attachmentFilenames: ['notes.zip'],
           createdAt: '2026-05-07T20:00:01.000Z',
         },

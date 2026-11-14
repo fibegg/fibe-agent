@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { useChatWebSocket } from './use-chat-websocket';
+import { apiRequest } from '../api-url';
 import { CHAT_STATES, WS_CLOSE } from './chat-state';
 
 vi.mock('../api-url', () => ({
@@ -10,6 +11,7 @@ vi.mock('../api-url', () => ({
   getAuthTokenForRequest: vi.fn(() => ''),
   getWsUrl: vi.fn(() => 'ws://test'),
   clearToken: vi.fn(),
+  apiRequest: vi.fn().mockResolvedValue({ ok: true, json: async () => ({ pendingPrompts: [] }) }),
 }));
 
 describe('useChatWebSocket', () => {
@@ -26,6 +28,23 @@ describe('useChatWebSocket', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+  });
+
+  it('refreshes pending prompts on a stale_prompt 409 without aborting the stream', async () => {
+    const socket: { onmessage?: (event: MessageEvent) => void } = {};
+    vi.stubGlobal('WebSocket', class {
+      close = vi.fn();
+      set onmessage(handler: (event: MessageEvent) => void) { socket.onmessage = handler; }
+    });
+    const onLocal = vi.fn();
+    const abort = vi.fn();
+    const wrapper = ({ children }: { children: React.ReactNode }) => <MemoryRouter>{children}</MemoryRouter>;
+    const { result } = renderHook(() => useChatWebSocket(undefined, undefined, undefined, undefined, undefined, undefined, onLocal, undefined, 'thread-a', abort), { wrapper });
+    await act(async () => { socket.onmessage?.({ data: JSON.stringify({ type: 'error', error: 'stale_prompt', statusCode: 409 }) } as MessageEvent); });
+    expect(apiRequest).toHaveBeenCalledWith('/api/conversations/thread-a/live');
+    expect(onLocal).toHaveBeenCalledWith({ type: 'pending_prompts_snapshot', pendingPrompts: [] });
+    expect(abort).not.toHaveBeenCalled();
+    expect(result.current.errorMessage).toBeNull();
   });
 
   it('returns state, send, reconnect, interruptAgent, and other expected fields', () => {
