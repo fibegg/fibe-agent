@@ -1255,6 +1255,36 @@ describe('OrchestratorService', () => {
     expect(strategyCalls.at(-1)?.systemPrompt).toBe('Built-in fallback prompt');
   });
 
+  test('attachment steering builds complete provider context for capable strategies', async () => {
+    const { orch, ctx, promptBuilds } = await createOrchestrator();
+    ctx.isProcessing = true;
+    ctx.strategy.supportsSteerContent = true;
+    let called = false;
+    ctx.strategy.steerAgent = async () => { called = true; return 'handled'; };
+    mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+    writeFileSync(join(dataDir, 'uploads', 'photo.png'), 'image');
+    writeFileSync(join(dataDir, 'uploads', 'notes.txt'), 'document');
+    const result = await orch.sendMessageFromApi('', 'default', ['photo.png'], ['notes.txt'], 'steer');
+    expect(result).toMatchObject({ accepted: true, resolution: 'steered' });
+    expect(called).toBe(true);
+    expect(promptBuilds.at(-1)).toMatchObject({ imageUrls: ['photo.png'], attachmentFilenames: ['notes.txt'] });
+    expect(ctx.queuedTurns).toHaveLength(0);
+  });
+
+  test('unsupported attachment steering queues complete content without calling provider', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isProcessing = true;
+    let called = false;
+    ctx.strategy.steerAgent = () => { called = true; return 'handled'; };
+    mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+    writeFileSync(join(dataDir, 'uploads', 'photo.png'), 'image');
+    writeFileSync(join(dataDir, 'uploads', 'notes.txt'), 'document');
+    const result = await orch.sendMessageFromApi('inspect', 'default', ['photo.png'], ['notes.txt'], 'steer');
+    expect(result).toMatchObject({ accepted: true, resolution: 'queued', fallbackReason: 'steer_unsupported_content' });
+    expect(called).toBe(false);
+    expect(ctx.queuedTurns[0]).toMatchObject({ text: 'inspect', imageUrls: ['photo.png'], attachmentFilenames: ['notes.txt'], policy: 'queue' });
+  });
+
   test('sendMessageFromApi steer policy uses provider steer when available', async () => {
     const { orch, ctx } = await createOrchestrator();
     ctx.isAuthenticated = true;
@@ -1307,6 +1337,7 @@ describe('OrchestratorService', () => {
 
     expect(result.accepted).toBe(true);
     expect(result.resolvedPolicy).toBe('steer');
+    expect(result.resolution).toBe('steered');
     expect(steered).toBe('steer native');
     expect(ctx.queuedTurns).toHaveLength(0);
   });

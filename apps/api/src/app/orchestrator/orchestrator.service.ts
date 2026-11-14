@@ -845,13 +845,17 @@ export class OrchestratorService implements OnModuleInit {
         payload.policy === 'steer' &&
         previousPolicy !== 'steer' &&
         turn.displayText &&
-        ctx.strategy.steerAgent
+        ctx.strategy.steerAgent &&
+        (!(turn.imageUrls.length || turn.attachmentFilenames?.length || turn.audioFilename) || ctx.strategy.supportsSteerContent)
       ) {
         if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) {
           await this.stores(ctx).messageStore.updateRequestState(turn.messageId, 'running');
           this.stores(ctx).messageStore.assertRequestGeneration(turn.messageId);
         }
-        const steerResult = await ctx.strategy.steerAgent(turn.displayText);
+        const steerText = (turn.imageUrls.length || turn.attachmentFilenames?.length || turn.audioFilename)
+          ? await this.chatPromptContext.buildFullPrompt(turn.displayText, turn.imageUrls, turn.audioFilename, turn.attachmentFilenames, undefined, ctx.conversationId)
+          : turn.displayText;
+        const steerResult = await ctx.strategy.steerAgent(steerText);
         if (steerResult === 'handled') {
           if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) this.trackSteeredRequest(ctx, turn.messageId);
           ctx.queuedTurns = ctx.queuedTurns.filter((queued) => queued !== turn);
@@ -1630,11 +1634,16 @@ export class OrchestratorService implements OnModuleInit {
 
     let resolvedPolicy: Exclude<BusyPolicy, 'reject'> = 'queue';
     let queuedText = saved.text;
-    if (policy === 'steer' && processingCtx.strategy.steerAgent) {
+    const hasContent = !!(saved.imageUrls.length || saved.attachmentFilenames?.length || saved.audioFilename);
+    const unsupportedContent = hasContent && !processingCtx.strategy.supportsSteerContent;
+    if (policy === 'steer' && processingCtx.strategy.steerAgent && !unsupportedContent) {
       if (payload.admission) await this.stores(processingCtx).messageStore.updateRequestState(saved.messageId, 'running');
       if (payload.admission) this.stores(processingCtx).messageStore.assertRequestGeneration(saved.messageId);
       processingCtx.pendingSteerRestart = true;
-      const steerResult = await processingCtx.strategy.steerAgent(saved.text);
+      const steerText = hasContent
+        ? await this.chatPromptContext.buildFullPrompt(saved.text, saved.imageUrls, saved.audioFilename, saved.attachmentFilenames, undefined, processingCtx.conversationId)
+        : saved.text;
+      const steerResult = await processingCtx.strategy.steerAgent(steerText);
       if (steerResult === 'handled') {
         if (payload.admission) this.trackSteeredRequest(processingCtx, saved.messageId);
         processingCtx.pendingSteerRestart = false;
@@ -1660,7 +1669,7 @@ export class OrchestratorService implements OnModuleInit {
       policy: resolvedPolicy,
       createdAt: new Date().toISOString(),
     });
-    return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
+    return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: unsupportedContent ? 'steer_unsupported_content' : processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
   }
 
   private async drainQueuedTurns(ctx: SessionContext): Promise<void> {

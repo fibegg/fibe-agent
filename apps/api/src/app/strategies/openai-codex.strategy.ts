@@ -717,6 +717,8 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     this.currentStreamProcess?.kill();
   }
 
+  readonly supportsSteerContent = true;
+
   override async steerAgent(message: string): Promise<SteerAgentResult> {
     const trimmed = message.trim();
     if (!trimmed) return 'queued';
