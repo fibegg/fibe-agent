@@ -416,7 +416,8 @@ export class OrchestratorService implements OnModuleInit {
       try {
         await handler();
       } catch (error) {
-        if (!(error instanceof ConflictException)) throw error;
+        if (!(error instanceof ConflictException) ||
+          (msg.action !== WS_ACTION.ANSWER_USER_QUESTION && msg.action !== WS_ACTION.CONFIRM_ACTION_RESPONSE)) throw error;
         ctx.send(WS_EVENT.ERROR, { error: 'stale_prompt', statusCode: 409 });
       }
     } else {
@@ -598,8 +599,10 @@ export class OrchestratorService implements OnModuleInit {
           await scopedStore.saveRequestOutcome(id, receipt);
           return { ...receipt, executionState: metadata.state };
         }
-        this.rejectedReceipts.set(id, { fingerprint, outcome });
-        if (this.rejectedReceipts.size > 1000) this.rejectedReceipts.delete(this.rejectedReceipts.keys().next().value!);
+        if (outcome.error === 'text is required and must be non-empty' || outcome.error === 'Uploaded file not found') {
+          this.rejectedReceipts.set(id, { fingerprint, outcome });
+          if (this.rejectedReceipts.size > 1000) this.rejectedReceipts.delete(this.rejectedReceipts.keys().next().value!);
+        }
         return outcome;
       } catch (error) {
         if (error instanceof StoreGenerationChangedError) return { accepted: false, messageId: id, error: 'STORE_GENERATION_CHANGED' };
@@ -641,6 +644,7 @@ export class OrchestratorService implements OnModuleInit {
       const scope = this.resolveDeliveryScope(conversationId, false);
       if (!scope.accepted) return scope;
       for (const filename of [...(images ?? []), ...(attachmentFilenames ?? [])]) {
+        if (filename.startsWith('data:')) continue;
         if (!this.uploadsService.getPath(filename, scope.conversationId)) {
           return { accepted: false, error: 'Uploaded file not found' };
         }
@@ -877,6 +881,11 @@ export class OrchestratorService implements OnModuleInit {
           };
         }
         turn.text = '';
+        if (steerResult === 'queued') {
+          turn.imageUrls = [];
+          turn.audioFilename = null;
+          turn.attachmentFilenames = undefined;
+        }
       }
     }
 
@@ -1672,6 +1681,11 @@ export class OrchestratorService implements OnModuleInit {
         };
       }
       queuedText = '';
+      if (steerResult === 'queued') {
+        saved.imageUrls = [];
+        saved.audioFilename = null;
+        saved.attachmentFilenames = undefined;
+      }
       resolvedPolicy = 'steer';
     }
 
@@ -1909,7 +1923,7 @@ export class OrchestratorService implements OnModuleInit {
     const streamStartedAt = new Date().toISOString();
     ctx.streamStartedAt = streamStartedAt;
     ctx.streamTextAccumulated = '';
-    ctx.send(WS_EVENT.STREAM_START, { model, startedAt: streamStartedAt });
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_START, { model, startedAt: streamStartedAt });
     const streamStartEntry: StoredStoryEntry = {
       id: randomUUID(),
       type: 'stream_start',
@@ -1924,7 +1938,8 @@ export class OrchestratorService implements OnModuleInit {
 
     const execAsync = promisify(exec);
     let cliOut = `> ${command}\n\n`;
-    ctx.send(WS_EVENT.STREAM_CHUNK, { text: cliOut });
+    ctx.streamTextAccumulated = cliOut;
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: cliOut });
 
     try {
       const envPath = `${process.env['DATA_DIR'] || '/app/data'}/.fibe/bin:/usr/local/bin:${process.env.PATH || ''}`;
@@ -1934,11 +1949,13 @@ export class OrchestratorService implements OnModuleInit {
       const output =
         stdout || stderr || 'Command executed successfully with no output.';
       cliOut += output;
-      ctx.send(WS_EVENT.STREAM_CHUNK, { text: output });
+      ctx.streamTextAccumulated = cliOut;
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: output });
     } catch (e) {
       const errText = e instanceof Error ? e.message : String(e);
       cliOut += `Error: ${errText}`;
-      ctx.send(WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
+      ctx.streamTextAccumulated = cliOut;
+      this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: `Error: ${errText}` });
     }
     finishAgentStream(
       this.finishStreamDeps(ctx),

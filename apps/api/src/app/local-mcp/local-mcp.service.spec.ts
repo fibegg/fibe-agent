@@ -210,6 +210,20 @@ describe('LocalMcpService', () => {
     expect((res.result as Record<string, unknown>)['answer']).toBe('Bob');
   });
 
+  test('conversation-less prompts survive reconnect snapshots and accept answers from any conversation', async () => {
+    const { svc } = makeService(5000);
+    for (const tool of [LOCAL_TOOL.ASK_USER, LOCAL_TOOL.CONFIRM_ACTION]) {
+      const waiting = svc.handleToolCall({ requestId: 'unscoped', tool, args: { question: 'Name?', message: 'Proceed?' } });
+      const prompt = svc.pendingPrompts('thread-a')[0];
+      expect(prompt.conversationId).toBeUndefined();
+      expect(svc.pendingPrompts('thread-b')[0]).toEqual(prompt);
+      const payload = tool === LOCAL_TOOL.ASK_USER ? { answer: 'Alice' } : { confirmed: true };
+      svc.resolveQuestion(prompt.promptId, payload, 'thread-b');
+      expect(await waiting).toMatchObject({ ok: true, result: payload });
+      expect(svc.pendingPrompts('thread-a')).toEqual([]);
+    }
+  });
+
   test('pending prompts survive snapshot reads and reject wrong scope, kind, and duplicate answers', async () => {
     const { svc } = makeService(5000);
     const waiting = svc.handleToolCall({ requestId: 'fake-request', tool: LOCAL_TOOL.ASK_USER, args: { question: 'Name?' }, conversationId: 'thread-a' });

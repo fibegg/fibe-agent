@@ -300,13 +300,13 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
    * Called by OrchestratorService when the operator replies via WebSocket.
    */
   pendingPrompts(conversationId: string): PendingPrompt[] {
-    return [...this.pending.values()].filter(p => (p.prompt.conversationId ?? 'default') === conversationId).map(p => ({ ...p.prompt }));
+    return [...this.pending.values()].filter(p => !p.prompt.conversationId || p.prompt.conversationId === conversationId).map(p => ({ ...p.prompt }));
   }
 
   resolveQuestion(questionId: string, payload: unknown, conversationId?: string): void {
     const p = this.pending.get(questionId);
     const body = payload as { answer?: unknown; confirmed?: unknown } | null;
-    if (!p || (conversationId !== undefined && (p.prompt.conversationId ?? 'default') !== conversationId) ||
+    if (!p || (conversationId !== undefined && p.prompt.conversationId && p.prompt.conversationId !== conversationId) ||
       (p.prompt.kind === 'question' ? typeof body?.answer !== 'string' : typeof body?.confirmed !== 'boolean')) {
       throw new ConflictException({ error: 'stale_prompt' });
     }

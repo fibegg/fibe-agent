@@ -801,6 +801,41 @@ describe('OrchestratorService', () => {
     expect(strategyCalls).toHaveLength(2);
   });
 
+  test('identified sends retry transient rejections but retain permanent validation failures', async () => {
+    const { orch, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
+    const generation = messageStore.deliveryGeneration();
+    const send = spyOn(orch as unknown as { sendApiMessage: (...args: unknown[]) => Promise<{ accepted: boolean; error?: string }> }, 'sendApiMessage');
+    for (const [index, error] of [ERROR_CODE.AGENT_BUSY, ERROR_CODE.NEED_AUTH, 'Conversation not found', 'Multiple active agent runs; provide conversationId.'].entries()) {
+      const id = `e514ad73-8519-42e4-b268-${String(index).padStart(12, '0')}`;
+      send.mockResolvedValueOnce({ accepted: false, error });
+      expect(await orch.sendMessageFromApi('retry later', 'default', undefined, undefined, 'reject', id, generation)).toMatchObject({ accepted: false, error });
+      expect(await orch.sendMessageFromApi('retry later', 'default', undefined, undefined, 'reject', id, generation)).toMatchObject({ accepted: true, messageId: id });
+      await waitForBackgroundTasks();
+    }
+    const id = 'f514ad73-8519-42e4-b268-ce7e141cb9e9';
+    expect(await orch.sendMessageFromApi('', 'default', undefined, ['missing.txt'], 'reject', id, generation)).toMatchObject({ accepted: false, error: 'Uploaded file not found' });
+    mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+    writeFileSync(join(dataDir, 'uploads', 'missing.txt'), 'now present');
+    expect(await orch.sendMessageFromApi('', 'default', undefined, ['missing.txt'], 'reject', id, generation)).toMatchObject({ accepted: false, error: 'Uploaded file not found' });
+    const emptyId = 'd514ad73-8519-42e4-b268-ce7e141cb9e9';
+    expect(await orch.sendMessageFromApi('', 'default', undefined, undefined, 'reject', emptyId, generation)).toMatchObject({ accepted: false, error: 'text is required and must be non-empty' });
+    expect(await orch.sendMessageFromApi('changed body', 'default', undefined, undefined, 'reject', emptyId, generation)).toMatchObject({ accepted: false, error: 'REQUEST_ID_CONFLICT' });
+    expect(strategyCalls).toHaveLength(4);
+  });
+
+  test('image-only REST sends accept data URLs without an existing upload', async () => {
+    const { orch, messageStore, promptBuilds, waitForBackgroundTasks } = await createOrchestrator();
+    const response = await new AgentController(orch).sendMessage({ conversationId: 'default', images: ['data:image/png;base64,YWJj'] });
+    expect(response).toMatchObject({ accepted: true, resolution: 'started' });
+    await waitForBackgroundTasks();
+    const message = messageStore.all().find(m => m.role === 'user');
+    expect(message?.body).toBe('');
+    expect(message?.imageUrls).toHaveLength(1);
+    if (!message?.imageUrls?.[0]) throw new Error('Missing stored image');
+    expect(readFileSync(join(dataDir, 'uploads', message.imageUrls[0]), 'utf8')).toBe('abc');
+    expect(promptBuilds.at(-1)?.imageUrls).toEqual(message?.imageUrls);
+  });
+
   test('queue insertion and cancellation advance live snapshot revisions', async () => {
     const { orch, ctx, sessionRegistry } = await createOrchestrator();
     ctx.isProcessing = true;
@@ -1307,6 +1342,27 @@ describe('OrchestratorService', () => {
     expect(ctx.queuedTurns[0]).toMatchObject({ text: 'inspect', imageUrls: ['photo.png'], attachmentFilenames: ['notes.txt'], policy: 'queue' });
   });
 
+  for (const path of ['send', 'policy update'] as const) {
+    test(`provider-queued attachment steering avoids duplicate context on ${path}`, async () => {
+      const { orch, ctx, messageStore, promptBuilds } = await createOrchestrator();
+      ctx.isProcessing = true;
+      ctx.strategy.supportsSteerContent = true;
+      const retained: string[] = [];
+      ctx.strategy.steerAgent = prompt => { retained.push(prompt); return 'queued'; };
+      mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+      writeFileSync(join(dataDir, 'uploads', 'photo.png'), 'image');
+      writeFileSync(join(dataDir, 'uploads', 'notes.txt'), 'document');
+      await orch.sendMessageFromApi('inspect', 'default', ['photo.png'], ['notes.txt'], path === 'send' ? 'steer' : 'queue');
+      if (path === 'policy update') await orch.updateQueuedTurnFromApi('default', ctx.queuedTurns[0].id, { policy: 'steer' });
+      expect(retained).toEqual(['inspect']);
+      expect(promptBuilds).toHaveLength(1);
+      expect(promptBuilds[0]).toMatchObject({ imageUrls: ['photo.png'], attachmentFilenames: ['notes.txt'] });
+      expect(ctx.queuedTurns[0]).toMatchObject({ text: '', imageUrls: [], audioFilename: null });
+      expect(ctx.queuedTurns[0].attachmentFilenames).toBeUndefined();
+      expect(messageStore.all()[0]).toMatchObject({ imageUrls: ['photo.png'], attachmentFilenames: ['notes.txt'] });
+    });
+  }
+
   test('sendMessageFromApi steer policy uses provider steer when available', async () => {
     const { orch, ctx } = await createOrchestrator();
     ctx.isAuthenticated = true;
@@ -1762,6 +1818,16 @@ describe('OrchestratorService', () => {
     );
   });
 
+  test('non-prompt conflicts propagate without being relabeled stale_prompt', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    const conflict = new ConflictException({ error: 'model_conflict' });
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe(event => events.push(event));
+    spyOn(orch['modelStore'], 'set').mockImplementation(() => { throw conflict; });
+    await expect(orch.handleClientMessage(ctx, { action: WS_ACTION.SET_MODEL, model: 'fake-model' })).rejects.toBe(conflict);
+    expect(events).toEqual([]);
+  });
+
   test('reconnected live snapshots recover prompts and REST and sockets reject stale answers', async () => {
     const localMcp = new LocalMcpService();
     const { orch, ctx, sessionRegistry } = await createOrchestrator(localMcp);
@@ -1860,10 +1926,15 @@ describe('OrchestratorService', () => {
       action: { type: 'EXECUTE_CLI', command: 'echo hello_from_cli' },
     });
 
+    const observer = orch['sessionRegistry'].create('default');
     const events: { type: string; data: Record<string, unknown> }[] = [];
-    ctx.outbound$.subscribe((e) =>
-      events.push(e as { type: string; data: Record<string, unknown> }),
-    );
+    const snapshots: Array<{ revision: number; streamId: string; streamText: string }> = [];
+    observer.outbound$.subscribe(e => {
+      events.push(e);
+      if ([WS_EVENT.STREAM_START, WS_EVENT.STREAM_CHUNK, WS_EVENT.STREAM_END].includes(e.type as typeof WS_EVENT.STREAM_START)) {
+        snapshots.push(orch['sessionRegistry'].liveConversationState('default'));
+      }
+    });
 
     await orch.handleClientMessage(ctx, {
       action: WS_ACTION.SEND_CHAT_MESSAGE,
@@ -1881,6 +1952,10 @@ describe('OrchestratorService', () => {
     const allChunks = chunkEvents.map((e) => String(e.data.text)).join('');
     expect(allChunks).toContain('hello_from_cli');
     expect(events.some((e) => e.type === WS_EVENT.STREAM_END)).toBe(true);
+    const lifecycle = events.filter(e => [WS_EVENT.STREAM_START, WS_EVENT.STREAM_CHUNK, WS_EVENT.STREAM_END].includes(e.type as typeof WS_EVENT.STREAM_START));
+    expect(lifecycle.map(e => e.data.revision)).toEqual([1, 2, 3, 4]);
+    expect(lifecycle.every((event, index) => event.data.streamId === snapshots[index].streamId && event.data.revision === snapshots[index].revision)).toBe(true);
+    expect(snapshots[2].streamText).toContain('hello_from_cli');
 
     configSpy.mockRestore();
   });

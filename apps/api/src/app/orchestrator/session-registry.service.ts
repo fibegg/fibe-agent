@@ -225,6 +225,7 @@ export class SessionRegistryService {
     for (const ctx of this.sessionsForConversation(conversationId)) {
       this.destroy(ctx.sessionId);
     }
+    this.sequences.delete(conversationId);
   }
 
   /**

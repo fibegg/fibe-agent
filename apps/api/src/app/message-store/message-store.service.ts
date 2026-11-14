@@ -194,7 +194,6 @@ export class MessageStoreService implements OnModuleDestroy {
     if (attachmentFilenames?.length)
       msg.attachmentFilenames = attachmentFilenames;
 
-    this.fillLegacyAttachments(msg);
     this.messages.push(msg);
     this.indexById.set(msg.id, msg);
     this.jsonWriter.schedule();
@@ -325,19 +324,9 @@ export class MessageStoreService implements OnModuleDestroy {
     this.jsonWriter.destroy();
   }
 
-  private fillLegacyAttachments(msg: StoredMessage): void {
-    if (msg.attachments) return;
-    const attachments: AttachmentMetadata[] = [
-      ...(msg.imageUrls ?? []).map(storedFilename => ({ storedFilename, originalFilename: storedFilename, kind: 'image' as const })),
-      ...(msg.attachmentFilenames ?? []).map(storedFilename => ({ storedFilename, originalFilename: storedFilename, kind: 'document' as const })),
-    ];
-    if (attachments.length) msg.attachments = attachments;
-  }
-
   private rebuildIndex(): void {
     this.indexById.clear();
     for (const msg of this.messages) {
-      this.fillLegacyAttachments(msg);
       this.indexById.set(msg.id, msg);
     }
   }

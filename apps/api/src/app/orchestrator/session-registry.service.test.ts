@@ -71,6 +71,19 @@ describe('SessionRegistryService', () => {
     expect(registry.liveConversationState('thread-b').revision).toBe(0);
   });
 
+  it('deleting a conversation releases its sequence without resetting other conversations', () => {
+    registry.create('thread-a');
+    registry.broadcastToConversation('thread-a', 'stream_start');
+    registry.broadcastToConversation('thread-b', 'stream_start');
+    const before = registry.liveConversationState('thread-a');
+    const other = registry.liveConversationState('thread-b');
+    registry.destroyConversation('thread-a');
+    const recreated = registry.liveConversationState('thread-a');
+    expect(recreated.streamId).not.toBe(before.streamId);
+    expect(recreated.revision).toBe(0);
+    expect(registry.liveConversationState('thread-b')).toEqual(other);
+  });
+
   it('starts with zero sessions', () => {
     expect(registry.size).toBe(0);
     expect(registry.all()).toHaveLength(0);
