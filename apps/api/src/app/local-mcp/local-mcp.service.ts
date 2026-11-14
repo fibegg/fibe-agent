@@ -213,7 +213,7 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
       return Promise.reject(new Error('ask_user: question must not be empty'));
     }
     const questionId = randomUUID();
-    const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'question', question, placeholder: placeholder ?? '', conversationId: conversationId ?? 'default' };
+    const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'question', question, placeholder: placeholder ?? '', ...(conversationId ? { conversationId } : {}) };
     const reply = this.waitForReply<{ answer: string }>(prompt);
     this.outbound$.next({ type: WS_EVENT.ASK_USER_PROMPT, data: { ...prompt } });
     return reply;
@@ -225,10 +225,14 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     cancelLabel?: string,
     conversationId?: string,
   ): Promise<{ confirmed: boolean }> {
-    if (!message.trim()) return Promise.reject(new Error('confirm_action: message must not be empty'));
+    if (!message.trim()) {
+      return Promise.reject(
+        new Error('confirm_action: message must not be empty'),
+      );
+    }
     const questionId = randomUUID();
     const prompt: PendingPrompt = { promptId: questionId, questionId, kind: 'confirmation', message,
-      confirmLabel: confirmLabel ?? 'Yes', cancelLabel: cancelLabel ?? 'No', conversationId: conversationId ?? 'default' };
+      confirmLabel: confirmLabel ?? 'Yes', cancelLabel: cancelLabel ?? 'No', ...(conversationId ? { conversationId } : {}) };
     const reply = this.waitForReply<{ confirmed: boolean }>(prompt);
     this.outbound$.next({ type: WS_EVENT.CONFIRM_ACTION_PROMPT, data: { ...prompt } });
     return reply;
@@ -299,15 +303,15 @@ export class LocalMcpService implements OnModuleInit, OnModuleDestroy {
     return [...this.pending.values()].filter(p => (p.prompt.conversationId ?? 'default') === conversationId).map(p => ({ ...p.prompt }));
   }
 
-  resolveQuestion(promptId: string, payload: unknown, conversationId?: string): void {
-    const p = this.pending.get(promptId);
+  resolveQuestion(questionId: string, payload: unknown, conversationId?: string): void {
+    const p = this.pending.get(questionId);
     const body = payload as { answer?: unknown; confirmed?: unknown } | null;
     if (!p || (conversationId !== undefined && (p.prompt.conversationId ?? 'default') !== conversationId) ||
       (p.prompt.kind === 'question' ? typeof body?.answer !== 'string' : typeof body?.confirmed !== 'boolean')) {
       throw new ConflictException({ error: 'stale_prompt' });
     }
     clearTimeout(p.timer);
-    this.pending.delete(promptId);
+    this.pending.delete(questionId);
     p.resolve(payload);
   }
 

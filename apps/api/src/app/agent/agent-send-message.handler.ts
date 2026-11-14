@@ -38,10 +38,7 @@ export function handleSendMessage(
     if (result.error === ERROR_CODE.AGENT_BUSY) {
       throw new ConflictException(result.reason ?? ERROR_CODE.AGENT_BUSY);
     }
-    if (result.error === 'REQUEST_ID_CONFLICT') {
-      throw new ConflictException({ error: 'request_conflict' });
-    }
-    if (result.error === 'request_conflict' || result.error === 'REQUEST_OUTCOME_UNKNOWN' || result.error === 'STORE_GENERATION_CHANGED') {
+    if (result.error === 'REQUEST_ID_CONFLICT' || result.error === 'REQUEST_OUTCOME_UNKNOWN' || result.error === 'STORE_GENERATION_CHANGED') {
       throw new ConflictException({ error: result.error, messageId: result.messageId });
     }
     if (result.error === 'Conversation not found') {

@@ -22,7 +22,7 @@ export class UploadsController {
       return res.status(404).send();
     }
     res.header('Content-Type', contentTypeFromFilename(filename));
-    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(this.uploads.getAttachmentMetadata(filename, conversationId).originalFilename)}"; filename*=UTF-8''${encodeURIComponent(this.uploads.getAttachmentMetadata(filename, conversationId).originalFilename)}`);
+    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(filename)}"`);
     const stream = createReadStream(path);
     return res.send(stream);
   }

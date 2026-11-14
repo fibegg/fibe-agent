@@ -146,7 +146,7 @@ export class ConversationsController {
   ): Promise<{ accepted: true; messageId: string; resolvedPolicy?: string }> {
     this.requireBundle(id);
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text && !body.images?.length && !body.attachmentFilenames?.length && !body.requestId) {
+    if (!text && !body.images?.length && !body.attachmentFilenames?.length) {
       throw new BadRequestException('text is required and must be non-empty');
     }
     const result = await this.orchestrator.sendMessageFromApi(

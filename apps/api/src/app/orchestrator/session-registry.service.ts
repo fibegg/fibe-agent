@@ -36,7 +36,7 @@ const RECENT_STREAM_RETENTION_MS = 30_000;
 @Injectable()
 export class SessionRegistryService {
   private readonly logger = new Logger(SessionRegistryService.name);
-  private readonly sequences = new Map<string, { streamId: string; revision: number; finishedAt: string | null }>();
+  private readonly sequences = new Map<string, { streamId: string; revision: number }>();
   private readonly sessions = new Map<string, SessionContext>();
   /** Per-conversation session sets for O(k) broadcastToConversation. */
   private readonly byConversation = new Map<string, Set<SessionContext>>();
@@ -133,9 +133,9 @@ export class SessionRegistryService {
         conversationId,
         streamId: sequence.streamId,
         revision: sequence.revision,
-        isProcessing: sequence.finishedAt === null,
+        isProcessing: true,
         streamText: processing.streamTextAccumulated,
-        currentActivityId: sequence.finishedAt ? null : processing.currentActivityId,
+        currentActivityId: processing.currentActivityId,
         queuedTurns: processing.queuedTurns.length,
         queue: processing.queuedTurns.map((turn) => ({
           id: turn.id,
@@ -149,7 +149,7 @@ export class SessionRegistryService {
             : {}),
         })),
         startedAt: processing.streamStartedAt,
-        finishedAt: sequence.finishedAt,
+        finishedAt: null,
       };
     }
     const completed = this.recentCompletedStreamForConversation(conversationId);
@@ -181,7 +181,7 @@ export class SessionRegistryService {
   private sequence(conversationId: string) {
     let sequence = this.sequences.get(conversationId);
     if (!sequence) {
-      sequence = { streamId: randomUUID(), revision: 0, finishedAt: null };
+      sequence = { streamId: randomUUID(), revision: 0 };
       this.sequences.set(conversationId, sequence);
     }
     return sequence;
@@ -277,8 +277,6 @@ export class SessionRegistryService {
     if ([WS_EVENT.STREAM_START, WS_EVENT.STREAM_CHUNK, WS_EVENT.STREAM_END, WS_EVENT.QUEUE_UPDATED].includes(type as typeof WS_EVENT.STREAM_START)) {
       const sequence = this.sequence(conversationId);
       sequence.revision += 1;
-      if (type === WS_EVENT.STREAM_START) sequence.finishedAt = null;
-      if (type === WS_EVENT.STREAM_END) sequence.finishedAt = new Date().toISOString();
       sequencing = { streamId: sequence.streamId, revision: sequence.revision };
     }
     const event: OutboundEvent = {

@@ -64,7 +64,8 @@ describe('SessionRegistryService', () => {
     expect(sequenced.map(event => event.data.revision)).toEqual([initial.revision + 1, initial.revision + 2, initial.revision + 3, initial.revision + 4]);
     expect(snapshot.revision).toBe(sequenced[1].data.revision);
     expect(end.revision).toBe(sequenced.at(-1)?.data.revision);
-    expect(end.isProcessing).toBe(false);
+    expect(end.isProcessing).toBe(true);
+    expect(end.finishedAt).toBeNull();
     expect(end.streamText).toBe('one');
     expect(sequenced.every(event => event.data.streamId === snapshot.streamId)).toBe(true);
     expect(registry.liveConversationState('thread-b').revision).toBe(0);
@@ -135,8 +136,10 @@ describe('SessionRegistryService', () => {
       createdAt: '2026-05-07T20:00:01.000Z',
     });
 
-    expect(registry.liveConversationState('thread-a')).toMatchObject({
+    expect(registry.liveConversationState('thread-a')).toEqual({
       conversationId: 'thread-a',
+      streamId: expect.any(String),
+      revision: 0,
       isProcessing: true,
       streamText: 'partial assistant output',
       currentActivityId: 'activity-1',
@@ -147,6 +150,7 @@ describe('SessionRegistryService', () => {
           messageId: 'msg-1',
           text: 'next',
           policy: 'queue',
+          imageUrls: [],
           attachmentFilenames: ['notes.zip'],
           createdAt: '2026-05-07T20:00:01.000Z',
         },

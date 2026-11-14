@@ -1,5 +1,4 @@
-import type { AttachmentMetadata, PendingPrompt } from '@shared/types';
-import type { StoredActivityEntry } from '@shared/types';
+import type { AttachmentMetadata, PendingPrompt, StoredActivityEntry } from '@shared/types';
 import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
 import { translate, type TranslationKey } from '../i18n';
 

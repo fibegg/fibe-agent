@@ -577,7 +577,7 @@ export class OrchestratorService implements OnModuleInit {
         accepted: false, messageId: requestId, error: 'REQUEST_OUTCOME_UNKNOWN',
         conversationId: existing.conversationId, executionState: request.state,
       };
-      if (request.outcome && (request.state !== 'pending' || this.acceptedRequestIds.has(requestId))) return { ...request.outcome };
+      if (request.outcome && (request.state !== 'pending' || this.acceptedRequestIds.has(requestId))) return { ...request.outcome, executionState: request.state };
       if (request.state !== 'pending' || this.acceptedRequestIds.has(requestId)) {
         return { accepted: true, messageId: requestId, conversationId: existing.conversationId, executionState: request.state };
       }
@@ -596,7 +596,7 @@ export class OrchestratorService implements OnModuleInit {
           if (metadata.state === 'pending') this.acceptedRequestIds.add(id);
           const receipt = metadata.outcome ?? { ...outcome, executionState: metadata.state };
           await scopedStore.saveRequestOutcome(id, receipt);
-          return receipt;
+          return { ...receipt, executionState: metadata.state };
         }
         this.rejectedReceipts.set(id, { fingerprint, outcome });
         if (this.rejectedReceipts.size > 1000) this.rejectedReceipts.delete(this.rejectedReceipts.keys().next().value!);
@@ -637,11 +637,10 @@ export class OrchestratorService implements OnModuleInit {
     if (!text.trim() && !images?.length && !attachmentFilenames?.length) {
       return { accepted: false, error: 'text is required and must be non-empty' };
     }
-    if (images?.length || attachmentFilenames?.length) {
+    if (!text.trim() && (images?.length || attachmentFilenames?.length)) {
       const scope = this.resolveDeliveryScope(conversationId, false);
       if (!scope.accepted) return scope;
       for (const filename of [...(images ?? []), ...(attachmentFilenames ?? [])]) {
-        if (text.trim() && images?.includes(filename) && filename.startsWith('data:image/')) continue;
         if (!this.uploadsService.getPath(filename, scope.conversationId)) {
           return { accepted: false, error: 'Uploaded file not found' };
         }
@@ -1611,7 +1610,7 @@ export class OrchestratorService implements OnModuleInit {
     fallbackReason?: string;
   }> {
     const text = payload.text.trim();
-    if (!text && !payload.images?.length && !payload.attachmentFilenames?.length && !payload.audio && !payload.audioFilename)
+    if (!text && !payload.images?.length && !payload.attachmentFilenames?.length)
       return {
         accepted: false,
         error: 'text is required and must be non-empty',

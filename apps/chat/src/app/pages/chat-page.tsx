@@ -343,7 +343,7 @@ export function ChatPage() {
           ? { kind: 'ask' as const, questionId: prompt.promptId, question: prompt.question, placeholder: prompt.placeholder }
           : { kind: 'confirm' as const, questionId: prompt.promptId, message: prompt.message, confirmLabel: prompt.confirmLabel, cancelLabel: prompt.cancelLabel }),
       ]);
-    } else if (data.type === 'ask_user_prompt'  && data.questionId && data.question) {
+    } else if (data.type === 'ask_user_prompt' && data.questionId && data.question) {
       const questionId = data.promptId ?? data.questionId;
       const question = data.question;
       setLocalToolItems((prev) => [

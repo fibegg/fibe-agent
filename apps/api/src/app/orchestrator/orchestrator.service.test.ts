@@ -792,30 +792,13 @@ describe('OrchestratorService', () => {
     expect(first).toMatchObject({ accepted: true, resolution: 'started' });
     await waitForBackgroundTasks();
     await expect(controller.sendMessage({ text: ' ', conversationId: 'default' })).rejects.toThrow('text is required');
+    await expect(controller.sendMessage({ text: ' ', conversationId: 'default', requestId: 'dceab946-4d81-489f-af64-b5c772267adc' })).rejects.toThrow('text is required');
     await expect(controller.sendMessage({ images: ['missing.png'], conversationId: 'default' })).rejects.toThrow('Uploaded file not found');
     const image = await controller.sendMessage({ images: ['photo.png'], conversationId: 'default' });
     expect(image).toMatchObject({ accepted: true, resolution: 'started' });
     await waitForBackgroundTasks();
     expect(messageStore.all().filter(m => m.role === 'user')).toHaveLength(2);
     expect(strategyCalls).toHaveLength(2);
-  });
-
-  test('identified empty rejection is replayed and binds the request body', async () => {
-    const { orch, messageStore, strategyCalls } = await createOrchestrator();
-    const controller = new AgentController(orch);
-    const requestId = 'dceab946-4d81-489f-af64-b5c772267adc';
-    const storeGeneration = messageStore.deliveryGeneration();
-    const body = { text: '', conversationId: 'default', requestId, storeGeneration };
-    await expect(controller.sendMessage(body)).rejects.toThrow('text is required');
-    await expect(controller.sendMessage(body)).rejects.toThrow('text is required');
-    try {
-      await controller.sendMessage({ ...body, text: 'changed' });
-      throw new Error('expected conflict');
-    } catch (error) {
-      expect((error as ConflictException).getResponse()).toEqual({ error: 'request_conflict' });
-    }
-    expect(strategyCalls).toHaveLength(0);
-    expect(messageStore.all()).toEqual([]);
   });
 
   test('queue insertion and cancellation advance live snapshot revisions', async () => {
@@ -842,10 +825,14 @@ describe('OrchestratorService', () => {
     const replay = await orch.sendMessageFromApi('one occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
     expect(first.accepted).toBe(true);
     expect(first.messageId).toBe(requestId);
-    expect(replay).toEqual(first);
+    expect(replay.messageId).toBe(first.messageId);
+    expect(replay.resolution).toBe(first.resolution);
     await waitForBackgroundTasks();
     expect(messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
     expect(strategyCalls).toHaveLength(1);
+    const completedReplay = await orch.sendMessageFromApi('one occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
+    expect(completedReplay.executionState).toBe('completed');
+    expect(completedReplay.resolution).toBe(first.resolution);
     const mismatch = await orch.sendMessageFromApi('different occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
     expect(mismatch).toMatchObject({ accepted: false, error: 'REQUEST_ID_CONFLICT' });
     // A restored record can retain its old generation under a fresh scope. A
@@ -1215,8 +1202,6 @@ describe('OrchestratorService', () => {
     ctx.isAuthenticated = true;
     orch.isAuthenticated = true;
 
-    mkdirSync(join(dataDir, 'uploads'), { recursive: true });
-    writeFileSync(join(dataDir, 'uploads', 'notes.txt'), 'notes');
     const result = await orch.sendMessageFromApi(
       ' update the app ',
       'thread-a',
