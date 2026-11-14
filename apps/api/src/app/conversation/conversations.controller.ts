@@ -130,13 +130,14 @@ export class ConversationsController {
   }
 
   @Post(':id/agent/send-message')
+  @HttpCode(HttpStatus.ACCEPTED)
   async sendMessage(
     @Param('id') id: string,
     @Body() body: SendMessageDto,
   ): Promise<{ accepted: true; messageId: string; resolvedPolicy?: string }> {
     this.requireBundle(id);
     const text = typeof body.text === 'string' ? body.text.trim() : '';
-    if (!text) {
+    if (!text && !body.images?.length && !body.attachmentFilenames?.length) {
       throw new BadRequestException('text is required and must be non-empty');
     }
     const result = await this.orchestrator.sendMessageFromApi(

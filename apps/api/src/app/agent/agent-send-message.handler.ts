@@ -14,6 +14,8 @@ export type SendMessageOrchestratorResult = {
   conversationId?: string;
   resolvedPolicy?: string;
   executionState?: string;
+  resolution?: 'started' | 'steered' | 'queued';
+  fallbackReason?: string;
 };
 
 export type SendMessageSuccess = {
@@ -22,6 +24,8 @@ export type SendMessageSuccess = {
   conversationId?: string;
   resolvedPolicy?: string;
   executionState?: string;
+  resolution?: 'started' | 'steered' | 'queued';
+  fallbackReason?: string;
 };
 
 export function handleSendMessage(
@@ -34,7 +38,10 @@ export function handleSendMessage(
     if (result.error === ERROR_CODE.AGENT_BUSY) {
       throw new ConflictException(result.reason ?? ERROR_CODE.AGENT_BUSY);
     }
-    if (result.error === 'REQUEST_ID_CONFLICT' || result.error === 'REQUEST_OUTCOME_UNKNOWN' || result.error === 'STORE_GENERATION_CHANGED') {
+    if (result.error === 'REQUEST_ID_CONFLICT') {
+      throw new ConflictException({ error: 'request_conflict' });
+    }
+    if (result.error === 'request_conflict' || result.error === 'REQUEST_OUTCOME_UNKNOWN' || result.error === 'STORE_GENERATION_CHANGED') {
       throw new ConflictException({ error: result.error, messageId: result.messageId });
     }
     if (result.error === 'Conversation not found') {
@@ -47,6 +54,8 @@ export function handleSendMessage(
   }
   return {
     accepted: true,
+    ...(result.resolution ? { resolution: result.resolution } : {}),
+    ...(result.fallbackReason ? { fallbackReason: result.fallbackReason } : {}),
     messageId: result.messageId,
     ...(result.conversationId ? { conversationId: result.conversationId } : {}),
     ...(result.resolvedPolicy ? { resolvedPolicy: result.resolvedPolicy } : {}),

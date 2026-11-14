@@ -36,6 +36,11 @@ export interface StoredApiRequest {
   busyPolicy: 'reject' | 'queue' | 'steer';
   images?: string[];
   queueOrder?: number;
+  outcome?: {
+    accepted: boolean; messageId?: string; conversationId?: string; resolvedPolicy?: string;
+    resolution?: 'started' | 'steered' | 'queued'; fallbackReason?: string;
+    executionState?: StoredApiRequest['state']; queueCount?: number; error?: string; reason?: string;
+  };
   state: 'pending' | 'running' | 'completed' | 'failed' | 'outcome_unknown';
 }
 
@@ -270,6 +275,15 @@ export class MessageStoreService implements OnModuleDestroy {
 
   flush(strict = false): Promise<void> {
     return this.jsonWriter.flush(strict);
+  }
+
+  async saveRequestOutcome(id: string, outcome: NonNullable<StoredApiRequest['outcome']>): Promise<void> {
+    const request = this.indexById.get(id)?.apiRequest;
+    if (!request) throw new StoreGenerationChangedError();
+    this.assertGeneration(request.storeGeneration);
+    request.outcome = { ...outcome };
+    this.jsonWriter.schedule();
+    await this.flush(true);
   }
 
   async updateRequestState(id: string, state: StoredApiRequest['state']): Promise<void> {

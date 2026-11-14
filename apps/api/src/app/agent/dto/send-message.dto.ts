@@ -1,8 +1,9 @@
 import { IsString, IsOptional, IsArray, IsUUID } from 'class-validator';
 
 export class SendMessageDto {
+  @IsOptional()
   @IsString()
-  text!: string;
+  text?: string;
 
   @IsOptional()
   @IsUUID()

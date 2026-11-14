@@ -90,6 +90,8 @@ type ApiSendResult = {
   resolvedPolicy?: string;
   queueCount?: number;
   executionState?: StoredApiRequest['state'];
+  resolution?: 'started' | 'steered' | 'queued';
+  fallbackReason?: string;
 };
 
 type ApiAdmission = { id: string; metadata: StoredApiRequest; existing?: StoredMessage };
@@ -101,6 +103,7 @@ export class OrchestratorService implements OnModuleInit {
   private sharedIsAuthenticated = false;
   private readonly acceptedRequestIds = new Set<string>();
   private readonly steeredRequestIds = new Map<string, Set<string>>();
+  private readonly rejectedReceipts = new Map<string, { fingerprint: string; outcome: ApiSendResult }>();
   private readonly requestAdmissions = new Map<string, { fingerprint: string; result: Promise<ApiSendResult> }>();
   /** Cached system prompt shared across all sessions. */
   private sharedSystemPromptFromFile: string | null = null;
@@ -554,6 +557,8 @@ export class OrchestratorService implements OnModuleInit {
     const fingerprint = createHash('sha256').update(JSON.stringify([
       text.trim(), conversationId?.trim() || null, images ?? [], attachmentFilenames ?? [], busyPolicy,
     ])).digest('hex');
+    const rejected = this.rejectedReceipts.get(requestId);
+    if (rejected) return rejected.fingerprint === fingerprint ? { ...rejected.outcome } : { accepted: false, error: 'REQUEST_ID_CONFLICT' };
     const inFlight = this.requestAdmissions.get(requestId);
     if (inFlight) return inFlight.fingerprint === fingerprint ? inFlight.result : { accepted: false, error: 'REQUEST_ID_CONFLICT' };
     const existing = this.apiRequestMessages().find(({ message }) => message.id === requestId);
@@ -566,6 +571,7 @@ export class OrchestratorService implements OnModuleInit {
         accepted: false, messageId: requestId, error: 'REQUEST_OUTCOME_UNKNOWN',
         conversationId: existing.conversationId, executionState: request.state,
       };
+      if (request.outcome && (request.state !== 'pending' || this.acceptedRequestIds.has(requestId))) return { ...request.outcome };
       if (request.state !== 'pending' || this.acceptedRequestIds.has(requestId)) {
         return { accepted: true, messageId: requestId, conversationId: existing.conversationId, executionState: request.state };
       }
@@ -575,19 +581,29 @@ export class OrchestratorService implements OnModuleInit {
       fingerprint, text: text.trim(), conversationId: conversationId?.trim() || undefined, busyPolicy,
       images, queueOrder: -1, state: 'pending' as const,
     };
-    const result = this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
-      { id: requestId, metadata, existing: existing?.message });
-    this.requestAdmissions.set(requestId, { fingerprint, result });
-    try {
-      const outcome = await result;
-      if (outcome.accepted) this.acceptedRequestIds.add(requestId);
-      return outcome.accepted ? { ...outcome, executionState: metadata.state } : outcome;
-    } catch (error) {
-      if (error instanceof StoreGenerationChangedError) return { accepted: false, messageId: requestId, error: 'STORE_GENERATION_CHANGED' };
-      throw error;
-    } finally {
-      this.requestAdmissions.delete(requestId);
-    }
+    const id = requestId;
+    const result = (async (): Promise<ApiSendResult> => {
+      try {
+        const outcome = await this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
+          { id, metadata, existing: existing?.message });
+        if (outcome.accepted) {
+          this.acceptedRequestIds.add(id);
+          const receipt = { ...outcome, executionState: metadata.state };
+          await scopedStore.saveRequestOutcome(id, receipt);
+          return receipt;
+        }
+        this.rejectedReceipts.set(id, { fingerprint, outcome });
+        if (this.rejectedReceipts.size > 1000) this.rejectedReceipts.delete(this.rejectedReceipts.keys().next().value!);
+        return outcome;
+      } catch (error) {
+        if (error instanceof StoreGenerationChangedError) return { accepted: false, messageId: id, error: 'STORE_GENERATION_CHANGED' };
+        throw error;
+      } finally {
+        this.requestAdmissions.delete(id);
+      }
+    })();
+    this.requestAdmissions.set(id, { fingerprint, result });
+    return result;
   }
 
   /** Resolve once before the caller pins its receipt; ordinary status never calls this. */
@@ -612,6 +628,17 @@ export class OrchestratorService implements OnModuleInit {
     busyPolicy: BusyPolicy = 'reject',
     admission?: ApiAdmission,
   ): Promise<ApiSendResult> {
+    if (!text.trim() && !images?.length && !attachmentFilenames?.length) {
+      return { accepted: false, error: 'text is required and must be non-empty' };
+    }
+    const scope = this.resolveDeliveryScope(conversationId, false);
+    if (!scope.accepted) return scope;
+    for (const filename of [...(images ?? []), ...(attachmentFilenames ?? [])]) {
+      if (text.trim() && images?.includes(filename) && filename.startsWith('data:image/')) continue;
+      if (!this.uploadsService.getPath(filename, scope.conversationId)) {
+        return { accepted: false, error: 'Uploaded file not found' };
+      }
+    }
     const requestedConversationId = conversationId?.trim();
     const busyResult = this.routeBusyApiMessage(
       text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission,
@@ -657,7 +684,7 @@ export class OrchestratorService implements OnModuleInit {
       .catch((err) =>
         this.logger.warn('REST send-message agent run failed', err),
       );
-    return { accepted: true, messageId, conversationId: ctx.conversationId };
+    return { accepted: true, messageId, conversationId: ctx.conversationId, resolution: 'started' };
   }
 
   /** Synchronous idle inspection; only an already-busy route returns a promise. */
@@ -1558,9 +1585,11 @@ export class OrchestratorService implements OnModuleInit {
     messageId?: string;
     error?: string;
     resolvedPolicy?: string;
+    resolution?: 'started' | 'steered' | 'queued';
+    fallbackReason?: string;
   }> {
     const text = payload.text.trim();
-    if (!text)
+    if (!text && !payload.images?.length && !payload.attachmentFilenames?.length && !payload.audio && !payload.audioFilename)
       return {
         accepted: false,
         error: 'text is required and must be non-empty',
@@ -1578,7 +1607,7 @@ export class OrchestratorService implements OnModuleInit {
         payload.audioFilename,
         payload.attachmentFilenames,
       );
-      return { accepted: true, resolvedPolicy: 'started' };
+      return { accepted: true, resolvedPolicy: 'started', resolution: 'started' };
     }
 
     if (policy === 'reject') {
@@ -1613,6 +1642,7 @@ export class OrchestratorService implements OnModuleInit {
           accepted: true,
           messageId: saved.messageId,
           resolvedPolicy: 'steer',
+          resolution: 'steered',
         };
       }
       queuedText = '';
@@ -1630,7 +1660,7 @@ export class OrchestratorService implements OnModuleInit {
       policy: resolvedPolicy,
       createdAt: new Date().toISOString(),
     });
-    return { accepted: true, messageId: saved.messageId, resolvedPolicy };
+    return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
   }
 
   private async drainQueuedTurns(ctx: SessionContext): Promise<void> {

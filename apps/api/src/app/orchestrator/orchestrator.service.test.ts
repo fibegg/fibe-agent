@@ -1,5 +1,5 @@
 import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
-import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { Subject } from 'rxjs';
@@ -778,6 +778,26 @@ describe('OrchestratorService', () => {
     expect(result.error).toBe(ERROR_CODE.AGENT_BUSY);
   });
 
+  test('REST accepts uploaded attachment-only messages, rejects empty and unknown files', async () => {
+    const { orch, ctx, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    orch.isAuthenticated = true;
+    mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+    writeFileSync(join(dataDir, 'uploads', 'notes.txt'), 'notes');
+    writeFileSync(join(dataDir, 'uploads', 'photo.png'), 'image');
+    const controller = new AgentController(orch);
+    const first = await controller.sendMessage({ attachmentFilenames: ['notes.txt'], conversationId: 'default' });
+    expect(first).toMatchObject({ accepted: true, resolution: 'started' });
+    await waitForBackgroundTasks();
+    await expect(controller.sendMessage({ text: ' ', conversationId: 'default' })).rejects.toThrow('text is required');
+    await expect(controller.sendMessage({ images: ['missing.png'], conversationId: 'default' })).rejects.toThrow('Uploaded file not found');
+    const image = await controller.sendMessage({ images: ['photo.png'], conversationId: 'default' });
+    expect(image).toMatchObject({ accepted: true, resolution: 'started' });
+    await waitForBackgroundTasks();
+    expect(messageStore.all().filter(m => m.role === 'user')).toHaveLength(2);
+    expect(strategyCalls).toHaveLength(2);
+  });
+
   test('caller identity replays response loss without repeating a message or provider turn', async () => {
     const { orch, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
     const requestId = 'a514ad73-8519-42e4-b268-ce7e141cb9e9';
@@ -785,7 +805,7 @@ describe('OrchestratorService', () => {
     const replay = await orch.sendMessageFromApi('one occurrence', 'default', undefined, undefined, 'queue', requestId, messageStore.deliveryGeneration());
     expect(first.accepted).toBe(true);
     expect(first.messageId).toBe(requestId);
-    expect(replay.messageId).toBe(first.messageId);
+    expect(replay).toEqual(first);
     await waitForBackgroundTasks();
     expect(messageStore.all().filter((message) => message.role === 'user')).toHaveLength(1);
     expect(strategyCalls).toHaveLength(1);
@@ -1158,6 +1178,8 @@ describe('OrchestratorService', () => {
     ctx.isAuthenticated = true;
     orch.isAuthenticated = true;
 
+    mkdirSync(join(dataDir, 'uploads'), { recursive: true });
+    writeFileSync(join(dataDir, 'uploads', 'notes.txt'), 'notes');
     const result = await orch.sendMessageFromApi(
       ' update the app ',
       'thread-a',

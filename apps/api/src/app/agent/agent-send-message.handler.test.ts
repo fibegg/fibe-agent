@@ -9,6 +9,15 @@ import { handleSendMessage } from './agent-send-message.handler';
 import { ERROR_CODE } from '@shared/ws-constants';
 
 describe('handleSendMessage', () => {
+  test('request identity conflicts have the shared error code', () => {
+    try {
+      handleSendMessage({ accepted: false, error: 'REQUEST_ID_CONFLICT' });
+      throw new Error('expected conflict');
+    } catch (error) {
+      expect((error as ConflictException).getResponse()).toEqual({ error: 'request_conflict' });
+    }
+  });
+
   test('returns accepted + messageId when result is accepted', () => {
     const result = handleSendMessage({ accepted: true, messageId: 'msg-123' });
     expect(result.accepted).toBe(true);
