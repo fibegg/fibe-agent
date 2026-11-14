@@ -799,6 +799,23 @@ describe('OrchestratorService', () => {
     expect(strategyCalls).toHaveLength(2);
   });
 
+  test('queue insertion and cancellation advance live snapshot revisions', async () => {
+    const { orch, ctx, sessionRegistry } = await createOrchestrator();
+    ctx.isProcessing = true;
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe(event => events.push(event));
+    const before = sessionRegistry.liveConversationState('default');
+    await orch.sendMessageFromApi('queue me', 'default', undefined, undefined, 'queue');
+    const queued = sessionRegistry.liveConversationState('default');
+    expect(queued.revision).toBeGreaterThan(before.revision);
+    expect(queued.queue).toHaveLength(1);
+    orch.removeQueuedTurnFromApi('default', queued.queue[0].id!);
+    const removed = sessionRegistry.liveConversationState('default');
+    expect(removed.revision).toBeGreaterThan(queued.revision);
+    expect(removed.queue).toEqual([]);
+    expect(events.filter(e => e.type === 'queue_updated').at(-1)?.data.revision).toBe(removed.revision);
+  });
+
   test('caller identity replays response loss without repeating a message or provider turn', async () => {
     const { orch, messageStore, strategyCalls, waitForBackgroundTasks } = await createOrchestrator();
     const requestId = 'a514ad73-8519-42e4-b268-ce7e141cb9e9';

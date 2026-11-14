@@ -8,6 +8,8 @@ import { ConversationManagerService } from '../conversation/conversation-manager
 
 export interface ConversationLiveState {
   conversationId: string;
+  streamId: string;
+  revision: number;
   isProcessing: boolean;
   streamText: string;
   currentActivityId: string | null;
@@ -18,6 +20,7 @@ export interface ConversationLiveState {
     text: string;
     policy: 'queue' | 'steer';
     attachmentFilenames?: string[];
+    imageUrls?: string[];
     createdAt?: string;
   }[];
   startedAt: string | null;
@@ -33,6 +36,7 @@ const RECENT_STREAM_RETENTION_MS = 30_000;
 @Injectable()
 export class SessionRegistryService {
   private readonly logger = new Logger(SessionRegistryService.name);
+  private readonly sequences = new Map<string, { streamId: string; revision: number; finishedAt: string | null }>();
   private readonly sessions = new Map<string, SessionContext>();
   /** Per-conversation session sets for O(k) broadcastToConversation. */
   private readonly byConversation = new Map<string, Set<SessionContext>>();
@@ -122,31 +126,37 @@ export class SessionRegistryService {
   }
 
   liveConversationState(conversationId: string): ConversationLiveState {
+    const sequence = this.sequence(conversationId);
     const processing = this.processingForConversation(conversationId);
     if (processing) {
       return {
         conversationId,
-        isProcessing: true,
+        streamId: sequence.streamId,
+        revision: sequence.revision,
+        isProcessing: sequence.finishedAt === null,
         streamText: processing.streamTextAccumulated,
-        currentActivityId: processing.currentActivityId,
+        currentActivityId: sequence.finishedAt ? null : processing.currentActivityId,
         queuedTurns: processing.queuedTurns.length,
         queue: processing.queuedTurns.map((turn) => ({
           id: turn.id,
           messageId: turn.messageId,
           text: turn.displayText ?? turn.text,
           policy: turn.policy,
+          imageUrls: turn.imageUrls,
           createdAt: turn.createdAt,
           ...(turn.attachmentFilenames?.length
             ? { attachmentFilenames: turn.attachmentFilenames }
             : {}),
         })),
         startedAt: processing.streamStartedAt,
-        finishedAt: null,
+        finishedAt: sequence.finishedAt,
       };
     }
     const completed = this.recentCompletedStreamForConversation(conversationId);
     return {
       conversationId,
+      streamId: sequence.streamId,
+      revision: sequence.revision,
       isProcessing: false,
       streamText: completed?.lastStreamText ?? '',
       currentActivityId: null,
@@ -157,6 +167,7 @@ export class SessionRegistryService {
           messageId: turn.messageId,
           text: turn.displayText ?? turn.text,
           policy: turn.policy,
+          imageUrls: turn.imageUrls,
           createdAt: turn.createdAt,
           ...(turn.attachmentFilenames?.length
             ? { attachmentFilenames: turn.attachmentFilenames }
@@ -165,6 +176,15 @@ export class SessionRegistryService {
       startedAt: completed?.lastStreamStartedAt ?? null,
       finishedAt: completed?.lastStreamFinishedAt ?? null,
     };
+  }
+
+  private sequence(conversationId: string) {
+    let sequence = this.sequences.get(conversationId);
+    if (!sequence) {
+      sequence = { streamId: randomUUID(), revision: 0, finishedAt: null };
+      this.sequences.set(conversationId, sequence);
+    }
+    return sequence;
   }
 
   private recentCompletedStreamForConversation(
@@ -253,9 +273,17 @@ export class SessionRegistryService {
     type: string,
     data: Record<string, unknown> = {},
   ): void {
+    let sequencing: Record<string, unknown> = {};
+    if ([WS_EVENT.STREAM_START, WS_EVENT.STREAM_CHUNK, WS_EVENT.STREAM_END, WS_EVENT.QUEUE_UPDATED].includes(type as typeof WS_EVENT.STREAM_START)) {
+      const sequence = this.sequence(conversationId);
+      sequence.revision += 1;
+      if (type === WS_EVENT.STREAM_START) sequence.finishedAt = null;
+      if (type === WS_EVENT.STREAM_END) sequence.finishedAt = new Date().toISOString();
+      sequencing = { streamId: sequence.streamId, revision: sequence.revision };
+    }
     const event: OutboundEvent = {
       type,
-      data: { conversationId, ...data },
+      data: { conversationId, ...data, ...sequencing },
     };
     const set = this.byConversation.get(conversationId);
     if (!set) return;

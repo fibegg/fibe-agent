@@ -794,6 +794,7 @@ export class OrchestratorService implements OnModuleInit {
       };
 
     const [removed] = ctx.queuedTurns.splice(index, 1);
+    this.emitQueueUpdate(ctx);
     if (removed?.messageId) {
       this.stores(ctx).messageStore.removeById(removed.messageId);
     }
@@ -865,6 +866,7 @@ export class OrchestratorService implements OnModuleInit {
         if (steerResult === 'handled') {
           if (this.stores(ctx).messageStore.getById(turn.messageId)?.apiRequest) this.trackSteeredRequest(ctx, turn.messageId);
           ctx.queuedTurns = ctx.queuedTurns.filter((queued) => queued !== turn);
+          this.emitQueueUpdate(ctx);
           return {
             updated: true,
             conversationId: ctx.conversationId,
@@ -876,6 +878,7 @@ export class OrchestratorService implements OnModuleInit {
       }
     }
 
+    this.emitQueueUpdate(ctx);
     return {
       updated: true,
       conversationId: ctx.conversationId,
@@ -914,6 +917,7 @@ export class OrchestratorService implements OnModuleInit {
     );
     ctx.queuedTurns = [...ordered, ...rest];
     ctx.queuedTurns.forEach((turn, index) => this.stores(ctx).messageStore.updateRequestQueueOrder(turn.messageId, index));
+    this.emitQueueUpdate(ctx);
     return {
       reordered: true,
       conversationId: ctx.conversationId,
@@ -1679,13 +1683,20 @@ export class OrchestratorService implements OnModuleInit {
       policy: resolvedPolicy,
       createdAt: new Date().toISOString(),
     });
+    this.emitQueueUpdate(processingCtx);
     return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: unsupportedContent ? 'steer_unsupported_content' : processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
+  }
+
+  private emitQueueUpdate(ctx: SessionContext): void {
+    const live = this.sessionRegistry.liveConversationState(ctx.conversationId);
+    this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.QUEUE_UPDATED, { queue: live.queue, queuedTurns: live.queuedTurns });
   }
 
   private async drainQueuedTurns(ctx: SessionContext): Promise<void> {
     while (!ctx.isProcessing && ctx.queuedTurns.length > 0) {
       const next = ctx.queuedTurns.shift() as QueuedAgentTurn;
       ctx.isProcessing = true;
+      this.emitQueueUpdate(ctx);
       this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
         count: this.sessionRegistry.size,
         anyProcessing: true,

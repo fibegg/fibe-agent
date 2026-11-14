@@ -37,6 +37,7 @@ export const WS_EVENT = {
   STREAM_START: 'stream_start',
   STREAM_CHUNK: 'stream_chunk',
   STREAM_END: 'stream_end',
+  QUEUE_UPDATED: 'queue_updated',
   MODEL_UPDATED: 'model_updated',
   EFFORT_UPDATED: 'effort_updated',
   REASONING_START: 'reasoning_start',
