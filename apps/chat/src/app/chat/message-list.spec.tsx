@@ -158,6 +158,17 @@ describe('MessageList', () => {
     expect(screen.getByText('Second')).toBeTruthy();
   });
 
+  it('shows original attachment filenames on chips and downloads, with legacy fallback', () => {
+    render(<MessageList messages={[{ role: 'user', body: '', created_at: '2026-11-14T12:00:00Z',
+      attachmentFilenames: ['opaque.pdf', 'legacy.txt'],
+      attachments: [{ storedFilename: 'opaque.pdf', originalFilename: 'Annual report.pdf', mediaType: 'application/pdf', size: 12, kind: 'document' }],
+    }]} streamingText="" isStreaming={false} />);
+    const link = screen.getByRole('link', { name: 'Annual report.pdf' });
+    expect(link.getAttribute('download')).toBe('Annual report.pdf');
+    expect(link.getAttribute('href')).toContain('opaque.pdf');
+    expect(screen.getByRole('link', { name: 'legacy.txt' })).toBeTruthy();
+  });
+
   it('renders user message with imageUrls', () => {
     const messages: ChatMessage[] = [
       {

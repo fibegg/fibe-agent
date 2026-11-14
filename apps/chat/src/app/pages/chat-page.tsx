@@ -596,6 +596,8 @@ export function ChatPage() {
         const payload = data as {
           id?: string;
           imageUrls?: string[];
+          attachmentFilenames?: string[];
+          attachments?: ChatMessage['attachments'];
           model?: string;
         };
         const role = data.role as string;
@@ -610,6 +612,8 @@ export function ChatPage() {
           ...(payload.imageUrls?.length
             ? { imageUrls: payload.imageUrls }
             : {}),
+          ...(payload.attachmentFilenames?.length ? { attachmentFilenames: payload.attachmentFilenames } : {}),
+          ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
           ...(payload.model ? { model: payload.model } : {}),
         };
         setMessages((prev) => {

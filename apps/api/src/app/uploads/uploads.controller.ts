@@ -22,7 +22,7 @@ export class UploadsController {
       return res.status(404).send();
     }
     res.header('Content-Type', contentTypeFromFilename(filename));
-    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(filename)}"`);
+    res.header('Content-Disposition', `inline; filename="${safeHeaderFilename(this.uploads.getAttachmentMetadata(filename, conversationId).originalFilename)}"; filename*=UTF-8''${encodeURIComponent(this.uploads.getAttachmentMetadata(filename, conversationId).originalFilename)}`);
     const stream = createReadStream(path);
     return res.send(stream);
   }
@@ -33,8 +33,8 @@ export class UploadsController {
     @Query('conversationId') conversationId?: string,
   ): Promise<{ filename: string }> {
     const data = await readMultipartUploadFile(req);
-    return processUploadFile(data, (buffer, mimetype) =>
-      this.uploads.saveFileFromBuffer(buffer, mimetype, conversationId)
+    return processUploadFile(data, (buffer, mimetype, originalFilename) =>
+      this.uploads.saveFileFromBuffer(buffer, mimetype, conversationId, originalFilename)
     );
   }
 }

@@ -1,3 +1,4 @@
+import type { AttachmentMetadata } from '@shared/types';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   forwardRef,
@@ -303,6 +304,8 @@ export interface ChatMessage {
   body: string;
   created_at: string;
   imageUrls?: string[];
+  attachmentFilenames?: string[];
+  attachments?: AttachmentMetadata[];
   story?: Array<{
     id: string;
     type: string;
@@ -431,6 +434,7 @@ const MessageRow = memo(
     const tightMaxWidth =
       msg.role === 'user' &&
       !msg.imageUrls?.length &&
+      !msg.attachmentFilenames?.length &&
       !msg.body.includes('```') &&
       containerWidthPx
         ? computeTightBubbleWidth(
@@ -500,7 +504,8 @@ const MessageRow = memo(
                         <img
                           key={filename}
                           src={getUploadSrc(filename, conversationId)}
-                          alt=""
+                          alt={msg.attachments?.find(a => a.storedFilename === filename)?.originalFilename ?? filename}
+                          title={msg.attachments?.find(a => a.storedFilename === filename)?.originalFilename ?? filename}
                           loading="lazy"
                           className="max-w-full max-h-48 rounded-lg object-contain bg-black/10"
                         />
@@ -512,6 +517,16 @@ const MessageRow = memo(
                   </div>
                 ) : (
                   <MessageBodyWithMentions body={msg.body} messageId={msg.id} />
+                )}
+                {!!msg.attachmentFilenames?.length && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    {msg.attachmentFilenames.map(filename => {
+                      const name = msg.attachments?.find(a => a.storedFilename === filename)?.originalFilename ?? filename;
+                      return <a key={filename} href={getUploadSrc(filename, conversationId)} download={name} className="inline-flex items-center gap-1 rounded border px-2 py-1 text-sm">
+                        <FileIcon pathOrName={name} className="size-4" />{name}
+                      </a>;
+                    })}
+                  </div>
                 )}
                 <div className="text-xs mt-1.5 sm:mt-2 text-user-bubble-foreground/75 flex items-center justify-between gap-2 min-h-[1.25rem]">
                   <p className="flex flex-wrap items-center gap-1.5 min-w-0">

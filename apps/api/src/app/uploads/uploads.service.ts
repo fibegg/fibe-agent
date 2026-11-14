@@ -1,6 +1,7 @@
+import type { AttachmentMetadata } from '@shared/types';
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { spawn } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
@@ -147,16 +148,36 @@ export class UploadsService {
     return this.writeFile(ext, buffer, conversationId);
   }
 
-  async saveFileFromBuffer(buffer: Buffer, mimetype: string, conversationId = DEFAULT_CONVERSATION_ID): Promise<string> {
+  async saveFileFromBuffer(buffer: Buffer, mimetype: string, conversationId = DEFAULT_CONVERSATION_ID, originalFilename?: string): Promise<string> {
     this.ensureUploadsDir(conversationId);
     const ext = extFromMimetype(mimetype);
-    return this.writeFile(ext, buffer, conversationId);
+    const filename = await this.writeFile(ext, buffer, conversationId);
+    const metadata: AttachmentMetadata = {
+      storedFilename: filename,
+      originalFilename: originalFilename?.split(/[\\/]/).pop() || filename,
+      mediaType: mimetype,
+      size: buffer.length,
+      kind: mimetype.startsWith('image/') ? 'image' : 'document',
+    };
+    await writeFile(join(this.getUploadsDir(conversationId), `${filename}.attachment.json`), JSON.stringify(metadata));
+    return filename;
   }
 
   getPath(filename: string, conversationId = DEFAULT_CONVERSATION_ID): string | null {
     if (!this.isSafeFilename(filename)) return null;
     const path = join(this.getUploadsDir(conversationId), filename);
     return existsSync(path) ? path : null;
+  }
+
+  getAttachmentMetadata(filename: string, conversationId = DEFAULT_CONVERSATION_ID, kind: AttachmentMetadata['kind'] = 'document'): AttachmentMetadata {
+    const path = this.getPath(filename, conversationId);
+    if (path) {
+      try {
+        const metadata = JSON.parse(readFileSync(`${path}.attachment.json`, 'utf8')) as AttachmentMetadata;
+        if (metadata.storedFilename === filename && typeof metadata.originalFilename === 'string') return metadata;
+      } catch { /* Legacy uploads have no attachment metadata. */ }
+    }
+    return { storedFilename: filename, originalFilename: filename, kind };
   }
 
   supportsImageOcr(filename: string): boolean {

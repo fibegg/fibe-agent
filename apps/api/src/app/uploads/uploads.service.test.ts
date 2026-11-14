@@ -91,6 +91,15 @@ describe('UploadsService', () => {
     rmSync(dataDir, { recursive: true, force: true });
   });
 
+  test('persists original upload metadata beside opaque files across service reload', async () => {
+    const service = new UploadsService(config as never);
+    const filename = await service.saveFileFromBuffer(Buffer.from('document'), 'application/pdf', 'default', 'Résumé 2026.pdf');
+    const reloaded = new UploadsService(config as never);
+    expect(reloaded.getAttachmentMetadata(filename)).toEqual({ storedFilename: filename, originalFilename: 'Résumé 2026.pdf', mediaType: 'application/pdf', size: 8, kind: 'document' });
+    const legacy = await service.saveImage('data:image/png;base64,YWJj');
+    expect(reloaded.getAttachmentMetadata(legacy, 'default', 'image')).toEqual({ storedFilename: legacy, originalFilename: legacy, kind: 'image' });
+  });
+
   test('getUploadsDir returns path under data dir', () => {
     const service = new UploadsService(config as never);
     expect(service.getUploadsDir()).toBe(join(dataDir, 'uploads'));

@@ -1,3 +1,4 @@
+import type { AttachmentMetadata } from '@shared/types';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
@@ -24,6 +25,7 @@ export interface StoredMessage {
   activityId?: string;
   imageUrls?: string[];
   attachmentFilenames?: string[];
+  attachments?: AttachmentMetadata[];
   apiRequest?: StoredApiRequest;
 }
 
@@ -176,6 +178,7 @@ export class MessageStoreService implements OnModuleDestroy {
     model?: string,
     attachmentFilenames?: string[],
     request?: { id: string; metadata: StoredApiRequest },
+    attachments?: AttachmentMetadata[],
   ): StoredMessage {
     if (request && this.indexById.has(request.id)) throw new Error('request message already exists');
     const msg: StoredMessage = {
@@ -184,12 +187,14 @@ export class MessageStoreService implements OnModuleDestroy {
       body,
       created_at: new Date().toISOString(),
     };
+    if (attachments?.length) msg.attachments = attachments;
     if (request) msg.apiRequest = request.metadata;
     if (imageUrls?.length) msg.imageUrls = imageUrls;
     if (model) msg.model = model;
     if (attachmentFilenames?.length)
       msg.attachmentFilenames = attachmentFilenames;
 
+    this.fillLegacyAttachments(msg);
     this.messages.push(msg);
     this.indexById.set(msg.id, msg);
     this.jsonWriter.schedule();
@@ -320,9 +325,19 @@ export class MessageStoreService implements OnModuleDestroy {
     this.jsonWriter.destroy();
   }
 
+  private fillLegacyAttachments(msg: StoredMessage): void {
+    if (msg.attachments) return;
+    const attachments: AttachmentMetadata[] = [
+      ...(msg.imageUrls ?? []).map(storedFilename => ({ storedFilename, originalFilename: storedFilename, kind: 'image' as const })),
+      ...(msg.attachmentFilenames ?? []).map(storedFilename => ({ storedFilename, originalFilename: storedFilename, kind: 'document' as const })),
+    ];
+    if (attachments.length) msg.attachments = attachments;
+  }
+
   private rebuildIndex(): void {
     this.indexById.clear();
     for (const msg of this.messages) {
+      this.fillLegacyAttachments(msg);
       this.indexById.set(msg.id, msg);
     }
   }

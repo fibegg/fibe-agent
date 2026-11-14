@@ -1,3 +1,4 @@
+import type { AttachmentMetadata } from '@shared/types';
 import type { StoredActivityEntry } from '@shared/types';
 import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
 import { translate, type TranslationKey } from '../i18n';
@@ -112,6 +113,8 @@ export interface ServerMessage {
   model?: string;
   effort?: string;
   imageUrls?: string[];
+  attachmentFilenames?: string[];
+  attachments?: AttachmentMetadata[];
   id?: string;
   title?: string;
   mode?: string;

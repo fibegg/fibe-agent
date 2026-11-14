@@ -1136,6 +1136,10 @@ export class OrchestratorService implements OnModuleInit {
       undefined,
       attachmentFilenames?.length ? attachmentFilenames : undefined,
       admission,
+      [
+        ...imageUrls.map(filename => this.uploadsService.getAttachmentMetadata(filename, ctx.conversationId, 'image')),
+        ...(attachmentFilenames ?? []).map(filename => this.uploadsService.getAttachmentMetadata(filename, ctx.conversationId, 'document')),
+      ],
     );
     try {
       await ctxMsgStore.flush(!!admission);

@@ -19,3 +19,11 @@ export interface StoredActivityEntry {
   story: StoredStoryEntry[];
   usage?: TokenUsage;
 }
+
+export interface AttachmentMetadata {
+  storedFilename: string;
+  originalFilename: string;
+  mediaType?: string;
+  size?: number;
+  kind: 'image' | 'document';
+}
