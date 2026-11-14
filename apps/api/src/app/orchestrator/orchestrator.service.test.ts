@@ -1,3 +1,4 @@
+import { ConversationsController } from '../conversation/conversations.controller';
 import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -14,7 +15,7 @@ import { EffortStoreService } from '../effort-store/effort-store.service';
 import { AgentModeStoreService } from '../agent-mode/agent-mode.store.service';
 import { UploadsService } from '../uploads/uploads.service';
 import type { GemmaRouterService } from '../gemma-router/gemma-router.service';
-import type { LocalMcpService } from '../local-mcp/local-mcp.service';
+import { LocalMcpService } from '../local-mcp/local-mcp.service';
 import {
   WS_ACTION,
   WS_EVENT,
@@ -1738,6 +1739,24 @@ describe('OrchestratorService', () => {
     expect((modeEvent?.data as { mode: string })?.mode).toBe(
       AGENT_MODES.casting,
     );
+  });
+
+  test('reconnected live snapshots recover prompts and REST and sockets reject stale answers', async () => {
+    const localMcp = new LocalMcpService();
+    const { orch, ctx, sessionRegistry } = await createOrchestrator(localMcp);
+    const controller = new ConversationsController({ get: () => ({}) } as never, sessionRegistry, orch, {} as never);
+    const waiting = localMcp.handleToolCall({ requestId: 'fake', tool: 'ask_user', args: { question: 'Proceed?' }, conversationId: 'thread-a' });
+    const first = controller.live('thread-a').pendingPrompts[0];
+    const reconnected = sessionRegistry.create('thread-a');
+    expect(controller.live('thread-a').pendingPrompts[0]).toEqual(first);
+    expect(controller.answerPrompt('thread-a', first.promptId, { answer: 'yes' })).toEqual({ accepted: true });
+    expect((await waiting).ok).toBe(true);
+    expect(() => controller.answerPrompt('thread-a', first.promptId, { answer: 'again' })).toThrow('stale_prompt');
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe(event => events.push(event));
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.ANSWER_USER_QUESTION, promptId: first.promptId, answer: 'again' } as never);
+    expect(events.at(-1)).toMatchObject({ type: 'error', data: { error: 'stale_prompt', statusCode: 409 } });
+    sessionRegistry.destroy(reconnected.sessionId);
   });
 
   test('answer_user_question resolves a pending LocalMcp question', async () => {

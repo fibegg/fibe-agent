@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { exec } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -398,21 +398,27 @@ export class OrchestratorService implements OnModuleInit {
       [WS_ACTION.SET_AGENT_MODE]: () => this.handleSetAgentMode(msg.mode ?? ''),
       [WS_ACTION.ANSWER_USER_QUESTION]: () =>
         this.handleAnswerUserQuestion(
-          (msg as { questionId?: string; answer?: string }).questionId ?? '',
+          (msg as { promptId?: string }).promptId ?? (msg as { questionId?: string }).questionId ?? '',
           (msg as { answer?: string }).answer ?? '',
+          ctx.conversationId,
         ),
       [WS_ACTION.CONFIRM_ACTION_RESPONSE]: () =>
         this.handleConfirmActionResponse(
-          (msg as { questionId?: string; confirmed?: boolean }).questionId ??
-            '',
+          (msg as { promptId?: string }).promptId ?? (msg as { questionId?: string }).questionId ?? '',
           !!(msg as { confirmed?: boolean }).confirmed,
+          ctx.conversationId,
         ),
       [WS_ACTION.RESET_CONVERSATION]: () => this.handleResetConversation(ctx),
     };
 
     const handler = handlers[msg.action];
     if (handler) {
-      await handler();
+      try {
+        await handler();
+      } catch (error) {
+        if (!(error instanceof ConflictException)) throw error;
+        ctx.send(WS_EVENT.ERROR, { error: 'stale_prompt', statusCode: 409 });
+      }
     } else {
       this.logger.warn(`Unknown action: ${msg.action}`);
     }
@@ -1823,15 +1829,25 @@ export class OrchestratorService implements OnModuleInit {
     this.sessionRegistry.broadcast(WS_EVENT.EFFORT_UPDATED, { effort: value });
   }
 
-  private handleAnswerUserQuestion(questionId: string, answer: string): void {
-    this.localMcp.resolveQuestion(questionId, { answer });
+  pendingPrompts(conversationId: string) {
+    return this.localMcp.pendingPrompts(conversationId);
+  }
+
+  answerPrompt(conversationId: string, promptId: string, payload: { answer?: string; confirmed?: boolean }): { accepted: true } {
+    this.localMcp.resolveQuestion(promptId, payload, conversationId);
+    return { accepted: true };
+  }
+
+  private handleAnswerUserQuestion(questionId: string, answer: string, conversationId: string): void {
+    this.localMcp.resolveQuestion(questionId, { answer }, conversationId);
   }
 
   private handleConfirmActionResponse(
     questionId: string,
     confirmed: boolean,
+    conversationId: string,
   ): void {
-    this.localMcp.resolveQuestion(questionId, { confirmed });
+    this.localMcp.resolveQuestion(questionId, { confirmed }, conversationId);
   }
 
   private handleSetAgentMode(mode: string): void {

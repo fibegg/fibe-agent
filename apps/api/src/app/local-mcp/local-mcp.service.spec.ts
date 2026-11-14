@@ -209,6 +209,22 @@ describe('LocalMcpService', () => {
     expect((res.result as Record<string, unknown>)['answer']).toBe('Bob');
   });
 
+  test('pending prompts survive snapshot reads and reject wrong scope, kind, and duplicate answers', async () => {
+    const { svc } = makeService(5000);
+    const waiting = svc.handleToolCall({ requestId: 'fake-request', tool: LOCAL_TOOL.ASK_USER, args: { question: 'Name?' }, conversationId: 'thread-a' });
+    const prompt = svc.pendingPrompts('thread-a')[0];
+    expect(prompt).toMatchObject({ kind: 'question', question: 'Name?' });
+    expect(prompt.promptId).toBe(prompt.questionId);
+    expect(svc.pendingPrompts('thread-a')[0]).toEqual(prompt);
+    expect(svc.pendingPrompts('thread-b')).toEqual([]);
+    expect(() => svc.resolveQuestion(prompt.promptId, { answer: 'yes' }, 'thread-b')).toThrow('stale_prompt');
+    expect(() => svc.resolveQuestion(prompt.promptId, { confirmed: true }, 'thread-a')).toThrow('stale_prompt');
+    svc.resolveQuestion(prompt.promptId, { answer: 'Alice' }, 'thread-a');
+    expect((await waiting).ok).toBe(true);
+    expect(svc.pendingPrompts('thread-a')).toEqual([]);
+    expect(() => svc.resolveQuestion(prompt.promptId, { answer: 'twice' }, 'thread-a')).toThrow('stale_prompt');
+  });
+
   test('ask_user with empty question returns error immediately', async () => {
     const { svc } = makeService();
     const res = await svc.handleToolCall({
@@ -282,8 +298,8 @@ describe('LocalMcpService', () => {
     await promise;
   });
 
-  test('resolveQuestion with unknown id is a no-op (no throw)', () => {
+  test('resolveQuestion with unknown id rejects as stale', () => {
     const { svc } = makeService();
-    expect(() => svc.resolveQuestion('ghost-id', {})).not.toThrow();
+    expect(() => svc.resolveQuestion('ghost-id', {})).toThrow('stale_prompt');
   });
 });

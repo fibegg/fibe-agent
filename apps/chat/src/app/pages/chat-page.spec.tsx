@@ -452,6 +452,15 @@ describe('ChatPage', () => {
     <MemoryRouter>{children}</MemoryRouter>
   );
 
+  it('sends the stable promptId when answering a recovered confirmation', () => {
+    render(<MemoryRouter><ChatPage /></MemoryRouter>);
+    const callback = vi.mocked(useChatWebSocket).mock.calls.at(-1)?.[6];
+    act(() => callback?.({ type: 'pending_prompts_snapshot', pendingPrompts: [{ promptId: 'stable-prompt', questionId: 'stable-prompt', kind: 'confirmation', message: 'Continue with this?', confirmLabel: 'Proceed now', cancelLabel: 'Decline' }] }));
+    fireEvent.click(screen.getByRole('button', { name: 'Proceed now' }));
+    const send = vi.mocked(useChatWebSocket).mock.results.at(-1)?.value.send;
+    expect(send).toHaveBeenCalledWith({ action: 'confirm_action_response', questionId: 'stable-prompt', promptId: 'stable-prompt', confirmed: true });
+  });
+
   it('renders the chat page when authenticated', () => {
     render(<ChatPage />, { wrapper });
     expect(screen.getByTestId('chat-header')).toBeTruthy();

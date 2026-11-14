@@ -27,3 +27,11 @@ export interface AttachmentMetadata {
   size?: number;
   kind: 'image' | 'document';
 }
+
+export type PendingPrompt = {
+  promptId: string;
+  questionId: string;
+  conversationId?: string;
+} & ({ kind: 'question'; question: string; placeholder: string } | {
+  kind: 'confirmation'; message: string; confirmLabel: string; cancelLabel: string;
+});

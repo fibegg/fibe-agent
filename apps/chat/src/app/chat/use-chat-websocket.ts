@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { isProviderAuthFailureMessage } from '@shared/provider-auth-errors';
 import {
+  apiRequest,
   clearToken,
   getAuthTokenForRequest,
   getWsUrl,
@@ -154,6 +155,15 @@ export function useChatWebSocket(
     const ws = new WebSocket(url);
     wsRef.current = ws;
 
+    const refreshPrompts = async () => {
+      try {
+        const res = await apiRequest(`/api/conversations/${encodeURIComponent(conversationId)}/live`);
+        if (!res.ok) return;
+        const snapshot = await res.json() as Pick<ServerMessage, 'pendingPrompts'>;
+        if (wsRef.current !== ws || !Array.isArray(snapshot.pendingPrompts)) return;
+        onLocalToolEventRef.current?.({ type: 'pending_prompts_snapshot', pendingPrompts: snapshot.pendingPrompts });
+      } catch { /* A later reconnect can recover pending prompts. */ }
+    };
     ws.onopen = () => {
       if (wsRef.current !== ws) return;
       if (reconnectTimerRef.current) {
@@ -165,6 +175,7 @@ export function useChatWebSocket(
         offlineTimerRef.current = null;
       }
       setErrorMessage(null);
+      void refreshPrompts();
       send({ action: 'get_model' });
       send({ action: 'get_effort' });
 
@@ -233,6 +244,10 @@ export function useChatWebSocket(
       },
       logout_success: () => setState(CHAT_STATES.UNAUTHENTICATED),
       error: (d) => {
+        if (d.statusCode === 409 && d.error === 'stale_prompt') {
+          void refreshPrompts();
+          return;
+        }
         clearResponseTimer();
         setErrorMessage(d.message ?? 'An unexpected error occurred');
         setState(CHAT_STATES.ERROR);

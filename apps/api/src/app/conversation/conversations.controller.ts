@@ -120,7 +120,14 @@ export class ConversationsController {
   @Get(':id/live')
   live(@Param('id') id: string) {
     this.requireBundle(id);
-    return this.sessionRegistry.liveConversationState(id);
+    return { ...this.sessionRegistry.liveConversationState(id), pendingPrompts: this.orchestrator.pendingPrompts(id) };
+  }
+
+  @Post(':id/prompts/:promptId/answer')
+  @HttpCode(HttpStatus.OK)
+  answerPrompt(@Param('id') id: string, @Param('promptId') promptId: string, @Body() body: { answer?: string; confirmed?: boolean }) {
+    this.requireBundle(id);
+    return this.orchestrator.answerPrompt(id, promptId, body);
   }
 
   @Get(':id/provider-traffic')
