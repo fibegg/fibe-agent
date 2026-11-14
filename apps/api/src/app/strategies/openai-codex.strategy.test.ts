@@ -218,6 +218,7 @@ readline.createInterface({ input: process.stdin }).on('line', (line) => {
       itemId: 'assistant-1',
       delta: message,
     });
+    notify('item/completed', { threadId: msg.params.threadId, turnId, item: { id: 'assistant-1', type: 'agentMessage', phase: 'final_answer', text: message } });
     if (process.env.CODEX_FAKE_MODE !== 'complete-on-steer') {
       setTimeout(() => completeTurn(msg.params.threadId), delay);
     }
@@ -1437,6 +1438,27 @@ describe('OpenaiCodexStrategy', () => {
       expect(usage).toEqual([{ inputTokens: 3, outputTokens: 4 }]);
     },
   );
+
+  test('Codex app-server forwards outputSchema and parses the completed answer', async () => {
+    process.env.CODEX_AGENT_TRANSPORT = 'app-server';
+    const fakePath = join(TEST_HOME, 'fake-codex-structured');
+    const requestsPath = join(TEST_HOME, 'structured-requests.jsonl');
+    writeFakeCodexAppServer(fakePath);
+    process.env.CODEX_BIN = fakePath;
+    process.env.CODEX_FAKE_REQUESTS_PATH = requestsPath;
+    process.env.CODEX_FAKE_MESSAGE = '{"answer":"ok"}';
+    const strategy = new OpenaiCodexStrategy(false, { getConversationDataDir: () => join(TEST_HOME, 'structured'), getEncryptionKey: () => undefined });
+    const output: unknown[] = [];
+    const responseFormat = { type: 'json_schema' as const, schema: { type: 'object' } };
+    await strategy.executePromptStreaming('extract', '', () => undefined, { onStructuredOutput: (value) => output.push(value) }, undefined, { responseFormat });
+    expect(output).toEqual([{ answer: 'ok' }]);
+    expect((readJsonl(requestsPath).find((r) => r.method === 'turn/start') as { params: Record<string, unknown> }).params.outputSchema).toEqual(responseFormat.schema);
+    process.env.CODEX_FAKE_MESSAGE = 'not JSON';
+    await expect(strategy.executePromptStreaming('extract', '', () => undefined, {}, undefined, { responseFormat })).rejects.toThrow('valid final JSON');
+    process.env.CODEX_AGENT_TRANSPORT = 'exec';
+    expect(strategy.supportsStructuredOutput()).toBe(false);
+    expect(() => strategy.executePromptStreaming('extract', '', () => undefined, {}, undefined, { responseFormat })).toThrow('active provider or transport');
+  });
 
   test('executePromptStreaming resumes Codex app-server thread from conversation marker', async () => {
     process.env.CODEX_AGENT_TRANSPORT = 'app-server';

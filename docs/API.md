@@ -80,7 +80,7 @@ All paths below include the `/api` global prefix.
 | POST   | `/api/uploads?conversationId=...`              | Bearer | Multipart attachment upload. Returns `{ filename, storedFilename, originalFilename, mediaType, size, kind }`. Blocked: executables/scripts. Max size: 20 MiB.                                                                                                                                              |
 | GET    | `/api/uploads/:filename?conversationId=...`    | Bearer | Serve an uploaded attachment. Filename must be a safe basename.                                                                                                                                                                                  |
 | GET    | `/api/agent/status`                            | Bearer | Default/session status: auth, processing, queue count, and last error.                                                                                                                                                                           |
-| POST   | `/api/agent/send-message`                      | Bearer | Async integration/webhook send. Body `{ text, images?, attachmentFilenames?, conversationId?, busyPolicy?, requestId?, storeGeneration? }`. Returns `202 { accepted, messageId, resolvedPolicy?, executionState?, resolution, fallbackReason? }`.                                                                            |
+| POST   | `/api/agent/send-message`                      | Bearer | Async integration/webhook send. Body `{ text, images?, attachmentFilenames?, conversationId?, busyPolicy?, requestId?, storeGeneration?, responseFormat? }`. Returns `202 { accepted, messageId, resolvedPolicy?, executionState?, resolution, fallbackReason? }`.                                                                            |
 | POST   | `/api/agent/interrupt`                         | Bearer | Interrupt a running provider turn. Body may include `{ conversationId? }`.                                                                                                                                                                       |
 | DELETE | `/api/agent/queue/:turnId`                     | Bearer | Remove a queued turn, using body `conversationId` when needed.                                                                                                                                                                                   |
 | PATCH  | `/api/agent/queue/:turnId`                     | Bearer | Update queued turn text/policy.                                                                                                                                                                                                                  |
@@ -110,6 +110,92 @@ All paths below include the `/api` global prefix.
 | POST   | `/api/local-tool-call`                         | Bearer | Internal loopback endpoint for the bundled local MCP stdio server.                                                                                                                                                                               |
 
 Send endpoints return `400` for empty text, `403` when provider authentication is required, `404` for an unknown conversation, and `409` when the busy policy rejects the request. A `202` response includes `{ accepted, messageId }` and may include `conversationId` and `resolvedPolicy`.
+
+## Structured answers (opt-in)
+
+Both `POST /api/agent/send-message` and
+`POST /api/conversations/:id/agent/send-message` accept `responseFormat`.
+The WebSocket actions `send_chat_message`, `queue_message`, and `steer_message`
+accept the same optional field. Omitting it preserves ordinary text behavior,
+existing HTTP statuses, and existing stream events. It applies to one turn only.
+
+```json
+{
+  "text": "Extract the customer's name and email",
+  "responseFormat": {
+    "type": "json_schema",
+    "schema": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" }
+      },
+      "required": ["name", "email"],
+      "additionalProperties": false
+    }
+  }
+}
+```
+
+Supported provider transports:
+
+| Provider | Native option |
+| --- | --- |
+| `claude-code` (SDK) | `outputFormat: { type: "json_schema", schema }` |
+| `openai-codex` / `openai` (app-server) | `turn/start.outputSchema` |
+| `opencode` / `opencodex` (server) | Message `format: { type: "json_schema", schema }` |
+
+Codex `exec` and OpenCode `run`/`cli` transports are unsupported, as are Gemini,
+Antigravity, Cursor, and mock. Unsupported requests are rejected before saving
+or executing a turn; there is no prompt-only fallback.
+
+Schemas must have an object root (`type: "object"`) and use JSON Schema draft-07
+accepted by Ajv strict validation, including standard `ajv-formats` formats.
+Unknown keywords, malformed schemas, external `$ref` references, schemas larger
+than 64 KiB, and nesting beyond 32 levels are rejected. Local references are
+allowed. No type coercion, default insertion, or property removal occurs.
+Providers/models may impose additional schema restrictions; these surface as
+provider failures rather than silently relaxing the schema.
+
+REST sends retain their asynchronous acceptance response. Subscribe to the
+conversation's existing `/ws` connection to receive the answer. Tool/reasoning
+progress continues to stream. The final answer is buffered and validated before
+any answer text is emitted. This version does **not** emit partial JSON deltas.
+On success, the stream contains, in order:
+
+```json
+{"type":"stream_chunk","text":"{\"name\":\"Ada\",\"email\":\"ada@example.com\"}","conversationId":"default"}
+{"type":"structured_output","output":{"name":"Ada","email":"ada@example.com"},"conversationId":"default"}
+{"type":"stream_end","model":"...","conversationId":"default"}
+```
+
+`stream_start` and progress precede these events; `stream_end` retains optional
+usage metadata. The single final `stream_chunk` supports existing text clients.
+The new `structured_output.output` contains the parsed, schema-validated object.
+History stores the JSON text in `body` and the parsed object in `structuredOutput`,
+also returned by message-history endpoints after reconnection. Failed or
+interrupted structured turns emit an `error` and no successful `stream_end`,
+`structured_output`, or assistant history record.
+
+| Error code | Meaning |
+| --- | --- |
+| `INVALID_RESPONSE_FORMAT` | Invalid format or schema; HTTP 400 at admission. |
+| `STRUCTURED_OUTPUT_UNSUPPORTED` | Provider/transport lacks support; HTTP 400 at admission. |
+| `STRUCTURED_OUTPUT_INVALID` | Missing, malformed, or schema-invalid final result. |
+| `STRUCTURED_OUTPUT_FAILED` | Provider rejected the schema, refused, exhausted retries, or otherwise failed. |
+| `STRUCTURED_OUTPUT_INTERRUPTED` | Turn interrupted before a validated result. |
+
+Admission errors use `{ code, message }` in HTTP error bodies or WebSocket
+`error` events. Runtime errors use WebSocket `error` events with the same fields.
+Existing authentication and busy errors retain their behavior.
+
+Queued turns preserve their own schema. Requests using `busyPolicy: "steer"`
+queue as a new turn when either the incoming or active turn is structured;
+REST receipts report `fallbackReason: "structured_output_requires_new_turn"`.
+The schema is included in caller `requestId` deduplication and persisted pending
+request recovery. Reusing a request ID with a different schema returns the
+existing `REQUEST_ID_CONFLICT` error. Structured turns bypass the Gemma direct
+CLI shortcut and answer-text mode-trigger processing.
 
 ## Persistence
 
@@ -184,9 +270,9 @@ Chat detects standalone and embedded modes. Unless set, `VITE_THEME_SOURCE` and 
 | `cancel_auth`               | -                                                                              | Cancel in-progress auth.                                                                                                       |
 | `reauthenticate`            | -                                                                              | Clear credentials and re-authenticate.                                                                                         |
 | `logout`                    | -                                                                              | Log out from provider.                                                                                                         |
-| `send_chat_message`         | `{ text, images?, audio?, audioFilename?, attachmentFilenames?, busyPolicy? }` | Send a user turn. Text may contain `@path` references to playground files; attachment filenames come from `POST /api/uploads`. |
-| `queue_message`             | `{ text }`                                                                     | Explicitly queue a message while busy.                                                                                         |
-| `steer_message`             | `{ text }`                                                                     | Try to steer the active run when the provider supports it.                                                                     |
+| `send_chat_message`         | `{ text, images?, audio?, audioFilename?, attachmentFilenames?, busyPolicy?, responseFormat? }` | Send a user turn. Text may contain `@path` references to playground files; attachment filenames come from `POST /api/uploads`. |
+| `queue_message`             | `{ text, responseFormat? }`                                                                     | Explicitly queue a message while busy.                                                                                         |
+| `steer_message`             | `{ text, responseFormat? }`                                                                     | Try to steer the active run when the provider supports it.                                                                     |
 | `submit_story`              | `{ story }`                                                                    | Submit activity story after stream end.                                                                                        |
 | `get_model` / `set_model`   | `{ model }` for set                                                            | Read or update current model.                                                                                                  |
 | `get_effort` / `set_effort` | `{ effort }` for set                                                           | Read or update Claude effort (`low`, `medium`, `high`, `xhigh`, `max`).                                                        |

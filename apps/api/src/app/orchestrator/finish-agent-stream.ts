@@ -23,12 +23,17 @@ export function finishAgentStream(
   accumulated: string,
   stepId: string,
   step: ThinkingStep,
-  usage?: TokenUsage
+  usage?: TokenUsage,
+  structuredOutput?: unknown,
 ): void {
   const finalText = accumulated || 'The agent produced no visible output.';
   const storedModel = (deps.modelStore.get() || '').trim();
   const model = storedModel || process.env.AGENT_PROVIDER || DEFAULT_PROVIDER;
-  deps.messageStore.add('assistant', finalText, undefined, model);
+  if (structuredOutput !== undefined) {
+    deps.messageStore.add('assistant', finalText, undefined, model, undefined, undefined, undefined, structuredOutput);
+  } else {
+    deps.messageStore.add('assistant', finalText, undefined, model);
+  }
   void deps.fibeSync.syncMessages(() => JSON.stringify(deps.messageStore.all()), deps.conversationId);
   deps.send(WS_EVENT.THINKING_STEP, {
     id: stepId,

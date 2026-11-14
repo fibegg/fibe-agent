@@ -1,3 +1,4 @@
+import { assertStructuredOutputSupport, parseStructuredOutput } from './structured-output';
 import { spawn } from 'node:child_process';
 import {
   existsSync,
@@ -255,6 +256,8 @@ interface CodexTurnResponse {
 }
 
 interface CodexAppServerTurnState {
+  structuredOutputRequested?: boolean;
+  finalAnswer?: string;
   threadId: string;
   turnId: string;
   onChunk: (chunk: string) => void;
@@ -269,6 +272,7 @@ interface CodexAppServerTurnState {
 }
 
 interface CodexThreadItem {
+  phase?: string;
   id?: string;
   type?: string;
   text?: string;
@@ -744,6 +748,10 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     return 'queued';
   }
 
+  supportsStructuredOutput(): boolean {
+    return useAppServerTransport();
+  }
+
   executePromptStreaming(
     prompt: string,
     model: string,
@@ -752,6 +760,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     systemPrompt?: string,
     runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
+    assertStructuredOutputSupport(this, runtimeOptions?.responseFormat);
     if (useAppServerTransport()) {
       return this.executePromptStreamingAppServer(
         prompt,
@@ -1058,6 +1067,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         cwd: this.getWorkingDir(),
         model: model || null,
         effort: normalizeEffort(runtimeOptions?.effort),
+        ...(runtimeOptions?.responseFormat ? { outputSchema: runtimeOptions.responseFormat.schema } : {}),
       },
     );
     const turnId = turnResponse.turn.id;
@@ -1073,6 +1083,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
       }, CODEX_APP_SERVER_TURN_TIMEOUT_MS);
       timer.unref?.();
       const state: CodexAppServerTurnState = {
+        structuredOutputRequested: !!runtimeOptions?.responseFormat,
         threadId,
         turnId,
         onChunk,
@@ -1169,6 +1180,7 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
     if (!item?.type) return;
 
     if (item.type === 'agentMessage' && completed && item.text) {
+      if (turn.structuredOutputRequested && (!item.phase || item.phase === 'final_answer')) turn.finalAnswer = item.text;
       const emitted = item.id
         ? (turn.assistantTextByItemId.get(item.id) ?? '')
         : '';
@@ -1324,6 +1336,15 @@ export class OpenaiCodexStrategy extends AbstractCLIStrategy {
         ),
       );
       return;
+    }
+    if (turn.structuredOutputRequested) {
+      try {
+        const output = parseStructuredOutput(turn.finalAnswer);
+        turn.callbacks?.onStructuredOutput?.(output);
+      } catch (error) {
+        turn.reject(error as Error);
+        return;
+      }
     }
     turn.resolve();
   }

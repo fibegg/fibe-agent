@@ -1,3 +1,10 @@
+import type { ResponseFormat } from '@shared/response-format';
+import {
+  compileResponseFormat,
+  assertStructuredOutputSupport,
+  validateStructuredOutput,
+  StructuredOutputError,
+} from '../strategies/structured-output';
 import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { exec } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
@@ -224,7 +231,7 @@ export class OrchestratorService implements OnModuleInit {
       const request = message.apiRequest;
       if (request?.state !== 'pending') continue;
       await this.sendMessageFromApi(request.text, request.conversationId, request.images,
-        message.attachmentFilenames, request.busyPolicy, message.id, request.storeGeneration);
+        message.attachmentFilenames, request.busyPolicy, message.id, request.storeGeneration, request.responseFormat);
     }
   }
 
@@ -342,6 +349,7 @@ export class OrchestratorService implements OnModuleInit {
       audio?: string;
       audioFilename?: string;
       attachmentFilenames?: string[];
+      responseFormat?: ResponseFormat;
       busyPolicy?: BusyPolicy;
       story?: Array<{
         id: string;
@@ -372,6 +380,7 @@ export class OrchestratorService implements OnModuleInit {
             audioFilename: msg.audioFilename,
             attachmentFilenames: msg.attachmentFilenames,
             busyPolicy: msg.busyPolicy ?? 'queue',
+            responseFormat: msg.responseFormat,
           });
         } else {
           await this.handleChatMessage(
@@ -381,13 +390,14 @@ export class OrchestratorService implements OnModuleInit {
             msg.audio,
             msg.audioFilename,
             msg.attachmentFilenames,
+            msg.responseFormat,
           );
         }
       },
       [WS_ACTION.QUEUE_MESSAGE]: () =>
-        this.handleControlMessage('queue', ctx, { text: msg.text ?? '' }),
+        this.handleControlMessage('queue', ctx, { text: msg.text ?? '', responseFormat: msg.responseFormat }),
       [WS_ACTION.STEER_MESSAGE]: () =>
-        this.handleControlMessage('steer', ctx, { text: msg.text ?? '' }),
+        this.handleControlMessage('steer', ctx, { text: msg.text ?? '', responseFormat: msg.responseFormat }),
       [WS_ACTION.SUBMIT_STORY]: () =>
         this.handleSubmitStory(ctx, msg.story ?? []),
       [WS_ACTION.GET_MODEL]: () => this.handleGetModel(ctx),
@@ -416,6 +426,10 @@ export class OrchestratorService implements OnModuleInit {
       try {
         await handler();
       } catch (error) {
+        if (error instanceof StructuredOutputError) {
+          ctx.send(WS_EVENT.ERROR, { code: error.code, message: error.message });
+          return;
+        }
         if (!(error instanceof ConflictException) ||
           (msg.action !== WS_ACTION.ANSWER_USER_QUESTION && msg.action !== WS_ACTION.CONFIRM_ACTION_RESPONSE)) throw error;
         ctx.send(WS_EVENT.ERROR, { error: 'stale_prompt', statusCode: 409 });
@@ -548,8 +562,15 @@ export class OrchestratorService implements OnModuleInit {
     busyPolicy: BusyPolicy = 'reject',
     requestId?: string,
     storeGeneration?: string,
+    responseFormat?: ResponseFormat,
   ): Promise<ApiSendResult> {
-    if (!requestId) return this.sendApiMessage(text, conversationId, images, attachmentFilenames, busyPolicy);
+    try {
+      compileResponseFormat(responseFormat);
+    } catch (error) {
+      if (error instanceof StructuredOutputError) return { accepted: false, error: error.code, reason: error.message };
+      throw error;
+    }
+    if (!requestId) return this.sendApiMessage(text, conversationId, images, attachmentFilenames, busyPolicy, undefined, responseFormat);
     requestId = requestId.toLowerCase();
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId)) {
       return { accepted: false, error: 'Invalid requestId' };
@@ -563,6 +584,7 @@ export class OrchestratorService implements OnModuleInit {
     conversationId = scope.conversationId;
     const fingerprint = createHash('sha256').update(JSON.stringify([
       text.trim(), conversationId?.trim() || null, images ?? [], attachmentFilenames ?? [], busyPolicy,
+      ...(responseFormat ? [responseFormat] : []),
     ])).digest('hex');
     const rejected = this.rejectedReceipts.get(requestId);
     if (rejected) return rejected.fingerprint === fingerprint ? { ...rejected.outcome } : { accepted: false, error: 'REQUEST_ID_CONFLICT' };
@@ -586,13 +608,13 @@ export class OrchestratorService implements OnModuleInit {
     const metadata = existing?.message.apiRequest ?? {
       storeGeneration,
       fingerprint, text: text.trim(), conversationId: conversationId?.trim() || undefined, busyPolicy,
-      images, queueOrder: -1, state: 'pending' as const,
+      images, responseFormat, queueOrder: -1, state: 'pending' as const,
     };
     const id = requestId;
     const result = (async (): Promise<ApiSendResult> => {
       try {
         const outcome = await this.sendApiMessage(text, existing?.conversationId ?? conversationId, images, attachmentFilenames, busyPolicy,
-          { id, metadata, existing: existing?.message });
+          { id, metadata, existing: existing?.message }, responseFormat);
         if (outcome.accepted) {
           if (metadata.state === 'pending') this.acceptedRequestIds.add(id);
           const receipt = metadata.outcome ?? { ...outcome, executionState: metadata.state };
@@ -636,6 +658,7 @@ export class OrchestratorService implements OnModuleInit {
     attachmentFilenames?: string[],
     busyPolicy: BusyPolicy = 'reject',
     admission?: ApiAdmission,
+    responseFormat?: ResponseFormat,
   ): Promise<ApiSendResult> {
     if (!text.trim() && !images?.length && !attachmentFilenames?.length) {
       return { accepted: false, error: 'text is required and must be non-empty' };
@@ -652,7 +675,7 @@ export class OrchestratorService implements OnModuleInit {
     }
     const requestedConversationId = conversationId?.trim();
     const busyResult = this.routeBusyApiMessage(
-      text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission,
+      text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission, responseFormat,
     );
     if (busyResult) return busyResult;
 
@@ -665,16 +688,23 @@ export class OrchestratorService implements OnModuleInit {
     if (!ctx) {
       ctx = this.sessionRegistry.create(targetConversationId, false);
     }
+    try {
+      assertStructuredOutputSupport(ctx.strategy, responseFormat);
+    } catch (error) {
+      if (error instanceof StructuredOutputError) return { accepted: false, error: error.code, reason: error.message };
+      throw error;
+    }
     await this.checkAndSendAuthStatus(ctx);
     if (!ctx.isAuthenticated)
       return { accepted: false, error: ERROR_CODE.NEED_AUTH };
     // Authentication yields: another REST or WebSocket request may have claimed
     // this conversation in the meantime. Recheck before reserving the session.
     const busyAfterAuth = this.routeBusyApiMessage(
-      text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission,
+      text, requestedConversationId, images, attachmentFilenames, busyPolicy, admission, responseFormat,
     );
     if (busyAfterAuth) return busyAfterAuth;
     ctx.isProcessing = true;
+    ctx.activeResponseFormat = responseFormat;
     let prepared: Awaited<ReturnType<OrchestratorService['addUserMessageAndEmit']>>;
     try {
       prepared = await this.addUserMessageAndEmit(
@@ -682,6 +712,7 @@ export class OrchestratorService implements OnModuleInit {
       );
     } catch (error) {
       ctx.isProcessing = false;
+      ctx.activeResponseFormat = undefined;
       // A queue request may have arrived during preparation. Preserve that turn
       // and let it run after releasing this failed request's reservation.
       void this.drainQueuedTurns(ctx).catch((err) =>
@@ -690,7 +721,7 @@ export class OrchestratorService implements OnModuleInit {
       throw error;
     }
     const { messageId, text: _text, imageUrls: urls, audioFilename: af, attachmentFilenames: att } = prepared;
-    void this.runAgentResponse(ctx, _text, urls, af, att, admission?.id)
+    void this.runAgentResponse(ctx, _text, urls, af, att, admission?.id, responseFormat)
       .then(() => this.drainQueuedTurns(ctx))
       .catch((err) =>
         this.logger.warn('REST send-message agent run failed', err),
@@ -706,6 +737,7 @@ export class OrchestratorService implements OnModuleInit {
     attachmentFilenames: string[] | undefined,
     busyPolicy: BusyPolicy,
     admission?: ApiAdmission,
+    responseFormat?: ResponseFormat,
   ): ReturnType<OrchestratorService['sendMessageFromApi']> | null {
     const activeProcessing = this.processingSessions();
     let processing: SessionContext | undefined;
@@ -735,7 +767,7 @@ export class OrchestratorService implements OnModuleInit {
     if (!processing) return null;
     const target = processing;
     return this.acceptBusyMessage(target, target, {
-      text, images, attachmentFilenames, busyPolicy, admission,
+      text, images, attachmentFilenames, busyPolicy, admission, responseFormat,
     }).then((result) => ({
       ...result,
       conversationId: target.conversationId,
@@ -1035,6 +1067,7 @@ export class OrchestratorService implements OnModuleInit {
     if (!result.accepted) {
       requesterCtx.send(WS_EVENT.ERROR, {
         message: result.reason ?? result.error ?? ERROR_CODE.AGENT_BUSY,
+        ...(result.error?.startsWith('STRUCTURED_OUTPUT_') || result.error === 'INVALID_RESPONSE_FORMAT' ? { code: result.error } : {}),
       });
     }
   }
@@ -1070,6 +1103,7 @@ export class OrchestratorService implements OnModuleInit {
       audio?: string;
       audioFilename?: string;
       attachmentFilenames?: string[];
+      responseFormat?: ResponseFormat;
     },
   ): Promise<void> {
     const resolution = this.resolveControlTarget(
@@ -1093,7 +1127,7 @@ export class OrchestratorService implements OnModuleInit {
       resolvedPolicy: result.resolvedPolicy,
       queueCount: resolution.ctx.queuedTurns.length,
       error: result.error,
-      reason: result.error,
+      reason: result.reason ?? result.error,
     });
   }
 
@@ -1198,6 +1232,7 @@ export class OrchestratorService implements OnModuleInit {
     audioFilename: string | null,
     attachmentFilenames?: string[],
     requestMessageId?: string,
+    responseFormat?: ResponseFormat,
   ): Promise<void> {
     const requestStore = requestMessageId ? this.stores(ctx).messageStore : undefined;
     // Failure here leaves a recoverable pending turn and prevents every provider effect.
@@ -1207,10 +1242,18 @@ export class OrchestratorService implements OnModuleInit {
         this.acceptedRequestIds.delete(requestMessageId);
       } catch (error) {
         ctx.isProcessing = false;
+        ctx.activeResponseFormat = undefined;
         this.acceptedRequestIds.delete(requestMessageId);
         throw error;
       }
     }
+    const sendRunError = (data: Record<string, unknown>) => {
+      if (responseFormat) {
+        this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.ERROR, data);
+      } else {
+        ctx.send(WS_EVENT.ERROR, data);
+      }
+    };
     let requestState: 'completed' | 'failed' = 'completed';
     let accumulated = '';
     const syntheticStepId = 'generating-response';
@@ -1221,7 +1264,11 @@ export class OrchestratorService implements OnModuleInit {
       timestamp: new Date(),
     };
     ctx.lastError = null;
+    ctx.activeResponseFormat = responseFormat;
     try {
+      const validate = compileResponseFormat(responseFormat);
+      assertStructuredOutputSupport(ctx.strategy, responseFormat);
+      let structuredOutput: unknown;
       let systemPrompt = '';
       const configSystemPrompt = this.config.getSystemPrompt();
       if (configSystemPrompt) {
@@ -1245,7 +1292,7 @@ export class OrchestratorService implements OnModuleInit {
       // Runs only when GEMMA_ROUTER_ENABLED=true and Ollama is reachable.
       // Stored chat history is never modified: only the built prompt changes.
       let routedText = text;
-      if (this.config.isGemmaRouterEnabled()) {
+      if (!responseFormat && this.config.isGemmaRouterEnabled()) {
         const mcpTools = this.gemmaMcpTools.getTools();
         this.logger.log(
           `[GemmaRouter] input: "${text.slice(0, 80)}", tools: ${mcpTools.length}`,
@@ -1374,6 +1421,9 @@ export class OrchestratorService implements OnModuleInit {
         },
       };
       const callbacks = createStreamingCallbacks(streamDeps);
+      if (responseFormat) {
+        callbacks.onStructuredOutput = (value) => { structuredOutput = value; };
+      }
       const modeTriggerStream = createAgentModeTriggerStream((mode) => {
         this.setAgentMode(mode);
       });
@@ -1392,20 +1442,28 @@ export class OrchestratorService implements OnModuleInit {
         fullPrompt,
         model,
         (chunk) => {
-          emitVisibleChunk(modeTriggerStream.push(chunk));
+          if (!responseFormat) emitVisibleChunk(modeTriggerStream.push(chunk));
         },
         callbacks,
         systemPrompt || undefined,
-        { effort, previousAssistantMessages },
+        { effort, previousAssistantMessages, ...(responseFormat ? { responseFormat } : {}) },
       );
       ctx.pendingSteerRestart = false;
-      emitVisibleChunk(modeTriggerStream.flush());
+      if (validate) {
+        validateStructuredOutput(validate, structuredOutput);
+        // Only the validated final answer enters history and the text stream.
+        emitVisibleChunk(JSON.stringify(structuredOutput));
+        bcastConv(WS_EVENT.STRUCTURED_OUTPUT, { output: structuredOutput });
+      } else {
+        emitVisibleChunk(modeTriggerStream.flush());
+      }
       finishAgentStream(
         this.finishStreamDeps(ctx),
         accumulated,
         syntheticStepId,
         syntheticStep,
         ctx.lastStreamUsage,
+        structuredOutput,
       );
     } catch (err) {
       requestState = 'failed';
@@ -1448,8 +1506,9 @@ export class OrchestratorService implements OnModuleInit {
           }
           ctx.currentActivityId = null;
           ctx.lastStreamUsage = undefined;
-          ctx.send(WS_EVENT.ERROR, {
+          sendRunError({
             message: 'Interrupted before producing output.',
+            ...(responseFormat ? { code: 'STRUCTURED_OUTPUT_INTERRUPTED' } : {}),
           });
         }
       } else {
@@ -1473,7 +1532,12 @@ export class OrchestratorService implements OnModuleInit {
         }
         ctx.currentActivityId = null;
         ctx.lastStreamUsage = undefined;
-        ctx.send(WS_EVENT.ERROR, { message });
+        sendRunError({
+          message,
+          ...(err instanceof StructuredOutputError
+            ? { code: err.code }
+            : responseFormat ? { code: 'STRUCTURED_OUTPUT_FAILED' } : {}),
+        });
       }
     } finally {
       const settledRequests = new Set(this.steeredRequestIds.get(ctx.sessionId));
@@ -1500,6 +1564,7 @@ export class OrchestratorService implements OnModuleInit {
       }
       ctx.streamTextAccumulated = '';
       ctx.streamStartedAt = null;
+      ctx.activeResponseFormat = undefined;
       // Notify all sessions that no agent is running anymore (anyProcessing may now be false)
       this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
         count: this.sessionRegistry.size,
@@ -1546,12 +1611,16 @@ export class OrchestratorService implements OnModuleInit {
     audio?: string,
     audioFilenameFromClient?: string,
     attachmentFilenames?: string[],
+    responseFormat?: ResponseFormat,
   ): Promise<void> {
+    compileResponseFormat(responseFormat);
+    assertStructuredOutputSupport(ctx.strategy, responseFormat);
     if (!ctx.isAuthenticated) {
       ctx.send(WS_EVENT.ERROR, { message: ERROR_CODE.NEED_AUTH });
       return;
     }
     ctx.isProcessing = true;
+    ctx.activeResponseFormat = responseFormat;
     this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
       count: this.sessionRegistry.size,
       anyProcessing: true,
@@ -1569,7 +1638,7 @@ export class OrchestratorService implements OnModuleInit {
       audioFilenameFromClient,
       attachmentFilenames,
     );
-    await this.runAgentResponse(ctx, _t, imageUrls, audioFilename, att);
+    await this.runAgentResponse(ctx, _t, imageUrls, audioFilename, att, undefined, responseFormat);
     await this.drainQueuedTurns(ctx);
   }
 
@@ -1582,6 +1651,7 @@ export class OrchestratorService implements OnModuleInit {
       audio?: string;
       audioFilename?: string;
       attachmentFilenames?: string[];
+      responseFormat?: ResponseFormat;
       busyPolicy?: BusyPolicy;
       admission?: ApiAdmission;
     },
@@ -1593,7 +1663,8 @@ export class OrchestratorService implements OnModuleInit {
     );
     if (!result.accepted) {
       requesterCtx.send(WS_EVENT.ERROR, {
-        message: result.error ?? ERROR_CODE.AGENT_BUSY,
+        message: result.reason ?? result.error ?? ERROR_CODE.AGENT_BUSY,
+        ...(result.error?.startsWith('STRUCTURED_OUTPUT_') || result.error === 'INVALID_RESPONSE_FORMAT' ? { code: result.error } : {}),
       });
     }
   }
@@ -1607,6 +1678,7 @@ export class OrchestratorService implements OnModuleInit {
       audio?: string;
       audioFilename?: string;
       attachmentFilenames?: string[];
+      responseFormat?: ResponseFormat;
       busyPolicy?: BusyPolicy;
       admission?: ApiAdmission;
     },
@@ -1614,10 +1686,18 @@ export class OrchestratorService implements OnModuleInit {
     accepted: boolean;
     messageId?: string;
     error?: string;
+    reason?: string;
     resolvedPolicy?: string;
     resolution?: 'started' | 'steered' | 'queued';
     fallbackReason?: string;
   }> {
+    try {
+      compileResponseFormat(payload.responseFormat);
+      assertStructuredOutputSupport(processingCtx.strategy, payload.responseFormat);
+    } catch (error) {
+      if (error instanceof StructuredOutputError) return { accepted: false, error: error.code, reason: error.message };
+      throw error;
+    }
     const text = payload.text.trim();
     if (!text && !payload.images?.length && !payload.attachmentFilenames?.length)
       return {
@@ -1636,6 +1716,7 @@ export class OrchestratorService implements OnModuleInit {
         payload.audio,
         payload.audioFilename,
         payload.attachmentFilenames,
+        payload.responseFormat,
       );
       return { accepted: true, resolvedPolicy: 'started', resolution: 'started' };
     }
@@ -1662,7 +1743,8 @@ export class OrchestratorService implements OnModuleInit {
     let queuedText = saved.text;
     const hasContent = !!(saved.imageUrls.length || saved.attachmentFilenames?.length || saved.audioFilename);
     const unsupportedContent = hasContent && !processingCtx.strategy.supportsSteerContent;
-    if (policy === 'steer' && processingCtx.strategy.steerAgent && !unsupportedContent) {
+    const structuredTurn = !!(payload.responseFormat || processingCtx.activeResponseFormat);
+    if (policy === 'steer' && !structuredTurn && processingCtx.strategy.steerAgent && !unsupportedContent) {
       if (payload.admission) await this.stores(processingCtx).messageStore.updateRequestState(saved.messageId, 'running');
       if (payload.admission) this.stores(processingCtx).messageStore.assertRequestGeneration(saved.messageId);
       processingCtx.pendingSteerRestart = true;
@@ -1692,6 +1774,7 @@ export class OrchestratorService implements OnModuleInit {
     processingCtx.queuedTurns.push({
       id: randomUUID(),
       messageId: saved.messageId,
+      responseFormat: payload.responseFormat,
       text: queuedText,
       displayText: saved.text,
       imageUrls: saved.imageUrls,
@@ -1701,7 +1784,7 @@ export class OrchestratorService implements OnModuleInit {
       createdAt: new Date().toISOString(),
     });
     this.emitQueueUpdate(processingCtx);
-    return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: unsupportedContent ? 'steer_unsupported_content' : processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
+    return { accepted: true, messageId: saved.messageId, resolvedPolicy, resolution: 'queued', ...(policy === 'steer' ? { fallbackReason: structuredTurn ? 'structured_output_requires_new_turn' : unsupportedContent ? 'steer_unsupported_content' : processingCtx.strategy.steerAgent ? 'steer_queued' : 'steer_unsupported' } : {}) };
   }
 
   private emitQueueUpdate(ctx: SessionContext): void {
@@ -1713,6 +1796,7 @@ export class OrchestratorService implements OnModuleInit {
     while (!ctx.isProcessing && ctx.queuedTurns.length > 0) {
       const next = ctx.queuedTurns.shift() as QueuedAgentTurn;
       ctx.isProcessing = true;
+      ctx.activeResponseFormat = next.responseFormat;
       this.emitQueueUpdate(ctx);
       this.sessionRegistry.broadcast(WS_EVENT.SESSIONS_UPDATED, {
         count: this.sessionRegistry.size,
@@ -1725,6 +1809,7 @@ export class OrchestratorService implements OnModuleInit {
         next.audioFilename,
         next.attachmentFilenames,
         this.stores(ctx).messageStore.getById(next.messageId)?.apiRequest ? next.messageId : undefined,
+        next.responseFormat,
       );
     }
   }

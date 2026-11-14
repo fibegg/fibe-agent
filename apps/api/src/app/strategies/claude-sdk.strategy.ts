@@ -591,6 +591,10 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     return this._pendingAuthCheck;
   }
 
+  supportsStructuredOutput(): boolean {
+    return true;
+  }
+
   async executePromptStreaming(
     prompt: string,
     model: string,
@@ -760,6 +764,7 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
       permissionMode: 'bypassPermissions',
       allowDangerouslySkipPermissions: true,
       includePartialMessages: true,
+      ...(runtimeOptions?.responseFormat ? { outputFormat: runtimeOptions.responseFormat } : {}),
       additionalDirectories: this.getPlaygroundDirs(),
       extraArgs: providerTokensToExtraArgs(
         buildProviderArgs(providerArgsConfig),
@@ -857,6 +862,10 @@ export class ClaudeSdkStrategy extends AbstractCLIStrategy {
     }
 
     if (message.type === 'result') {
+      if (message.subtype === 'success' && !message.is_error && message.structured_output !== undefined) {
+        state.emittedVisibleOutput = true;
+        callbacks?.onStructuredOutput?.(message.structured_output);
+      }
       const usage = usageFromObject(message.usage, state.usage);
       if (usage) {
         state.usage = usage;

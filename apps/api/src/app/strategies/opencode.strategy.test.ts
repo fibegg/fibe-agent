@@ -130,6 +130,7 @@ if (args[0] === 'serve') {
       if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'empty-no-idle') {
         sendEvent(clients, { type: 'message.updated', properties: { info: { id: userMessageID, sessionID: messageMatch[1], role: 'user' } } });
         sendEvent(clients, { type: 'message.updated', properties: { info: { id: assistantMessageID, sessionID: messageMatch[1], role: 'assistant' } } });
+      if (body?.format) sendEvent(clients, { type: 'message.updated', properties: { info: { id: assistantMessageID, sessionID: messageMatch[1], role: 'assistant', structured: { answer: 'ok' } } } });
         sendJson(res, 200, {
           info: {
             id: assistantMessageID,
@@ -180,6 +181,7 @@ if (args[0] === 'serve') {
       sendEvent(clients, { type: 'message.updated', properties: { info: { id: userMessageID, sessionID: messageMatch[1], role: 'user' } } });
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: userPartID, sessionID: messageMatch[1], messageID: userMessageID, type: 'text', text: '[MODE]Casting...[/MODE]\\n' + prompt } } });
       sendEvent(clients, { type: 'message.updated', properties: { info: { id: assistantMessageID, sessionID: messageMatch[1], role: 'assistant' } } });
+      if (body?.format) sendEvent(clients, { type: 'message.updated', properties: { info: { id: assistantMessageID, sessionID: messageMatch[1], role: 'assistant', structured: { answer: 'ok' } } } });
       sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: reasoningPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'reasoning', text: 'thinking' } } });
       const snapshotFirst = process.env.OPENCODE_FAKE_EVENT_ORDER === 'snapshot-first';
       if (snapshotFirst) {
@@ -211,6 +213,7 @@ if (args[0] === 'serve') {
       sendJson(res, 200, {
         info: {
           id: assistantMessageID,
+          ...(body?.format ? { structured: { answer: 'ok' } } : {}),
           sessionID: messageMatch[1],
           role: 'assistant',
           tokens: { input: 3, output: 4, cache: { read: 0, write: 0 }, reasoning: 0 },
@@ -811,6 +814,30 @@ describe('OpencodeStrategy', () => {
       command: ['fibe', 'mcp', 'serve'],
     });
   });
+
+  for (const responseMode of ['json', 'null']) {
+    test(`OpenCode structured output survives ${responseMode} response and SSE completion`, async () => {
+      const bin = join(TEST_HOME, 'structured-bin');
+      mkdirSync(bin, { recursive: true });
+      writeFakeOpencode(join(bin, 'opencode'));
+      process.env.PATH = `${bin}:${process.env.PATH ?? ''}`;
+      process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+      process.env.ANTHROPIC_API_KEY = 'test-key';
+      process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = responseMode;
+      const requestsPath = join(TEST_HOME, 'structured-requests.jsonl');
+      process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
+      const strategy = new OpencodeStrategy({ getConversationDataDir: () => join(TEST_HOME, 'structured-data'), getEncryptionKey: () => undefined });
+      const responseFormat = { type: 'json_schema' as const, schema: { type: 'object' } };
+      const output: unknown[] = [];
+      await strategy.executePromptStreaming('extract', '', () => undefined, { onStructuredOutput: (value) => output.push(value) }, undefined, { responseFormat });
+      expect(output).toEqual([{ answer: 'ok' }]);
+      const requests = readFileSync(requestsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+      expect(requests.find((r) => r.type === 'message-body').body.format).toEqual(responseFormat);
+      process.env.OPENCODE_AGENT_TRANSPORT = 'cli';
+      expect(strategy.supportsStructuredOutput()).toBe(false);
+      expect(() => strategy.executePromptStreaming('extract', '', () => undefined, undefined, undefined, { responseFormat })).toThrow('active provider or transport');
+    });
+  }
 
   test('executePromptStreaming uses OpenCode serve app-server with shared workspace and per-conversation session marker', async () => {
     const fakeBinDir = join(TEST_HOME, 'fake-bin');

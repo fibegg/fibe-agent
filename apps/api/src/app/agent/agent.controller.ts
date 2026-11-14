@@ -63,6 +63,7 @@ export class AgentController {
       body.busyPolicy,
       body.requestId,
       body.storeGeneration,
+      body.responseFormat,
     );
     return handleSendMessage(result);
   }

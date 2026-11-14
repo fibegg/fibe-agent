@@ -32,6 +32,9 @@ export function handleSendMessage(
   result: SendMessageOrchestratorResult
 ): SendMessageSuccess {
   if (!result.accepted) {
+    if (result.error === 'INVALID_RESPONSE_FORMAT' || result.error === 'STRUCTURED_OUTPUT_UNSUPPORTED') {
+      throw new BadRequestException({ code: result.error, message: result.reason ?? result.error });
+    }
     if (result.error === ERROR_CODE.NEED_AUTH) {
       throw new ForbiddenException(ERROR_CODE.NEED_AUTH);
     }

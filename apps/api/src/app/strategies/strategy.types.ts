@@ -1,3 +1,4 @@
+import type { ResponseFormat } from '@shared/response-format';
 export interface AuthConnection {
   sendAuthUrlGenerated(url: string): void;
   sendDeviceCode(code: string): void;
@@ -38,6 +39,7 @@ export interface TokenUsage {
 }
 
 export interface StreamingCallbacks {
+  onStructuredOutput?: (value: unknown) => void;
   onReasoningStart?: () => void;
   onReasoningChunk?: (text: string) => void;
   onReasoningEnd?: () => void;
@@ -48,6 +50,7 @@ export interface StreamingCallbacks {
 }
 
 export interface AgentRuntimeOptions {
+  responseFormat?: ResponseFormat;
   effort?: string;
   previousAssistantMessages?: string[];
 }
@@ -63,6 +66,7 @@ export interface ConversationDataDirProvider {
 }
 
 export interface AgentStrategy {
+  supportsStructuredOutput?(): boolean;
   ensureSettings?(): void;
   getWorkingDir?(): string | null;
   prepareWorkingDir?(): void;

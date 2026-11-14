@@ -316,6 +316,156 @@ describe('OrchestratorService', () => {
     expect(ctx.isProcessing).toBe(false);
   }
 
+  const responseFormat = { type: 'json_schema' as const, schema: { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'], additionalProperties: false } };
+
+  test('structured output is validated, streamed without prose or mode transformation, and persisted', async () => {
+    const { orch, ctx, messageStore } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    ctx.strategy.supportsStructuredOutput = () => true;
+    const output = { answer: '[MODE]plan[/MODE] exact JSON value' };
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk, callbacks, _system, options) => {
+      expect(options?.responseFormat).toEqual(responseFormat);
+      chunk('Progress prose that must not enter the answer');
+      callbacks?.onStructuredOutput?.(output);
+    });
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe((event) => events.push(event));
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'extract', responseFormat });
+    expect(events.filter((e) => e.type === WS_EVENT.STREAM_CHUNK).map((e) => e.data.text)).toEqual([JSON.stringify(output)]);
+    expect(events.find((e) => e.type === WS_EVENT.STRUCTURED_OUTPUT)?.data).toMatchObject({ output });
+    expect(events.findIndex((e) => e.type === WS_EVENT.STRUCTURED_OUTPUT)).toBeLessThan(events.findIndex((e) => e.type === WS_EVENT.STREAM_END));
+    expect(messageStore.all().at(-1)).toMatchObject({ role: 'assistant', body: JSON.stringify(output), structuredOutput: output });
+    await messageStore.flush();
+    const persisted = JSON.parse(readFileSync(join(dataDir, 'messages.json'), 'utf8'));
+    expect(persisted.at(-1).structuredOutput).toEqual(output);
+    expect(ctx.activeResponseFormat).toBeUndefined();
+  });
+
+  for (const value of [undefined, { answer: 123 }, { answer: 'ok', extra: true }]) {
+    test(`invalid structured answer never emits success: ${JSON.stringify(value)}`, async () => {
+      const { orch, ctx, messageStore } = await createOrchestrator();
+      ctx.isAuthenticated = true;
+      ctx.strategy.supportsStructuredOutput = () => true;
+      spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk, callbacks) => {
+        chunk('not JSON');
+        callbacks?.onStructuredOutput?.(value);
+      });
+      const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+      ctx.outbound$.subscribe((event) => events.push(event));
+      await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'extract', responseFormat });
+      expect(events.find((e) => e.type === WS_EVENT.ERROR)?.data.code).toBe('STRUCTURED_OUTPUT_INVALID');
+      expect(events.some((e) => [WS_EVENT.STREAM_END, WS_EVENT.STRUCTURED_OUTPUT, WS_EVENT.STREAM_CHUNK].includes(e.type as never))).toBe(false);
+      expect(messageStore.all().filter((m) => m.role === 'assistant')).toHaveLength(0);
+    });
+  }
+
+  test('REST and WebSocket reject unsupported providers and invalid schemas before storing a turn', async () => {
+    const { orch, ctx, messageStore } = await createOrchestrator();
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe((event) => events.push(event));
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'extract', responseFormat });
+    expect(events.at(-1)?.data.code).toBe('STRUCTURED_OUTPUT_UNSUPPORTED');
+    const controller = new AgentController(orch);
+    for (const [format, code] of [[responseFormat, 'STRUCTURED_OUTPUT_UNSUPPORTED'], [null, 'INVALID_RESPONSE_FORMAT']] as const) {
+      try {
+        await controller.sendMessage({ text: 'extract', responseFormat: format as never });
+        throw new Error('expected rejection');
+      } catch (error) {
+        expect((error as { getStatus(): number }).getStatus()).toBe(400);
+        expect((error as { getResponse(): unknown }).getResponse()).toMatchObject({ code });
+      }
+    }
+    expect(messageStore.all()).toHaveLength(0);
+  });
+
+  test('structured queue requests retain schema and identity and never steer an active turn', async () => {
+    const { orch, ctx, messageStore, waitForBackgroundTasks } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    ctx.isProcessing = true;
+    ctx.strategy.supportsStructuredOutput = () => true;
+    let steered = false;
+    ctx.strategy.steerAgent = () => { steered = true; return 'handled'; };
+    const id = '00000000-0000-4000-8000-000000000123';
+    const generation = messageStore.deliveryGeneration();
+    const result = await orch.sendMessageFromApi('extract', 'default', undefined, undefined, 'steer', id, generation, responseFormat);
+    expect(result).toMatchObject({ accepted: true, resolution: 'queued', fallbackReason: 'structured_output_requires_new_turn' });
+    expect(steered).toBe(false);
+    expect(ctx.queuedTurns[0].responseFormat).toEqual(responseFormat);
+    expect(messageStore.getById(id)?.apiRequest?.responseFormat).toEqual(responseFormat);
+    expect(await orch.sendMessageFromApi('extract', 'default', undefined, undefined, 'steer', id, generation, responseFormat)).toMatchObject({ accepted: true });
+    expect(ctx.queuedTurns).toHaveLength(1);
+    expect(await orch.sendMessageFromApi('extract', 'default', undefined, undefined, 'steer', id, generation, { ...responseFormat, schema: { type: 'object' } })).toMatchObject({ error: 'REQUEST_ID_CONFLICT' });
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, _chunk, callbacks, _system, options) => {
+      expect(options?.responseFormat).toEqual(responseFormat);
+      callbacks?.onStructuredOutput?.({ answer: 'queued' });
+    });
+    ctx.isProcessing = false;
+    await (orch as unknown as { drainQueuedTurns(ctx: SessionContext): Promise<void> }).drainQueuedTurns(ctx);
+    await waitForBackgroundTasks();
+    expect(messageStore.getById(id)?.apiRequest?.state).toBe('completed');
+  });
+
+  test('pending caller request recovery preserves its schema', async () => {
+    const { orch, ctx, messageStore } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    ctx.isProcessing = true;
+    ctx.strategy.supportsStructuredOutput = () => true;
+    const id = '00000000-0000-4000-8000-000000000124';
+    const generation = messageStore.deliveryGeneration();
+    await orch.sendMessageFromApi('extract', 'default', undefined, undefined, 'queue', id, generation, responseFormat);
+    ctx.queuedTurns = [];
+    (orch as unknown as { acceptedRequestIds: Set<string> }).acceptedRequestIds.clear();
+    await orch.recoverPendingApiRequests();
+    expect(ctx.queuedTurns).toHaveLength(1);
+    expect(ctx.queuedTurns[0].responseFormat).toEqual(responseFormat);
+    expect(messageStore.all().filter((m) => m.id === id)).toHaveLength(1);
+    ctx.queuedTurns = [];
+    ctx.isProcessing = false;
+  });
+
+  test('conversation-scoped REST send forwards responseFormat', async () => {
+    const { orch, sessionRegistry } = await createOrchestrator();
+    const send = spyOn(orch, 'sendMessageFromApi').mockResolvedValue({ accepted: true, messageId: 'structured-id' });
+    const controller = new ConversationsController({ get: () => ({}) } as never, sessionRegistry, orch, {} as never);
+    await controller.sendMessage('structured-conversation', { text: 'extract', responseFormat });
+    expect(send).toHaveBeenCalledWith('extract', 'structured-conversation', undefined, undefined, undefined, undefined, undefined, responseFormat);
+  });
+
+  for (const [message, code] of [[INTERRUPTED_MESSAGE, 'STRUCTURED_OUTPUT_INTERRUPTED'], ['structured output retries exhausted', 'STRUCTURED_OUTPUT_FAILED']]) {
+    test(`structured runtime failure is terminal without a false success: ${code}`, async () => {
+      const { orch, ctx, messageStore } = await createOrchestrator();
+      ctx.isAuthenticated = true;
+      ctx.strategy.supportsStructuredOutput = () => true;
+      spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, _chunk, callbacks) => {
+        callbacks?.onStructuredOutput?.({ answer: 'candidate that must be discarded' });
+        throw new Error(message);
+      });
+      const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+      ctx.outbound$.subscribe((event) => events.push(event));
+      await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'extract', responseFormat });
+      expect(events.find((e) => e.type === WS_EVENT.ERROR)?.data.code).toBe(code);
+      expect(events.some((e) => e.type === WS_EVENT.STRUCTURED_OUTPUT || e.type === WS_EVENT.STREAM_END)).toBe(false);
+      expect(messageStore.all().filter((m) => m.role === 'assistant')).toHaveLength(0);
+    });
+  }
+
+  test('ordinary steering queues behind a structured turn and later ordinary turns do not inherit its schema', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    ctx.isProcessing = true;
+    ctx.activeResponseFormat = responseFormat;
+    ctx.strategy.supportsStructuredOutput = () => true;
+    ctx.strategy.steerAgent = () => { throw new Error('must not steer'); };
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'ordinary', busyPolicy: 'steer' });
+    expect(ctx.queuedTurns[0].responseFormat).toBeUndefined();
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk, _callbacks, _system, options) => {
+      expect(options?.responseFormat).toBeUndefined();
+      chunk('ordinary answer');
+    });
+    ctx.isProcessing = false;
+    await (orch as unknown as { drainQueuedTurns(ctx: SessionContext): Promise<void> }).drainQueuedTurns(ctx);
+  });
+
   test('handleClientConnected sends auth_status, activity_snapshot, and agent_mode_updated', async () => {
     const { orch, ctx } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];

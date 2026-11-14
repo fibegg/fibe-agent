@@ -157,6 +157,7 @@ export class ConversationsController {
       body.busyPolicy,
       body.requestId,
       body.storeGeneration,
+      body.responseFormat,
     );
     return handleSendMessage(result);
   }

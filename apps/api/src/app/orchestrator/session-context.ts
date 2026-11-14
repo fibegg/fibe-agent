@@ -1,3 +1,4 @@
+import type { ResponseFormat } from '@shared/response-format';
 import { Subject } from 'rxjs';
 import type { TokenUsage } from '../activity-store/activity-store.service';
 import type { OutboundEvent } from './orchestrator.service';
@@ -6,6 +7,7 @@ import type { AgentStrategy } from '../strategies/strategy.types';
 export type BusyPolicy = 'reject' | 'queue' | 'steer';
 
 export interface QueuedAgentTurn {
+  responseFormat?: ResponseFormat;
   id: string;
   messageId: string;
   text: string;
@@ -27,6 +29,7 @@ export class SessionContext {
   isAuthenticated = false;
 
   isProcessing = false;
+  activeResponseFormat?: ResponseFormat;
 
   /** Last provider/runtime error observed for this session. Exposed via status for diagnostics. */
   lastError: string | null = null;

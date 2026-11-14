@@ -1,3 +1,4 @@
+import { assertStructuredOutputSupport } from './structured-output';
 import { spawn } from 'node:child_process';
 import {
   existsSync,
@@ -279,6 +280,7 @@ interface OpenCodeSession {
 }
 
 interface OpenCodeMessage {
+  structured?: unknown;
   id: string;
   sessionID: string;
   role: 'user' | 'assistant';
@@ -335,6 +337,7 @@ interface OpenCodeEvent {
 type OpenCodeTurnSignal = 'visible_output' | 'idle';
 
 interface OpenCodeEventState {
+  structuredOutput?: unknown;
   sessionId: string;
   startedAt: number;
   promptText: string;
@@ -820,6 +823,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     }
   }
 
+  supportsStructuredOutput(): boolean {
+    return useAppServerTransport();
+  }
+
   executePromptStreaming(
     prompt: string,
     model: string,
@@ -828,6 +835,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     systemPrompt?: string,
     runtimeOptions?: AgentRuntimeOptions,
   ): Promise<void> {
+    assertStructuredOutputSupport(this, runtimeOptions?.responseFormat);
     if (useAppServerTransport()) {
       return this.executePromptStreamingAppServer(
         prompt,
@@ -1160,6 +1168,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
             'Agent process completed successfully but returned no output. Session not saved to prevent corruption.',
         );
       }
+      if (runtimeOptions?.responseFormat) callbacks?.onStructuredOutput?.(state.structuredOutput);
       this.writeStoredSession(sessionId);
       this.logAppServerPhase(state, 'turn_complete');
     } catch (err) {
@@ -1266,6 +1275,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     const timeoutMs = resolveOpencodeAppServerTurnTimeoutMs();
     const body: Record<string, unknown> = {
       parts: [{ type: 'text', text: prompt }],
+      ...(runtimeOptions?.responseFormat ? { format: runtimeOptions.responseFormat } : {}),
     };
     const parsedModel = parseOpencodeModel(state.resolvedModel);
     if (parsedModel) body.model = parsedModel;
@@ -1659,6 +1669,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (info.id && info.role) state.messageRoleById.set(info.id, info.role);
     if (info.id && !state.currentUserMessageId)
       state.preCurrentTurnMessageIds.add(info.id);
+    if (info.role === 'assistant' && info.structured !== undefined && this.assistantMessageBelongsToCurrentTurn(state, info.id)) {
+      state.structuredOutput = info.structured;
+      this.markAppServerVisibleOutput(state);
+    }
     if (info.error) {
       if (
         info.role === 'assistant' &&

@@ -708,6 +708,15 @@ describe('ClaudeSdkStrategy › executePromptStreaming turns', () => {
     ).records.clear();
   });
 
+  test('passes a per-turn schema to the SDK without leaking it into the next query', async () => {
+    const strategy = makeStrategy(false, tmpDir);
+    const responseFormat = { type: 'json_schema' as const, schema: { type: 'object' } };
+    await strategy.executePromptStreaming('structured', '', () => undefined, undefined, undefined, { responseFormat });
+    await strategy.executePromptStreaming('ordinary', '', () => undefined);
+    expect((queryCalls[0].options as Record<string, unknown>).outputFormat).toEqual(responseFormat);
+    expect((queryCalls[1].options as Record<string, unknown>).outputFormat).toBeUndefined();
+  });
+
   test('starts a fresh Claude SDK query for every user turn and resumes the saved session', async () => {
     const strategy = makeStrategy(
       false,
@@ -1179,3 +1188,15 @@ describe('ClaudeSdkStrategy › getWorkingDir', () => {
     expect(strategy.getWorkingDir()).toContain('playground');
   });
 });
+
+ test('Claude forwards only successful structured results, including empty objects', () => {
+   const strategy = makeStrategy();
+   const output: unknown[] = [];
+   const state = freshState();
+   handleMsg(strategy, { type: 'result', subtype: 'success', is_error: false, structured_output: {} } as SDKMessage, state, () => undefined, { onStructuredOutput: (value) => output.push(value) });
+   expect(output).toEqual([{}]);
+   expect(state.emittedVisibleOutput).toBe(true);
+   handleMsg(strategy, { type: 'result', subtype: 'error_max_structured_output_retries', is_error: true, errors: ['schema failed'], structured_output: {} } as unknown as SDKMessage, state, () => undefined, { onStructuredOutput: (value) => output.push(value) });
+   expect(output).toHaveLength(1);
+   expect(state.errorText).toContain('schema failed');
+ });

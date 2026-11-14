@@ -1,6 +1,11 @@
+import type { ResponseFormat } from '@shared/response-format';
 import { IsString, IsOptional, IsArray, IsUUID } from 'class-validator';
 
 export class SendMessageDto {
+  // Full schema validation is shared with the WebSocket admission path.
+  @IsOptional()
+  responseFormat?: ResponseFormat;
+
   @IsOptional()
   @IsString()
   text?: string;

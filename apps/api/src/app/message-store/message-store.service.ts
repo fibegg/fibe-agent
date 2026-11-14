@@ -1,3 +1,4 @@
+import type { ResponseFormat } from '@shared/response-format';
 import type { AttachmentMetadata } from '@shared/types';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
@@ -16,6 +17,7 @@ export interface StoryEntry {
 }
 
 export interface StoredMessage {
+  structuredOutput?: unknown;
   id: string;
   role: 'user' | 'assistant';
   body: string;
@@ -31,6 +33,7 @@ export interface StoredMessage {
 
 /** Delivery identity on the existing user message; ordinary chat rows omit it. */
 export interface StoredApiRequest {
+  responseFormat?: ResponseFormat;
   storeGeneration?: string;
   fingerprint: string;
   text: string;
@@ -179,6 +182,7 @@ export class MessageStoreService implements OnModuleDestroy {
     attachmentFilenames?: string[],
     request?: { id: string; metadata: StoredApiRequest },
     attachments?: AttachmentMetadata[],
+    structuredOutput?: unknown,
   ): StoredMessage {
     if (request && this.indexById.has(request.id)) throw new Error('request message already exists');
     const msg: StoredMessage = {
@@ -187,6 +191,7 @@ export class MessageStoreService implements OnModuleDestroy {
       body,
       created_at: new Date().toISOString(),
     };
+    if (structuredOutput !== undefined) msg.structuredOutput = structuredOutput;
     if (attachments?.length) msg.attachments = attachments;
     if (request) msg.apiRequest = request.metadata;
     if (imageUrls?.length) msg.imageUrls = imageUrls;
