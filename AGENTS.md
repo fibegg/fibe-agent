@@ -410,6 +410,7 @@ Chat UI (QuestionCard / ConfirmCard)
 **URL:** `ws://localhost:3000/ws` (or `wss://` in production)
 **Auth:** `?token=<password>` when `agentPassword` is configured
 **Conversation:** `conversation_id` or `c` query param binds the session to a conversation; default is `default`
+**Activity snapshot:** `activity=none` skips the connect-time `activity_snapshot` (live activity events are unchanged); without it the snapshot is sent
 **Session:** multi-session up to `websocketMaxConnections` / `WEBSOCKET_MAX_CONNECTIONS` (default `5`); at the cap, the oldest connected client is evicted with close code `4002`
 
 **Close codes:**
@@ -470,7 +471,7 @@ All messages are JSON objects with a `type` field.
 | `thinking_step`         | `id`, `title`, `status`, `details?`, `timestamp`                     | Discrete thinking step (`pending` \| `processing` \| `complete`)                                                                        |
 | `tool_call`             | `name`, `path?`, `summary?`, `command?`                              | Tool invocation; `command` for terminal-style display                                                                                   |
 | `file_created`          | `name`, `path?`, `summary?`                                          | File created by agent                                                                                                                   |
-| `activity_snapshot`     | `activity`                                                           | Full activity list sent on connect                                                                                                      |
+| `activity_snapshot`     | `activity`                                                           | Full activity list sent on connect, unless the client connected with `activity=none`                                                   |
 | `activity_appended`     | `entry`                                                              | New activity added                                                                                                                      |
 | `activity_updated`      | `entry`                                                              | Existing activity updated                                                                                                               |
 | `playground_changed`    | None                                                                 | Playground directory changed                                                                                                            |
@@ -545,7 +546,7 @@ The session is destroyed when the WebSocket closes or the PTY process exits.
 | `PATCH`  | `/api/conversations/:id`                    | Bearer | Update conversation metadata                                                                                                                                                              |
 | `PATCH`  | `/api/conversations/:id/title`              | Bearer | Rename a conversation                                                                                                                                                                     |
 | `DELETE` | `/api/conversations/:id`                    | Bearer | Delete a user-created conversation                                                                                                                                                        |
-| `GET`    | `/api/conversations/:id/messages`           | Bearer | Messages for one conversation                                                                                                                                                             |
+| `GET`    | `/api/conversations/:id/messages`           | Bearer | Messages for one conversation. Optional `limit` (1-500) and `before=<messageId>` page from the newest end, oldest first, with `X-Has-More`; no parameters returns the full history         |
 | `GET`    | `/api/conversations/:id/activities`         | Bearer | Activity log for one conversation                                                                                                                                                         |
 | `GET`    | `/api/conversations/:id/live`               | Bearer | Non-durable live state for one conversation                                                                                                                                               |
 | `GET`    | `/api/conversations/:id/provider-traffic`   | Bearer | Raw provider traffic for one conversation                                                                                                                                                 |

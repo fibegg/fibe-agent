@@ -32,6 +32,8 @@ type ClientMessage = {
 interface ConnectionParams {
   token: string | null;
   conversationId: string;
+  /** `activity=none` opts this connection out of the connect-time activity_snapshot. */
+  sendActivitySnapshot: boolean;
 }
 
 function parseConnectionParams(req: IncomingMessage): ConnectionParams {
@@ -45,6 +47,7 @@ function parseConnectionParams(req: IncomingMessage): ConnectionParams {
   return {
     token: url.searchParams.get('token'),
     conversationId: c || 'default',
+    sendActivitySnapshot: url.searchParams.get('activity') !== 'none',
   };
 }
 
@@ -121,6 +124,8 @@ function attachChatWs(
     }
 
     const ctx = sessionRegistry.create(conversationId);
+    // A reattached session takes the preference of the client now connecting.
+    ctx.sendActivitySnapshot = params.sendActivitySnapshot;
     clientsBySession.set(ctx.sessionId, ws);
     logWs({ event: 'connect' });
 

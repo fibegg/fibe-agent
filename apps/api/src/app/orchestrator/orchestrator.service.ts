@@ -462,9 +462,11 @@ export class OrchestratorService implements OnModuleInit {
       anyProcessing,
       startedAt: liveState?.startedAt ?? null,
     });
-    ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, {
-      activity: this.stores(ctx).activityStore.all(),
-    });
+    if (ctx.sendActivitySnapshot) {
+      ctx.send(WS_EVENT.ACTIVITY_SNAPSHOT, {
+        activity: this.stores(ctx).activityStore.all(),
+      });
+    }
     ctx.send(WS_EVENT.AGENT_MODE_UPDATED, { mode: this.agentModeStore.get() });
     ctx.send(WS_EVENT.MODEL_UPDATED, { model: this.effectiveModel() });
     ctx.send(WS_EVENT.EFFORT_UPDATED, { effort: this.effectiveEffort() });

@@ -482,6 +482,27 @@ describe('OrchestratorService', () => {
     expect(events[4].type).toBe(WS_EVENT.EFFORT_UPDATED);
   });
 
+  test('handleClientConnected skips activity_snapshot when the client opted out', async () => {
+    const { orch, ctx } = await createOrchestrator();
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    ctx.outbound$.subscribe((ev) => events.push(ev));
+    ctx.sendActivitySnapshot = false;
+
+    orch.handleClientConnected(ctx);
+
+    expect(events.map((ev) => ev.type)).toEqual([
+      WS_EVENT.AUTH_STATUS,
+      WS_EVENT.AGENT_MODE_UPDATED,
+      WS_EVENT.MODEL_UPDATED,
+      WS_EVENT.EFFORT_UPDATED,
+    ]);
+
+    events.length = 0;
+    ctx.sendActivitySnapshot = true;
+    orch.handleClientConnected(ctx);
+    expect(events.map((ev) => ev.type)).toContain(WS_EVENT.ACTIVITY_SNAPSHOT);
+  });
+
   test('handleClientConnected includes the active turn start time', async () => {
     const { orch, ctx } = await createOrchestrator();
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];

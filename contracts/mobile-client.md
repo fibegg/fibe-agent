@@ -30,6 +30,10 @@ Successful receipts are persisted on existing user messages for as long as that 
 
 `GET /api/conversations/:id/messages` and `/api/messages` retain array responses and gain per-message `attachments: [{ storedFilename, originalFilename, mediaType?, size?, kind }]`. Metadata is persisted beside uploaded files and in message history. Old records without metadata are returned unchanged: clients use the stored filename from `imageUrls` / `attachmentFilenames` when attachment metadata or originalFilename is absent. No metadata is synthesized into legacy messages. Existing filename arrays remain authoritative upload identities.
 
+`GET /api/conversations/:id/messages` accepts optional paging. `?limit=N` (integer 1-500) returns the newest N messages; `?before=<messageId>&limit=N` returns the N messages immediately before that message; `before` alone returns every earlier message. Pages are oldest first with the same element shape (activity usage enrichment included) and carry `X-Has-More: true|false` (older messages exist before the first returned one). An unknown `before` id is 404 `Message not found`; an invalid `limit` (non-integer, below 1, above 500, repeated) or empty `before` is 400. Without either parameter the full array is returned exactly as before, with no `X-Has-More` header.
+
+`/ws?...&activity=none` skips the connect-time `activity_snapshot` for that connection; live `activity_appended` / `activity_updated` events during a turn are unchanged. Clients that omit the parameter keep receiving the snapshot.
+
 ## Recoverable prompts
 
 `GET /api/conversations/:id/live` retains all existing live fields and adds `pendingPrompts: [{ promptId, questionId, kind: "question", question, placeholder } | { promptId, questionId, kind: "confirmation", message, confirmLabel, cancelLabel }]` (conversationId may also be included). Prompts with no conversationId are included in every conversation snapshot and can be answered from any conversation; only prompts with an explicit conversationId enforce that scope. Prompts survive socket reconnect, until answered, timeout, or runtime shutdown; they are not durable across runtime restart.

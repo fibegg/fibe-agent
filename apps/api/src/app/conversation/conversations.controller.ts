@@ -10,8 +10,11 @@ import {
   Param,
   Patch,
   Post,
+  Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
+import type { FastifyReply } from 'fastify';
 import {
   ConversationManagerService,
   DEFAULT_CONVERSATION_ID,
@@ -20,6 +23,7 @@ import {
   type ConversationMeta,
 } from './conversation-manager.service';
 import { enrichMessagesWithActivityUsage } from '../messages/enrich-messages-with-usage';
+import { parseMessagePageQuery, sliceMessagePage } from '../messages/message-page';
 import { SessionRegistryService } from '../orchestrator/session-registry.service';
 import { OrchestratorService } from '../orchestrator/orchestrator.service';
 import { SendMessageDto } from '../agent/dto/send-message.dto';
@@ -106,10 +110,25 @@ export class ConversationsController {
   }
 
   @Get(':id/messages')
-  messages(@Param('id') id: string) {
+  messages(
+    @Param('id') id: string,
+    @Query('limit') limit: unknown,
+    @Query('before') before: unknown,
+    @Res({ passthrough: true }) reply: FastifyReply,
+  ) {
+    const pageQuery = parseMessagePageQuery(limit, before);
     const bundle = this.requireBundle(id);
+    if (!pageQuery) {
+      return enrichMessagesWithActivityUsage(
+        bundle.messageStore.all(),
+        bundle.activityStore.all(),
+      );
+    }
+    const page = sliceMessagePage(bundle.messageStore.all(), pageQuery);
+    if (!page) throw new NotFoundException('Message not found');
+    reply.header('X-Has-More', String(page.hasMore));
     return enrichMessagesWithActivityUsage(
-      bundle.messageStore.all(),
+      page.messages,
       bundle.activityStore.all(),
     );
   }

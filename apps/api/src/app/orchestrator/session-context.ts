@@ -40,6 +40,12 @@ export class SessionContext {
   destroyWhenIdle = false;
 
   /**
+   * False when the current client connected with `/ws?activity=none`: the
+   * connect-time `activity_snapshot` is skipped. Live activity events are unaffected.
+   */
+  sendActivitySnapshot = true;
+
+  /**
    * Per-session event stream. The WS layer subscribes to this so each client
    * only receives events for its own session.
    *

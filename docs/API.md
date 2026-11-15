@@ -90,7 +90,7 @@ All paths below include the `/api` global prefix.
 | PATCH  | `/api/conversations/:id/title`                 | Bearer | Rename a conversation.                                                                                                                                                                                                                           |
 | PATCH  | `/api/conversations/:id`                       | Bearer | Update conversation metadata, currently title.                                                                                                                                                                                                   |
 | DELETE | `/api/conversations/:id`                       | Bearer | Delete a user-created conversation and its state directory. Protected conversations return `{ ok: false }`.                                                                                                                                      |
-| GET    | `/api/conversations/:id/messages`              | Bearer | Messages for one conversation.                                                                                                                                                                                                                   |
+| GET    | `/api/conversations/:id/messages`              | Bearer | Messages for one conversation. Optional paging: `?limit=N` (1-500) returns the newest N, `?before=<messageId>&limit=N` the N before that message; both oldest first with `X-Has-More: true\|false`. Unknown `before` is 404, invalid `limit` 400. Without parameters the full history is returned unchanged. |
 | GET    | `/api/conversations/:id/activities`            | Bearer | Activity log for one conversation.                                                                                                                                                                                                               |
 | GET    | `/api/conversations/:id/live`                  | Bearer | Live stream/queue state, pendingPrompts, streamId and revision for one conversation.                                                                                                                                                                                        |
 | GET    | `/api/conversations/:id/provider-traffic`      | Bearer | Raw provider traffic for one conversation.                                                                                                                                                                                                       |
@@ -249,6 +249,7 @@ Chat detects standalone and embedded modes. Unless set, `VITE_THEME_SOURCE` and 
 | ------------------------ | --------------------------------------------------------------------------------------------------------- |
 | `token`                  | Required only when `agentPassword` is configured.                                                         |
 | `conversation_id` or `c` | Conversation id to bind the session to. Defaults to `default`; unknown non-default ids close with `4004`. |
+| `activity`               | `none` skips the connect-time `activity_snapshot`; live activity events are still sent.                   |
 
 **Behavior:**
 

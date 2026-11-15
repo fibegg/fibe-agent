@@ -292,6 +292,66 @@ describe('attachWebSocketServer: chat auth guard', () => {
   });
 });
 
+describe('attachWebSocketServer: activity snapshot opt-out', () => {
+  function connectAndRecordSnapshotFlags(urls: string[]): boolean[] {
+    const server = new EventEmitter();
+    // One context for every connection, like a reattached session.
+    const ctx = {
+      ...mockCtx,
+      sessionId: 'opt-out-session',
+      outbound$: new Subject<{
+        type: string;
+        data: Record<string, unknown>;
+      }>(),
+    } as unknown as import('./app/orchestrator/session-context').SessionContext;
+    const flags: boolean[] = [];
+    const recordingOrchestrator = {
+      handleClientConnected: mock(
+        (connected: { sendActivitySnapshot: boolean }) => {
+          flags.push(connected.sendActivitySnapshot);
+        },
+      ),
+      handleClientMessage: mock(async () => undefined),
+    } as unknown as import('./app/orchestrator/orchestrator.service').OrchestratorService;
+    const localRegistry = {
+      ...mockSessionRegistry,
+      all: () => [],
+      connected: () => [],
+      create: mock(() => ctx),
+    } as unknown as typeof mockSessionRegistry;
+
+    const wss = attachWebSocketServer(
+      makeFastify(server),
+      makeConfig(),
+      recordingOrchestrator,
+      localRegistry,
+      playgroundWatcher,
+      terminalService,
+      mockConversationManager,
+    );
+    for (const url of urls) wss.emit('connection', makeWsStub(), makeReq(url));
+    return flags;
+  }
+
+  it('opts the session out of the connect-time snapshot with activity=none', () => {
+    expect(connectAndRecordSnapshotFlags(['/ws?activity=none'])).toEqual([
+      false,
+    ]);
+  });
+
+  it('keeps the snapshot without the parameter or with another value', () => {
+    expect(
+      connectAndRecordSnapshotFlags(['/ws', '/ws?activity=all']),
+    ).toEqual([true, true]);
+  });
+
+  it('applies the preference of the client now connecting to a reattached session', () => {
+    expect(
+      connectAndRecordSnapshotFlags(['/ws?activity=none', '/ws']),
+    ).toEqual([false, true]);
+  });
+});
+
 describe('attachWebSocketServer: session takeover', () => {
   it('calls sessionRegistry.destroy on the oldest session when limit is reached', () => {
     const server = new EventEmitter();
