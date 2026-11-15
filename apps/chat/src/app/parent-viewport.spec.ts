@@ -59,11 +59,15 @@ describe('parent viewport bridge', () => {
 
   it('listens for parent viewport messages only when embedded', async () => {
     const originalParent = window.parent;
-    const fakeParent = {};
+    const fakeParent = { postMessage: vi.fn() };
     Object.defineProperty(window, 'parent', { configurable: true, value: fakeParent });
     const { initParentViewport } = await import('./parent-viewport');
 
     initParentViewport();
+    expect(fakeParent.postMessage).toHaveBeenCalledWith({ type: 'viewport_request' }, '*');
+    fakeParent.postMessage.mockClear();
+    document.dispatchEvent(new FocusEvent('focusin'));
+    expect(fakeParent.postMessage).toHaveBeenCalledWith({ type: 'viewport_request' }, '*');
     window.dispatchEvent(messageFrom(fakeParent, { type: 'viewport', height: 512 }));
 
     expect(document.documentElement.style.getPropertyValue('--parent-visual-height')).toBe('512px');
@@ -100,11 +104,15 @@ describe('parent viewport bridge', () => {
 
   it('ignores viewport messages that do not come from the parent window', async () => {
     const originalParent = window.parent;
-    const fakeParent = {};
+    const fakeParent = { postMessage: vi.fn() };
     Object.defineProperty(window, 'parent', { configurable: true, value: fakeParent });
     const { initParentViewport } = await import('./parent-viewport');
 
     initParentViewport();
+    expect(fakeParent.postMessage).toHaveBeenCalledWith({ type: 'viewport_request' }, '*');
+    fakeParent.postMessage.mockClear();
+    document.dispatchEvent(new FocusEvent('focusin'));
+    expect(fakeParent.postMessage).toHaveBeenCalledWith({ type: 'viewport_request' }, '*');
     window.dispatchEvent(messageFrom({}, { type: 'viewport', height: 333, safeArea: { top: 9, right: 0, bottom: 9, left: 0 } }));
     window.dispatchEvent(messageFrom(null, { type: 'viewport', height: 334 }));
 

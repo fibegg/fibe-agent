@@ -25,33 +25,63 @@ const MAX_VIEWPORT_PX = 10000;
 let parentViewportListenerInitialized = false;
 
 function isFiniteViewportNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value > 0 && value <= MAX_VIEWPORT_PX;
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value > 0 &&
+    value <= MAX_VIEWPORT_PX
+  );
 }
 
-function isOptionalPositiveViewportNumber(value: unknown): value is number | undefined {
+function isOptionalPositiveViewportNumber(
+  value: unknown,
+): value is number | undefined {
   return value === undefined || isFiniteViewportNumber(value);
 }
 
 function isOptionalViewportOffset(value: unknown): value is number | undefined {
-  return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_VIEWPORT_PX);
+  return (
+    value === undefined ||
+    (typeof value === 'number' &&
+      Number.isFinite(value) &&
+      value >= 0 &&
+      value <= MAX_VIEWPORT_PX)
+  );
 }
 
 function isOptionalScrollNumber(value: unknown): value is number | undefined {
-  return value === undefined || (typeof value === 'number' && Number.isFinite(value) && value >= 0);
+  return (
+    value === undefined ||
+    (typeof value === 'number' && Number.isFinite(value) && value >= 0)
+  );
 }
 
 function isSafeAreaInset(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= MAX_SAFE_AREA_PX;
+  return (
+    typeof value === 'number' &&
+    Number.isFinite(value) &&
+    value >= 0 &&
+    value <= MAX_SAFE_AREA_PX
+  );
 }
 
-function isOptionalSafeArea(value: unknown): value is ParentSafeArea | undefined {
+function isOptionalSafeArea(
+  value: unknown,
+): value is ParentSafeArea | undefined {
   if (value === undefined) return true;
   if (value === null || typeof value !== 'object') return false;
   const o = value as Record<string, unknown>;
-  return isSafeAreaInset(o.top) && isSafeAreaInset(o.right) && isSafeAreaInset(o.bottom) && isSafeAreaInset(o.left);
+  return (
+    isSafeAreaInset(o.top) &&
+    isSafeAreaInset(o.right) &&
+    isSafeAreaInset(o.bottom) &&
+    isSafeAreaInset(o.left)
+  );
 }
 
-export function isParentViewportMessage(data: unknown): data is ParentViewportMessage {
+export function isParentViewportMessage(
+  data: unknown,
+): data is ParentViewportMessage {
   const o = data as Record<string, unknown> | null;
   return (
     o !== null &&
@@ -69,7 +99,10 @@ export function isParentViewportMessage(data: unknown): data is ParentViewportMe
   );
 }
 
-function setOptionalPixelProperty(name: string, value: number | undefined): void {
+function setOptionalPixelProperty(
+  name: string,
+  value: number | undefined,
+): void {
   if (value === undefined) return;
   document.documentElement.style.setProperty(name, `${value}px`);
 }
@@ -77,7 +110,10 @@ function setOptionalPixelProperty(name: string, value: number | undefined): void
 export function applyParentViewport(message: ParentViewportMessage): void {
   if (typeof document === 'undefined') return;
 
-  document.documentElement.style.setProperty('--parent-visual-height', `${message.height}px`);
+  document.documentElement.style.setProperty(
+    '--parent-visual-height',
+    `${message.height}px`,
+  );
   setOptionalPixelProperty('--parent-visual-width', message.width);
   setOptionalPixelProperty('--parent-visual-offset-top', message.offsetTop);
   setOptionalPixelProperty('--parent-visual-offset-left', message.offsetLeft);
@@ -94,8 +130,22 @@ export function applyParentViewport(message: ParentViewportMessage): void {
 }
 
 export function initParentViewport(): void {
-  if (typeof window === 'undefined' || window === window.parent || parentViewportListenerInitialized) return;
+  if (
+    typeof window === 'undefined' ||
+    window === window.parent ||
+    parentViewportListenerInitialized
+  )
+    return;
   parentViewportListenerInitialized = true;
+
+  // Focus events never bubble across frame boundaries. Ask the parent to sample
+  // its visual viewport throughout keyboard opening/closing, including iOS PWA.
+  const requestViewport = () =>
+    window.parent.postMessage({ type: 'viewport_request' }, '*');
+  document.addEventListener('focusin', requestViewport, true);
+  document.addEventListener('focusout', requestViewport, true);
+  window.addEventListener('pageshow', requestViewport);
+  requestViewport();
 
   window.addEventListener('message', (event: MessageEvent) => {
     if (event.source !== window.parent) return;
