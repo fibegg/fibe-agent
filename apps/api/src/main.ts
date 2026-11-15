@@ -1,14 +1,12 @@
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import {
-  FastifyAdapter,
-  NestFastifyApplication,
-} from '@nestjs/platform-fastify';
+import { NestFastifyApplication } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync } from 'node:fs';
 import { loadDevEnv, loadFibeEnv } from './load-env';
+import { createHttpAdapter } from './http-adapter';
 import { AppModule } from './app/app.module';
 import { ConfigService } from './app/config/config.service';
 import { getCorsOrigin, getFrameAncestors } from './cors-frame.config';
@@ -58,7 +56,7 @@ if (process.env.FIBE_LOCAL_MCP_SERVER === '1') {
 
     const app = await NestFactory.create<NestFastifyApplication>(
       AppModule,
-      new FastifyAdapter(),
+      createHttpAdapter(),
       { logger },
     );
     const fastify = app.getHttpAdapter().getInstance();
