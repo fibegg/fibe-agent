@@ -71,6 +71,7 @@ export const en = {
   'message.queued': 'Queued',
   'message.nextTurn': 'Next',
   'message.steering': 'Steering',
+  'message.mode': 'Mode: {modes}',
   'message.copyRawUser': 'Copy raw user message',
   'message.copyRawAssistant': 'Copy raw assistant message',
   'message.readAloud': 'Read aloud',

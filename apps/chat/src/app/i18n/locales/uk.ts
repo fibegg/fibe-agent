@@ -73,6 +73,7 @@ export const uk: Record<TranslationKey, string> = {
   'message.queued': 'У черзі',
   'message.nextTurn': 'Далі',
   'message.steering': 'Скерування',
+  'message.mode': 'Режим: {modes}',
   'message.copyRawUser': 'Копіювати початкове повідомлення користувача',
   'message.copyRawAssistant': 'Копіювати початкове повідомлення асистента',
   'message.readAloud': 'Озвучити',

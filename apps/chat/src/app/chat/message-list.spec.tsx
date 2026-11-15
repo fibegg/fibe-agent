@@ -102,6 +102,28 @@ describe('MessageList', () => {
     expect(screen.getByText(/\d{1,2}:\d{2} (AM|PM)/)).toBeTruthy();
   });
 
+  it('shows announced work modes as icons instead of marker text', () => {
+    const messages: ChatMessage[] = [
+      {
+        role: 'assistant',
+        body: '[MODE]Brownfield[/MODE]\n\nPolished the popup.',
+        created_at: '2025-03-11T17:01:00.000Z',
+      },
+    ];
+    render(
+      <MessageList
+        messages={messages}
+        streamingText={'[MODE:DIALOG]\nHere is how'}
+        isStreaming
+      />,
+    );
+    expect(screen.getByText('Polished the popup.')).toBeTruthy();
+    expect(screen.getByText('Here is how')).toBeTruthy();
+    expect(screen.queryByText(/\[\/?MODE/)).toBeNull();
+    expect(screen.getByRole('img', { name: 'Mode: Brownfield' })).toBeTruthy();
+    expect(screen.getByRole('img', { name: 'Mode: Dialog' })).toBeTruthy();
+  });
+
   it('does not render Activity section in assistant message when story is present', () => {
     const messages: ChatMessage[] = [
       {

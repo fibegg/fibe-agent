@@ -23,6 +23,14 @@ import {
   User,
   Play,
   Square,
+  Binoculars,
+  Eye,
+  Hammer,
+  MessagesSquare,
+  Sprout,
+  WandSparkles,
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
 import { buildApiUrl, getAuthTokenForRequest } from '../api-url';
 import { useLocalTts } from './use-local-tts';
@@ -47,6 +55,11 @@ import {
   wrapBarePreElementsInHtmlString,
 } from './markdown-bare-pre';
 import { renderMarkdown } from './markdown-cache';
+import {
+  AGENT_WORK_MODE_TITLES,
+  parseAgentModeText,
+  type AgentWorkMode,
+} from './agent-mode-markers';
 import { prepareUserMessageMarkdownForRender } from './user-markdown-prep';
 import {
   estimateMessageHeight,
@@ -245,6 +258,60 @@ const MarkdownWithPrism = memo(
     prev.className === next.className &&
     prev.codeLangBadge === next.codeLangBadge,
 );
+
+const AGENT_WORK_MODE_ICONS: Record<AgentWorkMode, LucideIcon> = {
+  dialog: MessagesSquare,
+  sideEffects: Zap,
+  greenfield: Sprout,
+  brownfield: Hammer,
+  overseer: Eye,
+  exploring: Binoculars,
+  casting: WandSparkles,
+  building: Hammer,
+};
+
+/** An assistant reply with the work modes it announced shown as small muted icons before the text. */
+function AssistantMarkdown({
+  body,
+  cacheKey,
+  streaming = false,
+}: {
+  body: string;
+  cacheKey?: string;
+  streaming?: boolean;
+}) {
+  const { t } = useI18n();
+  const { modes, text } = useMemo(
+    () => parseAgentModeText(body, streaming),
+    [body, streaming],
+  );
+  const markdown = (
+    <MarkdownWithPrism
+      html={renderMarkdown(text, cacheKey)}
+      className={PROSE_MESSAGE}
+    />
+  );
+  if (!modes.length) return markdown;
+  const names = modes.map((mode) => AGENT_WORK_MODE_TITLES[mode]);
+  const label = t('message.mode', { modes: names.join(' → ') });
+  return (
+    <div className="flex items-start gap-2">
+      <span
+        className="mt-[0.3rem] inline-flex shrink-0 items-center gap-0.5 text-muted-foreground/60"
+        title={label}
+        aria-label={label}
+        role="img"
+        data-testid="agent-work-modes"
+      >
+        {modes.map((mode, index) => {
+          const Icon = AGENT_WORK_MODE_ICONS[mode];
+          return <Icon key={`${mode}-${index}`} className="size-3" aria-hidden />;
+        })}
+      </span>
+      <div className="min-w-0 flex-1">{markdown}</div>
+    </div>
+  );
+}
 
 function userMessageMarkdownPartKey(index: number, content: string): string {
   return `umd-${index}-${content.length}-${stringHash32(content)}`;
@@ -555,12 +622,9 @@ const MessageRow = memo(
               </>
             ) : (
               <>
-                <MarkdownWithPrism
-                  html={renderMarkdown(
-                    msg.body,
-                    msg.id ? `assistant-${msg.id}` : undefined,
-                  )}
-                  className={PROSE_MESSAGE}
+                <AssistantMarkdown
+                  body={msg.body}
+                  cacheKey={msg.id ? `assistant-${msg.id}` : undefined}
                 />
                 {isNoOutput && onRetry && (
                   <button
@@ -592,7 +656,10 @@ const MessageRow = memo(
                     {msg.id && onPlay && (
                       <button
                         type="button"
-                        onClick={() => msg.id && onPlay(msg.id, msg.body)}
+                        onClick={() =>
+                          msg.id &&
+                          onPlay(msg.id, parseAgentModeText(msg.body).text)
+                        }
                         className={COPY_BUTTON_CLASS_ASSISTANT}
                         title={
                           playingId === msg.id
@@ -1012,9 +1079,10 @@ export const MessageList = forwardRef<
             >
               {streamingText ? (
                 <>
-                  <MarkdownWithPrism
-                    html={renderMarkdown(streamingText, 'streaming-message')}
-                    className={PROSE_MESSAGE}
+                  <AssistantMarkdown
+                    body={streamingText}
+                    cacheKey="streaming-message"
+                    streaming
                   />
                   <div className="mt-2 flex justify-end">
                     <CopyRawMessageButton
