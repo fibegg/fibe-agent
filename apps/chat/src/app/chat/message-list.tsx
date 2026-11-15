@@ -270,7 +270,7 @@ const AGENT_WORK_MODE_ICONS: Record<AgentWorkMode, LucideIcon> = {
   building: Hammer,
 };
 
-/** An assistant reply with the work modes it announced shown as small muted icons before the text. */
+/** An assistant reply with the work modes it announced shown as small muted icons before its first line. */
 function AssistantMarkdown({
   body,
   cacheKey,
@@ -295,9 +295,9 @@ function AssistantMarkdown({
   const names = modes.map((mode) => AGENT_WORK_MODE_TITLES[mode]);
   const label = t('message.mode', { modes: names.join(' → ') });
   return (
-    <div className="flex items-start gap-2">
+    <div className="flow-root">
       <span
-        className="mt-[0.3rem] inline-flex shrink-0 items-center gap-0.5 text-muted-foreground/60"
+        className="float-left mr-1.5 mt-[0.3rem] inline-flex items-center gap-0.5 text-muted-foreground/60"
         title={label}
         aria-label={label}
         role="img"
@@ -308,7 +308,7 @@ function AssistantMarkdown({
           return <Icon key={`${mode}-${index}`} className="size-3" aria-hidden />;
         })}
       </span>
-      <div className="min-w-0 flex-1">{markdown}</div>
+      {markdown}
     </div>
   );
 }
