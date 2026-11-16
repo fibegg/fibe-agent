@@ -90,6 +90,11 @@ function parseGitignoreContent(content: string): Rule[] {
     .filter((r): r is Rule => r !== null);
 }
 
+/** One directory's .gitignore rules, without its parents' rules. */
+export function parseGitignore(content: string): GitignoreFilter {
+  return new GitignoreFilterImpl(parseGitignoreContent(content));
+}
+
 const EMPTY_FILTER: GitignoreFilter = { ignores: () => false };
 
 /**
@@ -102,17 +107,16 @@ export async function loadGitignore(
   read: (path: string) => Promise<string> = (path) => readFile(path, 'utf-8'),
 ): Promise<GitignoreFilter> {
   try {
-    const content = await read(join(dir, '.gitignore'));
-    const localRules = parseGitignoreContent(content);
+    const local = parseGitignore(await read(join(dir, '.gitignore')));
     if (parent && parent !== EMPTY_FILTER) {
       return {
         ignores(relativePath: string) {
           if (parent.ignores(relativePath)) return true;
-          return new GitignoreFilterImpl(localRules).ignores(relativePath);
+          return local.ignores(relativePath);
         },
       };
     }
-    return new GitignoreFilterImpl(localRules);
+    return local;
   } catch {
     return parent ?? EMPTY_FILTER;
   }

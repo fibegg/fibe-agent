@@ -18,8 +18,10 @@ const GENERATED_NAMES = new Set([
   'coverage',
 ]);
 
+export function isGeneratedWorkspaceName(name: string): boolean {
+  return GENERATED_NAMES.has(name);
+}
+
 export function isGeneratedWorkspacePath(root: string, path: string): boolean {
-  return relative(root, path)
-    .split(/[\\/]/)
-    .some((part) => GENERATED_NAMES.has(part));
+  return relative(root, path).split(/[\\/]/).some(isGeneratedWorkspaceName);
 }
