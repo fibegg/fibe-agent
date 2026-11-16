@@ -15,6 +15,8 @@ import {
   DEFAULT_CONVERSATION_TITLE,
   INBOX_CONVERSATION_ID,
   INBOX_CONVERSATION_TITLE,
+  INTERRUPTED_TURN_NOTICE,
+  TURN_MARKER_FILE,
 } from './conversation-manager.service';
 
 describe('ConversationManagerService', () => {
@@ -190,5 +192,42 @@ describe('ConversationManagerService', () => {
     manager.setClaudeSessionMarker(DEFAULT_CONVERSATION_ID, null);
     expect(manager.getClaudeSessionMarker(DEFAULT_CONVERSATION_ID)).toBeNull();
     expect(existsSync(join(legacyWorkspaceDir, '.claude_session'))).toBe(false);
+  });
+
+  test('turn marker round-trips and clears', () => {
+    const manager = createManager();
+    const id = manager.create('t').id;
+    const file = join(manager.dataDirFor(id), TURN_MARKER_FILE);
+    manager.markTurnStarted(id, 'm1');
+    expect(JSON.parse(readFileSync(file, 'utf8'))).toMatchObject({ userMessageId: 'm1' });
+    manager.clearTurnMarker(id);
+    expect(existsSync(file)).toBe(false);
+  });
+
+  test('startup recovery appends exactly one notice and a second startup adds nothing', async () => {
+    const first = createManager();
+    const id = first.create('t').id;
+    first.markTurnStarted(id);
+    await new Promise((resolve) => setTimeout(resolve, 400)); // index write is debounced 300ms
+    await first.onModuleDestroy();
+
+    const second = createManager();
+    expect(await second.recoverInterruptedTurns()).toEqual([id]);
+    const notices = () =>
+      second.messages(id).filter((m) => m.role === 'assistant' && m.body === INTERRUPTED_TURN_NOTICE);
+    expect(notices()).toHaveLength(1);
+    expect(existsSync(join(second.dataDirFor(id), TURN_MARKER_FILE))).toBe(false);
+    await second.onModuleDestroy();
+
+    const third = createManager();
+    expect(await third.recoverInterruptedTurns()).toEqual([]);
+    expect(third.messages(id).filter((m) => m.body === INTERRUPTED_TURN_NOTICE)).toHaveLength(1);
+  });
+
+  test('no marker means no change', async () => {
+    const manager = createManager();
+    const id = manager.create('t').id;
+    expect(await manager.recoverInterruptedTurns()).toEqual([]);
+    expect(manager.messages(id)).toHaveLength(0);
   });
 });

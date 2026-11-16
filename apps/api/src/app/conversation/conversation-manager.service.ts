@@ -4,6 +4,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  renameSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -32,6 +33,9 @@ export interface ConversationMeta {
   isProcessing?: boolean;
 }
 
+export const TURN_MARKER_FILE = 'turn-in-progress.json';
+export const INTERRUPTED_TURN_NOTICE =
+  'My last reply was cut off because the Agent restarted. Send your message again to continue.';
 export const DEFAULT_CONVERSATION_ID = 'default';
 export const DEFAULT_CONVERSATION_TITLE = 'Default';
 export const INBOX_CONVERSATION_ID = 'inbox';
@@ -251,6 +255,58 @@ export class ConversationManagerService implements OnModuleDestroy {
     if (id === DEFAULT_CONVERSATION_ID)
       return this.config.getConversationDataDir();
     return join(this.conversationsDir, id);
+  }
+
+  private turnMarkerPath(id: string): string {
+    return join(this.convDir(id), TURN_MARKER_FILE);
+  }
+
+  /** Records that a turn is in progress; removed when the turn ends on any path. */
+  markTurnStarted(id: string, userMessageId?: string): void {
+    try {
+      const path = this.turnMarkerPath(id);
+      mkdirSync(this.convDir(id), { recursive: true });
+      const tmp = `${path}.${process.pid}.tmp`;
+      writeFileSync(
+        tmp,
+        JSON.stringify({
+          startedAt: new Date().toISOString(),
+          ...(userMessageId ? { userMessageId } : {}),
+        }),
+      );
+      renameSync(tmp, path);
+    } catch (err) {
+      this.logger.warn(`Could not write turn marker for ${id}: ${err}`);
+    }
+  }
+
+  clearTurnMarker(id: string): void {
+    try {
+      rmSync(this.turnMarkerPath(id), { force: true });
+    } catch (err) {
+      this.logger.warn(`Could not clear turn marker for ${id}: ${err}`);
+    }
+  }
+
+  /**
+   * Appends one notice to every conversation whose turn was cut off by a
+   * process restart. The message is persisted before the marker is removed.
+   */
+  async recoverInterruptedTurns(): Promise<string[]> {
+    const recovered: string[] = [];
+    for (const [id, bundle] of this.bundles) {
+      if (!existsSync(this.turnMarkerPath(id))) continue;
+      try {
+        bundle.messageStore.add('assistant', INTERRUPTED_TURN_NOTICE);
+        await bundle.messageStore.flush(true);
+        this.clearTurnMarker(id);
+        this.touch(id);
+        recovered.push(id);
+      } catch (err) {
+        this.logger.warn(`Could not record interrupted turn for ${id}: ${err}`);
+      }
+    }
+    return recovered;
   }
 
   private claudeWorkspaceDir(id: string): string {

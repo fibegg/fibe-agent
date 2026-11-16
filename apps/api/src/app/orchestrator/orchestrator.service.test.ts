@@ -146,7 +146,12 @@ describe('OrchestratorService', () => {
     const messageStore = new MessageStoreService(config as never);
     const modelStore = new ModelStoreService(config as never);
     const effortStore = new EffortStoreService(config as never);
+    const turnMarkers = new Set<string>();
+    const markerLog: string[] = [];
     const conversationManager = {
+      markTurnStarted: (id: string) => { turnMarkers.add(id); markerLog.push(`start:${id}`); },
+      clearTurnMarker: (id: string) => { turnMarkers.delete(id); markerLog.push(`clear:${id}`); },
+      recoverInterruptedTurns: async () => [] as string[],
       get: (_id: string) => ({ messageStore, activityStore }),
       getOrCreate: (_id: string) => ({ messageStore, activityStore }),
       dataDirProvider: (_id: string) => ({
@@ -296,6 +301,8 @@ describe('OrchestratorService', () => {
       syncMessageContents,
       syncActivityContents,
       messageStore,
+      turnMarkers,
+      markerLog,
       waitForBackgroundTasks,
       dispose,
     };
@@ -317,6 +324,41 @@ describe('OrchestratorService', () => {
   }
 
   const responseFormat = { type: 'json_schema' as const, schema: { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'], additionalProperties: false } };
+
+  test('turn marker is written at turn start and removed on success', async () => {
+    const { orch, ctx, turnMarkers, markerLog } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk) => {
+      expect(turnMarkers.has(ctx.conversationId)).toBe(true);
+      chunk('done');
+    });
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    expect(markerLog).toEqual([`start:${ctx.conversationId}`, `clear:${ctx.conversationId}`]);
+    expect(turnMarkers.size).toBe(0);
+  });
+
+  test('turn marker is removed when the provider fails', async () => {
+    const { orch, ctx, turnMarkers, markerLog } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async () => {
+      expect(turnMarkers.size).toBe(1);
+      throw new Error('provider exploded');
+    });
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    expect(markerLog.filter((e) => e.startsWith('start:'))).toHaveLength(1);
+    expect(turnMarkers.size).toBe(0);
+  });
+
+  test('turn marker is removed when the user interrupts', async () => {
+    const { orch, ctx, turnMarkers } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async () => {
+      expect(turnMarkers.size).toBe(1);
+      throw new Error(INTERRUPTED_MESSAGE);
+    });
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'hi' });
+    expect(turnMarkers.size).toBe(0);
+  });
 
   test('structured output is validated, streamed without prose or mode transformation, and persisted', async () => {
     const { orch, ctx, messageStore } = await createOrchestrator();

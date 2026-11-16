@@ -210,6 +210,11 @@ export class OrchestratorService implements OnModuleInit {
         this.logger.error(`Error during hydration: ${err}`);
       }
     }
+    const interruptedTurns = await this.conversationManager.recoverInterruptedTurns();
+    for (const conversationId of interruptedTurns) {
+      const store = this.conversationManager.get(conversationId)?.messageStore;
+      if (store) void this.fibeSync.syncMessages(() => JSON.stringify(store.all()), conversationId);
+    }
     await this.recoverPendingApiRequests(true);
   }
 
@@ -1267,6 +1272,7 @@ export class OrchestratorService implements OnModuleInit {
     };
     ctx.lastError = null;
     ctx.activeResponseFormat = responseFormat;
+    this.conversationManager.markTurnStarted(ctx.conversationId, requestMessageId);
     try {
       const validate = compileResponseFormat(responseFormat);
       assertStructuredOutputSupport(ctx.strategy, responseFormat);
@@ -1542,6 +1548,7 @@ export class OrchestratorService implements OnModuleInit {
         });
       }
     } finally {
+      this.conversationManager.clearTurnMarker(ctx.conversationId);
       const settledRequests = new Set(this.steeredRequestIds.get(ctx.sessionId));
       this.steeredRequestIds.delete(ctx.sessionId);
       if (requestMessageId) settledRequests.add(requestMessageId);
