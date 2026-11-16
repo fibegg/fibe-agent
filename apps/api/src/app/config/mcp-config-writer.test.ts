@@ -933,4 +933,186 @@ describe('writeMcpConfig', () => {
       );
     });
   });
+
+  describe('Playwright MCP sandbox', () => {
+    const defaultManifest = {
+      mcpServers: {
+        context7: { command: 'npx', args: ['-y', '@upstash/context7-mcp'] },
+        playwright: { command: 'npx', args: ['-y', '@playwright/mcp@latest'] },
+      },
+    };
+
+    function useManifest(manifest: unknown) {
+      process.env.MCP_CONFIG_JSON = JSON.stringify(manifest);
+      process.env.DATA_DIR = join(testHome, 'data');
+      process.env.FIBE_AGENT_ID = 'agent-browser';
+      delete process.env.SESSION_DIR;
+    }
+
+    function claudeServers() {
+      const settings = JSON.parse(
+        readFileSync(join(testHome, '.claude', 'settings.json'), 'utf8'),
+      );
+      const project = JSON.parse(
+        readFileSync(
+          join(
+            testHome,
+            'data',
+            'agent-browser',
+            'claude_workspace',
+            '.mcp.json',
+          ),
+          'utf8',
+        ),
+      );
+      return { settings: settings.mcpServers, project: project.mcpServers };
+    }
+
+    it('adds --no-sandbox to the Playwright MCP in Codex TOML only', () => {
+      process.env.AGENT_PROVIDER = 'openai-codex';
+      useManifest(defaultManifest);
+
+      writeMcpConfig();
+
+      const content = readFileSync(
+        join(testHome, '.codex', 'config.toml'),
+        'utf8',
+      );
+      expect(content).toContain(
+        'args = ["-y", "@playwright/mcp@latest", "--no-sandbox"]',
+      );
+      expect(content).toContain('args = ["-y", "@upstash/context7-mcp"]');
+    });
+
+    it('adds --no-sandbox to the Playwright MCP in Claude user and project JSON', () => {
+      process.env.AGENT_PROVIDER = 'claude-code';
+      useManifest(defaultManifest);
+
+      writeMcpConfig();
+
+      const { settings, project } = claudeServers();
+      expect(settings.playwright).toEqual({
+        command: 'npx',
+        args: ['-y', '@playwright/mcp@latest', '--no-sandbox'],
+      });
+      expect(project.playwright).toEqual({
+        type: 'stdio',
+        command: 'npx',
+        args: ['-y', '@playwright/mcp@latest', '--no-sandbox'],
+      });
+      expect(settings.context7.args).toEqual(['-y', '@upstash/context7-mcp']);
+      expect(project.context7.args).toEqual(['-y', '@upstash/context7-mcp']);
+    });
+
+    it('keeps an explicit sandbox choice', () => {
+      process.env.AGENT_PROVIDER = 'claude-code';
+      useManifest({
+        mcpServers: {
+          sandboxed: {
+            command: 'npx',
+            args: ['@playwright/mcp', '--sandbox', '--headless'],
+          },
+          unsandboxed: {
+            command: 'npx',
+            args: ['@playwright/mcp@0.0.85', '--no-sandbox'],
+          },
+          envChoice: {
+            command: 'npx',
+            args: ['@playwright/mcp@latest'],
+            env: { PLAYWRIGHT_MCP_SANDBOX: 'true' },
+          },
+        },
+      });
+
+      writeMcpConfig();
+
+      const { settings } = claudeServers();
+      expect(settings.sandboxed.args).toEqual([
+        '@playwright/mcp',
+        '--sandbox',
+        '--headless',
+      ]);
+      expect(settings.unsandboxed.args).toEqual([
+        '@playwright/mcp@0.0.85',
+        '--no-sandbox',
+      ]);
+      expect(settings.envChoice.args).toEqual(['@playwright/mcp@latest']);
+    });
+
+    it('does not repeat the flag when the configuration is written again', () => {
+      process.env.AGENT_PROVIDER = 'openai-codex';
+      useManifest(defaultManifest);
+
+      writeMcpConfig();
+      writeMcpConfig();
+
+      const content = readFileSync(
+        join(testHome, '.codex', 'config.toml'),
+        'utf8',
+      );
+      expect(content.match(/--no-sandbox/g)).toHaveLength(1);
+      expect(content.match(/\[mcp_servers\."playwright"\]/g)).toHaveLength(1);
+    });
+
+    it('recognizes the Playwright MCP binaries and leaves other servers alone', () => {
+      process.env.AGENT_PROVIDER = 'claude-code';
+      useManifest({ mcpServers: {} });
+      const extraServers = {
+        bin: { command: 'playwright-mcp', args: ['--headless'] },
+        path: { command: '/usr/local/bin/mcp-server-playwright' },
+        fork: { command: 'npx', args: ['@someone/playwright-mcp-fork'] },
+        remote: { serverUrl: 'https://example.test/mcp' },
+      };
+
+      writeMcpConfig(extraServers);
+
+      const { settings } = claudeServers();
+      expect(settings.bin.args).toEqual(['--headless', '--no-sandbox']);
+      expect(settings.path.args).toEqual(['--no-sandbox']);
+      expect(settings.fork.args).toEqual(['@someone/playwright-mcp-fork']);
+      expect(settings.remote.args).toEqual(['https://example.test/mcp']);
+      expect(extraServers.bin.args).toEqual(['--headless']);
+    });
+
+    for (const [provider, relativePath] of [
+      ['gemini', 'settings.json'],
+      ['antigravity', 'config/mcp_config.json'],
+      ['cursor', 'mcp.json'],
+    ]) {
+      it(`adds --no-sandbox for ${provider}`, () => {
+        process.env.AGENT_PROVIDER = provider;
+        process.env.SESSION_DIR = testHome;
+        delete process.env.FIBE_AGENT_ID;
+        delete process.env.CONVERSATION_ID;
+        process.env.MCP_CONFIG_JSON = JSON.stringify(defaultManifest);
+
+        writeMcpConfig();
+
+        const config = JSON.parse(
+          readFileSync(join(testHome, relativePath), 'utf8'),
+        );
+        expect(config.mcpServers.playwright.args).toEqual([
+          '-y',
+          '@playwright/mcp@latest',
+          '--no-sandbox',
+        ]);
+      });
+    }
+
+    it('adds --no-sandbox for OpenCode', () => {
+      process.env.AGENT_PROVIDER = 'opencode';
+      delete process.env.OPENCODE_CONFIG_CONTENT;
+      process.env.MCP_CONFIG_JSON = JSON.stringify(defaultManifest);
+
+      writeMcpConfig();
+
+      const config = JSON.parse(process.env.OPENCODE_CONFIG_CONTENT ?? '{}');
+      expect(config.mcp.playwright.command).toEqual([
+        'npx',
+        '-y',
+        '@playwright/mcp@latest',
+        '--no-sandbox',
+      ]);
+    });
+  });
 });

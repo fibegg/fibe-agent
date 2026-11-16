@@ -38,6 +38,13 @@ so its cached Chromium matches the helper. The application test runner uses the
 stable Playwright release independently. Chrome is installed on amd64; arm64 uses
 Debian Chromium at the same `CHROME_BIN` path. The Gitea MCP builder uses Go 1.27.1.
 
+Chrome's sandbox needs user namespaces, which many Agent hosts deny to containers
+(Docker's seccomp/AppArmor defaults, Ubuntu's `apparmor_restrict_unprivileged_userns`).
+`scripts/chrome-sandbox-wrapper.sh` therefore replaces each Chrome/Chromium launcher and
+adds `--no-sandbox` only where `unshare` cannot create them (`FIBE_CHROME_SANDBOX=1` opts
+out); the MCP config writer also adds `--no-sandbox` to Playwright MCP entries that make
+no sandbox choice.
+
 For upgrades, query upstream stable releases, update package locks, update both
 Docker recipes' helper pins, and refresh the binary manifest. Run:
 
@@ -66,7 +73,8 @@ docker run --rm --user node --entrypoint node \
 ```
 
 The smoke check exercises the native terminal addon, both browser launch paths,
-MCP initialization and tool discovery, and an HTTP MCP bridge with a local dummy
+Chrome screenshots without sandbox flags (Playwright Chrome channel, the CLI and
+the Playwright MCP), MCP initialization and tool discovery, and an HTTP MCP bridge with a local dummy
 authentication header. It does not contact provider APIs or use live tokens.
 
 ## Dependency advisory review at the publication checkpoint

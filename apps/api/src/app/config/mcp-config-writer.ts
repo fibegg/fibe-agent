@@ -557,6 +557,56 @@ const PROVIDER_WRITERS: Record<
   },
 };
 
+const PLAYWRIGHT_MCP_COMMANDS = new Set([
+  'playwright-mcp',
+  'mcp-server-playwright',
+]);
+
+function isPlaywrightMcp(entry: McpServerEntry): boolean {
+  if (typeof entry.command !== 'string') return false;
+  const command = entry.command.split(/[\\/]/).pop() ?? '';
+  if (PLAYWRIGHT_MCP_COMMANDS.has(command)) return true;
+  return (Array.isArray(entry.args) ? entry.args : []).some(
+    (arg) =>
+      typeof arg === 'string' &&
+      (arg === '@playwright/mcp' || arg.startsWith('@playwright/mcp@')),
+  );
+}
+
+/**
+ * The Playwright MCP turns Chrome's sandbox on for the Chrome channel. That
+ * sandbox needs user namespaces, which Agent hosts often deny to containers
+ * (Docker's seccomp and AppArmor profiles, Ubuntu's userns restriction), and
+ * Chrome then exits before any page loads. The Agent container is the
+ * isolation boundary, so the Playwright MCP runs with --no-sandbox unless the
+ * configuration already chooses (--sandbox, --no-sandbox, PLAYWRIGHT_MCP_SANDBOX).
+ */
+function withPlaywrightSandboxDefault(
+  servers: Record<string, McpServerEntry>,
+): Record<string, McpServerEntry> {
+  const result: Record<string, McpServerEntry> = {};
+  for (const [name, entry] of Object.entries(servers)) {
+    if (
+      !entry ||
+      typeof entry !== 'object' ||
+      (entry.args !== undefined && !Array.isArray(entry.args)) ||
+      !isPlaywrightMcp(entry)
+    ) {
+      result[name] = entry;
+      continue;
+    }
+    const args = entry.args ?? [];
+    const chosen =
+      args.includes('--sandbox') ||
+      args.includes('--no-sandbox') ||
+      entry.env?.PLAYWRIGHT_MCP_SANDBOX !== undefined;
+    result[name] = chosen
+      ? entry
+      : { ...entry, args: [...args, '--no-sandbox'] };
+  }
+  return result;
+}
+
 function parseServersFromJson(
   raw: string,
 ): { servers: Record<string, McpServerEntry>; fullManifest: boolean } | null {
@@ -619,7 +669,7 @@ export function writeMcpConfig(
   }
 
   try {
-    writer(allServers, fullManifest);
+    writer(withPlaywrightSandboxDefault(allServers), fullManifest);
   } catch (err) {
     logger.error(`Failed to write MCP config: ${err}`);
   }

@@ -197,6 +197,24 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     /opt/google/chrome/chrome --version && \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/partial/*
 
+# Chrome's sandbox needs unprivileged user namespaces, which Agent hosts often
+# deny to containers (Docker's default seccomp and AppArmor profiles, Ubuntu's
+# kernel.apparmor_restrict_unprivileged_userns=1). The container is the Agent's
+# isolation boundary, so each Chrome/Chromium launcher goes through a wrapper
+# that adds --no-sandbox only where those namespaces are unavailable
+# (FIBE_CHROME_SANDBOX=1 opts out). The browser stays in its own directory as
+# <name>.real because Chrome loads its resources next to /proc/self/exe.
+COPY --link scripts/chrome-sandbox-wrapper.sh /usr/local/share/fibe/chrome-sandbox-wrapper.sh
+RUN set -eu; \
+    command -v unshare >/dev/null; \
+    for browser in /usr/bin/chromium /opt/google/chrome/chrome; do \
+      if [ -e "$browser" ]; then \
+        mv "$browser" "$browser.real"; \
+        install -m 755 /usr/local/share/fibe/chrome-sandbox-wrapper.sh "$browser"; \
+      fi; \
+    done; \
+    /opt/google/chrome/chrome --version
+
 ENV CHROME_BIN=/opt/google/chrome/chrome \
     GOOGLE_CHROME_BIN=/opt/google/chrome/chrome
 

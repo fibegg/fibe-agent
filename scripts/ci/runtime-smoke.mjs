@@ -3,7 +3,10 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { spawn, spawnSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:http';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 function command(binary, args = ['--version']) {
   const result = spawnSync(binary, args, { encoding: 'utf8', timeout: 30_000 });
@@ -12,7 +15,7 @@ function command(binary, args = ['--version']) {
   console.log(`${binary}: ${(result.stdout || result.stderr).split('\n')[0]}`);
 }
 
-async function mcp(binary, args = [], env = {}) {
+async function mcp(binary, args = [], env = {}, exercise = async () => {}) {
   const child = spawn(binary, args, { env: { ...process.env, ...env }, stdio: ['pipe', 'pipe', 'pipe'] });
   let buffer = '';
   let stderr = '';
@@ -44,6 +47,7 @@ async function mcp(binary, args = [], env = {}) {
     const listed = await request(2, 'tools/list');
     assert.ok(listed.result?.tools?.length > 0, `${binary} tools/list failed: ${JSON.stringify(listed)}`);
     console.log(`${binary}: MCP handshake and ${listed.result.tools.length} tools`);
+    await exercise(request);
   } finally { child.stdin.end(); child.kill('SIGTERM'); }
 }
 
@@ -86,6 +90,32 @@ for (const options of [{}, { executablePath: process.env.CHROME_BIN }]) {
     console.log(`Playwright: browser click via ${options.executablePath ?? 'bundled Chromium'}`);
   } finally { await browser.close(); }
 }
+// Agents reach Chrome without --no-sandbox: the Playwright MCP requests the
+// sandbox for the Chrome channel, and Agent scripts or the CLI pass no flag.
+// The image's launcher must make these work on hosts that deny user namespaces.
+const isPng = data => data.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+const screenshots = mkdtempSync(path.join(tmpdir(), 'fibe-runtime-smoke-'));
+try {
+  const browser = await chromium.launch({ channel: 'chrome', chromiumSandbox: true, headless: true });
+  try {
+    const page = await browser.newPage();
+    await page.setContent('<h1>fibe</h1>');
+    assert.ok(isPng(await page.screenshot()), 'Chrome channel screenshot is not a PNG');
+    console.log('Playwright: Chrome channel screenshot with the sandbox requested');
+  } finally { await browser.close(); }
+  for (const binary of [process.env.CHROME_BIN, 'google-chrome']) {
+    const file = path.join(screenshots, `${path.basename(binary)}.png`);
+    const result = spawnSync(binary, ['--headless=new', '--disable-gpu', `--screenshot=${file}`, 'about:blank'], { encoding: 'utf8', timeout: 60_000 });
+    assert.equal(result.status, 0, `${binary} screenshot: ${result.error ?? result.stderr}`);
+    assert.ok(isPng(readFileSync(file)), `${binary} screenshot is not a PNG`);
+    console.log(`${binary}: headless screenshot without sandbox flags`);
+  }
+  await mcp('playwright-mcp', ['--headless', '--output-dir', screenshots], {}, async request => {
+    const shot = await request(3, 'tools/call', { name: 'browser_take_screenshot', arguments: {} });
+    assert.ok(shot.result && !shot.result.isError, `playwright-mcp screenshot failed: ${JSON.stringify(shot)}`);
+    console.log('playwright-mcp: screenshot with its default Chrome sandbox setting');
+  });
+} finally { rmSync(screenshots, { recursive: true, force: true }); }
 await mcp('mcp-github', [], { GITHUB_PERSONAL_ACCESS_TOKEN: 'audit-placeholder' });
 await mcp('gitea-mcp', [], { GITEA_ACCESS_TOKEN: 'audit-placeholder', GITEA_HOST: 'http://127.0.0.1:1' });
 await mcp('playwright-mcp', ['--headless', '--no-sandbox']);

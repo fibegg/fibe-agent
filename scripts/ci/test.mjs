@@ -16,7 +16,7 @@ if (!hasInstallerTools) {
 }
 
 console.log('--> Checking release integrity and retained CI failure diagnostics');
-await run('node', ['--test', 'scripts/ci/notify.test.mjs', 'scripts/ci/install-provider.test.mjs', 'scripts/ci/install-fibe.test.mjs', 'scripts/ci/cli-build.test.mjs']);
+await run('node', ['--test', 'scripts/ci/notify.test.mjs', 'scripts/ci/install-provider.test.mjs', 'scripts/ci/install-fibe.test.mjs', 'scripts/ci/cli-build.test.mjs', 'scripts/ci/chrome-sandbox-wrapper.test.mjs']);
 
 console.log('--> Running unit tests');
 await run('bun', ['run', 'test']);
