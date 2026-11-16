@@ -108,10 +108,17 @@ describe('ChatInputArea', () => {
 
   it('Attach files button is disabled when not AUTHENTICATED', () => {
     render(
-      <ChatInputArea {...BASE_PROPS} state={CHAT_STATES.AWAITING_RESPONSE} />,
+      <ChatInputArea {...BASE_PROPS} state={CHAT_STATES.UNAUTHENTICATED} />,
     );
     const attachBtn = screen.getByRole('button', { name: /attach files/i });
     expect(attachBtn.getAttribute('disabled')).not.toBeNull();
+  });
+
+  it('Attach files button steps aside while the agent works', () => {
+    render(
+      <ChatInputArea {...BASE_PROPS} state={CHAT_STATES.AWAITING_RESPONSE} />,
+    );
+    expect(screen.queryByRole('button', { name: /attach files/i })).toBeNull();
   });
 
   it('shows Stop and Queue buttons when AWAITING_RESPONSE', () => {
