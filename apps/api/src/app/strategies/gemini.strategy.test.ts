@@ -268,6 +268,11 @@ describe('GeminiStrategy API token mode', () => {
     strategy.clearCredentials();
   });
 
+  test('lists default Gemini CLI model aliases', async () => {
+    expect(await new GeminiStrategy(true).listModels()).toEqual(['pro', 'flash', 'flash-lite']);
+    expect(await new GeminiStrategy(false).listModels()).toEqual(['pro', 'flash', 'flash-lite']);
+  });
+
   test('getModelArgs returns flags for valid model', () => {
     const strategy = new GeminiStrategy(true);
     expect(strategy.getModelArgs('gemini-2.5-pro')).toEqual([

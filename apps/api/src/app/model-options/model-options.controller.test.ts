@@ -9,8 +9,28 @@ function controller(envModels: string[], listModels?: () => Promise<string[]>) {
 }
 
 describe('ModelOptionsController', () => {
-  test('keeps configured model ordering in the initial response', () => {
-    expect(controller(['custom-model', 'gpt-6.1-sol']).getOptions()).toEqual(['custom-model', 'gpt-6.1-sol']);
+  test('keeps configured model ordering without querying the provider in the initial response', async () => {
+    let discoveryCalls = 0;
+    const instance = controller(['custom-model', 'gpt-6.1-sol'], async () => {
+      discoveryCalls += 1;
+      return ['provider-default'];
+    });
+    expect(await instance.getOptions()).toEqual(['custom-model', 'gpt-6.1-sol']);
+    expect(discoveryCalls).toBe(0);
+  });
+
+  test('initial response discovers provider models when no admin list is configured', async () => {
+    expect(await controller([], async () => ['provider-default', 'other-model', 'provider-default']).getOptions())
+      .toEqual(['provider-default', 'other-model']);
+  });
+
+  test('initial response stays available when provider discovery fails', async () => {
+    const instance = controller([], async () => { throw new Error('provider unavailable'); });
+    expect(await instance.getOptions()).toEqual([]);
+  });
+
+  test('initial response supports providers without discovery', async () => {
+    expect(await controller([]).getOptions()).toEqual([]);
   });
 
   test('refreshes from the provider, deduplicating while preserving admin ordering', async () => {

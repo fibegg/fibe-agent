@@ -714,6 +714,10 @@ export class GeminiStrategy extends AbstractCLIStrategy {
     return ['-m', model];
   }
 
+  listModels(): Promise<string[]> {
+    return Promise.resolve(['pro', 'flash', 'flash-lite']);
+  }
+
   private static readonly GOOGLE_OAUTH_URL_REGEX =
     /https:\/\/accounts\.google\.com\/o\/oauth2\/[^\s"'<>]+/;
 

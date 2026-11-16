@@ -14,8 +14,9 @@ export class ModelOptionsController {
   ) {}
 
   @Get('model-options')
-  getOptions(): string[] {
-    return this.config.getModelOptions();
+  async getOptions(): Promise<string[]> {
+    const configuredModels = this.config.getModelOptions();
+    return configuredModels.length > 0 ? configuredModels : this.refreshOptions();
   }
 
   @Post('model-options/refresh')
