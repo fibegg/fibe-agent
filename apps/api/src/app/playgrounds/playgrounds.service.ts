@@ -9,6 +9,7 @@ import { loadGitignore, type GitignoreFilter } from '../gitignore-utils';
 import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 import {
   readTrustedFile,
+  countTrustedFileLines,
   writeTrustedFile,
   inspectTrustedFile,
   inspectTrustedDirectory,
@@ -169,7 +170,24 @@ export class PlaygroundsService {
     private readonly playgroundBrowser: PlaygroundBrowserService,
   ) {}
 
-  async getTree(): Promise<PlaygroundEntry[]> {
+  private readonly inflight = new Map<string, Promise<unknown>>();
+
+  /** Concurrent identical calls share one promise; nothing is kept after it settles. */
+  private coalesce<T>(key: string, run: () => Promise<T>): Promise<T> {
+    const existing = this.inflight.get(key);
+    if (existing) return existing as Promise<T>;
+    const promise = run().finally(() => {
+      if (this.inflight.get(key) === promise) this.inflight.delete(key);
+    });
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
+  getTree(): Promise<PlaygroundEntry[]> {
+    return this.coalesce('tree', () => this.buildTree());
+  }
+
+  private async buildTree(): Promise<PlaygroundEntry[]> {
     const scope = await this.fileScope();
     const read = async (path: string) =>
       (await readTrustedFile(scope, relative(scope.root, path))).toString(
@@ -188,7 +206,15 @@ export class PlaygroundsService {
     );
   }
 
-  async getStats(): Promise<{
+  getStats(): Promise<{
+    fileCount: number;
+    totalLines: number;
+    hasGitRepo: boolean;
+  }> {
+    return this.coalesce('stats', () => this.buildStats());
+  }
+
+  private async buildStats(): Promise<{
     fileCount: number;
     totalLines: number;
     hasGitRepo: boolean;
@@ -664,10 +690,10 @@ export class PlaygroundsService {
         if (isFile) {
           fileCount++;
           try {
-            const content = (
-              await readTrustedFile(scope, relative(scope.root, childAbs))
-            ).toString('utf8');
-            totalLines += content.split('\n').length;
+            totalLines += await countTrustedFileLines(
+              scope,
+              relative(scope.root, childAbs),
+            );
           } catch {
             /* skip binary/unreadable */
           }

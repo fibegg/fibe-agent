@@ -17,6 +17,7 @@ const MAX_ENVELOPE_BYTES = 48 * 1024 * 1024;
 export const TRUSTED_FILES_PROGRAM = String.raw`
 import os, sys, json, stat, base64
 LIMIT = 32 * 1024 * 1024
+LINES_CAP = 8 * 1024 * 1024
 def inside(root, path):
     return os.path.commonpath([root, path]) == root
 def directory(path):
@@ -100,6 +101,20 @@ def run(p):
                 with os.fdopen(file_fd, 'rb', closefd=False) as src: data = src.read(LIMIT + 1)
                 if len(data) > LIMIT: raise OverflowError()
                 return {'content': base64.b64encode(data).decode('ascii')}
+            elif p['action'] == 'lines':
+                if st.st_size > LINES_CAP: return {'lines': 0, 'binary': False, 'skipped': True}
+                newlines = 0
+                total = 0
+                with os.fdopen(file_fd, 'rb', closefd=False) as src:
+                    head = src.read(8192)
+                    if b'\x00' in head: return {'lines': 0, 'binary': True, 'skipped': False}
+                    chunk = head
+                    while chunk:
+                        total += len(chunk)
+                        if total > LINES_CAP: return {'lines': 0, 'binary': False, 'skipped': True}
+                        newlines += chunk.count(b'\n')
+                        chunk = src.read(1024 * 1024)
+                return {'lines': newlines + 1, 'binary': False, 'skipped': False}
             return {'path': canonical}
         finally: os.close(file_fd)
     finally: os.close(fd)
@@ -272,6 +287,17 @@ export async function readTrustedFile(
 ): Promise<Buffer> {
   const result = await operate(scope, 'read', path);
   return Buffer.from(result.content as string, 'base64');
+}
+/**
+ * Line count of a text file as `content.split('\n').length`, streamed inside the
+ * helper under the same admission as readTrustedFile. Binary files (NUL in the
+ * first 8 KiB) and files over 8 MiB contribute 0.
+ */
+export async function countTrustedFileLines(
+  scope: TrustedFileScope,
+  path: string,
+): Promise<number> {
+  return (await operate(scope, 'lines', path)).lines as number;
 }
 export async function writeTrustedFile(
   scope: TrustedFileScope,

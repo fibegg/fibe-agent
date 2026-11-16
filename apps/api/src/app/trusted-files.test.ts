@@ -14,6 +14,7 @@ import { AgentFilesService } from './agent-files/agent-files.service';
 import { PlaygroundsService } from './playgrounds/playgrounds.service';
 import {
   TRUSTED_FILES_PROGRAM,
+  countTrustedFileLines,
   readTrustedFile,
   writeTrustedFile,
 } from './trusted-files';
@@ -366,3 +367,126 @@ test('streamed binary frames span pipe chunks and a size error leaves the helper
     'ordinary',
   );
 });
+
+const linesScope = () => ({
+  root: workspace,
+  trustedRoots: [repo],
+  ignoredNames: ['.git', 'node_modules'],
+});
+
+test('lines action matches split(newline).length for text files', async () => {
+  const cases: Record<string, string> = {
+    'empty.txt': '',
+    'one.txt': 'one',
+    'trailing.txt': 'a\nb\n',
+    'multi.txt': 'a\nb\nc',
+    'unicode.txt': 'h\u00e9llo\n\u4e16\u754c\n',
+  };
+  for (const [name, content] of Object.entries(cases)) {
+    writeFileSync(join(workspace, name), content);
+    expect(await countTrustedFileLines(linesScope(), name)).toBe(
+      content.split('\n').length,
+    );
+  }
+  const big = 'x'.repeat(99) + '\n';
+  writeFileSync(join(workspace, 'big.txt'), big.repeat(50_000));
+  expect(await countTrustedFileLines(linesScope(), 'big.txt')).toBe(50_001);
+  expect(
+    await countTrustedFileLines(linesScope(), 'linked-repo/source.txt'),
+  ).toBe(1);
+});
+
+test('lines action counts binary files as 0 and skips files over the cap', async () => {
+  writeFileSync(join(workspace, 'image.bin'), Buffer.from([1, 10, 0, 10, 10]));
+  expect(await countTrustedFileLines(linesScope(), 'image.bin')).toBe(0);
+  writeFileSync(join(workspace, 'huge.txt'), Buffer.alloc(9 * 1024 * 1024, 10));
+  expect(await countTrustedFileLines(linesScope(), 'huge.txt')).toBe(0);
+  const raw = await runHelper('lines', 'huge.txt');
+  expect(raw).toEqual({ lines: 0, binary: false, skipped: true });
+  expect(await runHelper('lines', 'image.bin')).toEqual({
+    lines: 0,
+    binary: true,
+    skipped: false,
+  });
+});
+
+function runHelper(action: string, target: string) {
+  return new Promise<Record<string, unknown>>((resolve, reject) => {
+    const child = spawn('python3', ['-I', '-c', TRUSTED_FILES_PROGRAM], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+    });
+    let result = '';
+    child.stdout.on('data', (chunk) => (result += chunk));
+    child.once('error', reject);
+    child.once('close', () => resolve(JSON.parse(result)));
+    child.stdin.end(
+      JSON.stringify({
+        root: workspace,
+        path: target,
+        trustedRoots: [repo],
+        ignoredNames: ['.git', 'node_modules'],
+        action,
+      }),
+    );
+  });
+}
+
+test('lines action refuses every path read refuses', async () => {
+  mkdirSync(join(workspace, '.git'));
+  writeFileSync(join(workspace, '.git', 'config'), 'ignored');
+  for (const path of [
+    '../outside/private.txt',
+    'escape.txt',
+    'escape/private.txt',
+    'broken',
+    '.git/config',
+    '/etc/hosts',
+    'missing.txt',
+    'linked-repo',
+  ]) {
+    const read = await runHelper('read', path);
+    const lines = await runHelper('lines', path);
+    expect(read.error).toBeDefined();
+    expect(lines.error).toBeDefined();
+    await expect(countTrustedFileLines(linesScope(), path)).rejects.toThrow();
+  }
+  expect((await runHelper('lines', 'ordinary.txt')).lines).toBe(1);
+});
+
+for (const kind of ['agent', 'playground']) {
+  test(`${kind} stats count lines without binaries and coalesce concurrent calls`, async () => {
+    writeFileSync(join(workspace, 'text.txt'), 'a\nb\n');
+    writeFileSync(join(workspace, 'photo.png'), Buffer.from([0, 10, 10, 10]));
+    const playgrounds = new PlaygroundsService(
+      { getPlaygroundsDir: () => workspace } as never,
+      {} as never,
+    );
+    playgrounds.getRepos = async () => [];
+    const service =
+      kind === 'playground'
+        ? playgrounds
+        : new AgentFilesService(
+            {
+              resolveStrategy: () => ({ getWorkingDir: () => workspace }),
+            } as never,
+            undefined,
+            playgrounds,
+          );
+    const target = service as unknown as {
+      countStats: (...args: unknown[]) => Promise<unknown>;
+    };
+    const original = target.countStats.bind(service);
+    let walks = 0;
+    target.countStats = (...args) => {
+      if (args.length === 4) walks++;
+      return original(...args);
+    };
+    const [a, b] = await Promise.all([service.getStats(), service.getStats()]);
+    expect(a).toEqual(b);
+    expect(walks).toBe(1);
+    // ordinary.txt (1) + text.txt (3) + photo.png (binary, 0); no repos trusted
+    expect(a.totalLines).toBe(1 + 3 + 0);
+    await service.getStats();
+    expect(walks).toBe(2);
+  });
+}

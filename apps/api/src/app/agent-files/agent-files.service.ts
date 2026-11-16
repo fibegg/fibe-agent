@@ -11,6 +11,7 @@ import { loadFibeSettings, type ResolvedFibeSettings } from '../fibe-settings';
 import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import {
   readTrustedFile,
+  countTrustedFileLines,
   writeTrustedFile,
   inspectTrustedFile,
   inspectTrustedDirectory,
@@ -62,9 +63,26 @@ export class AgentFilesService {
     return strategy.getWorkingDir?.() ?? null;
   }
 
-  async getTree(
-    conversationId = DEFAULT_CONVERSATION_ID,
-  ): Promise<AgentFileEntry[]> {
+  private readonly inflight = new Map<string, Promise<unknown>>();
+
+  /** Concurrent identical calls share one promise; nothing is kept after it settles. */
+  private coalesce<T>(key: string, run: () => Promise<T>): Promise<T> {
+    const existing = this.inflight.get(key);
+    if (existing) return existing as Promise<T>;
+    const promise = run().finally(() => {
+      if (this.inflight.get(key) === promise) this.inflight.delete(key);
+    });
+    this.inflight.set(key, promise);
+    return promise;
+  }
+
+  getTree(conversationId = DEFAULT_CONVERSATION_ID): Promise<AgentFileEntry[]> {
+    return this.coalesce(`tree:${conversationId}`, () =>
+      this.buildTree(conversationId),
+    );
+  }
+
+  private async buildTree(conversationId: string): Promise<AgentFileEntry[]> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return [];
     const scope = await this.fileScope(conversationId, dir);
@@ -77,8 +95,16 @@ export class AgentFilesService {
     return this.readDir(dir, '', ig, settings, scope);
   }
 
-  async getStats(
+  getStats(
     conversationId = DEFAULT_CONVERSATION_ID,
+  ): Promise<AgentWorkspaceStats> {
+    return this.coalesce(`stats:${conversationId}`, () =>
+      this.buildStats(conversationId),
+    );
+  }
+
+  private async buildStats(
+    conversationId: string,
   ): Promise<AgentWorkspaceStats> {
     const dir = this.getAgentWorkingDir(conversationId);
     if (!dir) return { fileCount: 0, totalLines: 0, workspaceAvailable: false };
@@ -136,10 +162,10 @@ export class AgentFilesService {
         if (e.type === 'file') {
           fileCount++;
           try {
-            const content = (
-              await readTrustedFile(scope, relative(scope.root, childAbs))
-            ).toString('utf8');
-            totalLines += content.split('\n').length;
+            totalLines += await countTrustedFileLines(
+              scope,
+              relative(scope.root, childAbs),
+            );
           } catch {
             /* skip binary/unreadable */
           }
