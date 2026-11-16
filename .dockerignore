@@ -23,6 +23,7 @@ scripts/*
 !scripts/provider-versions.json
 !scripts/install-fibe.sh
 !scripts/mcp-remote-wrapper.sh
+!scripts/chrome-sandbox-wrapper.sh
 
 node_modules
 **/node_modules
