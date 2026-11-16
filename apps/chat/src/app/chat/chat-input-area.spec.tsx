@@ -130,6 +130,23 @@ describe('ChatInputArea', () => {
     expect(screen.getByText('1m 5s')).toBeTruthy();
   });
 
+  it('keeps one composer while working: only Stop until there is text to send', () => {
+    const { container } = render(
+      <ChatInputArea
+        {...BASE_PROPS}
+        state={CHAT_STATES.AWAITING_RESPONSE}
+        workingElapsedMs={5_000}
+      />,
+    );
+    expect(screen.getByRole('button', { name: /stop/i })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /queue message/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /steer message/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /attach files/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /voice input/i })).toBeNull();
+    expect(container.querySelectorAll('[data-working="true"]')).toHaveLength(1);
+    expect(screen.getByText('Agent is working')).toBeTruthy();
+  });
+
   it('calls onInterrupt when Stop button is clicked', () => {
     const onInterrupt = vi.fn();
     render(

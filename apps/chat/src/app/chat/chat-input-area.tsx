@@ -6,7 +6,6 @@ import {
   Paperclip,
   Send,
   Square,
-  Timer,
   X,
 } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -104,6 +103,7 @@ export function ChatInputArea({
   const isReady = state === CHAT_STATES.AUTHENTICATED;
   const canType = isReady || isWorking;
   const steerIsLive = steerMode === 'live';
+  const hasText = inputValue.trim().length > 0;
   const canAttach =
     isReady &&
     pendingImages.length + pendingAttachments.length < maxPendingTotal;
@@ -220,27 +220,28 @@ export function ChatInputArea({
             )}
           </div>
         )}
-        {isWorking && (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/20 bg-primary/[0.07] px-3 py-2 text-xs">
-            <div className="flex min-w-0 items-center gap-2 text-muted-foreground">
-              <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-                <Timer className="size-3" aria-hidden />
+        <div
+          className={`overflow-hidden rounded-2xl border bg-card shadow-xl shadow-primary/[0.04] transition-[border-color,box-shadow] duration-300 focus-within:shadow-primary/[0.08] ${
+            isWorking ? 'border-primary/30' : 'border-border/60'
+          }`}
+          data-working={isWorking ? 'true' : undefined}
+        >
+          {isWorking && (
+            <div className="flex min-w-0 items-center gap-2 px-3 pt-2.5 text-xs text-muted-foreground sm:px-4">
+              <span className="relative flex size-2 shrink-0" aria-hidden>
+                <span className="absolute inline-flex size-full rounded-full bg-primary/60 motion-safe:animate-ping" />
+                <span className="relative inline-flex size-2 rounded-full bg-primary" />
               </span>
               <span className="min-w-0 truncate">
                 {t('chat.input.agentWorking')}
               </span>
               <span
-                className="shrink-0 font-mono tabular-nums text-primary"
+                className="shrink-0 font-mono tabular-nums text-foreground/70"
                 title={t('chat.input.workingTime')}
               >
                 {formatSessionDurationMs(workingElapsedMs)}
               </span>
-            </div>
-            <div className="flex shrink-0 items-center gap-1 text-[11px] text-muted-foreground">
-              <span className="rounded-full bg-background px-2 py-1">
-                {t('chat.input.queueHint')}
-              </span>
-              <span className="rounded-full bg-background px-2 py-1">
+              <span className="ml-auto hidden min-w-0 truncate text-[11px] text-muted-foreground/80 sm:inline">
                 {t(
                   steerIsLive
                     ? 'chat.input.steerHint'
@@ -248,102 +249,162 @@ export function ChatInputArea({
                 )}
               </span>
             </div>
-          </div>
-        )}
-        <div className="flex items-end gap-2 sm:gap-3 bg-card rounded-2xl border border-border/60 p-2 sm:p-3 shadow-xl shadow-primary/[0.04] transition-shadow duration-300 focus-within:shadow-primary/[0.08]">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept={ACCEPT_FILES}
-            multiple
-            className="hidden"
-            onChange={onFileChange}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={!canAttach}
-            className="size-8 sm:size-9 rounded-md flex items-center justify-center text-primary hover:text-primary hover:bg-primary/10 transition-colors shrink-0 disabled:opacity-50"
-            title={t('chat.input.attachFiles')}
-            aria-label={t('chat.input.attachFiles')}
-          >
-            <Paperclip className="size-3.5 sm:size-4" />
-          </button>
-          <div
-            className="relative flex-1 min-w-0"
-            title={
-              state === CHAT_STATES.AUTHENTICATED
-                ? t('chat.input.typeAt')
-                : undefined
-            }
-          >
-            <MentionInput
-              inputRef={chatInputRef}
-              id="chat-input"
-              value={inputValue}
-              onChange={(v) => onInputChange(v, v.length)}
-              onValueAndCursor={onInputChange}
-              onCursorChange={onCursorChange}
-              placeholder={placeholder}
-              disabled={!canType}
-              onKeyDown={onKeyDown}
-              onPaste={onPaste}
-              className={`w-full bg-transparent ${voiceRecorder.isRecording ? 'opacity-0' : ''}`}
+          )}
+          <div className="flex items-end gap-1.5 p-2 sm:gap-2 sm:p-3">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ACCEPT_FILES}
+              multiple
+              className="hidden"
+              onChange={onFileChange}
             />
-            {voiceRecorder.isRecording && (
-              <div className="absolute inset-0 z-10 flex items-center px-3 overflow-hidden pointer-events-none">
-                <span className="text-sm text-foreground/80 break-words line-clamp-1 italic">
-                  {voiceRecorder.liveText || t('chat.input.listening')}
-                </span>
-              </div>
+            {!isWorking && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={!canAttach}
+                className="size-8 sm:size-9 rounded-xl flex items-center justify-center text-primary hover:text-primary hover:bg-primary/10 transition-colors shrink-0 disabled:opacity-50"
+                title={t('chat.input.attachFiles')}
+                aria-label={t('chat.input.attachFiles')}
+              >
+                <Paperclip className="size-3.5 sm:size-4" />
+              </button>
             )}
-            <FileMentionDropdown
-              open={mentionOpen}
-              query={atMentionQuery}
-              entries={playgroundEntries}
-              anchorRef={chatInputRef}
-              onSelect={onMentionSelect}
-              onClose={onMentionClose}
-            />
-          </div>
-          {voiceRecorder.isSupported && (
-            <button
-              type="button"
-              onClick={onVoiceToggle}
-              disabled={!isReady}
-              className={`rounded-md flex items-center justify-center transition-colors shrink-0 ${
-                voiceRecorder.isRecording
-                  ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-white'
-                  : 'size-8 sm:size-9 text-primary hover:text-primary hover:bg-primary/10'
-              }`}
+            <div
+              className={`relative flex-1 min-w-0 ${isWorking ? 'pl-1' : ''}`}
               title={
-                voiceRecorder.isRecording
-                  ? t('chat.input.stopRecording')
-                  : t('chat.input.voiceInput')
-              }
-              aria-label={
-                voiceRecorder.isRecording
-                  ? t('chat.input.stopRecording')
-                  : t('chat.input.voiceInput')
+                state === CHAT_STATES.AUTHENTICATED
+                  ? t('chat.input.typeAt')
+                  : undefined
               }
             >
-              {voiceRecorder.isRecording ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
-                  <span className="text-xs tabular-nums ml-1 truncate">
-                    {Math.floor(voiceRecorder.recordingTimeSec / 60)}:
-                    {(voiceRecorder.recordingTimeSec % 60)
-                      .toString()
-                      .padStart(2, '0')}
+              <MentionInput
+                inputRef={chatInputRef}
+                id="chat-input"
+                value={inputValue}
+                onChange={(v) => onInputChange(v, v.length)}
+                onValueAndCursor={onInputChange}
+                onCursorChange={onCursorChange}
+                placeholder={placeholder}
+                disabled={!canType}
+                onKeyDown={onKeyDown}
+                onPaste={onPaste}
+                className={`w-full bg-transparent ${voiceRecorder.isRecording ? 'opacity-0' : ''}`}
+              />
+              {voiceRecorder.isRecording && (
+                <div className="absolute inset-0 z-10 flex items-center px-3 overflow-hidden pointer-events-none">
+                  <span className="text-sm text-foreground/80 break-words line-clamp-1 italic">
+                    {voiceRecorder.liveText || t('chat.input.listening')}
                   </span>
-                </>
-              ) : (
-                <Mic className="size-3.5 sm:size-4" />
+                </div>
               )}
-            </button>
-          )}
-          {isWorking ? (
-            <div className="flex items-center gap-1.5">
+              <FileMentionDropdown
+                open={mentionOpen}
+                query={atMentionQuery}
+                entries={playgroundEntries}
+                anchorRef={chatInputRef}
+                onSelect={onMentionSelect}
+                onClose={onMentionClose}
+              />
+            </div>
+            {voiceRecorder.isSupported && !isWorking && (
+              <button
+                type="button"
+                onClick={onVoiceToggle}
+                disabled={!isReady}
+                className={`rounded-xl flex items-center justify-center transition-colors shrink-0 ${
+                  voiceRecorder.isRecording
+                    ? 'min-w-8 sm:min-w-9 h-8 sm:h-9 px-1.5 bg-destructive/90 hover:bg-destructive text-white'
+                    : 'size-8 sm:size-9 text-primary hover:text-primary hover:bg-primary/10'
+                }`}
+                title={
+                  voiceRecorder.isRecording
+                    ? t('chat.input.stopRecording')
+                    : t('chat.input.voiceInput')
+                }
+                aria-label={
+                  voiceRecorder.isRecording
+                    ? t('chat.input.stopRecording')
+                    : t('chat.input.voiceInput')
+                }
+              >
+                {voiceRecorder.isRecording ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-white animate-pulse shrink-0" />
+                    <span className="text-xs tabular-nums ml-1 truncate">
+                      {Math.floor(voiceRecorder.recordingTimeSec / 60)}:
+                      {(voiceRecorder.recordingTimeSec % 60)
+                        .toString()
+                        .padStart(2, '0')}
+                    </span>
+                  </>
+                ) : (
+                  <Mic className="size-3.5 sm:size-4" />
+                )}
+              </button>
+            )}
+            {isWorking ? (
+              <div className="flex shrink-0 items-center gap-1">
+                {hasText && (
+                  <>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onSend();
+                        onRequestInputFocus();
+                      }}
+                      className="h-8 sm:h-9 rounded-xl flex items-center justify-center gap-1.5 bg-primary px-2.5 text-primary-foreground transition-transform duration-200 hover:scale-[1.03] active:scale-[0.97]"
+                      aria-label={t('chat.input.queueMessage')}
+                      title={t('chat.input.queueMessageTitle')}
+                    >
+                      <Send className="size-3.5 sm:size-4" />
+                      <span className="hidden sm:inline text-xs font-medium">
+                        {t('chat.input.queueShort')}
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => {
+                        onSteer?.();
+                        onRequestInputFocus();
+                      }}
+                      className="h-8 sm:h-9 rounded-xl flex items-center justify-center gap-1.5 bg-muted px-2.5 text-foreground transition-colors hover:bg-muted/70"
+                      aria-label={t(
+                        steerIsLive
+                          ? 'chat.input.steerMessage'
+                          : 'chat.input.steerNextMessage',
+                      )}
+                      title={t(
+                        steerIsLive
+                          ? 'chat.input.steerMessageTitle'
+                          : 'chat.input.steerNextMessageTitle',
+                      )}
+                    >
+                      <CornerDownRight className="size-3.5 sm:size-4" />
+                      <span className="hidden sm:inline text-xs font-medium">
+                        {t(
+                          steerIsLive
+                            ? 'chat.input.steerShort'
+                            : 'chat.input.steerNextShort',
+                        )}
+                      </span>
+                    </button>
+                  </>
+                )}
+                <button
+                  type="button"
+                  onClick={onInterrupt}
+                  className="size-8 sm:size-9 rounded-xl flex items-center justify-center border border-border/80 text-muted-foreground transition-colors hover:border-destructive/40 hover:bg-destructive/10 hover:text-destructive"
+                  title={t('chat.input.stop')}
+                  aria-label={t('chat.input.stop')}
+                >
+                  <Square className="size-3 sm:size-3.5 fill-current" />
+                </button>
+              </div>
+            ) : (
               <button
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
@@ -351,69 +412,14 @@ export function ChatInputArea({
                   onSend();
                   onRequestInputFocus();
                 }}
-                disabled={!inputValue.trim()}
-                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 bg-primary px-2.5 hover:from-primary hover:to-secondary text-primary-foreground disabled:opacity-30 transition-opacity"
-                aria-label={t('chat.input.queueMessage')}
-                title={t('chat.input.queueMessageTitle')}
+                disabled={!isReady}
+                className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
+                aria-label={t('chat.input.send')}
               >
                 <Send className="size-3.5 sm:size-4" />
-                <span className="hidden sm:inline text-xs font-medium">
-                  {t('chat.input.queueShort')}
-                </span>
               </button>
-              <button
-                type="button"
-                onMouseDown={(e) => e.preventDefault()}
-                onClick={() => {
-                  onSteer?.();
-                  onRequestInputFocus();
-                }}
-                disabled={!inputValue.trim()}
-                className="relative h-8 sm:h-9 rounded-md flex items-center justify-center gap-1.5 border border-primary/40 bg-primary/10 px-2.5 hover:bg-primary/20 text-primary disabled:opacity-30 transition-opacity"
-                aria-label={t(
-                  steerIsLive
-                    ? 'chat.input.steerMessage'
-                    : 'chat.input.steerNextMessage',
-                )}
-                title={t(
-                  steerIsLive
-                    ? 'chat.input.steerMessageTitle'
-                    : 'chat.input.steerNextMessageTitle',
-                )}
-              >
-                <CornerDownRight className="size-3.5 sm:size-4" />
-                <span className="hidden sm:inline text-xs font-medium">
-                  {t(
-                    steerIsLive
-                      ? 'chat.input.steerShort'
-                      : 'chat.input.steerNextShort',
-                  )}
-                </span>
-              </button>
-              <button
-                type="button"
-                onClick={onInterrupt}
-                className="size-8 sm:size-9 rounded-md flex items-center justify-center border border-border bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                aria-label={t('chat.input.stop')}
-              >
-                <Square className="size-3.5 sm:size-4 fill-current" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => {
-                onSend();
-                onRequestInputFocus();
-              }}
-              disabled={!isReady}
-              className="size-8 sm:size-9 rounded-xl flex items-center justify-center bg-primary text-primary-foreground disabled:opacity-50 transition-all duration-200 hover:scale-[1.05] active:scale-[0.95]"
-              aria-label={t('chat.input.send')}
-            >
-              <Send className="size-3.5 sm:size-4" />
-            </button>
-          )}
+            )}
+          </div>
         </div>
       </div>
     </div>
