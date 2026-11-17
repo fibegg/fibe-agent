@@ -154,3 +154,12 @@ test('latest resolves once per startup, even with an installed executable', () =
     assert.equal(urls(f).filter(url => url.endsWith('/releases/latest')).length, 2);
   } finally { f.cleanup(); }
 });
+
+test('an explicit prerelease keeps working while latest refuses prereleases', () => {
+  const f = fixture({ version: '9.9.0-rc.1', prerelease: true });
+  try {
+    const result = f.run();
+    assert.equal(result.status, 0, result.stderr);
+    assert.ok(urls(f)[0].endsWith('/releases/tags/v9.9.0-rc.1'));
+  } finally { f.cleanup(); }
+});

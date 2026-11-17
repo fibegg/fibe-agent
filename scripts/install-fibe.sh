@@ -59,15 +59,18 @@ else
     RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
     VERSION=""
   else
-    printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail 'Fibe CLI version must be latest or an exact stable version'
+    printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$' || fail 'Fibe CLI version must be latest or an exact release version'
     RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/v${VERSION}"
   fi
   echo "--> Resolving Fibe CLI ${VERSION:-latest} from ${REPO_OWNER}/${REPO_NAME}"
   api_request "$RELEASE_URL" "$RELEASE_JSON"
   TAG=$(jq -r '.tag_name // empty' "$RELEASE_JSON")
-  printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || fail 'Release has no stable Fibe CLI tag'
-  jq -e '(.draft != true) and (.prerelease != true)' "$RELEASE_JSON" >/dev/null || fail 'Fibe CLI release is not published stable'
-  [ -z "$VERSION" ] || [ "$TAG" = "v$VERSION" ] || fail "Release tag $TAG does not match requested Fibe CLI version"
+  if [ -z "$VERSION" ]; then
+    printf '%s\n' "$TAG" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || fail 'Release has no stable Fibe CLI tag'
+    jq -e '(.draft != true) and (.prerelease != true)' "$RELEASE_JSON" >/dev/null || fail 'Fibe CLI release is not published stable'
+  else
+    [ "$TAG" = "v$VERSION" ] || fail "Release tag $TAG does not match requested Fibe CLI version"
+  fi
   VERSION="${TAG#v}"
   ASSET_NAME="fibe_${VERSION}_linux_${FIBE_ARCH}.tar.gz"
   download_asset checksums.txt "$CHECKSUMS_PATH"

@@ -147,7 +147,7 @@ existing linked directory; relative overrides are resolved before tools change
 working directory. Linking replaces the directory atomically, so its parent
 must also be writable. No `/app` ownership change or per-agent override is
 required for the default. Bare provider tool calls require SDK/CLI 0.3.3 or newer to honor this shared
-default; both Docker recipes pin the verified release archives.
+default; both Docker recipes install the latest stable SDK release resolved before cache selection.
 Fibe stdio MCP entries explicitly receive the shared path and Host variables,
 because MCP clients may filter inherited environment variables. Server-specific
 path overrides and unrelated MCP servers remain intact.
@@ -575,19 +575,22 @@ GitHub CLI 2.102.0 uses immutable upstream release archives with an explicit
 SHA-256 for amd64 and arm64 in both Dockerfiles. Its rolling apt repository
 retains only the current version, so an older apt version pin is not rebuildable.
 
-### Stable CLI checksum pin
+### Latest stable CLI release
 
-`scripts/provider-versions.json` pins the Fibe CLI version baked into the image
-and the SHA-256 of its Linux amd64/arm64 release archives. Both Docker recipes
-ship this pin, and image builds install exactly that version.
+Normal image builds use `scripts/ci/cli-build.mjs` to resolve GitHub's latest
+stable published SDK release once before Docker cache selection. The build
+inputs contain the exact version, release tag commit and published Linux archive
+checksums. Both Docker recipes verify the matching archive before installing;
+image labels record the resolved version, commit and hashes. An explicit stable
+`FIBE_CLI_VERSION` overrides latest. Resolution or checksum errors fail the build.
+This policy supersedes the previous maintained Fibe SDK pin policy.
 
-At runtime an agent may request any released version, or `latest` / no version
-for the newest SDK release. The installer verifies every archive before
-extraction: the pinned version against the source pin, any other version
-against the `checksums.txt` its SDK release workflow published. A version whose
-release has no matching checksum is refused. A new SDK release therefore
-reaches agents on their next restart without an Agent release; bump the pin
-only to change the CLI baked into images.
+At runtime an Agent may request an explicit released version, or `latest` / no
+version. Latest resolves once per startup and verifies the release's published
+`checksums.txt` before extraction, logging its version, commit and archive hash.
+A new release reaches Agents on their next restart. Existing exact-version reuse
+and candidate injection remain available. `GH_TOKEN` authenticates GitHub API
+requests when available; otherwise resolution uses the public endpoint.
 
 ### Candidate CLI builds
 
@@ -613,7 +616,7 @@ Provider builds emit only `<provider>-cand-<cli-version>-<agent-sha7>-<arch>`
 tags and use separate candidate cache refs. They never emit `latest*` or ordinary
 SHA tags. Existing candidate images should be selected by digest. The entrypoint
 uses its matching baked/cached candidate and fails before downloads on an
-explicit mismatched or `latest` request. Stable release builds use the source checksum pin described above. Building/pushing images remains a separate authorized operation.
+explicit mismatched or `latest` request. Stable release builds resolve and verify the published checksums described above. Building/pushing images remains a separate authorized operation.
 
 The Compose CI build environment forwards these candidate inputs. Its binary
 path must be readable inside the `/app` source mount (for example, an already

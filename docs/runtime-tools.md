@@ -20,7 +20,7 @@ Reviewed on 2026-09-30:
 | OpenCode | 1.18.34 | [npm](https://www.npmjs.com/package/opencode-ai) |
 | Cursor Agent | 2026.09.28-64d2043 | [installer](https://cursor.com/install) |
 | Antigravity | 1.2.14 | [installer](https://antigravity.google/cli/install.sh) |
-| Fibe CLI | 0.3.0 | [release](https://github.com/fibegg/sdk/releases/tag/v0.3.0) |
+| Fibe CLI | Latest stable at build/startup | [releases](https://github.com/fibegg/sdk/releases/latest) |
 | Bun | 1.4.2 | [release](https://github.com/oven-sh/bun/releases/tag/bun-v1.4.2) |
 | Docker CLI | 29.8.1 | [release](https://github.com/moby/moby/releases/tag/docker-v29.8.1) |
 | GitHub CLI | 2.102.0 | [release](https://github.com/cli/cli/releases/tag/v2.102.0) |
@@ -54,11 +54,42 @@ docker build --target cli --build-arg AGENT_PROVIDER=openai_codex -t fibe-agent-
 docker run --rm fibe-agent-cli-check codex --version
 ```
 
-The Fibe CLI release is pinned in the manifest and both Docker recipes. Provider
-and common-cache builds pass the exact `FIBE_CLI_VERSION` and record it in the
-`gg.fibe.cli.version` image label. A release override must be an exact stable
-version; changing it invalidates the Fibe installation layer. Update the manifest
-and Docker defaults together when publishing a new SDK release.
+Fibe CLI builds resolve GitHub's latest stable published SDK release once per
+build invocation, before Docker cache selection. `scripts/ci/cli-build.mjs`
+fetches release metadata, the published `checksums.txt`, and the release tag's
+exact commit (two GitHub API requests). It uses `GH_TOKEN` when available for
+metadata; unauthenticated builds use the public `releases/latest` endpoint.
+`FIBE_CLI_VERSION=<exact stable version>` overrides latest. Provider and
+common-cache builds pass the resolved version, commit and both Linux archive
+SHA-256 values as Docker build args. These inputs invalidate the installation
+layer when a release or artifact changes; older caches cannot skip discovery.
+The Docker installer verifies the downloaded archive against that resolved hash
+before extraction. Metadata, missing asset and checksum failures stop the build.
+
+Images record `gg.fibe.cli.version`, `gg.fibe.cli.sdk.sha`, and
+`gg.fibe.cli.archive.{amd64,arm64}.sha256`. Startup with `latest` or no version
+resolves once again, verifies the matching published checksum, and logs the
+version, release commit and archive hash. An explicit startup version retains
+existing exact-version reuse. Candidate builds keep their local binary injection,
+checksum verification and separate tags; they do not resolve a release.
+
+For a direct development-image build, resolve before invoking Docker (Node 24+):
+
+```sh
+node --input-type=module <<'JS'
+import { spawnSync } from 'node:child_process';
+import { resolveCliBuild, cliBuildArgs } from './scripts/ci/cli-build.mjs';
+const release = await resolveCliBuild();
+const result = spawnSync('docker', ['build', '-f', 'Dockerfile.dev',
+  '--build-arg', `FIBE_CLI_VERSION=${release.version}`, ...cliBuildArgs(release),
+  '-t', 'fibe-agent-dev', '.'], { stdio: 'inherit' });
+process.exit(result.status ?? 1);
+JS
+```
+
+The latest stable policy supersedes the previous maintained Fibe SDK pin policy;
+it does not change pins for other tools. The old Fibe fields in the provider
+manifest are no longer read by the Fibe build or startup installers.
 
 Repeat the CLI stage for all six providers on `linux/amd64` and `linux/arm64`.
 Each installation executes the binary's version and help commands during the
