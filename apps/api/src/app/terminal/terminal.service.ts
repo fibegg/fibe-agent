@@ -1,4 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { withGhWrapper } from '../github-token-refresh/github-git-credentials';
 import * as pty from 'node-pty';
 import { randomUUID } from 'node:crypto';
 import { chmodSync, existsSync, mkdirSync } from 'node:fs';
@@ -49,9 +50,10 @@ export class TerminalService implements OnModuleDestroy {
     const dataDir = env.DATA_DIR || DEFAULT_DATA_DIR;
     const runtimeFibeBinDir = `${dataDir}/${RUNTIME_FIBE_BIN_RELATIVE_DIR}`;
     const path = env.PATH || '';
-    env.PATH = [runtimeFibeBinDir, '/usr/local/bin', path]
-      .filter(Boolean)
-      .join(':');
+    env.PATH = withGhWrapper(
+      [runtimeFibeBinDir, '/usr/local/bin', path].filter(Boolean).join(':'),
+      env,
+    );
     env.TERM = 'xterm-256color';
     env.COLORTERM = 'truecolor';
     return env;

@@ -1,12 +1,14 @@
 import {
   chmodSync,
+  mkdirSync,
   mkdtempSync,
   renameSync,
   rmSync,
+  statSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
 
 /** An installation token Git may use, with the organization it belongs to. */
 export interface InstallationCredential {
@@ -51,6 +53,136 @@ token=\${token:-$fallback}
 printf 'username=x-access-token\\npassword=%s\\n' "$token"
 `;
 
+const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
+
+/**
+ * `gh` wrapper for Agent processes while several installations are held. It
+ * names the organization from `-R/--repo`, else `GH_REPO`, else the current
+ * directory's `origin` remote (github.com only), and runs the real `gh` with
+ * that organization's current token (else the first held one) as GH_TOKEN. It
+ * reads the tokens file on every call, never prints a token, and execs the
+ * real `gh` (resolved when the wrapper is written) so arguments and the exit
+ * code pass through. Without a usable token it execs the real `gh` untouched.
+ */
+export function ghWrapperScript(realGh: string, tokensFile: string): string {
+  return `#!/bin/sh
+real=${shellQuote(realGh)}
+tokens=${shellQuote(tokensFile)}
+# org_of SPEC: the lower-cased GitHub organization of a repository spec or remote URL.
+org_of() {
+  s=$1
+  case $s in
+    *://*) s=\${s#*://}; s=\${s#*@}; host=\${s%%/*}; s=\${s#*/} ;;
+    *@*:*) s=\${s#*@}; host=\${s%%:*}; s=\${s#*:} ;;
+    github.com:*) host=github.com; s=\${s#*:} ;;
+    */*/*) host=\${s%%/*}; s=\${s#*/} ;;
+    *) host=github.com ;;
+  esac
+  host=\${host%%:*}
+  [ "$host" = github.com ] || return 1
+  s=\${s#/}
+  o=\${s%%/*}
+  case $o in '' | *[!A-Za-z0-9-]*) return 1 ;; esac
+  printf '%s' "$o" | tr '[:upper:]' '[:lower:]'
+}
+if [ -r "$tokens" ]; then
+  spec=
+  want=
+  for arg in "$@"; do
+    if [ -n "$want" ]; then spec=$arg; break; fi
+    case $arg in
+      --) break ;;
+      -R | --repo) want=1 ;;
+      --repo=*) spec=\${arg#--repo=}; break ;;
+      -R?*) spec=\${arg#-R}; spec=\${spec#=}; break ;;
+    esac
+  done
+  [ -n "$spec" ] || spec=\${GH_REPO-}
+  org=
+  if [ -n "$spec" ]; then
+    org=$(org_of "$spec") || org=
+  else
+    remote=$(git remote get-url origin 2>/dev/null) && org=$(org_of "$remote") || org=
+  fi
+  token= fallback=
+  while read -r account value; do
+    [ -n "$value" ] || continue
+    [ -n "$fallback" ] || fallback=$value
+    if [ -n "$org" ] && [ "$account" = "$org" ]; then
+      token=$value
+      break
+    fi
+  done < "$tokens"
+  token=\${token:-$fallback}
+  if [ -n "$token" ]; then
+    GH_TOKEN=$token
+    export GH_TOKEN
+  fi
+fi
+exec "$real" "$@"
+`;
+}
+
+/** The executable called `name` on PATH, skipping `skipDir`; null if none. */
+export function findExecutable(
+  name: string,
+  path: string,
+  skipDir?: string,
+): string | null {
+  for (const dir of path.split(delimiter)) {
+    if (!dir || !dir.startsWith('/') || dir === skipDir) continue;
+    const candidate = join(dir, name);
+    try {
+      const stat = statSync(candidate);
+      if (stat.isFile() && (stat.mode & 0o111) !== 0) return candidate;
+    } catch {
+      // Not in this directory.
+    }
+  }
+  return null;
+}
+
+/** Name of the variable that tells PATH builders where the `gh` wrapper is. */
+export const GH_WRAPPER_DIR_ENV = 'FIBE_GH_WRAPPER_DIR';
+
+/** PATH with the `gh` wrapper directory (when installed) ahead of everything. */
+export function withGhWrapper(
+  path: string,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  const dir = env[GH_WRAPPER_DIR_ENV];
+  if (!dir) return path;
+  return [dir, ...path.split(delimiter).filter((entry) => entry !== dir)]
+    .filter(Boolean)
+    .join(delimiter);
+}
+
+/**
+ * The lower-cased organization of a GitHub repository given as `owner/name`,
+ * `github.com/owner/name`, or an https/ssh remote URL; null for other hosts.
+ */
+export function githubOrganization(spec: unknown): string | null {
+  if (typeof spec !== 'string') return null;
+  let s = spec.trim();
+  let host = 'github.com';
+  if (s.includes('://')) {
+    s = s.slice(s.indexOf('://') + 3);
+    s = s.slice(s.indexOf('@') + 1);
+    host = s.split('/')[0];
+    s = s.slice(s.indexOf('/') + 1);
+  } else if (/^[^/@]*@[^/:]*:/.test(s) || /^github\.com:/.test(s)) {
+    s = s.slice(s.indexOf('@') + 1);
+    host = s.split(':')[0];
+    s = s.slice(s.indexOf(':') + 1);
+  } else if (s.split('/').length >= 3) {
+    host = s.split('/')[0];
+    s = s.slice(s.indexOf('/') + 1);
+  }
+  if (host.split(':')[0].toLowerCase() !== 'github.com') return null;
+  const org = s.replace(/^\/+/, '').split('/')[0];
+  return /^[A-Za-z0-9-]+$/.test(org) ? org.toLowerCase() : null;
+}
+
 const ACCOUNT = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/;
 const TOKEN = /^[\x21-\x7e]+$/;
 
@@ -75,6 +207,22 @@ export class GitCredentialStore {
     this.tokens = join(this.dir, 'tokens');
     this.write([]);
     writeFileSync(this.helper, GIT_CREDENTIAL_HELPER, { mode: 0o700 });
+  }
+
+  /**
+   * Writes the `gh` wrapper beside the helper and returns its directory, or
+   * null when no real `gh` is on `path` (resolved here, once, so the wrapper
+   * can never find itself).
+   */
+  installGhWrapper(path: string): string | null {
+    const binDir = join(this.dir, 'bin');
+    const realGh = findExecutable('gh', path, binDir);
+    if (!realGh) return null;
+    mkdirSync(binDir, { mode: 0o700 });
+    writeFileSync(join(binDir, 'gh'), ghWrapperScript(realGh, this.tokens), {
+      mode: 0o700,
+    });
+    return binDir;
   }
 
   /** Atomically replaces the tokens the helper answers with, in order. */

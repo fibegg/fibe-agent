@@ -1,4 +1,5 @@
 import type { ResponseFormat } from '@shared/response-format';
+import { withGhWrapper } from '../github-token-refresh/github-git-credentials';
 import {
   compileResponseFormat,
   assertStructuredOutputSupport,
@@ -2036,7 +2037,9 @@ export class OrchestratorService implements OnModuleInit {
     this.sessionRegistry.broadcastToConversation(ctx.conversationId, WS_EVENT.STREAM_CHUNK, { text: cliOut });
 
     try {
-      const envPath = `${process.env['DATA_DIR'] || '/app/data'}/.fibe/bin:/usr/local/bin:${process.env.PATH || ''}`;
+      const envPath = withGhWrapper(
+        `${process.env['DATA_DIR'] || '/app/data'}/.fibe/bin:/usr/local/bin:${process.env.PATH || ''}`,
+      );
       const { stdout, stderr } = await execAsync(command, {
         env: { ...process.env, PATH: envPath },
       });

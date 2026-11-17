@@ -1,17 +1,26 @@
 import {
   Injectable,
   Logger,
+  Optional,
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { promisify } from 'node:util';
 import { ConfigService } from '../config/config.service';
 import { writeMcpConfig } from '../config/mcp-config-writer';
+import { PlaygroundsService } from '../playgrounds/playgrounds.service';
 import {
   configureGitCredentialHelper,
+  GH_WRAPPER_DIR_ENV,
   GitCredentialStore,
   githubAccount,
+  githubOrganization,
+  withGhWrapper,
 } from './github-git-credentials';
+
+const execFileAsync = promisify(execFile);
+const REPOSITORY_LOOKUP_TIMEOUT_MS = 10_000;
 
 const REFRESH_INTERVAL_MS = 50 * 60 * 1000; // 50 minutes
 
@@ -40,10 +49,12 @@ function connectionIds(): string[] {
  *
  * With FIBE_GITHUB_CONNECTION_IDS (a Team Agent on a server that lists every
  * installation its Team can use) each installation keeps its own token, expiry
- * and backoff. The first one holding a token is the primary: it goes to the
- * GitHub MCP server and GH_TOKEN. Git chooses the token of the repository's
- * organization through a credential helper. Without the list only
- * FIBE_GITHUB_CONNECTION_ID is refreshed, as before.
+ * and backoff. The first one holding a token is the primary: it goes to
+ * GH_TOKEN and, unless the Agent's own repository belongs to another held
+ * organization, to the GitHub MCP server. Git (credential helper) and `gh`
+ * (wrapper ahead of it on PATH) choose the token of the repository's
+ * organization. Without the list only FIBE_GITHUB_CONNECTION_ID is refreshed,
+ * as before.
  */
 @Injectable()
 export class GithubTokenRefreshService
@@ -60,13 +71,17 @@ export class GithubTokenRefreshService
   private installations = new Map<string, Installation>();
   private store: GitCredentialStore | null = null;
   private storeUnavailable = false;
-  private publishedPrimary = '';
+  private publishedMcpToken = '';
+  private agentOrganizations: string[] = [];
   private clearPending = false;
   // An authored GH_TOKEN or GITHUB_TOKEN is the operator's choice; keep it.
   private readonly managesGhToken =
     !process.env.GH_TOKEN && !process.env.GITHUB_TOKEN;
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(
+    private readonly config: ConfigService,
+    @Optional() private readonly playgrounds?: PlaygroundsService,
+  ) {}
 
   async onModuleInit(): Promise<void> {
     await this.refreshToken();
@@ -235,6 +250,8 @@ export class GithubTokenRefreshService
       ),
     );
     if (this.stopped) return null;
+    await this.refreshAgentOrganizations();
+    if (this.stopped) return null;
     this.publish();
     return this.primary()?.token ?? null;
   }
@@ -247,6 +264,7 @@ export class GithubTokenRefreshService
       const endpoint = this.installationEndpoint();
       if (endpoint) {
         await this.refreshInstallation(installation, endpoint);
+        await this.refreshAgentOrganizations();
         if (!this.stopped) this.publish();
       }
       if (this.installations.get(installation.id) === installation)
@@ -381,14 +399,70 @@ export class GithubTokenRefreshService
   }
 
   /**
+   * The organizations of the Agent's own repositories (the linked Playground's
+   * repositories, by their repository name or `origin` remote), in order. A
+   * failed lookup keeps the previous answer.
+   */
+  private async refreshAgentOrganizations(): Promise<void> {
+    if (!this.playgrounds) return;
+    try {
+      const repos = await Promise.race([
+        this.playgrounds.getRepos(),
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error('timeout')),
+            REPOSITORY_LOOKUP_TIMEOUT_MS,
+          ).unref(),
+        ),
+      ]);
+      const found: string[] = [];
+      for (const repo of repos) {
+        const org =
+          githubOrganization(repo.repository) ??
+          (await this.originOrganization(repo.repo_root));
+        if (org && !found.includes(org)) found.push(org);
+      }
+      this.agentOrganizations = found;
+    } catch {
+      // Keep what is known; the primary token serves until a lookup succeeds.
+    }
+  }
+
+  private async originOrganization(repoRoot: string): Promise<string | null> {
+    try {
+      const { stdout } = await execFileAsync(
+        'git',
+        ['-C', repoRoot, 'remote', 'get-url', 'origin'],
+        { timeout: 5000 },
+      );
+      return githubOrganization(stdout);
+    } catch {
+      return null;
+    }
+  }
+
+  /** The token for the GitHub MCP server: the Agent's organization, else the primary. */
+  private mcpToken(): string {
+    for (const org of this.agentOrganizations) {
+      const match = [...this.installations.values()].find(
+        ({ account, token }) => token && account?.toLowerCase() === org,
+      );
+      if (match?.token) return match.token;
+    }
+    return this.primary()?.token ?? '';
+  }
+
+  /**
    * Hands the current tokens to their consumers: every token to the Git
-   * credential helper, the primary one to GH_TOKEN and the GitHub MCP server.
-   * The MCP server restarts only when its token changes after initialization,
-   * or when its token is withdrawn.
+   * credential helper and the `gh` wrapper, the primary one to GH_TOKEN, and
+   * the Agent's organization token (else the primary) to the GitHub MCP
+   * server. The MCP server restarts only when its token changes after
+   * initialization, or when its token is withdrawn.
    */
   private publish(): void {
     const primary = this.primary()?.token ?? '';
-    const clear = primary === '' && this.clearPending;
+    const mcp = this.mcpToken();
+    const clear = mcp === '' && this.clearPending;
     this.clearPending = false;
     this.store?.write(
       [...this.installations.values()].flatMap(({ account, token }) =>
@@ -399,11 +473,25 @@ export class GithubTokenRefreshService
       if (primary) process.env.GH_TOKEN = primary;
       else delete process.env.GH_TOKEN;
     }
-    if (primary === this.publishedPrimary && !clear) return;
-    this.publishedPrimary = primary;
-    this.updateGithubTokenInMcpConfig(primary);
+    if (mcp === this.publishedMcpToken && !clear) return;
+    this.publishedMcpToken = mcp;
+    this.updateGithubTokenInMcpConfig(mcp);
     writeMcpConfig();
-    if (!this.isInitialRefresh || !primary) this.killGithubMcpServer();
+    if (!this.isInitialRefresh || !mcp) this.killGithubMcpServer();
+  }
+
+  /**
+   * Puts the per-repository `gh` wrapper first on PATH for every child
+   * process, unless the operator authored GH_TOKEN/GITHUB_TOKEN or no `gh`
+   * is installed.
+   */
+  private installGhWrapper(store: GitCredentialStore): void {
+    if (!this.managesGhToken) return;
+    const path = process.env.PATH ?? '';
+    const dir = store.installGhWrapper(path);
+    if (!dir) return;
+    process.env[GH_WRAPPER_DIR_ENV] = dir;
+    process.env.PATH = withGhWrapper(path);
   }
 
   /** Points Git at the per-organization helper once per process. */
@@ -411,6 +499,7 @@ export class GithubTokenRefreshService
     if (this.store || this.storeUnavailable) return;
     try {
       this.store = new GitCredentialStore();
+      this.installGhWrapper(this.store);
       if (!configureGitCredentialHelper(this.store.helper)) {
         this.logger.warn(
           'GIT_CONFIG_COUNT is malformed: Git keeps its own credentials',
