@@ -14,29 +14,32 @@ function fixture(options = {}) {
   const temp = path.join(root, 'tmp'); mkdirSync(temp);
   const archive = 'synthetic-sdk-release-archive';
   const sha = createHash('sha256').update(archive).digest('hex');
-  const pin = path.join(root, 'pins.json');
-  writeFileSync(pin, JSON.stringify({ fibeCli: { version: '9.8.7', linuxArchiveSha256: options.missingPin ? {} : { amd64: sha, arm64: sha } } }));
   const env = {
     PATH: `${bin}:${process.env.PATH}`, TMPDIR: temp,
-    FIBE_CLI_VERSION: options.version ?? '9.8.7', FIBE_CLI_PIN_FILE: pin,
+    FIBE_CLI_VERSION: options.version ?? '9.8.7',
+    ...(options.resolved ? { FIBE_CLI_ARCHIVE_SHA256: options.hash || sha, FIBE_SDK_SHA: 'a'.repeat(40) } : {}),
     FIBE_INSTALL_DIR: path.join(root, 'installed'), FIXTURE_ROOT: root,
     FIXTURE_ARCH: options.arch || 'x86_64', FIXTURE_ARCHIVE: options.corrupt ? 'corrupted bytes' : archive,
     FIXTURE_TAG: options.tag || `v${options.version && options.version !== 'latest' ? options.version : '9.8.7'}`,
     FIXTURE_CHECKSUMS: options.checksums ?? 'match', FIXTURE_SHA: sha,
+    FIXTURE_UNAVAILABLE: options.unavailable ? '1' : '', FIXTURE_PRERELEASE: options.prerelease ? '1' : '', FIXTURE_MISSING_ARCHIVE: options.missingArchive ? '1' : '',
   };
   function executable(name, source) { writeFileSync(path.join(bin, name), `#!${process.execPath}\n${source}`, { mode: 0o755 }); }
   executable('uname', "console.log(process.env.FIXTURE_ARCH);");
   executable('curl', `
 const fs = require('node:fs'); const path = require('node:path'); const args = process.argv.slice(2);
 fs.appendFileSync(path.join(process.env.FIXTURE_ROOT, 'requests'), 'request\\n');
+if (process.env.FIXTURE_UNAVAILABLE) process.exit(22);
 const destination = args[args.indexOf('-o') + 1];
 const url = args.find((arg) => arg.startsWith('https://'));
 fs.appendFileSync(path.join(process.env.FIXTURE_ROOT, 'urls'), url + '\\n');
 const version = process.env.FIXTURE_TAG.slice(1);
-if (url.includes('/releases/tags/') || url.endsWith('/releases/latest')) {
-  const assets = ['amd64','arm64'].map(arch => ({name:'fibe_'+version+'_linux_'+arch+'.tar.gz',url:'https://fixture.invalid/api/'+arch,browser_download_url:'https://fixture.invalid/archive/'+arch}));
+if (url.includes('/commits/')) {
+  fs.writeFileSync(destination, JSON.stringify({sha:'a'.repeat(40)}));
+} else if (url.includes('/releases/tags/') || url.endsWith('/releases/latest')) {
+  const assets = (process.env.FIXTURE_MISSING_ARCHIVE ? [] : ['amd64','arm64']).map(arch => ({name:'fibe_'+version+'_linux_'+arch+'.tar.gz',url:'https://fixture.invalid/api/'+arch,browser_download_url:'https://fixture.invalid/archive/'+arch}));
   if (process.env.FIXTURE_CHECKSUMS !== 'absent') assets.push({name:'checksums.txt',url:'https://fixture.invalid/api/checksums',browser_download_url:'https://fixture.invalid/checksums'});
-  fs.writeFileSync(destination, JSON.stringify({tag_name:process.env.FIXTURE_TAG, assets}));
+  fs.writeFileSync(destination, JSON.stringify({tag_name:process.env.FIXTURE_TAG, prerelease:!!process.env.FIXTURE_PRERELEASE, assets}));
 } else if (url.endsWith('/checksums')) {
   const sha = process.env.FIXTURE_CHECKSUMS === 'wrong' ? '0'.repeat(64) : process.env.FIXTURE_SHA;
   fs.writeFileSync(destination, ['amd64','arm64'].map(arch => sha + '  fibe_' + version + '_linux_' + arch + '.tar.gz').join('\\n') + '\\n');
@@ -46,7 +49,7 @@ if (url.includes('/releases/tags/') || url.endsWith('/releases/latest')) {
   return { root, env, run: () => spawnSync('/bin/sh', [installer], { env, encoding: 'utf8' }), cleanup: () => rmSync(root, { recursive: true, force: true }) };
 }
 
-test('stable install verifies source-pinned archive bytes on both architectures before extraction', () => {
+test('stable install verifies published archive checksums on both architectures before extraction', () => {
   for (const arch of ['x86_64', 'aarch64']) {
     const f = fixture({ arch });
     try {
@@ -63,8 +66,8 @@ test('corrupt archive is rejected before the install directory is created', () =
     assert.equal(existsSync(f.env.FIBE_INSTALL_DIR), false);
   } finally { f.cleanup(); }
 });
-test('a missing pin for the pinned version and unsupported architectures fail before downloading', () => {
-  for (const options of [{ missingPin: true }, { arch: 'riscv64' }]) {
+test('unsupported architectures and malformed explicit versions fail before downloading', () => {
+  for (const options of [{ version: 'main' }, { arch: 'riscv64' }]) {
     const f = fixture(options);
     try {
       assert.notEqual(f.run().status, 0);
@@ -115,11 +118,39 @@ test('latest resolves the newest release and verifies it', () => {
     } finally { f.cleanup(); }
   }
 });
-test('latest equal to the pinned version uses the source pin', () => {
-  const f = fixture({ version: 'latest', tag: 'v9.8.7', checksums: 'absent' });
+test('missing checksums or assets, prereleases and service errors fail without extraction', () => {
+  for (const options of [{ checksums: 'absent' }, { missingArchive: true }, { prerelease: true }, { unavailable: true }]) {
+    const f = fixture({ version: 'latest', ...options });
+    try {
+      assert.notEqual(f.run().status, 0);
+      assert.equal(existsSync(f.env.FIBE_INSTALL_DIR), false);
+    } finally { f.cleanup(); }
+  }
+});
+test('build-resolved identity skips API resolution and checks the supplied archive hash', () => {
+  for (const arch of ['x86_64', 'aarch64']) {
+    const f = fixture({ resolved: true, arch });
+    try {
+      const result = f.run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(urls(f).length, 1);
+      assert.ok(urls(f)[0].includes('/releases/download/v9.8.7/fibe_9.8.7_linux_'));
+      assert.match(result.stdout, /SDK commit [a-f0-9]{40}; archive SHA-256 [a-f0-9]{64}/);
+    } finally { f.cleanup(); }
+  }
+});
+test('build-resolved checksum mismatch fails before extraction', () => {
+  const f = fixture({ resolved: true, corrupt: true });
   try {
-    const result = f.run();
-    assert.equal(result.status, 0, result.stderr);
-    assert.equal(urls(f).includes('https://fixture.invalid/checksums'), false);
+    assert.notEqual(f.run().status, 0);
+    assert.equal(existsSync(f.env.FIBE_INSTALL_DIR), false);
+  } finally { f.cleanup(); }
+});
+test('latest resolves once per startup, even with an installed executable', () => {
+  const f = fixture({ version: 'latest' });
+  try {
+    assert.equal(f.run().status, 0);
+    assert.equal(f.run().status, 0);
+    assert.equal(urls(f).filter(url => url.endsWith('/releases/latest')).length, 2);
   } finally { f.cleanup(); }
 });

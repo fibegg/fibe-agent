@@ -47,14 +47,17 @@ test('both image recipes use the shared installer and shipped binary directory',
   }
 });
 
-test('Fibe CLI release pin is present in both runtime recipes and publication metadata', () => {
+test('Fibe CLI resolved release inputs are required by both runtime recipes and publication metadata', () => {
   for (const filename of ['Dockerfile', 'Dockerfile.dev']) {
     const source = readFileSync(new URL(`../../${filename}`, import.meta.url), 'utf8');
-    assert.ok(source.includes(`ARG FIBE_CLI_VERSION=${versions.fibeCli.version}`));
+    assert.match(source, /ARG FIBE_CLI_VERSION\n/);
+    assert.doesNotMatch(source, /ARG FIBE_CLI_VERSION=/);
+    for (const argument of ['FIBE_SDK_SHA', 'FIBE_CLI_ARCHIVE_SHA256_AMD64', 'FIBE_CLI_ARCHIVE_SHA256_ARM64']) assert.ok(source.includes(`ARG ${argument}`));
   }
   for (const filename of ['build-provider.mjs', 'build-common.mjs']) {
     const source = readFileSync(new URL(filename, import.meta.url), 'utf8');
     assert.ok(source.includes('FIBE_CLI_VERSION=${fibeCliVersion}'));
+    assert.ok(source.indexOf('await resolveCliBuild()') < source.indexOf('await cacheFromArgsForExistingRefs'));
     assert.ok(source.includes('gg.fibe.cli.version=${fibeCliVersion}'));
   }
 });

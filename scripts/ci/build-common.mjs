@@ -11,10 +11,12 @@ import {
   setupGhcrImageContext,
 } from './lib.mjs';
 
-const cliBuild = resolveCliBuild();
+const cliBuild = await resolveCliBuild();
 stageCandidateCli(cliBuild);
 const fibeCliVersion = cliBuild.version;
-console.log(`--> Pinned Fibe CLI ${cliBuild.candidate ? 'candidate' : 'release'}: ${fibeCliVersion}`);
+console.log(`--> Resolved Fibe CLI ${cliBuild.candidate ? 'candidate' : 'release'}: ${fibeCliVersion}`);
+
+console.log(`--> Fibe SDK commit: ${cliBuild.sdkSha}; SHA-256: ${JSON.stringify(cliBuild.archiveChecksums || cliBuild.checksum)}`);
 
 console.log('--> Preparing shared Docker build cache');
 

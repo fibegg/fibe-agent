@@ -2,23 +2,47 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, chmodSync, existsSync } from 'node:fs';
 import path from 'node:path';
 
-const versions = JSON.parse(readFileSync(new URL('../provider-versions.json', import.meta.url)));
 const stable = /^\d+\.\d+\.\d+$/;
 const prerelease = /^\d+\.\d+\.\d+-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/;
 
-export function resolveCliBuild(env = process.env) {
+export async function resolveCliBuild(env = process.env, fetchRelease = fetch) {
   if (env.FIBE_CANDIDATE_BUILD && !['0', '1'].includes(env.FIBE_CANDIDATE_BUILD)) {
     throw new Error('FIBE_CANDIDATE_BUILD must be 0 or 1');
   }
   const candidate = env.FIBE_CANDIDATE_BUILD === '1';
-  const version = env.FIBE_CLI_VERSION || versions.fibeCli.version;
+  const version = (env.FIBE_CLI_VERSION || 'latest').replace(/^v/, '');
   if (!candidate) {
-    if (!stable.test(version)) throw new Error('FIBE_CLI_VERSION must be an exact stable version');
-    if (version !== versions.fibeCli.version) throw new Error('FIBE_CLI_VERSION must match the source checksum pin');
-    for (const arch of ['amd64', 'arm64']) {
-      if (!/^[0-9a-f]{64}$/.test(versions.fibeCli.linuxArchiveSha256?.[arch] || '')) throw new Error(`Missing Fibe CLI archive checksum for ${arch}`);
+    if (version !== 'latest' && !stable.test(version)) throw new Error('FIBE_CLI_VERSION must be latest or an exact stable version');
+    const api = 'https://api.github.com/repos/fibegg/sdk';
+    const headers = { Accept: 'application/vnd.github+json', ...(env.GH_TOKEN ? { Authorization: `Bearer ${env.GH_TOKEN}` } : {}) };
+    async function request(url, authenticated = true) {
+      let response;
+      try { response = await fetchRelease(url, { headers: authenticated ? headers : {}, signal: AbortSignal.timeout(60_000) }); }
+      catch { throw new Error('Could not fetch Fibe SDK release metadata or checksums'); }
+      if (!response.ok) throw new Error(`Fibe SDK release request failed (HTTP ${response.status})`);
+      return response;
     }
-    return { candidate, version, platforms: ['linux/amd64', 'linux/arm64'], cacheSuffix: '' };
+    const release = await (await request(`${api}/releases/${version === 'latest' ? 'latest' : `tags/v${version}`}`)).json();
+    const resolved = release.tag_name?.replace(/^v/, '');
+    if (!stable.test(resolved || '') || release.tag_name !== `v${resolved}` || release.draft || release.prerelease || (version !== 'latest' && resolved !== version)) {
+      throw new Error('Fibe SDK release must match the requested stable version');
+    }
+    const assets = release.assets || [];
+    const checksumsAsset = assets.find(asset => asset.name === 'checksums.txt');
+    if (!checksumsAsset?.browser_download_url) throw new Error('Fibe SDK release is missing checksums.txt');
+    const checksums = await (await request(checksumsAsset.browser_download_url, false)).text();
+    const archiveChecksums = {};
+    for (const arch of ['amd64', 'arm64']) {
+      const name = `fibe_${resolved}_linux_${arch}.tar.gz`;
+      if (!assets.some(asset => asset.name === name && asset.browser_download_url)) throw new Error(`Fibe SDK release is missing ${name}`);
+      const matches = checksums.split(/\r?\n/).map(line => line.trim().split(/\s+\*?/)).filter(parts => parts[1] === name);
+      if (matches.length !== 1 || !/^[0-9a-f]{64}$/.test(matches[0][0])) throw new Error(`Missing or invalid Fibe SDK checksum for ${name}`);
+      archiveChecksums[arch] = matches[0][0];
+    }
+    // target_commitish can be a branch; resolve the release tag itself to a commit.
+    const commit = await (await request(`${api}/commits/${encodeURIComponent(release.tag_name)}`)).json();
+    if (!/^[0-9a-f]{40}$/.test(commit.sha || '')) throw new Error('Fibe SDK release tag has no exact source commit');
+    return { candidate, version: resolved, sdkSha: commit.sha, archiveChecksums, platforms: ['linux/amd64', 'linux/arm64'], cacheSuffix: '' };
   }
   if (!prerelease.test(version)) throw new Error('Candidate FIBE_CLI_VERSION must be an exact prerelease version');
   const sdkSha = env.FIBE_SDK_SHA;
@@ -57,11 +81,15 @@ export function stageCandidateCli(build, root = process.cwd()) {
 
 export function cliBuildArgs(build) {
   return ['--build-arg', `FIBE_CANDIDATE_BUILD=${build.candidate ? '1' : '0'}`,
-    ...(build.candidate ? ['--build-arg', `FIBE_CLI_BINARY_SHA256=${build.checksum}`, '--build-arg', `FIBE_SDK_SHA=${build.sdkSha}`] : [])];
+    '--build-arg', `FIBE_SDK_SHA=${build.sdkSha}`,
+    ...(build.candidate ? ['--build-arg', `FIBE_CLI_BINARY_SHA256=${build.checksum}`] :
+      Object.entries(build.archiveChecksums).flatMap(([arch, checksum]) => ['--build-arg', `FIBE_CLI_ARCHIVE_SHA256_${arch.toUpperCase()}=${checksum}`]))];
 }
 
 export function cliImageLabels(build) {
-  return build.candidate ? ['--label', `gg.fibe.cli.sdk.sha=${build.sdkSha}`, '--label', `gg.fibe.cli.binary.sha256=${build.checksum}`] : [];
+  return ['--label', `gg.fibe.cli.sdk.sha=${build.sdkSha}`,
+    ...(build.candidate ? ['--label', `gg.fibe.cli.binary.sha256=${build.checksum}`] :
+      Object.entries(build.archiveChecksums).flatMap(([arch, checksum]) => ['--label', `gg.fibe.cli.archive.${arch}.sha256=${checksum}`]))];
 }
 
 export function providerImageTags({ provider, tagName, sourceBranch, gitSha }, build) {

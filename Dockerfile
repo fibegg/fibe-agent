@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
 ARG FIBE_CANDIDATE_BUILD=0
-ARG FIBE_CLI_VERSION=0.3.3
+ARG FIBE_CLI_VERSION
 
 FROM docker:29.8.1-cli AS docker-tools
 
@@ -253,10 +253,26 @@ RUN ln -s /usr/bin/vim.tiny /usr/local/bin/vim
 
 FROM runtime-packages AS runtime-cli-0
 ARG FIBE_CLI_VERSION
-RUN /usr/local/bin/install-fibe.sh \
-    && /usr/local/bin/fibe version \
-    && /usr/local/bin/fibe local playgrounds --help >/dev/null
-LABEL gg.fibe.cli.version=$FIBE_CLI_VERSION
+ARG FIBE_SDK_SHA
+ARG FIBE_CLI_ARCHIVE_SHA256_AMD64
+ARG FIBE_CLI_ARCHIVE_SHA256_ARM64
+ARG TARGETARCH
+# Resolved by scripts/ci before Docker sees any cache refs. Direct builds must
+# supply the same immutable inputs, rather than cache a literal "latest".
+RUN set -eu; \
+    case "$TARGETARCH" in \
+      amd64) archive_sha="$FIBE_CLI_ARCHIVE_SHA256_AMD64" ;; \
+      arm64) archive_sha="$FIBE_CLI_ARCHIVE_SHA256_ARM64" ;; \
+      *) echo "Unsupported Fibe CLI platform: $TARGETARCH" >&2; exit 1 ;; \
+    esac; \
+    test -n "$archive_sha" || { echo "Resolve the Fibe SDK release with scripts/ci/cli-build.mjs before building" >&2; exit 1; }; \
+    FIBE_CLI_ARCHIVE_SHA256="$archive_sha" /usr/local/bin/install-fibe.sh; \
+    /usr/local/bin/fibe version; \
+    /usr/local/bin/fibe local playgrounds --help >/dev/null
+LABEL gg.fibe.cli.version=$FIBE_CLI_VERSION \
+    gg.fibe.cli.sdk.sha=$FIBE_SDK_SHA \
+    gg.fibe.cli.archive.amd64.sha256=$FIBE_CLI_ARCHIVE_SHA256_AMD64 \
+    gg.fibe.cli.archive.arm64.sha256=$FIBE_CLI_ARCHIVE_SHA256_ARM64
 
 FROM runtime-packages AS runtime-cli-1
 ARG FIBE_CLI_VERSION
