@@ -57,8 +57,11 @@ const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
 
 /**
  * `gh` wrapper for Agent processes while several installations are held. It
- * names the organization from `-R/--repo`, else `GH_REPO`, else the current
- * directory's `origin` remote (github.com only), and runs the real `gh` with
+ * names the organization from `-R/--repo`, else the repository the command
+ * itself names (a `gh api` endpoint under `repos/`, `orgs/` or `users/`, a
+ * `gh repo <command> owner/name`, or a github.com URL argument), else
+ * `GH_REPO`, else the current directory's `origin` remote (github.com only),
+ * and runs the real `gh` with
  * that organization's current token (else the first held one) as GH_TOKEN. It
  * reads the tokens file on every call, never prints a token, and execs the
  * real `gh` (resolved when the wrapper is written) so arguments and the exit
@@ -85,6 +88,31 @@ org_of() {
   case $o in '' | *[!A-Za-z0-9-]*) return 1 ;; esac
   printf '%s' "$o" | tr '[:upper:]' '[:lower:]'
 }
+# spec_from_args ARGS: the repository a command names itself; nothing after \`--\`.
+spec_from_args() {
+  cmd=\${1-}
+  n=0
+  for arg in "$@"; do
+    n=$((n + 1))
+    [ "$n" -gt 1 ] || continue
+    case $arg in
+      --) return 1 ;;
+      https://github.com/*/* | http://github.com/*/* | github.com/*/*) printf '%s' "$arg"; return 0 ;;
+    esac
+    if [ "$cmd" = api ]; then
+      case $arg in
+        /repos/*/* | repos/*/* | /orgs/?* | orgs/?* | /users/?* | users/?*)
+          a=\${arg#/}; a=\${a#*/}; printf 'github.com/%s/x' "\${a%%/*}"; return 0 ;;
+      esac
+    elif [ "$cmd" = repo ] && [ "$n" -gt 2 ]; then
+      case $arg in
+        -*) ;;
+        ?*/?*) printf '%s' "$arg"; return 0 ;;
+      esac
+    fi
+  done
+  return 1
+}
 if [ -r "$tokens" ]; then
   spec=
   want=
@@ -97,6 +125,7 @@ if [ -r "$tokens" ]; then
       -R?*) spec=\${arg#-R}; spec=\${spec#=}; break ;;
     esac
   done
+  [ -n "$spec" ] || spec=$(spec_from_args "$@")
   [ -n "$spec" ] || spec=\${GH_REPO-}
   org=
   if [ -n "$spec" ]; then

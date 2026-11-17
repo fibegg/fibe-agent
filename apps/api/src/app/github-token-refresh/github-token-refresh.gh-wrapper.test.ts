@@ -143,6 +143,28 @@ describe('gh wrapper and MCP token by repository organization', () => {
     expect(gh(['pr']).status).toBe(7);
   });
 
+  test('picks the token by the repository a command names: api endpoints, repo arguments, github.com URLs', async () => {
+    await service.refreshToken();
+    const first = repoWithOrigin('first', 'https://github.com/first-org/r.git');
+    expect(gh(['api', 'repos/Second-Org/x/pulls'])).toMatchObject({ token: 'ghs_nine', argv: 'api repos/Second-Org/x/pulls' });
+    expect(gh(['api', '-X', 'GET', '/repos/second-org/x']).token).toBe('ghs_nine');
+    expect(gh(['api', 'orgs/second-org/repos']).token).toBe('ghs_nine');
+    expect(gh(['api', 'users/second-org']).token).toBe('ghs_nine');
+    expect(gh(['api', 'repos/first-org/x']).token).toBe('ghs_seven');
+    expect(gh(['repo', 'view', 'second-org/x']).token).toBe('ghs_nine');
+    expect(gh(['repo', 'clone', 'Second-Org/x', 'dir']).token).toBe('ghs_nine');
+    expect(gh(['pr', 'view', 'https://github.com/second-org/x/pull/1']).token).toBe('ghs_nine');
+    // The named repository wins over GH_REPO and the checkout; -R wins over it.
+    expect(gh(['api', 'repos/second-org/x'], root, { GH_REPO: 'first-org/y' }).token).toBe('ghs_nine');
+    expect(gh(['api', 'repos/second-org/x'], first).token).toBe('ghs_nine');
+    expect(gh(['api', 'repos/second-org/x', '-R', 'first-org/y']).token).toBe('ghs_seven');
+    // Endpoints without an owner, and arguments after `--`, keep the old order.
+    expect(gh(['api', 'graphql', '-f', 'query=x'], first).token).toBe('ghs_seven');
+    expect(gh(['api', 'user']).token).toBe('ghs_seven');
+    expect(gh(['api', '--', 'repos/second-org/x']).token).toBe('ghs_seven');
+    expect(gh(['repo', 'list']).token).toBe('ghs_seven');
+  });
+
   test('runs the real gh untouched without tokens, and is not installed for an authored GH_TOKEN', async () => {
     await service.refreshToken();
     const dir = process.env.FIBE_GH_WRAPPER_DIR as string;
