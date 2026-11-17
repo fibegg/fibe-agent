@@ -146,7 +146,7 @@ describe('gh wrapper and MCP token by repository organization', () => {
   test('runs the real gh untouched without tokens, and is not installed for an authored GH_TOKEN', async () => {
     await service.refreshToken();
     const dir = process.env.FIBE_GH_WRAPPER_DIR as string;
-    writeFileSync(join(dir, 'tokens'), '');
+    writeFileSync(join(dir, '..', 'tokens'), '');
     delete process.env.GH_TOKEN; // untouched: only the inherited environment reaches gh
     expect(gh(['pr'])).toMatchObject({ token: '', status: 7 });
     service.onModuleDestroy();
