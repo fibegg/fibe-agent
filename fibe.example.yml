@@ -34,6 +34,10 @@
 # When unset, the first entry from modelOptions is used.
 # defaultModel: flash
 
+# Default Claude Code effort: low, medium, high, xhigh or max (CLAUDE_EFFORT).
+# Default: max
+# claudeEffort: high
+
 # System prompt for every conversation. Overrides dist/assets/SYSTEM_PROMPT.md.
 # systemPrompt: |
 #   You are a TypeScript expert.

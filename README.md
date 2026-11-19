@@ -10,7 +10,6 @@
 
 <p align="center">
   <img src="https://img.shields.io/github/package-json/v/fibegg/fibe-agent" alt="Version" />
-  <img src="https://img.shields.io/badge/coverage-100%25-brightgreen.svg" alt="Coverage 100%" />
   <a href="https://bun.sh"><img src="https://img.shields.io/badge/bun-1.4.2-000?logo=bun&logoColor=white" alt="Bun" /></a>
   <a href="https://nx.dev"><img src="https://img.shields.io/badge/Nx-22-143055?logo=nx&logoColor=white" alt="Nx" /></a>
   <img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT" />
@@ -47,7 +46,7 @@
 | **Fibe integration**         | `FibeSyncService`, `postMessage` auto-auth, and iframe embed support with parent-controlled theming.                                                    |
 | **Security**                 | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), shared-password bearer token auth, multipart validation.                                    |
 | **Structured logging**       | One JSON object per line to stdout; request IDs, HTTP and WebSocket context, configurable via `LOG_LEVEL`.                                              |
-| **Testing**                  | Co-located unit specs with 100% coverage, plus Playwright tests for the API and Chat.                                                                   |
+| **Testing**                  | Co-located unit tests (Bun for the API, Vitest for Chat), plus end-to-end suites for the API and Chat.                                                  |
 | **Docker**                   | Multi-arch (`linux/amd64`, `linux/arm64`) images published to GHCR per provider on every push to `main` / `dev`.                                        |
 
 ## Architecture
@@ -142,122 +141,24 @@ fibe-agent/
 │   └── e2e-chat/     # Playwright e2e for the Chat UI
 ├── shared/           # Shared TS types, WS constants, API path helpers
 ├── docs/
-│   └── API.md        # REST, WebSocket, and logging contract
-├── AGENTS.md         # Agent providers, config, protocol, and architecture reference
+│   ├── API.md        # REST, WebSocket, and logging contract
+│   └── ARCHITECTURE.md # Providers, auth, persistence, MCP tools, API modules
+├── AGENTS.md         # Rules for contributors and coding agents: CI, tests, images
 ├── playground/       # Agent working directory (file explorer root)
 └── data/             # Persisted messages, activities, uploads (per conversation)
 ```
 
 ### API modules
 
-| Module                          | Responsibility                                                                                          |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `orchestrator`                  | Drives agent runs, streams chunks, manages session state                                                |
-| `strategies`                    | Provider adapters: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`, `mock` |
-| `agent`                         | `POST /api/agent/send-message`: async webhook endpoint                                                  |
-| `agent-files`                   | File watcher + REST for agent-generated files                                                           |
-| `auth`                          | Bearer token guard, login endpoint                                                                      |
-| `messages`                      | Message store + REST                                                                                    |
-| `activity` / `activity-store`   | Activity timeline store + REST                                                                          |
-| `model-options` / `model-store` | Model selection state + REST                                                                            |
-| `playgrounds`                   | File tree watcher + REST (`/api/playgrounds`)                                                           |
-| `uploads`                       | Multipart upload + file serving                                                                         |
-| `terminal`                      | `node-pty` shell sessions over `/ws-terminal`                                                           |
-| `steering`                      | Runtime steering/override hints for the orchestrator                                                    |
-| `fibe-sync`                     | Syncs conversation state back to the Fibe platform                                                      |
-| `github-token-refresh`          | Refreshes GitHub OAuth tokens for Codex                                                                 |
-| `init-status`                   | Tracks `POST_INIT_SCRIPT` execution state                                                               |
-| `persistence`                   | Base persistence helpers                                                                                |
-| `config`                        | Central env-config service                                                                              |
+The module map, providers, authentication modes, persistence layout and local MCP tools are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Environment
 
-See [`fibe.example.yml`](fibe.example.yml) for every setting. Use `.env` for process variables and `FIBE_SETTINGS_JSON`. Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `hostRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables.
+Every setting, with its default, is in [`fibe.example.yml`](fibe.example.yml); local process variables are in [`.env.example`](.env.example). Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `hostRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables. Settings promotion, provider key variables and Chat runtime variables are documented in [docs/API.md](docs/API.md).
 
-### API
+## API
 
-| Name                                                                                          | Default                         | Source         | Description                                                                                                    |
-| --------------------------------------------------------------------------------------------- | ------------------------------- | -------------- | -------------------------------------------------------------------------------------------------------------- |
-| `PORT`                                                                                        | `3000`                          | env            | API listen port                                                                                                |
-| `AGENT_PROVIDER` / `agentProvider`                                                            | `claude-code`                   | env or setting | Active agent: `gemini` \| `antigravity` \| `claude-code` \| `openai-codex` \| `cursor` \| `opencode` \| `mock` |
-| `AGENT_AUTH_MODE` / `agentAuthMode`                                                           | `oauth`                         | env or setting | `oauth` browser/device flow, or `api-token` env-key mode                                                       |
-| `agentPassword`                                                                               | None                            | setting        | Enables `/api` and `/ws` bearer-token auth; promoted to `AGENT_PASSWORD` for child processes                   |
-| `modelOptions`                                                                                | None                            | setting        | Model names shown in the selector, as a comma-separated string or YAML/JSON list                               |
-| `defaultModel`                                                                                | first `modelOptions` entry      | setting        | Pre-selected model                                                                                             |
-| `claudeEffort` / `CLAUDE_EFFORT`                                                              | `max`                           | setting or env | Default Claude Code effort (`low`, `medium`, `high`, `xhigh`, `max`)                                           |
-| `dataDir`                                                                                     | `<cwd>/data`                    | setting        | Base persistence directory                                                                                     |
-| `FIBE_AGENT_ID`                                                                               | None                            | env            | Default conversation storage id set by Fibe                                                                    |
-| `CONVERSATION_ID`                                                                             | None                            | env            | Fallback default conversation storage id                                                                       |
-| `systemPrompt`                                                                                | bundled prompt                  | setting        | Inline prompt content. If unset, `dist/assets/SYSTEM_PROMPT.md` is loaded.                                     |
-| `PLAYGROUNDS_DIR`                                                                             | `./playground`                  | env            | Root for the file explorer and shell sessions                                                                  |
-| `postInitScript`                                                                              | None                            | setting        | Shell script run once on first boot; state exposed at `/api/init-status`                                       |
-| `SESSION_DIR` / `sessionDir`                                                                  | provider default                | env or setting | Provider config/session dir (e.g. `~/.gemini`, `~/.codex`) for credential injection                            |
-| `AGENT_CREDENTIALS_JSON` / `agentCredentials`                                                 | None                            | env or setting | Credential files injected at startup                                                                           |
-| `FIBE_API_KEY`                                                                                | None                            | env            | Fibe platform API key for sync                                                                                 |
-| `fibeSyncEnabled` / `FIBE_SYNC_ENABLED`                                                       | `false`                         | setting or env | Enable Fibe sync                                                                                               |
-| `CORS_ORIGINS`                                                                                | `localhost:3100,localhost:4300` | env            | Comma-separated allowed CORS origins                                                                           |
-| `FRAME_ANCESTORS`                                                                             | `*`                             | env            | CSP `frame-ancestors` (restrict in production)                                                                 |
-| `LOG_LEVEL`                                                                                   | `info`                          | env            | `error` \| `warn` \| `info` \| `debug` \| `verbose`                                                            |
-| `gemmaRouterEnabled`, `ollamaUrl`, `gemmaModel`, `gemmaConfidenceThreshold`, `gemmaTimeoutMs` | see `fibe.example.yml`          | setting or env | Optional local LLM MCP routing via Ollama                                                                      |
-
-**Provider API keys** (used when `AGENT_AUTH_MODE=api-token`):
-
-| Provider     | Key variable(s)                                                                                                                                        |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Gemini       | `GEMINI_API_KEY`                                                                                                                                       |
-| Claude Code  | `ANTHROPIC_API_KEY`, `CLAUDE_API_KEY`, or `CLAUDE_CODE_OAUTH_TOKEN`                                                                                    |
-| OpenAI Codex | `OPENAI_API_KEY`                                                                                                                                       |
-| OpenCode     | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, or `OPENROUTER_API_KEY` |
-
-### Chat (Vite, optional)
-
-| Variable                 | Description                                                                                           |
-| ------------------------ | ----------------------------------------------------------------------------------------------------- |
-| `API_URL`                | API base URL when running on a different host (default: same origin)                                  |
-| `LOCK_CHAT_MODEL`        | Set to `true` to disable the model selector                                                           |
-| `ASSISTANT_AVATAR_URL`   | Custom avatar URL for the AI side of chat                                                             |
-| `USER_AVATAR_URL`        | Custom avatar URL for the user side of chat                                                           |
-| `VITE_THEME_SOURCE`      | `localStorage` (default) or `frame`; the latter accepts the theme from a parent through `postMessage` |
-| `VITE_HIDE_THEME_SWITCH` | `1` / `true` hides the in-app theme toggle                                                            |
-
-## API summary
-
-Full spec: [docs/API.md](docs/API.md). Agent configuration, providers, and WebSocket protocol: [AGENTS.md](AGENTS.md).
-
-### REST
-
-| Method   | Path                           | Auth   | Description                                                                                      |
-| -------- | ------------------------------ | ------ | ------------------------------------------------------------------------------------------------ |
-| `GET`    | `/api/health`                  | No     | Health / readiness probe                                                                         |
-| `POST`   | `/api/auth/login`              | No     | Password login → `{ success, token? }`; token is present only when `agentPassword` is configured |
-| `GET`    | `/api/messages`                | Bearer | Conversation message history                                                                     |
-| `GET`    | `/api/activities`              | Bearer | Activity timeline list                                                                           |
-| `GET`    | `/api/activities/:id`          | Bearer | Single activity                                                                                  |
-| `GET`    | `/api/model-options`           | Bearer | Available model names                                                                            |
-| `POST`   | `/api/model-options/refresh`   | Bearer | Configured models plus provider-discovered models                                                |
-| `GET`    | `/api/playgrounds`             | Bearer | Playground file tree                                                                             |
-| `GET`    | `/api/playgrounds/file?path=…` | Bearer | Read a playground file                                                                           |
-| `GET`    | `/api/playgrounds/browse`        | Bearer | Flat Fibe CLI local playground list, limited to selector-visible playgrounds with source mounts  |
-| `POST`   | `/api/playgrounds/link`          | Bearer | Link a named local playground through the Fibe CLI                                               |
-| `GET`    | `/api/playgrounds/current`       | Bearer | Current `.current_playground.json` selection                                                     |
-| `POST`   | `/api/uploads`                 | Bearer | Upload file (≤ 20 MB)                                                                            |
-| `GET`    | `/api/uploads/:filename`       | Bearer | Serve uploaded file                                                                              |
-| `POST`   | `/api/agent/send-message`      | Bearer | Async message (webhooks/integrations) → `202`                                                    |
-| `GET`    | `/api/init-status`             | Bearer | Post-init script status                                                                          |
-| `GET`    | `/api/data-privacy/export`     | Bearer | Export active conversation data as JSON                                                          |
-| `DELETE` | `/api/data-privacy`            | Bearer | Permanently delete conversation data                                                             |
-
-### WebSocket `/ws`
-
-Connect with `?token=<password>` when `agentPassword` is configured. Pass `conversation_id` (or `c`) to bind a session to a conversation. Up to `websocketMaxConnections` / `WEBSOCKET_MAX_CONNECTIONS` chat clients may be connected at once (default `5`); when the cap is reached, the oldest client is closed with code `4002`.
-
-**Key client→server actions:** `send_chat_message`, `interrupt_agent`, `set_model`, `set_effort`, `initiate_auth`, `submit_auth_code`, `cancel_auth`, `reauthenticate`, `logout`.
-
-**Key server→client events:** `stream_start`, `stream_chunk`, `stream_end`, `reasoning_start/chunk/end`, `thinking_step`, `tool_call`, `file_created`, `auth_status`, `model_updated`, `effort_updated`.
-
-### WebSocket `/ws-terminal`
-
-Bidirectional shell I/O between xterm.js and a `node-pty` shell spawned in `PLAYGROUNDS_DIR`.
+The REST endpoints (`/api/*`), the chat WebSocket (`/ws`) and the terminal WebSocket (`/ws-terminal`) are specified in [docs/API.md](docs/API.md). Contributor and coding-agent rules (CI, focused tests, image builds, adding a provider) are in [AGENTS.md](AGENTS.md).
 
 ## Lockfiles
 
@@ -271,7 +172,7 @@ The repo keeps **`bun.lock`** for Bun, CI, and Docker, and **`package-lock.json`
 | `dev:docker` | `bun run dev:docker` | Docker/Mutagen API + Chat with serialized API restarts |
 | `build`      | `bun run build`      | Build all apps                                         |
 | `lint`       | `bun run lint`       | Lint all projects                                      |
-| `test`       | `bun run test`       | Unit tests (100% coverage)                             |
+| `test`       | `bun run test`       | Unit tests                                             |
 | `typecheck`  | `bun run typecheck`  | TypeScript type-check                                  |
 | `e2e`        | `bun run e2e`        | Playwright e2e suites                                  |
 | `ci`         | `bun run ci`         | Lint + build + typecheck + test                        |
@@ -289,7 +190,7 @@ ghcr.io/<owner>/fibe-agent:<provider>-<git-sha>
 ghcr.io/<owner>/fibe-agent:<provider>-latest-dev
 ```
 
-Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and the root Compose CI file [ci.yml](ci.yml). The GitHub Actions workflow is currently disabled as `.github/workflows/ci.yml.disabled`.
+Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and the root Compose CI file [ci.yml](ci.yml).
 
 ## Embedding (iframe)
 

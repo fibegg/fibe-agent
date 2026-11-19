@@ -10,6 +10,7 @@ x-env-bun: &env-bun
   CI: "true"
   NPM_CONFIG_JOBS:
   NX_PARALLEL:
+  API_TEST_CONCURRENCY:
   CI_DEPENDENCY_WAIT_TIMEOUT_MS:
   CI_DEPENDENCY_WAIT_INTERVAL_MS:
   PATH: "/opt/fibe-ci-tools/node_modules/.bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
