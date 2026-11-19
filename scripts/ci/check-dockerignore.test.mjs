@@ -109,6 +109,25 @@ test('a Dockerfile-specific ignore file takes precedence', async () => {
   );
 });
 
+test('a wildcard source is checked against the context files it matches', async () => {
+  await withProject(
+    {
+      '.dockerignore': '*\n!package.json\n!package-lock.json\n',
+      'package.json': '{}',
+      'package-lock.json': '{}',
+      'package-extra.json': '{}',
+      Dockerfile: 'FROM node:24-slim\nCOPY package*.json ./\nCOPY missing-*.lock ./\n',
+    },
+    async (project) => {
+      const result = checkDockerignore(project);
+      assert.equal(result.ok, false);
+      assert.deepEqual(result.problems, [
+        'Dockerfile:2: COPY source package-extra.json is excluded by .dockerignore; add the allow line "!package-extra.json"',
+      ]);
+    },
+  );
+});
+
 test('the repository Dockerfiles copy only allowlisted sources', () => {
   const result = checkDockerignore(repoRoot);
   assert.equal(result.ok, true, result.problems.join('\n'));

@@ -166,6 +166,28 @@ export function copySources(dockerfileText) {
   return sources;
 }
 
+// A wildcard source (package-lock.json*) copies the context files it matches,
+// so each match is checked; a wildcard that matches nothing copies nothing.
+// Wildcards in a directory part are checked as written.
+function contextFiles(root, source) {
+  const base = path.posix.basename(source);
+  if (!/[*?[]/.test(base) || /[*?[]/.test(path.posix.dirname(source))) {
+    return [source];
+  }
+  const dir = path.posix.dirname(source);
+  let names;
+  try {
+    names = readdirSync(path.join(root, dir));
+  } catch {
+    return [];
+  }
+  const regex = patternToRegExp(base);
+  return names
+    .filter((name) => regex.test(name))
+    .sort()
+    .map((name) => (dir === '.' ? name : `${dir}/${name}`));
+}
+
 function defaultDockerfiles(root) {
   return readdirSync(root)
     .filter((name) => /^Dockerfile(\..+)?$/.test(name) && !name.endsWith('.dockerignore'))
@@ -183,10 +205,12 @@ export function checkDockerignore(root, dockerfiles = defaultDockerfiles(root)) 
     const patterns = existsSync(ignoreFile) ? parseDockerignore(readFileSync(ignoreFile, 'utf8')) : [];
     for (const { line, instruction, source } of copySources(readFileSync(dockerfilePath, 'utf8'))) {
       checked += 1;
-      if (!isIncluded(patterns, source)) {
-        problems.push(
-          `${path.relative(root, dockerfilePath)}:${line}: ${instruction} source ${source} is excluded by ${path.relative(root, ignoreFile)}; add the allow line "!${source}"`,
-        );
+      for (const file of contextFiles(root, source)) {
+        if (!isIncluded(patterns, file)) {
+          problems.push(
+            `${path.relative(root, dockerfilePath)}:${line}: ${instruction} source ${file} is excluded by ${path.relative(root, ignoreFile)}; add the allow line "!${file}"`,
+          );
+        }
       }
     }
   }
