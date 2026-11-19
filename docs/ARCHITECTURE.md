@@ -39,8 +39,8 @@ sessions, so their listeners do not compete.
 
 Set `AGENT_PROVIDER` explicitly in production. `mock` echoes configurable fake
 responses for local UI work without a key. Provider runtime details:
-[`providers/runtime-contracts.md`](providers/runtime-contracts.md),
-[`providers/antigravity.md`](providers/antigravity.md); pinned tool versions:
+[`providers/runtime-contracts.md`](providers/runtime-contracts.md) (including
+Antigravity); pinned tool versions:
 [`runtime-tools.md`](runtime-tools.md).
 
 Strategies live in `apps/api/src/app/strategies/`: one `<name>.strategy.ts` per

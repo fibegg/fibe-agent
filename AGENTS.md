@@ -13,7 +13,9 @@ material lives elsewhere; link to it instead of copying it here:
 | REST and WebSocket contract, settings promotion, logging | [`docs/API.md`](docs/API.md) |
 | Every setting with defaults | [`fibe.example.yml`](fibe.example.yml), local variables in [`.env.example`](.env.example) |
 | Providers, `AgentStrategy`, auth modes, persistence, local MCP tools, modules | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| Provider runtime contracts and pinned tool versions | [`docs/providers/`](docs/providers/), [`docs/runtime-tools.md`](docs/runtime-tools.md) |
+| Provider runtime contracts | [`docs/providers/runtime-contracts.md`](docs/providers/runtime-contracts.md) |
+| Conversations, provider sessions, steering and queueing | [`MULTI.md`](MULTI.md) |
+| Pinned tool versions, pin drift report and bump routine, image checks | [`docs/runtime-tools.md`](docs/runtime-tools.md) |
 | API layering rules | [`apps/api/BACKEND_BOUNDARIES.md`](apps/api/BACKEND_BOUNDARIES.md) |
 | Prompt library | [`prompts/README.md`](prompts/README.md) |
 
@@ -36,6 +38,8 @@ ci.yml            The real CI pipeline (a Compose file run as a managed job)
 Dockerfile        Release image recipe (multi-stage, multi-arch)
 Dockerfile.dev    Development image for `bun run dev:docker`
 docker-entrypoint.sh  Container start: settings, credentials, Fibe CLI, launch
+playground/       Local Agent working directory (file explorer root; not tracked)
+data/             Local persisted conversations, activity and uploads (not tracked)
 ```
 
 Tooling: Bun (exact version in `packageManager` in `package.json`) and Node 24
@@ -123,6 +127,7 @@ bunx nx lint api
 bunx nx typecheck chat
 # CI scripts and repository checks
 node --test scripts/ci/notify.test.mjs
+node --test scripts/ci/provider-pins-report.test.mjs
 node scripts/ci/check-dockerignore.mjs
 node scripts/ci/check-agents-md-size.mjs
 sh scripts/ci/entrypoint-config.test.sh
@@ -163,8 +168,10 @@ Dockerfile would take precedence over `.dockerignore` for that Dockerfile.
 
 ## Images
 
-- One image per provider, baked in with `--build-arg AGENT_PROVIDER=<value>`.
-  Release builds produce `linux/amd64` and `linux/arm64` and publish to GHCR as
+- One image per provider, baked in with `--build-arg AGENT_PROVIDER=<value>`,
+  which installs that provider's CLI next to the shared tools (git, Docker CLI,
+  ripgrep, fd, Python, Deno, uv, ffmpeg, ImageMagick, Playwright/Chromium,
+  sqlite3, pandoc; versions in `docs/runtime-tools.md`). Release builds produce `linux/amd64` and `linux/arm64` and publish to GHCR as
   `<provider>-latest` (`main`), `<provider>-latest-dev` (`dev`) and
   `<provider>-<git-sha>`. Image tags: `gemini`, `antigravity`, `claude-code`,
   `openai-codex`, `cursor`, `opencode`.
@@ -174,20 +181,24 @@ Dockerfile would take precedence over `.dockerignore` for that Dockerfile.
 - Provider CLIs are installed by `scripts/install-provider.mjs` in both
   recipes: npm providers use the exact version from the root `package.json`;
   Cursor and Antigravity use `scripts/provider-versions.json` (Antigravity with
-  per-architecture SHA-512). Bump one provider at a time and run its strategy
-  tests.
+  per-architecture SHA-512). `bun run provider:pins` reports how far each pin
+  is behind (read-only). Bump one provider at a time and run its strategy
+  tests, following the routine in `docs/runtime-tools.md`.
 - Tools downloaded from releases carry an explicit SHA-256 per architecture
   (for example the GitHub CLI, whose apt repository keeps only the current
   version, so an apt pin is not rebuildable).
 - Fibe CLI: `scripts/ci/cli-build.mjs` resolves the latest stable published SDK
-  release once before cache selection; the build inputs carry the exact
-  version, release commit and published archive checksums, both recipes verify
-  the archive, and labels record `gg.fibe.cli.version`, `gg.fibe.cli.sdk.sha`
-  and `gg.fibe.cli.binary.sha256`. An explicit stable `FIBE_CLI_VERSION`
-  overrides latest; resolution or checksum errors fail the build. At runtime
-  the entrypoint resolves `latest` (or an explicit version) once per start and
-  verifies the release's `checksums.txt`; `GH_TOKEN` authenticates GitHub API
-  requests when present.
+  release once before cache selection (this replaced the former fixed SDK pin);
+  the build inputs carry the exact version, release commit and published
+  archive checksums, both recipes verify the archive, and labels record
+  `gg.fibe.cli.version`, `gg.fibe.cli.sdk.sha` and
+  `gg.fibe.cli.archive.{amd64,arm64}.sha256`. An explicit stable
+  `FIBE_CLI_VERSION` overrides latest; resolution or checksum errors fail the
+  build. At runtime the entrypoint reuses an installed exact version, or
+  resolves `latest` (or an explicit version) once per start, verifies the
+  release's `checksums.txt` and logs version, commit and hash; a new release
+  reaches Agents on restart. `GH_TOKEN` authenticates GitHub API requests when
+  present; otherwise the public endpoint is used.
 
 ### Candidate CLI builds
 
@@ -197,12 +208,15 @@ To test an unreleased CLI, set `FIBE_CANDIDATE_BUILD=1`,
 `FIBE_CANDIDATE_PLATFORM` selects `linux/amd64` (default) or `linux/arm64`, one
 architecture per checksum. The build helper verifies checksum and ELF
 architecture before registry login, stages `.candidate-cli/fibe` (allowlisted,
-git-ignored) and refuses to overwrite a different staged binary. Candidate
+git-ignored) and refuses to overwrite a different staged binary (move it
+before selecting another candidate). Both recipes verify the staged binary and
+label it with `gg.fibe.cli.binary.sha256`; nothing is downloaded. Candidate
 images are tagged only `<provider>-cand-<cli-version>-<agent-sha7>-<arch>`,
 use separate cache refs and never emit `latest*` or SHA tags; select them by
 digest. The entrypoint uses the baked candidate and fails before any download
-on a mismatched or `latest` request. Inside CI the binary path must be readable
-under the `/app` source mount. Settings use `hostRoot` / `hostRootDomain`
+on a mismatched or `latest` request. The Compose CI forwards these inputs
+(stable CI leaves them unset); the binary path must be readable under the
+`/app` source mount (for example `/app/.candidate-cli/fibe`). Settings use `hostRoot` / `hostRootDomain`
 (`HOST_ROOT` / `HOST_ROOT_DOMAIN` for child processes) and `FIBE_HOST_ID`;
 removed settings fail with an error naming the replacement.
 
@@ -222,7 +236,9 @@ removed settings fail with an error naming the replacement.
    provider conditional in the final stage of both Dockerfiles.
 5. Configuration and docs: key variables in `.env.example`, settings in
    `fibe.example.yml`, the key table in `docs/API.md`, the provider and
-   `SESSION_DIR` tables in `docs/ARCHITECTURE.md`, and a prompt in
+   `SESSION_DIR` tables in `docs/ARCHITECTURE.md`, a provider section in
+   `docs/providers/runtime-contracts.md`, the version row in
+   `docs/runtime-tools.md`, and a prompt in
    `prompts/providers/` if needed.
 6. CI: a `ci-build-<provider>` service in `ci.yml` following the existing ones,
    the step in `CI_EXPECTED_STEPS` of `ci-results-notify`, the step in

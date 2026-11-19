@@ -30,24 +30,24 @@
 
 ## Features at a glance
 
-| Area                         | Details                                                                                                                                                 |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Agent providers**          | `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`, or `mock`, selected with `AGENT_PROVIDER`. Supports OAuth and API tokens. |
-| **Streaming chat**           | WebSocket at `/ws` with per-chunk streaming, reasoning/thinking steps, tool-call and file-created events, token usage, and agent interrupt.             |
-| **Code editor**              | CodeMirror 6 with highlighting for 15+ languages, unsaved-change indicators, shortcuts, and REST-backed saves.                                          |
-| **Interactive terminal**     | xterm.js terminal backed by `node-pty`, connected via WebSocket at `/ws-terminal`, spawning shell sessions in the playground directory.                 |
-| **Activity sidebar**         | Agent reasoning, tool calls, file operations, and status in chronological order.                                                                        |
-| **File explorer**            | Real-time file tree of the playground via `PlaygroundWatcherService`; open, edit, view, and save files without leaving the chat.                        |
-| **Voice input**              | Records with `MediaRecorder` and sends the audio as an attachment.                                                                                      |
-| **Gemma MCP Router**         | Optional local Ollama model (`gemma3:4b`) that classifies intent and suggests MCP tools.                                                                |
-| **File attachments**         | Upload images, audio, PDF, Office, CSV, JSON, or text files up to 20 MB each.                                                                           |
-| **`@`-mention files**        | Type `@` in the chat input to reference playground files; the API injects their contents into the agent prompt.                                         |
-| **Conversation persistence** | Stores messages, activity, model and effort choices, uploads, and provider sessions by conversation id.                                                 |
-| **Fibe integration**         | `FibeSyncService`, `postMessage` auto-auth, and iframe embed support with parent-controlled theming.                                                    |
-| **Security**                 | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), shared-password bearer token auth, multipart validation.                                    |
-| **Structured logging**       | One JSON object per line to stdout; request IDs, HTTP and WebSocket context, configurable via `LOG_LEVEL`.                                              |
-| **Testing**                  | Co-located unit tests (Bun for the API, Vitest for Chat), plus end-to-end suites for the API and Chat.                                                  |
-| **Docker**                   | Multi-arch (`linux/amd64`, `linux/arm64`) images published to GHCR per provider on every push to `main` / `dev`.                                        |
+| Area | Details |
+| --- | --- |
+| **Agent providers** | `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`, or `mock`, selected with `AGENT_PROVIDER`. Supports OAuth and API tokens. |
+| **Streaming chat** | WebSocket at `/ws` with per-chunk streaming, reasoning/thinking steps, tool-call and file-created events, token usage, and agent interrupt. |
+| **Code editor** | CodeMirror 6 with highlighting for 15+ languages, unsaved-change indicators, shortcuts, and REST-backed saves. |
+| **Interactive terminal** | xterm.js terminal backed by `node-pty` over `/ws-terminal`, spawning shells in the playground directory. |
+| **Activity sidebar** | Agent reasoning, tool calls, file operations, and status in chronological order. |
+| **File explorer** | Real-time playground file tree; open, edit, view, and save files without leaving the chat. |
+| **Voice input** | Records with `MediaRecorder` and sends the audio as an attachment. |
+| **Gemma MCP Router** | Optional local Ollama model (`gemma3:4b`) that classifies intent and suggests MCP tools. |
+| **File attachments** | Images, audio, PDF, Office, CSV, JSON, or text files up to 20 MB each. |
+| **`@`-mention files** | Type `@` to reference playground files; the API injects their contents into the prompt. |
+| **Conversation persistence** | Messages, activity, model and effort choices, uploads, and provider sessions by conversation id. |
+| **Fibe integration** | `FibeSyncService`, `postMessage` auto-auth, and iframe embedding with parent-controlled theming. |
+| **Security** | Helmet (CSP, frame-ancestors), rate limiting (100 req/min), shared-password bearer auth, multipart validation. |
+| **Structured logging** | One JSON object per line with request IDs and HTTP/WebSocket context; `LOG_LEVEL`. |
+| **Testing** | Co-located unit tests (Bun for the API, Vitest for Chat), plus end-to-end suites for the API and Chat. |
+| **Docker** | Multi-arch (`linux/amd64`, `linux/arm64`) GHCR images per provider, published by the Compose CI in [`ci.yml`](ci.yml). |
 
 ## Architecture
 
@@ -95,124 +95,45 @@ flowchart LR
 
 ## Quick start
 
-Requires [Bun](https://bun.sh). The version is pinned in `package.json`.
+Requires [Bun](https://bun.sh); the version is pinned in `package.json`.
 
 ```sh
 bun install
-bun run dev
+bun run dev                                      # API http://localhost:3000 (/api/health), Chat http://localhost:3100
+AGENT_PROVIDER=mock bunx nx serve api            # no provider CLI or key needed
+API_URL=http://localhost:3000 bunx nx serve chat # Chat against an API on another host
 ```
 
-| URL                                            | Description                                       |
-| ---------------------------------------------- | ------------------------------------------------- |
-| [http://localhost:3000](http://localhost:3000) | API: health at `/api/health`                      |
-| [http://localhost:3100](http://localhost:3100) | Chat UI: Vite proxies `/api` and `/ws` to the API |
+Chat's Vite server proxies `/api` and `/ws` to the API. For password protection set `agentPassword` in `fibe.yml` or `FIBE_SETTINGS_JSON`; `AGENT_PASSWORD` alone does not enable authentication.
 
-Use the mock agent when no provider CLI is installed:
+Fibe containers receive one built-in local stdio MCP entry through `MCP_CONFIG_JSON` (`fibe mcp serve --yolo` with `FIBE_API_KEY` and `FIBE_DOMAIN`), which keeps the bundled CLI and MCP tools aligned without a daemon. Expose Fibe only once per environment to avoid duplicate tools.
 
-```sh
-AGENT_PROVIDER=mock bunx nx serve api
-```
+## Documentation
 
-To use an API on another host:
-
-```sh
-API_URL=http://localhost:3000 bunx nx serve chat
-```
-
-For password protection, set `agentPassword` in `fibe.yml` or `FIBE_SETTINGS_JSON`, then sign in through Chat. `AGENT_PASSWORD` alone does not enable API or WebSocket authentication.
-
-Fibe containers receive one built-in local stdio MCP entry through `MCP_CONFIG_JSON`: `fibe mcp serve --yolo`, configured with `FIBE_API_KEY` and `FIBE_DOMAIN`. This keeps the bundled CLI and MCP tools aligned without a daemon. Providers may add remote MCP servers, but each environment should expose Fibe only once to avoid duplicate tools.
-
-### Run services separately
-
-| App  | Command              | Port |
-| ---- | -------------------- | ---- |
-| API  | `bunx nx serve api`  | 3000 |
-| Chat | `bunx nx serve chat` | 3100 |
-
-## Project layout
-
-```
-fibe-agent/
-├── apps/
-│   ├── api/          # NestJS + Fastify — WebSocket /ws & /ws-terminal, REST /api/*
-│   ├── chat/         # React + Vite — chat, editor, terminal, sidebar, explorer
-│   ├── e2e-api/      # Playwright e2e for the API
-│   └── e2e-chat/     # Playwright e2e for the Chat UI
-├── shared/           # Shared TS types, WS constants, API path helpers
-├── docs/
-│   ├── API.md        # REST, WebSocket, and logging contract
-│   └── ARCHITECTURE.md # Providers, auth, persistence, MCP tools, API modules
-├── AGENTS.md         # Rules for contributors and coding agents: CI, tests, images
-├── playground/       # Agent working directory (file explorer root)
-└── data/             # Persisted messages, activities, uploads (per conversation)
-```
-
-### API modules
-
-The module map, providers, authentication modes, persistence layout and local MCP tools are described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-
-## Environment
-
-Every setting, with its default, is in [`fibe.example.yml`](fibe.example.yml); local process variables are in [`.env.example`](.env.example). Settings such as `agentPassword`, `modelOptions`, `dataDir`, `systemPrompt`, `hostRoot`, and `postInitScript` come from `fibe.yml` or `FIBE_SETTINGS_JSON`, then pass to child processes as environment variables. Settings promotion, provider key variables and Chat runtime variables are documented in [docs/API.md](docs/API.md).
-
-## API
-
-The REST endpoints (`/api/*`), the chat WebSocket (`/ws`) and the terminal WebSocket (`/ws-terminal`) are specified in [docs/API.md](docs/API.md). Contributor and coding-agent rules (CI, focused tests, image builds, adding a provider) are in [AGENTS.md](AGENTS.md).
-
-## Lockfiles
-
-The repo keeps **`bun.lock`** for Bun, CI, and Docker, and **`package-lock.json`** for npm compatibility. Keep `bun.lock` when running `bun install`; workspace installs depend on it. CI uses `bun install --frozen-lockfile`.
-
-## Scripts
-
-| Script       | Command              | Description                                            |
-| ------------ | -------------------- | ------------------------------------------------------ |
-| `dev`        | `bun run dev`        | Local API + Chat through Nx                            |
-| `dev:docker` | `bun run dev:docker` | Docker/Mutagen API + Chat with serialized API restarts |
-| `build`      | `bun run build`      | Build all apps                                         |
-| `lint`       | `bun run lint`       | Lint all projects                                      |
-| `test`       | `bun run test`       | Unit tests                                             |
-| `typecheck`  | `bun run typecheck`  | TypeScript type-check                                  |
-| `e2e`        | `bun run e2e`        | Playwright e2e suites                                  |
-| `ci`         | `bun run ci`         | Lint + build + typecheck + test                        |
-| `ci:notest`  | `bun run ci:notest`  | Lint + build + typecheck only                          |
-
-## Container images
-
-The root Compose CI pipeline builds and pushes multi-arch (`linux/amd64`, `linux/arm64`) provider images when its `ci-build-<provider>` services run:
-
-```
-ghcr.io/<owner>/fibe-agent:<provider>-latest
-ghcr.io/<owner>/fibe-agent:<provider>-<git-sha>
-
-# latest-dev for the dev branch:
-ghcr.io/<owner>/fibe-agent:<provider>-latest-dev
-```
-
-Providers: `gemini`, `antigravity`, `claude-code`, `openai-codex`, `cursor`, `opencode`. Pass `AGENT_PROVIDER` as a build arg; see [Dockerfile](Dockerfile) and the root Compose CI file [ci.yml](ci.yml).
+| Document | Contents |
+| --- | --- |
+| [AGENTS.md](AGENTS.md) | Rules for contributors and coding agents: layout, lockfiles, CI, focused tests, images, adding a provider |
+| [fibe.example.yml](fibe.example.yml), [.env.example](.env.example) | Every setting with its default; local process variables |
+| [docs/API.md](docs/API.md) | REST, WebSocket, structured output, delivery identities and logging contract |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Providers, `AgentStrategy`, authentication modes, persistence, local MCP tools, Gemma router, API modules |
+| [MULTI.md](MULTI.md) | Multi-conversation runtime and per-provider session behaviour |
+| [contracts/mobile-client.md](contracts/mobile-client.md) | Mobile client request, response and event contract |
+| [docs/providers/runtime-contracts.md](docs/providers/runtime-contracts.md) | Provider CLI/SDK runtime contracts |
+| [docs/runtime-tools.md](docs/runtime-tools.md) | Tool and provider CLI pins, pin drift report and bump routine, image smoke checks |
+| [apps/api/BACKEND_BOUNDARIES.md](apps/api/BACKEND_BOUNDARIES.md) | Backend boundaries |
+| [prompts/README.md](prompts/README.md) | System prompt reference library |
 
 ## Embedding (iframe)
 
-The chat can run inside a `<iframe>` in another app (e.g. Fibe):
+- **Auto-auth:** the parent posts `{ action: 'auto_auth', password: '…' }`; Chat signs in.
+- **Theme control:** the parent posts `{ action: 'set_theme', theme: 'light'|'dark' }` (requires `VITE_THEME_SOURCE=frame`); `winter` and `halloween` are normalized to `light` and `dark`.
 
-- **Auto-auth:** parent posts `{ action: 'auto_auth', password: '…' }`; Chat signs in automatically.
-- **Theme control:** parent posts `{ action: 'set_theme', theme: 'light'|'dark' }` (requires `VITE_THEME_SOURCE=frame`). Legacy `winter` and `halloween` inputs are accepted and normalized to `light` and `dark`.
+## Light and Dark appearance
+
+The interface uses a neutral monochrome palette, Plus Jakarta Sans, solid surfaces and standard controls. Editor and terminal chrome follow the theme; syntax, ANSI and status colors keep their meaning. Tony Stark mode keeps its separate interface. Waiting messages use ordinary status text regardless of prompt keywords.
+
+The `chat-theme` storage key and `fibe_theme_changed` event are unchanged. Canonical themes are `light` and `dark`; `winter` migrates to `light`, and `halloween`, `dracula`, `midnight` and `contrast` migrate to `dark`. Startup follows the system preference without saving an inferred choice.
 
 ## License
 
 MIT. See `package.json`.
-
-### Light and Dark appearance
-
-The normal interface uses a neutral monochrome palette, Plus Jakarta Sans,
-solid surfaces and standard controls. Editor and terminal chrome follow the
-selected theme; syntax, ANSI and status colors remain meaningful. Tony Stark
-mode retains its separate interface. Waiting messages use ordinary operational
-status text regardless of prompt keywords.
-
-The `chat-theme` storage key and `fibe_theme_changed` event are unchanged.
-Canonical themes are `light` and `dark`; `winter` migrates to `light`, while
-`halloween`, `dracula`, `midnight` and `contrast` migrate to `dark`. Startup
-respects the system preference without saving an inferred choice. Embedded
-instances continue to accept the parent’s canonical `set_theme` message.
