@@ -1,9 +1,8 @@
 # Provider runtime contracts
 
-These contracts were checked against official documentation and the installed
-Linux CLI distributions on 2026-09-30. Installation versions belong in the
-provider manifest and package manifests. Example `cliVersion` values select the
-FIBE CLI used by MCP tools; provider snapshots are documented separately.
+Checked against official documentation and the installed Linux CLIs (pins in
+`docs/runtime-tools.md`). Example `cliVersion` values select the FIBE CLI used by
+MCP tools, not provider CLIs.
 
 Use an explicit `SESSION_DIR` for native authentication state. Credential
 availability checks do not prove that a key works, that OAuth remains valid, or
@@ -114,12 +113,40 @@ permission settings and structured output remain owned by the runtime.
 - [OpenCode CLI, authentication, models and run flags](https://opencode.ai/docs/cli/)
 - [OpenCode app-server contract](https://opencode.ai/docs/server/)
 
+## Antigravity
+
+`agy` supports Google OAuth or a Gemini API key. `agy models` fills the selector
+(account-dependent slugs); a selected model goes to `--model`, an empty one uses the
+CLI default, unknown models fail. Effort low/medium/high passes through; xhigh and
+max map to high.
+
+OAuth runs the CLI in a dedicated terminal because Google reads pasted codes from
+the controlling terminal; Chat forwards the URL and writes the submitted code there,
+and cancel closes the terminal. Keep credentials (native and legacy injected
+keyrings) in the configured `SESSION_DIR` or `ANTIGRAVITY_HOME`, not the operator's
+global home. For `api-token`, provide `GEMINI_API_KEY` (aliases `GOOGLE_API_KEY`,
+`GOOGLE_GENERATIVE_AI_API_KEY` are translated) via protected settings or the
+sign-in dialog; the runtime sets `modelProvider: gemini` in
+`.gemini/antigravity-cli/settings.json`, keeping other settings.
+
+Each prompt uses `--output-format stream-json` with closed stdin; text deltas,
+tool steps and terminal usage are forwarded. Success requires a terminal `SUCCESS`
+result with nonempty text; interrupted, canceled, invalid, waiting, incomplete or
+malformed responses fail visibly. The result's conversation ID is saved in that
+FIBE conversation and only that ID is resumed (no transcript stripping or guessed
+cache session); a missing session clears the marker for a fresh retry. Steering is
+queued for the next turn; interruption stops the CLI.
+
+- [Installation and authentication](https://www.antigravity.google/docs/cli/install/)
+- [Headless flags, events and results](https://www.antigravity.google/docs/cli/headless/)
+- [CLI reference](https://www.antigravity.google/docs/cli/reference/)
+
 ## Verification scope
 
 Focused provider tests cover parsing, terminal errors, tools/usage, credential
 formats, model discovery, session continuation and interruption/steering. They
 use deterministic CLI/SDK fixtures. Antigravity additionally exercises OAuth
-code entry in a real Node terminal; see `antigravity.md` for its protocol.
+code entry and cancellation in a real Node terminal.
 
 Real unauthenticated CLI checks confirmed missing-auth behavior, Cursor status
 JSON and login URLs, OpenCode model output, and Gemini's installed stream-schema

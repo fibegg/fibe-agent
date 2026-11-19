@@ -3,12 +3,12 @@
 Both Docker recipes call `scripts/install-provider.mjs`. npm provider versions
 come from exact root `package.json` dependencies; Cursor and Antigravity releases
 come from `scripts/provider-versions.json`. Missing versions and unknown providers
-fail the build. API runtime dependencies use their own `apps/api/package-lock.json`
+fail the build (never latest); each installed CLI must pass `--version` and `--help`.
+Provider versions belong to agent releases: standalone installs of other versions may
+break parsing or connectivity, and only the pinned version is tested. API runtime dependencies use their own `apps/api/package-lock.json`
 and `npm ci`; the workspace builder uses `bun.lock`. CI checks cached Bun and
 node-gyp versions before reusing them. The Antigravity manifest includes the publisher's SHA512 for each
 architecture. Cursor uses its versioned download URL and a stable runtime path.
-
-Reviewed on 2026-09-30:
 
 | Tool | Version | Upstream source |
 | --- | --- | --- |
@@ -54,26 +54,7 @@ docker build --target cli --build-arg AGENT_PROVIDER=openai_codex -t fibe-agent-
 docker run --rm fibe-agent-cli-check codex --version
 ```
 
-Fibe CLI builds resolve GitHub's latest stable published SDK release once per
-build invocation, before Docker cache selection. `scripts/ci/cli-build.mjs`
-fetches release metadata, the published `checksums.txt`, and the release tag's
-exact commit (two GitHub API requests). It uses `GH_TOKEN` when available for
-metadata; unauthenticated builds use the public `releases/latest` endpoint.
-`FIBE_CLI_VERSION=<exact stable version>` overrides latest. Provider and
-common-cache builds pass the resolved version, commit and both Linux archive
-SHA-256 values as Docker build args. These inputs invalidate the installation
-layer when a release or artifact changes; older caches cannot skip discovery.
-The Docker installer verifies the downloaded archive against that resolved hash
-before extraction. Metadata, missing asset and checksum failures stop the build.
-
-Images record `gg.fibe.cli.version`, `gg.fibe.cli.sdk.sha`, and
-`gg.fibe.cli.archive.{amd64,arm64}.sha256`. Startup with `latest` or no version
-resolves once again, verifies the matching published checksum, and logs the
-version, release commit and archive hash. An explicit startup version retains
-existing exact-version reuse. Candidate builds keep their local binary injection,
-checksum verification and separate tags; they do not resolve a release.
-
-For a direct development-image build, resolve before invoking Docker (Node 24+):
+Fibe CLI release resolution, verification and labels are described in `AGENTS.md` (Latest stable CLI release, Candidate CLI builds); old Fibe fields in the provider manifest are no longer read. `cliVersion` (or `FIBE_VERSION` / `FIBE_CLI_VERSION`) selects only the runtime `fibe` CLI; no strategy switches provider binaries or runs `npx @provider/cli@<version>`. For a direct development-image build, resolve the release first (Node 24+):
 
 ```sh
 node --input-type=module <<'JS'
@@ -86,10 +67,6 @@ const result = spawnSync('docker', ['build', '-f', 'Dockerfile.dev',
 process.exit(result.status ?? 1);
 JS
 ```
-
-The latest stable policy supersedes the previous maintained Fibe SDK pin policy;
-it does not change pins for other tools. The old Fibe fields in the provider
-manifest are no longer read by the Fibe build or startup installers.
 
 Repeat the CLI stage for all six providers on `linux/amd64` and `linux/arm64`.
 Each installation executes the binary's version and help commands during the
@@ -108,26 +85,13 @@ Chrome screenshots without sandbox flags (Playwright Chrome channel, the CLI and
 the Playwright MCP), MCP initialization and tool discovery, and an HTTP MCP bridge with a local dummy
 authentication header. It does not contact provider APIs or use live tokens.
 
-## Dependency advisory review at the publication checkpoint
+## Dependency advisories
 
-The coherent root npm graph reports16 affected dependency nodes, including Nx's
-exact Axios1.18.1 dependency and React Router6.30.6. The separately installed API
-lock audited0 findings and API source has no Axios import.
-
-The [Axios Node data-URL advisory](https://github.com/axios/axios/security/advisories/GHSA-c29m-xwm3-cm6r)
-requires untrusted malformed data URLs. Inspected Nx callers use configured
-cloud/tool URLs, fixed provider API paths and a bundle URL returned by the
-configured cache service, rather than application user requests. This does not
-prove operator configuration or compromised provider responses safe. The
-upstream Nx23.2.1 exact dependency is retained; no forced override or downgrade
-was applied. The affected version remains recorded in release evidence.
-
-The chat uses createRoot and BrowserRouter in declarative client mode. The
-[router hydration advisory](https://github.com/remix-run/react-router/security/advisories/GHSA-337j-9hxr-rhxg)
-explicitly excludes that mode. The
-[router navigation advisory](https://github.com/remix-run/react-router/security/advisories/GHSA-wrjc-x8rr-h8h6)
-remains an affected-library finding; inspected callers use fixed routes or the
-fixed `/activity/` prefix with stored identifier strings, and no pass-through
-external navigation URL was found. This bounded review does not establish that
-future callers are safe. Router6 compatibility is retained for this release.
-No CSP/header policy changes were introduced for these findings.
+Retained knowingly at the last publication review: Nx's exact Axios 1.18.1
+([data-URL advisory](https://github.com/axios/axios/security/advisories/GHSA-c29m-xwm3-cm6r)
+needs untrusted malformed data URLs; Nx callers use configured URLs; the API lock has
+no Axios) and React Router 6.30.6 (chat uses declarative `BrowserRouter`, excluded from
+the [hydration advisory](https://github.com/remix-run/react-router/security/advisories/GHSA-337j-9hxr-rhxg);
+the [navigation advisory](https://github.com/remix-run/react-router/security/advisories/GHSA-wrjc-x8rr-h8h6)
+applies to the library, but callers use fixed routes or the `/activity/` prefix). No
+override, downgrade or CSP change was made; recheck when callers change.
