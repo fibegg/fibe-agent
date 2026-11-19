@@ -22,7 +22,8 @@ provider CLI pinned in `package.json` and `scripts/provider-versions.json`, the
 pinned version, the latest version published on npm, a status (`current`,
 `behind`, `ahead`, `unknown`) and the date and age in days of the commit that
 introduced the pin. The Claude Agent SDK is listed with Claude Code because the
-two are bumped together. Cursor and Antigravity have no registry lookup and show
+two are bumped together, once for `package.json` and once for
+`apps/api/package.json`, which the API runtime installs. Cursor and Antigravity have no registry lookup and show
 `check installer`.
 
 The report is read-only: it never edits a pin. It runs `npm view <package>

@@ -36,22 +36,28 @@ const fixtureVersions = {
   },
 };
 
+const fixtureApiPackage = { name: 'fixture-api', private: true, dependencies: { '@anthropic-ai/claude-agent-sdk': '0.3.9' } };
+
 function fixture(dependencies = fixturePackage.dependencies) {
   const root = mkdtempSync(path.join(tmpdir(), 'fibe-provider-pins-'));
   mkdirSync(path.join(root, 'scripts'));
+  mkdirSync(path.join(root, 'apps/api'), { recursive: true });
   writeFileSync(path.join(root, 'package.json'), `${JSON.stringify({ ...fixturePackage, dependencies }, null, 2)}\n`);
+  writeFileSync(path.join(root, 'apps/api/package.json'), `${JSON.stringify(fixtureApiPackage, null, 2)}\n`);
   writeFileSync(path.join(root, 'scripts/provider-versions.json'), `${JSON.stringify(fixtureVersions, null, 2)}\n`);
   return root;
 }
 
 function digest(root) {
   const hash = createHash('sha256');
-  for (const file of ['package.json', 'scripts/provider-versions.json']) hash.update(readFileSync(path.join(root, file)));
+  for (const file of ['package.json', 'apps/api/package.json', 'scripts/provider-versions.json']) hash.update(readFileSync(path.join(root, file)));
   return hash.digest('hex');
 }
 
 function git(root, args, date) {
-  const env = { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date };
+  // Inherited GIT_DIR or GIT_WORK_TREE would point the fixture commands at another repository.
+  const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => !name.startsWith('GIT_')));
+  Object.assign(env, { GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date });
   const result = spawnSync(
     'git',
     ['-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', '-c', 'commit.gpgsign=false', ...args],
@@ -87,11 +93,11 @@ test('offline mode never queries the registry and marks npm pins as not checked'
       lookupLatest: () => assert.fail('registry lookup in offline mode'),
       pinDate: () => null,
     });
-    for (const row of rows.filter((row) => row.file === 'package.json')) {
+    for (const row of rows.filter((row) => row.file.endsWith('package.json'))) {
       assert.equal(row.status, 'not checked');
       assert.equal(row.latest, null);
     }
-    for (const row of rows.filter((row) => row.file !== 'package.json')) assert.equal(row.status, 'check installer');
+    for (const row of rows.filter((row) => !row.file.endsWith('package.json'))) assert.equal(row.status, 'check installer');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -116,6 +122,25 @@ test('registry results classify pins as current, behind, ahead or unknown', () =
     assert.equal(status['opencode-ai'], 'ahead');
     assert.equal(status['@google/gemini-cli'], 'unknown');
     assert.ok(!looked.some((name) => name.startsWith('https://')), 'installer-based providers are not looked up on npm');
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('the API runtime Agent SDK pin is reported beside the workspace pin', () => {
+  const root = fixture();
+  try {
+    const rows = buildReport({
+      root,
+      lookupLatest: (name) => (name === '@anthropic-ai/claude-agent-sdk' ? '0.3.10' : null),
+      pinDate: () => null,
+    }).filter((row) => row.package === '@anthropic-ai/claude-agent-sdk');
+    const byFile = Object.fromEntries(rows.map((row) => [row.file, row]));
+    assert.equal(rows.length, 2);
+    assert.equal(byFile['package.json'].pinned, '0.3.10');
+    assert.equal(byFile['package.json'].status, 'current');
+    assert.equal(byFile['apps/api/package.json'].pinned, '0.3.9');
+    assert.equal(byFile['apps/api/package.json'].status, 'behind');
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

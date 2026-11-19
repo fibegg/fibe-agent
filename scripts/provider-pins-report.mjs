@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Read-only report of the provider CLI pins: pinned version, latest published
 // version and how long the pin has been in place. It never edits a file.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -10,8 +10,21 @@ import { npmProviders } from './install-provider.mjs';
 const DAY_MS = 24 * 60 * 60 * 1000;
 const defaultRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// The Agent SDK runs Claude Code in process, so it is bumped with the CLI.
-const companionPackages = { 'claude-code': ['@anthropic-ai/claude-agent-sdk'] };
+// The Agent SDK runs Claude Code in process, so it is bumped with the CLI. The
+// API runtime installs its own copy from apps/api/package.json, so both pins
+// are reported.
+const companionPackages = {
+  'claude-code': [
+    ['@anthropic-ai/claude-agent-sdk', 'package.json'],
+    ['@anthropic-ai/claude-agent-sdk', 'apps/api/package.json'],
+  ],
+};
+
+function readDependencies(root, file) {
+  const fullPath = resolve(root, file);
+  if (file !== 'package.json' && !existsSync(fullPath)) return {};
+  return JSON.parse(readFileSync(fullPath, 'utf8')).dependencies ?? {};
+}
 
 const manifestProviders = {
   cursor: { source: (versions) => versions.cursor?.source },
@@ -50,17 +63,21 @@ export function parseArgs(argv) {
 }
 
 export function collectPins(root) {
-  const dependencies = JSON.parse(readFileSync(resolve(root, 'package.json'), 'utf8')).dependencies ?? {};
+  const dependencies = new Map();
+  const dependenciesOf = (file) => {
+    if (!dependencies.has(file)) dependencies.set(file, readDependencies(root, file));
+    return dependencies.get(file);
+  };
   const versions = JSON.parse(readFileSync(resolve(root, 'scripts/provider-versions.json'), 'utf8'));
   const pins = [];
   for (const [provider, [packageName]] of Object.entries(npmProviders)) {
-    for (const name of [packageName, ...(companionPackages[provider] ?? [])]) {
-      const version = dependencies[name] ?? null;
+    for (const [name, file] of [[packageName, 'package.json'], ...(companionPackages[provider] ?? [])]) {
+      const version = dependenciesOf(file)[name] ?? null;
       pins.push({
         provider,
         package: name,
         pinned: version,
-        file: 'package.json',
+        file,
         needle: version ? `"${name}": "${version}"` : null,
         registry: 'npm',
       });
@@ -84,6 +101,13 @@ export function collectPins(root) {
 // that introduced the current pin.
 export function gitPinDate(root, file, needle) {
   if (!needle) return null;
+  // A shallow clone's boundary commit adds every file, which would look like a
+  // recent pin.
+  const shallow = spawnSync('git', ['-C', root, 'rev-parse', '--is-shallow-repository'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  });
+  if (shallow.error || shallow.status !== 0 || shallow.stdout.trim() !== 'false') return null;
   const result = spawnSync('git', ['-C', root, 'log', '-1', '--format=%cI', `-S${needle}`, '--', file], {
     encoding: 'utf8',
     stdio: ['ignore', 'pipe', 'ignore'],
@@ -129,8 +153,13 @@ function status(pin, latest, offline) {
 }
 
 export function buildReport({ root = defaultRoot, offline = false, now = new Date(), lookupLatest = npmLatest, pinDate = gitPinDate } = {}) {
+  const latestByPackage = new Map();
+  const latestOf = (name) => {
+    if (!latestByPackage.has(name)) latestByPackage.set(name, lookupLatest(name));
+    return latestByPackage.get(name);
+  };
   return collectPins(root).map((pin) => {
-    const latest = pin.registry && pin.pinned && !offline ? lookupLatest(pin.package) : null;
+    const latest = pin.registry && pin.pinned && !offline ? latestOf(pin.package) : null;
     const since = pinDate(root, pin.file, pin.needle);
     const ageDays = since ? Math.max(0, Math.floor((now.getTime() - new Date(since).getTime()) / DAY_MS)) : null;
     return {
