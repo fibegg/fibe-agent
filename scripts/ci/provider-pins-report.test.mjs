@@ -212,6 +212,9 @@ test('versions compare numerically and the table aligns every row', () => {
   assert.equal(compareVersions('0.159.3', '0.170.0'), -1);
   assert.equal(compareVersions('2.1.328', '2.1.286'), 1);
   assert.equal(compareVersions('1.19.6', '1.19.6'), 0);
+  assert.equal(compareVersions('1.0.0-beta', '1.0.0'), -1);
+  assert.equal(compareVersions('1.0.0-beta.2', '1.0.0-beta.10'), -1);
+  assert.equal(compareVersions('1.0.0-rc.1', '1.0.0-beta'), 1);
   const table = formatReport([
     { provider: 'gemini', package: '@google/gemini-cli', pinned: '0.62.0', latest: '0.69.0', status: 'behind', pinnedSince: '2026-10-01', ageDays: 49, file: 'package.json' },
     { provider: 'cursor', package: 'https://cursor.example/install', pinned: '2026.09.28-64d2043', latest: null, status: 'check installer', pinnedSince: null, ageDays: null, file: 'scripts/provider-versions.json' },
