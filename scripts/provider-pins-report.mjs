@@ -128,18 +128,34 @@ export function npmLatest(packageName) {
   return version || null;
 }
 
+// Semver order: the release parts compare numerically, and a prerelease
+// (1.0.0-beta) sorts before its release (1.0.0).
 export function compareVersions(left, right) {
-  const parts = (version) => version.split(/[.-]/).map((part) => (/^\d+$/.test(part) ? Number(part) : part));
-  const a = parts(left);
-  const b = parts(right);
-  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
-    const x = a[index] ?? 0;
-    const y = b[index] ?? 0;
-    if (x === y) continue;
-    if (typeof x === 'number' && typeof y === 'number') return x < y ? -1 : 1;
-    return String(x) < String(y) ? -1 : 1;
+  const split = (version) => {
+    const [core, ...rest] = version.split('+')[0].split('-');
+    return { core: core.split('.').map(Number), pre: rest.length ? rest.join('-').split('.') : [] };
+  };
+  const compareParts = (a, b) => {
+    for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
+      if (index >= a.length) return -1;
+      if (index >= b.length) return 1;
+      const x = /^\d+$/.test(a[index]) ? Number(a[index]) : a[index];
+      const y = /^\d+$/.test(b[index]) ? Number(b[index]) : b[index];
+      if (x === y) continue;
+      if (typeof x === typeof y) return x < y ? -1 : 1;
+      return typeof x === 'number' ? -1 : 1;
+    }
+    return 0;
+  };
+  const a = split(left);
+  const b = split(right);
+  for (let index = 0; index < Math.max(a.core.length, b.core.length); index += 1) {
+    const x = a.core[index] ?? 0;
+    const y = b.core[index] ?? 0;
+    if (x !== y) return x < y ? -1 : 1;
   }
-  return 0;
+  if (a.pre.length === 0 || b.pre.length === 0) return a.pre.length === b.pre.length ? 0 : a.pre.length === 0 ? 1 : -1;
+  return compareParts(a.pre, b.pre);
 }
 
 function status(pin, latest, offline) {
