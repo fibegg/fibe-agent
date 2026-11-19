@@ -1,4 +1,5 @@
 import { Controller, Get } from '@nestjs/common';
+import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 
 export interface RuntimeConfig {
   userAvatarUrl: string | null;
@@ -9,6 +10,7 @@ export interface RuntimeConfig {
   agentProviderLabel: string | null;
   simplicate: boolean;
   lockChatModel: boolean;
+  structuredOutput: boolean;
 }
 
 function providerLabel(provider: string | null): string | null {
@@ -43,6 +45,8 @@ function truthy(value: string | undefined): boolean {
 
 @Controller()
 export class RuntimeConfigController {
+  constructor(private readonly strategyRegistry: StrategyRegistryService) {}
+
   @Get('runtime-config')
   getConfig(): RuntimeConfig {
     const agentProvider = process.env.AGENT_PROVIDER?.trim() || 'claude-code';
@@ -55,6 +59,8 @@ export class RuntimeConfigController {
       agentProviderLabel: providerLabel(agentProvider),
       simplicate: truthy(process.env.SIMPLICATE),
       lockChatModel: truthy(process.env.LOCK_CHAT_MODEL),
+      structuredOutput:
+        this.strategyRegistry.resolveStrategy().supportsStructuredOutput?.() ?? false,
     };
   }
 }

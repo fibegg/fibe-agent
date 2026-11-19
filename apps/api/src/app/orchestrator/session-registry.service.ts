@@ -12,6 +12,7 @@ export interface ConversationLiveState {
   revision: number;
   isProcessing: boolean;
   streamText: string;
+  structuredOutput: boolean;
   currentActivityId: string | null;
   queuedTurns: number;
   queue: {
@@ -135,6 +136,7 @@ export class SessionRegistryService {
         revision: sequence.revision,
         isProcessing: true,
         streamText: processing.streamTextAccumulated,
+        structuredOutput: !!processing.activeResponseFormat,
         currentActivityId: processing.currentActivityId,
         queuedTurns: processing.queuedTurns.length,
         queue: processing.queuedTurns.map((turn) => ({
@@ -159,6 +161,7 @@ export class SessionRegistryService {
       revision: sequence.revision,
       isProcessing: false,
       streamText: completed?.lastStreamText ?? '',
+      structuredOutput: completed?.lastStreamStructuredOutput ?? false,
       currentActivityId: null,
       queuedTurns: completed?.queuedTurns.length ?? 0,
       queue:
@@ -279,6 +282,13 @@ export class SessionRegistryService {
       const sequence = this.sequence(conversationId);
       sequence.revision += 1;
       sequencing = { streamId: sequence.streamId, revision: sequence.revision };
+      if (type !== WS_EVENT.QUEUE_UPDATED) {
+        const processing = this.processingForConversation(conversationId);
+        sequencing.structuredOutput = processing
+          ? !!processing.activeResponseFormat
+          : this.recentCompletedStreamForConversation(conversationId)
+              ?.lastStreamStructuredOutput ?? false;
+      }
     }
     const event: OutboundEvent = {
       type,

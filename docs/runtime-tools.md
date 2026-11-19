@@ -8,7 +8,8 @@ and `npm ci`; the workspace builder uses `bun.lock`. CI checks cached Bun and
 node-gyp versions before reusing them. The Antigravity manifest includes the publisher's SHA512 for each
 architecture. Cursor uses its versioned download URL and a stable runtime path.
 
-Reviewed on 2026-09-30:
+Reviewed on 2026-09-30. `bun run provider:pins` compares the provider pins with
+the latest published versions; see [provider CLI drift](PROVIDER_CLI_DRIFT.md).
 
 | Tool | Version | Upstream source |
 | --- | --- | --- |

@@ -6,7 +6,7 @@ import { join, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 
-const npmProviders = {
+export const npmProviders = {
   gemini: ['@google/gemini-cli', 'gemini'],
   'claude-code': ['@anthropic-ai/claude-code', 'claude'],
   'openai-codex': ['@openai/codex', 'codex'],

@@ -1373,6 +1373,7 @@ export class OrchestratorService implements OnModuleInit {
       ctx.streamTextAccumulated = '';
       ctx.streamStartedAt = streamStartedAt;
       ctx.lastStreamText = '';
+      ctx.lastStreamStructuredOutput = false;
       ctx.lastStreamStartedAt = null;
       ctx.lastStreamFinishedAt = null;
       this.sessionRegistry.broadcastToConversation(
@@ -1565,10 +1566,12 @@ export class OrchestratorService implements OnModuleInit {
       ctx.isProcessing = false;
       if (ctx.streamTextAccumulated.trim()) {
         ctx.lastStreamText = ctx.streamTextAccumulated;
+        ctx.lastStreamStructuredOutput = !!ctx.activeResponseFormat;
         ctx.lastStreamStartedAt = ctx.streamStartedAt;
         ctx.lastStreamFinishedAt = new Date().toISOString();
       } else {
         ctx.lastStreamText = '';
+        ctx.lastStreamStructuredOutput = false;
         ctx.lastStreamStartedAt = null;
         ctx.lastStreamFinishedAt = null;
       }

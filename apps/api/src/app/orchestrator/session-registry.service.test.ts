@@ -67,6 +67,8 @@ describe('SessionRegistryService', () => {
     expect(end.isProcessing).toBe(true);
     expect(end.finishedAt).toBeNull();
     expect(end.streamText).toBe('one');
+    expect(end.structuredOutput).toBe(false);
+    expect(sequenced.filter(event => event.type.startsWith('stream_')).every(event => event.data.structuredOutput === false)).toBe(true);
     expect(sequenced.every(event => event.data.streamId === snapshot.streamId)).toBe(true);
     expect(registry.liveConversationState('thread-b').revision).toBe(0);
   });
@@ -155,6 +157,7 @@ describe('SessionRegistryService', () => {
       revision: 0,
       isProcessing: true,
       streamText: 'partial assistant output',
+      structuredOutput: false,
       currentActivityId: 'activity-1',
       queuedTurns: 1,
       queue: [
@@ -188,6 +191,7 @@ describe('SessionRegistryService', () => {
       conversationId: 'thread-a',
       isProcessing: false,
       streamText: 'recent completed output',
+      structuredOutput: false,
       currentActivityId: null,
       queuedTurns: 0,
       queue: [],
@@ -199,6 +203,7 @@ describe('SessionRegistryService', () => {
   it('liveConversationState hides stale completed streams', () => {
     const ctx = registry.create('thread-a');
     ctx.lastStreamText = 'stale output';
+    ctx.lastStreamStructuredOutput = true;
     ctx.lastStreamStartedAt = '2026-05-07T20:00:00.000Z';
     ctx.lastStreamFinishedAt = new Date(Date.now() - 31_000).toISOString();
 
@@ -206,6 +211,7 @@ describe('SessionRegistryService', () => {
       conversationId: 'thread-a',
       isProcessing: false,
       streamText: '',
+      structuredOutput: false,
       currentActivityId: null,
       queuedTurns: 0,
       queue: [],

@@ -383,12 +383,75 @@ describe('OrchestratorService', () => {
     expect(ctx.activeResponseFormat).toBeUndefined();
   });
 
+  test('structured stream metadata survives reconnect and completion then resets for an ordinary turn', async () => {
+    const { orch, ctx, sessionRegistry, messageStore } = await createOrchestrator();
+    ctx.isAuthenticated = true;
+    ctx.strategy.supportsStructuredOutput = () => true;
+    const started = deferred<void>();
+    const finish = deferred<void>();
+    const output = { answer: 'A structured answer' };
+    const execute = spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk, callbacks) => {
+      started.resolve();
+      await finish.promise;
+      chunk('unvalidated prose');
+      callbacks?.onStructuredOutput?.(output);
+    });
+    const events: Array<{ type: string; data: Record<string, unknown> }> = [];
+    const streamEndSnapshots: ReturnType<SessionRegistryService['liveConversationState']>[] = [];
+    const lifecycle = [WS_EVENT.STREAM_START, WS_EVENT.STREAM_CHUNK, WS_EVENT.STREAM_END];
+    ctx.outbound$.subscribe((event) => {
+      if (lifecycle.includes(event.type as typeof WS_EVENT.STREAM_START)) events.push(event);
+      if (event.type === WS_EVENT.STREAM_END) {
+        streamEndSnapshots.push(sessionRegistry.liveConversationState(ctx.conversationId));
+      }
+    });
+    const turn = orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'extract', responseFormat });
+    await started.promise;
+    try {
+      expect(sessionRegistry.liveConversationState(ctx.conversationId)).toMatchObject({
+        isProcessing: true, structuredOutput: true, streamText: '',
+      });
+      sessionRegistry.detach(ctx.sessionId);
+      expect(sessionRegistry.create(ctx.conversationId)).toBe(ctx);
+      expect(sessionRegistry.liveConversationState(ctx.conversationId).structuredOutput).toBe(true);
+    } finally {
+      finish.resolve();
+      await turn;
+    }
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(events.map((event) => event.type)).toEqual(lifecycle);
+    expect(events.every((event) => event.data.structuredOutput === true)).toBe(true);
+    expect(events.every((event) => typeof event.data.revision === 'number')).toBe(true);
+    expect(streamEndSnapshots[0]).toMatchObject({
+      isProcessing: true, structuredOutput: true, streamText: JSON.stringify(output),
+    });
+    expect(ctx.activeResponseFormat).toBeUndefined();
+    expect(sessionRegistry.liveConversationState(ctx.conversationId)).toMatchObject({
+      isProcessing: false, structuredOutput: true, streamText: JSON.stringify(output),
+    });
+    expect(messageStore.all().at(-1)?.structuredOutput).toEqual(output);
+
+    events.length = 0;
+    execute.mockImplementation(async (_p, _m, chunk, _callbacks, _system, options) => {
+      expect(options?.responseFormat).toBeUndefined();
+      expect(sessionRegistry.liveConversationState(ctx.conversationId).structuredOutput).toBe(false);
+      chunk('Ordinary streamed answer');
+    });
+    await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'plain' });
+    expect(execute).toHaveBeenCalledTimes(2);
+    expect(events.map((event) => event.type)).toEqual(lifecycle);
+    expect(events.every((event) => event.data.structuredOutput === false)).toBe(true);
+    expect(sessionRegistry.liveConversationState(ctx.conversationId)).toMatchObject({
+      isProcessing: false, structuredOutput: false, streamText: 'Ordinary streamed answer',
+    });
+  });
+
   for (const value of [undefined, { answer: 123 }, { answer: 'ok', extra: true }]) {
     test(`invalid structured answer never emits success: ${JSON.stringify(value)}`, async () => {
       const { orch, ctx, messageStore } = await createOrchestrator();
       ctx.isAuthenticated = true;
       ctx.strategy.supportsStructuredOutput = () => true;
-      spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk, callbacks) => {
+      const execute = spyOn(ctx.strategy, 'executePromptStreaming').mockImplementation(async (_p, _m, chunk, callbacks) => {
         chunk('not JSON');
         callbacks?.onStructuredOutput?.(value);
       });
@@ -398,11 +461,13 @@ describe('OrchestratorService', () => {
       expect(events.find((e) => e.type === WS_EVENT.ERROR)?.data.code).toBe('STRUCTURED_OUTPUT_INVALID');
       expect(events.some((e) => [WS_EVENT.STREAM_END, WS_EVENT.STRUCTURED_OUTPUT, WS_EVENT.STREAM_CHUNK].includes(e.type as never))).toBe(false);
       expect(messageStore.all().filter((m) => m.role === 'assistant')).toHaveLength(0);
+      expect(execute).toHaveBeenCalledTimes(1);
     });
   }
 
   test('REST and WebSocket reject unsupported providers and invalid schemas before storing a turn', async () => {
     const { orch, ctx, messageStore } = await createOrchestrator();
+    const execute = spyOn(ctx.strategy, 'executePromptStreaming');
     const events: Array<{ type: string; data: Record<string, unknown> }> = [];
     ctx.outbound$.subscribe((event) => events.push(event));
     await orch.handleClientMessage(ctx, { action: WS_ACTION.SEND_CHAT_MESSAGE, text: 'extract', responseFormat });
@@ -418,6 +483,7 @@ describe('OrchestratorService', () => {
       }
     }
     expect(messageStore.all()).toHaveLength(0);
+    expect(execute).not.toHaveBeenCalled();
   });
 
   test('structured queue requests retain schema and identity and never steer an active turn', async () => {

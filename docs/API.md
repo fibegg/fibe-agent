@@ -149,6 +149,11 @@ Codex `exec` and OpenCode `run`/`cli` transports are unsupported, as are Gemini,
 Antigravity, Cursor, and mock. Unsupported requests are rejected before saving
 or executing a turn; there is no prompt-only fallback.
 
+`GET /api/runtime-config` exposes `structuredOutput: boolean` from the selected
+strategy's support predicate, including its current transport. This query does
+not execute a model turn. Clients should treat an absent capability on an older
+runtime as unadvertised support rather than guessing from the provider label.
+
 Schemas must have an object root (`type: "object"`) and use JSON Schema draft-07
 accepted by Ajv strict validation, including standard `ajv-formats` formats.
 Unknown keywords, malformed schemas, external `$ref` references, schemas larger
@@ -164,9 +169,9 @@ any answer text is emitted. This version does **not** emit partial JSON deltas.
 On success, the stream contains, in order:
 
 ```json
-{"type":"stream_chunk","text":"{\"name\":\"Ada\",\"email\":\"ada@example.com\"}","conversationId":"default"}
+{"type":"stream_chunk","text":"{\"name\":\"Ada\",\"email\":\"ada@example.com\"}","conversationId":"default","structuredOutput":true}
 {"type":"structured_output","output":{"name":"Ada","email":"ada@example.com"},"conversationId":"default"}
-{"type":"stream_end","model":"...","conversationId":"default"}
+{"type":"stream_end","model":"...","conversationId":"default","structuredOutput":true}
 ```
 
 `stream_start` and progress precede these events; `stream_end` retains optional
@@ -176,6 +181,16 @@ History stores the JSON text in `body` and the parsed object in `structuredOutpu
 also returned by message-history endpoints after reconnection. Failed or
 interrupted structured turns emit an `error` and no successful `stream_end`,
 `structured_output`, or assistant history record.
+
+The sequenced `stream_start`, `stream_chunk`, and `stream_end` events and
+`GET /api/conversations/:id/live` snapshots include `structuredOutput: boolean`.
+This flag identifies the current stream's format, independently of runtime
+capability, and is `false` for ordinary and direct CLI answers. A completed
+stream retains its flag for as long as its text is exposed in the existing
+recent-stream snapshot; a later ordinary turn resets it to `false`. Structured
+renderers use this metadata to suppress raw JSON during streaming/reconnect,
+then reconcile the final object with persisted message history. No partial JSON
+or new model call is introduced, and the `structured_output` payload is unchanged.
 
 | Error code | Meaning |
 | --- | --- |

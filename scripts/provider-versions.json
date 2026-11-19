@@ -1,5 +1,4 @@
 {
-  "reviewedAt": "2026-09-30",
   "cursor": {
     "version": "2026.09.28-64d2043",
     "source": "https://cursor.com/install"
@@ -16,16 +15,6 @@
         "url": "https://storage.googleapis.com/antigravity-public/antigravity-cli/1.2.14-4571742832820224/linux-arm/cli_linux_arm64.tar.gz",
         "sha512": "d96a67d6952a8ec1da16c8b6515f1393ed0260658cf104d9b57b8d13c92c591322ed5e08a62894842be81888116da0f5f80def7971c913d1f462300103426954"
       }
-    }
-  },
-  "fibeCli": {
-    "version": "0.3.3",
-    "source": "https://github.com/fibegg/sdk/releases/tag/v0.3.3",
-    "sourceRevision": "1f5ea3e99ea13b08abf6922d7ac32b7b02c463c7",
-    "reviewedAt": "2026-10-16",
-    "linuxArchiveSha256": {
-      "amd64": "4a66c7f12a76e682ab3752fd5ebb7c18a760233ca62058689f79eaa53c71cfee",
-      "arm64": "2370991e567189b3b065e1d0a47a7821ffa1ebdfd7a4268113481d002e24c0f7"
     }
   }
 }
