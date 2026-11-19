@@ -1,6 +1,6 @@
 # Provider runtime contracts
 
-Checked against official documentation and the installed Linux CLIs (pins in
+Checked on 2026-09-30 against official documentation and the installed Linux CLIs (pins in
 `docs/runtime-tools.md`). Example `cliVersion` values select the FIBE CLI used by
 MCP tools, not provider CLIs.
 

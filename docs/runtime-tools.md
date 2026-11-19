@@ -93,5 +93,6 @@ needs untrusted malformed data URLs; Nx callers use configured URLs; the API loc
 no Axios) and React Router 6.30.6 (chat uses declarative `BrowserRouter`, excluded from
 the [hydration advisory](https://github.com/remix-run/react-router/security/advisories/GHSA-337j-9hxr-rhxg);
 the [navigation advisory](https://github.com/remix-run/react-router/security/advisories/GHSA-wrjc-x8rr-h8h6)
-applies to the library, but callers use fixed routes or the `/activity/` prefix). No
-override, downgrade or CSP change was made; recheck when callers change.
+applies to the library, but callers use fixed routes or the `/activity/` prefix). This bounded
+review does not prove operator-configured or compromised provider URLs, or future
+callers, safe. No override, downgrade or CSP change was made; recheck when callers change.
