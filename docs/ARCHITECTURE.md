@@ -68,7 +68,8 @@ Optional: `ensureSettings()` (write provider config before the first run),
 - `api-token` (`AGENT_AUTH_MODE=api-token`): the provider key variable is the
   source of truth. `initiate_auth` succeeds at once when it is set and reports
   `unauthenticated` otherwise, without opening a browser. Key variables per
-  provider are listed in [`API.md`](API.md#provider-and-frontend-environment).
+  provider are listed in [`API.md`](API.md#provider-and-frontend-environment);
+  Claude Code also accepts `CLAUDE_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ### Credential injection
 
