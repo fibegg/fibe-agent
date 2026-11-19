@@ -128,6 +128,9 @@ function printAttempt(file, attemptNumber, attempt) {
 }
 
 async function runFile(file) {
+  // Output is buffered until a file finishes, so a START line without its
+  // result block is what identifies a file that hangs.
+  console.log(`START ${file}`);
   const first = await runAttempt(file);
   printAttempt(file, 1, first);
   if (first.ok) {

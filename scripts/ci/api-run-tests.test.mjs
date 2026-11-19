@@ -55,6 +55,7 @@ test('runs every file, retries a failure once and reports FLAKY files without fa
     const child = runRunner(fixture);
     assert.equal(child.status, 0, child.stdout + child.stderr);
     assert.match(child.stdout, /Running 3 API test files in isolated Bun processes, 2 at a time\./);
+    assert.match(child.stdout, /^START src\/app\/c-pass-2\.test\.ts$/m);
     assert.match(child.stdout, /^RETRY src\/app\/b-flaky-1\.test\.ts \(first attempt exit code 1\)$/m);
     assert.match(child.stdout, /^FLAKY src\/app\/b-flaky-1\.test\.ts$/m);
     assert.match(child.stdout, /3 files, 2 passed, 1 flaky, 0 failed/);
