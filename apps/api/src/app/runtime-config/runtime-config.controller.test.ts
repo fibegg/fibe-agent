@@ -1,204 +1,123 @@
-import { describe, test, expect, beforeEach, afterEach } from 'bun:test';
+import { describe, test, expect, beforeEach, afterEach, spyOn } from 'bun:test';
+import { RuntimeConfigController } from './runtime-config.controller';
+import { StrategyRegistryService } from '../strategies/strategy-registry.service';
 
-/**
- * Tests for the runtime-config response shape/logic without importing
- * the NestJS-decorated controller class (which triggers decorator
- * metadata errors in Bun's test runner).
- */
-
-interface RuntimeConfig {
-  userAvatarUrl: string | null;
-  userAvatarBase64: string | null;
-  assistantAvatarUrl: string | null;
-  assistantAvatarBase64: string | null;
-  agentProvider: string | null;
-  agentProviderLabel: string | null;
-  simplicate: boolean;
-}
-
-function providerLabel(provider: string | null): string | null {
-  if (!provider) return null;
-  switch (provider.trim().toLowerCase()) {
-    case 'claude-code':
-    case 'claude':
-      return 'Claude';
-    case 'openai-codex':
-    case 'openai':
-    case 'codex':
-      return 'Codex';
-    case 'gemini':
-      return 'Gemini';
-    case 'antigravity':
-      return 'Antigravity';
-    case 'opencode':
-    case 'opencodex':
-      return 'OpenCode';
-    case 'cursor':
-      return 'Cursor';
-    case 'mock':
-      return 'Mock';
-    default:
-      return provider.trim();
-  }
-}
-
-function truthy(value: string | undefined): boolean {
-  return ['1', 'true', 'yes'].includes(value?.trim().toLowerCase() ?? '');
-}
-
-/** Extracted logic identical to RuntimeConfigController.getConfig */
-function getRuntimeConfig(): RuntimeConfig {
-  const agentProvider = process.env.AGENT_PROVIDER?.trim() || null;
-  return {
-    userAvatarUrl: process.env.USER_AVATAR_URL?.trim() || null,
-    userAvatarBase64: process.env.USER_AVATAR_BASE64?.trim() || null,
-    assistantAvatarUrl: process.env.ASSISTANT_AVATAR_URL?.trim() || null,
-    assistantAvatarBase64: process.env.ASSISTANT_AVATAR_BASE64?.trim() || null,
-    agentProvider,
-    agentProviderLabel: providerLabel(agentProvider),
-    simplicate: truthy(process.env.SIMPLICATE),
-  };
-}
-
-describe('RuntimeConfigController: getConfig logic', () => {
-  const envBackup: Record<string, string | undefined> = {};
+describe('RuntimeConfigController', () => {
+  const envNames = [
+    'USER_AVATAR_URL', 'USER_AVATAR_BASE64', 'ASSISTANT_AVATAR_URL',
+    'ASSISTANT_AVATAR_BASE64', 'AGENT_PROVIDER', 'SIMPLICATE', 'LOCK_CHAT_MODEL',
+    'CODEX_AGENT_TRANSPORT', 'CODEX_USE_APP_SERVER',
+    'OPENCODE_AGENT_TRANSPORT', 'OPENCODE_USE_APP_SERVER',
+  ] as const;
+  let envBackup: Record<string, string | undefined>;
+  const controller = new RuntimeConfigController({
+    resolveStrategy: () => ({}),
+  } as unknown as StrategyRegistryService);
 
   beforeEach(() => {
-    envBackup.USER_AVATAR_URL = process.env.USER_AVATAR_URL;
-    envBackup.USER_AVATAR_BASE64 = process.env.USER_AVATAR_BASE64;
-    envBackup.ASSISTANT_AVATAR_URL = process.env.ASSISTANT_AVATAR_URL;
-    envBackup.ASSISTANT_AVATAR_BASE64 = process.env.ASSISTANT_AVATAR_BASE64;
-    envBackup.AGENT_PROVIDER = process.env.AGENT_PROVIDER;
-    envBackup.SIMPLICATE = process.env.SIMPLICATE;
-    delete process.env.USER_AVATAR_URL;
-    delete process.env.USER_AVATAR_BASE64;
-    delete process.env.ASSISTANT_AVATAR_URL;
-    delete process.env.ASSISTANT_AVATAR_BASE64;
-    delete process.env.AGENT_PROVIDER;
-    delete process.env.SIMPLICATE;
+    envBackup = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
+    for (const name of envNames) delete process.env[name];
   });
 
   afterEach(() => {
-    process.env.USER_AVATAR_URL = envBackup.USER_AVATAR_URL;
-    process.env.USER_AVATAR_BASE64 = envBackup.USER_AVATAR_BASE64;
-    process.env.ASSISTANT_AVATAR_URL = envBackup.ASSISTANT_AVATAR_URL;
-    process.env.ASSISTANT_AVATAR_BASE64 = envBackup.ASSISTANT_AVATAR_BASE64;
-    process.env.AGENT_PROVIDER = envBackup.AGENT_PROVIDER;
-    process.env.SIMPLICATE = envBackup.SIMPLICATE;
-  });
-
-  test('exposes the model lock from LOCK_CHAT_MODEL in the real runtime response', async () => {
-    const { RuntimeConfigController } = await import('./runtime-config.controller');
-    const previous = process.env.LOCK_CHAT_MODEL;
-    try {
-      const controller = new RuntimeConfigController();
-      for (const [value, expected] of [[undefined, false], ['', false], ['false', false], ['0', false], ['1', true], ['true', true], [' YES ', true]] as const) {
-        if (value === undefined) delete process.env.LOCK_CHAT_MODEL;
-        else process.env.LOCK_CHAT_MODEL = value;
-        expect(controller.getConfig().lockChatModel).toBe(expected);
-      }
-    } finally {
-      if (previous === undefined) delete process.env.LOCK_CHAT_MODEL;
-      else process.env.LOCK_CHAT_MODEL = previous;
+    for (const name of envNames) {
+      const value = envBackup[name];
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
     }
   });
 
-  test('returns all nulls when no env vars are set', () => {
-    expect(getRuntimeConfig()).toEqual({
+  test('returns defaults from the real controller', () => {
+    expect(controller.getConfig()).toEqual({
       userAvatarUrl: null,
       userAvatarBase64: null,
       assistantAvatarUrl: null,
       assistantAvatarBase64: null,
-      agentProvider: null,
-      agentProviderLabel: null,
-      simplicate: false,
-    });
-  });
-
-  test('returns userAvatarUrl when USER_AVATAR_URL is set', () => {
-    process.env.USER_AVATAR_URL =
-      'https://avatars.githubusercontent.com/u/3822576?v=4';
-    expect(getRuntimeConfig().userAvatarUrl).toBe(
-      'https://avatars.githubusercontent.com/u/3822576?v=4',
-    );
-  });
-
-  test('trims whitespace from USER_AVATAR_URL', () => {
-    process.env.USER_AVATAR_URL = '  https://example.com/avatar.png  ';
-    expect(getRuntimeConfig().userAvatarUrl).toBe(
-      'https://example.com/avatar.png',
-    );
-  });
-
-  test('returns null when USER_AVATAR_URL is whitespace-only', () => {
-    process.env.USER_AVATAR_URL = '   ';
-    expect(getRuntimeConfig().userAvatarUrl).toBeNull();
-  });
-
-  test('returns userAvatarBase64 when USER_AVATAR_BASE64 is set', () => {
-    process.env.USER_AVATAR_BASE64 = 'PHN2ZyAvPg==';
-    expect(getRuntimeConfig().userAvatarBase64).toBe('PHN2ZyAvPg==');
-  });
-
-  test('returns assistantAvatarUrl when ASSISTANT_AVATAR_URL is set', () => {
-    process.env.ASSISTANT_AVATAR_URL = 'https://example.com/bot.png';
-    expect(getRuntimeConfig().assistantAvatarUrl).toBe(
-      'https://example.com/bot.png',
-    );
-  });
-
-  test('returns assistantAvatarBase64 when ASSISTANT_AVATAR_BASE64 is set', () => {
-    process.env.ASSISTANT_AVATAR_BASE64 = 'aGVsbG8=';
-    expect(getRuntimeConfig().assistantAvatarBase64).toBe('aGVsbG8=');
-  });
-
-  test('returns agentProvider when AGENT_PROVIDER is set', () => {
-    process.env.AGENT_PROVIDER = 'gemini';
-    expect(getRuntimeConfig().agentProvider).toBe('gemini');
-  });
-
-  test('returns correct shape when all env vars are set', () => {
-    process.env.USER_AVATAR_URL = 'https://user.png';
-    process.env.USER_AVATAR_BASE64 = 'dXNlcg==';
-    process.env.ASSISTANT_AVATAR_URL = 'https://bot.png';
-    process.env.ASSISTANT_AVATAR_BASE64 = 'Ym90';
-    process.env.AGENT_PROVIDER = 'claude-code';
-    process.env.SIMPLICATE = 'true';
-    expect(getRuntimeConfig()).toEqual({
-      userAvatarUrl: 'https://user.png',
-      userAvatarBase64: 'dXNlcg==',
-      assistantAvatarUrl: 'https://bot.png',
-      assistantAvatarBase64: 'Ym90',
       agentProvider: 'claude-code',
       agentProviderLabel: 'Claude',
-      simplicate: true,
+      simplicate: false,
+      lockChatModel: false,
+      structuredOutput: false,
     });
   });
 
-  test('returns provider label for configured AGENT_PROVIDER', () => {
-    process.env.AGENT_PROVIDER = 'openai-codex';
-    expect(getRuntimeConfig().agentProvider).toBe('openai-codex');
-    expect(getRuntimeConfig().agentProviderLabel).toBe('Codex');
+  test('returns configured avatars and trims optional values', () => {
+    process.env.USER_AVATAR_URL = '  https://example.com/user.png  ';
+    process.env.USER_AVATAR_BASE64 = 'dXNlcg==';
+    process.env.ASSISTANT_AVATAR_URL = 'https://example.com/bot.png';
+    process.env.ASSISTANT_AVATAR_BASE64 = 'Ym90';
+    expect(controller.getConfig()).toMatchObject({
+      userAvatarUrl: 'https://example.com/user.png',
+      userAvatarBase64: 'dXNlcg==',
+      assistantAvatarUrl: 'https://example.com/bot.png',
+      assistantAvatarBase64: 'Ym90',
+    });
+    process.env.USER_AVATAR_URL = '   ';
+    expect(controller.getConfig().userAvatarUrl).toBeNull();
   });
 
-  test('trims AGENT_PROVIDER and labels Gemini', () => {
-    process.env.AGENT_PROVIDER = '  gemini  ';
-    expect(getRuntimeConfig().agentProvider).toBe('gemini');
-    expect(getRuntimeConfig().agentProviderLabel).toBe('Gemini');
+  for (const [provider, label] of [
+    ['claude-code', 'Claude'], ['openai-codex', 'Codex'], ['openai', 'Codex'],
+    ['  gemini  ', 'Gemini'], ['antigravity', 'Antigravity'],
+    ['opencode', 'OpenCode'], ['opencodex', 'OpenCode'], ['cursor', 'Cursor'],
+    ['mock', 'Mock'],
+  ]) {
+    test(`labels ${provider}`, () => {
+      process.env.AGENT_PROVIDER = provider;
+      expect(controller.getConfig()).toMatchObject({
+        agentProvider: provider.trim(), agentProviderLabel: label,
+      });
+    });
+  }
+
+  test('exposes model lock and simplicate using their configured boolean values', () => {
+    for (const [value, expected] of [
+      [undefined, false], ['', false], ['false', false], ['0', false],
+      ['1', true], ['true', true], [' YES ', true],
+    ] as const) {
+      if (value === undefined) {
+        delete process.env.LOCK_CHAT_MODEL;
+        delete process.env.SIMPLICATE;
+      } else {
+        process.env.LOCK_CHAT_MODEL = value;
+        process.env.SIMPLICATE = value;
+      }
+      expect(controller.getConfig()).toMatchObject({ lockChatModel: expected, simplicate: expected });
+    }
   });
 
-  test('labels Antigravity provider', () => {
-    process.env.AGENT_PROVIDER = 'antigravity';
-    expect(getRuntimeConfig().agentProviderLabel).toBe('Antigravity');
-  });
+  const transports = [
+    ['claude-code', undefined, undefined, true],
+    ['openai-codex', 'CODEX_AGENT_TRANSPORT', 'app-server', true],
+    ['openai', 'CODEX_AGENT_TRANSPORT', 'appserver', true],
+    ['openai-codex', 'CODEX_AGENT_TRANSPORT', 'exec', false],
+    ['openai-codex', 'CODEX_AGENT_TRANSPORT', 'cli', false],
+    ['openai-codex', 'CODEX_USE_APP_SERVER', 'false', false],
+    ['opencode', 'OPENCODE_AGENT_TRANSPORT', 'app-server', true],
+    ['opencodex', 'OPENCODE_AGENT_TRANSPORT', 'appserver', true],
+    ['opencode', 'OPENCODE_AGENT_TRANSPORT', 'run', false],
+    ['opencode', 'OPENCODE_AGENT_TRANSPORT', 'cli', false],
+    ['opencode', 'OPENCODE_USE_APP_SERVER', 'false', false],
+    ['gemini', undefined, undefined, false],
+    ['antigravity', undefined, undefined, false],
+    ['cursor', undefined, undefined, false],
+    ['mock', undefined, undefined, false],
+  ] as const;
 
-  test('returns simplicate=true when SIMPLICATE is truthy', () => {
-    process.env.SIMPLICATE = '1';
-    expect(getRuntimeConfig().simplicate).toBe(true);
-  });
-
-  test('returns simplicate=false when SIMPLICATE is false', () => {
-    process.env.SIMPLICATE = 'false';
-    expect(getRuntimeConfig().simplicate).toBe(false);
-  });
+  for (const [provider, transportVariable, transport, supported] of transports) {
+    test(`reports structured capability for ${provider}/${transport ?? 'default'} without invoking the provider`, () => {
+      process.env.AGENT_PROVIDER = provider;
+      if (transportVariable) process.env[transportVariable] = transport;
+      const registry = new StrategyRegistryService({
+        getConversationDataDir: () => '/tmp/runtime-config-test',
+        getEncryptionKey: () => undefined,
+      } as never);
+      const strategy = registry.resolveStrategy();
+      const resolve = spyOn(registry, 'resolveStrategy').mockReturnValue(strategy);
+      const execute = spyOn(strategy, 'executePromptStreaming');
+      expect(new RuntimeConfigController(registry).getConfig().structuredOutput).toBe(supported);
+      expect(resolve).toHaveBeenCalledTimes(1);
+      expect(execute).not.toHaveBeenCalled();
+    });
+  }
 });

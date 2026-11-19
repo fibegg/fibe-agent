@@ -1,0 +1,207 @@
+{
+  "version": 1,
+  "text": "## Playgrounds\n\nSnapshot of the two Playgrounds accessible on this Host.\n\n| Name | Status |\n| --- | --- |\n| Orion | Running |\n| Lyra | Stopped |\n\nOnly this Host was queried; this is not an account-wide list. These are saved results, not live status. [Open Fibe](https://next-next.fibe.live).",
+  "a2uiMessages": [
+    {
+      "version": "1.0",
+      "createSurface": {
+        "surfaceId": "answer",
+        "catalogId": "https://fibe.gg/catalogs/chat-display/v1",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": [
+              "title",
+              "scope",
+              "tabs"
+            ],
+            "align": "stretch",
+            "justify": "start"
+          },
+          {
+            "id": "title",
+            "component": "Text",
+            "text": "**Playgrounds**",
+            "variant": "body",
+            "weight": 0
+          },
+          {
+            "id": "scope",
+            "component": "Text",
+            "text": "Snapshot of the two Playgrounds accessible on this Host.",
+            "variant": "caption",
+            "weight": 0
+          },
+          {
+            "id": "tabs",
+            "component": "Tabs",
+            "tabs": [
+              {
+                "title": "Playgrounds",
+                "child": "table"
+              },
+              {
+                "title": "Details",
+                "child": "details"
+              }
+            ]
+          },
+          {
+            "id": "table",
+            "component": "Column",
+            "children": [
+              "head",
+              "rule",
+              "row1",
+              "row2"
+            ],
+            "align": "stretch",
+            "justify": "start"
+          },
+          {
+            "id": "head",
+            "component": "Row",
+            "children": [
+              "namehead",
+              "statushead"
+            ],
+            "align": "start",
+            "justify": "stretch"
+          },
+          {
+            "id": "namehead",
+            "component": "Text",
+            "text": "**Name**",
+            "variant": "body",
+            "weight": 1
+          },
+          {
+            "id": "statushead",
+            "component": "Text",
+            "text": "**Status**",
+            "variant": "body",
+            "weight": 1
+          },
+          {
+            "id": "rule",
+            "component": "Divider",
+            "axis": "horizontal"
+          },
+          {
+            "id": "row1",
+            "component": "Row",
+            "children": [
+              "name1",
+              "status1"
+            ],
+            "align": "start",
+            "justify": "stretch"
+          },
+          {
+            "id": "name1",
+            "component": "Text",
+            "text": "Orion",
+            "variant": "body",
+            "weight": 1
+          },
+          {
+            "id": "status1",
+            "component": "Text",
+            "text": "Running",
+            "variant": "body",
+            "weight": 1
+          },
+          {
+            "id": "row2",
+            "component": "Row",
+            "children": [
+              "name2",
+              "status2"
+            ],
+            "align": "start",
+            "justify": "stretch"
+          },
+          {
+            "id": "name2",
+            "component": "Text",
+            "text": "Lyra",
+            "variant": "body",
+            "weight": 1
+          },
+          {
+            "id": "status2",
+            "component": "Text",
+            "text": "Stopped",
+            "variant": "body",
+            "weight": 1
+          },
+          {
+            "id": "details",
+            "component": "Card",
+            "child": "detailsbody"
+          },
+          {
+            "id": "detailsbody",
+            "component": "Column",
+            "children": [
+              "detailstext",
+              "modal",
+              "link"
+            ],
+            "align": "stretch",
+            "justify": "start"
+          },
+          {
+            "id": "detailstext",
+            "component": "Text",
+            "text": "These are saved results. No resources are refreshed when you open this answer.",
+            "variant": "body",
+            "weight": 0
+          },
+          {
+            "id": "modal",
+            "component": "Modal",
+            "trigger": "detailstrigger",
+            "content": "expanded"
+          },
+          {
+            "id": "detailstrigger",
+            "component": "Text",
+            "text": "Show scope details",
+            "variant": "body",
+            "weight": 0
+          },
+          {
+            "id": "expanded",
+            "component": "Text",
+            "text": "Only this Host was queried. This answer does not claim to list every Playground in your account.",
+            "variant": "body",
+            "weight": 0
+          },
+          {
+            "id": "link",
+            "component": "Button",
+            "child": "linktext",
+            "variant": "borderless",
+            "action": {
+              "functionCall": {
+                "@call": "openUrl",
+                "args": {
+                  "url": "https://next-next.fibe.live"
+                }
+              }
+            }
+          },
+          {
+            "id": "linktext",
+            "component": "Text",
+            "text": "Open Fibe",
+            "variant": "body",
+            "weight": 0
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -61,6 +61,7 @@ export class SessionContext {
   streamTextAccumulated = '';
   streamStartedAt: string | null = null;
   lastStreamText = '';
+  lastStreamStructuredOutput = false;
   lastStreamStartedAt: string | null = null;
   lastStreamFinishedAt: string | null = null;
   lastStreamUsage: TokenUsage | undefined = undefined;
