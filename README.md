@@ -114,13 +114,12 @@ Fibe containers receive one built-in local stdio MCP entry through `MCP_CONFIG_J
 | --- | --- |
 | [AGENTS.md](AGENTS.md) | Rules for contributors and coding agents: layout, lockfiles, CI, focused tests, images, adding a provider |
 | [fibe.example.yml](fibe.example.yml), [.env.example](.env.example) | Every setting with its default; local process variables |
-| [docs/API.md](docs/API.md) | REST, WebSocket, structured output, delivery identities and logging contract |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Providers, `AgentStrategy`, authentication modes, persistence, local MCP tools, Gemma router, API modules |
+| [docs/API.md](docs/API.md) | REST, WebSocket, structured output, delivery identities, persistence, local MCP tools, Gemma router and logging contract |
 | [MULTI.md](MULTI.md) | Multi-conversation runtime and per-provider session behaviour |
 | [contracts/mobile-client.md](contracts/mobile-client.md) | Mobile client request, response and event contract |
-| [docs/providers/runtime-contracts.md](docs/providers/runtime-contracts.md) | Provider CLI/SDK runtime contracts |
+| [docs/providers/runtime-contracts.md](docs/providers/runtime-contracts.md) | Providers, `AgentStrategy`, authentication modes, credential injection, provider CLI/SDK runtime contracts |
 | [docs/runtime-tools.md](docs/runtime-tools.md) | Tool and provider CLI pins, pin drift report and bump routine, image smoke checks |
-| [apps/api/BACKEND_BOUNDARIES.md](apps/api/BACKEND_BOUNDARIES.md) | Backend boundaries |
+| [apps/api/BACKEND_BOUNDARIES.md](apps/api/BACKEND_BOUNDARIES.md) | API module map and backend boundaries |
 | [prompts/README.md](prompts/README.md) | System prompt reference library |
 
 ## Embedding (iframe)

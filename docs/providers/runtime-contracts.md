@@ -9,6 +9,70 @@ availability checks do not prove that a key works, that OAuth remains valid, or
 that the account can use a selected model. Run configured external probes for
 that evidence and report unconfigured probes as skipped.
 
+## Providers and strategies
+
+| `AGENT_PROVIDER` | Aliases | Transport | Image tag |
+| --- | --- | --- | --- |
+| `gemini` | | `@google/gemini-cli` CLI | `gemini` |
+| `antigravity` | | Antigravity CLI (`agy`) | `antigravity` |
+| `claude-code` (default) | | `@anthropic-ai/claude-agent-sdk` (in-process SDK) | `claude-code` |
+| `openai-codex` | `openai` | `@openai/codex` CLI | `openai-codex` |
+| `cursor` | | `cursor-agent` CLI | `cursor` |
+| `opencode` | `opencodex` | `opencode-ai` CLI | `opencode` |
+| `mock` | | built in, no CLI | none |
+
+Set `AGENT_PROVIDER` explicitly in production. `mock` echoes configurable fake
+responses for local UI work without a key.
+
+Each WebSocket message passes through `OrchestratorService`, the optional
+`GemmaRouterService` (see `docs/API.md`), `StrategyRegistryService` and the
+active `AgentStrategy`, which runs or contacts the provider and streams the
+response over the same socket. One HTTP upgrade dispatcher serves `/ws` (chat)
+and `/ws-terminal` (PTY), so their listeners do not compete.
+
+Strategies live in `apps/api/src/app/strategies/`: one `<name>.strategy.ts` per
+provider (`claude-sdk.strategy.ts` for Claude Code), `abstract-cli.strategy.ts`
+(shared base for CLI-process strategies), `tool-use-to-event.ts` (Claude SDK
+tool events), `strategy-registry.service.ts` (resolves `AGENT_PROVIDER`) and
+`strategy.types.ts` (`AgentStrategy`, `AuthConnection`, `StreamingCallbacks`,
+`TokenUsage`).
+
+`AgentStrategy` requires `executeAuth(connection)`, `submitAuthCode(code)`,
+`cancelAuth()`, `clearCredentials()`, `executeLogout(connection)`,
+`checkAuthStatus()` and
+`executePromptStreaming(prompt, model, onChunk, callbacks?, systemPrompt?, runtimeOptions?)`.
+Optional: `ensureSettings()` (write provider config before the first run),
+`getWorkingDir()`, `prepareWorkingDir()`, `getModelArgs(model)`, `listModels()`,
+`interruptAgent()`, `steerAgent(message)` (steer or queue while busy; see
+`MULTI.md`) and `hasNativeSessionSupport()`.
+
+## Authentication modes
+
+- `oauth` (default): the client sends `initiate_auth`; the server emits
+  `auth_url_generated`, `auth_device_code` or `auth_manual_token` (Claude paste
+  flow); the user completes it; the server emits `auth_success`.
+- `api-token` (`AGENT_AUTH_MODE=api-token`): the provider key variable is the
+  source of truth. `initiate_auth` succeeds at once when it is set and reports
+  `unauthenticated` otherwise, without opening a browser. Use it for Docker, CI
+  and key-only environments. Key variables per provider are listed in
+  [`docs/API.md`](../API.md#provider-and-frontend-environment).
+
+`AGENT_CREDENTIALS_JSON` (setting `agentCredentials`) maps file names to
+content. `credential-injector.ts` writes them into `SESSION_DIR` with mode
+`0600` before the strategy starts, so an Agent starts signed in; `SESSION_DIR`
+must be set with it and file names with path separators are skipped. Examples:
+Gemini `{ "agent_token.txt": "ya29.xxx" }`; Claude Code and OpenCode
+`{ "auth.json": "{\"api_key\":\"...\"}" }`; Codex (OAuth only)
+`{ "auth.json": "{\"access_token\":\"...\"}" }`.
+
+| Provider | `SESSION_DIR` in the image |
+| --- | --- |
+| `gemini`, `antigravity` | `/home/node/.gemini` |
+| `claude-code` | `/home/node/.claude` |
+| `openai-codex` | `/home/node/.codex` |
+| `cursor` | `/home/node/.cursor` |
+| `opencode` | `/home/node/.local/share/opencode` |
+
 ## Codex
 
 Codex uses the CLI app-server protocol. Model discovery opens a separate control

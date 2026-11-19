@@ -1,5 +1,36 @@
 # Agent backend boundaries
 
+## Module map
+
+Under `apps/api/src/app/`:
+
+| Module | Responsibility |
+| --- | --- |
+| `orchestrator` | Agent runs, streaming, session state |
+| `strategies` | Provider adapters and the strategy registry |
+| `gemma-router` | Optional local intent classifier |
+| `agent` | `POST /api/agent/send-message` and queue routes |
+| `agent-files` | Agent-generated files |
+| `agent-mode` | Agent mode state for `set_mode` / `get_mode` |
+| `auth` | Bearer guard and login |
+| `conversation` | Conversation registry and routes |
+| `messages`, `message-store` | Message history |
+| `activity`, `activity-store` | Activity timeline |
+| `model-options`, `model-store`, `effort-store` | Model list, model and effort |
+| `playgrounds` | File tree watcher, file REST, Playground browse and link |
+| `uploads` | Multipart validation and file serving |
+| `terminal` | `node-pty` shells over `/ws-terminal` |
+| `local-mcp` | Built-in `fibe-local` MCP tools |
+| `provider-traffic` | Provider traffic capture |
+| `fibe-sync` | Conversation sync to the Fibe platform |
+| `github-token-refresh` | GitHub token refresh (Codex) |
+| `init-status` | `postInitScript` state |
+| `persistence`, `config` | Persistence helpers, settings |
+| `audit`, `crypto`, `data-privacy` | Audit log, AES-256-GCM data-at-rest encryption, export and delete |
+| `runtime-config` | Runtime values for Chat |
+
+## Boundaries
+
 Audit actor `AuthenticatedUser` means the Agent shared credential was validated by
 the guard. It does not identify a specific human account. An Authorization header
 on an open route does not establish that actor. Audit serialization and normal HTTP

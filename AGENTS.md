@@ -10,13 +10,12 @@ material lives elsewhere; link to it instead of copying it here:
 
 | Topic | Where |
 | --- | --- |
-| REST and WebSocket contract, settings promotion, logging | [`docs/API.md`](docs/API.md) |
+| REST and WebSocket contract, settings promotion, persistence, local MCP tools, Gemma router, logging | [`docs/API.md`](docs/API.md) |
 | Every setting with defaults | [`fibe.example.yml`](fibe.example.yml), local variables in [`.env.example`](.env.example) |
-| Providers, `AgentStrategy`, auth modes, persistence, local MCP tools, modules | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) |
-| Provider runtime contracts | [`docs/providers/runtime-contracts.md`](docs/providers/runtime-contracts.md) |
+| Providers, `AgentStrategy`, auth modes, credential injection, provider runtime contracts | [`docs/providers/runtime-contracts.md`](docs/providers/runtime-contracts.md) |
 | Conversations, provider sessions, steering and queueing | [`MULTI.md`](MULTI.md) |
 | Pinned tool versions, pin drift report and bump routine, image checks | [`docs/runtime-tools.md`](docs/runtime-tools.md) |
-| API layering rules | [`apps/api/BACKEND_BOUNDARIES.md`](apps/api/BACKEND_BOUNDARIES.md) |
+| API module map and layering rules | [`apps/api/BACKEND_BOUNDARIES.md`](apps/api/BACKEND_BOUNDARIES.md) |
 | Prompt library | [`prompts/README.md`](prompts/README.md) |
 
 Keep this file under 16 KB: `scripts/ci/check-agents-md-size.mjs` fails CI
@@ -236,7 +235,7 @@ removed settings fail with an error naming the replacement.
    provider conditional in the final stage of both Dockerfiles.
 5. Configuration and docs: key variables in `.env.example`, settings in
    `fibe.example.yml`, the key table in `docs/API.md`, the provider and
-   `SESSION_DIR` tables in `docs/ARCHITECTURE.md`, a provider section in
+   `SESSION_DIR` tables and a provider section in
    `docs/providers/runtime-contracts.md`, the version row in
    `docs/runtime-tools.md`, and a prompt in
    `prompts/providers/` if needed.

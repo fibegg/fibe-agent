@@ -220,6 +220,32 @@ Named conversations are indexed in `dataDir/conversations/index.json` and stored
 
 Uploads are conversation-scoped. `POST /api/uploads` and `GET /api/uploads/:filename` accept `conversationId`; omitted values target the default conversation.
 
+`PLAYGROUNDS_DIR` is the shared root for the file explorer, shells and CLI/MCP tools. Blank means `<dataDir>/<storage-id>/playground`, using the same sanitized storage id as other data (or `default`); an explicit or linked override wins, and relative values are resolved to an absolute path at startup before it is exported to provider and MCP child processes. The data directory must be writable by the runtime user; linking replaces the directory atomically, so its parent must be writable too. Fibe stdio MCP entries receive the path and Host variables explicitly, because MCP clients may filter inherited environment; other MCP servers are left intact.
+
+## Local MCP tools
+
+Every provider that supports MCP receives a built-in stdio server, `fibe-local` (`local-mcp.server.ts`), next to the servers from `mcpConfig` (`MCP_CONFIG_JSON`). It forwards calls over loopback `POST /api/local-tool-call` to `LocalMcpService`, which emits WebSocket events to Chat.
+
+| Tool | Blocks the agent | Purpose |
+| --- | --- | --- |
+| `ask_user` | yes | Open question; Chat shows a question card; returns `{ answer }` |
+| `confirm_action` | yes | Yes/no before a destructive action; returns `{ confirmed }` |
+| `show_image` | no | Render an image (`url` or `base64` + `mimeType`) |
+| `set_mode`, `get_mode` | no | Agent mode (`exploring`, `casting`, `overseeing`, `build`) |
+| `notify` | no | Toast (`info`, `success`, `warning`, `error`) |
+| `set_title` | no | Activity run title |
+
+Blocking calls time out after `ASK_USER_TIMEOUT_MS` (default 300000).
+
+## Gemma router (optional)
+
+With `gemmaRouterEnabled` (or `GEMMA_ROUTER_ENABLED=true`) and a reachable [Ollama](https://ollama.com) (`ollamaUrl`, `gemmaModel`, default `gemma3:4b`), `GemmaRouterService` classifies each request locally, picks tools from the `MCP_CONFIG_JSON` list and, above `gemmaConfidenceThreshold`, prepends `[SYSTEM]Suggested MCP tools: ...[/SYSTEM]` to the provider prompt (stored messages are unchanged). It probes `GET /api/tags` at startup, warms the model with a one-token prompt, and probes again before later requests while Ollama is unavailable; those requests continue without a hint. A timeout or missing model skips the hint (logs show `skipped: true`). `claude-code` receives `.mcp.json` through `--mcp-config <path>`, independent of project trust. Local setup:
+
+```sh
+docker run -d --name ollama -v ollama:/root/.ollama -p 11434:11434 ollama/ollama
+docker exec ollama ollama pull gemma3:4b
+```
+
 ## Container logging
 
 The API writes one JSON object per line to stdout or stderr for filtering by level, context, and request ID.
@@ -240,13 +266,13 @@ In `api-token` mode, provider strategies read their provider-specific API key en
 
 | Provider | API-token env vars |
 | --- | --- |
-| Claude | `ANTHROPIC_API_KEY` |
+| Claude | `ANTHROPIC_API_KEY`, `CLAUDE_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN` |
 | OpenAI / Codex | `OPENAI_API_KEY` |
 | Gemini / Antigravity | `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GOOGLE_API_KEY` |
 | Cursor | `CURSOR_API_KEY` |
 | OpenCode | `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_GENERATIVE_AI_API_KEY`, `GOOGLE_API_KEY`, `OPENROUTER_API_KEY`, `DEEPSEEK_API_KEY` |
 
-Chat detects standalone and embedded modes. Unless set, `VITE_THEME_SOURCE` and `VITE_LOCALE_SOURCE` use `localStorage` when standalone and `frame` in an iframe. Embedded mode hides theme and locale controls unless their hide settings are explicitly false.
+Chat detects standalone and embedded modes. Unless set, `VITE_THEME_SOURCE` and `VITE_LOCALE_SOURCE` use `localStorage` when standalone and `frame` in an iframe. Embedded mode hides theme and locale controls unless their hide settings (for example `VITE_HIDE_THEME_SWITCH`) are explicitly false.
 
 **Log shape:** `{ "timestamp": "<ISO8601>", "level": "log", "context": "<optional>", "message": "<string>", ... }`
 
