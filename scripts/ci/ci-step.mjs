@@ -11,18 +11,32 @@ const resultFile = path.join(resultsDir, `${serviceName}.json`);
 const maxCaptureBytes = Number(process.env.CI_CAPTURE_MAX_BYTES || 2_000_000);
 const dependencyWaitTimeoutMs = Number(process.env.CI_DEPENDENCY_WAIT_TIMEOUT_MS || 7_200_000);
 const dependencyWaitIntervalMs = Number(process.env.CI_DEPENDENCY_WAIT_INTERVAL_MS || 1_000);
+const stepStartedAt = Date.now();
+// Set when the command starts; until then the step is waiting for dependencies.
+let commandStartedAt = null;
 
 function encodeText(value) {
   return Buffer.from(value).toString('base64');
 }
 
-async function writeResult(status, exitCode, output = '') {
+// Test runners print `FLAKY <file>` for a file that passed only on retry; the
+// notifier lists them so a retry never hides an intermittent failure.
+function flakyTests(output) {
+  return [...new Set([...output.matchAll(/^FLAKY (\S+)/gm)].map((match) => match[1]))];
+}
+
+async function writeResult(status, exitCode, output = '', flaky = flakyTests(output)) {
+  const finishedAt = Date.now();
+  const waitedUntil = commandStartedAt ?? finishedAt;
   await writeFile(
     resultFile,
     `${JSON.stringify({
       service: serviceName,
       status,
       exit_code: exitCode,
+      duration_ms: commandStartedAt === null ? 0 : finishedAt - commandStartedAt,
+      waited_ms: waitedUntil - stepStartedAt,
+      flaky,
       output_base64: encodeText(output),
     })}\n`,
   );
@@ -165,10 +179,11 @@ if (!(await validateRequiredEnvs()) || !(await validateRequiredSteps())) {
     await writeResult('failed', 1, 'No command was provided to ci-step wrapper');
   } else {
     console.log(`--> Running ${serviceName}: ${[command, ...args].join(' ')}`);
+    commandStartedAt = Date.now();
     const result = await runCommand(command, args);
 
     if (result.code === 0) {
-      await writeResult('passed', 0);
+      await writeResult('passed', 0, '', flakyTests(result.output));
       console.log(`--> ${serviceName} passed`);
     } else {
       await writeResult('failed', result.code, result.output);

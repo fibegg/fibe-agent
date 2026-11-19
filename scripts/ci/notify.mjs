@@ -47,6 +47,28 @@ async function notifySlack(notification) {
   }
 }
 
+function formatDuration(ms) {
+  const totalSeconds = Math.round(ms / 1000);
+  if (totalSeconds < 60) {
+    return `${totalSeconds}s`;
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = String(totalSeconds % 60).padStart(2, '0');
+  return hours > 0 ? `${hours}h ${String(minutes).padStart(2, '0')}m` : `${minutes}m ${seconds}s`;
+}
+
+function describeTiming(result) {
+  const parts = [];
+  if (Number.isFinite(result.duration_ms)) {
+    parts.push(`ran ${formatDuration(result.duration_ms)}`);
+  }
+  if (Number.isFinite(result.waited_ms) && result.waited_ms >= 1000) {
+    parts.push(`waited ${formatDuration(result.waited_ms)}`);
+  }
+  return parts.length > 0 ? `, ${parts.join(', ')}` : '';
+}
+
 function decodeOutput(encoded) {
   if (!encoded) {
     return '';
@@ -147,6 +169,7 @@ async function uploadFailurePayload(payload) {
 
 const summary = ['Fibe Agent CI results', `Branch: ${branch}`, '', 'Service Results:'];
 const detail = [];
+const flakyLines = [];
 let failures = 0;
 const missingExpectedResults = await waitForExpectedResults();
 
@@ -176,7 +199,10 @@ if (resultFiles.length === 0 && missingExpectedResults.length === 0) {
     const status = result.status || 'unknown';
     const exitCode = result.exit_code ?? 0;
 
-    summary.push(`- ${service}: ${status} (exit code ${exitCode})`);
+    summary.push(`- ${service}: ${status} (exit code ${exitCode}${describeTiming(result)})`);
+    for (const file of Array.isArray(result.flaky) ? result.flaky : []) {
+      flakyLines.push(`- ${service}: FLAKY ${file}`);
+    }
 
     if (status !== 'passed') {
       failures += 1;
@@ -185,6 +211,10 @@ if (resultFiles.length === 0 && missingExpectedResults.length === 0) {
       detail.push('');
     }
   }
+}
+
+if (flakyLines.length > 0) {
+  summary.push('', 'Flaky tests (failed once, passed on retry):', ...flakyLines);
 }
 
 let imagePulls = [];
@@ -200,6 +230,7 @@ console.log(redactSecrets(summary.join('\n')));
 
 if (failures === 0) {
   const formattedPulls = imagePulls.map(({ label, command }) => `- ${label}\n  ${command}`).join('\n');
+  const flakyText = flakyLines.length > 0 ? `\n\nFlaky tests (failed once, passed on retry):\n${flakyLines.join('\n')}` : '';
   const escapedRepositoryLabel = escapeSlackText(repositoryLabel);
   const escapedBranch = escapeSlackText(branch);
   const blocks = [
@@ -218,10 +249,22 @@ if (failures === 0) {
         text: `*${escapeSlackText(label)}*\n\`${escapeSlackText(command)}\``,
       },
     })),
+    ...(flakyLines.length > 0
+      ? [
+          { type: 'divider' },
+          {
+            type: 'section',
+            text: {
+              type: 'mrkdwn',
+              text: `*Flaky tests (failed once, passed on retry)*\n${escapeSlackText(flakyLines.join('\n'))}`,
+            },
+          },
+        ]
+      : []),
   ];
 
   await notifySlack({
-    text: `[${repositoryLabel}] build for branch ${branch} is ready:\n\n${formattedPulls}`,
+    text: `[${repositoryLabel}] build for branch ${branch} is ready:\n\n${formattedPulls}${flakyText}`,
     blocks,
   });
   process.exit(0);

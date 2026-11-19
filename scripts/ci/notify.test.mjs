@@ -101,3 +101,46 @@ test('failure reports remain bounded and retain the final assertion', () => {
   assert.match(safe, /Middle CI diagnostics omitted/);
   assert.match(safe, /final assertion at persistence\.test\.ts:44$/);
 });
+
+test('the summary shows step durations and lists flaky test files', async () => {
+  const fixture = await mkdtemp(path.join(os.tmpdir(), 'fibe-ci-notify-'));
+  try {
+    await writeFile(path.join(fixture, 'ci-lint.json'), JSON.stringify({
+      service: 'ci-lint', status: 'passed', exit_code: 0, duration_ms: 65_000, waited_ms: 12_000,
+      flaky: [], output_base64: '',
+    }));
+    await writeFile(path.join(fixture, 'ci-test.json'), JSON.stringify({
+      service: 'ci-test', status: 'failed', exit_code: 1, duration_ms: 3_725_000, waited_ms: 0,
+      flaky: ['src/app/agent-mode/agent-mode.store.service.test.ts'],
+      output_base64: Buffer.from('final assertion marker\n').toString('base64'),
+    }));
+    const child = spawnSync(process.execPath, [notifier], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, CI_RESULTS_DIR: fixture, CI_EXPECTED_STEPS: 'ci-lint ci-test' },
+    });
+    assert.equal(child.status, 1, child.stderr);
+    assert.match(child.stdout, /- ci-lint: passed \(exit code 0, ran 1m 05s, waited 12s\)/);
+    assert.match(child.stdout, /- ci-test: failed \(exit code 1, ran 1h 02m\)/);
+    assert.match(child.stdout, /Flaky tests \(failed once, passed on retry\):\n- ci-test: FLAKY src\/app\/agent-mode\/agent-mode\.store\.service\.test\.ts/);
+  } finally {
+    await rm(fixture, { recursive: true, force: true });
+  }
+});
+
+test('results written before durations existed still render', async () => {
+  const fixture = await mkdtemp(path.join(os.tmpdir(), 'fibe-ci-notify-'));
+  try {
+    await writeFile(path.join(fixture, 'ci-test.json'), JSON.stringify({
+      service: 'ci-test', status: 'failed', exit_code: 1, output_base64: '',
+    }));
+    const child = spawnSync(process.execPath, [notifier], {
+      encoding: 'utf8',
+      env: { PATH: process.env.PATH, CI_RESULTS_DIR: fixture, CI_EXPECTED_STEPS: 'ci-test' },
+    });
+    assert.equal(child.status, 1, child.stderr);
+    assert.match(child.stdout, /- ci-test: failed \(exit code 1\)\n/);
+    assert.doesNotMatch(child.stdout, /Flaky tests/);
+  } finally {
+    await rm(fixture, { recursive: true, force: true });
+  }
+});
