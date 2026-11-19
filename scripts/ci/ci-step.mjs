@@ -1,6 +1,7 @@
 import { mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
+import { StringDecoder } from 'node:string_decoder';
 import { setTimeout as sleep } from 'node:timers/promises';
 import path from 'node:path';
 import { isBlank } from './lib.mjs';
@@ -139,26 +140,55 @@ function appendTail(current, chunk) {
   return combined.subarray(combined.length - maxCaptureBytes);
 }
 
+// FLAKY lines are collected while the output streams, because the captured
+// output keeps only its tail and a long run can push them out of it.
+function flakyCollector(flaky) {
+  const decoder = new StringDecoder('utf8');
+  let pending = '';
+  const scan = (text) => {
+    for (const file of flakyTests(text)) flaky.add(file);
+  };
+  return {
+    push(chunk) {
+      const lines = (pending + decoder.write(chunk)).split('\n');
+      pending = lines.pop().slice(-maxCaptureBytes);
+      scan(lines.join('\n'));
+    },
+    end() {
+      scan(pending + decoder.end());
+      pending = '';
+    },
+  };
+}
+
 function runCommand(command, args) {
   return new Promise((resolve, reject) => {
     let captured = Buffer.alloc(0);
+    const flaky = new Set();
+    const stdoutFlaky = flakyCollector(flaky);
+    const stderrFlaky = flakyCollector(flaky);
     const child = spawn(command, args, { env: process.env, cwd: process.cwd() });
 
     child.stdout.on('data', (chunk) => {
       process.stdout.write(chunk);
       captured = appendTail(captured, chunk);
+      stdoutFlaky.push(chunk);
     });
     child.stderr.on('data', (chunk) => {
       process.stderr.write(chunk);
       captured = appendTail(captured, chunk);
+      stderrFlaky.push(chunk);
     });
 
     child.on('error', reject);
     child.on('close', (code, signal) => {
+      stdoutFlaky.end();
+      stderrFlaky.end();
       resolve({
         code: code ?? 1,
         signal,
         output: captured.toString('utf8'),
+        flaky: [...flaky],
       });
     });
   });
@@ -183,10 +213,10 @@ if (!(await validateRequiredEnvs()) || !(await validateRequiredSteps())) {
     const result = await runCommand(command, args);
 
     if (result.code === 0) {
-      await writeResult('passed', 0, '', flakyTests(result.output));
+      await writeResult('passed', 0, '', result.flaky);
       console.log(`--> ${serviceName} passed`);
     } else {
-      await writeResult('failed', result.code, result.output);
+      await writeResult('failed', result.code, result.output, result.flaky);
       const suffix = result.signal ? `signal ${result.signal}` : `exit code ${result.code}`;
       console.log(`--> ${serviceName} failed with ${suffix}`);
     }
