@@ -9,7 +9,7 @@ VERSION="${VERSION#v}"
 INSTALL_DIR="${FIBE_INSTALL_DIR:-/usr/local/bin}"
 EXPECTED_SHA256="${FIBE_CLI_ARCHIVE_SHA256:-}"
 SDK_SHA="${FIBE_SDK_SHA:-}"
-GITHUB_RELEASE="$(dirname "$0")/github-release.sh"
+. "$(dirname "$0")/github-release.sh"
 REPO="$REPO_OWNER/$REPO_NAME"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
@@ -27,13 +27,17 @@ CHECKSUMS_PATH=$(mktemp)
 trap 'rm -f "$RELEASE_JSON" "$COMMIT_JSON" "$ARCHIVE_PATH" "$CHECKSUMS_PATH"' EXIT
 
 api_request() {
-  "$GITHUB_RELEASE" "$1" application/vnd.github+json "$2" || fail "Could not resolve Fibe SDK release metadata"
+  github_api_get "$1" application/vnd.github+json "$2" || fail "Could not resolve Fibe SDK release metadata"
 }
 download_asset() {
   asset_id=$(jq -er --arg name "$1" '.assets[] | select(.name == $name) | .id | select(type == "number")' "$RELEASE_JSON") || fail "Could not find release asset $1 for $TAG"
-  "$GITHUB_RELEASE" "$REPO/releases/assets/$asset_id" application/octet-stream "$2" || fail "Could not download Fibe SDK asset $1"
+  github_api_get "$REPO/releases/assets/$asset_id" application/octet-stream "$2" || fail "Could not download Fibe SDK asset $1"
 }
 
+if [ "${1:-}" = --latest-version ]; then
+  VERSION=latest
+  EXPECTED_SHA256=
+fi
 if [ -n "$EXPECTED_SHA256" ]; then
   # CI resolved the release before Docker cache selection. Do not resolve again.
   printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || fail 'Build requires an exact resolved Fibe CLI version'
@@ -42,7 +46,7 @@ if [ -n "$EXPECTED_SHA256" ]; then
   TAG="v${VERSION}"
   ASSET_NAME="fibe_${VERSION}_linux_${FIBE_ARCH}.tar.gz"
   case "${FIBE_CLI_ASSET_ID:-}" in ''|*[!0-9]*) fail "Build requires the SDK release asset ID" ;; esac
-  "$GITHUB_RELEASE" "$REPO/releases/assets/$FIBE_CLI_ASSET_ID" application/octet-stream "$ARCHIVE_PATH" || fail "Could not download Fibe SDK asset $ASSET_NAME"
+  github_api_get "$REPO/releases/assets/$FIBE_CLI_ASSET_ID" application/octet-stream "$ARCHIVE_PATH" || fail "Could not download Fibe SDK asset $ASSET_NAME"
 else
   if [ "$VERSION" = latest ] || [ -z "$VERSION" ]; then
     RELEASE_URL="$REPO/releases/latest"
@@ -51,7 +55,7 @@ else
     printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$' || fail 'Fibe CLI version must be latest or an exact release version'
     RELEASE_URL="$REPO/releases/tags/v${VERSION}"
   fi
-  echo "--> Resolving Fibe CLI ${VERSION:-latest} from ${REPO_OWNER}/${REPO_NAME}"
+  echo "--> Resolving Fibe CLI ${VERSION:-latest} from ${REPO_OWNER}/${REPO_NAME}" >&2
   api_request "$RELEASE_URL" "$RELEASE_JSON"
   TAG=$(jq -r '.tag_name // empty' "$RELEASE_JSON")
   if [ -z "$VERSION" ]; then
@@ -61,6 +65,10 @@ else
     [ "$TAG" = "v$VERSION" ] || fail "Release tag $TAG does not match requested Fibe CLI version"
   fi
   VERSION="${TAG#v}"
+  if [ "${1:-}" = --latest-version ]; then
+    printf '%s\n' "$VERSION"
+    exit 0
+  fi
   ASSET_NAME="fibe_${VERSION}_linux_${FIBE_ARCH}.tar.gz"
   download_asset checksums.txt "$CHECKSUMS_PATH"
   EXPECTED_SHA256=$(awk -v name="$ASSET_NAME" '{ file=$2; sub(/^\*/, "", file); if (file == name) print $1 }' "$CHECKSUMS_PATH")

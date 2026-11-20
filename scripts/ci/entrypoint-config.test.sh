@@ -70,7 +70,7 @@ run_case() (
   export DATA_DIR="$fixture/data" FIBE_AGENT_ENTRYPOINT_SOURCE_ONLY=1
   export FIBE_ENTRYPOINT_CONFIG_CANDIDATES="$fixture/fibe.yml"
   export FIBE_TEST_INSTALL_LOG="$fixture/install.log"
-  rm -rf "$DATA_DIR" "$fixture/install.log" "$fixture/install-fibe.sh"
+  rm -rf "$DATA_DIR" "$fixture/lookup.log" "$fixture/install.log" "$fixture/install-fibe.sh"
   mkdir -p "$DATA_DIR/.fibe/bin"
   write_binary "$fixture/baked-fibe" 0.2.46
   write_binary "$DATA_DIR/.fibe/bin/fibe" 0.2.41
@@ -78,6 +78,12 @@ run_case() (
   cat > "$fixture/install-fibe.sh" <<'INSTALLER'
 #!/bin/sh
 set -eu
+if [ "${1:-}" = --latest-version ]; then
+  echo lookup >> "${FIBE_TEST_INSTALL_LOG%/*}/lookup.log"
+  [ -z "${FIBE_TEST_LOOKUP_FAILED:-}" ] || exit "$FIBE_TEST_LOOKUP_FAILED"
+  echo "${FIBE_TEST_LATEST:-0.2.46}"
+  exit
+fi
 printf '%s|%s\n' "${FIBE_VERSION:-}" "${FIBE_CLI_VERSION:-}" > "$FIBE_TEST_INSTALL_LOG"
 version="${FIBE_TEST_INSTALLED_VERSION:-${FIBE_VERSION:-${FIBE_CLI_VERSION:-0.2.46}}}"
 [ "$version" != latest ] || version=0.2.46
@@ -92,6 +98,11 @@ INSTALLER
     latest-cli-env) export FIBE_CLI_VERSION=latest ;;
     latest-yaml) printf 'cliVersion: latest\n' > "$fixture/fibe.yml" ;;
     default) printf 'agentProvider: mock\n' > "$fixture/fibe.yml" ;;
+    missing-credential) export FIBE_TEST_LOOKUP_FAILED=77; rm "$fixture/fibe.yml" ;;
+    upgrade|lookup-error)
+      printf 'agentProvider: mock\n' > "$fixture/fibe.yml"
+      if [ "$selection" = upgrade ]; then export FIBE_TEST_LATEST=0.2.48; else export FIBE_TEST_LOOKUP_FAILED=1; fi
+      ;;
     cached) write_binary "$DATA_DIR/.fibe/bin/fibe" 0.2.45; (cd "$DATA_DIR/.fibe/bin" && sha256sum fibe > fibe.sha256) ;;
     baked) printf 'cliVersion: v0.2.46\n' > "$fixture/fibe.yml" ;;
     missing-pinned) rm "$fixture/install-fibe.sh" ;;
@@ -123,7 +134,15 @@ INSTALLER
     fi
     assert_eq "$case_expected_version" "$("$DATA_DIR/.fibe/bin/fibe" version | awk '{print $2}')" "$name installed version"
   fi
-  if [ "$selection" = wrong-install ]; then
+  case "$selection" in
+    missing-credential|default|latest-*|upgrade|lookup-error) assert_eq lookup "$(cat "$fixture/lookup.log")" "$name checked latest exactly once" ;;
+    *) assert_eq no "$([ -f "$fixture/lookup.log" ] && printf yes || printf no)" "$name skipped latest lookup" ;;
+  esac
+  if [ "$selection" = missing-credential ]; then
+    grep -q 'Skipped latest Fibe CLI check: no usable GitHub credential' "$fixture/$name.log"
+    cmp "$fixture/baked-fibe" "$DATA_DIR/.fibe/bin/fibe"
+  fi
+  if [ "$selection" = wrong-install ] || [ "$selection" = lookup-error ]; then
     assert_eq 0.2.41 "$("$DATA_DIR/.fibe/bin/fibe" version | awk 'NR==1 { print $2 }')" "$name kept previous CLI"
   fi
   if [ "$case_expected_installer" = skip ]; then
@@ -137,14 +156,17 @@ INSTALLER
 run_case yaml-pin-different-from-cached-and-baked yaml 0.2.45 '0.2.45|' yes
 run_case fibe-version-precedes-cli-env-and-yaml version-env 0.2.44 '0.2.44|' yes
 run_case cli-env-precedes-yaml cli-env 0.2.43 '0.2.43|' yes
-run_case latest-version-clears-lower-priority-pin latest-env 0.2.46 'latest|' yes
-run_case latest-cli-env latest-cli-env 0.2.46 'latest|' yes
-run_case latest-yaml latest-yaml 0.2.46 'latest|' yes
-run_case default-uses-baked-offline default 0.2.46 skip yes
+run_case latest-version-clears-lower-priority-pin latest-env 0.2.46 skip yes
+run_case latest-cli-env latest-cli-env 0.2.46 skip yes
+run_case latest-yaml latest-yaml 0.2.46 skip yes
+run_case default-checks-latest-then-uses-baked default 0.2.46 skip yes
+run_case default-installs-new-stable-release upgrade 0.2.48 '0.2.48|' yes
+run_case missing-credential-starts-with-verified-image-and-reports missing-credential 0.2.46 skip yes
+run_case lookup-failure-keeps-existing-binary lookup-error '' skip no
 run_case matching-cache-preserved cached 0.2.45 skip yes
 run_case matching-baked-copied baked 0.2.46 skip yes
 run_case missing-installer-rejects-pin-mismatch missing-pinned '' skip no
-run_case missing-installer-default-keeps-baked-fallback missing-default 0.2.46 skip yes
+run_case missing-installer-cannot-check-latest missing-default '' skip no
 run_case wrong-installed-version-rejected wrong-install '' unchecked no
 run_case candidate-matching-baked-never-downloads candidate-baked 0.3.0-rc.1+1234567 skip yes
 run_case candidate-default-keeps-baked-version candidate-default 0.3.0-rc.1+1234567 skip yes

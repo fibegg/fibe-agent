@@ -312,12 +312,28 @@ ensure_runtime_fibe() {
     return
   fi
 
-  # The release image already carries the checksum-verified stable CLI.
-  if [ -z "$normalized_desired" ] || [ "$baked_version" = "$normalized_desired" ]; then
-    if [ -z "$baked_version" ]; then
-      echo "[entrypoint] Image is missing its verified Fibe CLI; rebuild the Agent image" >&2
+  installer=""
+  for candidate in /usr/local/bin/install-fibe.sh /app/scripts/install-fibe.sh; do
+    if [ -f "$candidate" ]; then
+      installer="$candidate"
+      break
+    fi
+  done
+  if [ -z "$normalized_desired" ] || [ "$normalized_desired" = latest ]; then
+    if [ -z "$installer" ]; then
+      echo "[entrypoint] No SDK installer to check the latest Fibe CLI" >&2
       return 1
     fi
+    normalized_desired=$(sh "$installer" --latest-version) || {
+      lookup_status=$?
+      if [ "$lookup_status" -ne 77 ] || [ -z "$baked_version" ]; then
+        return 1
+      fi
+      echo "[entrypoint] Skipped latest Fibe CLI check: no usable GitHub credential. Using verified image CLI $baked_version." >&2
+      normalized_desired=$baked_version
+    }
+  fi
+  if [ "$baked_version" = "$normalized_desired" ]; then
     if cmp -s /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"; then
       echo "[entrypoint] Runtime fibe ready: $baked_version"
       return 0
@@ -333,13 +349,6 @@ ensure_runtime_fibe() {
     return 0
   fi
 
-  installer=""
-  for candidate in /usr/local/bin/install-fibe.sh /app/scripts/install-fibe.sh; do
-    if [ -f "$candidate" ]; then
-      installer="$candidate"
-      break
-    fi
-  done
   if [ -z "$installer" ]; then
     echo "[entrypoint] No SDK installer for requested Fibe CLI $normalized_desired" >&2
     return 1
@@ -350,9 +359,7 @@ ensure_runtime_fibe() {
     echo "[entrypoint] Installing requested runtime fibe $normalized_desired"
     FIBE_VERSION="$normalized_desired" FIBE_CLI_VERSION= FIBE_INSTALL_DIR="$staging" sh "$installer" || exit 1
     installed_version=$("$staging/fibe" version | awk 'NR==1 { print $2 }')
-    if [ "$normalized_desired" = latest ]; then
-      printf '%s\n' "$installed_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "[entrypoint] Invalid stable CLI version" >&2; exit 1; }
-    elif [ "$installed_version" != "$normalized_desired" ]; then
+    if [ "$installed_version" != "$normalized_desired" ]; then
       echo "[entrypoint] Requested fibe $normalized_desired, installed ${installed_version:-unknown}" >&2
       exit 1
     fi
