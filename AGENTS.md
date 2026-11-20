@@ -193,11 +193,10 @@ Dockerfile would take precedence over `.dockerignore` for that Dockerfile.
   `gg.fibe.cli.version`, `gg.fibe.cli.sdk.sha` and
   `gg.fibe.cli.archive.{amd64,arm64}.sha256`. An explicit stable
   `FIBE_CLI_VERSION` overrides latest; resolution or checksum errors fail the
-  build. At runtime the entrypoint reuses an installed exact version, or
-  resolves `latest` (or an explicit version) once per start, verifies the
-  release's `checksums.txt` and logs version, commit and hash; a new release
-  reaches Agents on restart. `GH_TOKEN` authenticates GitHub API requests when
-  present; otherwise the public endpoint is used.
+  build. At runtime the default uses the image's verified CLI offline.
+  An explicit `latest` or different version downloads with the owner's selected GitHub App
+  connection or OAuth token and replaces the cached CLI after verification.
+  Stable builds require an owner credential and pass it as a BuildKit secret.
 
 ### Candidate CLI builds
 

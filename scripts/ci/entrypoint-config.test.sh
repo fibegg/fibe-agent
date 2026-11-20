@@ -80,6 +80,7 @@ run_case() (
 set -eu
 printf '%s|%s\n' "${FIBE_VERSION:-}" "${FIBE_CLI_VERSION:-}" > "$FIBE_TEST_INSTALL_LOG"
 version="${FIBE_TEST_INSTALLED_VERSION:-${FIBE_VERSION:-${FIBE_CLI_VERSION:-0.2.46}}}"
+[ "$version" != latest ] || version=0.2.46
 printf '#!/bin/sh\nprintf "Fibe %s\\n"\n' "$version" > "$FIBE_INSTALL_DIR/fibe"
 chmod +x "$FIBE_INSTALL_DIR/fibe"
 INSTALLER
@@ -91,7 +92,7 @@ INSTALLER
     latest-cli-env) export FIBE_CLI_VERSION=latest ;;
     latest-yaml) printf 'cliVersion: latest\n' > "$fixture/fibe.yml" ;;
     default) printf 'agentProvider: mock\n' > "$fixture/fibe.yml" ;;
-    cached) write_binary "$DATA_DIR/.fibe/bin/fibe" 0.2.45 ;;
+    cached) write_binary "$DATA_DIR/.fibe/bin/fibe" 0.2.45; (cd "$DATA_DIR/.fibe/bin" && sha256sum fibe > fibe.sha256) ;;
     baked) printf 'cliVersion: v0.2.46\n' > "$fixture/fibe.yml" ;;
     missing-pinned) rm "$fixture/install-fibe.sh" ;;
     missing-default) rm "$fixture/install-fibe.sh"; printf 'agentProvider: mock\n' > "$fixture/fibe.yml" ;;
@@ -122,6 +123,9 @@ INSTALLER
     fi
     assert_eq "$case_expected_version" "$("$DATA_DIR/.fibe/bin/fibe" version | awk '{print $2}')" "$name installed version"
   fi
+  if [ "$selection" = wrong-install ]; then
+    assert_eq 0.2.41 "$("$DATA_DIR/.fibe/bin/fibe" version | awk 'NR==1 { print $2 }')" "$name kept previous CLI"
+  fi
   if [ "$case_expected_installer" = skip ]; then
     assert_eq no "$([ -f "$fixture/install.log" ] && printf yes || printf no)" "$name installer skipped"
   elif [ "$case_expected_installer" != unchecked ]; then
@@ -133,10 +137,10 @@ INSTALLER
 run_case yaml-pin-different-from-cached-and-baked yaml 0.2.45 '0.2.45|' yes
 run_case fibe-version-precedes-cli-env-and-yaml version-env 0.2.44 '0.2.44|' yes
 run_case cli-env-precedes-yaml cli-env 0.2.43 '0.2.43|' yes
-run_case latest-version-clears-lower-priority-pin latest-env 0.2.46 '|' yes
-run_case latest-cli-env latest-cli-env 0.2.46 '|' yes
-run_case latest-yaml latest-yaml 0.2.46 '|' yes
-run_case default-resolves-latest default 0.2.46 '|' yes
+run_case latest-version-clears-lower-priority-pin latest-env 0.2.46 'latest|' yes
+run_case latest-cli-env latest-cli-env 0.2.46 'latest|' yes
+run_case latest-yaml latest-yaml 0.2.46 'latest|' yes
+run_case default-uses-baked-offline default 0.2.46 skip yes
 run_case matching-cache-preserved cached 0.2.45 skip yes
 run_case matching-baked-copied baked 0.2.46 skip yes
 run_case missing-installer-rejects-pin-mismatch missing-pinned '' skip no

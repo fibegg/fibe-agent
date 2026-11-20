@@ -17,11 +17,13 @@ function fixture(arch = 'amd64') {
   return { directory, binary, env: { FIBE_CANDIDATE_BUILD: '1', FIBE_CLI_VERSION: '0.3.0-rc.1+1234567', FIBE_SDK_SHA: sdkSha, FIBE_CLI_BINARY_SHA256: createHash('sha256').update(binary).digest('hex'), FIBE_CLI_BINARY_PATH: filename, FIBE_CANDIDATE_PLATFORM: `linux/${arch}` } };
 }
 
+const githubAuth = { GH_TOKEN: 'fixture-token' };
+
 function releaseFixture(options = {}) {
   const calls = [];
   const version = options.version || '9.8.7';
   const assets = ['checksums.txt', ...['amd64', 'arm64'].map(arch => `fibe_${version}_linux_${arch}.tar.gz`)]
-    .filter(name => name !== options.missingAsset).map(name => ({ name, browser_download_url: `https://github.com/fibegg/sdk/releases/download/v${version}/${name}` }));
+    .filter(name => name !== options.missingAsset).map((name, i) => ({ name, id: 120 + i, browser_download_url: `https://github.com/fibegg/sdk/releases/download/v${version}/${name}` }));
   const release = { tag_name: `v${version}`, assets, ...options.release };
   const fetchRelease = async (url, init) => {
     calls.push({ url, init });
@@ -35,13 +37,13 @@ function releaseFixture(options = {}) {
 
 test('normal builds resolve latest once before cache selection and preserve branch channels', async () => {
   const f = releaseFixture();
-  const build = await resolveCliBuild({}, f.fetchRelease);
+  const build = await resolveCliBuild(githubAuth, f.fetchRelease);
   assert.equal(build.version, '9.8.7');
   assert.equal(build.sdkSha, 'a'.repeat(40));
   assert.deepEqual(build.platforms, ['linux/amd64', 'linux/arm64']);
   assert.deepEqual(providerImageTags({ provider: 'opencode', tagName: 'opencode', sourceBranch: 'dev', gitSha: 'abc' }, build), ['opencode-latest-dev', 'opencode-abc']);
   assert.equal(f.calls.filter(call => call.url.endsWith('/releases/latest')).length, 1);
-  assert.equal(f.calls.filter(call => call.url.startsWith('https://api.github.com')).length, 2);
+  assert.equal(f.calls.filter(call => call.url.startsWith('https://api.github.com')).length, 3);
   assert.ok(cliBuildArgs(build).includes(`FIBE_CLI_ARCHIVE_SHA256_AMD64=${'b'.repeat(64)}`));
   assert.ok(cliBuildArgs(build).includes(`FIBE_CLI_ARCHIVE_SHA256_ARM64=${'c'.repeat(64)}`));
   assert.ok(cliBuildArgs(build).includes(`FIBE_SDK_SHA=${build.sdkSha}`));
@@ -50,17 +52,25 @@ test('normal builds resolve latest once before cache selection and preserve bran
   await assert.rejects(resolveCliBuild({ FIBE_CLI_VERSION: '0.3.0-rc.1' }, f.fetchRelease), /stable/);
 });
 
-test('explicit stable version overrides latest and GitHub token stays on metadata requests', async () => {
+test('explicit stable version authenticates metadata and asset requests to the GitHub API', async () => {
   const f = releaseFixture();
   await resolveCliBuild({ FIBE_CLI_VERSION: 'v9.8.7', GH_TOKEN: 'fixture-token' }, f.fetchRelease);
   assert.ok(f.calls[0].url.endsWith('/releases/tags/v9.8.7'));
   assert.equal(f.calls[0].init.headers.Authorization, 'Bearer fixture-token');
-  assert.equal(f.calls[1].init.headers.Authorization, undefined);
+  assert.equal(f.calls[1].url, 'https://api.github.com/repos/fibegg/sdk/releases/assets/120');
+  assert.equal(f.calls[1].init.headers.Accept, 'application/octet-stream');
+  assert.ok(f.calls.every(call => call.init.headers.Authorization === 'Bearer fixture-token'));
+});
+
+test('resolving without an owner credential makes zero requests', async () => {
+  const f = releaseFixture();
+  await assert.rejects(resolveCliBuild({}, f.fetchRelease), /token/);
+  assert.equal(f.calls.length, 0);
 });
 
 test('new latest release is discovered even after a previous resolution', async () => {
-  const first = await resolveCliBuild({}, releaseFixture().fetchRelease);
-  const second = await resolveCliBuild({}, releaseFixture({ version: '9.8.8' }).fetchRelease);
+  const first = await resolveCliBuild(githubAuth, releaseFixture().fetchRelease);
+  const second = await resolveCliBuild(githubAuth, releaseFixture({ version: '9.8.8' }).fetchRelease);
   assert.notEqual(first.version, second.version);
   assert.notDeepEqual({ version: first.version, args: cliBuildArgs(first) }, { version: second.version, args: cliBuildArgs(second) });
 });
@@ -71,8 +81,8 @@ test('missing assets, invalid checksums, unavailable API and unstable releases f
     { checksums: '' }, { checksums: 'invalid  fibe_9.8.7_linux_amd64.tar.gz' },
     { unavailable: true }, { httpError: true }, { commit: 'main' },
     { release: { prerelease: true } }, { release: { draft: true } }, { release: { tag_name: 'v9.8.7-rc.1' } },
-  ]) await assert.rejects(resolveCliBuild({}, releaseFixture(options).fetchRelease));
-  await assert.rejects(resolveCliBuild({ FIBE_CLI_VERSION: '9.8.6' }, releaseFixture().fetchRelease), /requested/);
+  ]) await assert.rejects(resolveCliBuild(githubAuth, releaseFixture(options).fetchRelease));
+  await assert.rejects(resolveCliBuild({ ...githubAuth, FIBE_CLI_VERSION: '9.8.6' }, releaseFixture().fetchRelease), /requested/);
 });
 
 test('candidate build refuses missing or mismatched immutable inputs before publication', async () => {

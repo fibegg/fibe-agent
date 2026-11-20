@@ -297,13 +297,6 @@ ensure_runtime_fibe() {
       return 1
     fi
   fi
-  if [ "$desired_version" = "latest" ]; then
-    if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ]; then
-      echo "[entrypoint] ERROR: candidate images require their exact baked CLI version" >&2
-      return 1
-    fi
-    desired_version=""
-  fi
   normalized_desired="${desired_version#v}"
 
   if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ]; then
@@ -319,30 +312,25 @@ ensure_runtime_fibe() {
     return
   fi
 
-  current_version=""
-  if [ -x "$RUNTIME_FIBE_BIN" ]; then
-    current_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
-  fi
-
-  if [ -n "$normalized_desired" ] && [ "$current_version" = "$normalized_desired" ]; then
-    echo "[entrypoint] Using cached runtime fibe ${current_version}"
-    return
-  fi
-
-  if [ -n "$normalized_desired" ] && [ "$baked_version" = "$normalized_desired" ]; then
+  # The release image already carries the checksum-verified stable CLI.
+  if [ -z "$normalized_desired" ] || [ "$baked_version" = "$normalized_desired" ]; then
+    if [ -z "$baked_version" ]; then
+      echo "[entrypoint] Image is missing its verified Fibe CLI; rebuild the Agent image" >&2
+      return 1
+    fi
+    if cmp -s /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"; then
+      echo "[entrypoint] Runtime fibe ready: $baked_version"
+      return 0
+    fi
     copy_baked_runtime_fibe
     return
   fi
 
-  if [ "${FIBE_CANDIDATE_BUILD:-0}" = "1" ]; then
-    echo "[entrypoint] ERROR: candidate CLI ${normalized_desired} does not match baked version ${baked_version:-missing}; release downloads are disabled" >&2
-    return 1
-  fi
-
-  if [ -n "$normalized_desired" ]; then
-    echo "[entrypoint] Installing runtime fibe ${normalized_desired}"
-  else
-    echo "[entrypoint] Installing runtime fibe latest"
+  if [ -x "$RUNTIME_FIBE_BIN" ] && [ -f "$RUNTIME_FIBE_BIN.sha256" ] &&
+     (cd "$RUNTIME_FIBE_BIN_DIR" && sha256sum --check --status fibe.sha256) &&
+     [ "$("$RUNTIME_FIBE_BIN" version | awk 'NR==1 { print $2 }')" = "$normalized_desired" ]; then
+    echo "[entrypoint] Using verified runtime fibe $normalized_desired"
+    return 0
   fi
 
   installer=""
@@ -352,44 +340,41 @@ ensure_runtime_fibe() {
       break
     fi
   done
-
-  rm -f "$RUNTIME_FIBE_BIN"
-
   if [ -z "$installer" ]; then
-    if [ -x /usr/local/bin/fibe ]; then
-      if [ -n "$normalized_desired" ] && [ "$baked_version" != "$normalized_desired" ]; then
-        echo "[entrypoint] ERROR: no fibe installer for requested version ${normalized_desired}" >&2
-        return 1
-      fi
-      echo "[entrypoint] install-fibe.sh not found; copying baked fibe from /usr/local/bin/fibe"
-      cp /usr/local/bin/fibe "$RUNTIME_FIBE_BIN"
-      chmod +x "$RUNTIME_FIBE_BIN"
-    else
-      echo "[entrypoint] ERROR: no fibe installer or baked fibe binary found" >&2
-      exit 1
-    fi
-  else
-    echo "[entrypoint] Using fibe installer at ${installer}"
-    FIBE_VERSION="$normalized_desired" FIBE_CLI_VERSION= FIBE_INSTALL_DIR="$RUNTIME_FIBE_BIN_DIR" sh "$installer"
-  fi
-
-  if [ "$(id -u)" = "0" ]; then
-    chown -R node:node "${DATA_DIR:-/app/data}/.fibe" 2>/dev/null || true
-  fi
-
-  installed_version=$("$RUNTIME_FIBE_BIN" version 2>/dev/null | awk 'NR==1 { print $2 }')
-  if [ -n "$normalized_desired" ] && [ "$installed_version" != "$normalized_desired" ]; then
-    echo "[entrypoint] ERROR: requested fibe ${normalized_desired}, installed ${installed_version:-unknown}" >&2
+    echo "[entrypoint] No SDK installer for requested Fibe CLI $normalized_desired" >&2
     return 1
   fi
-  echo "[entrypoint] Runtime fibe ready: ${installed_version:-unknown}"
+  (
+    staging=$(mktemp -d "$RUNTIME_FIBE_BIN_DIR/.install.XXXXXXXX") || exit 1
+    trap 'rm -rf "$staging"' EXIT
+    echo "[entrypoint] Installing requested runtime fibe $normalized_desired"
+    FIBE_VERSION="$normalized_desired" FIBE_CLI_VERSION= FIBE_INSTALL_DIR="$staging" sh "$installer" || exit 1
+    installed_version=$("$staging/fibe" version | awk 'NR==1 { print $2 }')
+    if [ "$normalized_desired" = latest ]; then
+      printf '%s\n' "$installed_version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "[entrypoint] Invalid stable CLI version" >&2; exit 1; }
+    elif [ "$installed_version" != "$normalized_desired" ]; then
+      echo "[entrypoint] Requested fibe $normalized_desired, installed ${installed_version:-unknown}" >&2
+      exit 1
+    fi
+    (cd "$staging" && sha256sum fibe > fibe.sha256) || exit 1
+    if [ "$(id -u)" = "0" ]; then
+      chown node:node "$staging/fibe" "$staging/fibe.sha256" 2>/dev/null || true
+    fi
+    mv -f "$staging/fibe" "$RUNTIME_FIBE_BIN" && mv -f "$staging/fibe.sha256" "$RUNTIME_FIBE_BIN.sha256"
+  ) || return 1
+  echo "[entrypoint] Runtime fibe ready: $normalized_desired"
 }
 
 if [ "${FIBE_AGENT_ENTRYPOINT_SOURCE_ONLY:-0}" = "1" ]; then
   return 0 2>/dev/null || exit 0
 fi
 
-ensure_runtime_fibe
+if ! ensure_runtime_fibe; then
+  # Docker may remove an exhausted container before the operator can inspect its logs.
+  (umask 077; printf '%s SDK bootstrap failed; check the requested CLI version and GitHub connection.\n' "$(date -u +%FT%TZ)" > "$RUNTIME_FIBE_BIN_DIR/../startup-error.log") || true
+  exit 1
+fi
+rm -f "$RUNTIME_FIBE_BIN_DIR/../startup-error.log"
 
 if [ -f /app/dist/main.js ]; then
   echo "[entrypoint] dist/main.js found: starting production server"

@@ -9,10 +9,8 @@ VERSION="${VERSION#v}"
 INSTALL_DIR="${FIBE_INSTALL_DIR:-/usr/local/bin}"
 EXPECTED_SHA256="${FIBE_CLI_ARCHIVE_SHA256:-}"
 SDK_SHA="${FIBE_SDK_SHA:-}"
-TOKEN="${GH_TOKEN:-}"
-if [ -z "$TOKEN" ] && [ -s /run/secrets/gh_token ]; then
-  TOKEN=$(tr -d '\r\n' < /run/secrets/gh_token)
-fi
+GITHUB_RELEASE="$(dirname "$0")/github-release.sh"
+REPO="$REPO_OWNER/$REPO_NAME"
 
 fail() { echo "ERROR: $*" >&2; exit 1; }
 ARCH=$(uname -m)
@@ -29,21 +27,11 @@ CHECKSUMS_PATH=$(mktemp)
 trap 'rm -f "$RELEASE_JSON" "$COMMIT_JSON" "$ARCHIVE_PATH" "$CHECKSUMS_PATH"' EXIT
 
 api_request() {
-  if [ -n "$TOKEN" ]; then
-    curl -fsSL -H "Authorization: Bearer ${TOKEN}" -H 'Accept: application/vnd.github+json' "$1" -o "$2"
-  else
-    curl -fsSL -H 'Accept: application/vnd.github+json' "$1" -o "$2"
-  fi || fail "Could not resolve Fibe SDK release metadata"
+  "$GITHUB_RELEASE" "$1" application/vnd.github+json "$2" || fail "Could not resolve Fibe SDK release metadata"
 }
 download_asset() {
-  api_url=$(jq -r --arg name "$1" '.assets[] | select(.name == $name) | .url' "$RELEASE_JSON" | head -n 1)
-  browser_url=$(jq -r --arg name "$1" '.assets[] | select(.name == $name) | .browser_download_url' "$RELEASE_JSON" | head -n 1)
-  [ -n "$browser_url" ] && [ "$browser_url" != null ] || fail "Could not find release asset $1 for $TAG"
-  if [ -n "$TOKEN" ] && [ -n "$api_url" ] && [ "$api_url" != null ]; then
-    curl -fsSL -H "Authorization: Bearer ${TOKEN}" -H 'Accept: application/octet-stream' "$api_url" -o "$2"
-  else
-    curl -fsSL "$browser_url" -o "$2"
-  fi || fail "Could not download Fibe SDK asset $1"
+  asset_id=$(jq -er --arg name "$1" '.assets[] | select(.name == $name) | .id | select(type == "number")' "$RELEASE_JSON") || fail "Could not find release asset $1 for $TAG"
+  "$GITHUB_RELEASE" "$REPO/releases/assets/$asset_id" application/octet-stream "$2" || fail "Could not download Fibe SDK asset $1"
 }
 
 if [ -n "$EXPECTED_SHA256" ]; then
@@ -53,14 +41,15 @@ if [ -n "$EXPECTED_SHA256" ]; then
   printf '%s\n' "$EXPECTED_SHA256" | grep -Eq '^[0-9a-f]{64}$' || fail 'Build requires a valid archive SHA-256'
   TAG="v${VERSION}"
   ASSET_NAME="fibe_${VERSION}_linux_${FIBE_ARCH}.tar.gz"
-  curl -fsSL "https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/download/${TAG}/${ASSET_NAME}" -o "$ARCHIVE_PATH" || fail "Could not download Fibe SDK asset $ASSET_NAME"
+  case "${FIBE_CLI_ASSET_ID:-}" in ''|*[!0-9]*) fail "Build requires the SDK release asset ID" ;; esac
+  "$GITHUB_RELEASE" "$REPO/releases/assets/$FIBE_CLI_ASSET_ID" application/octet-stream "$ARCHIVE_PATH" || fail "Could not download Fibe SDK asset $ASSET_NAME"
 else
   if [ "$VERSION" = latest ] || [ -z "$VERSION" ]; then
-    RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/latest"
+    RELEASE_URL="$REPO/releases/latest"
     VERSION=""
   else
     printf '%s\n' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?(\+[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$' || fail 'Fibe CLI version must be latest or an exact release version'
-    RELEASE_URL="https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/releases/tags/v${VERSION}"
+    RELEASE_URL="$REPO/releases/tags/v${VERSION}"
   fi
   echo "--> Resolving Fibe CLI ${VERSION:-latest} from ${REPO_OWNER}/${REPO_NAME}"
   api_request "$RELEASE_URL" "$RELEASE_JSON"
@@ -78,7 +67,7 @@ else
   [ "${#EXPECTED_SHA256}" -eq 64 ] || fail "Release $TAG publishes no unique SHA-256 for $ASSET_NAME"
   printf '%s\n' "$EXPECTED_SHA256" | grep -Eq '^[0-9a-f]{64}$' || fail "Release $TAG publishes no valid SHA-256 for $ASSET_NAME"
   # Branch-valued target_commitish is not the release commit identity.
-  api_request "https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/commits/${TAG}" "$COMMIT_JSON"
+  api_request "$REPO/commits/${TAG}" "$COMMIT_JSON"
   SDK_SHA=$(jq -r '.sha // empty' "$COMMIT_JSON")
   printf '%s\n' "$SDK_SHA" | grep -Eq '^[0-9a-f]{40}$' || fail 'Release tag has no exact SDK commit'
   download_asset "$ASSET_NAME" "$ARCHIVE_PATH"

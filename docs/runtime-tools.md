@@ -99,7 +99,7 @@ docker build --target cli --build-arg AGENT_PROVIDER=openai_codex -t fibe-agent-
 docker run --rm fibe-agent-cli-check codex --version
 ```
 
-Fibe CLI release resolution, verification and labels are described in `AGENTS.md` (Images, Candidate CLI builds); old Fibe fields in the provider manifest are no longer read. `cliVersion` (or `FIBE_VERSION` / `FIBE_CLI_VERSION`) selects only the runtime `fibe` CLI; no strategy switches provider binaries or runs `npx @provider/cli@<version>`. For a direct development-image build, resolve the release first (Node 24+):
+Fibe CLI release resolution, verification and labels are described in `AGENTS.md` (Images, Candidate CLI builds); old Fibe fields in the provider manifest are no longer read. `cliVersion` (or `FIBE_VERSION` / `FIBE_CLI_VERSION`) selects only the runtime `fibe` CLI; no strategy switches provider binaries or runs `npx @provider/cli@<version>`. An ordinary start uses the image's verified CLI offline. An explicit version change uses the Agent's selected GitHub connection, or an owner-supplied `GH_TOKEN` or `GITHUB_TOKEN`. A failed install leaves the previous CLI in place. For a direct development-image build, export the build owner's `GH_TOKEN` and resolve the release first (Node 24+):
 
 ```sh
 node --input-type=module <<'JS'

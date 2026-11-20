@@ -15,9 +15,10 @@ function fixture(options = {}) {
   const archive = 'synthetic-sdk-release-archive';
   const sha = createHash('sha256').update(archive).digest('hex');
   const env = {
+    GH_TOKEN: 'fixture-oauth',
     PATH: `${bin}:${process.env.PATH}`, TMPDIR: temp,
     FIBE_CLI_VERSION: options.version ?? '9.8.7',
-    ...(options.resolved ? { FIBE_CLI_ARCHIVE_SHA256: options.hash || sha, FIBE_SDK_SHA: 'a'.repeat(40) } : {}),
+    ...(options.resolved ? { FIBE_CLI_ASSET_ID: '123', FIBE_CLI_ARCHIVE_SHA256: options.hash || sha, FIBE_SDK_SHA: 'a'.repeat(40) } : {}),
     FIBE_INSTALL_DIR: path.join(root, 'installed'), FIXTURE_ROOT: root,
     FIXTURE_ARCH: options.arch || 'x86_64', FIXTURE_ARCHIVE: options.corrupt ? 'corrupted bytes' : archive,
     FIXTURE_TAG: options.tag || `v${options.version && options.version !== 'latest' ? options.version : '9.8.7'}`,
@@ -29,6 +30,14 @@ function fixture(options = {}) {
   executable('curl', `
 const fs = require('node:fs'); const path = require('node:path'); const args = process.argv.slice(2);
 fs.appendFileSync(path.join(process.env.FIXTURE_ROOT, 'requests'), 'request\\n');
+const headers = fs.readFileSync(0, 'utf8').trim();
+const expected = process.env.FIXTURE_FIBE_ENDPOINT;
+if (expected && args.includes(expected)) {
+  if (headers !== 'Authorization: Bearer fixture-fibe-key\\nX-Fibe-Expected-Owner-Type: ' + process.env.FIBE_OWNER_TYPE + '\\nX-Fibe-Expected-Owner-ID: 4' || args.some(a => a.includes('L') || a === '--location')) process.exit(23);
+  console.log(JSON.stringify({ token: 'fixture-oauth' }));
+  process.exit(0);
+}
+if (headers !== 'Authorization: Bearer fixture-oauth' || !args.includes('@-')) process.exit(23);
 if (process.env.FIXTURE_UNAVAILABLE) process.exit(22);
 const destination = args[args.indexOf('-o') + 1];
 const url = args.find((arg) => arg.startsWith('https://'));
@@ -37,10 +46,10 @@ const version = process.env.FIXTURE_TAG.slice(1);
 if (url.includes('/commits/')) {
   fs.writeFileSync(destination, JSON.stringify({sha:'a'.repeat(40)}));
 } else if (url.includes('/releases/tags/') || url.endsWith('/releases/latest')) {
-  const assets = (process.env.FIXTURE_MISSING_ARCHIVE ? [] : ['amd64','arm64']).map(arch => ({name:'fibe_'+version+'_linux_'+arch+'.tar.gz',url:'https://fixture.invalid/api/'+arch,browser_download_url:'https://fixture.invalid/archive/'+arch}));
-  if (process.env.FIXTURE_CHECKSUMS !== 'absent') assets.push({name:'checksums.txt',url:'https://fixture.invalid/api/checksums',browser_download_url:'https://fixture.invalid/checksums'});
+  const assets = (process.env.FIXTURE_MISSING_ARCHIVE ? [] : ['amd64','arm64']).map((arch, i) => ({id:123+i, name:'fibe_'+version+'_linux_'+arch+'.tar.gz',url:'https://fixture.invalid/api/'+arch,browser_download_url:'https://fixture.invalid/archive/'+arch}));
+  if (process.env.FIXTURE_CHECKSUMS !== 'absent') assets.push({id:122,name:'checksums.txt',url:'https://fixture.invalid/api/checksums',browser_download_url:'https://fixture.invalid/checksums'});
   fs.writeFileSync(destination, JSON.stringify({tag_name:process.env.FIXTURE_TAG, prerelease:!!process.env.FIXTURE_PRERELEASE, assets}));
-} else if (url.endsWith('/checksums')) {
+} else if (url.endsWith('/releases/assets/122')) {
   const sha = process.env.FIXTURE_CHECKSUMS === 'wrong' ? '0'.repeat(64) : process.env.FIXTURE_SHA;
   fs.writeFileSync(destination, ['amd64','arm64'].map(arch => sha + '  fibe_' + version + '_linux_' + arch + '.tar.gz').join('\\n') + '\\n');
 } else fs.writeFileSync(destination, process.env.FIXTURE_ARCHIVE);
@@ -94,7 +103,7 @@ test('another version installs after matching the checksums its release publishe
     const result = f.run();
     assert.equal(result.status, 0, result.stderr);
     assert.ok(urls(f)[0].endsWith('/releases/tags/v9.9.0'));
-    assert.ok(urls(f).includes('https://fixture.invalid/checksums'));
+    assert.ok(urls(f).includes('https://api.github.com/repos/fibegg/sdk/releases/assets/122'));
     assert.equal(readFileSync(path.join(f.env.FIBE_INSTALL_DIR, 'fibe'), 'utf8'), 'fixture executable');
   } finally { f.cleanup(); }
 });
@@ -114,7 +123,7 @@ test('latest resolves the newest release and verifies it', () => {
       const result = f.run();
       assert.equal(result.status, 0, result.stderr);
       assert.ok(urls(f)[0].endsWith('/releases/latest'));
-      assert.ok(urls(f).includes('https://fixture.invalid/checksums'));
+      assert.ok(urls(f).includes('https://api.github.com/repos/fibegg/sdk/releases/assets/122'));
     } finally { f.cleanup(); }
   }
 });
@@ -134,7 +143,7 @@ test('build-resolved identity skips API resolution and checks the supplied archi
       const result = f.run();
       assert.equal(result.status, 0, result.stderr);
       assert.equal(urls(f).length, 1);
-      assert.ok(urls(f)[0].includes('/releases/download/v9.8.7/fibe_9.8.7_linux_'));
+      assert.ok(urls(f)[0].endsWith('/releases/assets/123'));
       assert.match(result.stdout, /SDK commit [a-f0-9]{40}; archive SHA-256 [a-f0-9]{64}/);
     } finally { f.cleanup(); }
   }
@@ -146,7 +155,7 @@ test('build-resolved checksum mismatch fails before extraction', () => {
     assert.equal(existsSync(f.env.FIBE_INSTALL_DIR), false);
   } finally { f.cleanup(); }
 });
-test('latest resolves once per startup, even with an installed executable', () => {
+test('an explicit latest download resolves the release afresh', () => {
   const f = fixture({ version: 'latest' });
   try {
     assert.equal(f.run().status, 0);
@@ -162,4 +171,34 @@ test('an explicit prerelease keeps working while latest refuses prereleases', ()
     assert.equal(result.status, 0, result.stderr);
     assert.ok(urls(f)[0].endsWith('/releases/tags/v9.9.0-rc.1'));
   } finally { f.cleanup(); }
+});
+
+test('missing credentials fail before the first GitHub request', () => {
+  const f = fixture();
+  try {
+    delete f.env.GH_TOKEN;
+    const result = f.run();
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /GitHub App connection or OAuth token/);
+    assert.equal(existsSync(path.join(f.root, 'requests')), false);
+  } finally { f.cleanup(); }
+});
+
+test('explicit downloads exchange only the selected Team or personal installation', () => {
+  for (const owner of ['Team', 'Player']) {
+    const f = fixture({ resolved: true });
+    try {
+      delete f.env.GH_TOKEN;
+      Object.assign(f.env, {
+        FIBE_DOMAIN: 'https://fibe.localhost', FIBE_API_KEY: 'fixture-fibe-key',
+        FIBE_GITHUB_CONNECTION_ID: '7', FIBE_OWNER_TYPE: owner, FIBE_OWNER_ID: '4',
+        FIBE_GITHUB_CONNECTION_OWNER: owner === 'Team' ? 'Team' : '',
+        FIXTURE_FIBE_ENDPOINT: 'https://fibe.localhost/api/' +
+          (owner === 'Team' ? 'team_git_installations' : 'installations') + '/7/token',
+      });
+      const result = f.run();
+      assert.equal(result.status, 0, result.stderr);
+      assert.doesNotMatch(result.stdout + result.stderr, /fixture-oauth|fixture-fibe-key/);
+    } finally { f.cleanup(); }
+  }
 });

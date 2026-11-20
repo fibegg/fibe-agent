@@ -124,13 +124,14 @@ RUN npm install -g corepack@0.34.5 \
 
 # The apt repository retains only its current version. Use immutable release
 # archives so the exact GitHub CLI pin remains rebuildable after a new release.
-RUN set -eu; \
+COPY scripts/github-release.sh /usr/local/bin/github-release.sh
+RUN --mount=type=secret,id=gh_token,required=true set -eu; \
     case "$(dpkg --print-architecture)" in \
       amd64) GH_ARCH=amd64; GH_SHA256=bb766f710eef8ede859c18578c72c327597cd4c8a85b06001b1f3843c6019386 ;; \
       arm64) GH_ARCH=arm64; GH_SHA256=7862c86c72f43df3a2d93ddde6f473285b4e2af61b494849846827e513ef6484 ;; \
       *) echo "Unsupported GitHub CLI architecture" >&2; exit 1 ;; \
     esac; \
-    curl -fsSL -o /tmp/gh.tar.gz "https://github.com/cli/cli/releases/download/v2.102.0/gh_2.102.0_linux_${GH_ARCH}.tar.gz"; \
+    github-release.sh --asset cli/cli v2.102.0 "gh_2.102.0_linux_${GH_ARCH}.tar.gz" /tmp/gh.tar.gz; \
     printf '%s  /tmp/gh.tar.gz\n' "$GH_SHA256" | sha256sum --check --strict -; \
     tar -xzf /tmp/gh.tar.gz --strip-components=2 -C /usr/local/bin "gh_2.102.0_linux_${GH_ARCH}/bin/gh"; \
     rm /tmp/gh.tar.gz; \
@@ -138,12 +139,12 @@ RUN set -eu; \
 
 # Official GitHub MCP server. `mcp-github` is kept as a compatibility wrapper
 # for the MCP config currently emitted by Fibe.
-RUN ARCH=$(uname -m) && \
+RUN --mount=type=secret,id=gh_token,required=true ARCH=$(uname -m) && \
     if [ "$ARCH" = "x86_64" ]; then GITHUB_MCP_ARCH="x86_64"; \
     elif [ "$ARCH" = "aarch64" ]; then GITHUB_MCP_ARCH="arm64"; \
     else echo "Unsupported GitHub MCP architecture: $ARCH" >&2; exit 1; fi && \
-    curl -fsSL -o github-mcp-server.tgz \
-      "https://github.com/github/github-mcp-server/releases/download/v${GITHUB_MCP_VERSION}/github-mcp-server_Linux_${GITHUB_MCP_ARCH}.tar.gz" && \
+    github-release.sh --asset github/github-mcp-server "v${GITHUB_MCP_VERSION}" \
+      "github-mcp-server_Linux_${GITHUB_MCP_ARCH}.tar.gz" github-mcp-server.tgz && \
     tar -xzf github-mcp-server.tgz -C /usr/local/bin github-mcp-server && \
     rm -f github-mcp-server.tgz && \
     chmod +x /usr/local/bin/github-mcp-server && \
@@ -155,7 +156,9 @@ COPY --link --from=gitea-mcp /go/bin/gitea-mcp /usr/local/bin/gitea-mcp
 COPY --link --from=ghcr.io/astral-sh/uv:0.12.21 /uv /uvx /usr/local/bin/
 
 ENV DENO_INSTALL=/usr/local
-RUN curl -fsSL https://deno.land/install.sh | sh -s -- v2.9.7
+RUN --mount=type=secret,id=gh_token,required=true set -eu; \
+    github-release.sh --asset denoland/deno v2.9.7 "deno-$(uname -m)-unknown-linux-gnu.zip" /tmp/deno.zip; \
+    unzip -oq /tmp/deno.zip -d /usr/local/bin; rm /tmp/deno.zip; deno --version
 
 WORKDIR /app
 
@@ -256,17 +259,19 @@ ARG FIBE_CLI_VERSION
 ARG FIBE_SDK_SHA
 ARG FIBE_CLI_ARCHIVE_SHA256_AMD64
 ARG FIBE_CLI_ARCHIVE_SHA256_ARM64
+ARG FIBE_CLI_ASSET_ID_AMD64
+ARG FIBE_CLI_ASSET_ID_ARM64
 ARG TARGETARCH
 # Resolved by scripts/ci before Docker sees any cache refs. Direct builds must
 # supply the same immutable inputs, rather than cache a literal "latest".
-RUN set -eu; \
+RUN --mount=type=secret,id=gh_token,required=true set -eu; \
     case "$TARGETARCH" in \
-      amd64) archive_sha="$FIBE_CLI_ARCHIVE_SHA256_AMD64" ;; \
-      arm64) archive_sha="$FIBE_CLI_ARCHIVE_SHA256_ARM64" ;; \
+      amd64) archive_sha="$FIBE_CLI_ARCHIVE_SHA256_AMD64"; asset_id="$FIBE_CLI_ASSET_ID_AMD64" ;; \
+      arm64) archive_sha="$FIBE_CLI_ARCHIVE_SHA256_ARM64"; asset_id="$FIBE_CLI_ASSET_ID_ARM64" ;; \
       *) echo "Unsupported Fibe CLI platform: $TARGETARCH" >&2; exit 1 ;; \
     esac; \
     test -n "$archive_sha" || { echo "Resolve the Fibe SDK release with scripts/ci/cli-build.mjs before building" >&2; exit 1; }; \
-    FIBE_CLI_ARCHIVE_SHA256="$archive_sha" /usr/local/bin/install-fibe.sh; \
+    FIBE_CLI_ASSET_ID="$asset_id" FIBE_CLI_ARCHIVE_SHA256="$archive_sha" /usr/local/bin/install-fibe.sh; \
     /usr/local/bin/fibe version; \
     /usr/local/bin/fibe local playgrounds --help >/dev/null
 LABEL gg.fibe.cli.version=$FIBE_CLI_VERSION \
