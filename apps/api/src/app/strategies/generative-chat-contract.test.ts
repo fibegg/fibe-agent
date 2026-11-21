@@ -76,6 +76,9 @@ describe('mobile generative chat contract version 2', () => {
     const branches = schema.properties.a2uiMessages.items.properties.createSurface.properties.components.items.anyOf;
     const names = branches.flatMap((branch: { properties: { component: { enum: string[] } } }) => branch.properties.component.enum);
     expect(new Set(components(read('example-v2.json')).map((item) => item.component))).toEqual(new Set(names));
+    // Providers generate in schema order: text before the layout, id and component first in every component.
+    expect(Object.keys(schema.properties)).toEqual(['version', 'text', 'a2uiMessages']);
+    for (const branch of branches) expect(Object.keys(branch.properties).slice(0, 2)).toEqual(['id', 'component']);
     const enumValues = JSON.stringify(schema).match(/"enum":\[[^\]]*\]/g)!.join(',').split(',').length;
     expect(enumValues).toBeLessThan(1000);
   });

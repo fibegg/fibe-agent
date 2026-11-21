@@ -1,112 +1,71 @@
 {
-  "$defs": {
-    "Align": {
-      "enum": [
-        "start",
-        "center",
-        "end",
-        "stretch"
-      ],
-      "type": "string"
-    },
-    "Color": {
-      "description": "Prefer semantic tokens; use named or #RRGGBB colors when asked. none = no color.",
-      "pattern": "^(default|none|muted|accent|success|warning|danger|info|red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|gray|#[0-9A-Fa-f]{6})$",
-      "type": "string"
-    },
-    "Fill": {
-      "enum": [
-        "soft",
-        "solid",
-        "outline"
-      ],
-      "type": "string"
-    },
-    "Id": {
-      "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$",
-      "type": "string"
-    },
-    "Ids": {
-      "items": {
-        "$ref": "#/$defs/Id"
-      },
-      "maxItems": 128,
-      "minItems": 1,
-      "type": "array"
-    },
-    "Long": {
-      "maxLength": 20000,
-      "type": "string"
-    },
-    "Space": {
-      "enum": [
-        "none",
-        "xs",
-        "sm",
-        "md",
-        "lg",
-        "xl"
-      ],
-      "type": "string"
-    },
-    "Str": {
-      "maxLength": 300,
-      "type": "string"
-    },
-    "Sym": {
-      "description": "SF Symbol name, e.g. checkmark.seal.fill; empty = none.",
-      "pattern": "^[a-z0-9.]{0,64}$",
-      "type": "string"
-    },
-    "TextAlign": {
-      "enum": [
-        "start",
-        "center",
-        "end"
-      ],
-      "type": "string"
-    }
-  },
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "additionalProperties": false,
-  "description": "Native iPhone chat answer, saved as a display-only snapshot. text holds the full readable answer. Beyond short replies, also build one rich layout: use structure (Heading, Grid of Stat, Table, KeyValue, Timeline, Chart, Progress, Callout, Badge, Box) and color to make it scannable and attractive. Follow style requests exactly ('make it green': green backgrounds, text, badges, charts); otherwise prefer semantic colors. The app adapts colors to light and dark mode and keeps text readable. Only facts from your tools or the conversation. No forms, remote images or server actions; Button only opens a link. Return text and UI together; no second model call.",
+  "description": "Native iPhone chat answer, saved as a display-only snapshot. text holds the full readable answer. Beyond short replies, also build one rich layout: use structure (Heading, Grid of Stat, Table, KeyValue, Timeline, Chart, Progress, Callout, Badge, Box) and color to make it scannable and attractive. Keep it simple: one column of blocks, each block used once; no hidden, duplicate or unused components. Follow style requests exactly ('make it green': green backgrounds, text, badges, charts); otherwise prefer semantic colors. The app adapts colors to light and dark mode and keeps text readable. Only facts from your tools or the conversation. No forms, remote images or server actions; Button only opens a link. Return text and UI together; no second model call.",
+  "type": "object",
   "properties": {
+    "version": {
+      "type": "integer",
+      "enum": [
+        2
+      ]
+    },
+    "text": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 50000,
+      "description": "Complete readable Markdown answer with every essential fact and the actual scope and source of listed data; used for copy and fallback. Never UI JSON."
+    },
     "a2uiMessages": {
-      "description": "[] for a short plain answer, else one createSurface. components is a flat list; containers reference child ids. One tree from id root: each id unique, used once, reachable. Max 128 components, depth 24.",
+      "type": "array",
+      "maxItems": 1,
+      "description": "[] for a short plain answer, else one createSurface.",
       "items": {
-        "additionalProperties": false,
+        "type": "object",
         "properties": {
+          "version": {
+            "type": "string",
+            "enum": [
+              "1.0"
+            ]
+          },
           "createSurface": {
-            "additionalProperties": false,
+            "type": "object",
             "properties": {
+              "surfaceId": {
+                "type": "string",
+                "enum": [
+                  "answer"
+                ]
+              },
               "catalogId": {
+                "type": "string",
                 "enum": [
                   "https://fibe.gg/catalogs/chat-display/v2"
-                ],
-                "type": "string"
+                ]
               },
               "components": {
+                "type": "array",
                 "items": {
                   "anyOf": [
                     {
-                      "additionalProperties": false,
                       "description": "Vertical or horizontal stack; align is the cross axis. Keep Rows short on a phone.",
+                      "type": "object",
                       "properties": {
-                        "align": {
-                          "$ref": "#/$defs/Align"
+                        "id": {
+                          "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Column",
+                            "Row"
+                          ]
                         },
                         "children": {
                           "$ref": "#/$defs/Ids"
                         },
-                        "component": {
-                          "enum": [
-                            "Column",
-                            "Row"
-                          ],
-                          "type": "string"
-                        },
-                        "id": {
-                          "$ref": "#/$defs/Id"
+                        "align": {
+                          "$ref": "#/$defs/Align"
                         },
                         "spacing": {
                           "$ref": "#/$defs/Space"
@@ -119,31 +78,31 @@
                         "align",
                         "spacing"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Equal-width cells in rows, e.g. Stat tiles.",
+                      "type": "object",
                       "properties": {
+                        "id": {
+                          "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Grid"
+                          ]
+                        },
                         "children": {
                           "$ref": "#/$defs/Ids"
                         },
                         "columns": {
+                          "type": "integer",
                           "enum": [
                             2,
                             3,
                             4
-                          ],
-                          "type": "integer"
-                        },
-                        "component": {
-                          "enum": [
-                            "Grid"
-                          ],
-                          "type": "string"
-                        },
-                        "id": {
-                          "$ref": "#/$defs/Id"
+                          ]
                         },
                         "spacing": {
                           "$ref": "#/$defs/Space"
@@ -156,57 +115,57 @@
                         "columns",
                         "spacing"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Styled container: card, banner, colored panel. background default = card, none = clear; fill soft = tint, solid = full color (labels become white or black), outline = border only.",
+                      "type": "object",
                       "properties": {
-                        "align": {
-                          "$ref": "#/$defs/Align"
+                        "id": {
+                          "$ref": "#/$defs/Id"
                         },
-                        "background": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "border": {
-                          "$ref": "#/$defs/Color"
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Box"
+                          ]
                         },
                         "children": {
                           "$ref": "#/$defs/Ids"
                         },
-                        "component": {
-                          "enum": [
-                            "Box"
-                          ],
-                          "type": "string"
-                        },
                         "direction": {
+                          "type": "string",
                           "enum": [
                             "vertical",
                             "horizontal"
-                          ],
-                          "type": "string"
+                          ]
                         },
-                        "fill": {
-                          "$ref": "#/$defs/Fill"
+                        "align": {
+                          "$ref": "#/$defs/Align"
                         },
-                        "id": {
-                          "$ref": "#/$defs/Id"
+                        "spacing": {
+                          "$ref": "#/$defs/Space"
                         },
                         "padding": {
                           "$ref": "#/$defs/Space"
                         },
                         "radius": {
+                          "type": "string",
                           "enum": [
                             "none",
                             "sm",
                             "md",
                             "lg"
-                          ],
-                          "type": "string"
+                          ]
                         },
-                        "spacing": {
-                          "$ref": "#/$defs/Space"
+                        "background": {
+                          "$ref": "#/$defs/Color"
+                        },
+                        "fill": {
+                          "$ref": "#/$defs/Fill"
+                        },
+                        "border": {
+                          "$ref": "#/$defs/Color"
                         }
                       },
                       "required": [
@@ -222,40 +181,41 @@
                         "fill",
                         "border"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
+                      "description": "Only for two or more alternative views.",
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "Tabs"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Tabs"
+                          ]
+                        },
                         "tabs": {
+                          "type": "array",
                           "items": {
-                            "additionalProperties": false,
+                            "type": "object",
                             "properties": {
-                              "child": {
-                                "$ref": "#/$defs/Id"
-                              },
                               "title": {
                                 "$ref": "#/$defs/Str"
+                              },
+                              "child": {
+                                "$ref": "#/$defs/Id"
                               }
                             },
                             "required": [
                               "title",
                               "child"
                             ],
-                            "type": "object"
+                            "additionalProperties": false
                           },
                           "maxItems": 8,
-                          "minItems": 1,
-                          "type": "array"
+                          "minItems": 1
                         }
                       },
                       "required": [
@@ -263,25 +223,25 @@
                         "component",
                         "tabs"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
-                      "description": "trigger opens content in a sheet.",
+                      "description": "Only for long optional details: trigger (a Text) opens content in a sheet.",
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "Modal"
-                          ],
-                          "type": "string"
-                        },
-                        "content": {
-                          "$ref": "#/$defs/Id"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Modal"
+                          ]
+                        },
                         "trigger": {
+                          "$ref": "#/$defs/Id"
+                        },
+                        "content": {
                           "$ref": "#/$defs/Id"
                         }
                       },
@@ -291,70 +251,70 @@
                         "trigger",
                         "content"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Opens the link on tap; child is a Text.",
+                      "type": "object",
                       "properties": {
+                        "id": {
+                          "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Button"
+                          ]
+                        },
+                        "child": {
+                          "$ref": "#/$defs/Id"
+                        },
+                        "variant": {
+                          "type": "string",
+                          "enum": [
+                            "default",
+                            "primary",
+                            "borderless"
+                          ]
+                        },
                         "action": {
-                          "additionalProperties": false,
+                          "type": "object",
                           "properties": {
                             "functionCall": {
-                              "additionalProperties": false,
+                              "type": "object",
                               "properties": {
                                 "@call": {
+                                  "type": "string",
                                   "enum": [
                                     "openUrl"
-                                  ],
-                                  "type": "string"
+                                  ]
                                 },
                                 "args": {
-                                  "additionalProperties": false,
+                                  "type": "object",
                                   "properties": {
                                     "url": {
+                                      "type": "string",
                                       "maxLength": 4096,
-                                      "pattern": "^https?://[^\\s]+$",
-                                      "type": "string"
+                                      "pattern": "^https?://[^\\s]+$"
                                     }
                                   },
                                   "required": [
                                     "url"
                                   ],
-                                  "type": "object"
+                                  "additionalProperties": false
                                 }
                               },
                               "required": [
                                 "@call",
                                 "args"
                               ],
-                              "type": "object"
+                              "additionalProperties": false
                             }
                           },
                           "required": [
                             "functionCall"
                           ],
-                          "type": "object"
-                        },
-                        "child": {
-                          "$ref": "#/$defs/Id"
-                        },
-                        "component": {
-                          "enum": [
-                            "Button"
-                          ],
-                          "type": "string"
-                        },
-                        "id": {
-                          "$ref": "#/$defs/Id"
-                        },
-                        "variant": {
-                          "enum": [
-                            "default",
-                            "primary",
-                            "borderless"
-                          ],
-                          "type": "string"
+                          "additionalProperties": false
                         }
                       },
                       "required": [
@@ -364,40 +324,26 @@
                         "variant",
                         "action"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Inline Markdown; size is a Dynamic Type style.",
+                      "type": "object",
                       "properties": {
-                        "align": {
-                          "$ref": "#/$defs/TextAlign"
-                        },
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Text"
-                          ],
-                          "type": "string"
-                        },
-                        "design": {
-                          "enum": [
-                            "default",
-                            "rounded",
-                            "monospaced",
-                            "serif"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
-                        "italic": {
-                          "type": "boolean"
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Text"
+                          ]
+                        },
+                        "text": {
+                          "$ref": "#/$defs/Long"
                         },
                         "size": {
+                          "type": "string",
                           "enum": [
                             "caption",
                             "footnote",
@@ -409,21 +355,35 @@
                             "title2",
                             "title",
                             "largeTitle"
-                          ],
-                          "type": "string"
-                        },
-                        "text": {
-                          "$ref": "#/$defs/Long"
+                          ]
                         },
                         "weight": {
+                          "type": "string",
                           "enum": [
                             "regular",
                             "medium",
                             "semibold",
                             "bold",
                             "heavy"
-                          ],
-                          "type": "string"
+                          ]
+                        },
+                        "color": {
+                          "$ref": "#/$defs/Color"
+                        },
+                        "italic": {
+                          "type": "boolean"
+                        },
+                        "align": {
+                          "$ref": "#/$defs/TextAlign"
+                        },
+                        "design": {
+                          "type": "string",
+                          "enum": [
+                            "default",
+                            "rounded",
+                            "monospaced",
+                            "serif"
+                          ]
                         }
                       },
                       "required": [
@@ -437,37 +397,37 @@
                         "align",
                         "design"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Section title, level 1 largest.",
+                      "type": "object",
                       "properties": {
-                        "align": {
-                          "$ref": "#/$defs/TextAlign"
-                        },
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Heading"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Heading"
+                          ]
+                        },
+                        "text": {
+                          "$ref": "#/$defs/Str"
+                        },
                         "level": {
+                          "type": "integer",
                           "enum": [
                             1,
                             2,
                             3
-                          ],
-                          "type": "integer"
+                          ]
                         },
-                        "text": {
-                          "$ref": "#/$defs/Str"
+                        "color": {
+                          "$ref": "#/$defs/Color"
+                        },
+                        "align": {
+                          "$ref": "#/$defs/TextAlign"
                         }
                       },
                       "required": [
@@ -478,20 +438,20 @@
                         "color",
                         "align"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Block Markdown: lists, quotes, code, tables.",
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "Markdown"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Markdown"
+                          ]
                         },
                         "text": {
                           "$ref": "#/$defs/Long"
@@ -502,32 +462,32 @@
                         "component",
                         "text"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Pill label.",
+                      "type": "object",
                       "properties": {
-                        "color": {
-                          "$ref": "#/$defs/Color"
+                        "id": {
+                          "$ref": "#/$defs/Id"
                         },
                         "component": {
+                          "type": "string",
                           "enum": [
                             "Badge"
-                          ],
-                          "type": "string"
+                          ]
+                        },
+                        "text": {
+                          "$ref": "#/$defs/Str"
+                        },
+                        "color": {
+                          "$ref": "#/$defs/Color"
                         },
                         "fill": {
                           "$ref": "#/$defs/Fill"
                         },
-                        "id": {
-                          "$ref": "#/$defs/Id"
-                        },
                         "symbol": {
                           "$ref": "#/$defs/Sym"
-                        },
-                        "text": {
-                          "$ref": "#/$defs/Str"
                         }
                       },
                       "required": [
@@ -538,32 +498,32 @@
                         "fill",
                         "symbol"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Highlighted note toned by color; empty symbol = tone icon.",
+                      "type": "object",
                       "properties": {
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Callout"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
-                        "symbol": {
-                          "$ref": "#/$defs/Sym"
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Callout"
+                          ]
+                        },
+                        "title": {
+                          "$ref": "#/$defs/Str"
                         },
                         "text": {
                           "$ref": "#/$defs/Long"
                         },
-                        "title": {
-                          "$ref": "#/$defs/Str"
+                        "color": {
+                          "$ref": "#/$defs/Color"
+                        },
+                        "symbol": {
+                          "$ref": "#/$defs/Sym"
                         }
                       },
                       "required": [
@@ -574,34 +534,34 @@
                         "color",
                         "symbol"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
+                      "type": "object",
                       "properties": {
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Symbol"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Symbol"
+                          ]
                         },
                         "name": {
                           "$ref": "#/$defs/Sym"
                         },
+                        "color": {
+                          "$ref": "#/$defs/Color"
+                        },
                         "size": {
+                          "type": "string",
                           "enum": [
                             "sm",
                             "md",
                             "lg",
                             "xl"
-                          ],
-                          "type": "string"
+                          ]
                         }
                       },
                       "required": [
@@ -611,23 +571,23 @@
                         "color",
                         "size"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Line; vertical in a Row.",
+                      "type": "object",
                       "properties": {
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Divider"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Divider"
+                          ]
+                        },
+                        "color": {
+                          "$ref": "#/$defs/Color"
                         }
                       },
                       "required": [
@@ -635,22 +595,23 @@
                         "component",
                         "color"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
-                      "description": "flexible pushes Row siblings apart.",
+                      "description": "Rarely needed: stacks already space blocks. flexible pushes Row siblings apart.",
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "Spacer"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Spacer"
+                          ]
+                        },
                         "size": {
+                          "type": "string",
                           "enum": [
                             "xs",
                             "sm",
@@ -658,8 +619,7 @@
                             "lg",
                             "xl",
                             "flexible"
-                          ],
-                          "type": "string"
+                          ]
                         }
                       },
                       "required": [
@@ -667,32 +627,33 @@
                         "component",
                         "size"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "KeyValue"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "KeyValue"
+                          ]
+                        },
                         "items": {
+                          "type": "array",
                           "items": {
-                            "additionalProperties": false,
+                            "type": "object",
                             "properties": {
-                              "color": {
-                                "$ref": "#/$defs/Color"
-                              },
                               "key": {
                                 "$ref": "#/$defs/Str"
                               },
                               "value": {
                                 "$ref": "#/$defs/Str"
+                              },
+                              "color": {
+                                "$ref": "#/$defs/Color"
                               }
                             },
                             "required": [
@@ -700,11 +661,10 @@
                               "value",
                               "color"
                             ],
-                            "type": "object"
+                            "additionalProperties": false
                           },
                           "maxItems": 50,
-                          "minItems": 1,
-                          "type": "array"
+                          "minItems": 1
                         }
                       },
                       "required": [
@@ -712,73 +672,73 @@
                         "component",
                         "items"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "One cell per column in each row; cell is a string or {text, color}.",
+                      "type": "object",
                       "properties": {
+                        "id": {
+                          "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Table"
+                          ]
+                        },
                         "columns": {
+                          "type": "array",
                           "items": {
-                            "additionalProperties": false,
+                            "type": "object",
                             "properties": {
-                              "align": {
-                                "$ref": "#/$defs/TextAlign"
-                              },
                               "title": {
                                 "$ref": "#/$defs/Str"
+                              },
+                              "align": {
+                                "$ref": "#/$defs/TextAlign"
                               }
                             },
                             "required": [
                               "title",
                               "align"
                             ],
-                            "type": "object"
+                            "additionalProperties": false
                           },
                           "maxItems": 6,
-                          "minItems": 1,
-                          "type": "array"
-                        },
-                        "component": {
-                          "enum": [
-                            "Table"
-                          ],
-                          "type": "string"
-                        },
-                        "id": {
-                          "$ref": "#/$defs/Id"
+                          "minItems": 1
                         },
                         "rows": {
+                          "type": "array",
                           "items": {
+                            "type": "array",
                             "items": {
                               "anyOf": [
                                 {
                                   "$ref": "#/$defs/Str"
                                 },
                                 {
-                                  "additionalProperties": false,
+                                  "type": "object",
                                   "properties": {
-                                    "color": {
-                                      "$ref": "#/$defs/Color"
-                                    },
                                     "text": {
                                       "$ref": "#/$defs/Str"
+                                    },
+                                    "color": {
+                                      "$ref": "#/$defs/Color"
                                     }
                                   },
                                   "required": [
                                     "text",
                                     "color"
                                   ],
-                                  "type": "object"
+                                  "additionalProperties": false
                                 }
                               ]
                             },
                             "maxItems": 6,
-                            "minItems": 1,
-                            "type": "array"
+                            "minItems": 1
                           },
-                          "maxItems": 100,
-                          "type": "array"
+                          "maxItems": 100
                         }
                       },
                       "required": [
@@ -787,41 +747,41 @@
                         "columns",
                         "rows"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "KPI tile; detail (delta or context) may be empty; color tints value and trend.",
+                      "type": "object",
                       "properties": {
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Stat"
-                          ],
-                          "type": "string"
-                        },
-                        "detail": {
-                          "$ref": "#/$defs/Str"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Stat"
+                          ]
                         },
                         "label": {
                           "$ref": "#/$defs/Str"
                         },
+                        "value": {
+                          "$ref": "#/$defs/Str"
+                        },
+                        "detail": {
+                          "$ref": "#/$defs/Str"
+                        },
                         "trend": {
+                          "type": "string",
                           "enum": [
                             "up",
                             "down",
                             "flat",
                             "none"
-                          ],
-                          "type": "string"
+                          ]
                         },
-                        "value": {
-                          "$ref": "#/$defs/Str"
+                        "color": {
+                          "$ref": "#/$defs/Color"
                         }
                       },
                       "required": [
@@ -833,34 +793,34 @@
                         "trend",
                         "color"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "value 0-1; empty detail shows percent.",
+                      "type": "object",
                       "properties": {
-                        "color": {
-                          "$ref": "#/$defs/Color"
-                        },
-                        "component": {
-                          "enum": [
-                            "Progress"
-                          ],
-                          "type": "string"
-                        },
-                        "detail": {
-                          "$ref": "#/$defs/Str"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Progress"
+                          ]
                         },
                         "label": {
                           "$ref": "#/$defs/Str"
                         },
                         "value": {
-                          "maximum": 1,
+                          "type": "number",
                           "minimum": 0,
-                          "type": "number"
+                          "maximum": 1
+                        },
+                        "detail": {
+                          "$ref": "#/$defs/Str"
+                        },
+                        "color": {
+                          "$ref": "#/$defs/Color"
                         }
                       },
                       "required": [
@@ -871,23 +831,23 @@
                         "detail",
                         "color"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Code or log block; language may be empty.",
+                      "type": "object",
                       "properties": {
-                        "code": {
-                          "$ref": "#/$defs/Long"
-                        },
-                        "component": {
-                          "enum": [
-                            "Code"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
+                        },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Code"
+                          ]
+                        },
+                        "code": {
+                          "$ref": "#/$defs/Long"
                         },
                         "language": {
                           "$ref": "#/$defs/Str"
@@ -899,46 +859,47 @@
                         "code",
                         "language"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "bar, line, area, point plot value per label; pie shows shares. series names a series (empty = single).",
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "Chart"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Chart"
+                          ]
+                        },
                         "kind": {
+                          "type": "string",
                           "enum": [
                             "bar",
                             "line",
                             "area",
                             "point",
                             "pie"
-                          ],
-                          "type": "string"
+                          ]
                         },
                         "points": {
+                          "type": "array",
                           "items": {
-                            "additionalProperties": false,
+                            "type": "object",
                             "properties": {
-                              "color": {
-                                "$ref": "#/$defs/Color"
-                              },
                               "label": {
-                                "$ref": "#/$defs/Str"
-                              },
-                              "series": {
                                 "$ref": "#/$defs/Str"
                               },
                               "value": {
                                 "type": "number"
+                              },
+                              "series": {
+                                "$ref": "#/$defs/Str"
+                              },
+                              "color": {
+                                "$ref": "#/$defs/Color"
                               }
                             },
                             "required": [
@@ -947,11 +908,10 @@
                               "series",
                               "color"
                             ],
-                            "type": "object"
+                            "additionalProperties": false
                           },
                           "maxItems": 50,
-                          "minItems": 1,
-                          "type": "array"
+                          "minItems": 1
                         }
                       },
                       "required": [
@@ -960,39 +920,40 @@
                         "kind",
                         "points"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     },
                     {
-                      "additionalProperties": false,
                       "description": "Ordered events or steps; time and detail may be empty.",
+                      "type": "object",
                       "properties": {
-                        "component": {
-                          "enum": [
-                            "Timeline"
-                          ],
-                          "type": "string"
-                        },
                         "id": {
                           "$ref": "#/$defs/Id"
                         },
+                        "component": {
+                          "type": "string",
+                          "enum": [
+                            "Timeline"
+                          ]
+                        },
                         "items": {
+                          "type": "array",
                           "items": {
-                            "additionalProperties": false,
+                            "type": "object",
                             "properties": {
-                              "color": {
-                                "$ref": "#/$defs/Color"
+                              "title": {
+                                "$ref": "#/$defs/Str"
                               },
                               "detail": {
                                 "$ref": "#/$defs/Str"
                               },
-                              "symbol": {
-                                "$ref": "#/$defs/Sym"
-                              },
                               "time": {
                                 "$ref": "#/$defs/Str"
                               },
-                              "title": {
-                                "$ref": "#/$defs/Str"
+                              "color": {
+                                "$ref": "#/$defs/Color"
+                              },
+                              "symbol": {
+                                "$ref": "#/$defs/Sym"
                               }
                             },
                             "required": [
@@ -1002,11 +963,10 @@
                               "color",
                               "symbol"
                             ],
-                            "type": "object"
+                            "additionalProperties": false
                           },
                           "maxItems": 30,
-                          "minItems": 1,
-                          "type": "array"
+                          "minItems": 1
                         }
                       },
                       "required": [
@@ -1014,19 +974,13 @@
                         "component",
                         "items"
                       ],
-                      "type": "object"
+                      "additionalProperties": false
                     }
                   ]
                 },
-                "maxItems": 128,
+                "maxItems": 64,
                 "minItems": 1,
-                "type": "array"
-              },
-              "surfaceId": {
-                "enum": [
-                  "answer"
-                ],
-                "type": "string"
+                "description": "Flat list forming one tree. Exactly one component has id root (a Column or Box) whose children list the top-level blocks in order. Every other component is referenced exactly once by a parent's children, child, trigger, content or tabs. Max 64 components, depth 24."
               }
             },
             "required": [
@@ -1034,35 +988,15 @@
               "catalogId",
               "components"
             ],
-            "type": "object"
-          },
-          "version": {
-            "enum": [
-              "1.0"
-            ],
-            "type": "string"
+            "additionalProperties": false
           }
         },
         "required": [
           "version",
           "createSurface"
         ],
-        "type": "object"
-      },
-      "maxItems": 1,
-      "type": "array"
-    },
-    "text": {
-      "description": "Complete readable Markdown answer with every essential fact and the actual scope and source of listed data; used for copy and fallback. Never UI JSON.",
-      "maxLength": 50000,
-      "minLength": 1,
-      "type": "string"
-    },
-    "version": {
-      "enum": [
-        2
-      ],
-      "type": "integer"
+        "additionalProperties": false
+      }
     }
   },
   "required": [
@@ -1070,5 +1004,73 @@
     "text",
     "a2uiMessages"
   ],
-  "type": "object"
+  "additionalProperties": false,
+  "$defs": {
+    "Id": {
+      "type": "string",
+      "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,63}$"
+    },
+    "Ids": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Id"
+      },
+      "maxItems": 128,
+      "minItems": 1
+    },
+    "Color": {
+      "type": "string",
+      "pattern": "^(default|none|muted|accent|success|warning|danger|info|red|orange|yellow|green|mint|teal|cyan|blue|indigo|purple|pink|brown|gray|#[0-9A-Fa-f]{6})$",
+      "description": "Prefer semantic tokens; use named or #RRGGBB colors when asked. none = no color."
+    },
+    "Str": {
+      "type": "string",
+      "maxLength": 300
+    },
+    "Long": {
+      "type": "string",
+      "maxLength": 20000
+    },
+    "Sym": {
+      "type": "string",
+      "pattern": "^[a-z0-9.]{0,64}$",
+      "description": "SF Symbol name, e.g. checkmark.seal.fill; empty = none."
+    },
+    "Space": {
+      "type": "string",
+      "enum": [
+        "none",
+        "xs",
+        "sm",
+        "md",
+        "lg",
+        "xl"
+      ]
+    },
+    "Align": {
+      "type": "string",
+      "enum": [
+        "start",
+        "center",
+        "end",
+        "stretch"
+      ]
+    },
+    "TextAlign": {
+      "type": "string",
+      "enum": [
+        "start",
+        "center",
+        "end"
+      ]
+    },
+    "Fill": {
+      "type": "string",
+      "enum": [
+        "soft",
+        "solid",
+        "outline"
+      ]
+    }
+  }
 }

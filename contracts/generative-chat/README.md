@@ -25,7 +25,12 @@ Colors are semantic tokens (`default`, `muted`, `accent`, `success`,
 them to light and dark appearance and enforces readable contrast. Every
 object lists all of its properties as required (strict provider mode), shared
 definitions live in `$defs`, and the minified schema stays under 14 KiB
-because it is sent with every model request of a turn. Older app builds treat
+because it is sent with every model request of a turn. Key order is part of
+the contract: providers generate properties in schema order, so `id` and
+`component` lead every component and `text` precedes `a2uiMessages`; the app
+sends the bundled bytes in that order. The components list asks for one
+`root` Column or Box with every other component referenced exactly once; the
+app still rebuilds a usable tree from answers that miss those rules. Older app builds treat
 a version 2 answer as unsupported and show its `text`.
 
 The examples are synthetic fixture data, not an actual Playground inventory.
