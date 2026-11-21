@@ -9,9 +9,12 @@ for (const [source, bundled] of [
   ['schema.json', 'generative-chat-schema.json'],
   ['example.json', 'generative-chat-example.json'],
   ['text-example.json', 'generative-chat-text-example.json'],
+  ['schema-v2.json', 'generative-chat-v2-schema.json'],
+  ['example-v2.json', 'generative-chat-v2-example.json'],
+  ['text-example-v2.json', 'generative-chat-v2-text-example.json'],
 ]) {
   if (!readFileSync(resolve(contract, source)).equals(readFileSync(resolve(ios, 'Fibe/GenerativeChat/Resources', bundled)))) {
     throw new Error(`Generative chat contract differs: ${source}`);
   }
 }
-console.log('Generative chat schema and examples match the iOS bundle.');
+console.log('Generative chat schemas and examples match the iOS bundle.');

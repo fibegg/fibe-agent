@@ -1,0 +1,431 @@
+{
+  "version": 2,
+  "text": "## Playground health\n\nSaved snapshot of three synthetic Playgrounds on this Host.\n\n- Running: 2 (+1 today)\n- Stopped: 1\n- Uptime: 99.2% over 7 days\n- Disk used: 62 of 100 GB\n\n| Name | Status | CPU |\n| --- | --- | --- |\n| Orion | Running | 42% |\n| Lyra | Stopped | 0% |\n| Vega | Running | 67% |\n\nAll checks passed. Only this Host was queried; this is not an account-wide list. [Open Fibe](https://next-next.fibe.live).",
+  "a2uiMessages": [
+    {
+      "version": "1.0",
+      "createSurface": {
+        "surfaceId": "answer",
+        "catalogId": "https://fibe.gg/catalogs/chat-display/v2",
+        "components": [
+          {
+            "id": "root",
+            "component": "Column",
+            "children": [
+              "header",
+              "stats",
+              "cpuTitle",
+              "cpu",
+              "tableTitle",
+              "table",
+              "disk",
+              "callout",
+              "tags",
+              "tabs",
+              "link"
+            ],
+            "align": "stretch",
+            "spacing": "md"
+          },
+          {
+            "id": "header",
+            "component": "Box",
+            "children": [
+              "headerTop",
+              "headerTitle",
+              "headerScope"
+            ],
+            "direction": "vertical",
+            "align": "start",
+            "spacing": "xs",
+            "padding": "lg",
+            "radius": "lg",
+            "background": "green",
+            "fill": "solid",
+            "border": "none"
+          },
+          {
+            "id": "headerTop",
+            "component": "Row",
+            "children": [
+              "leaf",
+              "headerEyebrow"
+            ],
+            "align": "center",
+            "spacing": "xs"
+          },
+          {
+            "id": "leaf",
+            "component": "Symbol",
+            "name": "leaf.fill",
+            "color": "default",
+            "size": "sm"
+          },
+          {
+            "id": "headerEyebrow",
+            "component": "Text",
+            "text": "SAVED SNAPSHOT",
+            "size": "caption",
+            "weight": "semibold",
+            "color": "default",
+            "italic": false,
+            "align": "start",
+            "design": "monospaced"
+          },
+          {
+            "id": "headerTitle",
+            "component": "Heading",
+            "text": "Playground health",
+            "level": 1,
+            "color": "default",
+            "align": "start"
+          },
+          {
+            "id": "headerScope",
+            "component": "Text",
+            "text": "Three synthetic Playgrounds on this Host. Nothing refreshes when you reopen this answer.",
+            "size": "subheadline",
+            "weight": "regular",
+            "color": "default",
+            "italic": false,
+            "align": "start",
+            "design": "default"
+          },
+          {
+            "id": "stats",
+            "component": "Grid",
+            "children": [
+              "running",
+              "stopped",
+              "uptime"
+            ],
+            "columns": 3,
+            "spacing": "sm"
+          },
+          {
+            "id": "running",
+            "component": "Stat",
+            "label": "Running",
+            "value": "2",
+            "detail": "+1 today",
+            "trend": "up",
+            "color": "success"
+          },
+          {
+            "id": "stopped",
+            "component": "Stat",
+            "label": "Stopped",
+            "value": "1",
+            "detail": "since 09:40",
+            "trend": "flat",
+            "color": "muted"
+          },
+          {
+            "id": "uptime",
+            "component": "Stat",
+            "label": "Uptime",
+            "value": "99.2%",
+            "detail": "7 days",
+            "trend": "up",
+            "color": "green"
+          },
+          {
+            "id": "cpuTitle",
+            "component": "Heading",
+            "text": "CPU by Playground",
+            "level": 3,
+            "color": "default",
+            "align": "start"
+          },
+          {
+            "id": "cpu",
+            "component": "Chart",
+            "kind": "bar",
+            "points": [
+              {
+                "label": "Orion",
+                "value": 42,
+                "series": "",
+                "color": "green"
+              },
+              {
+                "label": "Lyra",
+                "value": 0,
+                "series": "",
+                "color": "gray"
+              },
+              {
+                "label": "Vega",
+                "value": 67,
+                "series": "",
+                "color": "mint"
+              }
+            ]
+          },
+          {
+            "id": "tableTitle",
+            "component": "Heading",
+            "text": "Playgrounds",
+            "level": 3,
+            "color": "default",
+            "align": "start"
+          },
+          {
+            "id": "table",
+            "component": "Table",
+            "columns": [
+              {
+                "title": "Name",
+                "align": "start"
+              },
+              {
+                "title": "Status",
+                "align": "start"
+              },
+              {
+                "title": "CPU",
+                "align": "end"
+              }
+            ],
+            "rows": [
+              [
+                "Orion",
+                {
+                  "text": "Running",
+                  "color": "success"
+                },
+                "42%"
+              ],
+              [
+                "Lyra",
+                {
+                  "text": "Stopped",
+                  "color": "muted"
+                },
+                "0%"
+              ],
+              [
+                "Vega",
+                {
+                  "text": "Running",
+                  "color": "success"
+                },
+                "67%"
+              ]
+            ]
+          },
+          {
+            "id": "disk",
+            "component": "Progress",
+            "label": "Disk used",
+            "value": 0.62,
+            "detail": "62 of 100 GB",
+            "color": "orange"
+          },
+          {
+            "id": "callout",
+            "component": "Callout",
+            "title": "All checks passed",
+            "text": "Both running Playgrounds answered their health checks.",
+            "color": "success",
+            "symbol": ""
+          },
+          {
+            "id": "tags",
+            "component": "Row",
+            "children": [
+              "hostBadge",
+              "snapshotBadge",
+              "push",
+              "count"
+            ],
+            "align": "center",
+            "spacing": "xs"
+          },
+          {
+            "id": "hostBadge",
+            "component": "Badge",
+            "text": "Host: local",
+            "color": "green",
+            "fill": "outline",
+            "symbol": "server.rack"
+          },
+          {
+            "id": "snapshotBadge",
+            "component": "Badge",
+            "text": "Snapshot",
+            "color": "info",
+            "fill": "soft",
+            "symbol": "clock"
+          },
+          {
+            "id": "push",
+            "component": "Spacer",
+            "size": "flexible"
+          },
+          {
+            "id": "count",
+            "component": "Text",
+            "text": "3 total",
+            "size": "footnote",
+            "weight": "regular",
+            "color": "muted",
+            "italic": false,
+            "align": "start",
+            "design": "default"
+          },
+          {
+            "id": "tabs",
+            "component": "Tabs",
+            "tabs": [
+              {
+                "title": "Activity",
+                "child": "timeline"
+              },
+              {
+                "title": "Details",
+                "child": "details"
+              }
+            ]
+          },
+          {
+            "id": "timeline",
+            "component": "Timeline",
+            "items": [
+              {
+                "title": "Vega started",
+                "detail": "Rollout of main finished",
+                "time": "10:05",
+                "color": "success",
+                "symbol": "play.circle.fill"
+              },
+              {
+                "title": "Lyra stopped",
+                "detail": "Stopped by its owner",
+                "time": "09:40",
+                "color": "gray",
+                "symbol": "stop.circle.fill"
+              },
+              {
+                "title": "Orion healthy",
+                "detail": "",
+                "time": "09:12",
+                "color": "green",
+                "symbol": ""
+              }
+            ]
+          },
+          {
+            "id": "details",
+            "component": "Box",
+            "children": [
+              "facts",
+              "rule",
+              "command",
+              "notes",
+              "more"
+            ],
+            "direction": "vertical",
+            "align": "stretch",
+            "spacing": "sm",
+            "padding": "md",
+            "radius": "md",
+            "background": "default",
+            "fill": "soft",
+            "border": "default"
+          },
+          {
+            "id": "facts",
+            "component": "KeyValue",
+            "items": [
+              {
+                "key": "Host",
+                "value": "local",
+                "color": "default"
+              },
+              {
+                "key": "Queried",
+                "value": "Playgrounds on this Host only",
+                "color": "default"
+              },
+              {
+                "key": "Health",
+                "value": "Good",
+                "color": "success"
+              }
+            ]
+          },
+          {
+            "id": "rule",
+            "component": "Divider",
+            "color": "default"
+          },
+          {
+            "id": "command",
+            "component": "Code",
+            "code": "fibe playgrounds list --host local",
+            "language": "shell"
+          },
+          {
+            "id": "notes",
+            "component": "Markdown",
+            "text": "- Values are **saved results**.\n- Open Fibe for live status."
+          },
+          {
+            "id": "more",
+            "component": "Modal",
+            "trigger": "moreLabel",
+            "content": "moreBody"
+          },
+          {
+            "id": "moreLabel",
+            "component": "Text",
+            "text": "Show scope details",
+            "size": "body",
+            "weight": "medium",
+            "color": "accent",
+            "italic": false,
+            "align": "start",
+            "design": "default"
+          },
+          {
+            "id": "moreBody",
+            "component": "Text",
+            "text": "Only this Host was queried. This answer does not list every Playground in your account.",
+            "size": "body",
+            "weight": "regular",
+            "color": "default",
+            "italic": false,
+            "align": "start",
+            "design": "default"
+          },
+          {
+            "id": "link",
+            "component": "Button",
+            "child": "linkText",
+            "variant": "primary",
+            "action": {
+              "functionCall": {
+                "@call": "openUrl",
+                "args": {
+                  "url": "https://next-next.fibe.live"
+                }
+              }
+            }
+          },
+          {
+            "id": "linkText",
+            "component": "Text",
+            "text": "Open Fibe",
+            "size": "body",
+            "weight": "semibold",
+            "color": "default",
+            "italic": false,
+            "align": "start",
+            "design": "default"
+          }
+        ]
+      }
+    }
+  ]
+}
