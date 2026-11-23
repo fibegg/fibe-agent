@@ -1,5 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, Route, Routes } from 'react-router-dom';
+import { isAuthenticated } from './api-url';
 import { AppErrorBoundary } from './error-boundary';
 import { AvatarConfigProvider } from './avatar-config-context';
 import { I18nProvider, useT } from './i18n';
@@ -20,6 +21,10 @@ function PageFallback() {
   );
 }
 
+function ChatRoute() {
+  return isAuthenticated() ? <ChatPage /> : <Navigate to="/login" replace />;
+}
+
 export function App() {
   return (
     <AppErrorBoundary>
@@ -28,7 +33,7 @@ export function App() {
           <Suspense fallback={<PageFallback />}>
             <Routes>
               <Route path="/login" element={<LoginPage />} />
-              <Route path="/" element={<ChatPage />} />
+              <Route path="/" element={<ChatRoute />} />
               <Route path="/stark" element={<StarkReasoningPage />} />
               <Route path="/stark/:activityId/:storyId" element={<StarkReasoningPage />} />
               <Route path="/stark/:activityStoryId" element={<StarkReasoningPage />} />
