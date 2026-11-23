@@ -34,6 +34,7 @@ import { WS_EVENT } from '@shared/ws-constants';
 import { ProviderTrafficStoreService } from '../provider-traffic/provider-traffic-store.service';
 
 @Controller('conversations')
+@UseGuards(AgentAuthGuard)
 export class ConversationsController {
   constructor(
     private readonly convManager: ConversationManagerService,
@@ -145,7 +146,6 @@ export class ConversationsController {
   }
 
   @Post(':id/prompts/:promptId/answer')
-  @UseGuards(AgentAuthGuard)
   @HttpCode(HttpStatus.OK)
   answerPrompt(@Param('id') id: string, @Param('promptId') promptId: string, @Body() body: { answer?: string; confirmed?: boolean }) {
     this.requireBundle(id);
