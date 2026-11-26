@@ -1995,6 +1995,7 @@ export class OrchestratorService implements OnModuleInit {
       });
       return;
     }
+    this.sessionRegistry.stopConversationRuntime(ctx.conversationId);
     const resetAt = new Date().toISOString();
     const { messageStore: rMsg, activityStore: rAct } = this.stores(ctx);
     rMsg.reset();

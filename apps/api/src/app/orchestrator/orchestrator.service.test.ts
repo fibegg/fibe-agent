@@ -207,6 +207,7 @@ describe('OrchestratorService', () => {
     };
     const strategyRegistry = {
       resolveStrategy: () => strategy,
+      stopConversationRuntime: () => undefined,
     } as unknown as import('../strategies/strategy-registry.service').StrategyRegistryService;
     const sessionRegistry = new SessionRegistryService(
       strategyRegistry as never,

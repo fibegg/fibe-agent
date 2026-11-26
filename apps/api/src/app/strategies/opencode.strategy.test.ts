@@ -15,9 +15,22 @@ import {
   buildOpencodeRunArgs,
   resolveOpencodeAppServerTurnTimeoutMs,
 } from './opencode.strategy';
+import { StrategyRegistryService } from './strategy-registry.service';
 import type { AuthConnection, LogoutConnection } from './strategy.types';
 
 const TEST_HOME = join(tmpdir(), `opencode-test-home-${process.pid}`);
+
+const strategies: OpencodeStrategy[] = [];
+
+function makeStrategy(...args: ConstructorParameters<typeof OpencodeStrategy>): OpencodeStrategy {
+  const strategy = new OpencodeStrategy(...args);
+  strategies.push(strategy);
+  return strategy;
+}
+
+async function stopStrategies(): Promise<void> {
+  await Promise.all(strategies.splice(0).map((strategy) => strategy.shutdown()));
+}
 
 function writeFakeOpencode(path: string): void {
   writeFileSync(
@@ -55,6 +68,7 @@ function sendEvent(clients, event) {
 }
 if (args[0] === 'serve') {
   const port = Number(args[args.indexOf('--port') + 1]);
+  record({ type: 'spawn', pid: process.pid });
   const clients = new Set();
   const sessionID = process.env.OPENCODE_FAKE_SESSION_ID || 'ses_fakeOpenCodeSession';
   let messageCounter = 0;
@@ -188,7 +202,8 @@ if (args[0] === 'serve') {
         sendEvent(clients, { type: 'message.part.updated', properties: { part: { id: textPartID, sessionID: messageMatch[1], messageID: assistantMessageID, type: 'text', text } } });
       }
       sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: assistantMessageID, partID: textPartID, field: 'text', delta: text.slice(0, Math.ceil(text.length / 2)) } });
-      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'output-no-idle') {
+      if (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'output-no-idle' ||
+          (process.env.OPENCODE_FAKE_MESSAGE_RESPONSE === 'second-turn-hangs' && turnNumber === 2)) {
         return;
       }
       sendEvent(clients, { type: 'message.part.delta', properties: { sessionID: messageMatch[1], messageID: assistantMessageID, partID: textPartID, field: 'text', delta: text.slice(Math.ceil(text.length / 2)) } });
@@ -312,7 +327,8 @@ describe('OpencodeStrategy', () => {
     mkdirSync(TEST_HOME, { recursive: true });
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await stopStrategies();
     for (const k of envKeys) {
       if (savedEnv[k] === undefined) delete process.env[k];
       else process.env[k] = savedEnv[k];
@@ -346,7 +362,7 @@ describe('OpencodeStrategy', () => {
   }
 
   test('executeAuth shows manual token modal when no env key set', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('manual_token');
@@ -355,7 +371,7 @@ describe('OpencodeStrategy', () => {
 
   test('executeAuth skips modal when ANTHROPIC_API_KEY is set', () => {
     process.env.ANTHROPIC_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
@@ -364,7 +380,7 @@ describe('OpencodeStrategy', () => {
 
   test('executeAuth skips modal when OPENAI_API_KEY is set', () => {
     process.env.OPENAI_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
@@ -372,7 +388,7 @@ describe('OpencodeStrategy', () => {
 
   test('executeAuth skips modal when OPENROUTER_API_KEY is set', () => {
     process.env.OPENROUTER_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
@@ -380,7 +396,7 @@ describe('OpencodeStrategy', () => {
 
   test('executeAuth skips modal when GEMINI_API_KEY is set', () => {
     process.env.GEMINI_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
@@ -388,7 +404,7 @@ describe('OpencodeStrategy', () => {
 
   test('executeAuth skips modal when GOOGLE_GENERATIVE_AI_API_KEY is set', () => {
     process.env.GOOGLE_GENERATIVE_AI_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
@@ -396,7 +412,7 @@ describe('OpencodeStrategy', () => {
 
   test('executeAuth skips modal when GOOGLE_API_KEY is set', () => {
     process.env.GOOGLE_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     expect(conn.calls).toContain('auth_success');
@@ -418,7 +434,7 @@ describe('OpencodeStrategy', () => {
         join(authDir, 'auth.json'),
         JSON.stringify({ anthropic: credential }),
       );
-      const strategy = new OpencodeStrategy();
+      const strategy = makeStrategy();
       expect(await strategy.checkAuthStatus()).toBe(true);
       const savedSessionDir = process.env.SESSION_DIR;
       process.env.SESSION_DIR = authDir;
@@ -441,7 +457,7 @@ describe('OpencodeStrategy', () => {
     const savedSessionDir = process.env.SESSION_DIR;
     process.env.SESSION_DIR = join(TEST_HOME, 'custom-session');
     try {
-      const strategy = new OpencodeStrategy();
+      const strategy = makeStrategy();
       const env = (
         strategy as unknown as { buildOpencodeEnv(): NodeJS.ProcessEnv }
       ).buildOpencodeEnv();
@@ -455,7 +471,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('submitAuthCode writes auth file and signals success', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.submitAuthCode('test-api-key-123');
@@ -474,7 +490,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('submitAuthCode with empty string sends unauthenticated', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.submitAuthCode('');
@@ -483,7 +499,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('submitAuthCode with whitespace-only sends unauthenticated', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.submitAuthCode('   ');
@@ -491,18 +507,18 @@ describe('OpencodeStrategy', () => {
   });
 
   test('checkAuthStatus returns false when no env key and no stored key', async () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(await strategy.checkAuthStatus()).toBe(false);
   });
 
   test('checkAuthStatus returns true when ANTHROPIC_API_KEY env set', async () => {
     process.env.ANTHROPIC_API_KEY = 'sk-ant-test';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(await strategy.checkAuthStatus()).toBe(true);
   });
 
   test('checkAuthStatus returns true after submitAuthCode', async () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.submitAuthCode('my-key');
@@ -520,7 +536,7 @@ describe('OpencodeStrategy', () => {
       }),
     );
 
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const env = (
       strategy as unknown as { buildOpencodeEnv: () => NodeJS.ProcessEnv }
     ).buildOpencodeEnv();
@@ -540,7 +556,7 @@ describe('OpencodeStrategy', () => {
       }),
     );
 
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const env = (
       strategy as unknown as { buildOpencodeEnv: () => NodeJS.ProcessEnv }
     ).buildOpencodeEnv();
@@ -562,7 +578,7 @@ describe('OpencodeStrategy', () => {
       }),
     );
 
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const env = (
       strategy as unknown as { buildOpencodeEnv: () => NodeJS.ProcessEnv }
     ).buildOpencodeEnv();
@@ -575,7 +591,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('cancelAuth prevents subsequent submitAuthCode from signaling', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.cancelAuth();
@@ -584,7 +600,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('clearCredentials removes auth file', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.submitAuthCode('my-key');
@@ -601,14 +617,14 @@ describe('OpencodeStrategy', () => {
   });
 
   test('executeLogout clears credentials and signals success', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const logoutConn = makeLogoutConnection();
     strategy.executeLogout(logoutConn);
     expect(logoutConn.calls).toContain('logout_success');
   });
 
   test('getModelArgs returns --model flag without prefix when no OpenRouter key', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(strategy.getModelArgs('anthropic/claude-sonnet-4')).toEqual([
       '--model',
       'anthropic/claude-sonnet-4',
@@ -617,7 +633,7 @@ describe('OpencodeStrategy', () => {
 
   test('getModelArgs auto-prefixes openrouter/ when OPENROUTER_API_KEY is set', () => {
     process.env.OPENROUTER_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(strategy.getModelArgs('openai/gpt-5.4')).toEqual([
       '--model',
       'openrouter/openai/gpt-5.4',
@@ -626,7 +642,7 @@ describe('OpencodeStrategy', () => {
 
   test('getModelArgs does not double-prefix when model already has openrouter/', () => {
     process.env.OPENROUTER_API_KEY = 'test-key';
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(strategy.getModelArgs('openrouter/openai/gpt-5.4')).toEqual([
       '--model',
       'openrouter/openai/gpt-5.4',
@@ -634,17 +650,17 @@ describe('OpencodeStrategy', () => {
   });
 
   test('getModelArgs returns empty array for empty model', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(strategy.getModelArgs('')).toEqual([]);
   });
 
   test('getModelArgs returns empty for undefined model', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     expect(strategy.getModelArgs('undefined')).toEqual([]);
   });
 
   test('interruptAgent does not throw', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     strategy.interruptAgent();
   });
 
@@ -666,7 +682,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('constructor with conversationDataDir', () => {
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'conv-data'),
       getEncryptionKey: () => undefined,
     });
@@ -674,7 +690,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('getModelArgs auto-prefixes when stored OpenRouter key is active', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const conn = makeConnection();
     strategy.executeAuth(conn);
     strategy.submitAuthCode('sk-or-test-openrouter-key');
@@ -693,7 +709,7 @@ describe('OpencodeStrategy', () => {
       }),
     );
 
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     const args = strategy.getModelArgs('openai/gpt-5.4');
     expect(args).toEqual(['--model', 'openai/gpt-5.4']);
   });
@@ -709,7 +725,7 @@ describe('OpencodeStrategy', () => {
     const argsPath = join(TEST_HOME, 'opencode-default-args.json');
     process.env.OPENCODE_FAKE_ARGS_PATH = argsPath;
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'default-transport-conv'),
       getEncryptionKey: () => undefined,
     });
@@ -726,7 +742,7 @@ describe('OpencodeStrategy', () => {
   });
 
   test('clearCredentials is safe when no auth file exists', () => {
-    const strategy = new OpencodeStrategy();
+    const strategy = makeStrategy();
     strategy.clearCredentials();
   });
 
@@ -746,7 +762,7 @@ describe('OpencodeStrategy', () => {
     mkdirSync(workspaceDir, { recursive: true });
     writeFileSync(join(convDir, '.opencode_session'), 'legacy');
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => convDir,
       getEncryptionKey: () => undefined,
     });
@@ -793,7 +809,7 @@ describe('OpencodeStrategy', () => {
     const envPath = join(TEST_HOME, 'opencode-env.json');
     process.env.OPENCODE_FAKE_ENV_PATH = envPath;
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'mcp-config-conv'),
       getEncryptionKey: () => undefined,
     });
@@ -826,7 +842,7 @@ describe('OpencodeStrategy', () => {
       process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = responseMode;
       const requestsPath = join(TEST_HOME, 'structured-requests.jsonl');
       process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
-      const strategy = new OpencodeStrategy({ getConversationDataDir: () => join(TEST_HOME, 'structured-data'), getEncryptionKey: () => undefined });
+      const strategy = makeStrategy({ getConversationDataDir: () => join(TEST_HOME, 'structured-data'), getEncryptionKey: () => undefined });
       const responseFormat = { type: 'json_schema' as const, schema: { type: 'object' } };
       const output: unknown[] = [];
       await strategy.executePromptStreaming('extract', '', () => undefined, { onStructuredOutput: (value) => output.push(value) }, undefined, { responseFormat });
@@ -851,7 +867,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
     const defaultDir = join(TEST_HOME, 'default-data');
     const convDir = join(TEST_HOME, 'conversation-data');
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => convDir,
       getDefaultConversationDataDir: () => defaultDir,
       getConversationId: () => 'conversation-a',
@@ -914,7 +930,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_EVENT_ORDER = 'snapshot-first';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'snapshot-first-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'conversation-snapshot-first',
@@ -939,7 +955,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_MESSAGE = 'sse-only response';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () =>
         join(TEST_HOME, 'null-message-response-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
@@ -965,7 +981,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_MESSAGE = 'delayed sse response';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () =>
         join(TEST_HOME, 'delayed-null-message-response-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
@@ -991,7 +1007,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_MESSAGE = 'sse post hang response';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () =>
         join(TEST_HOME, 'hanging-message-post-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
@@ -1018,7 +1034,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '50';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'output-no-idle-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'output-no-idle',
@@ -1046,7 +1062,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_MESSAGE = 'json response before idle';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () =>
         join(TEST_HOME, 'response-before-idle-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
@@ -1075,7 +1091,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_FAKE_MESSAGE = 'json response before delayed error';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () =>
         join(TEST_HOME, 'response-before-session-error-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
@@ -1119,7 +1135,7 @@ describe('OpencodeStrategy', () => {
       join(convDir, '.opencode_session'),
       'ses_existingOpenCodeSession',
     );
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => convDir,
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'empty-no-idle',
@@ -1146,7 +1162,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '1000';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'session-error-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'session-error',
@@ -1172,7 +1188,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '2000';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'provider-log-quota-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'provider-log-quota',
@@ -1204,7 +1220,7 @@ describe('OpencodeStrategy', () => {
     process.env.OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = '2000';
     process.env.ANTHROPIC_API_KEY = 'test-key';
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () =>
         join(TEST_HOME, 'structured-session-quota-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
@@ -1238,7 +1254,7 @@ describe('OpencodeStrategy', () => {
     const requestsPath = join(TEST_HOME, 'opencode-sequential-requests.jsonl');
     process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'opencode-sequential-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'opencode-sequential',
@@ -1289,6 +1305,144 @@ describe('OpencodeStrategy', () => {
     ).toBe(true);
   });
 
+  function appServerFixture() {
+    const fakeBinDir = join(TEST_HOME, 'fake-bin');
+    mkdirSync(fakeBinDir, { recursive: true });
+    writeFakeOpencode(join(fakeBinDir, 'opencode'));
+    process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
+    process.env.OPENCODE_AGENT_TRANSPORT = 'app-server';
+    process.env.OPENAI_API_KEY = 'test-key';
+
+    const requestsPath = join(TEST_HOME, 'lifecycle-requests.jsonl');
+    process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
+    const requests = (): Array<{ type?: string; pid?: number; sessionID?: string; path?: string }> =>
+      readFileSync(requestsPath, 'utf8').trim().split('\n').map((line) => JSON.parse(line));
+    const pids = () => requests().flatMap((request) => request.pid ?? []);
+    const data = {
+      getConversationDataDir: () => join(TEST_HOME, 'lifecycle-conv'),
+      getConversationId: () => 'lifecycle',
+    };
+    return { data, requests, pids };
+  }
+
+  const model = 'openai/gpt-4o-mini';
+  const noChunk = () => undefined;
+
+  test('reuses one server across turns and connection strategies for the same conversation', async () => {
+    const { data, requests, pids } = appServerFixture();
+    const registry = new StrategyRegistryService({} as never);
+    const previousProvider = process.env.AGENT_PROVIDER;
+    process.env.AGENT_PROVIDER = 'opencode';
+    try {
+      const first = registry.resolveStrategy(data);
+      const second = registry.resolveStrategy(data);
+      expect(first).not.toBe(second);
+      const chunks: string[] = [];
+      await first.executePromptStreaming('first turn', model, (chunk) => chunks.push(chunk));
+      first.interruptAgent?.(); // An idle WebSocket disconnect must leave the server usable.
+      await second.executePromptStreaming('second turn', model, (chunk) => chunks.push(chunk));
+
+      expect(pids()).toHaveLength(1);
+      const sent = requests().filter((request) => request.type === 'message-body');
+      expect(sent.map((request) => request.sessionID)).toEqual([
+        'ses_fakeOpenCodeSession',
+        'ses_fakeOpenCodeSession',
+      ]);
+      expect(chunks.join('')).toBe('fake app-server responsefake app-server response');
+      expect(requests().filter((request) => request.type === 'create-session-body')).toHaveLength(1);
+    } finally {
+      await registry.onModuleDestroy();
+      if (previousProvider === undefined) delete process.env.AGENT_PROVIDER;
+      else process.env.AGENT_PROVIDER = previousProvider;
+    }
+  });
+
+  test('restarts on model, MCP, native auth and workspace config changes', async () => {
+    const { data, pids, requests } = appServerFixture();
+    const strategy = makeStrategy(data);
+    const send = (modelName: string) => strategy.executePromptStreaming('prompt', modelName, noChunk);
+    await send(model);
+    const otherModel = 'openai/gpt-5.4';
+    await send(otherModel);
+    expect(pids()).toHaveLength(2);
+
+    process.env.OPENCODE_CONFIG_CONTENT = JSON.stringify({ mcp: { docker: { enabled: false } } });
+    await send(otherModel);
+    expect(pids()).toHaveLength(3);
+
+    const authDir = join(TEST_HOME, '.local', 'share', 'opencode');
+    mkdirSync(authDir, { recursive: true });
+    writeFileSync(join(authDir, 'auth.json'), JSON.stringify({ openai: { type: 'api', key: 'another-key' } }));
+    await send(otherModel);
+    expect(pids()).toHaveLength(4);
+
+    writeFileSync(join(strategy.getWorkingDir(), 'opencode.json'), JSON.stringify({ autoupdate: false }));
+    await send(otherModel);
+    expect(pids()).toHaveLength(5);
+    expect(new Set(pids()).size).toBe(5);
+    expect(requests().filter((request) => request.type === 'create-session-body')).toHaveLength(1);
+  });
+
+  test('restarts a crashed server and resumes the saved session', async () => {
+    const { data, requests, pids } = appServerFixture();
+    const strategy = makeStrategy(data);
+    await strategy.executePromptStreaming('first turn', model, noChunk);
+    const [pid] = pids();
+    process.kill(pid, 'SIGKILL');
+    while (true) {
+      try {
+        process.kill(pid, 0);
+      } catch (error) {
+        expect((error as NodeJS.ErrnoException).code).toBe('ESRCH');
+        break;
+      }
+      await Bun.sleep(10);
+    }
+
+    await strategy.executePromptStreaming('second turn', model, noChunk);
+    expect(pids()).toHaveLength(2);
+    expect(requests().filter((request) => request.type === 'create-session-body')).toHaveLength(1);
+    expect(requests().filter((request) => request.path === '/session/ses_fakeOpenCodeSession')).toHaveLength(1);
+  });
+
+  test('interrupts a reused turn, sends the abort request and releases its server', async () => {
+    const { data, requests, pids } = appServerFixture();
+    process.env.OPENCODE_FAKE_MESSAGE_RESPONSE = 'second-turn-hangs';
+    const strategy = makeStrategy(data);
+    await strategy.executePromptStreaming('first turn', model, noChunk);
+    let receivedOutput!: () => void;
+    const visibleOutput = new Promise<void>((resolve) => { receivedOutput = resolve; });
+    const turn = strategy.executePromptStreaming('second turn', model, receivedOutput);
+    void turn.catch(() => undefined);
+    await visibleOutput;
+    expect(pids()).toHaveLength(1);
+    strategy.interruptAgent();
+
+    await expect(turn).rejects.toThrow('INTERRUPTED');
+    expect(requests().filter((request) => request.type === 'abort')).toHaveLength(1);
+    expect(() => process.kill(pids()[0], 0)).toThrow();
+    await strategy.executePromptStreaming('third turn', model, noChunk);
+    expect(pids()).toHaveLength(2);
+  });
+
+  test('stops the reusable server on application shutdown', async () => {
+    const { data, pids } = appServerFixture();
+    const registry = new StrategyRegistryService({} as never);
+    const previousProvider = process.env.AGENT_PROVIDER;
+    process.env.AGENT_PROVIDER = 'opencode';
+    try {
+      await registry.resolveStrategy(data).executePromptStreaming('start', model, noChunk);
+      const [pid] = pids();
+      expect(process.kill(pid, 0)).toBe(true);
+      await registry.onModuleDestroy();
+      expect(() => process.kill(pid, 0)).toThrow();
+    } finally {
+      await registry.onModuleDestroy();
+      if (previousProvider === undefined) delete process.env.AGENT_PROVIDER;
+      else process.env.AGENT_PROVIDER = previousProvider;
+    }
+  });
+
   test('executePromptStreaming ignores replayed app-server events before the current user turn', async () => {
     const fakeBinDir = join(TEST_HOME, 'fake-bin');
     mkdirSync(fakeBinDir, { recursive: true });
@@ -1301,7 +1455,7 @@ describe('OpencodeStrategy', () => {
     const requestsPath = join(TEST_HOME, 'opencode-replay-requests.jsonl');
     process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'opencode-replay-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'opencode-replay',
@@ -1349,7 +1503,7 @@ describe('OpencodeStrategy', () => {
       join(convDir, '.opencode_session'),
       'ses_staleOpenCodeSession',
     );
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => convDir,
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'conversation-b',
@@ -1378,7 +1532,7 @@ describe('OpencodeStrategy', () => {
     const requestsPath = join(TEST_HOME, 'opencode-steer-requests.jsonl');
     process.env.OPENCODE_FAKE_REQUESTS_PATH = requestsPath;
 
-    const strategy = new OpencodeStrategy({
+    const strategy = makeStrategy({
       getConversationDataDir: () => join(TEST_HOME, 'steer-conv'),
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'conversation-c',
@@ -1448,7 +1602,8 @@ describe('OpencodeStrategy app-server SSE filtering', () => {
     process.env.PATH = `${fakeBinDir}:${process.env.PATH ?? ''}`;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    await stopStrategies();
     for (const k of filterEnvKeys) {
       if (savedFilterEnv[k] === undefined) delete process.env[k];
       else process.env[k] = savedFilterEnv[k];
@@ -1458,7 +1613,7 @@ describe('OpencodeStrategy app-server SSE filtering', () => {
   });
 
   function makeFilterStrategy(convDir: string) {
-    return new OpencodeStrategy({
+    return makeStrategy({
       getConversationDataDir: () => convDir,
       getDefaultConversationDataDir: () => join(TEST_HOME, 'default-data'),
       getConversationId: () => 'filter-test-conv',

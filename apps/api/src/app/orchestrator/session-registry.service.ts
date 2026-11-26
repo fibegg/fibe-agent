@@ -224,10 +224,15 @@ export class SessionRegistryService {
     this.broadcastSessionCount();
   }
 
+  stopConversationRuntime(conversationId: string): void {
+    this.strategyRegistry.stopConversationRuntime(conversationId);
+  }
+
   destroyConversation(conversationId: string): void {
     for (const ctx of this.sessionsForConversation(conversationId)) {
       this.destroy(ctx.sessionId);
     }
+    this.strategyRegistry.stopConversationRuntime(conversationId, true);
     this.sequences.delete(conversationId);
   }
 

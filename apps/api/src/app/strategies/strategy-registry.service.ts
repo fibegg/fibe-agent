@@ -1,11 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, type OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '../config/config.service';
 import { AntigravityStrategy } from './antigravity.strategy';
 import { ClaudeSdkStrategy } from './claude-sdk.strategy';
 import { CursorStrategy } from './cursor.strategy';
 import { GeminiStrategy } from './gemini.strategy';
 import { MockStrategy } from './mock.strategy';
-import { OpencodeStrategy } from './opencode.strategy';
+import { OpencodeAppServer, OpencodeStrategy } from './opencode.strategy';
 import { OpenaiCodexStrategy } from './openai-codex.strategy';
 import type { AgentStrategy, ConversationDataDirProvider } from './strategy.types';
 
@@ -37,7 +37,33 @@ function resolveAuthMode(): AuthMode {
 }
 
 @Injectable()
-export class StrategyRegistryService {
+export class StrategyRegistryService implements OnModuleDestroy {
+  private readonly opencodeServers = new Map<string, OpencodeAppServer>();
+
+  async onModuleDestroy(): Promise<void> {
+    await this.stopOpencodeServers();
+  }
+
+  stopConversationRuntime(conversationId: string, removed = false): void {
+    void this.opencodeServers.get(conversationId)?.stop();
+    if (removed) this.opencodeServers.delete(conversationId);
+  }
+
+  private async stopOpencodeServers(): Promise<void> {
+    await Promise.all([...this.opencodeServers.values()].map((server) => server.stop()));
+  }
+
+  private resolveOpencodeStrategy(conversationDataDir: ConversationDataDirProvider): OpencodeStrategy {
+    const conversationId = conversationDataDir.getConversationId?.();
+    if (!conversationId) return new OpencodeStrategy(conversationDataDir);
+    let server = this.opencodeServers.get(conversationId);
+    if (!server) {
+      server = new OpencodeAppServer();
+      this.opencodeServers.set(conversationId, server);
+    }
+    return new OpencodeStrategy(conversationDataDir, server, () => { void this.stopOpencodeServers(); });
+  }
+
   constructor(private readonly config: ConfigService) {}
 
   resolveStrategy(conversationDataDir: ConversationDataDirProvider = this.config): AgentStrategy {
@@ -62,7 +88,7 @@ export class StrategyRegistryService {
         return new OpenaiCodexStrategy(useApiToken, conversationDataDir);
       case 'opencode':
       case 'opencodex':
-        return new OpencodeStrategy(conversationDataDir);
+        return this.resolveOpencodeStrategy(conversationDataDir);
       default:
         throw new Error(
           `Unknown AGENT_PROVIDER: '${providerName}'. Available: ${PROVIDER_NAMES.join(', ')}`

@@ -16,6 +16,7 @@ export interface HttpAppServerOptions extends Omit<SpawnOptionsWithoutStdio, 'st
   startupTimeoutMs?: number;
   healthRequestTimeoutMs?: number;
   requestTimeoutMs?: number;
+  terminateProcessGroup?: boolean;
 }
 
 export interface JsonRequestOptions {
@@ -26,12 +27,18 @@ export interface JsonRequestOptions {
   timeoutMs?: number;
 }
 
+const OUTPUT_TAIL_LENGTH = 8_192;
+const STOP_GRACE_MS = 1_000;
+
 export class HttpAppServerProcess {
   private proc: ChildProcess | null = null;
   private port: number | null = null;
   private stopping = false;
+  private closed = Promise.resolve();
+  private killTimer?: NodeJS.Timeout;
   private stdoutBuffer = '';
   private stderrBuffer = '';
+  private readonly closeHandlers = new Set<() => void>();
   private readonly outputHandlers = new Set<(output: HttpAppServerOutput) => void>();
 
   constructor(
@@ -40,41 +47,66 @@ export class HttpAppServerProcess {
     private readonly options: HttpAppServerOptions = {},
   ) {}
 
+  isRunning(): boolean {
+    return !this.stopping && !!this.proc?.pid &&
+      this.proc.exitCode === null && this.proc.signalCode === null;
+  }
+
   async start(): Promise<void> {
     if (this.proc) return;
+    const { terminateProcessGroup, ...options } = this.options;
+    if (terminateProcessGroup && this.stopping) throw new Error('HTTP app-server was stopped');
 
-    this.port = await this.findFreePort(this.options.host ?? '127.0.0.1');
-    const args = typeof this.args === 'function' ? this.args(this.port) : this.args;
+    this.port = await this.findFreePort(options.host ?? '127.0.0.1');
+    if (terminateProcessGroup && this.stopping) throw new Error('HTTP app-server was stopped');
     this.stopping = false;
     this.stdoutBuffer = '';
     this.stderrBuffer = '';
-    this.proc = spawn(this.command, args, {
-      ...this.options,
+    const args = typeof this.args === 'function' ? this.args(this.port) : this.args;
+    const proc = spawn(this.command, args, {
+      ...options,
+      ...(terminateProcessGroup ? { detached: process.platform !== 'win32' } : {}),
       shell: false,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
+    this.proc = proc;
 
-    this.proc.stdout?.on('data', (chunk: Buffer | string) => {
+    proc.stdout?.on('data', (chunk: Buffer | string) => {
       const text = chunk.toString();
-      this.stdoutBuffer += text;
+      this.stdoutBuffer = (this.stdoutBuffer + text).slice(-OUTPUT_TAIL_LENGTH);
       this.emitOutput({ stream: 'stdout', text });
     });
-    this.proc.stderr?.on('data', (chunk: Buffer | string) => {
+    proc.stderr?.on('data', (chunk: Buffer | string) => {
       const text = chunk.toString();
-      this.stderrBuffer += text;
+      this.stderrBuffer = (this.stderrBuffer + text).slice(-OUTPUT_TAIL_LENGTH);
       this.emitOutput({ stream: 'stderr', text });
     });
-    this.proc.on('error', (err) => {
+    proc.on('error', (err) => {
       this.options.logger?.warn?.(`HTTP app-server process error: ${err.message}`);
     });
-    this.proc.on('close', (code, signal) => {
-      if (!this.stopping) {
-        const detail = this.stderrBuffer.trim() || this.stdoutBuffer.trim();
-        this.options.logger?.warn?.(
-          `HTTP app-server exited unexpectedly with ${signal ?? `code ${code}`}${detail ? `: ${detail}` : ''}`,
-        );
-      }
-      this.proc = null;
+    if (terminateProcessGroup) {
+      proc.once('exit', (code, signal) => {
+        if (!this.stopping) {
+          this.warnUnexpectedExit(code, signal);
+          void this.close();
+        }
+      });
+    }
+    this.closed = new Promise<void>((resolve) => {
+      proc.once('close', (code, signal) => {
+        if (terminateProcessGroup) {
+          clearTimeout(this.killTimer);
+          // The leader can exit before a local MCP child in its process group.
+          this.signalProcess(proc, 'SIGKILL');
+        }
+        if (this.proc === proc) {
+          if (!this.stopping) this.warnUnexpectedExit(code, signal);
+          this.proc = null;
+          this.stopping = true;
+        }
+        resolve();
+        for (const handler of this.closeHandlers) handler();
+      });
     });
 
     await this.waitForHealthy();
@@ -84,6 +116,13 @@ export class HttpAppServerProcess {
     this.outputHandlers.add(handler);
     return () => {
       this.outputHandlers.delete(handler);
+    };
+  }
+
+  onClose(handler: () => void): () => void {
+    this.closeHandlers.add(handler);
+    return () => {
+      this.closeHandlers.delete(handler);
     };
   }
 
@@ -102,7 +141,11 @@ export class HttpAppServerProcess {
   }
 
   async json<T>(path: string, options: JsonRequestOptions = {}): Promise<T> {
-    await this.start();
+    if (this.options.terminateProcessGroup) {
+      if (!this.isRunning()) throw new Error('HTTP app-server is not running');
+    } else {
+      await this.start();
+    }
     const controller = new AbortController();
     const abortFromCaller = () => controller.abort(options.signal?.reason);
     if (options.signal?.aborted) abortFromCaller();
@@ -139,10 +182,47 @@ export class HttpAppServerProcess {
     }
   }
 
-  close(signal: NodeJS.Signals = 'SIGTERM'): void {
-    this.stopping = true;
-    if (this.proc && !this.proc.killed) this.proc.kill(signal);
-    this.proc = null;
+  close(signal: NodeJS.Signals = 'SIGTERM'): Promise<void> {
+    if (!this.options.terminateProcessGroup) {
+      this.stopping = true;
+      if (this.proc && !this.proc.killed) this.proc.kill(signal);
+      this.proc = null;
+      return Promise.resolve();
+    }
+    if (!this.stopping) {
+      this.stopping = true;
+      const proc = this.proc;
+      if (proc?.pid) {
+        this.signalProcess(proc, signal);
+        this.killTimer = setTimeout(
+          () => this.signalProcess(proc, 'SIGKILL'),
+          STOP_GRACE_MS,
+        );
+      }
+    }
+    return this.closed;
+  }
+
+  private warnUnexpectedExit(code: number | null, signal: NodeJS.Signals | null): void {
+    const detail = this.options.terminateProcessGroup
+      ? ''
+      : this.stderrBuffer.trim() || this.stdoutBuffer.trim();
+    this.options.logger?.warn?.(
+      `HTTP app-server exited unexpectedly with ${signal ?? `code ${code}`}${detail ? `: ${detail}` : ''}`,
+    );
+  }
+
+  private signalProcess(proc: ChildProcess, signal: NodeJS.Signals): void {
+    if (!proc.pid) return;
+    if (process.platform === 'win32') {
+      if (proc.exitCode === null && proc.signalCode === null) proc.kill(signal);
+      return;
+    }
+    try {
+      process.kill(-proc.pid, signal);
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code !== 'ESRCH') throw err;
+    }
   }
 
   private async waitForHealthy(): Promise<void> {
@@ -153,12 +233,12 @@ export class HttpAppServerProcess {
     let lastError: unknown;
 
     while (Date.now() - startedAt < timeoutMs) {
-      if (!this.proc) break;
+      if (!this.proc || (this.options.terminateProcessGroup && !this.isRunning())) break;
       const remainingMs = timeoutMs - (Date.now() - startedAt);
       const requestTimeoutMs = Math.max(1, Math.min(healthRequestTimeoutMs, remainingMs));
       try {
         const res = await this.fetchHealth(this.url(healthPath), requestTimeoutMs);
-        if (res.ok) return;
+        if (res.ok && (!this.options.terminateProcessGroup || this.isRunning())) return;
         lastError = new Error(`health check returned ${res.status}`);
       } catch (err) {
         lastError = err;
@@ -167,7 +247,7 @@ export class HttpAppServerProcess {
     }
 
     const detail = this.stderrBuffer.trim() || this.stdoutBuffer.trim();
-    this.close();
+    await this.close();
     const suffix = detail ? `: ${detail}` : '';
     throw new Error(`Timed out waiting for HTTP app-server health${suffix || (lastError ? `: ${String(lastError)}` : '')}`);
   }

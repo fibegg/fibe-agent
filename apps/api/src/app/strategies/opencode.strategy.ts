@@ -1,5 +1,6 @@
 import { assertStructuredOutputSupport } from './structured-output';
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import {
   existsSync,
   mkdirSync,
@@ -37,6 +38,7 @@ const PLAYGROUND_DIR = join(process.cwd(), 'playground');
 const OPENCODE_WORKSPACE_SUBDIR = 'opencode_workspace';
 const SESSION_MARKER_FILE = '.opencode_session';
 const OPENCODE_CONFIG_FILE = 'opencode.json';
+const DOCKER_MCP_BINARY = '/usr/local/bin/mcp-server-docker';
 const OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS = 120_000;
 const OPENCODE_APP_SERVER_TURN_TIMEOUT_MS = 60 * 1000;
 const OPENCODE_APP_SERVER_TURN_TIMEOUT_ENV =
@@ -372,14 +374,81 @@ interface OpenCodeEventState {
   messageRoleById: Map<string, string>;
 }
 
+/** Owns the process across connection sessions for one conversation. */
+export class OpencodeAppServer {
+  private current: { fingerprint: string; process: HttpAppServerProcess } | null = null;
+  private closing = Promise.resolve();
+
+  reuse(fingerprint: string): HttpAppServerProcess | undefined {
+    if (this.current?.fingerprint === fingerprint && this.current.process.isRunning()) {
+      return this.current.process;
+    }
+    return undefined;
+  }
+
+  replace(fingerprint: string, process: HttpAppServerProcess): Promise<void> {
+    const closing = this.stop();
+    this.current = { fingerprint, process };
+    return closing;
+  }
+
+  stop(process = this.current?.process): Promise<void> {
+    if (process && process === this.current?.process) {
+      this.current = null;
+      this.closing = Promise.all([this.closing, process.close()]).then(() => undefined);
+    }
+    return this.closing;
+  }
+}
+
+function appServerFingerprint(cwd: string, model: string, env: NodeJS.ProcessEnv): string {
+  const home = env.HOME ?? '/home/node';
+  const userConfig = join(env.XDG_CONFIG_HOME || join(home, '.config'), 'opencode');
+  const userData = join(env.XDG_DATA_HOME || join(home, '.local', 'share'), 'opencode');
+  const files = new Set([
+    opencodeAuthFile(),
+    join(userData, 'auth.json'),
+    join(userData, 'mcp-auth.json'),
+    join(userConfig, 'config.json'),
+  ]);
+  const configDirs = [userConfig, env.OPENCODE_CONFIG_DIR];
+  for (let dir = resolve(cwd); dir !== dirname(dir); dir = dirname(dir)) {
+    configDirs.push(dir, join(dir, '.opencode'));
+  }
+  for (const dir of configDirs) {
+    if (!dir) continue;
+    files.add(resolve(cwd, dir, OPENCODE_CONFIG_FILE));
+    files.add(resolve(cwd, dir, 'opencode.jsonc'));
+  }
+  if (env.OPENCODE_CONFIG) files.add(resolve(cwd, env.OPENCODE_CONFIG));
+
+  const hash = createHash('sha256').update(
+    JSON.stringify([cwd, model, Object.entries(env).sort()]),
+  );
+  for (const file of files) {
+    try {
+      hash.update(JSON.stringify([file, createHash('sha256').update(readFileSync(file)).digest('hex')]));
+    } catch {
+      // A missing or unreadable file contributes no configuration.
+    }
+  }
+  return hash.digest('hex');
+}
+
 export class OpencodeStrategy extends AbstractCLIStrategy {
   private readonly paths: ProviderConversationPaths;
-  private appServer: HttpAppServerProcess | null = null;
+  private activeAppServer: HttpAppServerProcess | null = null;
+  private activeAppServerState: OpenCodeEventState | null = null;
+  private appServerAbort?: Promise<unknown>;
   private activeAppServerSessionId: string | null = null;
   private activeSseAbort: AbortController | null = null;
   private activePromptAbort: AbortController | null = null;
 
-  constructor(conversationDataDir?: ConversationDataDirProvider) {
+  constructor(
+    conversationDataDir?: ConversationDataDirProvider,
+    private readonly appServer = new OpencodeAppServer(),
+    private readonly stopAuthenticatedServers = () => { void this.shutdown(); },
+  ) {
     super(OpencodeStrategy.name, false, conversationDataDir);
     this.paths = new ProviderConversationPaths({
       conversationDataDir,
@@ -592,6 +661,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     if (existsSync(authFile)) {
       rmSync(authFile, { force: true });
     }
+    this.stopAuthenticatedServers();
   }
 
   executeLogout(connection: LogoutConnection): void {
@@ -700,6 +770,20 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     });
   }
 
+  private static useInstalledDockerMcp(env: NodeJS.ProcessEnv): void {
+    if (!existsSync(DOCKER_MCP_BINARY)) return;
+    const config = OpencodeStrategy.readConfigContent(env);
+    if (!OpencodeStrategy.isRecord(config.mcp)) return;
+    for (const server of Object.values(config.mcp)) {
+      if (!OpencodeStrategy.isRecord(server) || server.type !== 'local') continue;
+      const command = server.command;
+      if (Array.isArray(command) && command[0] === 'uvx' && command[1] === 'mcp-server-docker') {
+        server.command = [DOCKER_MCP_BINARY, ...command.slice(2)];
+      }
+    }
+    env.OPENCODE_CONFIG_CONTENT = JSON.stringify(config);
+  }
+
   private buildOpencodeEnv(): NodeJS.ProcessEnv {
     const env: NodeJS.ProcessEnv = {
       ...process.env,
@@ -725,6 +809,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
     }
     OpencodeStrategy.applyYoloConfigContent(env);
+    OpencodeStrategy.useInstalledDockerMcp(env);
     const storedAuth = this.getStoredAuth();
 
     if (storedAuth) {
@@ -783,18 +868,21 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     this.streamInterrupted = true;
     this.activeSseAbort?.abort();
     this.activePromptAbort?.abort();
-    const appServer = this.appServer;
+    const interrupted = new Error(INTERRUPTED_MESSAGE);
+    this.activeAppServerState?.rejectTurn(interrupted);
+    this.activeAppServerState?.rejectIdle(interrupted);
+    const appServer = this.activeAppServer;
     const sessionId = this.activeAppServerSessionId;
     if (appServer && sessionId) {
-      void appServer
+      this.appServerAbort ??= appServer
         .json(`/session/${encodeURIComponent(sessionId)}/abort`, {
           method: 'POST',
           query: this.appServerQuery(),
           timeoutMs: 5_000,
         })
         .catch(() => undefined);
-    } else {
-      this.shutdownAppServer();
+    } else if (appServer) {
+      void this.appServer.stop(appServer);
     }
     this.currentStreamProcess?.kill();
   }
@@ -846,6 +934,7 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         runtimeOptions,
       );
     }
+    void this.appServer.stop();
     return this.executePromptStreamingRun(
       prompt,
       model,
@@ -1083,10 +1172,13 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       finalPrompt = `[Operator Interruption]\n${pendingMessages}\n\n${prompt}`;
     }
 
-    const appServer = this.createAppServer();
     const turn = this.resolveAppServerTurn(model);
     const turnTimeoutMs = resolveOpencodeAppServerTurnTimeoutMs();
-    this.appServer = appServer;
+    const env = this.buildOpencodeEnv();
+    const fingerprint = appServerFingerprint(workspaceDir, turn.resolvedModel, env);
+    const reusedServer = this.appServer.reuse(fingerprint);
+    const appServer = reusedServer ?? this.createAppServer(workspaceDir, env);
+    this.activeAppServer = appServer;
     const state = this.createOpenCodeEventState(
       turn,
       finalPrompt,
@@ -1094,15 +1186,26 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       callbacks,
     );
 
+    this.activeAppServerState = state;
+    let completed = false;
     let eventStream: { stop: () => void; done: Promise<void> } | null = null;
     const unsubscribeAppServerOutput = appServer.onOutput((output) =>
       this.handleAppServerOutput(state, output),
     );
-    let existingSessionId = this.readStoredSession();
+    const unsubscribeAppServerClose = appServer.onClose(() => {
+      const error = new Error('OpenCode app-server exited during the turn');
+      state.rejectTurn(error);
+      state.rejectIdle(error);
+    });
+    const existingSessionId = this.readStoredSession();
     try {
-      this.logAppServerPhase(state, 'starting');
+      this.logAppServerPhase(state, reusedServer ? 'reused' : 'starting');
       try {
-        await appServer.start();
+        if (!reusedServer) {
+          await this.appServer.replace(fingerprint, appServer);
+          await appServer.start();
+          this.logAppServerPhase(state, 'started');
+        }
       } catch (err) {
         const message = errorMessage(err);
         if (/\b(?:timed out|timeout)\b/i.test(message)) {
@@ -1114,13 +1217,13 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
           `OpenCode app-server startup failed for ${this.describeAppServerTurn(state)}: ${sanitizeLogValue(message)}`,
         );
       }
-      this.logAppServerPhase(state, 'started');
       eventStream = await this.openAppServerEventStream(appServer, state);
       this.logAppServerPhase(state, 'event_stream_connected');
       const sessionId = await this.ensureAppServerSession(
         appServer,
         existingSessionId,
       );
+      if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
       state.sessionId = sessionId;
       this.activeAppServerSessionId = sessionId;
       this.logAppServerPhase(state, 'session_ready');
@@ -1170,8 +1273,10 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
       if (runtimeOptions?.responseFormat) callbacks?.onStructuredOutput?.(state.structuredOutput);
       this.writeStoredSession(sessionId);
+      completed = true;
       this.logAppServerPhase(state, 'turn_complete');
     } catch (err) {
+      if (this.streamInterrupted) throw new Error(INTERRUPTED_MESSAGE);
       const message = err instanceof Error ? err.message : String(err);
       this.logAppServerPhase(
         state,
@@ -1188,21 +1293,25 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
       }
       if (existingSessionId && missingSessionError(message)) {
         this.clearStoredSession();
-        existingSessionId = null;
       }
       throw err;
     } finally {
       unsubscribeAppServerOutput();
+      unsubscribeAppServerClose();
       eventStream?.stop();
       await eventStream?.done.catch(() => undefined);
       this.activeSseAbort = null;
       this.activePromptAbort = null;
+      await this.appServerAbort;
+      this.appServerAbort = undefined;
       this.activeAppServerSessionId = null;
-      this.shutdownAppServer();
+      this.activeAppServerState = null;
+      this.activeAppServer = null;
+      if (!completed || this.streamInterrupted) await this.appServer.stop(appServer);
     }
   }
 
-  private createAppServer(): HttpAppServerProcess {
+  private createAppServer(cwd: string, env: NodeJS.ProcessEnv): HttpAppServerProcess {
     return new HttpAppServerProcess(
       'opencode',
       (port) => [
@@ -1216,10 +1325,11 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
         '--print-logs',
       ],
       {
-        env: this.buildOpencodeEnv(),
-        cwd: this.getWorkingDir(),
+        env,
+        cwd,
         logger: this.logger,
         healthPath: '/global/health',
+        terminateProcessGroup: true,
         startupTimeoutMs: 20_000,
         requestTimeoutMs: OPENCODE_APP_SERVER_REQUEST_TIMEOUT_MS,
       },
@@ -1858,9 +1968,8 @@ export class OpencodeStrategy extends AbstractCLIStrategy {
     };
   }
 
-  private shutdownAppServer(): void {
-    this.appServer?.close();
-    this.appServer = null;
+  shutdown(): Promise<void> {
+    return this.appServer.stop();
   }
 
   hasNativeSessionSupport(): boolean {

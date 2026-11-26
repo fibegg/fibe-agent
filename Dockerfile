@@ -343,6 +343,15 @@ RUN if [ "$AGENT_PROVIDER" = "gemini" ]; then \
     mkdir -p /home/node/.gemini/antigravity-cli && chown -R node:node /home/node/.gemini; \
     fi
 
+# The stock OpenCode Docker MCP command uses the baked tool and its Python 3.12 runtime.
+RUN --mount=type=cache,target=/root/.cache/uv set -eu; \
+    if [ "$AGENT_PROVIDER" = "opencode" ]; then \
+      version="$(node -p 'require("/usr/local/share/fibe/provider-versions.json").dockerMcp.version')"; \
+      UV_PYTHON_INSTALL_DIR=/opt/fibe/uv-python UV_TOOL_DIR=/opt/fibe/uv-tools UV_TOOL_BIN_DIR=/usr/local/bin \
+        uv tool install --managed-python --python 3.12 "mcp-server-docker==$version"; \
+      test -x /usr/local/bin/mcp-server-docker; \
+    fi
+
 # Doing this LAST ensures code changes don't bust the Playwright/native cache
 COPY --link --from=builder /app/apps/api/dist ./dist/
 COPY --link --from=builder /app/apps/chat/dist ./chat/

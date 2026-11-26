@@ -20,6 +20,7 @@ function makeStrategy(): AgentStrategy {
 function makeStrategyRegistry(): StrategyRegistryService {
   return {
     resolveStrategy: vi.fn().mockImplementation(makeStrategy),
+    stopConversationRuntime: vi.fn(),
   } as unknown as StrategyRegistryService;
 }
 
