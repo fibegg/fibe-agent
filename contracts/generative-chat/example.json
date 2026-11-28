@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "text": "## Playgrounds\n\nSnapshot of the two Playgrounds accessible on this Host.\n\n| Name | Status |\n| --- | --- |\n| Orion | Running |\n| Lyra | Stopped |\n\nOnly this Host was queried; this is not an account-wide list. These are saved results, not live status. [Open Fibe](https://next-next.fibe.live).",
+  "text": "## Playgrounds\n\nSnapshot of the two Playgrounds accessible on this Host.\n\n| Name | Status |\n| --- | --- |\n| Orion | Running |\n| Lyra | Stopped |\n\nOnly this Host was queried; this is not an account-wide list. These are saved results, not live status. [Open example link](https://example.org/).",
   "a2uiMessages": [
     {
       "version": "1.0",
@@ -188,7 +188,7 @@
               "functionCall": {
                 "@call": "openUrl",
                 "args": {
-                  "url": "https://next-next.fibe.live"
+                  "url": "https://example.org/"
                 }
               }
             }
@@ -196,7 +196,7 @@
           {
             "id": "linktext",
             "component": "Text",
-            "text": "Open Fibe",
+            "text": "Open example link",
             "variant": "body",
             "weight": 0
           }

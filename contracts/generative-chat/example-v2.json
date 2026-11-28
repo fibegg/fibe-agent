@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "text": "## Playground health\n\nSaved snapshot of three synthetic Playgrounds on this Host.\n\n- Running: 2 (+1 today)\n- Stopped: 1\n- Uptime: 99.2% over 7 days\n- Disk used: 62 of 100 GB\n\n| Name | Status | CPU |\n| --- | --- | --- |\n| Orion | Running | 42% |\n| Lyra | Stopped | 0% |\n| Vega | Running | 67% |\n\nAll checks passed. Only this Host was queried; this is not an account-wide list. [Open Fibe](https://next-next.fibe.live).",
+  "text": "## Playground health\n\nSaved snapshot of three synthetic Playgrounds on this Host.\n\n- Running: 2 (+1 today)\n- Stopped: 1\n- Uptime: 99.2% over 7 days\n- Disk used: 62 of 100 GB\n\n| Name | Status | CPU |\n| --- | --- | --- |\n| Orion | Running | 42% |\n| Lyra | Stopped | 0% |\n| Vega | Running | 67% |\n\nAll checks passed. Only this Host was queried; this is not an account-wide list. [Open example link](https://example.org/).",
   "a2uiMessages": [
     {
       "version": "1.0",
@@ -369,7 +369,7 @@
           {
             "id": "notes",
             "component": "Markdown",
-            "text": "- Values are **saved results**.\n- Open Fibe for live status."
+            "text": "- Values are **saved results**.\n- The example link opens a separate page."
           },
           {
             "id": "more",
@@ -408,7 +408,7 @@
               "functionCall": {
                 "@call": "openUrl",
                 "args": {
-                  "url": "https://next-next.fibe.live"
+                  "url": "https://example.org/"
                 }
               }
             }
@@ -416,7 +416,7 @@
           {
             "id": "linkText",
             "component": "Text",
-            "text": "Open Fibe",
+            "text": "Open example link",
             "size": "body",
             "weight": "semibold",
             "color": "default",
